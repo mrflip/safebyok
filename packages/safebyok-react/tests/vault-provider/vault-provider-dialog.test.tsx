@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type Outcome, type VaultError } from 'safebyok'
+import { Bank, isVaultError, type Vault, memoryDeviceDB, type Ask, type GetProof, type Outcome, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, useVault } from '../../src/vault-provider'
@@ -21,17 +21,17 @@ describe("VaultProvider", () => {
     expect(shownState()).to.eq('no vault')
   })
 
-  it("opens the vault for the signed-in user, settling into 'absent' with no dialog", async () => {
+  it("opens the vault for the signed-in user, born 'novel', with no dialog", async () => {
     const world = makeWorld()
     world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
     expect(screen.queryByText('Choose a vault passphrase')).to.be.null
   })
 
   it("summons the dialog for a call that needs the vault, and the call goes on once it unlocks (Contract: getProof, in React)", async () => {
     const world = makeWorld()
     world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
 
     fireEvent.click(screen.getByText('put'))
     const passphraseInput = await screen.findByPlaceholderText('vault passphrase')
@@ -53,7 +53,7 @@ describe("VaultProvider", () => {
         <Probe />
       </VaultProvider>,
     )
-    await waitFor(() => { expect(screen.getByTestId('state').textContent).to.eq('absent') })
+    await waitFor(() => { expect(screen.getByTestId('state').textContent).to.eq('novel') })
     fireEvent.click(screen.getByText('put'))
     await screen.findByPlaceholderText('vault passphrase')
     expect(screen.queryByText('Locks on this device in 15 minutes.')).to.not.be.null
@@ -62,7 +62,7 @@ describe("VaultProvider", () => {
   it("the dialog promises seven days when the vault was opened with the default window", async () => {
     const world = makeWorld()
     world.mount('u1')
-    await waitFor(() => { expect(screen.getByTestId('state').textContent).to.eq('absent') })
+    await waitFor(() => { expect(screen.getByTestId('state').textContent).to.eq('novel') })
     fireEvent.click(screen.getByText('put'))
     await screen.findByPlaceholderText('vault passphrase')
     expect(screen.queryByText('Locks on this device in 7 days.')).to.not.be.null
@@ -71,7 +71,7 @@ describe("VaultProvider", () => {
   it("once unlocked, further calls run without the dialog (Contract: ensureLease, Does 2)", async () => {
     const world = makeWorld()
     world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
     await putThroughNewVault('a fine passphrase')
 
     fireEvent.click(screen.getByText('grab'))
@@ -82,7 +82,7 @@ describe("VaultProvider", () => {
   it("a wrong passphrase keeps the dialog open with a calm gripe; the right one proceeds", async () => {
     const world = makeWorld()
     const first = world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
     await putThroughNewVault('the right one')
     first.unmount()
 
@@ -103,19 +103,19 @@ describe("VaultProvider", () => {
   it("dismissing the dialog refuses the call vault_locked, and nothing is stored (Contract: ensureLease, Does 3.5)", async () => {
     const world = makeWorld()
     world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
     fireEvent.click(screen.getByText('put'))
     await screen.findByPlaceholderText('vault passphrase')
     fireEvent.click(screen.getByText('Cancel'))
     await expectOutcome('dismissed')
-    expect(shownState()).to.eq('absent')
+    expect(shownState()).to.eq('novel')
     expect(screen.getByTestId('boxcount').textContent).to.eq('0')
   })
 
   it("a dialog that meets misuse keeps the app in place, and closing it answers declined: the call is refused vault_locked", async () => {
     const world = makeWorld()
     const first = world.mount('u1')
-    await expectShown('absent')
+    await expectShown('novel')
     await putThroughNewVault('the right one')
     first.unmount()
 
@@ -148,14 +148,14 @@ describe("VaultProvider", () => {
   // == [Its getProof]: one at a time, closing on a lock, sign-out and another user, the host's own getProof, no gesture
 
   describe("its getProof, the passphrase dialog", () => {
-    it("refuses a call vault_locked when the provider unmounts with the dialog open (Contract: ensureLease, Does 3.7)", async () => {
+    it("refuses a call vault_gone when the provider unmounts with the dialog open (Contract: ensureLease, Does 3.7)", async () => {
       const world = await lockedWorld()
       const { unmount } = render(world.tree('u1'))
       const vault = await world.opened()
       const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       unmount()
-      await TH.expectBad(reading, 'vault_locked')
+      await TH.expectBad(reading, 'vault_gone')
     })
 
     it("refuses a read vault_locked when the user dismisses the dialog, as VaultProvider's third example shows (Contract: ensureLease, Does 3.5)", async () => {
@@ -187,27 +187,27 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(eager.reading.outcome).to.eq('sk-fake') })
     })
 
-    it("refuses vault_locked when another user signs in, and shows that user no dialog", async () => {
+    it("refuses vault_gone when another user signs in, and shows that user no dialog", async () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
       const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree('u2'))
-      await TH.expectBad(reading, 'vault_locked')
+      await TH.expectBad(reading, 'vault_gone')
       await waitFor(() => { expect(world.latest().vault).to.not.be.null })
       expect(world.latest().vault).to.not.equal(vault)
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
-    it("refuses vault_locked when the user signs out, and the dialog goes", async () => {
+    it("refuses vault_gone when the user signs out, and the dialog goes", async () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
       const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree(null))
-      await TH.expectBad(reading, 'vault_locked')
+      await TH.expectBad(reading, 'vault_gone')
       await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
     })
 
@@ -246,10 +246,10 @@ describe("VaultProvider", () => {
       // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish: the
       // dialog is handed each ask through one whose attempt keeps what it starts.
       const attempts: Promise<Outcome<Vault>>[] = []
-      const make = Vault.make.bind(Vault)
-      vi.spyOn(Vault, 'make').mockImplementation((opts) => {
+      const make = Bank.make.bind(Bank)
+      vi.spyOn(Bank, 'make').mockImplementation((opts) => {
         const { getProof } = opts
-        if (getProof === undefined || getProof === null) { throw new Error("The provider hands every vault it makes a getProof.") }
+        if (getProof === undefined || getProof === null) { throw new Error("The provider hands every bank it makes a getProof.") }
         return make({ ...opts, getProof: async (ask) => {
           const attempt: Ask['attempt'] = (proof) => {
             const attempting = ask.attempt(proof)
@@ -301,7 +301,7 @@ describe("VaultProvider", () => {
       const elsewhere = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
       await elsewhere.unlock('pw')
       await elsewhere.putBox({ boxlabel: 'openai_api_key' }, 'sk-also-fake')
-      elsewhere.close()
+      TH.closeVault(elsewhere)
       await waitFor(() => { expect(vault.getSnapshot().boxes).to.have.lengthOf(2) })
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       await vault.lock()
@@ -332,7 +332,7 @@ describe("VaultProvider", () => {
       const other = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
       await other.unlock('pw2')
       await other.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-other-fake')
-      other.close()
+      TH.closeVault(other)
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       const { rerender } = render(world.tree('u1', slowDeriver))
@@ -398,9 +398,9 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const asked: string[] = []
       const answers: unknown[] = []
-      const made = vi.spyOn(Vault, 'make')
+      const made = vi.spyOn(Bank, 'make')
       // Rendered after the provider, so its layout effect runs after the provider's in the same
-      // commit: it asks through the getProof u1's vault was handed, as an ask raised then would.
+      // commit: it asks through the getProof u1's bank was handed, as an ask raised then would.
       const LateAsk = ({ userId }: { userId: string }) => {
         useLayoutEffect(() => {
           const [opts] = made.mock.calls[0] ?? []
@@ -432,7 +432,7 @@ describe("VaultProvider", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
-    it("throws a getProof that is no function to the error boundary, as Vault.make refuses it", async () => {
+    it("throws a getProof that is no function to the error boundary, as Bank.make refuses it", async () => {
       hushConsole()
       const world = makeWorld()
       const caught: unknown[] = []

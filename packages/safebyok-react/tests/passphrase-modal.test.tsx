@@ -8,7 +8,7 @@ import * as TH from './test-helpers'
 // == [Test helpers]: vaultInState, noop, Trouble, wordingOf, lockedVault, usernameField, renderUnlocking, others
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
-const vaultInState = (state: 'absent' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
+const vaultInState = (state: 'novel' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
 
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_answer: ProofAnswer) => undefined
@@ -69,7 +69,7 @@ describe("PassphraseModal", () => {
   // == [Basic flow and unlock failures]: a wrong passphrase, vault created on another device, any other failure
 
   it("tells a user choosing a passphrase that nobody can recover it", () => {
-    render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} onDone={noop} />)
+    render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} onDone={noop} />)
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     expect(screen.queryByText(/Nobody can recover it for you/)).to.not.be.null
     expect(screen.queryByText('Create vault')).to.not.be.null
@@ -143,11 +143,12 @@ describe("PassphraseModal", () => {
     })
   })
 
-  describe("a vault created on another device meanwhile", () => {
-    const Advice = 'A vault was just created for this label on another device, with a different passphrase than the one you entered. Enter the passphrase you chose there to unlock it.'
-    const createdElsewhere = () => TH.stubVault({
-      state:  'absent',
-      unlock: () => Promise.reject(new VaultError('created_elsewhere', Advice)),
+  describe("a vault whose first passphrase was set on another device meanwhile", () => {
+    const Advice = "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it."
+    const createdElsewhere = (tryHello?: TH.StubVaultOpts['tryHello']) => TH.stubVault({
+      state:  'novel',
+      unlock: () => Promise.reject(new VaultError('gate_made_elsewhere', Advice)),
+      ...(tryHello !== undefined && { tryHello }),
     })
 
     it("shows the vault's message as advice, quiet and not a gripe, in the live region, and not as a wrong passphrase", async () => {
@@ -170,6 +171,17 @@ describe("PassphraseModal", () => {
       expect(screen.getByRole('dialog')).to.not.be.null
     })
 
+    it("has the vault say hello, so that it reads the passphrase set there and shows locked", async () => {
+      const hello = vi.fn<NonNullable<TH.StubVaultOpts['tryHello']>>(() => Promise.resolve(TH.bad(new VaultError('storage_unavailable', 'Not now.'))))
+      render(<PassphraseModal ask={TH.askOf(createdElsewhere(hello))} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      expect(hello).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      expect(hello).toHaveBeenCalledOnce()
+      expect(screen.getByRole('dialog')).to.not.be.null
+    })
+
     it("empties the passphrase field and focuses it, for the passphrase chosen on the other device", async () => {
       render(<PassphraseModal ask={TH.askOf(createdElsewhere())} onDone={noop} />)
       const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
@@ -183,9 +195,9 @@ describe("PassphraseModal", () => {
     })
 
     it("keeps the advice through typing, and clears it at the next submit, replaced by that submit's outcome", async () => {
-      const outcomes = [new VaultError('created_elsewhere', Advice), new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')]
+      const outcomes = [new VaultError('gate_made_elsewhere', Advice), new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')]
       let tries = 0
-      const vault = TH.stubVault({ state: 'absent', unlock: () => Promise.reject(outcomes[tries++] ?? new Error('no more outcomes')) })
+      const vault = TH.stubVault({ state: 'novel', unlock: () => Promise.reject(outcomes[tries++] ?? new Error('no more outcomes')) })
       render(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
       fireEvent.click(screen.getByText('Create vault'))
@@ -201,24 +213,24 @@ describe("PassphraseModal", () => {
     it("turns, with a real vault that lost the race, into an unlock: the same field, emptied, focused, and asking for the current password", async () => {
       const store = memoryStore()
       const opts = TH.memoryVaultOpts({ vaultDB: localVaultDB({ store }) })
-      // Deaf to the other device's create, so that it is met only at this device's own write.
+      // Deaf to the other device's first gate, so that it is met only at this device's own write.
       const deafDB = localVaultDB({ store: { ...store, subscribe: neverRings } })
       const here = await TH.settledVault({ ...opts, vaultDB: deafDB })
       const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
-      TH.beforeNextCall(deafDB, 'ensureVault', () => there.unlock('pw one'))
+      TH.beforeNextCall(deafDB, 'putVaultProps', () => there.unlock('pw one'))
       render(<PassphraseModal ask={TH.askOf(here)} onDone={noop} />)
       const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
       fireEvent.change(field, { target: { value: 'pw two' } })
       fireEvent.click(screen.getByText('Create vault'))
-      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.match(/created for this label on another device/) })
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.match(/just set on another device/) })
       expect(screen.queryByText('Unlock your vault')).to.not.be.null
       expect(screen.getByPlaceholderText('vault passphrase')).to.equal(field)
       expect(field.value).to.eq('')
       expect(document.activeElement).to.equal(field)
       expect(field.getAttribute('autocomplete')).to.eq('current-password')
       expect(field.name).to.eq('current-password')
-      here.close()
-      there.close()
+      TH.closeVault(here)
+      TH.closeVault(there)
     })
 
     it("shows a wrong passphrase as a gripe still", async () => {
@@ -237,7 +249,7 @@ describe("PassphraseModal", () => {
       await maker.unlock('pw')
       await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
       await maker.lock()
-      maker.close()
+      TH.closeVault(maker)
       const host: { show: (dialog: ReactNode) => void } = { show: noopShow }
       const Host = () => {
         const [shown, setShown] = useState<ReactNode>(null)
@@ -252,7 +264,7 @@ describe("PassphraseModal", () => {
       await screen.findByPlaceholderText('vault passphrase')
       TH.submitPassphrase('pw')
       expect(await reading).to.eq('sk-fake')
-      vault.close()
+      TH.closeVault(vault)
     })
   })
 
@@ -274,7 +286,7 @@ describe("PassphraseModal", () => {
       const maker = await TH.settledVault(opts)
       await maker.unlock('pw')
       await maker.lock()
-      maker.close()
+      TH.closeVault(maker)
       const { vault, ask, ensuring } = await TH.askedBy(opts)
       const heard: ProofAnswer[] = []
       render(<PassphraseModal ask={ask} onDone={(answer) => { heard.push(answer) }} />)
@@ -282,7 +294,7 @@ describe("PassphraseModal", () => {
       expect(heard).to.deep.equal(['declined'])
       const { err } = await ensuring
       expect(err?.refusalkind).to.eq('vault_locked')
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("answers unlocked when the vault comes to be unlocked under it, as by unlock() elsewhere in the app", async () => {
@@ -291,7 +303,7 @@ describe("PassphraseModal", () => {
       render(<PassphraseModal ask={TH.askOf(vault)} onDone={(answer) => { heard.push(answer) }} />)
       await act(async () => { await vault.unlock('pw') })
       expect(heard).to.deep.equal(['unlocked'])
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("answers once, however many ways it is answered", async () => {
@@ -336,16 +348,16 @@ describe("PassphraseModal", () => {
     })
 
     it("meets misuse with a calm notice in the dialog, and reports the very error to React, leaving the page alone", async () => {
-      const closed = new VaultError('vault_closed', 'The vault was closed.')
+      const misuse = new VaultError('bad_option', 'This call was handed an option it does not take.')
       const heard: ProofAnswer[] = []
-      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(closed)))} onDone={(unlocked) => { heard.push(unlocked) }} /></TH.Catcher>)
+      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(misuse)))} onDone={(unlocked) => { heard.push(unlocked) }} /></TH.Catcher>)
       TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(screen.getByRole('alertdialog', { name: 'Something went wrong' }).textContent).to.match(Trouble)
-      expect(reported).to.deep.equal([closed])
-      expect(reported[0]).to.equal(closed)
+      expect(reported).to.deep.equal([misuse])
+      expect(reported[0]).to.equal(misuse)
       expect(screen.queryByText(/caught:/)).to.be.null
-      expect(screen.queryByText('The vault was closed.')).to.be.null
+      expect(screen.queryByText('This call was handed an option it does not take.')).to.be.null
       expect(heard).to.deep.equal([])
     })
 
@@ -361,7 +373,7 @@ describe("PassphraseModal", () => {
 
     it("closes as if dismissed when the user presses Escape on the notice", async () => {
       const heard: ProofAnswer[] = []
-      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'This call was handed an option it does not take.')))
       TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} onDone={(unlocked) => { heard.push(unlocked) }} />)
       TH.submitPassphrase('pw one')
       fireEvent.keyDown(await screen.findByRole('button', { name: 'Close' }), { key: 'Escape' })
@@ -414,7 +426,7 @@ describe("PassphraseModal", () => {
       expect(told.refusalkind).to.eq('unexpected_error')
       expect(told.message).to.not.include('pw-the-passphrase')
       expect(told.cause).to.be.undefined
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("meets a broken strength checker at Create with the calm trouble notice, reporting the vault's refusal to React, quoting nothing of the passphrase", async () => {
@@ -428,9 +440,9 @@ describe("PassphraseModal", () => {
       expect(reported).to.have.lengthOf(1)
       const told = reported[0] as VaultError
       expect(told.refusalkind).to.eq('unexpected_error')
-      expect(told.message).to.match(/strengthChecker handed to Vault\.make threw/)
+      expect(told.message).to.match(/strengthChecker handed to Bank\.make threw/)
       expect(TH.thrownText(told)).to.not.include('pw-the-passphrase')
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("closes its trouble notice as a lock lands, answering declined once, whatever its Close says after", async () => {
@@ -460,7 +472,7 @@ describe("PassphraseModal", () => {
       expect(heard).to.deep.equal(['unlocked'])
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       expect(heard).to.deep.equal(['unlocked'])
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("meets a rejection that is no Error at all the same way, as unexpected_error", async () => {
@@ -499,7 +511,7 @@ describe("PassphraseModal", () => {
         const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         render(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, true))).to.not.be.null
-        vault.close()
+        TH.closeVault(vault)
       })
 
       it(`${blurb}, on an ordinary unlock`, async () => {
@@ -508,7 +520,7 @@ describe("PassphraseModal", () => {
         await vault.lock()
         render(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, false))).to.not.be.null
-        vault.close()
+        TH.closeVault(vault)
       })
     }
 
@@ -555,7 +567,7 @@ describe("PassphraseModal", () => {
     it("keeps Escape on the trouble notice to itself, too", async () => {
       const hostHeard: string[] = []
       const hostListener = (evt: KeyboardEvent) => { hostHeard.push(evt.key) }
-      TH.renderReporting(<PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.'))))} onDone={noop} />)
+      TH.renderReporting(<PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'This call was handed an option it does not take.'))))} onDone={noop} />)
       TH.submitPassphrase('pw one')
       const close = await screen.findByRole('button', { name: 'Close' })
       document.addEventListener('keydown', hostListener)
@@ -574,11 +586,11 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
       const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
-      elsewhere.close()
+      TH.closeVault(elsewhere)
       // A read begun after the other device's writes: one rung by them may have begun before the last.
       await act(async () => { await TH.readAfresh(vault) })
       await waitFor(() => { expect(screen.queryByText('Unlock your vault')).to.not.be.null })
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("starts afresh when handed another vault, keeping nothing typed for the last", () => {
@@ -589,7 +601,7 @@ describe("PassphraseModal", () => {
     })
 
     it("starts afresh after trouble when handed another vault", async () => {
-      const { rerender } = TH.renderReporting(<PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.'))))} onDone={noop} />)
+      const { rerender } = TH.renderReporting(<PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'This call was handed an option it does not take.'))))} onDone={noop} />)
       TH.submitPassphrase('pw one')
       await screen.findByText('Something went wrong')
       rerender(<PassphraseModal ask={TH.askOf(vaultInState('locked'))} onDone={noop} />)
@@ -608,7 +620,7 @@ describe("PassphraseModal", () => {
     })
 
     it("offers none while it creates the vault, with nothing to start over from", () => {
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} allowStartOver onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} allowStartOver onDone={noop} />)
       expect(screen.queryByText('Forgot it? Start a new vault')).to.be.null
     })
 
@@ -622,26 +634,27 @@ describe("PassphraseModal", () => {
       fireEvent.click(screen.getByText('Keep it'))
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(vault.getSnapshot().state).to.eq('locked')
-      vault.close()
+      TH.closeVault(vault)
     })
 
-    it("deletes the vault once confirmed, a delete landing as a lock: the dialog closes, answering declined, and the next ask is to choose", async () => {
+    it("deletes the vault once confirmed, the delete ending the prompt: the dialog closes, answering declined, the call that asked is refused vault_gone, and the vault asked for again is novel, to choose", async () => {
       const opts = TH.memoryVaultOpts()
       const maker = await TH.settledVault(opts)
       await maker.unlock('pw')
       await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
       await maker.lock()
-      maker.close()
+      TH.closeVault(maker)
       const { vault, ask, ensuring } = await TH.askedBy(opts)
       const heard: ProofAnswer[] = []
       render(<PassphraseModal ask={ask} allowStartOver onDone={(answer) => { heard.push(answer) }} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Remove and start over'))
       await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
-      expect(vault.getSnapshot().state).to.eq('absent')
       const { err } = await ensuring
-      expect(err?.refusalkind).to.eq('vault_locked')
-      vault.close()
+      expect(err?.refusalkind).to.eq('vault_gone')
+      const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+      expect(next.getSnapshot().state).to.eq('novel')
+      TH.bankOf(vault).closeVaults()
     })
 
     it("shows a condition the delete meets in place, to try again", async () => {
@@ -705,26 +718,24 @@ describe("PassphraseModal", () => {
       expect(del).toHaveBeenCalledOnce()
     })
 
-    it("drops the question once the vault is deleted elsewhere, and never asks it of a vault made after", async () => {
+    it("closes with the question, answering declined, once a read finds the vault deleted elsewhere: the Vault object is gone, and deletes nothing more", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await TH.settledVault(opts)
-      await vault.unlock('pw')
-      await vault.lock()
-      render(<PassphraseModal ask={TH.askOf(vault)} allowStartOver onDone={noop} />)
+      const maker = await TH.settledVault(opts)
+      await maker.unlock('pw')
+      await maker.lock()
+      TH.closeVault(maker)
+      const { vault, ask, ensuring } = await TH.askedBy(opts)
+      const deleting = vi.spyOn(vault, 'tryDel')
+      const heard: ProofAnswer[] = []
+      render(<PassphraseModal ask={ask} allowStartOver onDone={(answer) => { heard.push(answer) }} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       const deleter = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await deleter.del() })
-      deleter.close()
-      await act(async () => { await TH.readAfresh(vault) })
-      await screen.findByText('Choose a vault passphrase')
-      const maker = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
-      await act(async () => { await maker.unlock('another pw') })
-      maker.close()
-      await act(async () => { await TH.readAfresh(vault) })
-      await screen.findByText('Unlock your vault')
-      expect(screen.queryByText('Remove and start over')).to.be.null
-      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
-      vault.close()
+      await act(async () => { await TH.expectRefusal(TH.readAfresh(vault), 'vault_gone') })
+      await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
+      expect(deleting).not.toHaveBeenCalled()
+      const { err } = await ensuring
+      expect(err?.refusalkind).to.eq('vault_gone')
     })
   })
   // --
@@ -733,7 +744,7 @@ describe("PassphraseModal", () => {
 
   describe("for a password manager", () => {
     it("asks for a new password in a real form while it creates the vault", () => {
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} onDone={noop} />)
       const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
       expect(field.closest('form')).to.not.be.null
       expect(field.type).to.eq('password')
@@ -771,7 +782,7 @@ describe("PassphraseModal", () => {
 
     it("files it under the host's passphraseUsername when given, as its example does", () => {
       const email = 'margo@example.com'
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseUsername={`${email} (vault)`} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseUsername={`${email} (vault)`} onDone={noop} />)
       expect(usernameField().value).to.eq('margo@example.com (vault)')
     })
 
@@ -801,7 +812,7 @@ describe("PassphraseModal", () => {
 
   describe("advice while the user chooses a passphrase", () => {
     it("shows what passphraseAdvice says of the text typed, tied to the field and announced politely, as its example does", async () => {
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={twelveOrMore} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={twelveOrMore} onDone={noop} />)
       const field = screen.getByPlaceholderText('vault passphrase')
       expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
       fireEvent.change(field, { target: { value: 'short' } })
@@ -813,7 +824,7 @@ describe("PassphraseModal", () => {
     it("says nothing before anything is typed, nor once the field is emptied, without asking", async () => {
       const asked: string[] = []
       const advice = (typed: string) => { asked.push(typed); return 'Longer is stronger.' }
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={advice} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={advice} onDone={noop} />)
       expect(adviceRegion().textContent).to.eq('')
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('Longer is stronger.') })
@@ -828,7 +839,7 @@ describe("PassphraseModal", () => {
         if (typed === 'slow') { await gate.pass() }
         return `said of ${typed}`
       }
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={advice} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={advice} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
       await gate.reached
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'fast' } })
@@ -851,7 +862,7 @@ describe("PassphraseModal", () => {
 
     it("lets the user create the vault whatever it says: it is advice, and the vault decides", async () => {
       const given: unknown[] = []
-      const vault = TH.stubVault({ state: 'absent', unlock: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
+      const vault = TH.stubVault({ state: 'novel', unlock: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
       render(<PassphraseModal ask={TH.askOf(vault)} passphraseAdvice={() => 'Too short.'} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       await screen.findByText('Too short.')
@@ -860,7 +871,7 @@ describe("PassphraseModal", () => {
     })
 
     it("meets advice that throws with the calm trouble notice, and reports to React a fixed unexpected_error quoting nothing of the throw, which heard the passphrase", async () => {
-      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={quotingAdvice} onDone={noop} />)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={quotingAdvice} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
       expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
@@ -872,7 +883,7 @@ describe("PassphraseModal", () => {
 
     it("reports a VaultError the host's advice throws as any throw of it, quoting nothing of it: the host may have put the passphrase in it", async () => {
       const refusal = new VaultError('bad_option', 'pw-the-passphrase is no passphrase I can judge.')
-      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => Promise.reject(refusal)} onDone={noop} />)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={() => Promise.reject(refusal)} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
       expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
@@ -883,7 +894,7 @@ describe("PassphraseModal", () => {
 
     it("asks vault.checkPassphrase when the host gives no advice, saying its reason for a weak passphrase", async () => {
       const checkPassphrase = vi.fn((typed: string) => Promise.resolve(typed.length < 6 ? { strong: false as const, reason: 'Longer, please.' } : { strong: true as const }))
-      render(<PassphraseModal ask={TH.askOf(TH.stubVault({ state: 'absent', checkPassphrase }))} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(TH.stubVault({ state: 'novel', checkPassphrase }))} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('Longer, please.') })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw longer' } })
@@ -898,9 +909,9 @@ describe("PassphraseModal", () => {
       expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       expect(reported[0]).to.include({ refusalkind: 'unexpected_error' })
-      expect((reported[0] as Error).message).to.match(/strengthChecker handed to Vault\.make threw/)
+      expect((reported[0] as Error).message).to.match(/strengthChecker handed to Bank\.make threw/)
       expect(TH.thrownText(reported[0])).to.not.include('pw-the-passphrase')
-      vault.close()
+      TH.closeVault(vault)
     })
 
     it("lets a superseded call's failure pass unseen: only the latest call can fail the dialog", async () => {
@@ -912,7 +923,7 @@ describe("PassphraseModal", () => {
         }
         return `said of ${typed}`
       }
-      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={advice} onDone={noop} />)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={advice} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
       await gate.reached
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'fast' } })
@@ -926,7 +937,7 @@ describe("PassphraseModal", () => {
       expect(adviceRegion().textContent).to.eq('said of fast')
     })
 
-    it("forgets what it said once the vault is made and deleted elsewhere, and an answer still on its way with it", async () => {
+    it("forgets what it said once the vault is made elsewhere, and an answer still on its way with it", async () => {
       const opts = TH.memoryVaultOpts()
       const vault = await TH.settledVault(opts)
       const gate = TH.makeGate()
@@ -943,21 +954,21 @@ describe("PassphraseModal", () => {
       await act(async () => { await elsewhere.unlock('pw') })
       await act(async () => { await TH.readAfresh(vault) })
       await screen.findByText('Unlock your vault')
-      await act(async () => { await elsewhere.del() })
-      elsewhere.close()
-      await act(async () => { await TH.readAfresh(vault) })
-      await screen.findByText('Choose a vault passphrase')
+      TH.closeVault(elsewhere)
+      expect(screen.queryByRole('status')).to.be.null
+      const updates = TH.watchStateUpdates()
       await act(async () => {
         gate.release()
         await TH.wakeupAtNextTick()
       })
-      expect(adviceRegion().textContent).to.eq('')
-      vault.close()
+      expect(updates.count()).to.eq(0)
+      expect(screen.queryByText('said of slow')).to.be.null
+      TH.closeVault(vault)
     })
 
     it("reads an undefined answer, from a host in JavaScript, as nothing to say, keeping its region", async () => {
       const silent = (() => undefined) as unknown as PassphraseAdvice
-      render(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={silent} onDone={noop} />)
+      render(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={silent} onDone={noop} />)
       const field = screen.getByPlaceholderText('vault passphrase')
       fireEvent.change(field, { target: { value: 'pw' } })
       await act(async () => { await TH.wakeupAtNextTick() })
@@ -992,7 +1003,7 @@ describe("PassphraseModal", () => {
       [null,                                                                  'an unlock that succeeds'],
       [new VaultError('wrong_passphrase', 'That passphrase did not open it.'), 'a wrong passphrase'],
       [new VaultError('vault_locked', 'Locked meanwhile.'),                   'a lock that won meanwhile'],
-      [new VaultError('vault_closed', 'This vault handle was closed.'),       'misuse: the handle its provider closed as it unmounted'],
+      [new VaultError('vault_gone', 'This vault was let go.'),                'a vault its provider let go as it unmounted'],
       [new Error('not a VaultError'),                                         'a failure that is no VaultError'],
     ] as const
 
@@ -1034,7 +1045,7 @@ describe("PassphraseModal", () => {
       [null,                                                                   'a delete that succeeds'],
       [new VaultError('stale_write', 'The vault changed in storage.'),         'a delete refused: the vault changed elsewhere'],
       [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a delete that meets a condition'],
-      [new VaultError('vault_closed', 'This vault handle was closed.'),        'a delete that meets misuse: a closed handle'],
+      [new VaultError('bad_option', 'This call was handed an option it does not take.'), 'a delete that meets misuse: an option amiss'],
     ] as const
 
     for (const [refusal, blurb] of DelOutcomes) {
@@ -1064,7 +1075,7 @@ describe("PassphraseModal", () => {
     for (const [outcome, blurb] of AdviceOutcomes) {
       it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
         const answering = TH.held<string | null>()
-        const { reported, unmount } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => answering.promise} onDone={noop} />)
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('novel'))} passphraseAdvice={() => answering.promise} onDone={noop} />)
         fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
         unmount()
         const updates = TH.watchStateUpdates()

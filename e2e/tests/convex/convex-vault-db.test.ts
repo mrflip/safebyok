@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexError } from 'convex/values'
-import { Vault, VaultError, memoryDeviceDB } from 'safebyok'
+import { Bank, VaultError, memoryDeviceDB } from 'safebyok'
 import * as TH from './test-helpers'
 import { convexVaultDB } from 'safebyok-convex'
 import type { ConvexVaultClient, SafebyokApi } from 'safebyok-convex'
@@ -223,13 +223,14 @@ const openOver = (client: ConvexVaultClient, api: SafebyokApi) => TH.settledVaul
 
 describe("a vault over convexVaultDB, opened before sign-in", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`is refused as identity_revoked over a ${clientTitle}, still opening, and leaves no watch live on the deployment once closed`, async () => {
+    it(`is refused as identity_revoked over a ${clientTitle}, its entry refused with no Vault object, and leaves no watch live on the deployment once let go`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-      const vault = Vault.make(TH.memoryVaultOpts({ vaultDB }))
-      await TH.expectRefusal(vault.hello(), 'identity_revoked')
-      expect(vault.getSnapshot().state).to.eq('opening')
-      vault.close()
+      const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+      const bank = Bank.make(bankOpts)
+      await TH.expectRefusal(bank.ensureVault({ userId, vaultlabel }), 'identity_revoked')
+      expect(bank.entryOf({ userId, vaultlabel })).to.deep.include({ status: 'refused', vault: null })
+      bank.closeVault({ userId, vaultlabel })
       await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
     })
   }
@@ -254,7 +255,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
       const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
       expect(stored?.boxes).to.have.lengthOf(1)
-      vault.close()
+      TH.closeVault(vault)
     })
   }
 })
@@ -269,7 +270,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     const deployment = deploy()
     const laptop = await openOver(deployment.client('u1'), deployment.api.safebyok)
     const phone = await openOver(connectReact(deployment, 'u1'), deployment.api.safebyok)
-    expect(laptop.getSnapshot().state).to.eq('absent')
+    expect(laptop.getSnapshot().state).to.eq('novel')
 
     // The laptop makes the vault and stores a whisper; the phone hears of both.
     await laptop.unlock(TH.RealPassphrase)
@@ -303,10 +304,10 @@ describe("a vault over convexVaultDB, on two devices", () => {
     await phone.unlock(NewPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
 
-    // The phone deletes the vault; the laptop hears it gone.
+    // The phone deletes the vault; the laptop hears it gone, and its bank hands out no Vault object for it.
     await phone.del()
-    await vi.waitFor(() => { expect(laptop.getSnapshot().state).to.eq('absent') })
-    laptop.close()
-    phone.close()
+    await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ userId: 'u1', vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
+    TH.closeVault(laptop)
+    TH.closeVault(phone)
   })
 })

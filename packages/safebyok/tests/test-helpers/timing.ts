@@ -244,7 +244,7 @@ export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Pr
 
 /**
  * A count of the storage watches `vaultDB` opens and closes from here on, kept by spying on its
- * `subscribe`: for a test that a close or a lock leaves no watch running that
+ * `subscribe`: for a test that letting a vault go leaves no watch running that
  * nobody could end. Each watch still reaches the adapter's own `subscribe`.
  *
  * A watch counts as closed the first time it is closed: closing it again changes nothing, so a
@@ -255,9 +255,8 @@ export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Pr
  *
  * @example
  *   const tally = TH.tallyWatches(vaultDB)
- *   const vault = Vault.make(opts)
- *   await TH.expectRefusal(vault.hello(), 'not_permitted')
- *   vault.close()
+ *   const vault = await TH.settledVault({ ...opts, vaultDB })
+ *   TH.closeVault(vault)
  *   expect(tally.opened - tally.closed).to.eq(0)
  */
 export const tallyWatches = (vaultDB: Pick<VaultDB, 'subscribe'>) => {

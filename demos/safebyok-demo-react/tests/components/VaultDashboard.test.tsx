@@ -44,7 +44,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a browser that withholds storage won't keep the vault, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.deviceDB, 'getMark').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
+    vi.spyOn(world.deviceDB, 'getDeviceRecord').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/won't let the app keep your vault/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
@@ -52,7 +52,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
+    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null

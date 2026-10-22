@@ -19,7 +19,7 @@ const saidOf = (err: VaultError) => (err.refusalkind === 'vault_locked' ? 'dismi
 
 /**
  * A probe component exercising the binding the way a host app would: its `put` and `grab` call
- * the vault, which asks through the provider's dialog when it is locked or absent.
+ * the vault, which asks through the provider's dialog when it is locked or novel.
  */
 export const Probe = () => {
   const vault = useVault()
@@ -106,7 +106,7 @@ export const madeWorld = async () => {
   const made = await TH.settledVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
-  made.close()
+  TH.closeVault(made)
   const spoil = () => {
     const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
     const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
@@ -174,7 +174,7 @@ export const lockedWorld = async () => {
   const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
   await maker.unlock('pw')
   await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
-  maker.close()
+  TH.closeVault(maker)
   const grab = grabber()
   const tree = (userId: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
     <VaultProvider {...world.props} keyDeriver={keyDeriver} userId={userId}><grab.Grab /></VaultProvider>
@@ -214,16 +214,16 @@ export const LockButton = () => {
 /** useVaultSnapshot's @example, as a host would write it. */
 export const BoxCount = () => {
   const snapshot = useVaultSnapshot()
-  if (snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
+  if (snapshot === null) { return <p>Opening your vault…</p> }
   return <p>{snapshot.boxes.length} keys stored</p>
 }
 
-/** Counts the calls a world's stores hear that a vault's hello makes: the storage watch, the props read, the mark read. */
+/** Counts the calls a world's stores hear that a vault's birth makes: the storage watch, the ensure of the vault, the device record read. */
 export const countStoreCalls = (world: { vaultDB: VaultDB, deviceDB: DeviceDB }) => {
   const subscribe = vi.spyOn(world.vaultDB, 'subscribe')
-  const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
-  const getMark = vi.spyOn(world.deviceDB, 'getMark')
-  return () => ({ subscribe: subscribe.mock.calls.length, getVaultProps: getVaultProps.mock.calls.length, getMark: getMark.mock.calls.length })
+  const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+  const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
+  return () => ({ subscribe: subscribe.mock.calls.length, ensureVault: ensureVault.mock.calls.length, getDeviceRecord: getDeviceRecord.mock.calls.length })
 }
 
 /** Stands in for a function a test replaces before it is called. */

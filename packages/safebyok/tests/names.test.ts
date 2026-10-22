@@ -167,7 +167,7 @@ describe("Names.check", () => {
   it("names a host check that refuses, and that the check is the host's, saying nothing of why", () => {
     const rules = Names.rulesOf({ boxlabel: ZClassic.string().max(5, 'too long for our forms') })
     const err = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'sk-fake-long'), 'bad_label')
-    expect(err.message).to.include("boxlabel check passed in Vault.make's validators")
+    expect(err.message).to.include("boxlabel check passed in Bank.make's validators")
     expect(err.message).to.not.include('too long for our forms')
   })
 

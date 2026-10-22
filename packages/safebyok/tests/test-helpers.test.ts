@@ -5,14 +5,14 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type StringStore } from '../src/index'
+import { Bank, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, raisedDeviceRecord, type DeviceDB, type StringStore } from '../src/index'
 import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
 import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
-import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceMark, type LeaseRecord } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceRecord, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
@@ -370,9 +370,22 @@ describe("readAfresh", () => {
 })
 
 describe("settledVault", () => {
-  it("makes a vault and awaits its hello, as its first example shows", async () => {
-    const vault = await TH.settledVault(TH.memoryVaultOpts())
-    expect(vault.getSnapshot().state).to.eq('absent')
+  it("births a vault in a bank of its own, novel, as its first example shows", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
+    expect(TH.bankOf(vault).entryOf({ userId: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
+  })
+
+  it("makes a bank of its own each call, so two calls over one deviceDB are two tabs of one device", async () => {
+    const opts = TH.memoryVaultOpts()
+    const here = await TH.settledVault(opts)
+    await here.unlock('pw')
+    const there = await TH.settledVault(opts)
+    expect(TH.bankOf(there)).to.not.eq(TH.bankOf(here))
+    expect(there).to.not.eq(here)
+    expect(there.getSnapshot().state, "the other tab takes up this one's lease at birth").to.eq('unlocked')
   })
 
   it("makes two devices over one vaultDB, each with a device store of its own, as its second example shows", async () => {
@@ -383,11 +396,40 @@ describe("settledVault", () => {
     expect(there.getSnapshot().state).to.eq('locked')
   })
 
-  it("rejects as hello does, and throws as Vault.make does for misuse", async () => {
+  it("rejects as ensureVault does, and as Bank.make does for misuse", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
+    vi.spyOn(vaultDB, 'ensureVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ vaultDB })), 'not_permitted')
     await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ applabel: 'not-a-label' })), 'bad_label')
+  })
+})
+
+describe("bankOf", () => {
+  it("answers the bank a vault was born in, which can let it go, as its example shows", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    TH.bankOf(vault).closeVault({ userId: 'u1', vaultlabel: 'main' })
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
+  })
+
+  it("throws for a vault settledVault did not hand out", async () => {
+    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts()
+    const vault = await Bank.make(bankOpts).ensureVault({ userId, vaultlabel })
+    expect(() => TH.bankOf(vault)).to.throw(/settledVault/)
+  })
+})
+
+describe("closeVault", () => {
+  it("lets the vault go, every call then refusing 'vault_gone', and leaves the lease for the next vault settled over this deviceDB, as its example shows", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    await vault.unlock('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    TH.closeVault(vault)
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
+    expect(await TH.expectingGood(opts.deviceDB).getLease(TH.scopeOf('u1'))).to.not.be.null
+    const next = await TH.settledVault(opts)
+    expect(next.getSnapshot().state).to.eq('unlocked')
+    expect(await next.getWhisper('anthropic')).to.eq('sk-fake')
   })
 })
 
@@ -397,7 +439,7 @@ describe("tallyWatches", () => {
     const tally = TH.tallyWatches(vaultDB)
     const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB }))
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
-    vault.close()
+    TH.closeVault(vault)
     expect(tally).to.deep.equal({ opened: 1, closed: 1 })
   })
 
@@ -411,14 +453,23 @@ describe("tallyWatches", () => {
     expect(tally).to.deep.equal({ opened: 2, closed: 1 })
   })
 
-  it("shows no leak once a refused vault is closed, as its @example has it", async () => {
-    const vaultDB = localVaultDB({ store: memoryStore() })
-    vi.spyOn(vaultDB, 'getVault').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
-    const tally = TH.tallyWatches(vaultDB)
-    const vault = Vault.make(TH.memoryVaultOpts({ vaultDB }))
-    await TH.expectRefusal(vault.hello(), 'not_permitted')
-    vault.close()
+  it("shows no leak once a vault is let go, as its @example has it", async () => {
+    const opts = TH.memoryVaultOpts()
+    const tally = TH.tallyWatches(opts.vaultDB)
+    const vault = await TH.settledVault(opts)
+    TH.closeVault(vault)
     expect(tally.opened).to.eq(1)
+    expect(tally.opened - tally.closed).to.eq(0)
+  })
+
+  it("shows no leak once a bank refuses a birth", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    vi.spyOn(vaultDB, 'ensureVault').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
+    const tally = TH.tallyWatches(vaultDB)
+    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+    const bank = Bank.make(bankOpts)
+    await TH.expectRefusal(bank.ensureVault({ userId, vaultlabel }), 'not_permitted')
+    bank.closeVaults()
     expect(tally.opened - tally.closed).to.eq(0)
   })
 })
@@ -656,9 +707,19 @@ describe("the fixtures", () => {
 
   it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
     const later = TH.SliceNow + 1000
-    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: null })
+    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: 'vault-tok-other' })
     expect(slice.now()).to.eq(later)
-    expect(slice.vault_tok).to.be.null
+    expect(slice.vault_tok).to.eq('vault-tok-other')
+  })
+
+  it("deviceRecordOf: a whole device record of the user's main vault, raised as its first example shows", async () => {
+    const deviceDB = TH.expectingGood(memoryDeviceDB())
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
+    expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal({ format: 'safebyok-device-v1', ...TH.scopeOf('u1'), device_id: 'device-one', highest_vault_epoch: 1 })
+  })
+
+  it("deviceRecordOf: any field as its overrides say, as its second example shows", () => {
+    expect(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })).to.include({ user_id: 'u1', device_id: 'device-one', highest_vault_epoch: 3 })
   })
 
   it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, stamped with its scope and vault token, as its examples show", async () => {
@@ -672,13 +733,13 @@ describe("the fixtures", () => {
 
   it("leasedSliceOf's demand refuses as the vault's does, and its tryLock drops the lease and counts", async () => {
     const vault = await TH.leasedSliceOf('u1', await makeVaultKey(), { vault_tok: 'vault-tok-other' })
-    expect(vault.stamp?.vault_tok).to.eq('vault-tok-other')
+    expect(vault.stamp.vault_tok).to.eq('vault-tok-other')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-u1' }) }, 'vault_remade')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other', gate_epoch: 2 }) }, 'gate_moved')
     await TH.expectGood(vault.tryLock())
     expect(vault.locks).to.eq(1)
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }, { leaseBound: true }) }, 'vault_locked')
-    vault.stamp = null
+    vault.gone = true
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }) }, 'vault_gone')
   })
 
@@ -763,10 +824,10 @@ describe("spyLogger", () => {
     ])
   })
 
-  it("is a logger Vault.make takes", async () => {
+  it("is a logger Bank.make takes", async () => {
     const spy = TH.spyLogger()
     const vault = await TH.settledVault(TH.memoryVaultOpts({ logger: spy.logger }))
-    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(vault.getSnapshot().state).to.eq('novel')
     expect(spy.calls).to.have.lengthOf(0)
   })
 })
@@ -993,16 +1054,21 @@ const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scop
  */
 const hostDeviceDB = (withheld?: Error): DeviceDB => {
   const rows = new Map<string, LeaseRecord>()
-  const marks = new Map<string, DeviceMark>()
+  const records = new Map<string, DeviceRecord>()
   const touch = () => { if (withheld !== undefined) { throw withheld } }
   return {
     getLease: (scope) => deviceOutcomeOf('getLease', () => { touch(); return rows.get(ckeyOf(scope)) ?? null }),
     putLease: (record) => deviceOutcomeOf('putLease', () => { touch(); rows.set(ckeyOf(record), record); return record }),
     delLease: (scope) => deviceOutcomeOf('delLease', () => { touch(); rows.delete(ckeyOf(scope)) }),
-    getMark:  (scope) => deviceOutcomeOf('getMark', () => { touch(); return marks.get(ckeyOf(scope)) ?? null }),
-    putMark:  (mark) => deviceOutcomeOf('putMark', () => { touch(); marks.set(ckeyOf(mark), mark) }),
-    delMark:  (scope) => deviceOutcomeOf('delMark', () => { touch(); marks.delete(ckeyOf(scope)) }),
-    delAll:   () => deviceOutcomeOf('delAll', () => { touch(); rows.clear(); marks.clear() }),
+    getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => { touch(); return records.get(ckeyOf(scope)) ?? null }),
+    raiseDeviceRecord: (record) => deviceOutcomeOf('raiseDeviceRecord', () => {
+      touch()
+      const raised = raisedDeviceRecord(records.get(ckeyOf(record)), record)
+      records.set(ckeyOf(record), raised)
+      return raised
+    }),
+    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', () => { touch(); records.delete(ckeyOf(scope)) }),
+    delAll:   () => deviceOutcomeOf('delAll', () => { touch(); rows.clear(); records.clear() }),
   }
 }
 

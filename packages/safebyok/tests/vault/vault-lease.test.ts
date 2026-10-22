@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { FarFuture, FarPast, LeaseHours, MaxLeaseHours, MinuteMillis, ForeverMillis, StaleMinutes } from '../../src/types'
 import { memoryDeviceDB } from '../../src/device-db'
-import { Vault } from '../../src/vault'
+import type { Vault } from '../../src/vault'
+import { Bank } from '../../src/bank'
 import { Ask, type GetProof, type ProofAnswer } from '../../src/ask'
 import { VaultError } from '../../src/errors'
 import { bad } from '../../src/outcome'
 import { toB64 } from '../../src/crypto'
-import type { MakeVaultOpts } from '../../src/vault-opts'
 import type { StrengthChecker } from '../../src/passphrase-strength'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -40,7 +40,7 @@ describe("unlock and lock", () => {
     const world = makeWorld()
     const vault = await world.open()
     await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'weak_passphrase')
-    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(vault.getSnapshot().state).to.eq('novel')
   })
 
   it("a passphrase of only whitespace opens nothing: as a proof, it is wrong, and costs no derivation", async () => {
@@ -68,7 +68,7 @@ describe("unlock and lock", () => {
     for (const passphrase of [undefined, null, 1234, ['pw']]) {
       await TH.expectRefusal(vault.unlock(passphrase as unknown as string), 'bad_option')
     }
-    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(vault.getSnapshot().state).to.eq('novel')
   })
 })
 
@@ -271,19 +271,19 @@ const leaseDeadlineOf = async (world: ReturnType<typeof makeWorld>): Promise<num
 }
 
 describe("the lease, when the host changes leaseHours", () => {
-  it("lowered from Infinity to one hour, discards a lease already granted at its next open, and the next unlock lasts an hour", async () => {
+  it("lowered from Infinity to one hour, takes no lease already granted up at its next birth, leaving it where it lies, and the next unlock lasts an hour", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: Infinity })
     world.advance(30 * 24 * HourMillis)
     const lowered = await world.open({ leaseHours: 1 })
     expect(lowered.getSnapshot().state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
+    expect(await leaseDeadlineOf(world)).to.eq(FarFuture)
     await lowered.unlock('pw one')
     expect(lowered.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + HourMillis)
     expect(await world.stateOnOpen({ leaseHours: 1 })).to.eq('unlocked')
   })
 
-  it("writes no record on any open, shortened or not", async () => {
+  it("writes no lease on any birth, shortened or not", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: Infinity })
     const putLease = vi.spyOn(world.deviceDB, 'putLease')
@@ -428,35 +428,37 @@ describe("the lease, from a host's own DeviceDB", () => {
   })
 
   for (const [spoil, blurb] of SpoiledWayins) {
-    it(`reads ${blurb} as no lease, and discards it`, async () => {
+    it(`reads ${blurb} as no lease at birth, and leaves it where it lies`, async () => {
       const world = makeWorld()
       const device = uncheckingDeviceDB()
       await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
       device.spoilRow(spoil)
+      const spoiled = [...device.rows.values()]
       const later = await world.open({ deviceDB: device.deviceDB })
       expect(later.getSnapshot().state).to.eq('locked')
       expect(later.getSnapshot().askPassphraseAt).to.be.null
-      expect(device.rows.size).to.eq(0)
+      expect([...device.rows.values()]).to.deep.equal(spoiled)
     })
   }
 
-  it("says through the logger that a record naming another scope was discarded", async () => {
+  it("says through the logger that a record naming another scope could not be read, and was left where it lies", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     await world.open({ deviceDB: device.deviceDB })
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(world.logged[0]?.message).to.include('could not be read or would not open, so it was discarded')
+    expect(world.logged[0]?.message).to.include('could not be read')
+    expect(world.logged[0]?.message).to.include('left where it lies')
   })
 
-  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was discarded", async () => {
+  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, could not be read, and leaves it where it lies", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
     device.spoilRow(({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }))
     await world.open({ deviceDB: device.deviceDB })
-    expect(device.rows.size).to.eq(0)
+    expect(device.rows.size).to.eq(1)
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
     expect(world.logged[0]?.message).to.include('could not be read')
   })
@@ -600,14 +602,18 @@ describe("natural expiry", () => {
 describe("a change to the ways in, once it has landed", () => {
   afterEach(() => { vi.restoreAllMocks() })
 
-  it("resolves though the device mark could not be kept, says so through the logger, and stays unlocked", async () => {
+  it("resolves though the device record could not be raised, says so through the logger, and stays unlocked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.deviceDB, 'putMark').mockRejectedValueOnce(new Error('device storage is full'))
+    // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
+    TH.beforeNextCall(world.vaultDB, 'putVaultProps', () => {
+      vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
+      return Promise.resolve()
+    })
     await vault.putWayin('pw one', 'pw two')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
-    expect(world.logged[0]?.message).to.include('mark')
+    expect(world.logged[0]?.message).to.include('record')
     await vault.lock()
     await vault.unlock('pw two')
   })
@@ -719,7 +725,7 @@ describe("its timer", () => {
     const vault = await world.openUnlocked('pw one')
     const [armed] = timers.mock.results.map((result) => result.value as NodeJS.Timeout)
     expect(armed?.hasRef()).to.be.false
-    vault.close()
+    TH.closeVault(vault)
   })
 })
 
@@ -824,26 +830,26 @@ const heldPrompt = () => {
 /** A strength checker that finds `pw` weak, and every other passphrase strong. */
 const pwIsWeak: StrengthChecker = (passphrase) => (passphrase === 'pw' ? { strong: false, reason: 'Found in a breach: pick another.' } : { strong: true })
 
-/** A world whose `u1` vault stands, made with `pw`, with a vault handle on it opened locked under `opts`. */
-const lockedVaultWith = async (overrides: Partial<MakeVaultOpts>) => {
+/** A world whose `u1` vault stands, made with `pw`, with a Vault object on it born locked under `overrides`. */
+const lockedVaultWith = async (overrides: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const maker = await world.openUnlocked('pw')
   await maker.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   await maker.lock()
-  maker.close()
+  TH.closeVault(maker)
   const vault = await world.open(overrides)
   return { world, vault }
 }
 
 describe("vault.ensureLease, by the Contract", () => {
   it("says hello first, and refuses with hello's refusal as it came (Contract: ensureLease, Does 1, and Refuses: everything hello refuses)", async () => {
-    const world = makeWorld()
     const getProof = typingPw()
-    const vault = Vault.make(world.optsWith({ getProof }))
+    const { world, vault } = await lockedVaultWith({ getProof })
+    world.advance(StaleMinutes * MinuteMillis)
     vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.ensureLease(), 'storage_unavailable')
     expect(getProof).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('opening')
+    expect(vault.state).to.eq('locked')
   })
 
   it("resolves the vault at once while unlocked and the lease not ending within renewMinutes: no prompt, no write (Contract: ensureLease, Does 2)", async () => {
@@ -857,12 +863,12 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(putLease).not.toHaveBeenCalled()
   })
 
-  it("asks why 'absent' of a vault never made, and the proof makes it (Contract: ensureLease, Does 3)", async () => {
+  it("asks why 'novel' of a vault with no passphrase yet, and the proof gates it (Contract: ensureLease, Does 3)", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ getProof })
     expect(await vault.ensureLease()).to.eq(vault)
-    expect(getProof.mock.calls[0]?.[0].why).to.eq('absent')
+    expect(getProof.mock.calls[0]?.[0].why).to.eq('novel')
     expect(vault.state).to.eq('unlocked')
     expect(vault.passphrase).to.not.be.null
   })
@@ -986,12 +992,12 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(vault.state).to.eq('locked')
   })
 
-  for (const [landing, blurb] of [
-    [(vault: Vault) => vault.lock(), 'lock()'],
-    [(vault: Vault) => { vault.close(); return Promise.resolve() }, 'close()'],
-    [(vault: Vault) => vault.del(), 'del()'],
+  // A del() leaves the Vault object gone, so its waiters hear that, as every later call does.
+  for (const [landing, blurb, refusalkind] of [
+    [(vault: Vault) => vault.lock(), 'lock()', 'vault_locked'],
+    [(vault: Vault) => vault.del(), 'del()', 'vault_gone'],
   ] as const) {
-    it(`refuses every waiter vault_locked at once and settles lockLanded when a ${blurb} lands while the prompt is up (Contract: ensureLease, Does 3.7)`, async () => {
+    it(`refuses every waiter ${refusalkind} at once and settles lockLanded when a ${blurb} lands while the prompt is up (Contract: ensureLease, Does 3.7)`, async () => {
       const prompt = heldPrompt()
       const { vault } = await lockedVaultWith({ getProof: prompt.getProof })
       const first = vault.tryEnsureLease()
@@ -1002,8 +1008,8 @@ describe("vault.ensureLease, by the Contract", () => {
       let landed = false
       void ask.lockLanded.then(() => { landed = true })
       await landing(vault)
-      await TH.expectBad(first, 'vault_locked')
-      await TH.expectBad(second, 'vault_locked')
+      await TH.expectBad(first, refusalkind)
+      await TH.expectBad(second, refusalkind)
       expect(landed).to.be.true
       // The answer that comes after the lock is dropped.
       prompt.answer('unlocked')
@@ -1016,7 +1022,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const vault = await world.open({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
@@ -1035,7 +1041,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const vault = await world.open({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
@@ -1056,7 +1062,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const vault = await world.open({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
@@ -1076,7 +1082,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const vault = await world.open({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
@@ -1100,7 +1106,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const vault = await world.open({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
@@ -1213,36 +1219,147 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(await vault.ensureLease()).to.eq(vault)
   })
 
-  it("refuses vault_closed after close()", async () => {
-    const { vault } = await lockedVaultWith({ getProof: typingPw() })
-    vault.close()
-    await TH.expectRefusal(vault.ensureLease(), 'vault_closed')
+  it("refuses every waiter vault_gone at once and settles lockLanded when the bank lets the vault go while the prompt is up (Contract: ensureLease, Does 3.7)", async () => {
+    const prompt = heldPrompt()
+    const { vault } = await lockedVaultWith({ getProof: prompt.getProof })
+    const first = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    const second = vault.tryGetWhisper('anthropic')
+    // Let the second caller reach the prompt up, and wait on it.
+    await TH.wakeupAtNextTick()
+    let landed = false
+    void ask.lockLanded.then(() => { landed = true })
+    TH.closeVault(vault)
+    await TH.expectBad(first, 'vault_gone')
+    await TH.expectBad(second, 'vault_gone')
+    expect(landed).to.be.true
+    // The answer that comes after the let-go is dropped.
+    prompt.answer('unlocked')
+    expect(prompt.getProof).toHaveBeenCalledOnce()
   })
 
-  it("refuses vault_closed for a close() landing during its hello, asking getProof nothing", async () => {
+  it("refuses vault_gone once the bank lets the vault go", async () => {
+    const { vault } = await lockedVaultWith({ getProof: typingPw() })
+    TH.closeVault(vault)
+    await TH.expectRefusal(vault.ensureLease(), 'vault_gone')
+  })
+
+  it("refuses vault_gone for a let-go landing during its hello, asking getProof nothing", async () => {
     const getProof = typingPw()
-    const world = makeRacingWorld()
-    const maker = await world.openUnlocked('pw')
-    await maker.lock()
-    maker.close()
-    const vault = Vault.make(world.optsWith({ getProof }))
-    const looking = world.holdNextLook()
+    const { world, vault } = await lockedVaultWith({ getProof })
+    world.advance(StaleMinutes * MinuteMillis)
+    const looking = TH.holdNextCall(world.vaultDB, 'getVault')
     const ensuring = vault.ensureLease()
     await looking.reached
-    vault.close()
+    TH.closeVault(vault)
     looking.release()
-    await TH.expectRefusal(ensuring, 'vault_closed')
+    await TH.expectRefusal(ensuring, 'vault_gone')
     expect(getProof).not.toHaveBeenCalled()
+  })
+
+  it("refuses vault_gone for a let-go landing while it takes up another tab's lease, taking nothing up and asking getProof nothing", async () => {
+    const getProof = typingPw()
+    const { world, vault } = await lockedVaultWith({ getProof })
+    const otherTab = await world.open()
+    await otherTab.unlock('pw')
+    const reading = TH.holdNextCall(world.deviceDB, 'getLease')
+    const ensuring = vault.ensureLease()
+    await reading.reached
+    TH.closeVault(vault)
+    reading.release()
+    await TH.expectRefusal(ensuring, 'vault_gone')
+    expect(getProof).not.toHaveBeenCalled()
+    expect(vault.askPassphraseAt).to.be.null
+    expect(await world.getLease()).to.not.be.null
+  })
+
+  it("takes nothing up when a lock() lands while it takes up another tab's lease: the take-up stands down, and the lock erases the lease", async () => {
+    const getProof = vi.fn<GetProof>(() => Promise.resolve('declined'))
+    const { world, vault } = await lockedVaultWith({ getProof })
+    const otherTab = await world.open()
+    await otherTab.unlock('pw')
+    const reading = TH.holdNextCall(world.deviceDB, 'getLease')
+    const ensuring = vault.ensureLease()
+    await reading.reached
+    await vault.lock()
+    reading.release()
+    await TH.expectRefusal(ensuring, 'vault_locked')
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
   })
 })
 
-describe("Vault.make's getProof", () => {
-  it("refuses anything but a function, or none, as bad_option", () => {
+describe("a lock or a let-go landing while a box call waits to be unlocked (risk 10)", () => {
+  // Each box call that needs the vault unlocked, and what it would change in storage.
+  const BoxCalls = [
+    [(vault: Vault) => vault.tryPutBox({ boxlabel: 'anthropic' }, 'sk-fake-new'), 'putBox()'],
+    [(vault: Vault) => vault.tryDelBox('anthropic'), 'delBox()'],
+  ] as const
+  // Where the wait is held: the hello first, or the take-up of another tab's lease after it.
+  const Waits = [
+    ['its hello', (world: ReturnType<typeof makeWorld>) => {
+      // Past staleMinutes, so the hello reads.
+      world.advance(StaleMinutes * MinuteMillis)
+      return TH.holdNextCall(world.vaultDB, 'getVault')
+    }],
+    // The answer held, not the call: the lease is read before the lock lands, as a device store applies calls in order.
+    ["its take-up of another tab's lease", (world: ReturnType<typeof makeWorld>) => TH.holdNextAnswer(world.deviceDB, 'getLease')],
+  ] as const
+
+  for (const [call, callname] of BoxCalls) {
+    for (const [waitname, holdWait] of Waits) {
+      it(`refuses ${callname} vault_locked for a lock() landing during ${waitname}, taking nothing up and changing nothing stored`, async () => {
+        const getProof = vi.fn<GetProof>(() => Promise.resolve('declined'))
+        const { world, vault } = await lockedVaultWith({ getProof })
+        const otherTab = await world.open({ vaultDB: world.deafVaultDB() })
+        await otherTab.unlock('pw')
+        const boxBefore = storedRowOf(world, 'anthropic')
+        const held = holdWait(world)
+        const calling = call(vault)
+        await held.reached
+        await vault.lock()
+        held.release()
+        await TH.expectBad(calling, 'vault_locked')
+        expect(vault.state).to.eq('locked')
+        expect(await world.getLease()).to.be.null
+        expect(storedRowOf(world, 'anthropic')).to.deep.equal(boxBefore)
+      })
+
+      it(`refuses ${callname} vault_gone for a let-go landing during ${waitname}, asking getProof nothing and changing nothing stored`, async () => {
+        const getProof = typingPw()
+        const { world, vault } = await lockedVaultWith({ getProof })
+        const otherTab = await world.open({ vaultDB: world.deafVaultDB() })
+        await otherTab.unlock('pw')
+        const leaseBefore = await world.getLease()
+        const boxBefore = storedRowOf(world, 'anthropic')
+        const held = holdWait(world)
+        const calling = call(vault)
+        await held.reached
+        TH.closeVault(vault)
+        held.release()
+        await TH.expectBad(calling, 'vault_gone')
+        expect(getProof).not.toHaveBeenCalled()
+        expect(vault.askPassphraseAt).to.be.null
+        expect(await world.getLease()).to.deep.equal(leaseBefore)
+        expect(storedRowOf(world, 'anthropic')).to.deep.equal(boxBefore)
+      })
+    }
+  }
+})
+
+/** The options `world` makes a bank with: its vault options, the vault's own names left out. */
+const bankOptsOf = (world: ReturnType<typeof makeWorld>, overrides: Partial<TH.BornVaultOpts>) => {
+  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  return bankOpts
+}
+
+describe("Bank.make's getProof", () => {
+  it("refuses anything but a function, or none, as bad_option", async () => {
     const world = makeWorld()
     for (const notAFunction of ['pw', 42, {}]) {
-      TH.expectSyncRefusal(() => Vault.make(world.optsWith({ getProof: notAFunction as unknown as GetProof })), 'bad_option')
+      TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { getProof: notAFunction as unknown as GetProof })), 'bad_option')
     }
-    expect(Vault.make(world.optsWith({ getProof: null })).state).to.eq('opening')
+    expect(await world.stateOnOpen({ getProof: null })).to.eq('novel')
   })
 
   it("is handed each ask, and its dialog's answer decides, as its example shows", async () => {
@@ -1342,7 +1459,7 @@ describe("every data call, through ensureLease", () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const getProof = typingPw()
     const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
@@ -1364,7 +1481,7 @@ describe("every data call, through ensureLease", () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
-    expect(vault.state).to.eq('absent')
+    expect(vault.state).to.eq('novel')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -1375,14 +1492,14 @@ describe("every data call, through ensureLease", () => {
     expect(getProof.mock.calls[0]?.[0].why).to.eq('locked')
   })
 
-  it("answers at once for a vault never made, rather than asking to make one only to find nothing in it: getWhisper and delBox refuse absent_box", async () => {
+  it("answers at once for a novel vault, rather than asking to gate one only to find nothing in it: getWhisper and delBox refuse absent_box", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ getProof })
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(getProof).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('absent')
+    expect(vault.state).to.eq('novel')
   })
 
   it("reads storage for the box once unlocked, whatever the listing shows: the listing in hand only spares a prompt", async () => {
@@ -1423,16 +1540,16 @@ describe("getProof's attempt, by the Contract", () => {
     expect(tries).to.deep.equal(['wrong_passphrase'])
   })
 
-  it("refuses weak_passphrase on absent, the checker's reason its message, creating nothing (Contract: getProof, attempt refuses: show in place)", async () => {
+  it("refuses weak_passphrase on novel, the checker's reason its message, gating nothing (Contract: getProof, attempt refuses: show in place)", async () => {
     const world = makeWorld()
     const prompt = heldPrompt()
     const vault = await world.open({ getProof: prompt.getProof, strengthChecker: pwIsWeak })
     void vault.tryEnsureLease()
     const ask = await prompt.asked
-    expect(ask.why).to.eq('absent')
+    expect(ask.why).to.eq('novel')
     const err = await TH.expectBad(ask.attempt('pw'), 'weak_passphrase')
     expect(err.message).to.eq('Found in a breach: pick another.')
-    expect(vault.state).to.eq('absent')
+    expect(vault.state).to.eq('novel')
     await TH.expectGood(ask.attempt('a longer one'))
     prompt.answer('unlocked')
   })
@@ -1440,7 +1557,7 @@ describe("getProof's attempt, by the Contract", () => {
   it("refuses wrong_passkey for a passkey's answer that does not open the vault, and opens with the right one, as attempt's second example shows (Contract: getProof, attempt refuses: show in place)", async () => {
     const { world, vault: maker } = await vaultWithPasskey()
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const prompt = heldPrompt()
     const vault = await world.open({ getProof: prompt.getProof })
     void vault.tryEnsureLease()
@@ -1451,18 +1568,18 @@ describe("getProof's attempt, by the Contract", () => {
     prompt.answer('unlocked')
   })
 
-  it("refuses created_elsewhere on absent when another device made the vault meanwhile under another passphrase, to show in place and ask again (Contract: getProof, attempt refuses: show in place)", async () => {
+  it("refuses gate_made_elsewhere on novel when another device gated the vault meanwhile, to show in place and ask again (Contract: getProof, attempt refuses: show in place)", async () => {
     const world = makeWorld()
     const deafDB = world.deafVaultDB()
     const prompt = heldPrompt()
     const vault = await world.open({ vaultDB: deafDB, getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
-    expect(ask.why).to.eq('absent')
+    expect(ask.why).to.eq('novel')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'ensureVault', async () => { await elsewhere.unlock('pw one') })
-    await TH.expectBad(ask.attempt('pw two'), 'created_elsewhere')
-    expect(vault.state).to.eq('locked')
+    TH.beforeNextCall(deafDB, 'putVaultProps', async () => { await elsewhere.unlock('pw one') })
+    await TH.expectBad(ask.attempt('pw one'), 'gate_made_elsewhere')
+    expect(vault.state).to.eq('novel')
     await TH.expectGood(ask.attempt('pw one'))
     prompt.answer('unlocked')
     expect(await TH.expectGood(ensuring)).to.eq(vault)
@@ -1471,7 +1588,7 @@ describe("getProof's attempt, by the Contract", () => {
   it("refuses damaged_wayin for a passkey stored damaged, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
     const { world, vault: maker, laptop } = await vaultWithPasskey()
     await maker.lock()
-    maker.close()
+    TH.closeVault(maker)
     const shortSalt = toB64(new Uint8Array(16))
     spoilWayin(world, 'passkey', { prf_salt_b64: shortSalt })
     const prompt = heldPrompt()

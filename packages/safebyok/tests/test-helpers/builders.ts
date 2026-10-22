@@ -4,9 +4,10 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord, type Stamp } from '../../src/types'
-import { Vault } from '../../src/vault'
-import { type MakeVaultOpts } from '../../src/vault-opts'
+import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceRecord, type LeaseRecord, type Stamp } from '../../src/types'
+import type { Vault } from '../../src/vault'
+import { Bank } from '../../src/bank'
+import type { MakeBankOpts, VaultDraft } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/local-vault-db'
 import type { VaultDB } from '../../src/vault-db'
 import { good, valOf } from '../../src/outcome'
@@ -21,7 +22,7 @@ import { registerLeaseReader } from '../../src/held-lease'
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
  * hand it to a vault that holds a real secret.
  *
- * @example Vault.make({ ...opts, keyDeriver: testDeriver })
+ * @example Bank.make({ ...opts, keyDeriver: testDeriver })
  */
 export const testDeriver: KeyDeriver = {
   key_deriver_label: 'test_digest_v0',
@@ -65,10 +66,12 @@ export const SliceNow = Date.UTC(2026, 9, 19, 12)
 /** What {@link vaultSliceOf} makes: the slice of a vault a proof, a box, a way in and a lease read. */
 export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
 
-/** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp and lease are the test's to change. */
+/** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */
 export type LeasedSlice = VaultSlice & {
-  stamp:                Stamp | null
+  stamp:                Stamp
   lease:                Lease | null
+  /** True once the test has the vault gone: its demand then refuses 'vault_gone'. */
+  gone:                 boolean
   demandConsistentWith: Vault['demandConsistentWith']
   tryLock:              Vault['tryLock']
   /** How many times something called `tryLock`: what a damaged lease does. */
@@ -78,25 +81,25 @@ export type LeasedSlice = VaultSlice & {
 /** A stand-in for `userId`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
  * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
  * stamped with its scope and `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted
- * at its clock's time. Its demand is the vault's in small: no stamp is `vault_gone`; another scope
- * or `vault_tok`, `vault_remade`; another
- * `gate_epoch`, `gate_moved`; lease-bound, no lease or one ended by its clock, `vault_locked`. Its
- * `tryLock` drops the lease and counts the call.
+ * at its clock's time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope
+ * or `vault_tok`, `vault_remade`; another `gate_epoch`, `gate_moved`; lease-bound, no lease or one
+ * ended by its clock, `vault_locked`. Its `tryLock` drops the lease and counts the call.
  *
  * @example const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
  * @example const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
  */
 export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
   const base = vaultSliceOf(userId, testDeriver, overrides)
-  const vaultTok = base.vault_tok ?? `vault-tok-${userId}`
+  const vaultTok = base.vault_tok
   const slice: LeasedSlice = {
     ...base,
     stamp: Object.freeze({ applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, vault_epoch: 1, gate_epoch: 1 }),
     lease: null,
+    gone:  false,
     locks: 0,
     demandConsistentWith: (thing, opts) => {
       const { stamp, lease } = slice
-      if (stamp === null) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
+      if (slice.gone) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
       const sameScope = (thing.applabel ?? stamp.applabel) === stamp.applabel && (thing.user_id ?? stamp.user_id) === stamp.user_id && (thing.vaultlabel ?? stamp.vaultlabel) === stamp.vaultlabel
       if (! sameScope || thing.vault_tok !== stamp.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
       if ((thing.gate_epoch ?? stamp.gate_epoch) !== stamp.gate_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
@@ -118,23 +121,25 @@ export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrid
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that holds a real secret.
  *
- * @example Vault.make({ ...opts, strengthChecker: anyStrengthChecker })
+ * @example Bank.make({ ...opts, strengthChecker: anyStrengthChecker })
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
-/**
- * Everything Vault.make needs, over stores in memory made fresh for each call: `u1`'s `main` vault
- * in the `acme` app (as {@link scopeOf} has it), deriving through {@link testDeriver}, and
- * admitting any passphrase ({@link anyStrengthChecker}). `overrides`
+/** Everything a bank and one of its vaults need, in one bag: {@link Bank.make}'s options beside the vault's `userId` and `vaultlabel`. */
+export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'userId' | 'vaultlabel'>
+
+/** Everything a bank and its vault need, over stores in memory made fresh for each call.
+ * That is `u1`'s `main` vault in the `acme` app (as {@link scopeOf} has it), deriving through
+ * {@link testDeriver}, and admitting any passphrase ({@link anyStrengthChecker}). `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
- * @returns A complete bag of options for Vault.make, or (`userId` aside) for a VaultProvider.
+ * @returns A complete bag for {@link settledVault}, or (`userId` and `vaultlabel` aside) for Bank.make.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ userId: 'u2', vaultDB: myVaultDB }))
  */
-export const memoryVaultOpts = (overrides: Partial<MakeVaultOpts> = {}): MakeVaultOpts => ({
+export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVaultOpts => ({
   applabel:   'acme',
   userId:     'u1',
   vaultlabel: 'main',
@@ -145,13 +150,15 @@ export const memoryVaultOpts = (overrides: Partial<MakeVaultOpts> = {}): MakeVau
   ...overrides,
 })
 
-/**
- * A vault made with `opts` and settled: `Vault.make(opts)`, then its `hello()` awaited, so its
- * snapshot says `absent`, `locked` or `unlocked`. Throws as `Vault.make` does for misuse, and
- * rejects as `hello()` does, leaving that handle open: a test that needs it closed makes the vault
- * itself.
+// The bank each vault settledVault handed out was born of, so a test can let it go.
+const banksOf = new WeakMap<Vault, Bank>()
+
+/** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of `userId` and `vaultlabel`.
+ * Its snapshot says `novel`, `locked` or `unlocked`. A bank of its own each time, so two calls
+ * over one deviceDB are two tabs of one device. Rejects as `Bank.make` throws for misuse, and as
+ * `ensureVault` rejects.
  *
- * @param opts - Everything Vault.make takes; {@link memoryVaultOpts} makes a bag of them.
+ * @param opts - Everything Bank.make takes, and the vault's names; {@link memoryVaultOpts} makes a bag of them.
  * @returns The vault, settled.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
@@ -160,10 +167,32 @@ export const memoryVaultOpts = (overrides: Partial<MakeVaultOpts> = {}): MakeVau
  *   const here = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
  *   const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
  */
-export const settledVault = async (opts: MakeVaultOpts): Promise<Vault> => {
-  const vault = Vault.make(opts)
-  await vault.hello()
+export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
+  const { userId, vaultlabel, ...bankOpts } = opts
+  const bank = Bank.make(bankOpts)
+  const vault = await bank.ensureVault({ userId, vaultlabel })
+  banksOf.set(vault, bank)
   return vault
+}
+
+/** The bank `vault` was born in, by {@link settledVault}: for a test that lets it go, reopens it, or clears what the device keeps of it.
+ * Throws for a vault settledVault did not hand out.
+ *
+ * @example TH.bankOf(vault).closeVault({ userId: 'u1', vaultlabel: 'main' })
+ */
+export const bankOf = (vault: Vault): Bank => {
+  const bank = banksOf.get(vault)
+  if (bank === undefined) { throw new Error('bankOf knows only the vaults settledVault handed out.') }
+  return bank
+}
+
+/** Let `vault` go, as its bank's `closeVault` does: every call on it then refuses 'vault_gone'.
+ * Nothing stored is erased: the lease and the device record stay, for the next birth.
+ *
+ * @example TH.closeVault(vault)   // the lease stays, for the next vault settled over this deviceDB
+ */
+export const closeVault = (vault: Vault): void => {
+  bankOf(vault).closeVault({ userId: vault.user_id, vaultlabel: vault.vaultlabel })
 }
 
 /**
@@ -394,30 +423,19 @@ export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 
  */
 export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
 
-/** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen. */
-export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> }
-
-/**
- * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
- * has it, seen at gate epoch 1, by the device `device-one`.
+/** A shape-valid DeviceRecord for device-storage tests: `userId`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
+ * Any field as `overrides` says otherwise.
  *
- * @example await deviceDB.putMark(TH.markOf('u1'))
- * @example TH.markOf('u1', { seen: { gate_epoch: 3 } })    // a device that has seen the vault at epoch 3
+ * @example await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
+ * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
  */
-export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {
-  const { seen, ...head } = overrides
-  return {
-    format: 'safebyok-mark-v5',
-    ...scopeOf(userId),
-    ...head,
-    seen:   {
-      device_id:  'device-one',
-      vault_tok:  `vault-tok-${userId}`,
-      gate_epoch: 1,
-      ...seen,
-    },
-  }
-}
+export const deviceRecordOf = (userId: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({
+  format:              'safebyok-device-v1',
+  ...scopeOf(userId),
+  device_id:           'device-one',
+  highest_vault_epoch: 1,
+  ...overrides,
+})
 
 /** A real lease record for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
 export const leaseOf = async (userId: string, overrides: Partial<LeaseRecord> = {}): Promise<LeaseRecord> => ({

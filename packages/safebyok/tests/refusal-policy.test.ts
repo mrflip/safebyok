@@ -12,7 +12,7 @@ describe("RefusalPolicy.decide", () => {
   const DecideCases = [
     // the examples:
     [signedOut(),                                                       "lock",  'locks for identity_revoked'],
-    [new VaultError('rolled_back', 'An older copy.'),                   "lock",  'locks for rolled_back: storage handing back an older copy is as little to be trusted'],
+    [new VaultError('vault_behind', 'An older copy.'),                  "lock",  'locks for vault_behind: storage handing back an older copy is as little to be trusted'],
     [new VaultError('not_permitted', 'Not yours.'),                     "none",  'does nothing more for not_permitted: the vault\'s own user, refused one call'],
     // what says nothing about who is signed in:
     [new VaultError('stale_write', 'Another device wrote first.'),      "none",  'does nothing more for a stale write'],

@@ -89,7 +89,7 @@ describe("the README Yoga recipe", () => {
     await vault.unlock('correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    vault.close()
+    TH.closeVault(vault)
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {

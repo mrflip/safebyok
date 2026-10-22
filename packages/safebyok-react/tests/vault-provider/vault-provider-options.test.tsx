@@ -6,13 +6,13 @@ import { VaultProvider, type VaultProviderProps } from '../../src/vault-provider
 import { Probe, grabber, makeWorld, refuseAcme, shownState, expectShown, CatchingBoundary, hushConsole, lockedWorld, providerOf, twelveOrMore } from './world'
 
 describe("VaultProvider", () => {
-  // == [Options passed through]: keyDeriver, Vault.make options, validators, strengthChecker, logger, allowStartOver, others
+  // == [Options passed through]: keyDeriver, Bank.make options, validators, strengthChecker, logger, allowStartOver, others
 
-  it("asks for a keyDeriver outright, as Vault.make does", () => {
+  it("asks for a keyDeriver outright, as Bank.make does", () => {
     expectTypeOf<Pick<VaultProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
   })
 
-  it("passes every Vault.make option through, as given", async () => {
+  it("passes every Bank.make option through, as given", async () => {
     // A fixed instant the vault accepts as a time: after 1981, before FarFuture.
     const ClockMillis = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
@@ -86,7 +86,7 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(screen.getByRole('status').textContent).to.match(/can't take a new passphrase yet/) })
   })
 
-  it("throws to the error boundary a strengthChecker that is no function, as Vault.make refuses it", () => {
+  it("throws to the error boundary a strengthChecker that is no function, as Bank.make refuses it", () => {
     hushConsole()
     const caught: unknown[] = []
     const { props } = makeWorld()
@@ -94,7 +94,7 @@ describe("VaultProvider", () => {
     render(<CatchingBoundary caught={caught}><VaultProvider {...misfit} userId="u1"><Probe /></VaultProvider></CatchingBoundary>)
     expect(shownState()).to.eq('boundary')
     expect(isVaultError(caught[0], 'bad_option')).to.be.true
-    expect((caught[0] as Error).message).to.match(/^Vault\.make's strengthChecker: expected a function.*browserOpts/)
+    expect((caught[0] as Error).message).to.match(/^Bank\.make's strengthChecker: expected a function.*browserOpts/)
   })
 
   it("keeps its vault for a strengthChecker that keeps its identity, the vault running that checker", async () => {
@@ -124,7 +124,7 @@ describe("VaultProvider", () => {
     if (second === null) { throw new Error('the provider opened no vault') }
     const err = await TH.expectRefusal(second.unlock('correct horse battery staple'), 'weak_passphrase')
     expect(err.message).to.eq('Second reason.')
-    await TH.expectRefusal(first.unlock('correct horse battery staple'), 'vault_closed')
+    await TH.expectRefusal(first.unlock('correct horse battery staple'), 'vault_gone')
   })
 
   it("shows the vault locked when storage says its user signed out, as the vault locks itself", async () => {
@@ -186,20 +186,24 @@ describe("VaultProvider", () => {
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'refresh']])
   })
 
-  it("passes allowStartOver to the dialog: a user who forgot the passphrase may start a new vault", async () => {
+  it("passes allowStartOver to the dialog: a user who forgot the passphrase may start a new vault, which the provider hands down novel with no retry", async () => {
     const world = await lockedWorld()
     render(<VaultProvider {...world.props} userId="u1" allowStartOver><world.Grab /></VaultProvider>)
     const vault = await world.opened()
     const reading = vault.tryGetWhisper('anthropic_api_key')
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
     fireEvent.click(screen.getByText('Remove and start over'))
-    // The delete lands as a lock: the dialog closes, and the read that asked is refused.
+    // The delete ends the prompt: the dialog closes, and the read that asked is refused, its Vault object gone.
     const { err } = await reading
-    expect(err?.refusalkind).to.eq('vault_locked')
+    expect(err?.refusalkind).to.eq('vault_gone')
     await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
-    expect(vault.getSnapshot().state).to.eq('absent')
+    // The provider asks for the vault again on its own: the next life, novel, never an openError.
+    await waitFor(() => { expect(world.latest().vault).to.not.be.null.and.not.eq(vault) })
+    expect(world.latest().openError).to.be.null
+    const next = await world.opened()
+    expect(next.getSnapshot().state).to.eq('novel')
     // The next call asks the user to choose a passphrase for the new vault.
-    const storing = vault.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-new-fake')
+    const storing = next.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-new-fake')
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     fireEvent.click(screen.getByText('Create vault'))
@@ -245,7 +249,7 @@ describe("VaultProvider", () => {
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
       await waitFor(() => { expect(reported).to.have.lengthOf(1) })
       expect(isVaultError(reported[0], 'unexpected_error')).to.be.true
-      expect((reported[0] as Error).message).to.match(/strengthChecker handed to Vault\.make threw/)
+      expect((reported[0] as Error).message).to.match(/strengthChecker handed to Bank\.make threw/)
       expect(TH.thrownText(reported[0])).to.not.include('could not judge')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
@@ -307,11 +311,11 @@ describe("VaultProvider", () => {
       const spy = TH.spyLogger()
       const world = makeWorld()
       const { rerender } = render(providerOf(world, { logger: { ...spy.logger } }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { logger: { ...spy.logger } }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { logger: { ...spy.logger } }))
-      await expectShown('absent')
+      await expectShown('novel')
       const warned = spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')
       expect(warned).to.have.lengthOf(1)
       expect(warned[0]?.level).to.eq('warn')
@@ -323,9 +327,9 @@ describe("VaultProvider", () => {
       const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
       const world = makeWorld()
       const { rerender } = render(providerOf(world, { clock: { now: () => Date.now() } }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { clock: { now: () => Date.now() } }))
-      await expectShown('absent')
+      await expectShown('novel')
       // Each open with the test deriver also warns, of the deriver: only the provider's own are counted.
       const warned = consoleWarn.mock.calls.map(([said]) => String(said)).filter((said) => said.startsWith('safebyok: VaultProvider'))
       expect(warned).to.have.lengthOf(1)
@@ -336,11 +340,11 @@ describe("VaultProvider", () => {
       const spy = TH.spyLogger()
       const world = makeWorld()
       const { rerender } = render(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
-      await expectShown('absent')
+      await expectShown('novel')
       const warned = spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')
       expect(warned).to.have.lengthOf(1)
       expect(warned[0]?.story).to.deep.equal({ call: 'VaultProvider', props: ['strengthChecker'] })
@@ -351,9 +355,9 @@ describe("VaultProvider", () => {
       const clock = { now: () => Date.now() }
       const world = makeWorld()
       const { rerender } = render(providerOf(world, { logger: spy.logger, clock }))
-      await expectShown('absent')
+      await expectShown('novel')
       rerender(providerOf(world, { logger: spy.logger, clock }))
-      await expectShown('absent')
+      await expectShown('novel')
       expect(spy.calls).to.deep.equal([])
     })
   })

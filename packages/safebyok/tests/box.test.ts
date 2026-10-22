@@ -102,7 +102,7 @@ const sealedOf = async (whisper: Whisper = Secret, props: Partial<SealBoxProps> 
  */
 const handSealedOf = async (vault: TH.LeasedSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
   const { format, box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...header } = TH.boxOf('anthropic_api_key', 'hand')
-  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_tok ?? '', purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
+  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_tok, purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
   const boxKey = await makeBoxKey()
   return {
     format,
@@ -110,12 +110,6 @@ const handSealedOf = async (vault: TH.LeasedSlice, vaultKey: CryptoKey, plainByt
     box_key_wrapped:  await wrapKeyUnder(vaultKey, boxKey, ctxFor('box_key_wrapped')),
     whisper_ciphered: await cipherBytes(boxKey, plainBytes, ctxFor('whisper_ciphered')),
   }
-}
-
-/** The stamp `vault` holds, failing the test where it holds none. */
-const stampOf = (vault: TH.LeasedSlice): Stamp => {
-  if (vault.stamp === null) { throw new Error('expected the vault to hold a stamp') }
-  return vault.stamp
 }
 
 /** The stamp `box` carries, read field by field: no spread or key list shows it. */
@@ -144,14 +138,13 @@ describe("Box.make", () => {
   it("is made under the stamp its vault holds, or under the stamp it is handed", async () => {
     const vault = await vaultOf()
     expect(Box.make(vault, TH.boxOf('anthropic_api_key', 'a1')).vault_tok).to.eq('vault-tok-u1')
-    const read = Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), { ...stampOf(vault), vault_tok: 'vault-tok-read', gate_epoch: 4 })
+    const read = Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), { ...vault.stamp, vault_tok: 'vault-tok-read', gate_epoch: 4 })
     expect(read).to.include({ vault_tok: 'vault-tok-read', gate_epoch: 4 })
   })
 
-  it("refuses as 'absent_vault' a box of a vault that holds no vault props, when no stamp is handed", async () => {
+  it("refuses a null stamp as 'bad_option': a vault always holds one, so there is no vault-not-made-yet to say", async () => {
     const vault = await vaultOf()
-    vault.stamp = null
-    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1')), 'absent_vault')
+    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), null as unknown as Stamp), 'bad_option')
   })
 
   it("refuses a stamp that is no stamp as 'bad_option'", async () => {
@@ -184,7 +177,7 @@ describe("Box.make", () => {
   it("carries its stamp readable but hidden, frozen with the rest: the vault's, for its demand to judge, as the class's example shows", async () => {
     const vault = await vaultOf()
     const box = Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'))
-    const stamp = stampOf(vault)
+    const { stamp } = vault
     expect(boxStampOf(box)).to.deep.equal(stamp)
     for (const ckey of Object.keys(stamp)) {
       expect(Object.getOwnPropertyDescriptor(box, ckey)).to.include({ enumerable: false, writable: false, configurable: false })
@@ -253,7 +246,7 @@ describe("Box.seal", () => {
 
   it("stamps the box with the vault as it stood at the seal, the lease's vault_tok among it", async () => {
     const { vault, box } = await sealedOf()
-    expect(boxStampOf(box)).to.deep.equal(stampOf(vault))
+    expect(boxStampOf(box)).to.deep.equal(vault.stamp)
     expect(box.vault_tok).to.eq(vault.lease?.vault_tok)
   })
 
@@ -354,10 +347,10 @@ describe("Box.seal", () => {
     await TH.expectRefusal(Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret), 'vault_locked')
   })
 
-  it("refuses as 'absent_vault' a seal into a vault that holds no vault props", async () => {
+  it("refuses as 'vault_gone' a seal into a vault let go", async () => {
     const vault = await vaultOf()
-    vault.stamp = null
-    await TH.expectRefusal(Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret), 'absent_vault')
+    vault.gone = true
+    await TH.expectRefusal(Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret), 'vault_gone')
   })
 
   it("resolves the box as an Outcome's val from trySeal", async () => {
@@ -440,7 +433,7 @@ describe("box.extractWhisper", () => {
   ] as const) {
     it(`refuses as '${refusalkind}' a box made before its vault moved on, opening nothing`, async () => {
       const { vault, box } = await sealedOf()
-      vault.stamp = { ...stampOf(vault), ...moved }
+      vault.stamp = { ...vault.stamp, ...moved }
       const decipher = vi.spyOn(crypto.subtle, 'decrypt')
       await TH.expectBad(box.tryExtractWhisper(), refusalkind)
       expect(decipher).not.toHaveBeenCalled()

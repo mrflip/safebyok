@@ -118,7 +118,7 @@ describe("postgresVaultDB, as the README has it", () => {
     await first.unlock('correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
     await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
-    first.close()
+    TH.closeVault(first)
 
     const second = await opened()
     await second.unlock('correct horse battery staple')
@@ -127,7 +127,7 @@ describe("postgresVaultDB, as the README has it", () => {
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
-    second.close()
+    TH.closeVault(second)
   })
 })
 
@@ -215,12 +215,12 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
     }
     const owner = await opened(TH.requestFor(db, 'u1'))
     await owner.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    owner.close()
+    TH.closeVault(owner)
     const reader = await opened(postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), userId: 'u1' }))
     await TH.expectRefusal(reader.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
     expect(reader.getSnapshot().state).to.eq('unlocked')
     expect(await reader.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    reader.close()
+    TH.closeVault(reader)
   })
 })
 // --
@@ -594,8 +594,8 @@ describe("postgresVaultDB, its box limit", () => {
     expect(here.getSnapshot().boxes).to.have.lengthOf(1)
     const refusal = await TH.expectRefusal(here.putBox({ boxlabel: 'mistral' }, 'sk-fake-three'), 'vault_full')
     expect(refusal.message).to.include('its storage keeps')
-    here.close()
-    there.close()
+    TH.closeVault(here)
+    TH.closeVault(there)
   })
 
   it("opens a vault with the smaller of MaxBoxes and its own, and refuses one asking for more", async () => {
@@ -610,7 +610,7 @@ describe("postgresVaultDB, its box limit", () => {
     for (const boxlabel of ['one', 'two', 'three']) { await vault.putBox({ boxlabel }, `sk-fake-${boxlabel}`) }
     const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'four' }, 'sk-fake-four'), 'vault_full')
     expect(refusal.message).to.include('limit of 3 boxes')
-    vault.close()
+    TH.closeVault(vault)
   })
 })
 // --

@@ -12,10 +12,10 @@ export type LoggedCall = {
 
 /**
  * A VaultLogger that logs nowhere and keeps every call it hears, in order, for a test to look at
- * -- bar the one notice `Vault.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
+ * -- bar the one notice `Bank.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
  * which every vault opened through {@link testDeriver} would otherwise add to every count.
  *
- * @returns The `logger` to hand Vault.make, and the `calls` it has heard so far.
+ * @returns The `logger` to hand Bank.make, and the `calls` it has heard so far.
  *
  * @example
  *   const spy = TH.spyLogger()

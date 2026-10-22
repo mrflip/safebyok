@@ -9,7 +9,7 @@ import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
 import { VaultProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { memoryVaultOpts, settledVault } from 'safebyok/testing'
+import { closeVault, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
@@ -29,7 +29,7 @@ export const Passphrase = 'correct horse battery staple'
  *   fresh `localVaultDB` in memory.
  * @returns `vaultDB` and `deviceDB`, `renderInVault(ui, userId?)`, `open(userId?)`,
  *   `openUnlocked(userId?)`, unlocked with {@link Passphrase}, and `seed(whispers, userId?)`. The
- *   user is `u1` unless named. Each vault `open` and `openUnlocked` hand out is closed when the
+ *   user is `u1` unless named. Each vault `open` and `openUnlocked` hand out is let go when the
  *   test ends, by tests/setup.ts.
  *
  * @example
@@ -61,7 +61,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
         await vault.putBox({ boxlabel }, whisper)
       }
     } finally {
-      vault.close()
+      closeVault(vault)
     }
   }
 
@@ -154,7 +154,7 @@ export const VaultProbe = () => {
 /**
  * Waits until the {@link VaultProbe} shows the vault in `state`, failing if it never does.
  *
- * @param state - The snapshot state to wait for: `absent`, `locked` or `unlocked`.
+ * @param state - The snapshot state to wait for: `novel`, `locked` or `unlocked`.
  *
  * @example await TH.expectProbeState('locked')
  */

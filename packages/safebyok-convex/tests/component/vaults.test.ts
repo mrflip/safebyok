@@ -276,7 +276,7 @@ describe("a real vault's records", () => {
     for (const [boxlabel, { whisper }] of Object.entries(TH.RealWhispers)) {
       expect(await vault.getWhisper(boxlabel)).to.deep.equal(whisper)
     }
-    vault.close()
+    TH.closeVault(vault)
   })
 
   it("list what the core reads as the summaries it lists", async () => {
@@ -294,7 +294,7 @@ describe("a real vault's records", () => {
       BoxSummary.parse({ ...shell, vault_tok: real.vaultProps.vault_tok })
     ))
     expect(summaries).to.deep.equal(vault.getSnapshot().boxes)
-    vault.close()
+    TH.closeVault(vault)
   })
 })
 
@@ -519,7 +519,7 @@ describe("a vault's weight limit", () => {
 // and signing read the vault once, but deleting it reads every row twice (each delete reads its row
 // again). So the component holds every vault to MaxVaultBoxes boxes and
 // MaxVaultBoxBytes bytes of them, whatever its client asks, and convexVaultDB declares half the
-// read budget, 8 MiB, as its maxVaultBytes. Vault.make admits a maxBoxes only while that many
+// read budget, 8 MiB, as its maxVaultBytes. Bank.make admits a maxBoxes only while that many
 // boxes, each counted at twice maxWhisperBytes plus 1 KiB for its other fields, fit in the
 // 8 MiB: at most 102 of the largest default whisper (40444 bytes of JSON, about 54 KB stored),
 // and at most 1638 of 2 KiB whispers. The tests below fill a vault to each of those, and to each

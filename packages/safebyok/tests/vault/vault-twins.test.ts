@@ -3,7 +3,7 @@ import { Vault } from '../../src/vault'
 import { VaultError, type RefusalKind } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { damagedVaultWorld, makeWorld, vaultWithPasskey } from './world'
+import { makeWorld, vaultWithPasskey, u1VaultPropsCkey, storedVaultPropsOf } from './world'
 
 // == [The pairs]: TwinCases, each X over its tryX
 
@@ -23,21 +23,21 @@ type Twin = Awaited<ReturnType<typeof twinVault>>
 
 /**
  * Each pair: its name; the kind it refuses with, and the arguments, given the vault, that it
- * refuses (a vault closed first, where only that refuses); the arguments it answers, and what its
+ * refuses (a vault let go first, where only that refuses); the arguments it answers, and what its
  * answer must be.
  */
 const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unknown[], (twin: Twin) => unknown[], (val: unknown, twin: Twin) => void])[] = [
   ["hello",            "bad_option",       () => [{ staleMinute: 0 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
   ["ensureLease",      "bad_option",       () => [{ renewMinute: 5 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
   ["unlock",           "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
-  ["lock",             "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
+  ["lock",             "vault_gone",       ({ vault }) => { TH.closeVault(vault); return [] },  () => [],                                          (val) => { expect(val).to.be.undefined }],
   ["putWayin",         "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val, { vault }) => { expect(val).to.deep.equal(vault.passphrase) }],
   ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val, { vault }) => { expect(val).to.eq(vault) }],
   ["putBox",           "bad_whisper",      () => [{ boxlabel: 'openai' }, null],               () => [{ boxlabel: 'openai' }, 'sk-fake-two'],     (val) => { expect(val).to.have.property('boxlabel', 'openai') }],
   ["getBox",           "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
   ["getWhisper",       "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
   ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val, { vault }) => { expect(val).to.deep.eq({ boxlabel: 'anthropic', vault_tok: vault.vault_tok, outcome: 'deleted' }) }],
-  ["del",              "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
+  ["del",              "vault_gone",       ({ vault }) => { TH.closeVault(vault); return [] },  () => [],                                          (val) => { expect(val).to.be.undefined }],
 ]
 
 /** `callname`'s two forms on `vault`: its `try` form and its throwing one. */
@@ -45,6 +45,18 @@ const twinsOf = (vault: Vault, callname: TwinName) => {
   const calls = vault as unknown as CallsByName
   const tryCall = calls[`try${callname[0]!.toUpperCase()}${callname.slice(1)}`]!.bind(vault) as (...args: unknown[]) => Promise<Outcome<unknown>>
   return { tryCall, call: calls[callname]!.bind(vault) }
+}
+
+/**
+ * A vault unlocked with `pw`, born with `overrides` over a vaultDB that hears no change bells, whose
+ * stored vault props are then spoiled underfoot: its next read meets 'damaged_vault', and no watch
+ * has met it first.
+ */
+const damagedUnderfoot = async (overrides?: Partial<TH.BornVaultOpts>) => {
+  const world = makeWorld()
+  const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), ...overrides })
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  return { world, vault }
 }
 
 describe("each call's two forms (Contract: Shapes, Two forms of every call)", () => {
@@ -69,37 +81,26 @@ describe("each call's two forms (Contract: Shapes, Two forms of every call)", ()
   }
 
   it("throws, from the throwing form, the very refusal it told onBadNews: one err, two forms", async () => {
-    const world = await damagedVaultWorld()
     const told: VaultError[] = []
-    const vault = Vault.make(world.optsWith({ onBadNews: (news) => { told.push(news) } }))
-    const { err } = await vault.tryHello()
+    const { vault } = await damagedUnderfoot({ onBadNews: (news) => { told.push(news) } })
+    const { err } = await vault.tryHello({ staleMinutes: 0 })
     expect(told).to.deep.equal([err])
     expect(told[0]).to.eq(err)
-    const refusal = await TH.expectRefusal(vault.hello(), 'damaged_vault')
+    const refusal = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault')
     expect(told).to.have.lengthOf(2)
     expect(told[1]).to.eq(refusal)
   })
 
   it("tells bad news once, whichever form met it (Contract: Bad news is told once)", async () => {
-    const world = await damagedVaultWorld()
     const onBadNews = vi.fn()
-    const vault = Vault.make(world.optsWith({ onBadNews }))
-    await TH.expectBad(vault.tryHello(), 'damaged_vault')
+    const { vault } = await damagedUnderfoot({ onBadNews })
+    await TH.expectBad(vault.tryHello({ staleMinutes: 0 }), 'damaged_vault')
     expect(onBadNews).toHaveBeenCalledOnce()
-    await TH.expectRefusal(vault.hello(), 'damaged_vault')
+    await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault')
     expect(onBadNews).toHaveBeenCalledTimes(2)
   })
 
-  it("closes at once, its try form answering an Outcome, not a promise of one", () => {
-    const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
-    const outcome = vault.tryClose()
-    expect(outcome).to.deep.equal({ ok: true, val: undefined })
-    vault.close()
-    expect(vault.tryClose()).to.deep.equal({ ok: true, val: undefined })
-  })
-
-  it("answers as the vault class's second example shows: a wrong passphrase branched on, never thrown", async () => {
+  it("answers as the vault class's fourth example shows: a wrong passphrase branched on, never thrown", async () => {
     const { vault } = await twinVault()
     await vault.lock()
     const gripes: string[] = []
@@ -162,8 +163,8 @@ describe("vault.getWhisper", () => {
 })
 
 describe("vault.subscribe", () => {
-  it("throws 'bad_option' at once for a listener that is no function, having no try form", () => {
-    const vault = Vault.make(makeWorld().optsWith())
+  it("throws 'bad_option' at once for a listener that is no function, having no try form", async () => {
+    const vault = await makeWorld().open()
     TH.expectSyncRefusal(() => vault.subscribe('listen' as unknown as () => void), 'bad_option')
     expect(vault).to.not.have.property('trySubscribe')
   })
@@ -175,28 +176,30 @@ describe("vault.subscribe", () => {
 describe("vault.hello as an event handler", () => {
   it("refuses an event in place of its options as bad_option, naming the wrap, and reads nothing", async () => {
     const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
+    const vault = await world.open()
+    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
     expect(err.message).to.match(/^Unrecognized keys?: "[^.]*\. hello\(\)'s only option is `staleMinutes`/)
     expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
     expect(err.message).to.include('`() => vault.tryHello()`')
-    expect(vault.state).to.eq('opening')
+    expect(propsReads).not.toHaveBeenCalled()
   })
 
-  it("hellos when wrapped as its fourth example shows, the handler reading storage on the event", async () => {
-    const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
+  it("hellos when wrapped as its third example shows, the handler reading storage on the event", async () => {
+    const world = makeWorld({ staleMinutes: 0 })
+    const vault = await world.open()
+    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     const window = new EventTarget()
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
     window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => { expect(vault.state).to.eq('absent') })
+    await vi.waitFor(() => { expect(propsReads).toHaveBeenCalledOnce() })
+    expect(vault.state).to.eq('novel')
     expect(vault.trouble).to.be.null
   })
 
   it("refuses any object that is no plain bag of options, as a React event is, as bad_option", async () => {
-    const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
+    const vault = await makeWorld().open()
     class SyntheticEvent { readonly type = 'click' }
     const clicked = new SyntheticEvent()
     await TH.expectBad(vault.tryHello(clicked as unknown as { staleMinutes: number }), 'bad_option')
@@ -204,8 +207,7 @@ describe("vault.hello as an event handler", () => {
   })
 
   it("still refuses a plain bag that misspells its option, and a value that is no object, with kind 'bad_option'", async () => {
-    const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
+    const vault = await makeWorld().open()
     const misspelt = await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
     expect(misspelt.message).to.eq("Unrecognized key: \"staleMinute\". hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
     const numbered = await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
@@ -213,8 +215,7 @@ describe("vault.hello as an event handler", () => {
   })
 
   it("takes a bag of options with no prototype, as a plain bag", async () => {
-    const world = makeWorld()
-    const vault = Vault.make(world.optsWith())
+    const vault = await makeWorld().open()
     const opts = Object.assign(Object.create(null) as object, { staleMinutes: 0 })
     expect(await TH.expectGood(vault.tryHello(opts))).to.eq(vault)
   })

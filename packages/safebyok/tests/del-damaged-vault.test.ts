@@ -4,15 +4,18 @@ import * as Z from 'zod/mini'
 import { type DeviceDB } from '../src/device-db'
 import { type VaultDB } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
-import { type MakeVaultOpts } from '../src/vault-opts'
+import { type MakeBankOpts } from '../src/vault-opts'
+import { type DelDamagedVaultOpts } from '../src/del-damaged-vault'
 import { delDamagedVault } from '../src/del-damaged-vault'
+import { Bank } from '../src/bank'
+import { isVaultError } from '../src/errors'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 import { damagedVaultWorld, rowsOf, makeWorld, u1VaultPropsCkey, isU1Box, storedVaultPropsOf, MisfitStores, VaultDBVerbsUsed } from './vault/world'
 
 
 describe("delDamagedVault", () => {
-  it("clears a vault whose hello() refuses it as damaged_vault -- its vault props, its boxes and this device's lease -- so a new one can be made", async () => {
+  it("clears a vault whose birth refuses it as damaged_vault -- its vault props, its boxes and this device's lease -- so a new one can be born", async () => {
     const world = await damagedVaultWorld()
     expect(await world.getLease()).to.not.be.null
     await TH.expectRefusal(world.open(), 'damaged_vault')
@@ -20,7 +23,7 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
-    expect(fresh.getSnapshot().state).to.eq('absent')
+    expect(fresh.getSnapshot().state).to.eq('novel')
     await fresh.unlock('another pw')
     await fresh.putBox({ boxlabel: 'anthropic' }, 'sk-new-fake')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
@@ -29,9 +32,9 @@ describe("delDamagedVault", () => {
   it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already deleted", async () => {
     const world = await damagedVaultWorld()
     const trouble = new Error('device storage is unavailable')
-    vi.spyOn(world.deviceDB, 'delMark').mockRejectedValueOnce(trouble)
+    vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
-    expect(err.message).to.match(/erasing its mark of this vault/)
+    expect(err.message).to.match(/writing its record of this vault/)
     expect(err.cause).to.eq(trouble)
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
   })
@@ -119,11 +122,11 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks the scope with the vault's validators, handing the VaultDB's verb the scope alone, and refuses a misspelt bag as Vault.make does", async () => {
+  it("checks the scope with the vault's validators, handing the VaultDB's verb the scope alone, and refuses a misspelt bag as Bank.make does", async () => {
     const world = await damagedVaultWorld()
     const longUserId = ZClassic.string().min(1).max(300)
     const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userID: longUserId } as unknown as MakeVaultOpts['validators'] })), 'bad_option')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userID: longUserId } as unknown as MakeBankOpts['validators'] })), 'bad_option')
     const narrowUserId = ZClassic.string().max(1)
     await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userId: narrowUserId } })), 'bad_label')
     expect(verb).not.toHaveBeenCalled()
@@ -132,11 +135,11 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
   })
 
-  it("takes the options Vault.make took, and refuses misuse before touching storage", async () => {
+  it("takes the options Bank.make took beside the vault's names, and refuses misuse before touching storage", async () => {
     const world = await damagedVaultWorld()
     await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_label')
     await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: '' })), 'bad_label')
-    await TH.expectRefusal(delDamagedVault(null as unknown as MakeVaultOpts), 'bad_option')
+    await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')
     }
@@ -146,16 +149,39 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks names with the host's validators, as Vault.make does", async () => {
+  it("checks names with the host's validators, as Bank.make does", async () => {
     const world = makeWorld()
     const opts = world.optsWith({ userId: 'u1@example', validators: { userId: Z.string() } })
     const vault = await TH.settledVault(opts)
     await vault.unlock('pw')
-    vault.close()
+    TH.closeVault(vault)
     const ckey = Ckeys.vaultProps({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
     const vaultProps = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object
     world.dbStore.write(ckey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
     await delDamagedVault(opts)
     expect(JSON.parse(world.dbStore.read(ckey) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
+  })
+
+  it("raises this device's record to the tombstone's vault_epoch, keeping its device_id, so a restored copy of the damaged vault is behind", async () => {
+    const world = await damagedVaultWorld()
+    const before = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    await delDamagedVault(world.optsWith())
+    const tombstone = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? 'null') as { vault_epoch: number }
+    const after = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    expect(after?.highest_vault_epoch).to.eq(tombstone.vault_epoch)
+    expect(after?.device_id).to.eq(before?.device_id)
+  })
+
+  it("clears a vault its bank refused as damaged_vault, and the same bank then births a new life, novel, as its example shows", async () => {
+    const world = await damagedVaultWorld()
+    const { userId, vaultlabel, ...bankOpts } = world.optsWith()
+    const bank = Bank.make(bankOpts)
+    const { ok, err } = await bank.tryEnsureVault({ userId, vaultlabel: 'main' })
+    expect(ok).to.be.false
+    expect(isVaultError(err, 'damaged_vault')).to.be.true
+    await delDamagedVault({ ...bankOpts, userId, vaultlabel })
+    const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+    expect(vault.getSnapshot().state).to.eq('novel')
+    bank.closeVaults()
   })
 })

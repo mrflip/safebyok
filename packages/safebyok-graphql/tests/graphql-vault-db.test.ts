@@ -158,7 +158,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     await first.unlock('correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
     await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
-    first.close()
+    TH.closeVault(first)
 
     const second = await opened()
     await second.unlock('correct horse battery staple')
@@ -167,7 +167,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
-    second.close()
+    TH.closeVault(second)
   })
 
   it("never lets the Client's cache answer: a read after another device's write sees it", async () => {
@@ -195,7 +195,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     await first.unlock('correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await first.putWayin('correct horse battery staple', laptop)).to.deep.equal(first.passkey)
-    first.close()
+    TH.closeVault(first)
 
     const second = await opened()
     expect(second.getSnapshot().passkey).to.deep.include({
@@ -203,7 +203,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     })
     await second.unlock(laptop)
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    second.close()
+    TH.closeVault(second)
   })
 })
 

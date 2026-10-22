@@ -9,10 +9,10 @@
  * runnable over an adapter made per signed-in user). For tests only, and under vitest: the
  * deriver is worthless against a brute-forcer.
  */
-export { testDeriver, vaultSliceOf, leasedSliceOf, SliceNow, anyStrengthChecker, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
+export { testDeriver, vaultSliceOf, leasedSliceOf, SliceNow, anyStrengthChecker, memoryVaultOpts, settledVault, bankOf, closeVault, freshDbName, fakeCiphered, scopeOf,
   wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, gatelessOf, ensureGated, propsOf, boxesOf, boxOf, OddLabels,
-  summaryOf, noBoxYet, inThisVault, thisVault, deleting, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
-export type { LeasedSlice, MarkOverrides, VaultSlice } from './test-helpers/builders'
+  summaryOf, noBoxYet, inThisVault, thisVault, deleting, deviceRecordOf, leaseOf, tweakB64 } from './test-helpers/builders'
+export type { BornVaultOpts, LeasedSlice, VaultSlice } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,
   holdNextCall, holdNextAnswer, readAfresh, tallyWatches } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'

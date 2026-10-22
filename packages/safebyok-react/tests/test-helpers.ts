@@ -8,8 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Ask, type AskWhy, type MakeVaultOpts, type Outcome, type PasskeyWayinSummary, type ProofAnswer, type Vault, type VaultState } from 'safebyok'
-import { eventually, scopeOf, settledVault } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Ask, type AskWhy, type Outcome, type PasskeyWayinSummary, type ProofAnswer, type Vault, type VaultState } from 'safebyok'
+import { eventually, scopeOf, settledVault, type BornVaultOpts } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'
@@ -40,6 +40,7 @@ export type StubVaultOpts = {
   unlock?:          Vault['unlock']
   del?:             Vault['del']
   checkPassphrase?: Vault['checkPassphrase']
+  tryHello?:        Vault['tryHello']
 }
 
 /** A stub vault's `checkPassphrase` unless the test hands it another: every passphrase is strong. */
@@ -57,16 +58,16 @@ const trying = <ArgsT extends unknown[], ValT>(call: ((...args: ArgsT) => Promis
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven days), a subscribe that
- * never calls back, a `checkPassphrase` admitting every passphrase unless the test hands it
- * another, and whichever calls the test hands it, each in both its forms: given as the throwing
+ * never calls back, a `checkPassphrase` admitting every passphrase and a `tryHello` settling at
+ * once unless the test hands it others, and whichever calls the test hands it, each in both its forms: given as the throwing
  * form, its `try` form answers the same as an Outcome.
  *
- * @example const vault = TH.stubVault({ state: 'absent' })
+ * @example const vault = TH.stubVault({ state: 'novel' })
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
   const snapshot = { state: opts.state ?? 'locked', passkey: opts.passkey ?? null, ...scopeOf('u1') }
-  return {
+  const stub = {
     ...scopeOf('u1'),
     getSnapshot:     () => snapshot,
     subscribe:       () => unsubscribeFromNothing,
@@ -76,7 +77,10 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     del:             opts.del,
     tryDel:          trying(opts.del),
     checkPassphrase: opts.checkPassphrase ?? admitsEvery,
+    // Settles at once, reading nothing.
+    tryHello:        opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
   } as unknown as Vault
+  return stub
 }
 
 /**
@@ -100,7 +104,7 @@ const asksMade = new WeakMap<Vault, Ask>()
 
 /**
  * An {@link Ask} over `vault`, as a dialog reads one, for rendering a dialog or a button without
- * a vault raising it: its `why` (by default 'absent' for a vault so shown, 'locked' otherwise),
+ * a vault raising it: its `why` (by default 'novel' for a vault so shown, 'locked' otherwise),
  * the vault, an `attempt` that is the vault's `tryUnlock` resolving the vault, and a
  * `lockLanded` that settles when `opts.lockLanded` does, or never. Called again for the same
  * vault with no options, it hands back the same ask.
@@ -113,7 +117,7 @@ export const askOf = (vault: Vault, opts: { why?: AskWhy, lockLanded?: Promise<v
   const kept = plain ? asksMade.get(vault) : undefined
   if (kept !== undefined) { return kept }
   const ask = {
-    why:        opts.why ?? (vault.getSnapshot().state === 'absent' ? 'absent' : 'locked'),
+    why:        opts.why ?? (vault.getSnapshot().state === 'novel' ? 'novel' : 'locked'),
     vault,
     attempt:    async (...args: Parameters<Vault['tryUnlock']>): Promise<Outcome<Vault>> => {
       const { ok, err } = await vault.tryUnlock(...args)
@@ -134,7 +138,7 @@ export const askOf = (vault: Vault, opts: { why?: AskWhy, lockLanded?: Promise<v
  *   const { vault, ask, ensuring } = await TH.askedBy(opts)
  *   render(<PassphraseModal ask={ask} onDone={noop} />)
  */
-export const askedBy = async (opts: MakeVaultOpts) => {
+export const askedBy = async (opts: BornVaultOpts) => {
   const answering = held<ProofAnswer>()
   const asks: Ask[] = []
   const vault = await settledVault({ ...opts, getProof: (ask) => { asks.push(ask); return answering.promise } })

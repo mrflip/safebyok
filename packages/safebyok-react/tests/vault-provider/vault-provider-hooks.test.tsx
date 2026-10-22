@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
+import { Bank, VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Activity, StrictMode, useLayoutEffect } from 'react'
 import { renderToString } from 'react-dom/server'
@@ -17,7 +17,7 @@ describe("VaultProvider", () => {
       const { rerender } = render(tree(null))
       expect(screen.getByText('Sign in')).to.not.be.null
       rerender(tree('u1'))
-      await expectShown('absent')
+      await expectShown('novel')
       await putThroughNewVault('a fine passphrase')
       expect(shownState()).to.eq('unlocked')
       fireEvent.click(screen.getByText('Lock'))
@@ -35,23 +35,23 @@ describe("VaultProvider", () => {
       expect(await screen.findByText('1 keys stored')).to.not.be.null
     })
 
-    it("hands down a damaged record as openError, the very bad news the vault keeps as its trouble; storage out of reach is openError alone", async () => {
+    it("hands down a damaged record as openError, the very bad news told to onBadNews, and no vault; storage out of reach is openError too", async () => {
       const damaged = await damagedWorld()
       const told: VaultError[] = []
       const grab = grabber()
       const { unmount } = render(<VaultProvider {...damaged.props} userId="u1" onBadNews={(news) => { told.push(news) }}><grab.Grab /></VaultProvider>)
       await waitFor(() => { expect(grab.latest().openError?.refusalkind).to.eq('damaged_vault') })
-      expect(grab.latest().vault?.trouble).to.eq(grab.latest().openError)
+      expect(grab.latest().vault).to.be.null
       expect(told).to.deep.equal([grab.latest().openError])
       unmount()
 
       const world = makeWorld()
       const refusal = unreachable()
-      vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(refusal))
+      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(refusal))
       const reach = grabber()
       render(<VaultProvider {...world.props} userId="u1"><reach.Grab /></VaultProvider>)
       await waitFor(() => { expect(reach.latest().openError).to.eq(refusal) })
-      expect(reach.latest().vault?.trouble).to.be.null
+      expect(reach.latest().vault).to.be.null
     })
 
     it("each throws, rendered with no VaultProvider above it, saying what it needs", () => {
@@ -73,21 +73,21 @@ describe("VaultProvider", () => {
   })
 
   describe("under StrictMode", () => {
-    it("reads storage once: the vault its rehearsal makes and closes reads nothing, and only the vault kept says hello (Contract: getProof, in React)", async () => {
+    it("reads storage once: the bank its rehearsal makes and lets go reads nothing, and only the vault kept is born (Contract: getProof, in React)", async () => {
       const world = makeWorld()
       const counts = countStoreCalls(world)
       const { Grab, opened } = grabber()
       render(<StrictMode><VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider></StrictMode>)
       const vault = await opened()
-      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('novel') })
       await TH.wakeupAtNextTick()
-      expect(counts()).to.deep.equal({ subscribe: 1, getVaultProps: 1, getMark: 1 })
+      expect(counts()).to.deep.equal({ subscribe: 1, ensureVault: 1, getDeviceRecord: 1 })
     })
 
     it("asks for the passphrase and runs the action again, as it does without", async () => {
       const world = makeWorld()
       render(<StrictMode>{world.tree('u1')}</StrictMode>)
-      await expectShown('absent')
+      await expectShown('novel')
       await putThroughNewVault('a fine passphrase')
       expect(shownState()).to.eq('unlocked')
     })
@@ -99,15 +99,15 @@ describe("VaultProvider", () => {
       const tree = (userId: string | null) => <StrictMode><VaultProvider {...world.props} userId={userId}><Grab /></VaultProvider></StrictMode>
       const { rerender } = render(tree('u1'))
       const first = await opened()
-      await waitFor(() => { expect(first.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(first.getSnapshot().state).to.eq('novel') })
       rerender(tree(null))
       expect(latest().vault).to.be.null
-      await TH.expectRefusal(first.hello(), 'vault_closed')
+      await TH.expectRefusal(first.hello(), 'vault_gone')
       rerender(tree('u2'))
       const second = await opened()
-      await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(second.getSnapshot().state).to.eq('novel') })
       expect(second.user_id).to.eq('u2')
-      expect(counts()).to.deep.equal({ subscribe: 2, getVaultProps: 2, getMark: 2 })
+      expect(counts()).to.deep.equal({ subscribe: 2, ensureVault: 2, getDeviceRecord: 2 })
     })
 
     it("makes a fresh vault when a hidden <Activity> shows again, never using the one it closed", async () => {
@@ -116,13 +116,13 @@ describe("VaultProvider", () => {
       const tree = (mode: 'visible' | 'hidden') => <StrictMode><Activity mode={mode}><VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider></Activity></StrictMode>
       const { rerender } = render(tree('visible'))
       const first = await opened()
-      await waitFor(() => { expect(first.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(first.getSnapshot().state).to.eq('novel') })
       rerender(tree('hidden'))
-      await TH.expectRefusal(first.hello(), 'vault_closed')
+      await TH.expectRefusal(first.hello(), 'vault_gone')
       rerender(tree('visible'))
       await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
       const second = latest().vault
-      await waitFor(() => { expect(second?.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(second?.getSnapshot().state).to.eq('novel') })
     })
   })
 
@@ -139,7 +139,7 @@ describe("VaultProvider", () => {
       )
       const { rerender } = render(tree(null))
       const vault = await opened()
-      await waitFor(() => { expect(vault.getSnapshot().state).to.not.eq('opening') })
+      expect(vault.getSnapshot().state).to.eq('unlocked')
       rerender(tree('first'))
       rerender(tree('second'))
       expect(latest().vault).to.eq(vault)
@@ -150,7 +150,7 @@ describe("VaultProvider", () => {
       expect(spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')).to.deep.equal([])
     })
 
-    it("tells the next user's handler nothing a closed vault meets", async () => {
+    it("tells the next user's handler nothing a vault let go meets", async () => {
       const world = await madeWorld()
       const told: string[] = []
       const { Grab, opened } = grabber()
@@ -161,7 +161,7 @@ describe("VaultProvider", () => {
       )
       const { rerender } = render(tree('u1'))
       const first = await opened()
-      await waitFor(() => { expect(first.getSnapshot().state).to.not.eq('opening') })
+      expect(first.getSnapshot().state).to.eq('unlocked')
       // A read under way on u1's vault as u2 signs in meets u1's damaged record after the switch.
       world.spoil()
       const hello = first.tryHello({ staleMinutes: 0 })
@@ -170,7 +170,7 @@ describe("VaultProvider", () => {
       expect(ok).to.be.false
       const second = await opened()
       expect(second.user_id).to.eq('u2')
-      await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
+      await waitFor(() => { expect(second.getSnapshot().state).to.eq('novel') })
       await TH.wakeupAtNextTick()
       expect(told).to.deep.equal([])
     })
@@ -178,11 +178,11 @@ describe("VaultProvider", () => {
     it("tells the next user's handler nothing the last user's vault meets in the commit that brings the next user, before its passive effects", async () => {
       const world = await madeWorld()
       const told: string[] = []
-      const made = vi.spyOn(Vault, 'make')
+      const made = vi.spyOn(Bank, 'make')
       const { Grab, opened } = grabber()
       const news = new VaultError('damaged_box', "A box in the vault is damaged: it can't be read.")
       // Rendered after the provider, so its layout effect runs after the provider's in the same
-      // commit: it tells news through the handler u1's vault was handed, as a read landing then would.
+      // commit: it tells news through the handler u1's bank was handed, as a read landing then would.
       const LateNews = ({ userId }: { userId: string }) => {
         useLayoutEffect(() => {
           if (userId === 'u2') { void made.mock.calls[0]?.[0].onBadNews?.(news) }
@@ -204,7 +204,7 @@ describe("VaultProvider", () => {
       expect(told.filter((line) => line.startsWith('u2'))).to.deep.equal([])
     })
 
-    it("throws an onBadNews that is no function to the error boundary, as Vault.make refuses it", async () => {
+    it("throws an onBadNews that is no function to the error boundary, as Bank.make refuses it", async () => {
       hushConsole()
       const world = makeWorld()
       const caught: unknown[] = []

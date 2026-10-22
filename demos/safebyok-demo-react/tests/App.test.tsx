@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserOpts } from 'safebyok/browser'
 import { App } from '../src/App'
+import { Applabel, vaultDB } from '../src/lib/stores'
 
 // The App derives through the browser's defaults: 64 MiB of Argon2id for every passphrase typed,
 // near a second each here and over five on a loaded CI machine under coverage, where one click
@@ -44,6 +45,24 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
     expect(screen.queryByText('The Knock-Knock Machine')).to.be.null
+  })
+
+  it("deletes the account and its vault, leaving no vault made anew: signing out lets the vault go before the provider could ask for it again", async () => {
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: 'leaver' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByText(/No boxes yet/)
+    const shown = await screen.findByText(/^\(user_/)
+    const scope = { applabel: Applabel, user_id: shown.textContent.slice(1, -1), vaultlabel: 'main' }
+    const born = await vaultDB.getVault(scope)
+    expect(born.ok && born.val !== null).to.be.true
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByPlaceholderText('username')
+    await waitFor(async () => { expect(await vaultDB.getVault(scope)).to.deep.equal({ ok: true, val: null }) })
+    // A beat more, for any ask the provider might have made once the Vault object went.
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
+    expect(await vaultDB.getVault(scope)).to.deep.equal({ ok: true, val: null })
   })
 
   it("clicks through the passphrase dialog: set, lock, mistype, dismiss, enter, and start over", async () => {
@@ -97,4 +116,5 @@ describe("App", () => {
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
   })
+
 })

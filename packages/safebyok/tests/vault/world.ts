@@ -1,9 +1,8 @@
-import { VaultScope, type LeaseRecord, type DeviceMark } from '../../src/types'
+import { VaultScope, type LeaseRecord, type DeviceRecord } from '../../src/types'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
-import { type MakeVaultOpts } from '../../src/vault-opts'
 import type { KeyDeriver } from '../../src/key-deriver'
 import * as Ckeys from '../../src/ckeys'
 import * as TH from '../test-helpers'
@@ -30,7 +29,7 @@ export const neverRings = () => silence
  * derive through the cheap testDeriver, so the suite is not a benchmark of Argon2id; the real
  * deriver has its own tests in key-deriver.test.ts.
  */
-export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
+export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const dbStore = memoryStore()
   const vaultDB = localVaultDB({ store: dbStore })
   const deviceDB = memoryDeviceDB()
@@ -38,18 +37,18 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const clock = { now: () => nowMillis }
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
-  const optsWith = (overrides?: Partial<MakeVaultOpts>): MakeVaultOpts => (
+  const optsWith = (overrides?: Partial<TH.BornVaultOpts>): TH.BornVaultOpts => (
     { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger, ...defaults, ...overrides }
   )
-  const open = (overrides?: Partial<MakeVaultOpts>) => TH.settledVault(optsWith(overrides))
-  const openUnlocked = async (passphrase: string, overrides?: Partial<MakeVaultOpts>) => {
+  const open = (overrides?: Partial<TH.BornVaultOpts>) => TH.settledVault(optsWith(overrides))
+  const openUnlocked = async (passphrase: string, overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
     await vault.unlock(passphrase)
     return vault
   }
   const getLease = () => TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
-  const stateOnOpen = async (overrides?: Partial<MakeVaultOpts>) => {
+  const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
     return vault.getSnapshot().state
   }
@@ -59,11 +58,11 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
 /** Boxlabels in the snapshot, in order. */
 export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summary) => summary.boxlabel)
 
-/** Storage adapters Vault.make refuses: short of a verb the vault calls. */
-export const MisfitStores: readonly (readonly [Partial<MakeVaultOpts>, string])[] = [
-  [{ vaultDB: { getVaultProps: () => Promise.resolve(null) } as unknown as MakeVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
-  [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as MakeVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
-  [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getMark') }, 'a deviceDB that keeps no device mark'],
+/** Storage adapters Bank.make refuses: short of a verb the vault calls. */
+export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
+  [{ vaultDB: { getVaultProps: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
+  [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
+  [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getDeviceRecord') }, 'a deviceDB that keeps no device record'],
 ]
 
 export const HourMillis = 60 * 60 * 1000
@@ -78,15 +77,15 @@ export const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}
  */
 export const uncheckingDeviceDB = () => {
   const rows = new Map<string, unknown>()
-  const marks = new Map<string, unknown>()
+  const records = new Map<string, unknown>()
   const deviceDB: DeviceDB = {
     getLease: (scope) => { const kept = (rows.get(ckeyOf(scope)) ?? null) as LeaseRecord | null; return Promise.resolve(TH.good(kept)) },
     putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(record)) },
     delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    getMark:  (scope) => { const kept = (marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null; return Promise.resolve(TH.good(kept)) },
-    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
-    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve(TH.good(undefined)) },
+    getDeviceRecord:   (scope) => { const kept = (records.get(ckeyOf(scope)) ?? null) as DeviceRecord | null; return Promise.resolve(TH.good(kept)) },
+    raiseDeviceRecord: (record) => { records.set(ckeyOf(record), record); return Promise.resolve(TH.good(record)) },
+    delDeviceRecord:   (scope) => { records.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    delAll:   () => { rows.clear(); records.clear(); return Promise.resolve(TH.good(undefined)) },
   }
   /** Rewrite the one stored row through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {
@@ -122,13 +121,13 @@ export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-  vault.close()
+  TH.closeVault(vault)
   world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
 }
 
-/** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'getVault', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+/** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
@@ -152,7 +151,7 @@ export const vaultWithPasskey = async () => {
  * a lease write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
  * own copy of testDeriver, so a spy on it stays here.
  */
-export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
+export const makeRacingWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const keyDeriver: KeyDeriver = { ...TH.testDeriver }
   const world = makeWorld({ keyDeriver, ...defaults })
   const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVault')

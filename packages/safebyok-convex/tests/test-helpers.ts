@@ -3,7 +3,7 @@ import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { GatedVaultProps, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
+import { boxOf, closeVault, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -133,7 +133,7 @@ export const realRecords = async (userId = 'u1') => {
   for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
     await vault.putBox({ boxlabel, sidecar }, whisper)
   }
-  vault.close()
+  closeVault(vault)
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
   const vaultPropsRow = rows.find((row) => VaultProps.safeParse(row.record).success)
   if (! vaultPropsRow) { throw new Error('the core stored no vault props') }

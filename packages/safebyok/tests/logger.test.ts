@@ -1,10 +1,13 @@
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { Bank } from '../src/bank'
 import { VaultError } from '../src/errors'
+import { localVaultDB } from '../src/local-vault-db'
+import { memoryStore } from '../src/string-store'
 import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
-/** What a host might hand Vault.make as its logger that is not one. */
+/** What a host might hand Bank.make as its logger that is not one. */
 const NotLoggers = [
   [{},                                                         'an empty object'],
   [{ log: () => undefined, warn: () => undefined },            'a logger without error'],
@@ -206,6 +209,66 @@ describe("VaultLogger", () => {
     const story = { call: 'putBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a store retried', story)
     expect(spy.calls[0]?.story).to.deep.equal(story)
+  })
+})
+
+/**
+ * A bank over `logger` births u1's vault, then its device store fails every raise of the device
+ * record, so the vault's first unlock warns that it could not note the copy it wrote: one line,
+ * through `logger`. `overrides` replace any of the bank's options.
+ */
+const warnAtFirstUnlock = async (logger: VaultLogger, overrides: Partial<TH.BornVaultOpts> = {}): Promise<void> => {
+  const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ logger, ...overrides })
+  const bank = Bank.make(bankOpts)
+  const vault = await bank.ensureVault({ userId, vaultlabel })
+  vi.spyOn(bankOpts.deviceDB, 'raiseDeviceRecord').mockRejectedValue(new Error('the disk said no'))
+  await vault.unlock('pw')
+  bank.closeVaults()
+}
+
+const RaiseWarning = 'could not note the newest copy of the vault'
+
+describe("VaultLogger, handed to Bank.make", () => {
+  it("hears what a bank's vault says, through the host's own three calls, as its first example shows", async () => {
+    const telemetry = TH.spyLogger()
+    const logger: VaultLogger = {
+      log:   (message, story) => { telemetry.logger.log(message, story) },
+      warn:  (message, story, err) => { telemetry.logger.warn(message, story, err) },
+      error: (message, story, err) => { telemetry.logger.error(message, story, err) },
+    }
+    await warnAtFirstUnlock(logger)
+    expect(telemetry.calls).to.have.length.greaterThan(0)
+    for (const call of telemetry.calls) {
+      expect(call.level).to.eq('warn')
+      expect(call.message).to.include(RaiseWarning)
+    }
+  })
+
+  it("is silent given three calls that do nothing, as its second example shows", async () => {
+    const consoles = (['log', 'warn', 'error'] as const).map((level) => vi.spyOn(console, level).mockImplementation(() => { /* kept out of the test output */ }))
+    await warnAtFirstUnlock({ log: () => undefined, warn: () => undefined, error: () => undefined })
+    for (const said of consoles) { expect(said).not.toHaveBeenCalled() }
+  })
+
+  it("takes the console itself, its lines untagged, as its third example shows", async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
+    await warnAtFirstUnlock(console)
+    const warned = consoleWarn.mock.calls.map(([message]) => String(message)).find((message) => message.includes(RaiseWarning))
+    expect(warned).to.match(/^This device could not note/)
+  })
+})
+
+describe("DefaultLogger", () => {
+  afterEach(() => { setDefaultLogger(undefined) })
+
+  it("sends the vault's lines to the default, while its storage keeps a logger of its own, as its example shows", async () => {
+    const telemetry = TH.spyLogger()
+    const storageSpy = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
+    await warnAtFirstUnlock(DefaultLogger, { vaultDB: localVaultDB({ store: memoryStore(), logger: storageSpy.logger }) })
+    const warnedOf = (calls: readonly TH.LoggedCall[]) => calls.filter((call) => call.message?.includes(RaiseWarning)).length
+    expect(warnedOf(telemetry.calls)).to.be.greaterThan(0)
+    expect(warnedOf(storageSpy.calls)).to.eq(0)
   })
 })
 

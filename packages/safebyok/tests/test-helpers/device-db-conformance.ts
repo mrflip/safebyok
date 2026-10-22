@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { type DeviceDB } from '../../src/device-db'
-import { scopeOf, leaseOf, markOf } from './builders'
+import { scopeOf, leaseOf, deviceRecordOf } from './builders'
 import { expectBad, expectingGood } from './refusals'
 
 
 /**
  * The behaviour every DeviceDB owes, written once: every verb answering a good Outcome; no lease
  * until one is written, then that record back, its leaseKey still a non-extractable CryptoKey;
- * likewise a device mark, the newest written in place of the one before; each scope kept to
- * itself, and marks apart from leases; an erase of one, or of all; and one scope's calls landing
+ * a device record, raised and never lowered, the first `device_id` kept; each scope kept to
+ * itself, and records apart from leases; an erase of one, or of all; and one scope's calls landing
  * in the order they were made, awaited or not. Given a second factory, an
  * adapter over a store the browser withholds, it checks too that every verb then resolves a bad
  * Outcome of 'storage_blocked', never a rejection, as `deviceOutcomeOf` answers. Run it against
@@ -40,9 +40,9 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
         await expectBad(deviceDB.getLease(scopeOf('u1')), 'storage_blocked')
         await expectBad(deviceDB.putLease(lease), 'storage_blocked')
         await expectBad(deviceDB.delLease(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.getMark(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.putMark(markOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.delMark(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.getDeviceRecord(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.raiseDeviceRecord(deviceRecordOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.delDeviceRecord(scopeOf('u1')), 'storage_blocked')
         await expectBad(deviceDB.delAll(), 'storage_blocked')
       })
     }
@@ -52,10 +52,10 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       const lease = await leaseOf('u1')
       expect(await deviceDB.putLease(lease)).to.deep.equal({ ok: true, val: lease })
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
-      expect(await deviceDB.putMark(markOf('u1'))).to.deep.equal({ ok: true, val: undefined })
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal({ ok: true, val: markOf('u1') })
+      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
       expect(await deviceDB.delLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
-      expect(await deviceDB.delMark(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
+      expect(await deviceDB.delDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
       expect(await deviceDB.delAll()).to.deep.equal({ ok: true, val: undefined })
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
     })
@@ -105,37 +105,57 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getLease(scopeOf('u2'))).to.not.be.null
     })
 
-    it("delAll erases every lease, and every device mark", async () => {
+    it("delAll erases every lease, and every device record", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.putLease(await leaseOf('u1'))
       await deviceDB.putLease(await leaseOf('u2'))
-      await deviceDB.putMark(markOf('u1'))
+      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))
       await deviceDB.delAll()
       expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
       expect(await deviceDB.getLease(scopeOf('u2'))).to.be.null
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
     })
 
-    it("has no device mark until one is written, then keeps it whole, and the newest in place of the one before", async () => {
+    it("has no device record until one is raised, then keeps it whole, raised to a higher vault_epoch", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
-      await deviceDB.putMark(markOf('u1'))
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
-      await deviceDB.putMark(markOf('u1', { seen: { gate_epoch: 4 } }))
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { gate_epoch: 4 } }))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
+      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 4 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
     })
 
-    it("keeps marks per vault, and apart from leases: erasing one leaves the rest", async () => {
+    it("never lowers a device record: a lower vault_epoch keeps the higher, and resolves the record as it stands", async () => {
+      const deviceDB = expectingGood(await makeDeviceDB())
+      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+    })
+
+    it("keeps the first device_id raised: a later raise under another id keeps it, and raises the epoch", async () => {
+      const deviceDB = expectingGood(await makeDeviceDB())
+      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-one' }))
+      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 2 }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 }))
+    })
+
+    it("raises two at once to the higher, in whichever order they land", async () => {
+      const deviceDB = expectingGood(await makeDeviceDB())
+      await Promise.all([deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 7 })), deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 6 }))])
+      const raised = await deviceDB.getDeviceRecord(scopeOf('u1'))
+      expect(raised?.highest_vault_epoch).to.eq(7)
+    })
+
+    it("keeps device records per vault, and apart from leases: erasing one leaves the rest", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.putLease(await leaseOf('u1'))
-      await deviceDB.putMark(markOf('u1'))
-      await deviceDB.putMark(markOf('u2'))
-      await deviceDB.delMark(scopeOf('u1'))
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.getMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
+      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))
+      await deviceDB.raiseDeviceRecord(deviceRecordOf('u2'))
+      await deviceDB.delDeviceRecord(scopeOf('u1'))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
       expect(await deviceDB.getLease(scopeOf('u1'))).to.not.be.null
       await deviceDB.delLease(scopeOf('u2'))
-      expect(await deviceDB.getMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
+      expect(await deviceDB.getDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
     })
   })
 }
