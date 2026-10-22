@@ -196,10 +196,8 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
   return gate
 }
 
-/**
- * Holds the answer of the next call to `target[verb]` at a gate (see {@link makeGate}) once the
- * call itself has run, until the test releases it: the store has done the work, and the caller
- * has not yet heard. Later calls go straight through.
+/** Holds the answer of the next call to `target[verb]` at a gate (see {@link makeGate}) once the call itself has run, until the test releases it.
+ * The store has done the work, and the caller has not yet heard. Later calls go straight through.
  *
  * Use it, not {@link holdNextCall}, to land a call while a write is in flight to a store that
  * applies calls in the order made, as a DeviceDB does: a hold at the door would let a later call
@@ -229,10 +227,9 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
   return gate
 }
 
-/**
- * Has `vault` read storage afresh, as it stands once this is called: a read already under way may
- * have begun before the test's last write, and a refresh asked for meanwhile shares it, so this
- * awaits that one, then asks for another.
+/** Has `vault` read storage afresh, as it stands once this is called.
+ * A read already under way may have begun before the test's last write, and a refresh asked for
+ * meanwhile shares it, so this awaits that one, then asks for another.
  *
  * @param vault - The Vault object to read into: anything with a `refresh()`.
  *

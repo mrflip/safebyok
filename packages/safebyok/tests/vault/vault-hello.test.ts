@@ -972,10 +972,9 @@ describe("a lease take-up a key change overtakes", () => {
   })
 })
 
-/**
- * Expect the lease this device's store still holds, granted before the vault moved on, never to
- * open `vault`: a read drops a lease from memory and erases nothing, and `ensureLease()` (with no
- * `getProof` to ask) finds it outdated, discards it, and refuses.
+/** Expect the lease this device's store still holds, granted before the vault moved on, never to open `vault`.
+ * A read drops a lease from memory and erases nothing, and `ensureLease()` (with no `getProof` to
+ * ask) finds it outdated, discards it, and refuses.
  */
 const expectOutdatedLeaseRefused = async (world: ReturnType<typeof makeWorld>, vault: Vault) => {
   expect(await world.getLease()).to.not.be.null
