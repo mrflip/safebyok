@@ -1,70 +1,60 @@
 # Thread 6b: box_seal (2026-10-22)
 
-Branch `20261022-box_seal`, PR [#256](https://github.com/mrflip/safebyok/pull/256), stacked on [#254](https://github.com/mrflip/safebyok/pull/254). Justify: green (core 2905 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). `pnpm size:budget`: no line moves (everything 43.3 of 47 kB, Vault 35.6 of 39 kB).
-
-**Blocking question for the Coach** (below, *For the Coach*): the binding the thread was cut for
-already stands; what the Coach's question points at is the whole `putBox()` carrying forward an
-unopened `registered_at`, and closing that changes a ruled path.
+Branch `20261022-box_seal`, PR [#256](https://github.com/mrflip/safebyok/pull/256), stacked on [#254](https://github.com/mrflip/safebyok/pull/254). Justify: green (core 2911 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). `pnpm size:budget`: no line moves (everything 43.4 of 47 kB, Vault 35.6 of 39 kB).
 
 * **Built**:
   * `src/box.ts`: a Box's stamp (`applabel`, `user_id`, `vaultlabel`, `vault_tok`, `vault_epoch`,
     `gate_epoch`) is attached with `decorate` (`src/adorn.ts`) before `Object.freeze`, so it is
-    non-enumerable: `{ ...box }`, `Object.keys(box)`, `JSON.stringify(box)` and `box.toJSON()`
-    show the five visible fields alone (`boxlabel`, `revision_tok`, `sidecar`, `registered_at`,
-    `written_at`). `box.vault_tok` and the rest still read, for `vault.demandConsistentWith`.
-    `BoxView` narrows to `Omit<BoxSummary, 'damaged' | 'vault_tok'>`.
-  * The rule, named in `BoxRecord`'s and `Box.seal`'s doc blocks: "we sign all immutable fields".
-  * `lock()`, `putBox()`, `delBox()` doc blocks and the README's `vault.lock()` paragraph (the
-    Coach, via the orchestrator): a lock refuses `vault_locked`, writing nothing, at every step
-    before the write -- the wait on `getProof`, `VaultDB.getBox`, `box.extractWhisper()`,
-    `Box.seal`; only the write itself, once `VaultDB.putBox` / `VaultDB.delBox` is sent, lands or
-    refuses as storage decides, a stale `putBox()` refusing `stale_write` as ever. Existing tests
-    cover each step (`vault-demand.test.ts`, *a lock landing during a box call*, and the prompt
-    test above it); none added.
-  * `tests/box.test.ts`: 41 → 42 `it(` cases (82 → 83 run), none retired. The view test now lists
-    five fields and checks the stamp's absence from JSON and `inspect`; a new test reads the stamp
-    field by field and finds each non-enumerable, non-writable.
-  * The changeset (minor): what a host sees of the stamp; stored boxes unchanged.
-  * `notes/security.md`, through a sonnet subagent, amending four entries in place (no new
-    ones): the box ctx entry (the rule, the stamp unauthenticated and hidden), thread 6's whole-put
-    amendment (the one exception, open with the Coach), thread 5's `lock()` entry (what a lock
-    stops), and thread 5's ground-truth entry (one line on the stamp).
+    non-enumerable: `{ ...box }`, `JSON.stringify(box)` and `box.toJSON()` show the five visible
+    fields alone. `box.vault_tok` and the rest still read, for `vault.demandConsistentWith`.
+    `BoxView` is `Omit<BoxSummary, 'damaged' | 'vault_tok'>`.
+  * The rule, named in `BoxRecord`'s and `Box.seal`'s doc blocks and the security note: "we sign
+    all immutable fields".
+  * **Rework (the Coach's rulings, 2026-10-22):**
+    * **The lease is private again.** `vault.lease` is gone. `src/held-lease.ts` holds a
+      module-private `WeakMap`: the Vault constructor calls `registerLeaseReader(this, () =>
+      this.#lease)` (first registration wins), and `Box.seal`, `box.extractWhisper()` and a
+      damaged lease's `#dropDamaged` read it with `heldLeaseOf(vault)`. Exported from no entry
+      point. `BoxVault` and `LeaseVault` no longer name `lease`; `TH.leasedSliceOf` registers its
+      slice. The surface walk (`vault-boxes.test.ts`) now finds no `Lease` at all.
+    * **The delegated block**, `// == [Vault: the lease, delegated]`: `askPassphraseAt` (the
+      lease's deadline, already on the snapshot, moved here from the fields section, its doc
+      block now for an autolock line) and `leaseMillis`. Nothing new: the lease's other fields
+      (scope, `vault_tok`, `gate_epoch`) already read on the Vault object as the vault props'
+      own, equal to the lease's while it stands.
+    * **`getWhisper` of none refuses `absent_box`** (`Promise<Whisper>`); `getBox` still resolves
+      null; `useWhisper` drops its own null check. Thread 6's changeset and details line amended
+      in place on this branch, so the CHANGELOG does not say both.
+    * **Lock wording.** `lock()`, `putBox()`, the README: a `putBox()` refuses `vault_locked`
+      while it waits on `getProof`, `VaultDB.getBox` / `box.extractWhisper()`, or `Box.seal`; a
+      `delBox()` while it waits on `getProof`. Once `VaultDB.putBox` / `VaultDB.delBox` is sent,
+      storage decides. New tests: a lock on the `getProof` prompt of a `putBox()` and a `delBox()`.
+    * **Renames**: `#takeStoredBox` → `#updateBoxListingOf`; its twin `#takeBoxDeletion` →
+      `#dropBoxListingOf`. Threads 5's and 6's files note the new names beside the old.
+  * Tests (`it(` cases; none retired): `box.test.ts` 41 → 42; `held-lease.test.ts` 0 → 3;
+    `vault-boxes.test.ts` 126 → 127; `vault-demand.test.ts` 33 → 34 (two runs).
+  * `notes/security.md` (sonnet subagent), amended in place: the box ctx entry, thread 6's
+    whole-put and `vault.lease` entries, the non-extractable-vaultKey entry, thread 5's `lock()`
+    entry ("at each wait named here") and its ground-truth entry (the stamp).
 * **Decisions taken**:
-  * **The immutable set**, from `BoxRecord` and `#sealAndPutBox`: the vault's scope and
-    `vault_tok`, the `boxlabel`, `registered_at` (carried forward by every store), and the
-    `format`, `whisper_codec` and `whisper_schema_version` (literals). Mutable per revision:
-    `revision_tok`, `sidecar`, `written_at`. All of both are already in the box ctx
-    (`lease.ts`, `#boxCtxOf`, by `cipherCtx`): the ctx bytes are unchanged, `ctx-bytes.test.ts`
-    untouched, and `box.test.ts`'s *its registered_at altered* already refuses `damaged_box`.
-    So no stored-format change: boxes sealed before still open.
-  * The stamp's `vault_epoch` and `gate_epoch` are not in the ctx and must not be: they are the
-    vault's as it stood at a read, and move without the box being resealed.
-  * `decorate` with the six fields picked by name, not the stamp object spread, so nothing more
-    than the stamp is ever attached.
-* **Deviations**: the gloss asked for a minor changeset saying old boxes read as damaged. None
-  do, so the changeset (still minor, for the narrowed `BoxView` and `toJSON`) says they open as
-  before.
+  * **The immutable set**: the vault's scope and `vault_tok`, `boxlabel`, `registered_at`, and
+    `format` / `whisper_codec` / `whisper_schema_version`. Per revision: `revision_tok`,
+    `sidecar`, `written_at`. All already in the box ctx (`lease.ts`, `#boxCtxOf`): ctx bytes
+    unchanged, no stored-format change.
+  * The stamp's epochs stay out of the ctx: they move without the box being resealed.
+  * **A WeakMap, not a static-block accessor** (as `leaseRecordOf` is): a `#lease` brand check
+    would refuse the test slices `Box` and `Lease` are tested with; a registry lets the slice
+    register as a Vault does, and keeps nothing reachable from the Vault object.
+* **Deviations**: no box reads as damaged (the gloss expected so); the changeset says they open
+  as before.
 * **Discoveries**:
-  * The thread's premise -- that `registered_at` is not authenticated -- holds only for the
-    listing. The ctx binds it on every revision; what is unauthenticated is the listing's copy,
-    which the snapshot shows and a whole `putBox()` (sidecar and whisper both given) adopts in
-    `#listedBase` without opening anything (thread 6's open matter 2).
-  * For thread 8: the ctx builder to reuse is `cipherCtx` (`src/crypto.ts`), as `wayinCtxOf`
-    already does; it binds a whole header object, so "sign all immutable fields" there is a
-    question of which fields go in the header, not of a new builder.
+  * `registered_at` was already authenticated; only the listing's copy is not, which a whole
+    `putBox()` carries forward (ruled: keep).
+  * **Two copies of the package** each hold their own registry: a Box of one copy refuses
+    `vault_locked` under a Vault object of the other. `box.test.ts`'s other-copy test registers
+    its slice with the second copy.
+  * For thread 8: reuse `cipherCtx`, as `wayinCtxOf` already does.
 * **For the Coach**:
-  1. **BLOCKING. Close the whole `putBox()`'s carry-forward of `registered_at`?** Answers:
-     (a) **keep** -- the whole put reads nothing (audit 7, as ruled); a `registered_at` altered in
-     storage is sealed into the new revision on that path alone; the security note says so.
-     (b) **open before carrying** -- every `putBox()` reads and opens the box first, as a partial
-     put does: one more storage read and decipher per whole put, and a whole put over a stale
-     listing no longer refuses `stale_write` (it writes over what it read): a Contract change.
-     (c) **carry ciphertext in the listing** -- `VaultDB.getVault`'s listing keeps each box's
-     `box_key_wrapped`, and the whole put unwraps it under the lease against the listed fields
-     before adopting them: no extra read, but a change to every adapter's listing shape and the
-     snapshot's memory of ciphertext. **Rec: (a)**: the worst storage gains is choosing the time a
-     box shows as first stored, which the snapshot already shows as storage holds it; (b) breaks
-     a ruled contract and (c) is an adapter-wide change for a timestamp.
-  2. **The Lease shows its stamp.** `{ ...lease }` and `lease.toJSON()` still show its scope,
-     `vault_tok` and `gate_epoch` (they are all its visible fields). **Rec:** leave it; it holds
-     nothing else to show.
+  1. **Ruled (a), keep**: the whole `putBox()` carries the listing's `registered_at` unopened.
+  2. **Cross-copy Vault and Box** refuse `vault_locked`, a misleading kind for "another copy".
+     **Rec:** leave it; `Box.make` already refuses another copy's Box as no box (`bad_record`).
