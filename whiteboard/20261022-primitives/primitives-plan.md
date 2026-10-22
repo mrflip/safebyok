@@ -489,7 +489,11 @@ demands after each await. TODO entries from the Coach (2026-10-22): the Postgres
 an agent skill set; `capacity` as an attribute of the Vault object for the app; the Vault object
 adopting storage's capacity on `vault_full`; the stamp rather than the scope as VaultDB request
 params; sending the authenticated immutable fields with puts and reads for an early server-side
-check; whether `damaged_lease` should call `lock()` (without recursing). Write the get/demand/ensure triplet into STYLE.md
+check; whether `damaged_lease` should call `lock()` (without recursing). In the Contract, say that a lock spares only the
+transactional part: a VaultDB write once sent completes or refuses as storage decides, and every
+step before it refuses `vault_locked` (the Coach: "that covers only the transactional part, which
+I'm sure is uncleaer in the contract"); a stale write never succeeds, refusing `stale_write`, not
+`vault_locked`. Write the get/demand/ensure triplet into STYLE.md
 beside the try pairs. `box_moved` is dropped from the kinds.
 
 ### 12. route_meta
