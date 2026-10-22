@@ -70,6 +70,7 @@ Every worker, beyond CLAUDE.md:
   the spec wherever they disagree.
 * `primitives-toldjaso.md`: every guarantee relaxed so far. A thread that relaxes one more
   reports it for the list.
+* `guarantees-audit.md`: what your thread must do so that no guarantee falls (*By thread*).
 * `tests-retired.md`: the ledger of retired tests (*Ground rules*, 1).
 * STYLE.md: *Naming* before naming anything new, *Tests* before writing a test, *Comments and doc
   blocks* before a doc block.
@@ -133,6 +134,9 @@ Every worker, beyond CLAUDE.md:
     PR's open questions and `primitives-toldjaso.md`, with what a user would see.
 14. **Fluid design, no feature jealousy.** The spec's placement of a method is a guess the Coach
     will flip once the code is seen; build it as written and say in the PR where it fought you.
+15. **`guarantees-audit.md` binds threads 4 to 9** (*Orchestrator*, 2026-10-22): nine places
+    where the spec as written lets an outward guarantee fall, each with its fix and its thread
+    (*By thread*). Where it and `primitives.md` differ, it wins until the Coach rules.
 
 ## Threads
 
