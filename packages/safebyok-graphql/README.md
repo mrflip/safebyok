@@ -123,8 +123,8 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   `vault_props_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
   VaultError from it. Those fields are in the response's `data`: take care that your server's
   logging of responses, where it has any, does not write them down. Upgrade the client and the
-  server together; an older server's error with `extensions.meta` reads as a wrong answer
-  (`corrupt_record`).
+  server together; a client and a server of different versions refuse each other's operations
+  as `bad_option`.
 * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` and the optional `VaultNotifySql` trigger, one
   `listen` serving every VaultDB your server makes -- and stops listening when the subscriber goes. Changes that come

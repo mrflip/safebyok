@@ -33,9 +33,9 @@ const ServerMaxNameBytes = 640
  *   message, the GraphQL error its `cause`. A stale write, and a box write into a full vault,
  *   come back in the mutation's body (`landed: false`) with what stands or how full the vault is,
  *   never in an error's `extensions`, and are thrown here as the same VaultError, `meta` and all.
- *   A GraphQL error your server's own auth raises with
- *   `extensions.code` `FORBIDDEN` refuses with kind `not_permitted`. One with `UNAUTHENTICATED` is
- *   `storage_unavailable`, as a token expired mid-refresh is not a user gone.
+ *   A GraphQL error your server's own auth raises with `extensions.code` `FORBIDDEN` refuses with
+ *   kind `not_permitted`. One with `UNAUTHENTICATED` is `storage_unavailable`, as a token expired
+ *   mid-refresh is not a user gone.
  * * **Other writes** reach `subscribe` through the `safebyokVaultChanged` subscription, when your
  *   Client can send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
  *   `fetchSubscriptions`). Without one, nothing is pushed. A subscription that fails is not
