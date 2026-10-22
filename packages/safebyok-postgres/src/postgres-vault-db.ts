@@ -1,5 +1,5 @@
 import { Expectations, Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultProps } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredBox, StoredVault, VaultProps } from 'safebyok'
 import * as Columns from './columns'
 import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -55,6 +55,8 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   one is signed in, refuses with kind `identity_revoked` before the database is asked anything.
  * * **Every write is one statement**, atomic as Postgres makes every statement. An update of the
  *   vault props that does not move their `gate_epoch` forward refuses as `stale_write`.
+ * * **A vault is read in one statement**: `getVault` reads the vault props and their boxes from
+ *   one snapshot, and `ensureVault` creates and reads them in one statement too.
  * * **Locks**: a box write holds its vault row `FOR SHARE` and its box `FOR UPDATE`. It waits on a
  *   write to the vault props or to the same box, never on another box's write.
  * * **A full vault**: a new box in a vault holding `maxBoxes` refuses with kind `vault_full`. The
@@ -111,6 +113,31 @@ const BoxParamsFrom = 6
 
 const GetVaultPropsSql = `SELECT ${Columns.selected(VaultPropsColumns)} FROM safebyok_vaults WHERE ${ScopeIs}`
 
+// The boxes of the vault row `vaultRow` names, as one JSON array in text, `[]` for none: a
+// subquery of the statement that reads or writes that row. Its scope is $1 to $3, as in every
+// statement here, and each box's columns are as `selected` reads them, but its bigints, which JSON
+// carries as exact whole numbers.
+const VaultBoxesJsonSql = (vaultRow: string) => `(SELECT COALESCE(json_agg(listed), '[]'::json)::text FROM (
+    SELECT ${Columns.jsonSelected(ListedBoxColumns)} FROM safebyok_boxes WHERE ${ScopeIs} AND vault_tok = ${vaultRow}.vault_tok
+  ) AS listed) AS boxes`
+
+// The vault props and their boxes, from one snapshot: no write lands between the two reads.
+const GetVaultSql = `SELECT ${Columns.selected(VaultPropsColumns)}, ${VaultBoxesJsonSql('vault')}
+  FROM safebyok_vaults AS vault WHERE ${ScopeIs}`
+
+// EnsureVaultPropsSql's create, and the boxes of the vault props it returns. Its scope parameters
+// are the vault props' first three columns, $1 to $3, as the listing's are. The listing reads the
+// statement's snapshot, filtered to the vault_tok the insert returns: vault props another device
+// created after that snapshot are returned as they stand, with the boxes the snapshot holds of
+// them, and never another vault's.
+const EnsureVaultSql = `WITH ensured AS (
+    INSERT INTO safebyok_vaults (${Columns.names(VaultPropsColumns)})
+    VALUES (${Columns.placeholders(VaultPropsColumns, 1)})
+    ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET format = safebyok_vaults.format
+    RETURNING ${Columns.selected(VaultPropsColumns)}
+  )
+  SELECT ensured.*, ${VaultBoxesJsonSql('ensured')} FROM ensured`
+
 // Another device's vault props may land between this statement's start and its insert: DO NOTHING
 // would then return no row, so a no-op update instead returns the vault props that stand. Nothing
 // changes, so a notify trigger, if the host installed one, tells no one.
@@ -121,13 +148,23 @@ const EnsureVaultPropsSql = `INSERT INTO safebyok_vaults (${Columns.names(VaultP
 
 // The vault props written must name the vault they replace, as a vault_tok never changes, and move
 // their gate_epoch forward, as every update does (line 3.2): a modified client cannot write vault
-// props back over those it read.
-const PutVaultPropsSql = `UPDATE safebyok_vaults SET (${Columns.names(VaultPropsColumns)}) = ROW(${Columns.placeholders(VaultPropsColumns, 1)})
-  WHERE ${ScopeIs}
-    AND vault_tok = $${String(VaultPropsParamCount + 1)}::text AND gate_epoch = $${String(VaultPropsParamCount + 2)}::bigint
-    AND vault_tok = ${Columns.placeholderOf(VaultPropsColumns, 'vault_tok', 1)}
-    AND gate_epoch < ${Columns.placeholderOf(VaultPropsColumns, 'gate_epoch', 1)}
-  RETURNING 1 AS landed`
+// props back over those it read. The vault row is read FOR UPDATE first, which locks it and reads
+// it as it stands once locked, another writer's commit since the statement began included: what a
+// miss reports is the winner. The UPDATE then writes only over that row. One row back, either way:
+// `landed`, `stands` (whether vault props stood), and their columns as locked.
+const PutVaultPropsSql = `WITH standing AS MATERIALIZED (
+    SELECT ${Columns.selected(VaultPropsColumns)} FROM safebyok_vaults WHERE ${ScopeIs} FOR UPDATE
+  ), written AS (
+    UPDATE safebyok_vaults SET (${Columns.names(VaultPropsColumns)}) = ROW(${Columns.placeholders(VaultPropsColumns, 1)})
+    WHERE ${ScopeIs}
+      AND vault_tok = $${String(VaultPropsParamCount + 1)}::text AND gate_epoch = $${String(VaultPropsParamCount + 2)}::bigint
+      AND vault_tok = ${Columns.placeholderOf(VaultPropsColumns, 'vault_tok', 1)}
+      AND gate_epoch < ${Columns.placeholderOf(VaultPropsColumns, 'gate_epoch', 1)}
+      AND EXISTS (SELECT 1 FROM standing)
+    RETURNING 1
+  )
+  SELECT EXISTS (SELECT 1 FROM written) AS landed, EXISTS (SELECT 1 FROM standing) AS stands, standing.*
+  FROM (SELECT 1) AS answer LEFT JOIN standing ON true`
 
 const GetBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes WHERE ${ScopeIs} AND boxlabel = $4::text`
 
@@ -270,6 +307,18 @@ class TablesVaultDB extends VaultDB {
     this.maxBoxes = maxBoxes
   }
 
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+    this.mustReach(scope)
+    const { rows } = await this.sent(GetVaultSql, scopeParams(scope))
+    return rows.length === 0 ? { vaultProps: null, boxes: [] } : storedVaultOf(rows[0])
+  }
+
+  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    this.mustReach(draft)
+    const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(draft, VaultPropsColumns))
+    return storedVaultOf(rows[0])
+  }
+
   protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
     this.mustReach(scope)
     const { rows } = await this.sent(GetVaultPropsSql, scopeParams(scope))
@@ -282,10 +331,14 @@ class TablesVaultDB extends VaultDB {
     return Columns.recordOf(rows[0], VaultPropsColumns)
   }
 
+  // What a miss reports is the row as the statement's FOR UPDATE read it.
   protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     this.mustReach(vaultProps)
     const params = [...Columns.paramsOf(vaultProps, VaultPropsColumns), expected.vault_tok, expected.gate_epoch]
-    return landed(await this.sent(PutVaultPropsSql, params))
+    const { rows } = await this.sent(PutVaultPropsSql, params)
+    const answer = rows[0] as { landed: boolean, stands: boolean }
+    if (answer.landed) { return true }
+    throw Refusals.staleVaultProps(answer.stands ? Columns.recordOf(answer, VaultPropsColumns) : null)
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
@@ -426,6 +479,15 @@ const NotPermittedMessage = "The vault's database refused this call by a rule of
 const MaxNameBytes = 640
 
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
+
+/** A vault as a statement read it, its vault props' columns beside its boxes as JSON text: the vault props as stored, and each box under its own boxlabel column. */
+const storedVaultOf = (row: unknown): StoredVault => {
+  const listed = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
+  return {
+    vaultProps: Columns.recordOf(row, VaultPropsColumns),
+    boxes:      listed.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, ListedBoxColumns) })),
+  }
+}
 
 /** True when a write's `RETURNING` or `SELECT` says it landed: one row back. */
 const landed = ({ rows }: { rows: unknown[] }): boolean => rows.length > 0

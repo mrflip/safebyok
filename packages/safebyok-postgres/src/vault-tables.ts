@@ -17,7 +17,8 @@ export const VaultTablesSql = `-- safebyok-postgres: the tables a safebyok vault
 -- text as text, a time or a count as a bigint, and each structured value -- an encrypted value
 -- (a cipherIv and its ciphertext), or one of the vault props' two ways in -- as one opaque jsonb. A record's secret fields are ciphertext, every one.
 
--- One row of vault props per vault: its passphrase always, its passkey null when it has none.
+-- One row of vault props per vault: its passphrase and passkey both null until its gate is made
+-- (gate_epoch 0), then its passphrase always, and its passkey null when it has none.
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
   user_id          text   NOT NULL,
@@ -25,7 +26,7 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   vault_tok        text   NOT NULL,
   format           text   NOT NULL,
   gate_epoch       bigint NOT NULL,
-  passphrase       jsonb  NOT NULL,
+  passphrase       jsonb,
   passkey          jsonb,
   registered_at    bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel),

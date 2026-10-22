@@ -340,6 +340,41 @@ describe("postgresVaultDB, what it stores", () => {
     expect(spy.sent).to.have.lengthOf(7)
   })
 
+  it("reads and ensures a vault, its props and its boxes, each in one statement, the boxes without their ciphered fields", async () => {
+    const db = await TH.emptyDatabase()
+    const spy = TH.spyClient(db)
+    const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
+    await TH.expectingGood(vaultDB).ensureVault(u1, TH.gatelessOf('u1'))
+    await TH.expectingGood(vaultDB).getVault(u1)
+    expect(spy.sent).to.have.lengthOf(2)
+    for (const { text } of spy.sent) {
+      expect(text).to.include('json_agg')
+      expect(text).to.not.include('whisper_ciphered')
+    }
+  })
+
+  it("stores gateless vault props with their passphrase and passkey as SQL nulls, and reads them back beside their boxes, every field as written", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await TH.expectingGood(vaultDB).ensureVault(u1, TH.gatelessOf('u1'))
+    const { rows } = await db.query<{ passphrase: unknown, passkey: unknown, gate_epoch: unknown }>('SELECT passphrase, passkey, gate_epoch FROM safebyok_vaults')
+    expect(rows).to.deep.equal([{ passphrase: null, passkey: null, gate_epoch: 0 }])
+    await TH.expectingGood(vaultDB).putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
+    const sidecar = { alpha: 'café', zeta: 1, be: [true, null] }
+    await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar }))
+    expect(await TH.expectingGood(vaultDB).getVault(u1)).to.deep.equal({ vaultProps: TH.vaultPropsOf('u1'), boxes: await TH.expectingGood(vaultDB).listBoxes(u1) })
+  })
+
+  it("names the vault props standing when an update misses, from its one statement: the winner's, or none", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    const gone = await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 }), 'stale_write')
+    expect(gone.meta).to.deep.equal({ vault_props_stored: null })
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }))
+    const late = await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
+    expect(late.meta).to.deep.equal({ vault_props_stored: TH.vaultPropsOf('u1', { gate_epoch: 2 }) })
+  })
+
   it("leaves no box standing when its vault props go: deleting the vault takes them in the same statement", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
