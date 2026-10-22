@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 built (#258), in review; thread 7b (the React BankProvider) planned; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -352,7 +352,7 @@ tests for `putBox` and `delBox`. The second reviewer fixed a demo left red by a 
 copy refuses `vault_locked`; `askPassphraseAt` under `leaseHours: Infinity`; a lock during
 `#ensureUnlocked`'s hello or take-up (threads 7 to 9): Open Matters.
 
-### 7. bank
+### 7. bank, filed ([#258](https://github.com/mrflip/safebyok/pull/258))
 
 > **bank**: `Bank` with `make`, `hello`, `ensureVault(draft)`, `reopenVault`, `closeVault`,
 > `closeVaults`, `clearCachedVault(scope)`, its snapshot and `subscribe`; the libraries load at
@@ -399,6 +399,14 @@ refused `identity_revoked` or `vault_behind` erases the stored lease (a sign-out
 device record is validated at entry (`deviceRecordFor`); anything that makes the Vault object gone
 refuses calls waiting on the prompt `vault_gone`; VaultProvider re-ensures when its vault goes
 gone. React is adapted minimally: thread 7b below.
+
+*Review:* **fixed** ([#258](https://github.com/mrflip/safebyok/pull/258)). Each of the six bug fixes proven by
+reverting it; every guarantee on the list held. Fixed: a listener calling `bank.hello()` on
+'starting' recursed (`#ensureLoaded` holds the load first); the Postgres grants lacked `SELECT` on
+`safebyok_boxes`; two stale titles. Left (Open Matters): a Vault gone during its own birth is handed
+out; a listener calling `bank.ensureVault` recurses; a draft's own stores ignored for a held scope.
+For thread 11: `CUSTOMIZATION.md`, `VAULTDB.md`, `VOCABULARY.md` (85, 116), `old_vocabulary.md`, and
+the Postgres README's hidden-rows sentence still name retired things.
 
 ### 7b. bank_provider
 

@@ -78,8 +78,8 @@ rules* 3).
 | 5 | demand | filed, on main | #253 |
 | 6 | lease_box | filed, stacked on #253 | #254 |
 | 6b | box_seal | filed, stacked on #254 | #256 |
-| 7 | bank | built, in review | #258 |
-| 7b | bank_provider | planned | |
+| 7 | bank | filed, stacked on #256 | #258 |
+| 7b | bank_provider | building | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
 | 10 | react | planned | |
@@ -92,6 +92,29 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 7, bank (#258)
+
+*Orchestrator,* from the reports and review. Thread file `thread-7-bank.md`; every test moved is in
+`thread-7-bank-tests.md` (long, a reviewer's appendix).
+
+* **The Bank** (`src/bank.ts`): `make`, `hello` (loads the strength checker), `ensureVault` (one
+  Vault object per scope; joins a birth under way), `reopenVault`, `closeVault`, `closeVaults`,
+  `clearCachedVault` (erases the device record and the lease), `entryOf`, a snapshot and `subscribe`.
+  `applabel` lives on the Bank; the draft holds `userId`, `vaultlabel`, optional per-vault stores.
+* **Birth:** `deviceDB.getDeviceRecord` first, then `vaultDB.ensureVault` beside `deviceDB.getLease`;
+  `vault_behind` below the record; the record raised; the take-up by `#fitsTakeUp`; a lease of
+  another life left where it lies; a birth refused `identity_revoked` or `vault_behind` erases the
+  lease. A failed raise refuses a birth (it needs the `device_id`) but only warns after a read.
+* **The device record:** `getDeviceRecord`, `raiseDeviceRecord` (a store-side max that keeps the
+  first `device_id`), `delDeviceRecord`; every answer checked by `deviceRecordFor(scope, answer)`.
+* **Gone:** a refresh finding `getVault` null or another `vault_tok` makes the Vault object gone
+  (`vault_gone` / `vault_remade`) for good; so do `bank.closeVault`, `del()` and a box read refused
+  `vault_mismatch`. Calls waiting on the prompt then refuse `vault_gone`; a `lock()` refuses them
+  `vault_locked`. `close()`, `vault_closed`, `opening`, `absent`, the device mark, `rolled_back` are gone;
+  `novel`, `freshness`, `gate_made_elsewhere` came in.
+* **React:** `VaultProvider` builds a Bank inside, keeps its props, and re-ensures when its vault
+  goes gone; no way past `vault_behind` (7b).
 
 ### Thread 6b, box_seal (#256)
 
