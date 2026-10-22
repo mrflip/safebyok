@@ -60,3 +60,11 @@ and 11 are restated for the demand model.
     *Vault and bank*)
 15. **A whisper-omitted `putBox` costs a read first**, since the listing carries no ciphertext;
     ergonomics reconsidered after the sprint. (the Coach, 2026-10-22)
+16. **A POSTGRES VAULT DELETED AND ENSURED IN THE SAME INSTANT CAN RESTART ITS COUNTER.** Under
+    READ COMMITTED, an `ensureVault` statement that began before a `delVault` committed reads no
+    tombstone and finds the old row gone, so it starts a new life at `vault_epoch` 0 and the
+    fresh tombstone stays beside it. It fails safe: a device that saw a higher epoch refuses the
+    new life as `vault_behind` until the host calls `bank.clearCachedVault`. Convex, IndexedDB and
+    the local store are unaffected. The cure, if it shows: keep the tombstone as a state of the
+    vault row, so one `INSERT ... ON CONFLICT DO UPDATE` decides. (#251 review; the Coach: "don't
+    let rollback protection drive any large revisions")

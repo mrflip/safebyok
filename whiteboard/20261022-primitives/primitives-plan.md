@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** thread 4 underway; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** thread 4 filed; threads 5 and 12 next; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -186,6 +186,14 @@ suite); may split into VaultDB and DeviceDB.
 *Tests.* `tests/vault-db.test.ts`, the conformance suite, each adapter's tests: the new
 expectations and the tombstone's life, one happy path and one refused expectation per verb.
 Nothing retires here beyond the removed verbs' own tests (ledger them).
+
+*Review:* **fixed** ([#251](https://github.com/mrflip/safebyok/pull/251)). Fixed: a first unlock
+that lost the gate race over a vault ensured gateless now says `created_elsewhere`, not a bare
+`wrong_passphrase`. Left, significant: Postgres `EnsureVaultSql` under READ COMMITTED can start a
+new life at `vault_epoch` 0 beside a fresh tombstone when a `delVault` commits mid-statement;
+accepted (fails safe as `vault_behind`), toldjaso 16, Open Matter. Left, minor: a damaged vault's
+tombstone counts from 0; the two-write first unlock's gateless window; the Postgres
+`($n * 0)` placeholder trick; Convex ignoring the draft's epoch (always 0).
 
 *Orchestrator:* a ruling carried from the streamline doc (2026-10-22, on the `getVault` /
 `getVaultRecords` pairs): keep both pairs, and add a **loud TODO** entry in the Coach's words:

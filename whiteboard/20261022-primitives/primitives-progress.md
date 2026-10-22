@@ -58,7 +58,7 @@ rules* 3).
 | 1 | renames | filed, restacked on main | #243 |
 | 2 | get_vault | filed, restacked | #244 |
 | 3 | wire_meta | filed, restacked | #246 |
-| 4 | store_verbs | underway | |
+| 4 | store_verbs | filed | #251 |
 | 5 | demand | planned | |
 | 6 | lease_box | planned | |
 | 7 | bank | planned | |
@@ -74,3 +74,31 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 4, store_verbs (#251)
+
+*Orchestrator*, from its thread file and review; the full account is
+`thread-4-store_verbs.md` on its branch.
+
+* **Every write resolves what now stands.** `putVaultProps` resolves the props with the store's
+  new `vault_epoch` and `gate_epoch`; `putBox` the record stored; `delVault(scope, { vault_tok,
+  gate_epoch })` the tombstone `{ format: 'safebyok-tombstone-v1', ...scope, vault_epoch }`
+  (exported `Tombstone`); `delBox` still today's `BoxDeletion` (thread 5 shapes what
+  `vault.delBox` returns). `DeviceDB.putLease` resolves the record; one scope's calls land in order.
+* **`vault_epoch`** is set by the store: standing + 1 on every `putVaultProps` and `delVault`,
+  whatever the writer sends; a draft claims 0. Box writes do not move it.
+* **`getVault` over a tombstone is `null`**: a refresh cannot tell deleted from never made; the
+  counter reaches a new life only through `ensureVault(draft)`. Rec (Open Matter): a refresh that
+  finds null where it held a vault says `vault_gone`.
+* **Gone:** `getVaultProps`, `ensureVaultProps`, `listBoxes`, `listBoxRecords`, their `do*`
+  hooks, `Expectations.vaultTokMeets`. `Expectations` gains `isTombstone`, `vaultPropsPutOf`,
+  `newLifeOf`, `tombstoneOf`.
+* **Try pairs at the store:** adapters return `Outcome`; `heed` in `refusal-policy.ts` is the
+  throwing half. No `x`/`tryX` doubling was added on `VaultDB`.
+* **`vault.ts` interim:** reads through `getVault`; the first unlock is `ensureVault` of a gateless
+  draft, then the first gate expecting `gate_epoch` 0; `del()` passes the gate it read; the
+  interim `created_elsewhere` for gateless props is gone, but `created_elsewhere` itself stands
+  (thread 7 renames it). The device mark still checks `gate_epoch` (thread 7 replaces it).
+* **VaultDB private helpers are `private`, not `#`**: a Proxy-wrapped VaultDB breaks on `#`.
+* `delDamagedVault` expects `gate_epoch: null` (the `vault_tok` alone) and resolves
+  `Tombstone | null`.
