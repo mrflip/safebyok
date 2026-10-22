@@ -1,14 +1,16 @@
 # primitives: the sprint plan
 
 * **Date:** 2026-10-22
-* **Mode:** normal
+* **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
+* **Status:** thread 4 underway; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
-* **Threads at once:** 1. The line is serial: every thread rewrites `vault.ts` or builds on the
-  one before.
+* **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
+  on the one before. Thread 12 runs beside it.
 * **Issued by:** the Coach (flip), by `/sprint primitives` with `/turbochat`.
-* **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4), reused:
-  Open Matters, Progress, Resolved.
+* **Sprint doc:** [Sprint primitives](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4), the
+  streamline doc renamed and reused: Open Matters, Progress, Resolved.
+* **Sprint PR:** the `20261022-primitives` branch (`plan:`), a draft; it joins the line last.
 * **Supersedes:** `whiteboard/20261021-streamline/` (the streamline sprint,
   [#242](https://github.com/mrflip/safebyok/pull/242)). Its threads 1, 2 and 11 are this sprint's
   first three, filed as [#243](https://github.com/mrflip/safebyok/pull/243),
@@ -30,6 +32,27 @@ The Coach's charge (verbatim):
 > or go away as those methods do). However, outward expectations of consistency and correctness
 > should not be altered; if we told you to do something that is contradictory, or eliminates a
 > safety/consistency guarantee, call it out.
+
+The Coach's charge at the invocation (verbatim):
+
+> You are in charge of a very difficult sprint. Follow the plan, understanding that it was written
+> in part by an agent. Think flexibly and honor outcome over specifics. The goal is that the
+> control flow simplify according to principles described in the first few sections of the
+> whiteboard files. It is easier and better to add synchronization on top of these primitives to
+> cure unpleasant ergonomics than to build complicated logic within them.
+>
+> Still, if you find that something we proposed has the unacknowledged reality that some critical
+> part of our guarantees fail, do not allow the final guarantee to fall. proceed with other parts
+> of the plan: think "how can I, the orchestrator, and my team of capable thread workers, follow
+> the good parts of the plan so that it gets easier to think through the dumb half-baked parts
+> later"
+
+*Orchestrator:* read together, the two charges say: simple primitives first, synchronization
+layered on top later; and where building a primitive as written would let a guarantee a caller
+relies on fall (a lock that does not lock, a stale write that lands, a wrong passphrase that
+opens), the thread keeps the guarantee by the smallest means that does not add a mechanism inside
+the primitive (keep today's behaviour for that one path, or leave the old path standing beside
+the new), says so loudly as an open matter, and carries on with the rest.
 
 ## Read first
 
@@ -159,6 +182,14 @@ suite); may split into VaultDB and DeviceDB.
 *Tests.* `tests/vault-db.test.ts`, the conformance suite, each adapter's tests: the new
 expectations and the tombstone's life, one happy path and one refused expectation per verb.
 Nothing retires here beyond the removed verbs' own tests (ledger them).
+
+*Orchestrator:* a ruling carried from the streamline doc (2026-10-22, on the `getVault` /
+`getVaultRecords` pairs): keep both pairs, and add a **loud TODO** entry in the Coach's words:
+"the vaultdb closest to the database should handle validation and consistency checks. I don't
+mind if graphql does checks as well. But every vaultDB relies on the consistency guarantees of
+its backing store -- in the case that you're a facade on another vaultDB this is particularly
+easy." This thread writes it, since it rewrites every adapter's verbs. The Postgres route
+recipe's meta is thread 12's, not this thread's.
 
 ### 5. demand
 
@@ -305,7 +336,11 @@ one hold: an attempt runs its chain inside the slot it holds, and `putGate`, `gr
 `delVault` never take it themselves. `initialize_gate` takes a passkey beside the passphrase in
 one gating. The cleartext `===` for `same_passphrase` and `checkStrength` run only in the
 attempt. **The public surface changes most here:** every vault call that took a passphrase or
-passkey answer stops. **Depends on:** 8. **Look-ahead:** thread 10 dispatches on `gatingkind`.
+passkey answer stops. *Orchestrator:* a ruling carried from the streamline doc (2026-10-22): a
+host that sets the twilight at least as long as the lease "likely didn't understand", so
+`ensureUnlocked({ renewMinutes })` with `renewMinutes` at least the lease's length refuses as a
+misuse (`bad_option`), and the README says that a lease of zero is how to prompt every time.
+**Depends on:** 8. **Look-ahead:** thread 10 dispatches on `gatingkind`.
 **Size:** L.
 
 *Tests.* `ask.test.ts` and the gating halves of `vault-lease.test.ts` and `vault-wayins.test.ts`;
@@ -337,6 +372,25 @@ the preplan's *Libraries* candidates no earlier thread decided: each gets a verd
 keep, or delete) in the PR, and a dependency added needs the Coach's yes first, so the sweep
 proposes and does not add. **Depends on:** 10. **Size:** M-L. May split: docs, then the sweep.
 
+### 12. route_meta
+
+> *Orchestrator*, from the Coach's ruling on the streamline doc's row "Postgres route recipe
+> sends a refusal's whole meta" (2026-10-22), verbatim: "add meta on both, put error information
+> in one if there is such / put these not-quite-an-error or full record where-do-they-go fields
+> in the main meta field. Good and bad outcomes both have access to the main meta field /
+> Sanitize out the wrapped/encrypted fields from what's in the error meta".
+
+*Gloss.* The Postgres route recipe (`safebyok-postgres`, its route and its tests) and, where the
+same shape is meant, the GraphQL wire (`safebyok-graphql`): one `meta` field on every answer,
+good or bad; a write's not-quite-an-error records (`box_stored`, `vault_props_stored`) in that
+main meta; error information in one place; wrapped and encrypted fields stripped from whatever
+an error carries. Whether GraphQL's winner record moves from its opaque body field into `meta`
+waits on the open row "Only a refusal's winner record is opaque": until ruled, the GraphQL half
+keeps #246's shape and this thread does the route recipe. A wire shape is a contract the host's
+server and browser share: the changeset says what a host sees. **Model:** `sonnet`. **Depends
+on:** 4 (it rewrites the same adapters' verbs). Independent of 5 to 11: it runs beside the line,
+and joins it at wrap-up just below the sprint PR. **Size:** S-M.
+
 ## Wrap-up
 
 `wrapup.md`'s restack, then one `opus`, `high` reviewer over the whole line, briefed with
@@ -347,7 +401,7 @@ audits `notes/security.md` after the sprint; no agent rewrites it.
 
 ## For the Coach
 
-* Restack #243, #244 and #246 onto main and leave them open; close #245 and tag its branch
-  `closed/20261022-turns`; issue `/sprint primitives`.
+* ~~Restack #243, #244 and #246 onto main~~ (*Orchestrator:* done 2026-10-22). Close #245 and
+  tag its branch `closed/20261022-turns`: still yours.
 * Wind up the streamline sprint: its folder to `winboard/`, its paused note resolved.
 * The Open Matters tab of the sprint doc is where the sprint raises what it cannot decide.

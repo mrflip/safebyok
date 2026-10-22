@@ -30,6 +30,17 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   vault's core fields only; no back-compat for pre-rename vaults; security notes through a
   `sonnet` subagent, the Coach audits the file after the sprint; wire meta in the body.
 
+* *Orchestrator:* carried from the streamline doc's rows (2026-10-22): `renewMinutes` at least
+  the lease's length refuses `bad_option` (thread 9); the `getVault`/`getVaultRecords` pairs stay,
+  with a loud TODO that the VaultDB nearest the database owns validation and consistency
+  (thread 4); one main `meta` on every wire answer, wrapped and encrypted fields stripped from an
+  error's (thread 12); the server is the trusted party (the GraphQL client's kinds stay as they
+  are).
+* *Orchestrator:* the Coach's charge at the invocation (the plan, under the first charge): keep
+  the primitives simple and layer synchronization on later; where a primitive as written would let
+  a caller's guarantee fall, keep the guarantee by the smallest means outside the primitive, raise
+  it loudly, and carry on.
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
@@ -37,10 +48,10 @@ rules* 3).
 
 | # | Label | Status | PR |
 |---|---|---|---|
-| 1 | renames | filed | #243 |
-| 2 | get_vault | filed | #244 |
-| 3 | wire_meta | filed | #246 |
-| 4 | store_verbs | planned | |
+| 1 | renames | filed, restacked on main | #243 |
+| 2 | get_vault | filed, restacked | #244 |
+| 3 | wire_meta | filed, restacked | #246 |
+| 4 | store_verbs | underway | |
 | 5 | demand | planned | |
 | 6 | lease_box | planned | |
 | 7 | bank | planned | |
@@ -48,6 +59,7 @@ rules* 3).
 | 9 | gating | planned | |
 | 10 | react | planned | |
 | 11 | docs | planned | |
+| 12 | route_meta | planned, beside the line | |
 
 ## What the threads found
 
