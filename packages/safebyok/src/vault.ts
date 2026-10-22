@@ -1387,7 +1387,7 @@ export class Vault {
       gate_epoch:       standing.gate_epoch + 1,
       ...await plan.revise(standing, proven, deviceId),
     })
-    await this.#refreshOnStale(this.#vaultDB.putVaultProps(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }), plan.call)
+    await this.#refreshOnStale(withoutStoredVaultProps(this.#vaultDB.putVaultProps(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })), plan.call)
     // The change has landed, whatever happens now: what follows is this device's own, and a
     // failure of it is said through the logger, never thrown as though the change had not landed.
     const raised = await this.#raiseMarkAfter(next, plan.call)
@@ -1944,7 +1944,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, closedError, gatelessElsewhereError
+// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, closedError, gatelessElsewhereError, withoutStoredVaultProps
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
@@ -1956,6 +1956,16 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
   : 'The vault is locked, and there is no getProof to ask the user for a proof (Vault.make was given none): nothing was read or written. Prompt the user, unlock() with their passphrase, and call again.')
 
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
+
+/** What `writing` resolves, or its refusal with the vault props a stale write names stripped: a vault's refusal carries no stored vault props record. */
+const withoutStoredVaultProps = async (writing: Promise<void>): Promise<void> => {
+  try {
+    await writing
+  } catch (err) {
+    if (! isVaultError(err, 'stale_write') || err.meta?.vault_props_stored === undefined) { throw err }
+    throw new VaultError(err.refusalkind, err.message, err.cause === undefined ? {} : { cause: err.cause })
+  }
+}
 
 /** The refusal of a first unlock that met gateless vault props another device made: no passphrase is set there to open. */
 const gatelessElsewhereError = () => new VaultError('created_elsewhere', 'A vault was just made for this label on another device, which has not set its passphrase yet. Nothing was created on this device. Set the passphrase on that device, then unlock with it here.')
