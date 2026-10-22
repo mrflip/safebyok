@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultPropsExpectation, type VaultDelExpectation, type BoxRecord, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultProps, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultPropsExpectation, type VaultDelExpectation, type BoxRecord, type BoxExpectation, type BoxDelExpectation, type GatelessVaultProps, type StoredBox, type StoredVault, type VaultProps, type VaultRecords, type VaultScope } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -69,6 +69,19 @@ export class OutageVaultDB extends VaultDB {
     this.maxVaultBytes = inner.maxVaultBytes
     this.maxBoxes = inner.maxBoxes
     this.maxNameBytes = inner.maxNameBytes
+  }
+
+  // The inner adapter's records verbs hand on each box as stored, which this adapter's own checks
+  // read as its listing does.
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+    this.refuseWhileDown()
+    return storedVaultOf(valOf(await this.inner.getVaultRecords(scope)))
+  }
+
+  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    this.refuseWhileDown()
+    const { applabel, user_id, vaultlabel } = draft
+    return storedVaultOf(valOf(await this.inner.ensureVaultRecords({ applabel, user_id, vaultlabel }, draft)))
   }
 
   protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
@@ -150,3 +163,10 @@ export class OutageVaultDB extends VaultDB {
     }
   }
 }
+
+/** A vault as another VaultDB's records verbs hand it on, or null for none, as this adapter's half hands it up: each box under the boxlabel it holds. */
+const storedVaultOf = (records: VaultRecords | null): StoredVault => (
+  records === null
+    ? { vaultProps: null, boxes: [] }
+    : { vaultProps: records.vaultProps, boxes: records.boxes.map((box) => ({ boxlabel: (box as { boxlabel: string }).boxlabel, box })) }
+)
