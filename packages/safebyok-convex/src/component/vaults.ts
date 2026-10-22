@@ -5,7 +5,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
+  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, PutVaultPropsAnswer, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
@@ -13,13 +13,37 @@ import {
  * `user_id`'s own. Each function keeps the contract of the `VaultDB` method it serves, and says
  * only where it differs.
  *
- * Convex runs mutations serializably, so each check and its write hold together. A failed
- * expectation is not an error: it resolves `false`, or `null` for a box deletion, which the client
- * refuses as `stale_write`.
+ * Convex runs mutations serializably, so each check and its write hold together, and a query reads
+ * one snapshot. A failed expectation is not an error: it resolves `false`, `null` for a box
+ * deletion, or an answer naming what stands, which the client refuses as `stale_write`.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
  * always be deleted whole. A delete is never refused for room.
  */
+
+// ------------------------------------------------------------------------------- the vault
+
+/** The vault props and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
+export const getVault = query({
+  args:    { scope: VaultScope },
+  returns: v.nullable(VaultAnswer),
+  handler: async (ctx, { scope }) => {
+    const row = await findVaultPropsRow(ctx.db, scope)
+    return row && { vaultProps: vaultPropsOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+  },
+})
+
+/** Store `draft` only if its scope holds no vault props, and return whichever vault props stand there afterwards, with every box, from one transaction. */
+export const ensureVault = mutation({
+  args:    { draft: GatelessVaultProps },
+  returns: VaultAnswer,
+  handler: async (ctx, { draft }) => {
+    const scope = scopeOfVaultProps(draft)
+    const standing = await findVaultPropsRow(ctx.db, scope)
+    if (! standing) { await ctx.db.insert('safebyok_vaults', draft) }
+    return { vaultProps: standing ? vaultPropsOfRow(standing) : draft, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+  },
+})
 
 // ------------------------------------------------------------------------------- the vault props
 
@@ -45,14 +69,14 @@ export const ensureVaultProps = mutation({
   },
 })
 
-/** Replace the vault props, only while those standing have `expected.vault_tok` and `expected.gate_epoch`.
- * It also resolves false, writing nothing, for vault props that name another vault or do not move
- * `gate_epoch` forward.
+/** Replace the vault props, only while those standing have `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link PutVaultPropsAnswer}.
+ * It also misses, writing nothing, for vault props that name another vault or do not move
+ * `gate_epoch` forward. A miss names the vault props standing, or null for none.
  */
 export const putVaultProps = mutation({
   args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
-  returns: v.boolean(),
-  handler: async (ctx, { vaultProps, expected }) => {
+  returns: PutVaultPropsAnswer,
+  handler: async (ctx, { vaultProps, expected }): Promise<Infer<typeof PutVaultPropsAnswer>> => {
     const standing = await findVaultPropsRow(ctx.db, scopeOfVaultProps(vaultProps))
     const meetsExpectation = standing !== null
       && standing.vault_tok === expected.vault_tok
@@ -60,9 +84,9 @@ export const putVaultProps = mutation({
     const movesForward = standing !== null
       && vaultProps.vault_tok === standing.vault_tok
       && vaultProps.gate_epoch > standing.gate_epoch
-    if (! (meetsExpectation && movesForward)) { return false }
+    if (! (meetsExpectation && movesForward)) { return { landed: false, vault_props_stored: standing && vaultPropsOfRow(standing) } }
     await ctx.db.replace('safebyok_vaults', standing._id, vaultProps)
-    return true
+    return { landed: true }
   },
 })
 
@@ -82,13 +106,7 @@ export const getBox = query({
 export const listBoxSummaries = query({
   args:    { scope: VaultScope },
   returns: v.array(ListedBox),
-  handler: async (ctx, { scope }) => {
-    const rows = await vaultBoxRows(ctx.db, scope)
-    return rows.map((row) => {
-      const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOfRow(row)
-      return listed
-    })
-  },
+  handler: async (ctx, { scope }) => listedOf(await vaultBoxRows(ctx.db, scope)),
 })
 
 /** Write `box` as `VaultDB`'s `doPutBox` does, resolving a {@link PutBoxAnswer} where that throws.
@@ -244,6 +262,12 @@ const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
   const { _id, _creationTime, applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, ...box } = row
   return box
 }
+
+/** Box rows as a listing returns them: each record without its two ciphered fields. */
+const listedOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof ListedBox>[] => rows.map((row) => {
+  const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOfRow(row)
+  return listed
+})
 
 /** The row a box is stored as: its scope columns added. */
 const boxRowOf = (scope: VaultScope, box: BoxRecord) => ({ ...scope, ...box })

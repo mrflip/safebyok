@@ -62,7 +62,8 @@ export const PasskeyWayin = v.object({
 })
 
 /** A vault's props: its scope and identity, and its ways in, each the vaultKey wrapped under a wayinKey.
- * Every vault has a `passphrase`; `passkey` is null when it has none. Nothing in it opens without a passphrase or passkey.
+ * A vault with a gate (`gate_epoch` 1 or more) has a `passphrase`, and a `passkey` or null. A
+ * gateless one (`gate_epoch` 0) has null for both. Nothing in it opens without a passphrase or passkey.
  */
 export const VaultProps = v.object({
   format:           VaultPropsFormat,
@@ -71,8 +72,24 @@ export const VaultProps = v.object({
   vaultlabel:       v.string(),
   vault_tok:        v.string(),
   gate_epoch:       v.number(),
-  passphrase:       PassphraseWayin,
+  passphrase:       v.nullable(PassphraseWayin),
   passkey:          v.nullable(PasskeyWayin),
+  registered_at:    v.number(),
+})
+
+/** The vault props a vault is first stored as, which `ensureVault` takes: `gate_epoch` 0, and no way in.
+ *
+ * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, gate_epoch: 0, passphrase: null, passkey: null, registered_at }
+ */
+export const GatelessVaultProps = v.object({
+  format:           VaultPropsFormat,
+  applabel:         v.string(),
+  user_id:          v.string(),
+  vaultlabel:       v.string(),
+  vault_tok:        v.string(),
+  gate_epoch:       v.literal(0),
+  passphrase:       v.null(),
+  passkey:          v.null(),
   registered_at:    v.number(),
 })
 
@@ -94,6 +111,15 @@ export const BoxRecord = v.object({
 
 /** A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. */
 export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
+
+/** A vault as one query or mutation reads it: its vault props, and every box without its two ciphered fields, in boxlabel order.
+ *
+ * @example { vaultProps, boxes: [listedBox] }
+ */
+export const VaultAnswer = v.object({
+  vaultProps: VaultProps,
+  boxes:      v.array(ListedBox),
+})
 
 /** What an update of the vault props was proven against: it lands only while the standing vault props have this `vault_tok` and `gate_epoch`.
  *
@@ -140,6 +166,17 @@ export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(false), refusalkind: v.literal('stale_write'), box_stored: v.nullable(BoxRecord) }),
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
+)
+
+/** What an update of the vault props answers, from its one transaction: `landed`, or the vault props standing that it did not land over.
+ * A miss carries them as a read returns them (`vault_props_stored`; null for none).
+ *
+ * @example { landed: true }
+ * @example { landed: false, vault_props_stored: winner }
+ */
+export const PutVaultPropsAnswer = v.union(
+  v.object({ landed: v.literal(true) }),
+  v.object({ landed: v.literal(false), vault_props_stored: v.nullable(VaultProps) }),
 )
 
 /** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_tok`.

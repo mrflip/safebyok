@@ -17,8 +17,10 @@ const seeded = async () => {
 
 type Caller = ReturnType<ReturnType<typeof createTest>['withIdentity']>
 
-/** One call of each of the ten functions, on `u1`'s vault, as `caller`. */
+/** One call of each of the twelve functions, on `u1`'s vault, as `caller`. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
+  ['getVault',         (caller) => caller.query(api.safebyok.getVault, { scope: u1 })],
+  ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }) })],
   ['getVaultProps',    (caller) => caller.query(api.safebyok.getVaultProps, { scope: u1 })],
   ['ensureVaultProps', (caller) => caller.mutation(api.safebyok.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })],
   ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf('u1', { gate_epoch: 2 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })],

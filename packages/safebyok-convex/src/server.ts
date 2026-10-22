@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
+  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, PutVaultPropsAnswer, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -48,7 +48,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
+ *     getVault, ensureVault, getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
  *     putBox, getCapacity, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
@@ -67,7 +67,7 @@ export class SafebyokComponent {
     this.component = component
   }
 
-  /** The ten public functions a client's `convexVaultDB` calls, one per storage verb.
+  /** The twelve public functions a client's `convexVaultDB` calls, one per storage verb.
    * Export them under these names from one module of the host's `convex/`. Each refuses with
    * `identity_revoked` unless `getUserId` names the vault's own `user_id`, before it calls the
    * component. A refusal `getUserId` throws itself reaches the client as it was thrown. Kind
@@ -96,6 +96,22 @@ export class SafebyokComponent {
     }
 
     return {
+      getVault: publicQuery({
+        args:    { scope: VaultScope },
+        returns: v.nullable(VaultAnswer),
+        handler: async (ctx, args) => {
+          await mustBe(ctx, args.scope.user_id)
+          return await ctx.runQuery(vaults.getVault, args)
+        },
+      }),
+      ensureVault: publicMutation({
+        args:    { draft: GatelessVaultProps },
+        returns: VaultAnswer,
+        handler: async (ctx, args) => {
+          await mustBe(ctx, args.draft.user_id)
+          return await ctx.runMutation(vaults.ensureVault, args)
+        },
+      }),
       getVaultProps: publicQuery({
         args:    { scope: VaultScope },
         returns: v.nullable(VaultProps),
@@ -114,7 +130,7 @@ export class SafebyokComponent {
       }),
       putVaultProps: publicMutation({
         args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
-        returns: v.boolean(),
+        returns: PutVaultPropsAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
           return await ctx.runMutation(vaults.putVaultProps, args)
