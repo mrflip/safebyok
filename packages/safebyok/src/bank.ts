@@ -88,7 +88,10 @@ export class Bank {
 
   /** The current {@link BankSnapshot}: the same object until something changes. */
   getSnapshot = (): BankSnapshot => this.#snapshot
-  /** Call `listener` after every snapshot change, returning the unsubscribe. */
+  /** Call `listener` after every snapshot change, returning the unsubscribe.
+   * A listener may call into the bank as it hears: an ask for a vault, as its entry goes
+   * `starting`, joins the birth under way.
+   */
   subscribe = (listener: () => void): (() => void) => {
     if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each snapshot change.') }
     this.#listeners.add(listener)
@@ -198,7 +201,8 @@ export class Bank {
   /** Let the vault `choice` names go: its Vault object is gone, every call on it refusing 'vault_gone', and its entry leaves the snapshot.
    * Not a lock: nothing stored is erased, and this device's lease stays for the next birth. A
    * prompt up for a proof ends, its `lockLanded` settling as at a `lock()`, and each call waiting
-   * on it refuses 'vault_gone', as a birth under way does.
+   * on it refuses 'vault_gone', as a birth under way does; one let go in the task that asked for it
+   * has read nothing.
    * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_label' for a name that
    * fails its check.
    *
@@ -330,6 +334,8 @@ export class Bank {
     // 'starting', or the bank's as the birth says hello: a listener asking for the vault as it
     // hears either joins this birth, rather than beginning another from inside this one.
     await Promise.resolve()
+    // Let go in the task that asked for it -- a React StrictMode rehearsal, say: nothing is read.
+    if (this.#entries.get(ckey) !== entry) { throw goneError() }
     const born = await outcomeOf(() => this.#bear(ckey, parts), unexpectedError)
     // Let go while it was born: the Vault object goes with it, and the caller hears so.
     if (this.#entries.get(ckey) !== entry) {

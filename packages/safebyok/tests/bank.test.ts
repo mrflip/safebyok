@@ -663,6 +663,19 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     expect(bank.entryOf(U1)?.vault).to.eq(vault)
   })
 
+  it("reads nothing for a birth let go in the task that asked for it, its caller refused 'vault_gone'", async () => {
+    const world = makeWorld()
+    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
+    const bank = bankIn(world)
+    const asked = bank.ensureVault(U1)
+    bank.closeVault(U1)
+    await TH.expectRefusal(asked, 'vault_gone')
+    expect(ensureVault).not.toHaveBeenCalled()
+    expect(getDeviceRecord).not.toHaveBeenCalled()
+    expect(bank.entryOf(U1)).to.be.null
+  })
+
   it("moves an entry from starting to refused when its birth is refused, the refusal kept", async () => {
     const world = makeWorld()
     const unreachable = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')
