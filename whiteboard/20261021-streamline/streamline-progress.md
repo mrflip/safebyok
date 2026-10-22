@@ -7,8 +7,18 @@ keeps it. Newer than the plan and the preplan wherever they disagree.
 
 * **Row 1, a whisper asked before a lock (2026-10-22):** keep the current contract; a sync
   `checkUnlocked` inside each call's turn, with a TODO. No contract-level calls without a ruling.
-* **Row 2, when a lease stops counting (the Coach's model, awaiting confirmation):** unlocked
-  until a lock lands; the twilight only makes `ensureLease` prompt; expiry at `askPassphraseAt`.
+* **When a lease stops counting (confirmed 2026-10-22):** unlocked until a lock lands (`lock()`,
+  the expiry at `askPassphraseAt`, or `checkUnlocked` finding the deadline passed); the twilight
+  before `askPassphraseAt` only makes `ensureLease` prompt.
+* **Consistency (2026-10-22):** no props/listing check in the core; the VaultDB checks server
+  side, in its transaction, and reports `damaged_vault`; a missing adapter check is a TODO.
+* **`putVaultProps` resolves the stored props** (2026-10-22): the new contract, built when first
+  needed (thread 4).
+* **Rollback (2026-10-22):** a `vault_epoch` counter, tombstoned vaults, a device refusing storage
+  behind what it has seen, `clearCachedVault`: thread 5, rewritten, pending three rulings.
+* **Pull anticipated changes forward** (the plan, *Ground rules* 9).
+* **Security notes:** the subagent may modernize an entry it touches; one full pass at the end.
+* **No back-compat** for pre-rename vaults (confirmed); pending changesets stay as written.
 
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
@@ -21,7 +31,7 @@ rules* 3).
 | 2 | get_vault | filed | #244 |
 | 3 | turns | building | |
 | 4 | bank | planned | |
-| 5 | device_id | planned | |
+| 5 | vault_epoch | waits on rulings | |
 | 6 | proving | planned | |
 | 7 | gate | planned | |
 | 8 | gating | planned | |

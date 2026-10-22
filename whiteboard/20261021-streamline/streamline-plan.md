@@ -9,7 +9,8 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns) building. Branches cut on or after
+* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns) building; thread 5 rewritten as
+  vault_epoch, waiting on three rulings. Branches cut on or after
   2026-10-22 carry that date (`20261022-get_vault`, `20261022-turns`).
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
@@ -64,10 +65,16 @@ Every worker, beyond CLAUDE.md:
 5. **No format bumps, no back-compat** (the preplan's first paragraph). Each changeset says what a
    host with records written before it will see.
 6. **Security decisions** go to `notes/security.md` through a `sonnet` subagent, in the thread
-   that makes them.
+   that makes them. *Orchestrator (2026-10-22), the Coach's ruling:* the subagent may bring an
+   entry it touches up to today's terms and interfaces, where it is certain of them; it does not
+   bulk-rewrite the file. One agent modernizes the whole file at the sprint's end.
 7. **The Contract** is the *Contract* tab of the design doc
    (https://claude.ai/code/artifact/8ac26722-33ee-4082-a76f-f4c9b6722b70). Only thread 10 edits
    it; earlier threads list in their thread file the Contract lines their change makes untrue.
+9. **Pull anticipated changes forward.** The Coach (2026-10-22): "Expect a lot of moving
+   anticipated changes forward in this sprint." A thread that needs a later thread's change to
+   stay simple may make it, declaring it in its PR; the orchestrator strikes it from the later
+   thread.
 8. **Size budgets**: no measure was taken while planning (it needs a build). Each thread runs
    `pnpm size:budget` after its `pnpm justify` and follows PROCESS.md's rule.
 
@@ -171,28 +178,47 @@ is an unlock turn. **Size:** L. Likely lowers the `Vault` and `everything` lines
 *Gloss.* A new `src/bank.ts` and its tests; `vault.ts` (birth, states, `close`), `vault-opts.ts`
 and `options.ts` (what the bank holds versus the vault), `refusals.ts` (`vault_gone`,
 `gate_made_elsewhere`, and Open Matter 4's kind), `index.ts`; `safebyok-react/src/vault-provider.tsx`
-and `tests/vault-provider/`; `demos/` and `e2e/` that build a vault. Two features (core bank,
+and `tests/vault-provider/`; `demos/` and `e2e/` that build a vault. **Rulings (2026-10-22):**
+no props/listing consistency check in the core: the VaultDB checks server side, in its
+transaction, and reports damage (`damaged_vault`); a check an adapter lacks becomes a TODO
+(this replaces Open Matter 4's Rec). `putVaultProps` resolves the stored props, the new
+contract, made here where the first gate is written. Add the line to
+`.changeset/20261021-renames.md` telling hosts to upgrade every client together and clear storage
+once. Two features (core bank,
 React provider) in one thread, because `pnpm justify` builds the React package against the core:
 if the worker's context runs long, it may file the core half with the React package adapted
-minimally and report, and the orchestrator cuts the provider as thread 4b. **From Open Matters 4
-and 5:** reload is once (a birth read that finds props and listing disagreeing refuses the
-entry); the README says a host deleting a user's data signs them out first. **Depends on:** 3.
+minimally and report, and the orchestrator cuts the provider as thread 4b. **Depends on:** 3.
 **Look-ahead:** thread 5 mints the device record at the bank's first need; thread 9's dialogs
 read the bank's entry. **Size:** L. Adds a `Bank` line to `.size-limit.json` (or renames
 `Vault`'s) and `VaultProvider`'s becomes `BankProvider`'s.
 
-### 5. device_id
+### 5. vault_epoch (was device_id)
 
 > **device_id**: the mark becomes the device id; `rolled_back` and the list under *The device id*
 > out; the security note.
 
-*Gloss.* `src/device-db.ts`, `idb.ts`, `vault.ts`'s mark code, `refusals.ts`/`refusal-policy.ts`
-(`rolled_back`), `del-damaged-vault.ts` if it touches the mark, the README's *A vault rolled
-back*, VOCABULARY's mark rows. The preplan's *The device id* lists every name that goes. **From
-Open Matter 6:** the security note says plainly what is no longer caught (a backend serving an
-older gate after a reload is accepted) and why that costs no secrecy. **Depends on:** 4.
-**Look-ahead:** thread 6's Proving seals ways in carrying the device id. **Size:** M. May lower
-`idbDeviceDB`.
+The Coach, ruling on Open Matter "Rollback is no longer caught" (2026-10-22, verbatim): "You're
+right, this is a problem. Does the system record a revision counter on the vault itself? If not
+add a "vault_epoch" counter updated on write. Tombstone vaults, preserving that counter. if a
+system is "in the future" (restored backup) it should not serve. TODO, or as needed: add a
+"clearCachedVault" external method to remove a vault". And on "Deleting a vault while another
+device is open": "If a vault tombstone is needed add one [...] the paradigm is that the vault
+"always is has and will exist, we're only writing it down just now"".
+
+*Gloss (Orchestrator, 2026-10-22).* This reverses part of the preplan: *The device id*'s "holding
+no `vault_tok` and no epoch", *The rules*' "no durable record of what was seen", "no tombstones",
+and the `rolled_back` removal. What survives of the old line: the mark becomes the device
+record (`device_id`, minted at first need, carried by every way in this device seals), and
+`heedMark`, `raiseMarkAfter` and the other mark machinery go. New: a `vault_epoch` on the vault
+props, bumped by writes; tombstones on `del()`; the device record remembering the highest
+`vault_epoch` seen; a read behind it refused; `clearCachedVault`. **Waits on three Open Matters**
+(which writes move it; where the device remembers it and what "not serve" refuses; tombstones,
+new lives and the way out), each a contract change, and on the Coach's wording for CLAUDE.md's
+ground-truth paragraph. Touches every adapter (the counter and the tombstone), `device-db.ts`,
+`idb.ts`, `vault.ts`'s read judgment, `refusals.ts`, the README's *A vault rolled back*
+(rewritten, not removed), VOCABULARY. **Depends on:** 4. **Look-ahead:** thread 6's Proving
+seals ways in carrying the device id. **Size:** L; may split into the counter and tombstone
+(adapters) and the device's memory (core).
 
 ### 6. proving
 
@@ -259,12 +285,12 @@ sweep.
 
 ## Wrap-up
 
-`wrapup.md`'s restack, then the preplan's end pass: one `opus`, `high` reviewer over the whole
+`wrapup.md`'s restack; one agent modernizes `notes/security.md` to today's terms and interfaces
+(the Coach, 2026-10-22: once, at the end, not bulk updates as we go); then the preplan's end pass: one `opus`, `high` reviewer over the whole
 line, brief *Trust, checks and races*, grepping for the vestiges threads 3 and 5 name in their
 "out" lines, the security notes, and the Contract. Its findings are Open Matters, not fixes.
 
 ## For the Coach
 
-* Open Matters 1-6 in the sprint doc: places where the preplan contradicts itself or drops a
-  guarantee. Each thread takes the Rec until you rule.
-* Open Matter 7: #241 is open; the line stands on it.
+* The sprint doc's Open Matters; ruled ones are in its *Resolved* tab and the progress document.
+* #241 merged 2026-10-22; the line restacks onto main at wrap-up.
