@@ -207,6 +207,12 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
   })
 })
 
+/** A graphqlVaultDB whose server answers every operation with `answer` as the data of a successful response. */
+const answering = (answer: unknown) => {
+  const answered = { toPromise: () => Promise.resolve({ data: answer }) }
+  return graphqlVaultDB({ client: { query: () => answered, mutation: () => answered, subscription: () => answered } as unknown as GraphqlVaultClient })
+}
+
 describe("graphqlVaultDB, its refusals", () => {
   it("carries the server's refusal across as the same VaultError, kind and message, the GraphQL error it crossed as its cause", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
@@ -318,19 +324,37 @@ describe("graphqlVaultDB, its refusals", () => {
     expect(refusal.message).to.match(/^Nothing was written/)
   })
 
-  it("leaves behind a box_stored that crossed with any refusal but a stale write, which alone carries one, checked", async () => {
-    const mismatched = new GraphQLError('The vault changed.', { extensions: { kind: 'vault_mismatch', meta: { box_stored: { boxlabel: 'openai', not: 'a box' } } } })
-    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [mismatched] }) }) }
-    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
+  it("leaves behind a box_stored that came with any refusal but a stale write, which alone carries one, checked", async () => {
+    const mismatched = answering({ safebyokPutBox: { landed: false, refusalkind: 'vault_mismatch', message: 'The vault changed.', box_stored: { boxlabel: 'openai', not: 'a box' }, capacity: null } })
+    const refusal = await TH.expectBad(mismatched.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
     expect(refusal).to.not.have.property('meta')
   })
 
-  it("refuses as corrupt_record a vault_full that crossed with no capacity that reads as one", async () => {
-    const full = new GraphQLError('This vault is full.', { extensions: { kind: 'vault_full', meta: { capacity: { boxes: 'many' } } } })
-    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [full] }) }) }
+  it("refuses as corrupt_record a vault_full that came with no capacity that reads as one", async () => {
+    for (const capacity of [null, { boxes: 'many' }]) {
+      const full = answering({ safebyokPutBox: { landed: false, refusalkind: 'vault_full', message: 'This vault is full.', box_stored: null, capacity } })
+      await TH.expectBad(full.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
+    }
+  })
+
+  it("reports a stale box write's standing box that is not one as the damaged box a read of it would name", async () => {
+    const stale = answering({ safebyokPutBox: { landed: false, refusalkind: 'stale_write', message: 'The box changed.', box_stored: 'not a box', capacity: null } })
+    const refusal = await TH.expectBad(stale.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'stale_write')
+    expect(refusal.meta?.box_stored).to.include({ boxlabel: 'openai' })
+  })
+
+  it("refuses a write that came back not landed and naming no kind as corrupt_record, quoting nothing of the answer", async () => {
+    const vague = answering({ safebyokPutVaultProps: { landed: false, refusalkind: 'made_up', message: 'sk-ant-not-a-real-key', vault_props_stored: null } })
+    const refusal = await TH.expectBad(vague.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
+    expect(refusal.message).to.not.include('sk-ant')
+  })
+
+  it("ignores a record in a refusal's extensions: a stale_write that came as an error, as an older server sent it, is refused as the adapter's wrong answer", async () => {
+    const stale = new GraphQLError('The vault changed.', { extensions: { kind: 'stale_write', meta: { box_stored: TH.boxOf('openai', 'r2') } } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [stale] }) }) }
     const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
+    expect(refusal.meta).to.be.undefined
   })
 
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {

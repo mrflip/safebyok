@@ -111,12 +111,20 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
 * **A refusal crosses as a GraphQL error**: its message the VaultError's calm one, its
-  `extensions.kind` its kind, a stale box write's `extensions.meta.box_stored` (the box that
-  stands under the boxlabel, whole, as a read would send it), a full vault's
-  `extensions.meta.capacity` (how full it is), and nothing else -- never the VaultError's `cause`, your driver's
-  own error, which may name your database or quote a row. That stays on your server, as the
-  GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws crosses as
-  `storage_unavailable`.
+  `extensions.kind` its kind, and nothing else -- never a record, and never the VaultError's
+  `cause`, your driver's own error, which may name your database or quote a row. That stays on
+  your server, as the GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws
+  crosses as `storage_unavailable`.
+* **What a refusal learned crosses in the mutation's body, not in the error.** GraphQL servers,
+  gateways and APM tools commonly log an error's `extensions`, and a stale write learns the
+  winning vault props (both ways in, their salts and wrapped vaultKeys) or a winning box. So
+  `safebyokPutVaultProps` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
+  for a `vault_full` box write), `landed: false` with the `refusalkind`, the `message`, and
+  `vault_props_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
+  VaultError from it. Those fields are in the response's `data`: take care that your server's
+  logging of responses, where it has any, does not write them down. Upgrade the client and the
+  server together; an older server's error with `extensions.meta` reads as a wrong answer
+  (`corrupt_record`).
 * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` and the optional `VaultNotifySql` trigger, one
   `listen` serving every VaultDB your server makes -- and stops listening when the subscriber goes. Changes that come

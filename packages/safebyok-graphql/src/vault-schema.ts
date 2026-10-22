@@ -17,6 +17,13 @@ it is, never looked inside.
 scalar SafebyokWayin
 
 """
+A record as storage holds it, sound or damaged, or null for none: JSON, carried as it is, never
+looked inside. It travels in a write's answer, never in an error's \`extensions\`, which GraphQL
+servers, gateways and APM tools commonly log.
+"""
+scalar SafebyokStoredRecord
+
+"""
 A box's sidecar: the app's own JSON object, {} for none, carried as it is, never looked inside.
 """
 scalar SafebyokSidecar
@@ -181,6 +188,33 @@ type SafebyokCapacity {
   bytes: SafebyokRoom!
 }
 
+"""
+What an update of the vault props answered. It \`landed\`, or it was refused and nothing was written:
+\`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_props_stored\` carries the vault
+props standing, whole, or null when none stand. Those are the ways in, so they ride in this body,
+never in an error's \`extensions\`.
+"""
+type SafebyokPutVaultPropsAnswer {
+  landed:             Boolean!
+  refusalkind:        String
+  message:            String
+  vault_props_stored: SafebyokStoredRecord
+}
+
+"""
+What a box write answered. It \`landed\`, and \`box_stored\` is the box as stored; or it was refused and
+nothing was written: \`refusalkind\` and \`message\` say why, and \`box_stored\` is the box standing
+under that boxlabel for a \`stale_write\` (sound or damaged, or null for none), \`capacity\` how full
+the vault is for a \`vault_full\`. A refusal of any other kind crosses as a GraphQL error.
+"""
+type SafebyokPutBoxAnswer {
+  landed:      Boolean!
+  refusalkind: String
+  message:     String
+  box_stored:  SafebyokStoredRecord
+  capacity:    SafebyokCapacity
+}
+
 type Query {
   """The vault's props and every box, read in one step, or null when the vault has never been made."""
   safebyokGetVault(scope: SafebyokVaultScopeInput!): SafebyokVault
@@ -199,10 +233,10 @@ type Mutation {
   safebyokEnsureVault(scope: SafebyokVaultScopeInput!, draft: SafebyokVaultPropsInput!): SafebyokVault!
   """Stores the vault props if their vault has none, and answers with whichever vault props stand there afterwards: these, or another device's already standing."""
   safebyokEnsureVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
-  """Replaces the vault props, only while those standing are the ones expected."""
-  safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
-  """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored."""
-  safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokBox!
+  """Replaces the vault props, only while those standing are the ones expected, and answers whether it landed, or the vault props standing when it did not."""
+  safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): SafebyokPutVaultPropsAnswer!
+  """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
+  safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
   safebyokDelBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
   """Deletes the vault, its props and every box, removing them for good, only while the vault is the one expected."""
