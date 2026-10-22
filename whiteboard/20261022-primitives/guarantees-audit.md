@@ -8,6 +8,16 @@ adds no mechanism inside a primitive. They are YOLO decisions under the Coach's 
 allow the final guarantee to fall"): each is an Open Matters row, and each is easy to undo.
 **Where this file and `primitives.md` differ, this file wins** until the Coach rules otherwise.
 
+**The Coach's ruling on epochs** (2026-10-22, verbatim): "lease should go away when gate changes
+/ vault_epoch and vault_tok (formerly spelled vault_id) is largely used for rollback detection
+and it's only weird for it to be larger than device. / Don't bump vault_epoch on each read; do
+bump it on each write or deletion. Compare it by less-than-equal-to. / Don't let rollback
+protection drive any large revisions to the plan". So: `gate_epoch` is compared by equality, and
+a lease from another gate goes (8 stands); `vault_epoch` is compared by ≤ (the device record's
+highest at or below what storage serves; a stamp's at or below the picture's), bumped by the
+store on gate writes and `delVault`, never on a read; 6 is kept to its smallest form, and
+nothing about rollback grows past it.
+
 S breaks a security or consistency guarantee; U degrades the user's experience only.
 
 ## The nine, and what each thread does
@@ -56,6 +66,7 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    then raise their own.
 
 6. **Nothing raises the device record but birth (S, plus a false positive; threads 7 and 5).**
+   *Smallest form, per the ruling: remembering the highest `vault_epoch` seen is not bumping it.*
    A passphrase change (epoch 6), storage restored to 5, and the next birth accepts it, so the
    old passphrase works again. **Fix:** the record is raised (a store-side max) at birth and in
    the refresh from what each fetched, and from what `putGate` and `delVault` returned. In the

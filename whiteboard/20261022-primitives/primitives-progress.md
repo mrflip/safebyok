@@ -41,6 +41,9 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   a caller's guarantee fall, keep the guarantee by the smallest means outside the primitive, raise
   it loudly, and carry on.
 
+* **Epochs** (the Coach, 2026-10-22): `gate_epoch` by equality, and the lease goes when the gate
+  changes; `vault_epoch` by ≤, bumped by the store on writes and deletion, never on a read;
+  rollback protection drives no large revision (`guarantees-audit.md`, the ruling at its head).
 * *Orchestrator:* **`guarantees-audit.md` binds threads 4 to 9** (2026-10-22): nine places the
   spec as written lets a guarantee fall, each fix by thread (*By thread*), each an Open Matters
   row. It wins over `primitives.md` until ruled.
