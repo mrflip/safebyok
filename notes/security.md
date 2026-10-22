@@ -56,7 +56,15 @@ added or folded into through the subagent, and no other entry changes.
   ciphered whisper, which is what storage holds. Same-origin code in a browser with the IndexedDB device store can
   read the stored lease record directly, as before (amended 2026-10-22 (lease_box review): so can a host's own
   `DeviceDB`, which is pluggable: its `putLease` and `getLease` are handed every lease record, `lease_key` and the
-  wrapped vaultKey included, as their job requires).
+  wrapped vaultKey included, as their job requires). Amended 2026-10-22 (box_seal): **`vault.lease` is no longer
+  public; the headline and the holder sentences above no longer hold.** The getter is removed and the Lease is the Vault
+  object's own again: a host reaches no Lease, and so cannot decipher a box ciphertext through one; what an app reads
+  of it is `vault.askPassphraseAt` (the deadline, from the snapshot) and `vault.leaseMillis`. The package reads the
+  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseReader(vault, read)`, called once
+  in the Vault constructor with the first registration winning, and `heldLeaseOf(vault)`, used by `Box.seal`,
+  `box.extractWhisper()` and a damaged lease dropping itself; exported from no entry point. The walk test above now
+  finds no Lease either. Each copy of the package has its own registry, so a Vault object from one copy reads as locked
+  to a Box of another.
 
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **storage is the ground truth, and the vault argues with none
   of it: every call demands, synchronously and at each of its steps, that the vault still stands at the stamp of what
@@ -76,10 +84,12 @@ added or folded into through the subagent, and no other entry changes.
   (`#lockNow`; `del()` locks through it too). Because a device store applies one scope's calls in the order made, a
   lease write already issued by an unlock under way is erased behind it. The grant demands the vault's stamp and its
   prompt immediately before and after that write, and no longer erases its own lease. Amended 2026-10-22 (box_seal):
-  **a lock stops a `putBox()` or `delBox()` at every step before its write to storage, and not the write.** The wait
-  on getProof, `VaultDB.getBox`, `box.extractWhisper()` and `Box.seal` each refuse `vault_locked` having written
-  nothing. Once `VaultDB.putBox` / `VaultDB.delBox` is sent a lock does not stop it: it lands or refuses as storage
-  decides, and a stale `putBox()` still refuses `stale_write` and never lands.
+  **a lock stops a `putBox()` or `delBox()` at each wait named here, and not the write.** A `putBox()` refuses
+  `vault_locked`, writing nothing, when a lock lands while it waits on `getProof`, `VaultDB.getBox` /
+  `box.extractWhisper()`, or `Box.seal`; a `delBox()` when it lands while it waits on `getProof`. Once
+  `VaultDB.putBox` / `VaultDB.delBox` is sent a lock does not stop it: it lands or refuses as storage decides, and a
+  stale `putBox()` still refuses `stale_write` and never lands. (Amended 2026-10-22 (box_seal): this once said "at every
+  step before its write"; `#ensureUnlocked`'s pre-prompt hello and lease take-up are not among the named waits.)
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **drops are memory-only; only a lock erases the pantry's
   lease.** The expiry at the deadline, `close()`, a demand that finds the lease ended, and a read that finds the
   lease revoked (the pantry holding none or a newer one, the ways in changed, the vault deleted or made anew) each
@@ -2938,7 +2948,7 @@ added or folded into through the subagent, and no other entry changes.
   anyone who can use this browser profile can open the vault with the lease's leaseKey, and
   `unwrapKey` can hand back the vaultKey extractable (the 2026-10-14 leaseKey entry above). Amended 2026-10-22
   (lease_box): the vault holds no vaultKey handle while it waits; one exists only inside a lease's cipher or decipher
-  call, and injected code can still reach the same operations through `vault.lease` or the vault's own API (amended 2026-10-22 (lease_box rework): `vault.lease` yields no record, leaseKey or wrapped vaultKey, so those operations are cipher and decipher only, not `unwrapKey`; amended 2026-10-22 (lease_box review): that holds of `vault.lease` alone, a host's own pluggable `DeviceDB`, like same-origin IndexedDB, is handed every lease record, `lease_key` and the wrapped vaultKey included).
+  call, and injected code can still reach the same operations through `vault.lease` or the vault's own API (amended 2026-10-22 (box_seal): `vault.lease` is gone, the Lease being the Vault object's own and read by the package through a module-private registry (see the 2026-10-22 `vault.lease` entry at the top), so those operations are reachable through the vault's own API alone; the next two amendments describe the getter that stood) (amended 2026-10-22 (lease_box rework): `vault.lease` yields no record, leaseKey or wrapped vaultKey, so those operations are cipher and decipher only, not `unwrapKey`; amended 2026-10-22 (lease_box review): that holds of `vault.lease` alone, a host's own pluggable `DeviceDB`, like same-origin IndexedDB, is handed every lease record, `lease_key` and the wrapped vaultKey included).
 * 2026-10-17 (thread sweep_small, [#143](https://github.com/mrflip/safebyok/pull/143)): **the Postgres README no longer ships a hard-cap trigger
   recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
   `safebyok_boxes` that refused a box past a hard limit, taking a transaction-scoped
