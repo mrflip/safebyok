@@ -55,10 +55,10 @@ rules* 3).
 
 | # | Label | Status | PR |
 |---|---|---|---|
-| 1 | renames | filed, restacked on main | #243 |
-| 2 | get_vault | filed, restacked | #244 |
-| 3 | wire_meta | filed, restacked | #246 |
-| 4 | store_verbs | filed | #251 |
+| 1 | renames | merged | #243 |
+| 2 | get_vault | merged | #244 |
+| 3 | wire_meta | merged | #246 |
+| 4 | store_verbs | merged | #251 |
 | 5 | demand | planned | |
 | 6 | lease_box | planned | |
 | 7 | bank | planned | |
