@@ -41,6 +41,55 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **storage is the ground truth, and the vault argues with none
+  of it: every call demands, synchronously and at each of its steps, that the vault still stands at the stamp of what
+  it holds.** A write storage refuses as stale is refused as it came (`stale_write`), and the vault reads nothing
+  after it: the old catch-up refresh is gone. Every thing the vault hands out (a box, a lease, a listing's entry)
+  carries the stamp it was made under, `{ scope, vault_tok, vault_epoch, gate_epoch }`, and
+  `vault.demandConsistentWith(thing)` refuses it as `vault_gone` (deleted), `vault_remade` (deleted and made anew),
+  `gate_moved` (a way in changed) or, for a thing bound to the lease, `vault_locked`. A call makes the demand
+  before and after each wait it holds; none of it is a repair, and none of it reads storage. A demand failure is
+  logged by its kind and the call only, never the thing's fields (`packages/safebyok/src/vault.ts`, *Vault:
+  demand*).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **`lock()` acts before it returns, and the device's erase of
+  the lease is issued last.** In order, with nothing awaited between: the lease in memory is dropped and its expiry
+  disarmed, a lease take-up under way is stood down, the prompt up (if any) is landed on, and the snapshot swaps to
+  locked; only then is the pantry's erase (`DeviceDB.delLease`) issued, and its promise is what `lock()` awaits
+  (`#lockNow`; `del()` locks through it too). Because a device store applies one scope's calls in the order made, a
+  lease write already issued by an unlock under way is erased behind it. The grant demands the vault's stamp and its
+  prompt immediately before and after that write, and no longer erases its own lease.
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **drops are memory-only; only a lock erases the pantry's
+  lease.** The expiry at the deadline, `close()`, a demand that finds the lease ended, and a read that finds the
+  lease revoked (the pantry holding none or a newer one, the ways in changed, the vault deleted or made anew) each
+  drop the lease from memory and erase nothing, because an unconditional erase on a judgment could take another
+  tab's fresh lease. A lease left in the pantry that names an old `gate_epoch` or `vault_tok` is never taken up
+  (take-up checks both) and is discarded by the next take-up. `lock()` (and `del()`, which locks as it does) erases,
+  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a read older than the vault props in hand is ignored, never
+  judged, and a Vault object holding newer props does not notice storage rolled back beneath it.** A read of the
+  same `vault_tok` at a lower `gate_epoch` or `vault_epoch` (one served before this tab's own write and answered
+  after it) changes nothing and refuses nothing; the test runs before the device mark's rollback check, so it is
+  never a false `rolled_back`. Consequence: the Vault object keeps proving against the newer props it holds, so a
+  removed way in stays removed on it, and its writes of the gate expect the newer epoch and refuse as stale. A Vault
+  object made anew still refuses the older copy as `rolled_back`. Box writes expect no epoch and land in
+  rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a pantry read older than the lease in hand cannot revoke
+  it.** A refresh judges the pantry (this device's store of the lease) only when its read began at or after the
+  moment the lease in hand was granted or taken up, by the vault's clock, or when the pantry holds a lease newer than
+  the one in hand; otherwise a refresh in flight across this tab's own unlock (common on a first unlock over a
+  store that rings on its own writes) would re-lock the tab at once. Narrow cost: a lock in another tab landing in
+  the same clock millisecond as this tab's grant may be seen only at the next read.
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a cancel landing while an attempt writes its lease leaves
+  that lease in the pantry.** A prompt ended (Cancel) after the attempt's last demand before the write does not
+  erase what the write stores: this tab stays locked in memory, and the next `ensureLease()` takes the lease up
+  without a prompt. A lock landing then erases it behind the write (previous entries). This is the sprint's
+  narrowing, "cancel declines this prompt only".
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **the lease take-up keeps its own abort guard until the
+  gating owns it.** `ensureLease()` and the first hello take a stored lease up under an abort signal that `lock()`,
+  a grant and `close()` stand down, so a lock landing while the pantry is read is never undone by the take-up, which
+  installs nothing and discards no lease once stood down. It is the one guard kept from the old machinery, because
+  no demand can see a lock from a take-up that holds no lease; a later thread moves the pantry consult inside the
+  prompt's gating.
 * 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a deleted vault leaves a tombstone, and `vault_epoch`
   is the record of a life.** The vault props carry `vault_epoch`, a counter the store, never the writer, moves up
   by one on every write of the gate (`putVaultProps`) and on `delVault`; no box write moves it. `delVault` leaves
@@ -307,7 +356,7 @@ added or folded into through the subagent, and no other entry changes.
   read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
   aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
   nothing up and writes no lease (or, outrun only during its write, erases the lease it wrote:
-  amended 2026-10-21, thread b_fixes); the unlock refuses `vault_locked`. A race test in
+  amended 2026-10-21, thread b_fixes; amended 2026-10-22 (primitives sprint, thread 5 (demand)): it no longer erases, see the `lockLanded` entry); the unlock refuses `vault_locked`. A race test in
   `packages/safebyok/tests/vault/vault-races.test.ts` fails without the fix. Known residue, failing
   safe: a make stood down by the deletion of *another* device's vault refuses although its own vault
   stands (the next read takes it up, the next unlock opens it). Cross-device invalidation in general
@@ -672,6 +721,13 @@ added or folded into through the subagent, and no other entry changes.
   erases that lease (and so the one it overwrote), while the key already held in memory stays until
   its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
   the lease it wrote, so a hello that read that lease in between takes nothing up.
+  Amended 2026-10-22 (primitives sprint, thread 5 (demand)): `#grantLease` no longer erases a lease it wrote,
+  whether the prompt ended or the vault props moved during the write. The write is erased by a `lock()` landing
+  then (its erase is issued after the write, and the device store applies one scope's calls in order); a cancel
+  alone leaves the lease in the pantry, and the next `ensureLease()` takes it up without a prompt. A lease left for
+  vault props that have moved on is never taken up (take-up checks `gate_epoch` and `vault_tok`). So the
+  "erases the lease it just wrote" statements in this entry and in the `a_sec2` and `b_fixes` statements
+  about the grant no longer hold.
 * 2026-10-19 (thread A6, getproof); 2026-10-20 (placement): **`Ask`: one per prompt, with one shared answer, and its
   `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
   `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
@@ -933,7 +989,8 @@ added or folded into through the subagent, and no other entry changes.
   (2) **`hello()` is memoised.** Amended 2026-10-19 (20261019-softlock_gone): a lock is no longer
   kept from being undone on its handle by a later `hello()`; with the counter gone, a lease that a
   lock failed to erase (the device store threw) is taken up by the next `hello()` that reads afresh
-  on the same handle, not only at the next page load. What the rest of this point says of the
+  on the same handle, not only at the next page load (amended 2026-10-22 (primitives sprint, thread 5 (demand)): only the first hello, or
+  `ensureLease()`, takes a lease up). What the rest of this point says of the
   counter, and of a lock staying locked on its handle, describes what stood until then.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
@@ -988,7 +1045,8 @@ added or folded into through the subagent, and no other entry changes.
   key and deadline; as the default five-minute `staleMinutes` makes a routine `hello()` re-run it, a
   `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
   and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
-  `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
+  `AbortController` (amended 2026-10-22 (primitives sprint, thread 5 (demand)): a lock, a grant and `close()` stand it down; the expiry and other
+  drops no longer do); whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
   expiry timer and relocks; and `#grantLease`, as an unlock or wayin change begins writing its
   lease, before the write, so a take-up that read an older lease cannot erase the fresh one by
   discarding the older) aborts it. An aborted take-up installs nothing and discards no lease
@@ -1005,7 +1063,8 @@ added or folded into through the subagent, and no other entry changes.
   a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
   `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
   before any further await: it drops the key, stands down any take-up, and (for a different
-  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes. Before,
+  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes (amended 2026-10-22 (primitives sprint, thread 5 (demand)):
+  a read that finds the lease revoked drops it from memory and erases nothing). Before,
   it decided "outlived" first and assigned the new props only after awaiting `delLease` and
   `listBoxes`, so a take-up or an unlock's lease grant that finished inside those waits still saw the
   old props through `#outrun`, installed a key fitted to them, and was never relocked. A revocation
@@ -1642,7 +1701,8 @@ added or folded into through the subagent, and no other entry changes.
   versioned expectation (same `vault_id`, same `revision_tok` or none; amended 2026-10-21 (trust_lines): it once also had the
   same `vault_key_epoch`, a field now removed). On a
   `stale_write` refusal it catches up with storage once and throws `stale_write` (nothing written;
-  the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
+  the adapter's refusal is the `cause`; amended 2026-10-22 (primitives sprint, thread 5 (demand)): it reads nothing after the refusal, and the catch-up
+  outcomes that follow in this sentence no longer occur); a catch-up that relocks the device (vault reborn, or its
   wayins changed) throws `vault_locked` with nothing written, and one that fails throws as it came
   (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
   box deleted elsewhere is now just a stale write. So no whisper is sealed over what another device
@@ -2323,7 +2383,9 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-21 (fault_kinds): a box that will not open under the lease in hand is `damaged_box` at
   once, with no re-read first, its message saying to read again with `hello({ staleMinutes: 0 })` in
   case the vault was made anew on another device; such a vault shows first as `damaged_box`, then
-  relocks on a fresh `hello()`. The catch-up after a `stale_write` write is unchanged. A
+  relocks on a fresh `hello()`. The catch-up after a `stale_write` write is unchanged (amended 2026-10-22 (primitives sprint, thread 5 (demand)): it
+  is gone; a write storage refuses as stale is refused as it came and reads nothing after it, and a call racing a
+  deleted or remade vault refuses `vault_gone` or `vault_remade`, see the entry on demands). A
   catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
   and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
   queued), so two reads never interleave their snapshot updates. None retries: `putBox()`, a change
