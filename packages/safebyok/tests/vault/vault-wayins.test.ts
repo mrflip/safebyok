@@ -787,6 +787,7 @@ describe("a new passphrase's strength", () => {
       expect(err.message).to.match(/strengthChecker handed to Vault\.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
+      expect(err.message).to.not.include('meta.')
       expect(err).to.not.eq(thrown)
       expect(world.dbStore.ckeys()).to.have.lengthOf(0)
     })
