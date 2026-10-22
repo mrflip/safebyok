@@ -1,6 +1,6 @@
 # Thread 7: bank (2026-10-22)
 
-Branch `20261022-bank`, PR #TBD, stacked on #256. Justify: in progress.
+Branch `20261022-bank`, PR [#258](https://github.com/mrflip/safebyok/pull/258), stacked on #256. Justify: green; safebyok 3021 passed (37 skipped), react 292, convex 316 (9), postgres 311 (15), graphql 323 (15), indexeddb 164 (11), fastkey 49, demo 222 (17), e2e 107 (116).
 
 * **Built**: `packages/safebyok/src/bank.ts`, the `Bank`: `make` (sync, touches nothing), `hello`
   (loads the strength checker once; `refused` and retried on failure), `ensureVault(draft)` (the
@@ -91,3 +91,6 @@ Branch `20261022-bank`, PR #TBD, stacked on #256. Justify: in progress.
      let-go to a deletion. Rec: keep; the Vault object is gone either way.
   3. **`vault_mismatch` on a box read is `vault_gone`, never `vault_remade`.** Rec: keep; the
      store cannot say which, and both mean "ask the bank".
+  4. **The React provider gives a host no way past `vault_behind`**: the bank isn't exposed and
+     `retryOpen()` reads nothing. Rec: thread 7b, with `useBank`.
+  5. **VOCABULARY.md:116 still defines "rolled back" by the device mark.** Rec: thread 11.
