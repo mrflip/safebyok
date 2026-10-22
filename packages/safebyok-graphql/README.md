@@ -138,12 +138,15 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`listBoxRecords(scope)`, which lists a vault's boxes as stored records, its two ciphered
-fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shape a vault shows,
-without `format` -- which the browser's VaultDB may not hand back from its own listing.
+`listBoxRecords(scope)`, `getVaultRecords(scope)` and `ensureVaultRecords(scope, draft)`, which
+hand on a vault's boxes as stored records, their two ciphered fields left out. A VaultDB's own
+`listBoxes`, `getVault` and `ensureVault` give summaries instead -- the shape a vault shows,
+without `format` -- which the browser's VaultDB may not hand back from its own listing. A
+vault read is one query, its props and its boxes from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
-Every stored field is non-null in the schema. A listing of yours that hands back a record missing
+Every stored field is non-null in the schema but the vault props' `passphrase` and `passkey`,
+both null while a vault has no gate. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
 `storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.

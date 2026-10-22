@@ -49,7 +49,8 @@ input SafebyokVaultScopeInput {
 
 """
 A vault's props, as stored: its scope, its vault_tok, and its two ways in, each wrapping the
-one vaultKey: its passphrase, and its passkey, null when it has none. Times are epoch milliseconds.
+one vaultKey: its passphrase, and its passkey, null when it has none. Both are null while the vault
+has no gate (gate_epoch 0). Times are epoch milliseconds.
 """
 type SafebyokVaultProps {
   format:           String!
@@ -58,7 +59,7 @@ type SafebyokVaultProps {
   vaultlabel:       String!
   vault_tok:        String!
   gate_epoch:       Int!
-  passphrase:       SafebyokWayin!
+  passphrase:       SafebyokWayin
   passkey:          SafebyokWayin
   registered_at:    Float!
 }
@@ -71,7 +72,7 @@ input SafebyokVaultPropsInput {
   vaultlabel:       String!
   vault_tok:        String!
   gate_epoch:       Int!
-  passphrase:       SafebyokWayin!
+  passphrase:       SafebyokWayin
   passkey:          SafebyokWayin
   registered_at:    Float!
 }
@@ -118,6 +119,12 @@ type SafebyokListedBox {
   sidecar:                SafebyokSidecar!
   registered_at:          Float!
   written_at:             Float!
+}
+
+"""A vault as its storage read it in one step: its props, and every box as a listing has it."""
+type SafebyokVault {
+  vaultProps: SafebyokVaultProps!
+  boxes:      [SafebyokListedBox!]!
 }
 
 """What an update of the vault props was proven against: it lands only while the vault props standing have both."""
@@ -175,6 +182,8 @@ type SafebyokCapacity {
 }
 
 type Query {
+  """The vault's props and every box, read in one step, or null when the vault has never been made."""
+  safebyokGetVault(scope: SafebyokVaultScopeInput!): SafebyokVault
   """The vault's props, or null when the vault has never been made."""
   safebyokGetVaultProps(scope: SafebyokVaultScopeInput!): SafebyokVaultProps
   """One box, or null when there is none under that boxlabel."""
@@ -186,6 +195,8 @@ type Query {
 }
 
 type Mutation {
+  """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its props and every box, from one step: these, or another device's already standing."""
+  safebyokEnsureVault(scope: SafebyokVaultScopeInput!, draft: SafebyokVaultPropsInput!): SafebyokVault!
   """Stores the vault props if their vault has none, and answers with whichever vault props stand there afterwards: these, or another device's already standing."""
   safebyokEnsureVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
   """Replaces the vault props, only while those standing are the ones expected."""
