@@ -1,6 +1,6 @@
 # Thread 6b: box_seal (2026-10-22)
 
-Branch `20261022-box_seal`, PR #PR, stacked on [#254](https://github.com/mrflip/safebyok/pull/254). Justify: green (core 2905 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). `pnpm size:budget`: no line moves (everything 43.3 of 47 kB, Vault 35.6 of 39 kB).
+Branch `20261022-box_seal`, PR [#256](https://github.com/mrflip/safebyok/pull/256), stacked on [#254](https://github.com/mrflip/safebyok/pull/254). Justify: green (core 2905 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). `pnpm size:budget`: no line moves (everything 43.3 of 47 kB, Vault 35.6 of 39 kB).
 
 **Blocking question for the Coach** (below, *For the Coach*): the binding the thread was cut for
 already stands; what the Coach's question points at is the whole `putBox()` carrying forward an
@@ -25,8 +25,10 @@ unopened `registered_at`, and closing that changes a ruled path.
     five fields and checks the stamp's absence from JSON and `inspect`; a new test reads the stamp
     field by field and finds each non-enumerable, non-writable.
   * The changeset (minor): what a host sees of the stamp; stored boxes unchanged.
-  * `notes/security.md`, through a sonnet subagent: the rule, the whole put's carry-forward, and
-    what a lock stops.
+  * `notes/security.md`, through a sonnet subagent, amending four entries in place (no new
+    ones): the box ctx entry (the rule, the stamp unauthenticated and hidden), thread 6's whole-put
+    amendment (the one exception, open with the Coach), thread 5's `lock()` entry (what a lock
+    stops), and thread 5's ground-truth entry (one line on the stamp).
 * **Decisions taken**:
   * **The immutable set**, from `BoxRecord` and `#sealAndPutBox`: the vault's scope and
     `vault_tok`, the `boxlabel`, `registered_at` (carried forward by every store), and the
