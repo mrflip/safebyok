@@ -150,6 +150,8 @@ const FamilyCases = [
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
   ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
+  ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
+  ["no_whisper",          "condition", 'a store keeping a whisper where none stands is told to the caller, who hands one in'],
 ] as const
 
 describe("each kind's family", () => {

@@ -33,10 +33,10 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
   ["lock",             "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
   ["putWayin",         "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val, { vault }) => { expect(val).to.deep.equal(vault.passphrase) }],
   ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val, { vault }) => { expect(val).to.eq(vault) }],
-  ["putBox",           "bad_whisper",      () => ['openai', null],                             () => ['openai', 'sk-fake-two'],                   (val) => { expect(val).to.be.undefined }],
-  ["getBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
-  ["getWhisper",       "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
-  ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.be.undefined }],
+  ["putBox",           "bad_whisper",      () => [{ boxlabel: 'openai' }, null],               () => [{ boxlabel: 'openai' }, 'sk-fake-two'],     (val) => { expect(val).to.have.property('boxlabel', 'openai') }],
+  ["getBox",           "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
+  ["getWhisper",       "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
+  ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val, { vault }) => { expect(val).to.deep.eq({ boxlabel: 'anthropic', vault_tok: vault.vault_tok, outcome: 'deleted' }) }],
   ["del",              "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
 ]
 
@@ -153,9 +153,9 @@ describe("vault.getWhisper", () => {
     expect(apiKey).to.eq('sk-fake')
   })
 
-  it("throws what getWhisper refuses with: 'absent_box' for an empty label, 'vault_locked' while locked", async () => {
+  it("resolves null for an empty label, and throws what getWhisper refuses with: 'vault_locked' while locked", async () => {
     const { vault } = await twinVault()
-    await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
+    expect(await vault.getWhisper('openai')).to.be.null
     await vault.lock()
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
   })

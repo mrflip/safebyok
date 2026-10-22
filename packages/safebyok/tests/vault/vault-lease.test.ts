@@ -87,12 +87,13 @@ const OutOfBoundsDeadlines = [
 describe("the lease", () => {
   it("spares the passphrase on a later open, within seven days", async () => {
     const world = makeWorld()
-    await world.openUnlocked('pw one')
+    const vault = await world.openUnlocked('pw one')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     world.advance(6 * 24 * 60 * 60 * 1000)
     const later = await world.open()
     expect(later.getSnapshot().state).to.eq('unlocked')
-    // Genuinely unlocked: a read reaches the box layer ('absent_box'), not the lock ('vault_locked').
-    await TH.expectRefusal(later.getWhisper('missing'), 'absent_box')
+    // Genuinely unlocked: the whisper opens, where a locked vault with no getProof refuses 'vault_locked'.
+    expect(await later.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("has lapsed by day eight: the next open is locked", async () => {
@@ -105,7 +106,7 @@ describe("the lease", () => {
   it("lapses mid-session too: no whisper comes out past the deadline", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     world.advance(SevenDaysMillis + 1)
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
   })
@@ -154,7 +155,7 @@ describe("the lease", () => {
     it("unlocks, and stays unlocked however long it is left, showing FarFuture as its deadline", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
-      await vault.putBox('anthropic', 'sk-fake')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       expect(vault.getSnapshot().state).to.eq('unlocked')
       expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
       world.advance(200 * 365 * 24 * HourMillis)
@@ -165,7 +166,7 @@ describe("the lease", () => {
     it("writes the clamped deadline to the device, as a finite number, and a reopen picks it up", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
-      await vault.putBox('anthropic', 'sk-fake')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       const lease = await world.getLease()
       expect(lease?.ask_passphrase_at).to.eq(FarFuture)
       world.advance(10 * 365 * 24 * HourMillis)
@@ -197,17 +198,20 @@ describe("the lease", () => {
   })
 
   for (const [shiftMillis, blurb] of [[HourMillis, 'later'], [-HourMillis, 'earlier']] as const) {
-    it(`reads a lease's deadline moved an hour ${blurb} on the device as no lease, discards it, and says so: the deadline is bound into its wrap`, async () => {
+    it(`takes up a lease whose deadline was moved an hour ${blurb} on the device, then refuses it 'damaged_lease' at its first use, erasing it and locking: the deadline is bound into its wrap`, async () => {
       const world = makeWorld()
-      await world.openUnlocked('pw one')
+      const vault = await world.openUnlocked('pw one')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       const written = await world.getLease()
       if (written === null) { throw new Error('expected a lease on the device') }
       await world.deviceDB.putLease({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis })
       // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the ctx can.
       const reopened = await world.open({ leaseHours: Infinity })
+      expect(reopened.getSnapshot().state).to.eq('unlocked')
+      await TH.expectRefusal(reopened.getWhisper('anthropic'), 'damaged_lease')
       expect(reopened.getSnapshot().state).to.eq('locked')
+      await TH.wakeupAtNextTick()
       expect(await world.getLease()).to.be.null
-      expect(world.logged.map((call) => call.level)).to.deep.eq(['warn'])
     })
   }
 
@@ -514,7 +518,7 @@ describe("natural expiry", () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     expect(vi.getTimerCount()).to.eq(1)
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.getWhisper('anthropic')
     await vault.putWayin('pw one', 'pw two')
     expect(vi.getTimerCount()).to.eq(1)
@@ -543,7 +547,7 @@ describe("natural expiry", () => {
   it("leaves a putWayin() under way when it falls due unlocked, under the new passphrase, with a new deadline: a timer is no lock", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('old passphrase', { leaseHours: 1 })
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const gate = world.holdNextDerive()
     const changing = vault.putWayin('old passphrase', 'new passphrase')
     await gate.reached
@@ -678,11 +682,11 @@ describe("the unlock window, renewed", () => {
     const vault = await world.openUnlocked('pw one')
     const deadline = vault.getSnapshot().askPassphraseAt
     world.advance(HourMillis)
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.getWhisper('anthropic')
     await vault.delBox('anthropic')
     const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
-    await there.putBox('openai', 'sk-fake-too')
+    await there.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     await vi.waitFor(() => { expect(boxlabelsOf(vault)).to.deep.equal(['openai']) })
     expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
     expect(await leaseDeadlineOf(world)).to.eq(deadline)
@@ -730,7 +734,7 @@ describe("the session vaultKey is non-extractable", () => {
     const vault = await world.open()
     await vault.unlock('pw one')
     const wraps = vi.spyOn(crypto.subtle, 'wrapKey')
-    await vault.putBox('anthropic', 'sk-ant-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
     const wrappingKeys = wraps.mock.calls.map((callArgs) => callArgs[2])
     expect(wrappingKeys).to.have.lengthOf(1)
     expect(wrappingKeys[0]?.extractable).to.be.false
@@ -743,7 +747,7 @@ describe("the session vaultKey is non-extractable", () => {
     const spied = watchUnwraps()
     await vault.unlock('pw one')
     // The non-extractable handle it kept still does the whole job.
-    await vault.putBox('anthropic', 'sk-ant-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-fake')
     expect(extractableUnwraps(spied)).to.have.lengthOf(1)
   })
@@ -751,7 +755,7 @@ describe("the session vaultKey is non-extractable", () => {
   it("a lease never makes an extractable handle at all", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    await vault.putBox('anthropic', 'sk-ant-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
     const spied = watchUnwraps()
     const later = await world.open()
     expect(later.getSnapshot().state).to.eq('unlocked')
@@ -762,7 +766,7 @@ describe("the session vaultKey is non-extractable", () => {
   it("putWayin asks for exactly one extractable transient, for the new wraps", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    await vault.putBox('anthropic', 'sk-ant-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
     const spied = watchUnwraps()
     await vault.putWayin('pw one', 'pw two')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-fake')
@@ -807,7 +811,7 @@ const pwIsWeak: StrengthChecker = (passphrase) => (passphrase === 'pw' ? { stron
 const lockedVaultWith = async (overrides: Partial<MakeVaultOpts>) => {
   const world = makeWorld()
   const maker = await world.openUnlocked('pw')
-  await maker.putBox('anthropic', 'sk-fake')
+  await maker.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   await maker.lock()
   maker.close()
   const vault = await world.open(overrides)
@@ -895,7 +899,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const err = await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
     expect(err.message).to.include('getProof')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
-    await TH.expectRefusal(vault.putBox('openai', 'sk-fake'), 'vault_locked')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai' }, 'sk-fake'), 'vault_locked')
     await TH.expectRefusal(vault.delBox('anthropic'), 'vault_locked')
     expect(vault.state).to.eq('locked')
   })
@@ -1258,7 +1262,7 @@ describe("every data call, through ensureLease", () => {
     [(vault: Vault) => vault.getWhisper('anthropic'), 'getBox'],
     [(vault: Vault) => vault.getWhisper('anthropic'), 'getWhisper'],
     [(vault: Vault) => vault.useWhisper('anthropic', (whisper) => whisper), 'useWhisper'],
-    [(vault: Vault) => vault.putBox('openai', 'sk-fake-two'), 'putBox'],
+    [(vault: Vault) => vault.putBox({ boxlabel: 'openai' }, 'sk-fake-two'), 'putBox'],
     [(vault: Vault) => vault.delBox('anthropic'), 'delBox'],
   ] as const) {
     it(`asks getProof when locked, and goes on once it is unlocked: ${blurb} (Contract: ensureLease)`, async () => {
@@ -1273,25 +1277,32 @@ describe("every data call, through ensureLease", () => {
   it("refuses a whisper it cannot store before asking for anything: a call that cannot land never prompts", async () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
-    await TH.expectRefusal(vault.putBox('openai', undefined as unknown as string), 'bad_whisper')
-    await TH.expectRefusal(vault.putBox('no such label!', 'sk-fake'), 'bad_label')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai' }, null as unknown as string), 'bad_whisper')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'no such label!' }, 'sk-fake'), 'bad_label')
     expect(getProof).not.toHaveBeenCalled()
   })
 
-  for (const [call, blurb] of [
-    [(vault: Vault, boxlabel: string) => vault.getBox(boxlabel), 'getBox'],
-    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper'],
-    [(vault: Vault, boxlabel: string) => vault.useWhisper(boxlabel, (whisper) => whisper), 'useWhisper'],
-    [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox'],
+  for (const [call, blurb, unlisted] of [
+    [(vault: Vault, boxlabel: string) => vault.getBox(boxlabel), 'getBox', 'resolves null'],
+    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper', 'resolves null'],
+    [(vault: Vault, boxlabel: string) => vault.useWhisper(boxlabel, (whisper) => whisper), 'useWhisper', 'refuses absent_box'],
+    [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox', 'refuses absent_box'],
   ] as const) {
-    it(`refuses bad_label below the floor and absent_box from what it holds, before asking for anything: ${blurb} (Contract: ensureLease, a call that cannot land never prompts)`, async () => {
+    it(`refuses bad_label below the floor, and ${unlisted} for a box the listing in hand does not show, before asking for anything: ${blurb} (Contract: ensureLease, a call that cannot land never prompts)`, async () => {
       const getProof = typingPw()
       const { vault } = await lockedVaultWith({ getProof })
+      const expectUnlisted = async (boxlabel: string) => {
+        if (unlisted === 'resolves null') {
+          expect(await call(vault, boxlabel)).to.be.null
+        } else {
+          await TH.expectRefusal(call(vault, boxlabel), 'absent_box')
+        }
+      }
       // Below the floor every name is held to; refused by the vault's own check, which gates only
       // writes, and not listed; passing both, and not listed.
       await TH.expectRefusal(call(vault, 'tab\there'), 'bad_label')
-      await TH.expectRefusal(call(vault, 'no such label!'), 'absent_box')
-      await TH.expectRefusal(call(vault, 'openai'), 'absent_box')
+      await expectUnlisted('no such label!')
+      await expectUnlisted('openai')
       expect(getProof).not.toHaveBeenCalled()
       expect(vault.state).to.eq('locked')
       // A box the listing shows is asked for as before.
@@ -1300,7 +1311,7 @@ describe("every data call, through ensureLease", () => {
     })
   }
 
-  it("refuses absent_box from the listing in hand, reading nothing more, though another device stored the box meanwhile: the listing is as fresh as staleMinutes keeps it", async () => {
+  it("answers from the listing in hand, reading nothing more, though another device stored the box meanwhile: getWhisper resolves null and delBox refuses absent_box, the listing as fresh as staleMinutes keeps it", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
@@ -1309,10 +1320,10 @@ describe("every data call, through ensureLease", () => {
     const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
-    await elsewhere.putBox('anthropic', 'sk-fake')
+    await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     world.advance(MinuteMillis)
     const reads = vi.spyOn(world.vaultDB, 'getVault')
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
+    expect(await vault.getWhisper('anthropic')).to.be.null
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(reads).not.toHaveBeenCalled()
     expect(getProof).not.toHaveBeenCalled()
@@ -1329,19 +1340,19 @@ describe("every data call, through ensureLease", () => {
     expect(vault.state).to.eq('absent')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
-    await elsewhere.putBox('anthropic', 'sk-fake')
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
+    await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.be.null
     world.advance(StaleMinutes * MinuteMillis)
     expect(await TH.expectGood(vault.tryGetWhisper('anthropic'))).to.eq('sk-fake')
     expect(getProof).toHaveBeenCalledOnce()
     expect(getProof.mock.calls[0]?.[0].why).to.eq('locked')
   })
 
-  it("refuses absent_box at once for a vault never made, rather than asking to make one only to find nothing in it", async () => {
+  it("answers at once for a vault never made, rather than asking to make one only to find nothing in it: getWhisper resolves null, delBox refuses absent_box", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ getProof })
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
+    expect(await vault.getWhisper('anthropic')).to.be.null
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(getProof).not.toHaveBeenCalled()
     expect(vault.state).to.eq('absent')
@@ -1351,7 +1362,7 @@ describe("every data call, through ensureLease", () => {
     const { world, vault } = await lockedVaultWith({ getProof: typingPw() })
     await vault.ensureLease()
     const reads = vi.spyOn(world.vaultDB, 'getBox')
-    await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
+    expect(await vault.getWhisper('openai')).to.be.null
     expect(reads).toHaveBeenCalledOnce()
   })
 })

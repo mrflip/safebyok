@@ -141,7 +141,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox:
   const save = async () => {
     setGripe(null)
     try {
-      await vault.putBox(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
+      await vault.putBox({ boxlabel: ApiKeyBoxlabel, sidecar: { note: 'feeds the knock-knock machine' } }, keyText.trim())
       setEditing(false)
       setKeyText('')
       setJustSaved(true)

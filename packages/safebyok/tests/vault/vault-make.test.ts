@@ -108,7 +108,7 @@ describe("Vault.make", () => {
     const unsubscribe = subscribe(heard)
     await vault.hello()
     await vault.unlock('correct horse')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test')
     expect(await vault.useWhisper('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
     await vault.delBox('anthropic_api_key')
@@ -690,7 +690,7 @@ describe("the vault's fields, by the Contract", () => {
   it("shows each field as the snapshot holds it, live, in an event handler as in render (Contract: Vault)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const snapshot = vault.getSnapshot()
     expect(vault.snapshot).to.eq(snapshot)
     for (const [field, shown] of Object.entries(snapshot)) {
@@ -714,7 +714,7 @@ describe("the vault's fields, by the Contract", () => {
   it("lets no host write over a field: each is a getter with no setter, and the snapshot is frozen", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await addLaptopPasskey(vault)
     // Every field the snapshot shows, the scope's among them, and those only the handle has.
     for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'keyDeriver']) {
@@ -734,7 +734,7 @@ describe("the vault's fields, by the Contract", () => {
     Object.defineProperties(vault, { hello: { value: helloWrittenOver } })
     await vault.unlock('pw')
     expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(helloWrittenOver).not.toHaveBeenCalled()
   })
 
@@ -742,8 +742,8 @@ describe("the vault's fields, by the Contract", () => {
     const world = makeWorld({ maxBoxes: 3 })
     const vault = await world.openUnlocked('pw')
     const before = vault.capacity
-    await vault.putBox('anthropic', 'sk-fake')
-    await vault.putBox('openai', 'sk-fake-too')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await vault.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     expect(vault.capacity.boxes).to.deep.equal({ used: 2, max: 3 })
     expect(vault.capacity.bytes.used).to.be.greaterThan(0)
     expect(vault.capacity.bytes.max).to.eq(before.bytes.max)
@@ -753,8 +753,8 @@ describe("the vault's fields, by the Contract", () => {
   it("warns that the vault is nearly full, as capacity's example shows", async () => {
     const world = makeWorld({ maxBoxes: 3 })
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    await vault.putBox('openai', 'sk-fake-too')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await vault.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     const warnings: string[] = []
     const warn = (said: string) => { warnings.push(said) }
     const { boxes } = vault.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }

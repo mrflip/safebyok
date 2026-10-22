@@ -19,11 +19,11 @@ describe("scoping", () => {
   it("two users each keep a box by the same label, unseen by the other", async () => {
     const world = makeWorld()
     const one = await world.openUnlocked('pw one', { userId: 'u1' })
-    await one.putBox('anthropic', 'u1-secret')
+    await one.putBox({ boxlabel: 'anthropic' }, 'u1-secret')
     const two = await world.open({ userId: 'u2' })
     expect(two.getSnapshot().state).to.eq('absent')
     await two.unlock('pw two')
-    await two.putBox('anthropic', 'u2-secret')
+    await two.putBox({ boxlabel: 'anthropic' }, 'u2-secret')
     expect(await one.getWhisper('anthropic')).to.eq('u1-secret')
     expect(await two.getWhisper('anthropic')).to.eq('u2-secret')
   })
@@ -49,7 +49,7 @@ describe("the snapshot and its subscribers", () => {
     const vault = await world.openUnlocked('pw')
     const before = vault.getSnapshot()
     expect(vault.getSnapshot()).to.eq(before)
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(vault.getSnapshot()).to.not.eq(before)
   })
 
@@ -62,7 +62,7 @@ describe("the snapshot and its subscribers", () => {
     expect(heardCount).to.be.greaterThan(0)
     const heardBefore = heardCount
     unsubscribe()
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(heardCount).to.eq(heardBefore)
   })
 
@@ -70,7 +70,7 @@ describe("the snapshot and its subscribers", () => {
     const world = makeWorld()
     const here = await world.openUnlocked('pw')
     const there = await world.open()
-    await there.putBox('anthropic', 'written elsewhere')
+    await there.putBox({ boxlabel: 'anthropic' }, 'written elsewhere')
     await vi.waitFor(() => { expect(boxlabelsOf(here)).to.deep.equal(['anthropic']) })
   })
 })
@@ -79,7 +79,7 @@ describe("what the backend sees", () => {
   it("stores no whisper and no passphrase in the clear, anywhere", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a very memorable passphrase')
-    await vault.putBox('anthropic', 'sk-ant-api03-fake-but-secret', { sidecar: { note: 'sidecars are visible in storage' } })
+    await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'sidecars are visible in storage' } }, 'sk-ant-api03-fake-but-secret')
     const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
     expect(everything).to.not.include('sk-ant-api03-fake-but-secret')
     expect(everything).to.not.include('a very memorable passphrase')
@@ -90,8 +90,8 @@ describe("what the backend sees", () => {
   it("two stores of the same whisper write different ciphertext: fresh key and iv every time", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('one_box', 'the same whisper')
-    await vault.putBox('two_box', 'the same whisper')
+    await vault.putBox({ boxlabel: 'one_box' }, 'the same whisper')
+    await vault.putBox({ boxlabel: 'two_box' }, 'the same whisper')
     const [oneRow, twoRow] = world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))
       .map((ckey) => JSON.parse(world.dbStore.read(ckey) ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } })
     expect(oneRow?.whisper_ciphered.ciphertext_b64).to.not.eq(twoRow?.whisper_ciphered.ciphertext_b64)
@@ -112,7 +112,7 @@ describe("tampering", () => {
   it("a box with altered ciphertext refuses to open, and is left as it is", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const ckey = world.dbStore.ckeys().find((ckey) => isU1Box(ckey))
     const row = JSON.parse(world.dbStore.read(ckey ?? '') ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
@@ -125,7 +125,7 @@ describe("tampering", () => {
   it("a box row moved under another label refuses to open", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('victim_box', 'sk-fake')
+    await vault.putBox({ boxlabel: 'victim_box' }, 'sk-fake')
     const fromCkey = world.dbStore.ckeys().find((candidate) => candidate.includes('victim_box'))
     world.dbStore.write(u1BoxCkey('other_box'), world.dbStore.read(fromCkey ?? '') ?? '')
     await TH.expectRefusal(vault.getWhisper('other_box'), 'damaged_box')
@@ -135,7 +135,7 @@ describe("tampering", () => {
     it(`a box with ${blurb} refuses to open, and is left as it is: its whole visible header is bound`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
-      await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+      await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
       const ckey = world.dbStore.ckeys().find((candidate) => isU1Box(candidate)) ?? ''
       const row = JSON.parse(world.dbStore.read(ckey) ?? '{}') as Record<string, unknown>
       const spoiled = JSON.stringify(spoil(row))
@@ -169,7 +169,7 @@ describe("tampering", () => {
   it("a box that will not open under the vault's own key is called damaged, with the remedy, never quoting its boxlabel", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const row = JSON.parse(world.dbStore.read(u1BoxCkey('anthropic')) ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify(row))
@@ -213,7 +213,7 @@ describe("the logger", () => {
   it("hears nothing from a vault going about its business", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
     await vault.getWhisper('anthropic')
     await vault.putWayin('pw', 'pw two')
     await vault.lock()
@@ -377,16 +377,22 @@ describe("the logger", () => {
     expect(world.logged[0]?.message).to.match(/lease could not be read/)
   })
 
-  it("warns when a lease would not open", async () => {
+  it("takes up a lease whose wrap was altered, unopened, and refuses it 'damaged_lease' at its first use, erasing it and locking", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
-    await world.openUnlocked('pw', { deviceDB: device.deviceDB })
+    const vault = await world.openUnlocked('pw', { deviceDB: device.deviceDB })
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     device.spoilRow((row) => {
       const wrapped = row['vault_key_lease_wrapped'] as { cipher_iv_b64: string, ciphertext_b64: string }
       return { ...row, vault_key_lease_wrapped: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }
     })
-    expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
-    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
+    const reopened = await world.open({ deviceDB: device.deviceDB })
+    expect(reopened.state).to.eq('unlocked')
+    await TH.expectRefusal(reopened.getWhisper('anthropic'), 'damaged_lease')
+    expect(reopened.state).to.eq('locked')
+    await TH.wakeupAtNextTick()
+    const kept = await device.deviceDB.getLease(TH.scopeOf('u1'))
+    expect(valOf(kept)).to.be.null
   })
 
   it("says nothing of an unreadable lease that could not be erased: hello rejects instead, and the logger hears nothing", async () => {
@@ -416,7 +422,7 @@ describe("the logger", () => {
   it("warns when a background refresh fails, with the refusal as its error", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     // That write's bell is answered first: a ring during a read is answered by that read.
     await TH.wakeupAtNextTick()
     world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v6"}')
@@ -434,7 +440,7 @@ describe("the logger", () => {
     const reading = world.clock.now()
     const clock = { now: () => reading }
     const vault = await world.openUnlocked('pw', { logger, deviceDB: device.deviceDB, clock })
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     // a refresh rung in the background, failing
     const row = world.dbStore.read(u1BoxCkey('anthropic')) ?? ''
     world.dbStore.write(u1BoxCkey('anthropic'), '{"not":"a box"}')
@@ -459,7 +465,7 @@ describe("the logger", () => {
     const whisper = 'sk-FAKESECRET-whisper'
     const passphrase = 'FAKESECRET passphrase'
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
-    await vault.putBox('anthropic', whisper, { sidecar: { note: 'FAKESECRET note' } })
+    await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'FAKESECRET note' } }, whisper)
     // every call site: a change whose mark could not be kept (its error carrying the device
     // store's as its cause), a lease unreadable, a background refresh refused
     vi.spyOn(device.deviceDB, 'putMark').mockRejectedValueOnce(new Error('the device store broke: disk full'))
@@ -490,7 +496,7 @@ describe("when storage says the user is no longer signed in", () => {
   /** Each vault call that reaches storage, the storage verb it reaches, and the call. */
   const RevokedCallCases: readonly (readonly [string, 'getVault' | 'getBox' | 'putBox' | 'putVaultProps', (vault: Vault) => Promise<unknown>])[] = [
     ['getWhisper()',       'getBox',        (vault) => vault.getWhisper('anthropic')],
-    ['putBox()',           'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
+    ['putBox()',           'putBox',        (vault) => vault.putBox({ boxlabel: 'openai' }, 'sk-fake-two')],
     ['unlock()',           'getVault', (vault) => vault.unlock('pw one')],
     ['putWayin()', 'putVaultProps', (vault) => vault.putWayin('pw one', 'pw two')],
   ]
@@ -499,7 +505,7 @@ describe("when storage says the user is no longer signed in", () => {
     it(`locks at once when ${callTitle} meets it, throws the refusal itself, and removes nothing stored`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw one')
-      await vault.putBox('anthropic', 'sk-fake-one')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-one')
       // That write's bell is answered first, so the refusal below is this call's to meet.
       await TH.wakeupAtNextTick()
       const refusal = signedOut()
@@ -818,8 +824,16 @@ describe("vault props rolled back", () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()
     const late = Vault.make(world.optsWith())
-    // The hello's read of storage passes; its take-up of the lease is held as it unwraps.
-    const takingUp = TH.holdNextCall(crypto.subtle, 'unwrapKey')
+    // The hello's read of storage passes; its take-up's look at the lease, the second, is held as it answers.
+    const takingUp = TH.makeGate()
+    const getLease = world.deviceDB.getLease.bind(world.deviceDB)
+    let leasesRead = 0
+    vi.spyOn(world.deviceDB, 'getLease').mockImplementation(async (scope) => {
+      leasesRead += 1
+      const kept = await getLease(scope)
+      if (leasesRead === 2) { await takingUp.pass() }
+      return kept
+    })
     const saying = late.hello()
     await takingUp.reached
     world.dbStore.write(u1VaultPropsCkey, older)
@@ -867,7 +881,7 @@ describe("older stored formats", () => {
   it("makes a vault and its boxes in this version's formats", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(storedVaultPropsOf(world)).to.deep.include({ format: 'safebyok-vault-v6' })
     expect(storedVaultPropsOf(world)).to.not.have.property('vault_key_epoch')
     expect(storedRowOf(world, 'anthropic')).to.deep.include({ format: 'safebyok-box-v8' })
@@ -877,12 +891,12 @@ describe("older stored formats", () => {
   it("lists a box stored with a vaultKey epoch, safebyok-box-v6, as damaged, its revision kept, and putBox() replaces it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, format: 'safebyok-box-v6', vault_key_epoch: 1 }))
     await TH.readAfresh(vault)
     expect(vault.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: row['revision_tok'] }])
-    await vault.putBox('anthropic', 'sk-fake-again')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-again')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-again')
   })
 
@@ -897,7 +911,7 @@ describe("older stored formats", () => {
     it(`opens a vault stored under ${blurb}, as damaged_vault, never newer_format, which delDamagedVault clears`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
-      await vault.putBox('anthropic', 'sk-fake')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       vault.close()
       world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), ...older }))
       await TH.expectRefusal(world.open(), 'damaged_vault')

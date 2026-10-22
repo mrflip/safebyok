@@ -121,7 +121,7 @@ export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'pass
 export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  await vault.putBox('anthropic', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   vault.close()
   world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
@@ -140,7 +140,7 @@ export const vaultWithPasskey = async () => {
   const world = makeWorld()
   const vault = await world.open()
   await vault.unlock('pw')
-  await vault.putBox('anthropic', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
   await addLaptopPasskey(vault)
   return { world, vault, laptop }

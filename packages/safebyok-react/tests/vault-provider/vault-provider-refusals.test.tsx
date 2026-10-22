@@ -201,7 +201,7 @@ describe("VaultProvider", () => {
       await elsewhere.unlock('correct horse battery staple')
       // A ring of a write after the vault was made: one rung during the make may be answered by a read begun before its last write.
       await TH.wakeupAtNextTick()
-      await elsewhere.putBox('anthropic', 'sk-ant-fake')
+      await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
       await expectShown('locked')
     })
 

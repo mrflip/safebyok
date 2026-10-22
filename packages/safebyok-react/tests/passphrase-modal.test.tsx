@@ -34,7 +34,7 @@ const wordingOf = (relative: string | null, creating: boolean) => {
 const lockedVault = async () => {
   const vault = await TH.settledVault(TH.memoryVaultOpts())
   await vault.unlock('pw')
-  await vault.putBox('anthropic_api_key', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   await vault.lock()
   return vault
 }
@@ -235,7 +235,7 @@ describe("PassphraseModal", () => {
       const opts = TH.memoryVaultOpts()
       const maker = await TH.settledVault(opts)
       await maker.unlock('pw')
-      await maker.putBox('anthropic_api_key', 'sk-fake')
+      await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
       await maker.lock()
       maker.close()
       const host: { show: (dialog: ReactNode) => void } = { show: noopShow }
@@ -629,7 +629,7 @@ describe("PassphraseModal", () => {
       const opts = TH.memoryVaultOpts()
       const maker = await TH.settledVault(opts)
       await maker.unlock('pw')
-      await maker.putBox('anthropic_api_key', 'sk-fake')
+      await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
       await maker.lock()
       maker.close()
       const { vault, ask, ensuring } = await TH.askedBy(opts)

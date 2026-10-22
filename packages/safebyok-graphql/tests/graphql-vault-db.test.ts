@@ -156,8 +156,8 @@ describe("graphqlVaultDB, as the README has it", () => {
     const opened = () => vaultIn(schema)
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
-    await first.putBox('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
+    await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
+    await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
     const second = await opened()
@@ -193,7 +193,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const laptop = await TH.passkeyOf('laptop')
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await first.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await first.putWayin('correct horse battery staple', laptop)).to.deep.equal(first.passkey)
     first.close()
 

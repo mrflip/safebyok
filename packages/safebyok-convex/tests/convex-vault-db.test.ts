@@ -198,9 +198,9 @@ describe("convexVaultDB, refusing", () => {
     })
     const vault = await openOver(deployment.client('u1'), deployment.api.safebyok)
     await vault.unlock(TH.RealPassphrase)
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     refusing.now = true
-    await TH.expectRefusal(vault.putBox('openai_api_key', 'sk-test-not-a-real-key'), 'not_permitted')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     refusing.now = false
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
@@ -248,7 +248,7 @@ describe("convexVaultDB, refusing", () => {
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
       await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }
-    const refusal = await TH.expectRefusal(vault.putBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
+    const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key' }, 'x'.repeat(40_000)), 'vault_full')
     expect(refusal.message).to.match(/no room for this one/)
     expect(refusal.meta?.capacity?.boxes.used).to.eq(9)
     expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.not.include('anthropic_api_key')
@@ -482,7 +482,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
       await vault.unlock(TH.RealPassphrase)
-      await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+      await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null

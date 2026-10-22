@@ -297,7 +297,7 @@ describe("idbVaultDB", () => {
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
     const vault = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await vault.unlock('correct horse')
-    await vault.putBox('anthropic', 'sk-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-not-a-real-key')
     vault.close()
     const reopened = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await reopened.unlock('correct horse')

@@ -65,7 +65,7 @@ describe("the ctx builders' output, byte for byte", () => {
       keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger,
     })
     await vault.unlock('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const vaultProps = (await TH.propsOf(vaultDB, scope))!
     const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', { vault_tok: vaultProps.vault_tok }))!
     const lease = (await TH.expectGood(deviceDB.getLease(scope)))!

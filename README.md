@@ -41,7 +41,7 @@ Holds vault​s and box​es scoped by applabel, userId, vaultlabel and boxlabel
 * a vault​ object
   - Vault.make({ applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver, ... })​: Vault, non-async
   - vault.hello() (initial bookkeeping that doesn't bother the user)
-  - lock​, unlock​, putWayin​, delWayin​, getBox(boxlabel)​, getWhisper(boxlabel)​, putBox(boxlabel, whisper, { sidecar? })​, delBox(boxlabel)
+  - lock​, unlock​, putWayin​, delWayin​, getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
 * a pantry​ holding keys
 * a DeviceDB​ safely holding and managing access to the boxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)

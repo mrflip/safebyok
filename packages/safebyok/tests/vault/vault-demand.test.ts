@@ -42,14 +42,13 @@ describe("vault.stamp", () => {
 })
 // --
 
-// == [The demand]: vault.demandConsistentWith, tryDemandConsistentWith
+// == [The demand]: vault.demandConsistentWith, vault.isConsistentWith
 
 describe("vault.demandConsistentWith", () => {
   it("passes a box the vault handed out while the vault stands, as its first example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    const box = await vault.getBox('anthropic')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(() => { vault.demandConsistentWith(box) }).to.not.throw()
     expect(() => { vault.demandConsistentWith(box, { leaseBound: true }) }).to.not.throw()
   })
@@ -57,8 +56,7 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a box from before the vault was deleted as 'vault_gone', as its first example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    const box = await vault.getBox('anthropic')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.del()
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(box) }, 'vault_gone')
   })
@@ -66,8 +64,7 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a box from before the vault was deleted and made anew elsewhere as 'vault_remade', as its first example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
-    await vault.putBox('anthropic', 'sk-fake')
-    const box = await vault.getBox('anthropic')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.del()
     await there.unlock('pw two')
@@ -78,8 +75,7 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a box once a lock lands, when lease-bound, as 'vault_locked', as its second example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    const box = await vault.getBox('anthropic')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.lock()
     expect(() => { vault.demandConsistentWith(box) }).to.not.throw()
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(box, { leaseBound: true }) }, 'vault_locked')
@@ -150,12 +146,47 @@ describe("vault.demandConsistentWith", () => {
     expect(TH.loggedText(world.logged)).to.not.include(stamp.vault_tok)
   })
 
-  it("resolves its refusal as an Outcome in its try form, throwing nothing", async () => {
+})
+
+describe("vault.isConsistentWith", () => {
+  it("answers the demand's question without refusing: true while the thing stands, false once the vault moved on", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const stamp = stampOf(vault)
-    expect(vault.tryDemandConsistentWith(stamp)).to.deep.equal({ ok: true, val: undefined })
-    await TH.expectBad(vault.tryDemandConsistentWith({ ...stamp, gate_epoch: 0 }), 'gate_moved')
+    expect(vault.isConsistentWith(stamp)).to.be.true
+    expect(vault.isConsistentWith({ ...stamp, gate_epoch: 0 })).to.be.false
+    expect(vault.isConsistentWith({ ...stamp, vault_tok: 'vault-tok-other' })).to.be.false
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("reads a box again once the vault moved on, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    let box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await vault.putWayin('pw', 'pw two')
+    expect(vault.isConsistentWith(box)).to.be.false
+    const read = await vault.getBox(box.boxlabel)
+    if (read === null) { throw new Error('expected the box') }
+    box = read
+    expect(vault.isConsistentWith(box)).to.be.true
+  })
+
+  it("asks for a lease in hand that has not ended when lease-bound, dropping none it finds ended", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { leaseHours: 1 })
+    const stamp = stampOf(vault)
+    expect(vault.isConsistentWith(stamp, { leaseBound: true })).to.be.true
+    world.advance(60 * 60 * 1000)
+    expect(vault.isConsistentWith(stamp, { leaseBound: true })).to.be.false
+    expect(vault.isConsistentWith(stamp)).to.be.true
+    expect(vault.lease).to.not.be.null
+  })
+
+  it("throws 'bad_option' for a thing with no vault_tok, or an option it does not take", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    TH.expectSyncRefusal(() => vault.isConsistentWith({} as never), 'bad_option')
+    TH.expectSyncRefusal(() => vault.isConsistentWith(stampOf(vault), { leasebound: true } as never), 'bad_option')
   })
 })
 // --
@@ -167,7 +198,7 @@ describe("vault.refresh", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    await there.putBox('anthropic', 'sk-fake')
+    await there.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(boxlabelsOf(vault)).to.deep.equal([])
     await vault.refresh()
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
@@ -333,10 +364,10 @@ describe("a lock landing during a box call", () => {
   it("refuses a putBox() 'vault_locked' when it lands while the box is read, writing nothing", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const row = storedRowOf(world, 'anthropic')
     const reading = world.holdNextBoxRead()
-    const putting = vault.putBox('anthropic', 'sk-fake-two')
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')
     await reading.reached
     await vault.lock()
     reading.release()
@@ -344,17 +375,17 @@ describe("a lock landing during a box call", () => {
     expect(storedRowOf(world, 'anthropic')).to.deep.equal(row)
   })
 
-  it("lands a putBox() when it comes while the whisper is sealed", async () => {
+  it("refuses a putBox() 'vault_locked' when a lock comes while the whisper is sealed, writing nothing: the lease demands itself after its seal", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw')
     const sealing = TH.holdNextCall(crypto.subtle, 'encrypt')
-    const putting = vault.putBox('anthropic', 'sk-fake')
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await sealing.reached
     await vault.lock()
     sealing.release()
-    await putting
-    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.not.be.null
-    expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
+    await TH.expectRefusal(putting, 'vault_locked')
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
   it("lands a putBox() when it comes while the box is written, and lists what was stored", async () => {
@@ -362,7 +393,7 @@ describe("a lock landing during a box call", () => {
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
     const writing = TH.holdNextAnswer(deaf, 'putBox')
-    const putting = vault.putBox('anthropic', 'sk-fake')
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await writing.reached
     await vault.lock()
     writing.release()
@@ -374,7 +405,7 @@ describe("a lock landing during a box call", () => {
     const world = makeRacingWorld()
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const deleting = TH.holdNextAnswer(deaf, 'delBox')
     const removing = vault.delBox('anthropic')
     await deleting.reached

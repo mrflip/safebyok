@@ -35,7 +35,7 @@ describe("putWayin, with a new passphrase", () => {
   it("replaces the passphrase, resolving the new one as stored, the vault unlocked, and keeps every box readable, as its first example shows (Contract: putWayin, Returns)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const put = await vault.putWayin('old passphrase', 'new passphrase')
     expect(put).to.deep.equal(vault.passphrase)
     expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'], vault_tok: vault.vault_tok })
@@ -51,7 +51,7 @@ describe("putWayin, with a new passphrase", () => {
   it("rewrites no box: each stands byte for byte as it was (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const before = storedRowOf(world, 'anthropic')
     await vault.putWayin('old passphrase', 'new passphrase')
     expect(storedRowOf(world, 'anthropic')).to.deep.equal(before)

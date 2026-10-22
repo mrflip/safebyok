@@ -16,7 +16,7 @@ import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultPropsCkey, u1BoxC
 /** Makes the vault, with a box in it, and closes the handle: what a later open will find. */
 const seedVault = async (world: ReturnType<typeof makeWorld>) => {
   const vault = await world.openUnlocked('pw')
-  await vault.putBox('anthropic', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   vault.close()
 }
 
@@ -103,7 +103,7 @@ describe("hello", () => {
     const refusal = new VaultError('not_permitted', 'Sign in to reach this vault.')
     vi.spyOn(world.vaultDB, 'getVault').mockResolvedValue(bad(refusal))
     const vault = Vault.make(world.optsWith())
-    expect(await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake'), 'not_permitted')).to.eq(refusal)
+    expect(await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake'), 'not_permitted')).to.eq(refusal)
     expect(await TH.expectRefusal(vault.del(), 'not_permitted')).to.eq(refusal)
   })
 
@@ -155,7 +155,7 @@ describe("hello", () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
       vi.spyOn(world.vaultDB, 'putBox').mockResolvedValueOnce(bad(new VaultError(kind, 'Storage cannot be trusted as it stands.')))
-      await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake'), kind)
+      await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake'), kind)
       const reads = vi.spyOn(world.vaultDB, 'getVault')
       await vault.hello()
       expect(reads).toHaveBeenCalledTimes(1)
@@ -176,9 +176,9 @@ describe("hello", () => {
   it("reads nothing anew after a lock or a stale write caught up with", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     vi.spyOn(world.vaultDB, 'putBox').mockResolvedValueOnce(bad(new VaultError('stale_write', 'Someone else wrote first.')))
-    await TH.expectRefusal(vault.putBox('anthropic', 'sk-other'), 'stale_write')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-other'), 'stale_write')
     await vault.lock()
     const reads = vi.spyOn(world.vaultDB, 'getVault')
     await vault.hello()
@@ -642,8 +642,8 @@ describe("vault.hello, by the Contract", () => {
   it("fills every field from the one read: the props, the ways in, the listing and the capacity agree (Contract: vault.hello, Guarantees)", async () => {
     const world = makeWorld()
     const writer = await world.openUnlocked('pw')
-    await writer.putBox('anthropic', 'sk-fake')
-    await writer.putBox('openai', 'sk-fake-too')
+    await writer.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await writer.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     const stored = storedVaultPropsOf(world)
     const vault = Vault.make(world.optsWith({ deviceDB: memoryDeviceDB() }))
     await vault.hello()
@@ -780,10 +780,10 @@ describe("onBadNews, by the Contract", () => {
     const world = makeWorld({ maxBoxes: 1 })
     const { told, onBadNews } = newsKeeper()
     const vault = await world.openUnlocked('pw', { onBadNews })
-    await vault.putBox('anthropic', 'sk-fake')
-    await TH.expectRefusal(vault.putBox('openai', 'sk-fake-too'), 'vault_full')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai' }, 'sk-fake-too'), 'vault_full')
     vi.spyOn(world.vaultDB, 'putBox').mockResolvedValueOnce(bad(new VaultError('stale_write', 'Someone else wrote first.')))
-    await TH.expectRefusal(vault.putBox('anthropic', 'sk-other'), 'stale_write')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-other'), 'stale_write')
     vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'storage_unavailable')
     expect(told).to.have.lengthOf(0)
@@ -983,21 +983,43 @@ const expectOutdatedLeaseRefused = async (world: ReturnType<typeof makeWorld>, v
   expect(await world.getLease()).to.be.null
 }
 
+/** Hold the answer of the take-up's look at `world`'s device store: the first hello's second look, after its read's own, read now and answered once the test releases it. */
+const holdTakeUpAnswer = (world: ReturnType<typeof makeWorld>) => {
+  const answering = TH.makeGate()
+  const getLease = world.deviceDB.getLease.bind(world.deviceDB)
+  let leasesRead = 0
+  vi.spyOn(world.deviceDB, 'getLease').mockImplementation(async (scope) => {
+    leasesRead += 1
+    const kept = await getLease(scope)
+    if (leasesRead === 2) { await answering.pass() }
+    return kept
+  })
+  return answering
+}
+
 /**
  * A world whose `u1` vault stands, made with `pw`, this device holding a lease of it, and a handle
- * opened anew on it (a reload) whose first hello is held as it unwraps that lease: `outrun` is
- * there for the test to change the vault elsewhere meanwhile, through `other`, a second device.
+ * opened anew on it (a reload) whose first hello is held as it takes that lease up, the lease read
+ * and not yet answered: the test changes the vault elsewhere meanwhile, through `other`, a second
+ * device, then calls `release`.
  */
-const reloadHeldAtUnwrap = async () => {
+const reloadHeldAtTakeUp = async () => {
   const world = makeWorld()
   const before = await world.openUnlocked('pw')
   before.close()
   const other = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-  const unwrapping = TH.holdNextCall(crypto.subtle, 'unwrapKey')
+  const answering = holdTakeUpAnswer(world)
   const vault = Vault.make(world.optsWith())
   const hello = vault.hello()
-  await unwrapping.reached
-  return { world, vault, hello, other, release: unwrapping.release }
+  await answering.reached
+  return { world, vault, hello, other, release: answering.release }
+}
+
+/** Expect `vault` locked, and this device's store holding no lease it would take up: `ensureLease()` (with no `getProof` to ask) refuses. */
+const expectNoLeaseTakenUp = async (world: ReturnType<typeof makeWorld>, vault: Vault) => {
+  await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
+  expect(vault.state).to.eq('locked')
+  expect(await world.getLease()).to.be.null
 }
 
 describe("a revocation read while a key is being taken up: a take-up, an unlock, a change to the ways in", () => {
@@ -1007,15 +1029,15 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     before.close()
     // Its own adapter over the same store, so that holding this device's listing holds no other's.
     const other = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB(), vaultDB: localVaultDB({ store: world.dbStore }) })
-    const unwrapping = TH.holdNextCall(crypto.subtle, 'unwrapKey')
+    const answering = holdTakeUpAnswer(world)
     const vault = Vault.make(world.optsWith())
     const hello = vault.hello()
-    await unwrapping.reached
+    await answering.reached
     const listing = TH.holdNextCall(world.vaultDB, 'getVault')
     await other.putWayin('pw', 'pw-new')
     // The change bell's refresh has read epoch 2, and waits on the listing.
     await listing.reached
-    unwrapping.release()
+    answering.release()
     await hello
     listing.release()
     await TH.eventually(() => vault.gate_epoch === 2)
@@ -1094,11 +1116,11 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await expectOutdatedLeaseRefused(world, vault)
   })
 
-  it("stays locked when the passphrase changes on another device while a hello unwraps this device's lease", async () => {
-    const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
+  it("stays locked when the passphrase changes on another device while a hello takes up this device's lease", async () => {
+    const { world, vault, hello, other, release } = await reloadHeldAtTakeUp()
     expect(vault.gate_epoch).to.eq(1)
     await other.putWayin('pw', 'pw-new')
-    // The change bell's refresh brings the new epoch while the unwrap is held.
+    // The change bell's refresh brings the new epoch while the take-up's answer is held.
     await TH.eventually(() => vault.gate_epoch === 2)
     release()
     await hello
@@ -1106,17 +1128,17 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     expect(vault.askPassphraseAt).to.be.null
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('locked')
-    await expectOutdatedLeaseRefused(world, vault)
+    await expectNoLeaseTakenUp(world, vault)
   })
 
-  it("stays locked when the vault is deleted and made anew on another device while a hello unwraps this device's lease", async () => {
-    const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
+  it("stays locked when the vault is deleted and made anew on another device while a hello takes up this device's lease", async () => {
+    const { world, vault, hello, other, release } = await reloadHeldAtTakeUp()
     const formerId = vault.vault_tok
     await other.del()
     const remaker = await world.openUnlocked('pw-new', { deviceDB: memoryDeviceDB() })
     // A box written once the remake's bells have settled rings a read of the new vault.
     await TH.wakeupAtNextTick()
-    await remaker.putBox('anthropic', 'sk-ant-fake-new')
+    await remaker.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-new')
     await TH.eventually(() => vault.vault_tok !== null && vault.vault_tok !== formerId)
     release()
     await hello
@@ -1125,7 +1147,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     expect(vault.askPassphraseAt).to.be.null
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('locked')
-    await expectOutdatedLeaseRefused(world, vault)
+    await expectNoLeaseTakenUp(world, vault)
   })
 })
 // --

@@ -14,10 +14,10 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`.
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `no_whisper`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
- *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `rolled_back`,
- *   `identity_revoked`.
+ *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
+ *   `rolled_back`, `identity_revoked`.
  *
  * Each kind's one-line meaning sits beside it below. These need more:
  *
@@ -119,6 +119,8 @@ export const RefusalKindVals = [
   'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
   'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
+  'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
+  'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
 ] as const
 export type RefusalKind = typeof RefusalKindVals[number]
 
@@ -170,6 +172,8 @@ export const RefusalFamilyForKind = {
   vault_gone:          'condition',
   vault_remade:        'condition',
   gate_moved:          'condition',
+  damaged_lease:       'bad_news',
+  no_whisper:          'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** What a refusal learned, each fact under its own name, filled only by the refusals that name it.

@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, type GatedVaultProps, type GatelessVaultProps, type VaultProps, isGated, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
-import { Box, type BoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
+import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
@@ -18,7 +18,7 @@ import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenew
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { Lease, type LeaseView } from './lease'
+import { Lease, type LeaseView, sealLeaseRecord } from './lease'
 import { Ask, type AskWhy, type GetProof, type RaisedAsk, raiseAsk } from './ask'
 
 // == [Public types]: VaultState, VaultSnapshot
@@ -171,7 +171,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, keyDeriver, now
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, keyDeriver, now, lease
 
   // Each field reads the snapshot `#replaceSnapshot()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
@@ -235,6 +235,14 @@ export class Vault {
    * @example lease.endsBy(vault.now())   // true once the lease has ended
    */
   now(): number { return this.#clockNow() }
+  /** This device's lease the vault holds now, or null while locked: what seals and opens its boxes.
+   * It is the live one, read afresh at each look: hold on to a box, never to the lease. It is
+   * dropped at `lock()`, at its end and when the ways in change; one past its end whose timer has
+   * not fired yet still shows here, and refuses at its next use.
+   *
+   * @example const whisperBytes = await vault.lease?.decipherWith(ciphered, visible)   // what box.extractWhisper() does
+   */
+  get lease(): Lease | null { return this.#lease }
   // --
 
   // == [Vault: opening]: hello, refresh, ensureLease
@@ -332,7 +340,7 @@ export class Vault {
   }
   // --
 
-  // == [Vault: demand]: stamp, demandConsistentWith
+  // == [Vault: demand]: stamp, demandConsistentWith, isConsistentWith
 
   /** The vault's {@link Stamp}, frozen: its scope, and the `vault_tok`, `vault_epoch` and `gate_epoch` of the vault it holds now; null while it holds none.
    * Each thing the vault hands out was made under the stamp it held then, and
@@ -362,15 +370,22 @@ export class Vault {
    * @example vault.demandConsistentWith(box, { leaseBound: true })        // and 'vault_locked' once a lock lands
    * @example vault.demandConsistentWith({ ...stamp, gate_epoch: 0 })      // throws 'gate_moved' for a vault with a way in
    */
-  demandConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): void { valOf(this.tryDemandConsistentWith(thing, opts)) }
+  demandConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): void {
+    const demandOpts = checkDemandOpts(opts)
+    this.#demand(checkedStamped(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
+  }
 
-  /** Refuse unless `thing` is consistent with the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.demandConsistentWith}. */
-  tryDemandConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): Outcome<void> {
-    try {
-      const demandOpts = checkDemandOpts(opts)
-      this.#demand(checkedStamped(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+  /** True while `thing` is consistent with the vault as it stands now: the question {@link Vault.demandConsistentWith} refuses on, asked without refusing.
+   * It compares as the demand does, and with `opts.leaseBound` asks also for a lease in hand that
+   * has not ended. It changes nothing, not even an ended lease, and logs nothing. A thing missing
+   * its `vault_tok`, or an option it does not take, throws 'bad_option', as misuse.
+   *
+   * @example if (! vault.isConsistentWith(box)) { box = await vault.getBox(box.boxlabel) }   // read it again once the vault moved on
+   */
+  isConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): boolean {
+    const leaseBound = checkDemandOpts(opts)?.leaseBound === true
+    const leaseStands = this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
+    return this.#inconsistencyWith(checkedStamped(thing)) === null && (! leaseBound || leaseStands)
   }
   // --
 
@@ -561,194 +576,151 @@ export class Vault {
   }
   // --
 
-  // == [Vault: boxes]: putBox, getBox, getWhisper, decryptWhisper, useWhisper, delBox
+  // == [Vault: boxes]: putBox, getBox, getWhisper, useWhisper, delBox
 
-  /** Write `whisper` into the box `boxlabel`, creating or replacing it.
+  /** Seal `whisper` into the box `props.boxlabel` and store it, creating or replacing it, resolving the {@link Box} as stored.
    * Once it resolves, the box holds this whisper, and the snapshot lists its new revision. It goes
-   * through {@link Vault.ensureLease}, which may prompt, only once the whisper, boxlabel and sidecar
+   * through {@link Vault.ensureLease}, which may prompt, only once the boxlabel, sidecar and whisper
    * have passed their checks: a store that cannot land never prompts. It is one write, with
-   * `VaultDB.putBox`, over the revision of the box this device last read.
+   * `VaultDB.putBox`, over the revision the box was sealed from.
+   *
+   * Given both the sidecar and the whisper, it reads nothing: it writes over the revision the
+   * snapshot lists under the boxlabel, keeping its `registered_at`, or as a new box when none is
+   * listed. Leave either out to keep the box's own: it reads the box first, opens it (so what it
+   * keeps is proven unaltered), and writes over the revision it read. With none standing, a sidecar
+   * left out is `{}`, and a whisper left out refuses 'no_whisper'.
    *
    * Refuses 'whisper_too_large' when the whisper's JSON and the sidecar's are together over
-   * `maxWhisperBytes`; a sidecar kept from the box counts as one given does. Refuses 'vault_full'
-   * for a new boxlabel when the vault holds `maxBoxes`, or has no room left in what storage holds of
-   * one vault, as the listing in hand counts them: one a moment stale may refuse, and a hello
-   * cures it. Replacing a box is never refused so by the vault's own limits, though storage may
-   * refuse it 'vault_full' by its own. Storage refuses 'box_too_large' for a box heavier than one
-   * record holds.
+   * `maxWhisperBytes`; a sidecar kept counts as one given does. Refuses 'vault_full' for a new
+   * boxlabel when the vault holds `maxBoxes`, or has no room left in what storage holds of one vault,
+   * as the listing in hand counts them: one a moment stale may refuse, and a hello cures it.
+   * Replacing a box is never refused so by the vault's own limits, though storage may refuse it
+   * 'vault_full' by its own. Storage refuses 'box_too_large' for a box heavier than one record holds.
    *
    * Refuses 'stale_write' when another call, here or on another device, wrote, created or deleted
-   * this box between this call's read of it and its write: nothing was written, and the refusal's
-   * `meta.box_stored` is what stands. Call again if this whisper should still replace it: the call
-   * reads the box afresh. A vault deleted or made anew elsewhere refuses 'stale_write' too, writing
-   * nothing. A lock landing while the box is read refuses 'vault_locked', writing nothing; one
-   * landing during the seal or the write lets it land. Once the write lands, the listing takes the
-   * box as storage stored it; a vault made anew meanwhile refuses 'vault_remade' after the write
-   * landed, and calling again writes the same whisper over itself, harmlessly.
+   * this box since the revision it was sealed from: nothing was written, and the refusal's
+   * `meta.box_stored` is what stands. A whole store over a listing a moment stale refuses so too: a
+   * hello shows what stands, or leave out the sidecar to read the box first. A vault deleted or made
+   * anew elsewhere refuses 'stale_write' too, writing nothing. A lock landing before the write,
+   * while the box is read or sealed, refuses 'vault_locked'; one landing during the write lets it
+   * land. Once the write lands, the listing takes the box as storage stored it; a vault made anew
+   * meanwhile refuses 'vault_remade' after the write landed.
    *
    * Every store stamps `written_at`, the same whisper stored again included; `registered_at` keeps
-   * the box's first store. A box that will not read or open is overwritten as new, carrying over
-   * neither its sidecar nor its `registered_at`. One listed damaged with no revision refuses
-   * 'damaged_box', writing nothing: {@link Vault.delBox} it first. A boxlabel the vault's check
-   * refuses is refused 'bad_label', even where a box stands under it: the check gates writes alone.
+   * the box's first store. A box that will not read or open is written over as new, keeping neither
+   * its sidecar nor its `registered_at`, when the whisper is given; a store keeping its whisper
+   * refuses 'damaged_box'. One listed damaged with no revision refuses 'damaged_box', writing
+   * nothing: {@link Vault.delBox} it first. A boxlabel the vault's check refuses is refused
+   * 'bad_label', even where a box stands under it: the check gates writes alone.
    *
-   * @param storeOpts - `sidecar`, the box's {@link Sidecar}: your app's own JSON object beside the
-   *   whisper, shown in the snapshot while locked, and never interpreted by the vault. Anything but
-   *   a JSON object, a bare string, array or null among them, refuses 'bad_option'. It is stored in
+   * @param props - The box: its `boxlabel`, and its `sidecar`, your app's own JSON object beside the
+   *   whisper, shown in the snapshot while locked, and never interpreted by the vault. Anything but a
+   *   JSON object, a bare string, array or null among them, refuses 'bad_option'. It is stored in
    *   the clear, readable by anyone who can read the database: never put secret material in it. It
-   *   is authenticated, so a sidecar altered in storage makes the box refuse to open. Left out, the
-   *   box keeps the sidecar it has, and a new box gets `{}`; `{}` empties it.
+   *   is authenticated, so a sidecar altered in storage makes the box refuse to open. `{}` empties it.
+   * @param whisper - Any JSON value but a bare null. Left out, the box keeps the one it holds.
    *
-   * @example await vault.putBox('anthropic_api_key', 'sk-ant-...', { sidecar: { note: 'work account' } })
-   * @example await vault.putBox('anthropic_api_key', 'sk-ant-...')              // keeps the sidecar it has
-   * @example await vault.putBox('anthropic_api_key', 'sk-ant-...', { sidecar: {} }) // and empties it
+   * @example await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...')
+   * @example await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...')                 // keeps the sidecar it has
+   * @example await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'personal' } })   // keeps the whisper it has
    */
-  async putBox(boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<void> { valOf(await this.tryPutBox(boxlabel, whisper, storeOpts)) }
+  async putBox(props: PutBoxProps, whisper?: Whisper): Promise<Box> { return valOf(await this.tryPutBox(props, whisper)) }
 
-  /** Write `whisper` into the box `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.putBox}. */
-  async tryPutBox(boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<Outcome<void>> {
+  /** Seal and store the box `props.boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.putBox}. */
+  async tryPutBox(props: PutBoxProps, whisper?: Whisper): Promise<Outcome<Box>> {
     try {
       this.#checkOpen()
+      const { boxlabel, sidecar } = putBoxPropsOf(props)
       // The host's check gates every name written; reads and deletes hold a name to the floor alone.
       const label = Names.check(this.#rules, 'boxlabel', boxlabel)
-      const givenSidecar = sidecarOf(storeOpts)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const whisperBytes = whisperBytesOf(whisper)
-      this.#checkWhisperFits(whisperBytes, givenSidecar ?? {})
+      const given = whisper === undefined ? undefined : checkedWhisper(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
+      if (given !== undefined) { this.#checkWhisperFits(given, sidecar ?? {}) }
       await this.#ensureUnlocked(0)
-      const lease = this.#demandLease('putBox')
-      const standing = await this.#getBoxOrDamaged(label, lease)
-      // A lock landing while storage was read refuses, writing nothing; one during the seal or the write lands.
-      this.#demand(lease, { leaseBound: true, call: 'putBox' })
-      // A store is one write, over a revision storage arbitrates. A box listed damaged naming none
-      // could be cleared only by a delete before it, a second call another device's write could
-      // fall between and be lost: the user deletes it, then stores.
-      if (standing === 'damaged' && this.#isListedDamaged(label) && this.#listedRevisionOf(label) === null) { throw damagedBeyondNaming() }
-      // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
-      const prev = standing === 'damaged' ? null : standing
-      this.#checkRoomFor(label, prev)
-      // Lands only in the vault this whisper is sealed for, over the revision just read -- for a
-      // damaged box, the one the listing names -- : a vault reborn elsewhere, or a box written
-      // meanwhile by another device, refuses it.
-      const overRevision = standing === 'damaged' ? this.#listedRevisionOf(label) : prev?.revision_tok ?? null
-      // A damaged box the listing does not show yet is written as over none, which storage refuses
-      // while it stands; the next hello lists it, with its revision for the next store.
-      // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
-      // limit too: known once the plan has vouched for that box, and weighed before any key is made.
-      const plan = await planSeal(lease, { boxlabel: label, whisperBytes, sidecar: givenSidecar, over: prev })
-      this.#checkWhisperFits(plan.whisperBytes, plan.sidecar)
-      const box = await sealPlanned(this, lease, plan)
-      const stored = await this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: overRevision })
-      this.#takeStoredBox(stored, lease)
-      return good(undefined)
+      return good(await this.#sealAndPutBox(label, sidecar, given))
     } catch (err) { return this.#badOutcome(err) }
   }
-  /** The {@link Box} under `boxlabel`, still sealed: its visible fields, sidecar among them, and its ciphered whisper.
-   * {@link Vault.decryptWhisper} opens the whisper. The call goes through {@link Vault.ensureLease},
-   * which may prompt, only once the listing in hand shows a box under `boxlabel`; otherwise it
-   * refuses at once. That listing is as fresh as `staleMinutes` keeps it. Reads `VaultDB.getBox`.
+
+  /** The {@link Box} under `boxlabel`, still sealed: its visible fields, sidecar among them, and its ciphered whisper; null when there is none.
+   * `box.extractWhisper()` opens the whisper. A box the snapshot does not list resolves null at
+   * once, asking nobody: that listing is as fresh as `staleMinutes` keeps it. Otherwise the call
+   * goes through {@link Vault.ensureLease}, which may prompt, and reads `VaultDB.getBox` under the
+   * vault this device holds.
    *
-   * Refuses 'absent_box' when there is none, and 'damaged_box' when its record fails its checks. It
-   * does not open the whisper, so a whisper that will not open shows only at `decryptWhisper()` or
-   * `getWhisper()`. A lock or the lease ending while storage is read refuses 'vault_locked', handing
-   * nothing back, unless an unlock has put a lease back in hand meanwhile; the vault deleted or made
-   * anew meanwhile refuses 'vault_gone' or 'vault_remade', and a `close()` 'vault_closed'. The boxlabel is held to the floor alone, 'bad_label' below it:
-   * the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
+   * Refuses 'damaged_box' when its record fails its checks. It does not open the whisper, so a
+   * whisper that will not open shows only at `extractWhisper()` or `getWhisper()`. A vault deleted
+   * or made anew elsewhere refuses 'vault_gone', reading no box of the vault that stands now: say
+   * `hello()`, which reads storage afresh. Deleted or made anew while storage is read, it refuses
+   * 'vault_gone' or 'vault_remade', and a `close()` 'vault_closed'; a lock landing then lets the box
+   * through, as it holds nothing secret. The boxlabel is held to the floor alone, 'bad_label'
+   * below it: the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
    *
-   * @example const box = await vault.getBox('anthropic_api_key')
+   * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
    */
-  async getBox(boxlabel: string): Promise<Box> { return valOf(await this.tryGetBox(boxlabel)) }
+  async getBox(boxlabel: string): Promise<Box | null> { return valOf(await this.tryGetBox(boxlabel)) }
 
   /** The box under `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.getBox}. */
-  async tryGetBox(boxlabel: string): Promise<Outcome<Box>> {
+  async tryGetBox(boxlabel: string): Promise<Outcome<Box | null>> {
     try {
-      const { box } = await this.#getBoxUnlocked(boxlabel, 'getBox')
-      return good(box)
+      return good(await this.#getBoxUnlocked(boxlabel, 'getBox'))
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** The whisper in `boxlabel`, opened under the vault's key.
-   * Asks, reads and refuses as {@link Vault.getBox} does. It also refuses 'damaged_box' for a box
-   * that will not open under the vault's key: {@link Vault.delBox} it, or {@link Vault.putBox} over
-   * it.
+  /** The whisper in `boxlabel`, opened under the vault's key; null when there is none.
+   * Asks, reads and refuses as {@link Vault.getBox} does, then opens it as `box.extractWhisper()`
+   * does: 'damaged_box' for a box that will not open under the vault's key ({@link Vault.delBox}
+   * it, or {@link Vault.putBox} over it), and 'vault_locked' for a lock landing meanwhile.
    */
-  async getWhisper(boxlabel: string): Promise<Whisper> { return valOf(await this.tryGetWhisper(boxlabel)) }
+  async getWhisper(boxlabel: string): Promise<Whisper | null> { return valOf(await this.tryGetWhisper(boxlabel)) }
 
   /** The whisper in `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.getWhisper}. */
-  async tryGetWhisper(boxlabel: string): Promise<Outcome<Whisper>> {
+  async tryGetWhisper(boxlabel: string): Promise<Outcome<Whisper | null>> {
     try {
-      const { box, lease } = await this.#getBoxUnlocked(boxlabel, 'getWhisper')
-      const whisper = await box.open(lease)
-      // A lock landing while the box opened refuses, handing nothing back.
-      this.#demand(box, { leaseBound: true, call: 'getWhisper' })
-      return good(whisper)
-    } catch (err) { return this.#badOutcome(err) }
-  }
-
-  /** The whisper `box` holds, opened under the lease in hand: a {@link Box} from {@link Vault.getBox}, or its stored record.
-   * Reads nothing, prompts nobody and awaits no hello: call {@link Vault.ensureLease} first. A
-   * record lies under the vault props the lease in hand opens; a box, under the ones it was read or
-   * sealed under. Refuses 'vault_locked' when no lease is in hand, before it looks at what it was
-   * handed, when a lock lands while the box opens, or for a box of another vault than the lease
-   * opens (one deleted and made anew since). Refuses 'bad_record' for a record this package does not
-   * write, before it is opened, and 'damaged_box' for a box that will not open under the vault's key.
-   *
-   * @example const whisper = await vault.decryptWhisper(box)
-   */
-  async decryptWhisper(box: Box | BoxRecord): Promise<Whisper> { return valOf(await this.tryDecryptWhisper(box)) }
-
-  /** The whisper `box` holds, as an {@link Outcome}: the non-throwing form of {@link Vault.decryptWhisper}. */
-  async tryDecryptWhisper(box: Box | BoxRecord): Promise<Outcome<Whisper>> {
-    try {
-      this.#checkOpen()
-      const lease = this.#demandLease('decryptWhisper')
-      // Made anew for this vault, its record checked once, by Box.make: a box opens under this
-      // vault's scope, whichever it came from, and under the vault props it was read under; a
-      // record, under those the lease opens.
-      const held = box instanceof Box ? Box.make(this, box.record, box.vault_tok) : Box.make(this, box, lease.vault_tok)
-      const whisper = valOf(await held.tryOpen(lease))
-      // A lock landing while the box opened refuses, handing nothing back.
-      this.#demand(held, { leaseBound: true, call: 'decryptWhisper' })
-      return good(whisper)
+      const box = await this.#getBoxUnlocked(boxlabel, 'getWhisper')
+      return good(box === null ? null : await box.extractWhisper())
     } catch (err) { return this.#badOutcome(err) }
   }
 
   /** Hand the whisper in `boxlabel` to `callback`, resolving its result: the shape that discourages parking a secret in state.
-   * Asks, reads and refuses as {@link Vault.getWhisper} does. A throw from `callback` rejects as it
+   * Asks, reads and refuses as {@link Vault.getWhisper} does, and refuses 'absent_box' when there is
+   * none: the callback is handed a whisper or not called. A throw from `callback` rejects as it
    * came, and is never told as bad news.
    *
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
   async useWhisper<ResultT>(boxlabel: string, callback: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
     if (typeof callback !== 'function') { throw new VaultError('bad_option', 'use needs a callback function to hand the whisper to.') }
-    // The callback's own throw is the host's, and is never told as the vault's bad news.
     const whisper = valOf(await this.tryGetWhisper(boxlabel))
+    if (whisper === null) { throw absentBox() }
+    // The callback's own throw is the host's, and is never told as the vault's bad news.
     return await callback(whisper)
   }
 
-
-  /** Remove the box `boxlabel`, whatever revision of it stands: a damaged one too, as deleting is its remedy.
+  /** Remove the box `boxlabel`, whatever revision of it stands, resolving what was removed: a damaged one too, as deleting is its remedy.
    * Once it resolves, storage holds no box under `boxlabel`. It asks for a proof, and refuses
-   * 'absent_box' or 'bad_label', as {@link Vault.getBox} does; 'absent_box' too when another device
-   * or tab deleted it first. Writes with `VaultDB.delBox`.
+   * 'absent_box' at once for a box the snapshot does not list, or 'bad_label', as {@link Vault.getBox}
+   * does; 'absent_box' too when another device or tab deleted it first. Writes with
+   * `VaultDB.delBox`, which keeps no record of what it removed.
    *
    * The delete lands only in the vault this device last read. If that vault was deleted, or made
    * anew, elsewhere, nothing is removed, and the call refuses 'stale_write': `hello()` to see what
    * stands. Within that vault the delete wins: a revision another device or tab wrote meanwhile
-   * is deleted all the same, and the logger warns. Deleted is gone: a later `putBox()` from a device
-   * that never saw the delete is refused as stale. Once it lands, the listing drops the box; a lock
-   * landing meanwhile lets it land.
+   * is deleted all the same, its `outcome` 'deleted_other', and the logger warns. Deleted is gone: a
+   * later `putBox()` from a device that never saw the delete is refused as stale. Once it lands,
+   * the listing drops the box; a lock landing meanwhile lets it land.
+   *
+   * @example const { outcome } = await vault.delBox('anthropic_api_key')   // 'deleted', or 'deleted_other' when another write stood
    */
-  async delBox(boxlabel: string): Promise<void> { valOf(await this.tryDelBox(boxlabel)) }
+  async delBox(boxlabel: string): Promise<DeletedBox> { return valOf(await this.tryDelBox(boxlabel)) }
 
   /** Remove the box `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.delBox}. */
-  async tryDelBox(boxlabel: string): Promise<Outcome<void>> {
+  async tryDelBox(boxlabel: string): Promise<Outcome<DeletedBox>> {
     try {
       this.#checkOpen()
       const label = Names.checkFloor('boxlabel', boxlabel)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
-      await this.#ensureUnlocked(0, () => { this.#checkListed(label) })
+      if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { throw absentBox() }
       const lease = this.#demandLease('delBox')
       // Lands only in the vault this device holds a lease for, whatever revision of the box stands:
       // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
@@ -765,8 +737,7 @@ export class Vault {
           this.#logger.warn("The box deleted was not the revision this device showed: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox' })
         }
       }
-      this.#takeBoxDeletion(label, lease)
-      return good(undefined)
+      return good(this.#takeBoxDeletion({ boxlabel: label, vault_tok: lease.vault_tok, outcome }))
     } catch (err) { return this.#badOutcome(err) }
   }
   // --
@@ -1280,23 +1251,25 @@ export class Vault {
   #asking: RaisedAsk | null = null
 
   /** Have the vault unlocked: at once while a lease of the ways in held stands past `renewMillis` from now, else by this device's lease, else once the prompt answers.
-   * The prompt is the one up, or one raised now. See {@link Vault.ensureLease}. `beforeAsking` runs
+   * The prompt is the one up, or one raised now. See {@link Vault.ensureLease}. `shouldAsk` runs
    * only when the vault must ask, after the hello and before any prompt: a call checks there what
-   * it can know without the key, so a call that cannot land never prompts. It resolves once the
-   * prompt answers, demanding nothing after: the call's own operation demands on the lease first.
+   * it can know without the key, so a call that cannot land never prompts. It resolves true once
+   * unlocked, the prompt answered, demanding nothing after: the call's own operation demands on the
+   * lease first. It resolves false, asking nobody, when `shouldAsk` says not to ask.
    */
-  async #ensureUnlocked(renewMillis: number, beforeAsking?: () => void): Promise<void> {
+  async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
     await this.#helloWithin(this.#staleMillis)
     // A close() during the hello: no ask is raised over a closed handle.
     this.#checkOpen()
-    if (this.#leaseStandsPast(renewMillis)) { return }
+    if (this.#leaseStandsPast(renewMillis)) { return true }
     // Another tab's unlock, taken up before anyone is asked (see takeUpLease).
     if (this.#lease === null) { await this.#takeUpLease() }
-    if (this.#leaseStandsPast(renewMillis)) { return }
+    if (this.#leaseStandsPast(renewMillis)) { return true }
+    if (shouldAsk?.() === false) { return false }
     const why = this.#whyAsk()
-    beforeAsking?.()
     const answer = valOf(await (this.#asking ?? this.#raiseAsk(why)).answer)
     if (answer === 'declined') { throw declinedError(this.#getProof !== null) }
+    return true
   }
 
   /** True while the lease in hand fits the ways in the picture holds and does not end within `renewMillis` from now. */
@@ -1607,8 +1580,9 @@ export class Vault {
   // == [Lease]: grantLease, demandGranting, takeUpLease, takeUp, standDownTakeUp, takeUpUnder, discardLease
 
   /** Grant this device a lease, `leaseHours` from now, write it, and hold it: the vault is then unlocked, resolving the lease.
-   * {@link Lease.grant} makes the lease, opened around the vaultKey's non-extractable handle, and
-   * {@link DeviceDB.putLease} writes it. Before each wait and after the last it demands that the
+   * {@link sealLeaseRecord} wraps the vaultKey under a fresh leaseKey, {@link DeviceDB.putLease}
+   * writes the record, and the lease held is made from the record as stored. Before each wait and
+   * after the last it demands that the
    * vault still stands at `standing`, the vault props the key was proven against, and that
    * `overtaken` (an ask's attempt, which its prompt's end stands down) has not aborted; one that
    * refuses takes nothing up. A lock that lands during the write erases the lease behind it, as
@@ -1627,11 +1601,12 @@ export class Vault {
     this.#standDownTakeUp()
     // The transient's last act: wrapped into this device's lease, then dropped. The deadline is
     // leaseHours from now, and never past FarFuture, which is how leaseHours: Infinity reads.
-    const lease = await Lease.grant(this, standing, unlocked)
+    const record = await sealLeaseRecord(this, standing, unlocked.transientKey)
     // Nothing is awaited between this demand and the write.
     this.#demandGranting(proven, overtaken)
-    valOf(await this.#deviceDB.putLease(lease.record))
+    const stored = valOf(await this.#deviceDB.putLease(record))
     this.#demandGranting(proven, overtaken)
+    const lease = Lease.make(this, stored)
     this.#lease = lease
     this.#leaseSince = this.#clockNow()
     this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
@@ -1694,17 +1669,18 @@ export class Vault {
       return
     }
     const lease = made.val
-    // Granted under a longer leaseHours than this handle's: it does not fit. Otherwise the lease
-    // judges itself against the vault props in hand, and the clock.
-    const opened = lease.endsBy(this.#clockNow() + this.#leaseMillis) ? await lease.tryOpen(standing) : null
-    // One stood down, or outrun by the vault moving on meanwhile, is left alone: the lease standing
-    // now may be the change's own, and the next take-up judges it against the vault props then.
-    if (isStoodDown() || this.#inconsistencyWith(stampOf(this.#scope, standing)) !== null) { return }
-    if (! opened?.ok) {
-      await this.#discardLease(opened?.err ?? null)
+    // Granted under a longer leaseHours than this handle's, under other vault props, or ended: it
+    // does not fit. Its wrap is not tried: a damaged one refuses at its first use.
+    const now = this.#clockNow()
+    const fits = lease.endsBy(now + this.#leaseMillis) && fitsLease(standing, lease) && ! lease.endsBy(now)
+    // One outrun by the vault moving on meanwhile is left alone: the lease standing now may be the
+    // change's own, and the next take-up judges it against the vault props then.
+    if (this.#inconsistencyWith(stampOf(this.#scope, standing)) !== null) { return }
+    if (! fits) {
+      await this.#discardLease(null)
       return
     }
-    this.#lease = opened.val
+    this.#lease = lease
     this.#leaseSince = this.#clockNow()
     this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
     this.#replaceSnapshot()
@@ -1741,20 +1717,22 @@ export class Vault {
   }
 
   /** Refuse 'whisper_too_large' for a whisper whose JSON, with the sidecar's beside it, is over `maxWhisperBytes`, quoting neither. */
-  #checkWhisperFits(whisperBytes: Uint8Array, sidecar: Sidecar) {
-    const sidecarBytes = new TextEncoder().encode(stableJsonify(sidecar)).length
-    if (whisperBytes.length + sidecarBytes <= this.#whisperByteLimit) { return }
+  #checkWhisperFits(whisper: Whisper, sidecar: Sidecar) {
+    const whisperBytes = whisperBytesOf(whisper)
+    const weight = whisperBytes.length + new TextEncoder().encode(stableJsonify(sidecar)).length
+    whisperBytes.fill(0)
+    if (weight <= this.#whisperByteLimit) { return }
     throw new VaultError('whisper_too_large', `That whisper and its box's sidecar are over this vault's limit of ${String(this.#whisperByteLimit)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Vault.make.`)
   }
 
   /** Refuse 'vault_full' for a new box while the vault holds `maxBoxes`, or one that would take it past `maxVaultBytes`.
    * Each box is weighed by `#boxWeight`. It counts from the boxes last listed, so a store costs no
-   * extra read: a listing a moment stale may refuse, and a hello cures it. A replacement always
-   * passes.
+   * extra read: a listing a moment stale may refuse, and a hello cures it. A replacement, sealed
+   * over a base, always passes.
    */
-  #checkRoomFor(boxlabel: string, prev: Box | null) {
+  #checkRoomFor(boxlabel: string, base: BoxBase | null) {
     // A replacement weighs what it replaces, so it never makes the vault fuller: it always lands.
-    if (prev !== null) { return }
+    if (base !== null) { return }
     const others = this.#boxes.filter((box) => box.boxlabel !== boxlabel)
     if (others.length >= this.#boxLimit) {
       throw new VaultError('vault_full', `This vault already holds its limit of ${String(this.#boxLimit)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`)
@@ -1766,7 +1744,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: listedRevisionOf, isListedDamaged, checkListed, getBoxOrDamaged, getBoxUnlocked
+  // == [Reading boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, readBox, fetchBox, boxUnder
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1774,48 +1752,129 @@ export class Vault {
    */
   #listedRevisionOf(boxlabel: string): string | null { return this.#boxes.find((box) => box.boxlabel === boxlabel)?.revision_tok ?? null }
 
+  /** True when the snapshot's listing shows a box under `boxlabel`: what a locked vault can know before it asks for a proof. Reads nothing. */
+  #isListed(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel) }
+
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
   #isListedDamaged(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel && box.damaged) }
 
-  /** Refuse `boxlabel` as 'absent_box' when the listing in hand shows no box under it.
-   * That is what a locked vault can know before it asks for a proof. Reads nothing: the listing is
-   * as fresh as `staleMinutes` keeps it.
-   */
-  #checkListed(boxlabel: string) {
-    if (this.#boxes.every((box) => box.boxlabel !== boxlabel)) { throw absentBox() }
+  /** The box under `boxlabel`, once the vault is unlocked for it; null when there is none, or when a locked vault's listing shows none, asking nobody. */
+  async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<Box | null> {
+    this.#checkOpen()
+    const label = Names.checkFloor('boxlabel', boxlabel)
+    // Checked before the user is asked for anything: a box the listing does not show is none.
+    if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { return null }
+    const lease = this.#demandLease(call)
+    return await this.#readBox(label, lease.vault_tok, call)
   }
 
-  /** The box under `boxlabel`, lying under `lease`'s vault; null when there is none, and 'damaged' when storage refuses its record as 'damaged_box'. */
-  async #getBoxOrDamaged(boxlabel: string, lease: Lease): Promise<Box | 'damaged' | null> {
+  /** The box under `boxlabel` as storage holds it in the vault `vaultTok`, or null when none stands; the box demanded after the read, the vault half.
+   * A box another device wrote is what storage holds, not drift. A lock meanwhile lets it through:
+   * opening it is what demands the lease.
+   */
+  async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
+    const record = await this.#fetchBox(boxlabel, vaultTok)
+    if (record === null) {
+      this.#demand({ vault_tok: vaultTok }, { call })
+      return null
+    }
+    const fetched = this.#boxUnder(record, vaultTok)
+    this.#demand(fetched, { call })
+    return fetched
+  }
+
+  /** The record under `boxlabel`, read from storage only while the vault `vaultTok` stands there; 'vault_gone' when another stands, or none.
+   * A vault deleted or made anew elsewhere leaves this device's picture behind: the next hello
+   * reads storage afresh, whatever `staleMinutes` says.
+   */
+  async #fetchBox(boxlabel: string, vaultTok: string): Promise<BoxRecord | null> {
     try {
-      const record = await this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: lease.vault_tok })
-      return record === null ? null : Box.make(this, record, lease.vault_tok)
+      return await this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok })
     } catch (err) {
-      if (! isVaultError(err, 'damaged_box')) { throw err }
-      return 'damaged'
+      if (! isVaultError(err, 'vault_mismatch')) { throw err }
+      this.#readAt = FarPast
+      throw new VaultError('vault_gone', 'The vault this device holds was deleted, or deleted and made anew, on another device, so no box was read: what stands now is another vault, or none. Read the vault again (hello) to see what stands, and unlock it to carry on.', { cause: err })
     }
   }
 
-  /** The box under `boxlabel`, with the lease it was read under, once the vault is unlocked for it: 'absent_box' when there is none.
-   * It demands the lease before the read, and the box after it, lease-bound: a lock or a `close()`
-   * meanwhile refuses 'vault_locked' or 'vault_closed', handing nothing back.
+  /** `record` as a {@link Box}, lying in the vault `vaultTok`, which the read or write that handed it back expected; stamped with the picture's scope and epochs.
+   * The vault holding no vault props refuses 'vault_gone', as the demand would.
    */
-  async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<{ box: Box, lease: Lease }> {
-    this.#checkOpen()
-    const label = Names.checkFloor('boxlabel', boxlabel)
-    // Checked before the user is asked for anything: a call that cannot land never prompts.
-    await this.#ensureUnlocked(0, () => { this.#checkListed(label) })
-    const lease = this.#demandLease(call)
-    const record = await this.#vaultDB.getBox(this.#scope, label, { vault_tok: lease.vault_tok })
-    if (record === null) { throw absentBox() }
-    // A box another device wrote is what storage holds, not drift: the box is held to its vault alone.
-    const box = Box.make(this, record, lease.vault_tok)
-    this.#demand(box, { leaseBound: true, call })
-    return { box, lease }
+  #boxUnder(record: BoxRecord, vaultTok: string): Box {
+    const { stamp } = this
+    if (stamp === null) { throw goneError() }
+    return Box.make(this, record, { ...stamp, vault_tok: vaultTok })
   }
   // --
 
-  // == [Writing boxes]: writeOver, takeStoredBox, takeBoxDeletion
+  // == [Writing boxes]: sealAndPutBox, listedBase, storedBase, damagedBase, writeOver, takeStoredBox, takeBoxDeletion
+
+  /** Seal and store the box `boxlabel`, as `putBox()` says, once the vault is unlocked: one read when the sidecar or whisper is left out, one seal, one write.
+   * It demands the lease first, and the box after its seal; what storage stored is taken into the
+   * listing after its own demand, a lock meanwhile letting it land.
+   */
+  async #sealAndPutBox(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<Box> {
+    const lease = this.#demandLease('putBox')
+    const { base, sidecar, whisper } = givenSidecar === undefined || givenWhisper === undefined
+      ? await this.#storedBase(boxlabel, lease.vault_tok, givenSidecar, givenWhisper)
+      : { base: this.#listedBase(boxlabel), sidecar: givenSidecar, whisper: givenWhisper }
+    // A sidecar kept counts toward the limit as one given does, weighed before any key is made.
+    this.#checkWhisperFits(whisper, sidecar)
+    this.#checkRoomFor(boxlabel, base)
+    const box = await Box.seal(this, { boxlabel, sidecar, base }, whisper)
+    this.#demand(box, { call: 'putBox' })
+    // Lands only in the vault this whisper is sealed for, over the revision it was sealed from: a
+    // vault reborn elsewhere, or a box written meanwhile by another device, refuses it.
+    const stored = await this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok })
+    return this.#takeStoredBox(stored, box.vault_tok)
+  }
+
+  /** What a whole `putBox()` seals over, reading nothing: the listing's entry for `boxlabel`, its revision and `registered_at` adopted as they stand, or none for a box it does not show, which is a new box.
+   * A box listed damaged gives its revision alone; one naming none refuses 'damaged_box'.
+   */
+  #listedBase(boxlabel: string): BoxBase | null {
+    const listed = this.#boxes.find((box) => box.boxlabel === boxlabel)
+    if (listed === undefined) { return null }
+    if (! listed.damaged) { return { revision_tok: listed.revision_tok, registered_at: listed.registered_at } }
+    // A box listed damaged naming no revision could be cleared only by a delete before the store,
+    // a second call another device's write could fall between and be lost: the user deletes it, then stores.
+    if (listed.revision_tok === null) { throw damagedBeyondNaming() }
+    return { revision_tok: listed.revision_tok }
+  }
+
+  /** What a `putBox()` leaving out the sidecar or the whisper seals: the box read from storage, opened, its sidecar and whisper kept where not given, and its revision the base.
+   * Opening it proves what is kept unaltered. A box that will not read or open is written over as
+   * new, keeping nothing, when the whisper is given, and refuses 'damaged_box' when it is not; none
+   * standing refuses 'no_whisper' when the whisper is not given.
+   */
+  async #storedBase(boxlabel: string, vaultTok: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
+    const read = await outcomeOf(() => this.#readBox(boxlabel, vaultTok, 'putBox'), unexpectedError)
+    if (! read.ok) {
+      if (givenWhisper === undefined || ! isVaultError(read.err, 'damaged_box')) { throw read.err }
+      return { base: this.#damagedBase(boxlabel), sidecar: givenSidecar ?? {}, whisper: givenWhisper }
+    }
+    const stored = read.val
+    if (stored === null) {
+      if (givenWhisper === undefined) { throw noWhisper() }
+      return { base: null, sidecar: givenSidecar ?? {}, whisper: givenWhisper }
+    }
+    const opened = await stored.tryExtractWhisper()
+    if (! opened.ok) {
+      if (givenWhisper === undefined || ! isVaultError(opened.err, 'damaged_box')) { throw opened.err }
+      // Nothing in a box that will not open vouches for its fields: it is written over as new.
+      return { base: { revision_tok: stored.revision_tok }, sidecar: givenSidecar ?? {}, whisper: givenWhisper }
+    }
+    return { base: stored, sidecar: givenSidecar ?? stored.sidecar, whisper: givenWhisper ?? opened.val }
+  }
+
+  /** What a store seals over a box storage refused as damaged: the revision the listing names, or none for a box it does not show yet, which storage refuses while one stands; 'damaged_box' for one listed with none.
+   * The next hello lists it, with its revision for the next store.
+   */
+  #damagedBase(boxlabel: string): BoxBase | null {
+    const revision = this.#listedRevisionOf(boxlabel)
+    if (revision === null && this.#isListedDamaged(boxlabel)) { throw damagedBeyondNaming() }
+    return revision === null ? null : { revision_tok: revision }
+  }
 
   /** Write `box` over `expected`, as `putBox()` does, resolving the record as stored: one write, which storage refuses unless the revision `expected` names still stands.
    * A stale refusal comes as storage gave it, the box that stands as its `meta.box_stored`.
@@ -1836,20 +1895,23 @@ export class Vault {
     }
   }
 
-  /** Take `stored`, the record a box write just landed, into the listing, once the vault is demanded to stand under `lease`'s vault: a lock meanwhile lets it land. */
-  #takeStoredBox(stored: BoxRecord, lease: Lease) {
-    this.#demand({ vault_tok: lease.vault_tok }, { call: 'putBox' })
+  /** Take `stored`, the record a box write just landed in the vault `vaultTok`, into the listing, once the box it makes is demanded consistent: a lock meanwhile lets it land. Resolves that box. */
+  #takeStoredBox(stored: BoxRecord, vaultTok: string): Box {
+    const box = this.#boxUnder(stored, vaultTok)
+    this.#demand(box, { call: 'putBox' })
     const { boxlabel, revision_tok, sidecar, registered_at, written_at } = stored
-    const entry = heldListing({ boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false }, lease.vault_tok)
-    this.#boxes = [...this.#boxes.filter((box) => box.boxlabel !== boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+    const entry = heldListing({ boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false }, vaultTok)
+    this.#boxes = [...this.#boxes.filter((listed) => listed.boxlabel !== boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
     this.#replaceSnapshot()
+    return box
   }
 
-  /** Drop the box under `boxlabel`, which a delete just removed, from the listing, once the vault is demanded to stand under `lease`'s vault: a lock meanwhile lets it land. */
-  #takeBoxDeletion(boxlabel: string, lease: Lease) {
-    this.#demand({ vault_tok: lease.vault_tok }, { call: 'delBox' })
-    this.#boxes = this.#boxes.filter((box) => box.boxlabel !== boxlabel)
+  /** Drop the box `deleted` names, which a delete just removed, from the listing, once it is demanded consistent: a lock meanwhile lets it land. Resolves it, frozen. */
+  #takeBoxDeletion(deleted: DeletedBox): DeletedBox {
+    this.#demand(deleted, { call: 'delBox' })
+    this.#boxes = this.#boxes.filter((box) => box.boxlabel !== deleted.boxlabel)
     this.#replaceSnapshot()
+    return Object.freeze({ ...deleted })
   }
   // --
 
@@ -2066,7 +2128,7 @@ const MarkFormat = 'safebyok-mark-v5'
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */
 type VaultCall = 'make' | 'hello' | 'refresh' | 'unlock' | 'del' | 'untrustedStorage' | 'ensureLease' | 'demandConsistentWith'
-  | 'putWayin' | 'delWayin' | 'putBox' | 'delBox' | 'getBox' | 'getWhisper' | 'decryptWhisper'
+  | 'putWayin' | 'delWayin' | 'putBox' | 'delBox' | 'getBox' | 'getWhisper'
 
 /** The refusals that say storage cannot be trusted as it stands: 'identity_revoked' and 'rolled_back', which lock the vault, and 'newer_format'.
  * Each asks something of the caller that a stale write does not: the user to sign in again,
@@ -2075,7 +2137,7 @@ type VaultCall = 'make' | 'hello' | 'refresh' | 'unlock' | 'del' | 'untrustedSto
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
 // --
 
-// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarOf, standingPassphraseOf, newProofOf, absentBox
+// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, standingPassphraseOf, newProofOf, absentBox, noWhisper
 
 /** What a call that takes options most likely had in place of its bag, and what to do: an event, as `call` was handed to `addEventListener` or `onClick` itself. */
 const eventHint = (call: 'hello' | 'ensureLease', tried: 'tryHello' | 'tryEnsureLease') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
@@ -2105,18 +2167,26 @@ const checkedStamped = (thing: unknown): Stamped => {
   throw new VaultError('bad_option', "demandConsistentWith() takes something the vault handed out -- a box, a lease, a listing's entry -- or a stamp: an object carrying the vault_tok it was made under, and its epochs as numbers.")
 }
 
-/** What `putBox()`'s options may hold: a sidecar, which {@link sidecarOf} checks, and nothing else. */
-const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`, the box's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
+/** What `putBox()` is handed to name the box it seals: its boxlabel, and its sidecar, left out to keep the one it has. */
+export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
 
-/** The sidecar a `putBox()` was handed, checked; undefined when it was handed none.
- * Refuses 'bad_option' for anything but a JSON object, quoting none of it, and for options beside
- * it.
+/** What `putBox()`'s props may hold: a boxlabel, a sidecar, and nothing else. */
+const checkPutBoxProps = optionsCheck({ boxlabel: Z.unknown(), sidecar: Z.optional(Z.unknown()) }, "putBox()'s props are `boxlabel`, and `sidecar`, the box's own visible data (it is authenticated but never encrypted): check their spelling, and leave out any other. A note is kept in the sidecar: { boxlabel, sidecar: { note } }.")
+
+/** The boxlabel and sidecar a `putBox()` was handed, the sidecar checked and undefined when left out.
+ * Refuses 'bad_option' for props that are no object, a sidecar that is no JSON object, or a field
+ * beside them, quoting none of it. The boxlabel is the caller's to check.
  */
-const sidecarOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): Sidecar | undefined => {
-  checkStoreOpts(storeOpts)
-  if (storeOpts?.sidecar === undefined) { return undefined }
-  return checkedSidecar(storeOpts.sidecar)
+const putBoxPropsOf = (props: unknown): { boxlabel: unknown, sidecar: Sidecar | undefined } => {
+  if (typeof props !== 'object' || props === null) {
+    throw new VaultError('bad_option', "putBox() takes the box it stores as its first argument, { boxlabel, sidecar }, and the whisper second: putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...').")
+  }
+  const { boxlabel, sidecar } = checkPutBoxProps(props as Partial<Record<'boxlabel' | 'sidecar', unknown>>)
+  return { boxlabel, sidecar: sidecar === undefined ? undefined : checkedSidecar(sidecar) }
 }
+
+/** What `delBox()` removed: the boxlabel, the vault it lay in, and whether the revision removed was the one the snapshot listed (`deleted`) or another written over it meanwhile (`deleted_other`). Storage keeps nothing of it. */
+export type DeletedBox = Readonly<{ boxlabel: string, vault_tok: string, outcome: 'deleted' | 'deleted_other' }>
 
 /** The proof of a change to the ways in, `call`'s: the vault's standing passphrase, as text.
  * Refuses 'bad_option' for anything else, a passkey's answer among it, and as
@@ -2144,6 +2214,9 @@ const newProofOf = async (vault: Vault, given: unknown): Promise<PassphraseProof
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const absentBox = () => new VaultError('absent_box', 'No box stands under that boxlabel in this vault: its snapshot lists the ones it holds.')
+
+/** The refusal of a `putBox()` that left out the whisper, to keep the one stored, where none is stored. */
+const noWhisper = () => new VaultError('no_whisper', 'No box stands under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store.')
 
 // --
 

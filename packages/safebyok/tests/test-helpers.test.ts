@@ -6,10 +6,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type StringStore } from '../src/index'
-import { Ciphered, fromB64, toB64 } from '../src/crypto'
+import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
-import { BoxRecord } from '../src/box'
+import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
 import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceMark, type LeaseRecord } from '../src/types'
@@ -620,7 +620,7 @@ describe("testDeriver", () => {
   it("opens a vault, deterministic in passphrase and salt", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
     await vault.unlock('correct horse battery staple')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     await vault.lock()
     await vault.unlock('correct horse battery staple')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
@@ -659,6 +659,27 @@ describe("the fixtures", () => {
     const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: null })
     expect(slice.now()).to.eq(later)
     expect(slice.vault_tok).to.be.null
+  })
+
+  it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, stamped with its scope and vault token, as its examples show", async () => {
+    const vaultKey = await makeVaultKey()
+    const vault = await TH.leasedSliceOf('u1', vaultKey)
+    expect(vault.stamp).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.lease).to.include({ vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+    const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
+    expect(await box.extractWhisper()).to.eq('sk-fake')
+  })
+
+  it("leasedSliceOf's demand refuses as the vault's does, and its tryLock drops the lease and counts", async () => {
+    const vault = await TH.leasedSliceOf('u1', await makeVaultKey(), { vault_tok: 'vault-tok-other' })
+    expect(vault.stamp?.vault_tok).to.eq('vault-tok-other')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-u1' }) }, 'vault_remade')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other', gate_epoch: 2 }) }, 'gate_moved')
+    await TH.expectGood(vault.tryLock())
+    expect(vault.locks).to.eq(1)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }, { leaseBound: true }) }, 'vault_locked')
+    vault.stamp = null
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }) }, 'vault_gone')
   })
 
   it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
