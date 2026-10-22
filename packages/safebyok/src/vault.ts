@@ -245,11 +245,11 @@ export class Vault {
    * `VaultDB.subscribe`, each of whose rings is a hello that reads.
    *
    * A refused hello applies no partial read: the vault stands as its last read left it, and
-   * `opening` after 'rolled_back' (see
-   * {@link Vault}). Stored vault props it cannot use refuse with 'damaged_vault'
-   * (`delDamagedVault` clears them), 'newer_format' or 'rolled_back'. A box or way in stored
-   * damaged refuses nothing: it lists damaged, and is told as bad news. A strength checker whose
-   * `load` fails refuses the hello 'unexpected_error', and nothing read is taken up.
+   * `opening` after 'rolled_back' (see {@link Vault}). Stored vault props it cannot use refuse
+   * with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format' or 'rolled_back'. A box
+   * or way in stored damaged refuses nothing: it lists damaged, and is told as bad news. A
+   * strength checker whose `load` fails refuses the hello 'unexpected_error', and nothing read
+   * is taken up.
    *
    * @example await vault.hello()   // vault.state: 'absent' | 'locked' | 'unlocked'
    * @example
