@@ -67,14 +67,19 @@ added or folded into through the subagent, and no other entry changes.
   `gate_moved` (a way in changed) or, for a thing bound to the lease, `vault_locked`. A call makes the demand
   before and after each wait it holds; none of it is a repair, and none of it reads storage. A demand failure is
   logged by its kind and the call only, never the thing's fields (`packages/safebyok/src/vault.ts`, *Vault:
-  demand*).
+  demand*). Amended 2026-10-22 (box_seal): a box's stamp is no part of its record and is not authenticated; it is
+  non-enumerable on the Box object and read for this demand only (see the box ctx entry).
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **`lock()` acts before it returns, and the device's erase of
   the lease is issued last.** In order, with nothing awaited between: the lease in memory is dropped and its expiry
   disarmed, a lease take-up under way is stood down, the prompt up (if any) is landed on, and the snapshot swaps to
   locked; only then is the pantry's erase (`DeviceDB.delLease`) issued, and its promise is what `lock()` awaits
   (`#lockNow`; `del()` locks through it too). Because a device store applies one scope's calls in the order made, a
   lease write already issued by an unlock under way is erased behind it. The grant demands the vault's stamp and its
-  prompt immediately before and after that write, and no longer erases its own lease.
+  prompt immediately before and after that write, and no longer erases its own lease. Amended 2026-10-22 (box_seal):
+  **a lock stops a `putBox()` or `delBox()` at every step before its write to storage, and not the write.** The wait
+  on getProof, `VaultDB.getBox`, `box.extractWhisper()` and `Box.seal` each refuse `vault_locked` having written
+  nothing. Once `VaultDB.putBox` / `VaultDB.delBox` is sent a lock does not stop it: it lands or refuses as storage
+  decides, and a stale `putBox()` still refuses `stale_write` and never lands.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **drops are memory-only; only a lock erases the pantry's
   lease.** The expiry at the deadline, `close()`, a demand that finds the lease ended, and a read that finds the
   lease revoked (the pantry holding none or a newer one, the ways in changed, the vault deleted or made anew) each
@@ -2314,7 +2319,16 @@ added or folded into through the subagent, and no other entry changes.
   from `safebyok-lockbox-v5` to `safebyok-box-v6`, and the purpose string that binds a wrapped boxKey
   moved from `lockbox_key_wrapped` to `box_key_wrapped`. Both are still distinct from every other format
   tag and purpose string. A box stored under the old names fails schema validation before any
-  decryption is tried, and is listed as damaged.
+  decryption is tried, and is listed as damaged. Amended 2026-10-22 (box_seal, branch `20261022-box_seal`, stacked on
+  #254): **the box ctx's rule is named, "we sign all immutable fields" (the Coach).** Both of a box's encryptions
+  (`box_key_wrapped` under the vaultKey, `whisper_ciphered` under the boxKey) are bound, as additional data, to every
+  field of a box that never changes once first stored (the vault's scope and `vault_tok`, the boxlabel,
+  `registered_at`, the format, codec and schema version) and to every other visible field of the revision
+  (`revision_tok`, sidecar, `written_at`). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`); only
+  the doc blocks in `box.ts` now state the rule, and a later thread (8) applies it to wayins. The box's stamp (scope,
+  `vault_tok`, `vault_epoch`, `gate_epoch`, as the vault stood when the box was read or sealed) is no part of the
+  record and is not authenticated; it is non-enumerable on the Box object and read only for the vault's consistency
+  demand.
 * 2026-10-16 (locks_and_expiry); 2026-10-19 (20261019-softlock_gone): **the lease has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
@@ -2820,7 +2834,10 @@ added or folded into through the subagent, and no other entry changes.
   is never sealed into a fresh, authenticated revision; a box that will not open is written over as new, keeping
   nothing. **A whole put** (both given) reads nothing and adopts the listing's revision and `registered_at` as its
   base (the Coach's ruling): the listing is not authenticated, so a `registered_at` altered in storage can be sealed
-  into the new revision on that path. `recordOpens` and `box.tryOpen` are gone.
+  into the new revision on that path. `recordOpens` and `box.tryOpen` are gone. Amended 2026-10-22 (box_seal): this
+  is the one path that seals an unopened `registered_at`, an exception to the rule that a box's ctx signs all
+  its immutable fields (see the box ctx entry): a `registered_at` altered in storage would make the old revision
+  refuse to open, yet is authenticated into the new one. Whether to close it is open with the Coach.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **a write's
   catch-up passes `identity_revoked`, `rolled_back` and `newer_format` through unchanged.** When
   storage refuses a write as stale, the vault refreshes once; if that refresh fails with one of
