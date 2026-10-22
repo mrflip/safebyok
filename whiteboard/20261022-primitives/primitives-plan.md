@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main); thread 5 building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 built (#253), in review; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -137,6 +137,19 @@ Every worker, beyond CLAUDE.md:
 15. **`guarantees-audit.md` binds threads 4 to 9** (*Orchestrator*, 2026-10-22): nine places
     where the spec as written lets an outward guarantee fall, each with its fix and its thread
     (*By thread*). Where it and `primitives.md` differ, it wins until the Coach rules.
+16. **A guarantee may loosen for a while** (the Coach, 2026-10-22, verbatim): "it's acceptable for a
+    guarantee to loosen if a later commit will fix it, that should not cause a change in design to
+    carry it through in every step -- we don't want that churn but it is acceptable." Name each
+    loosening in the PR's open matters, with the thread that closes it.
+17. **More refusals are expected** (the Coach, 2026-10-22, verbatim): "it is expected this sprint will
+    result in more apparent scenarios where calls refuse. This is purposeful: we can build higher
+    coordination on these primitives. (it's not great if something throws -- but resist your baked
+    in training to say that it's a catastrophe.)" A call that now refuses where today coped is a
+    named line (PR, toldjaso), not a blocker and never cause for a rescue mechanism.
+18. **Same scope, other `vault_tok` is a new life** (the Coach, 2026-10-22, verbatim): "gets should be
+    checking they are reading the same vault -- if scope matches but vault_tok doesn't that implies a
+    new vault was created and the current should reload". Scope is the id, `vault_tok` the version
+    (checked: every key and index in `packages/*/src` goes by scope).
 
 ## Threads
 
@@ -259,7 +272,10 @@ box call. Chain tests are the happy path plus one injected failure per step.
 section, `crypto.ts` only if a name moves. The whisper's JSON string cannot be zeroed and is not
 kept; byte arrays are. Security note: the unwrap-rewrap on a whisper-omitted put, and where the
 vaultKey lives during `cipheredWith`. **Depends on:** 5. **Look-ahead:** thread 8's
-`grantLease` makes the Lease this thread opens. **Size:** M-L.
+`grantLease` makes the Lease this thread opens. **Size:** M-L. *Orchestrator:* a box read names
+the `vault_tok` it was read under (ground rule 18), so a box from another life reloads rather
+than failing to decrypt; thread 5's `Stamped` is partial (Box carries only `vault_tok`, Lease the
+scope and `gate_epoch`), and full stamps are this thread's.
 
 *Tests.* `box.test.ts` (43), `lease.test.ts` (27), `vault-boxes.test.ts` (107): rewritten to the
 new names; the races "a whisper-omitted put racing another device's write" and "a renewal during
@@ -382,7 +398,9 @@ second attempt, the stale-state settle, and "a write that lands and then a lock"
 *Gloss.* Gathers the Contract lines earlier threads listed as untrue. The hand-roll sweep covers
 the preplan's *Libraries* candidates no earlier thread decided: each gets a verdict (library,
 keep, or delete) in the PR, and a dependency added needs the Coach's yes first, so the sweep
-proposes and does not add. **Depends on:** 10. **Size:** M-L. May split: docs, then the sweep.
+proposes and does not add. **Depends on:** 10. **Size:** M-L. May split: docs, then the sweep. *Orchestrator:* add a TODO entry
+for a test that reads the Postgres README's route-recipe code blocks, so the copy a host takes is
+the one tested (Open Matters, from #252's review, the Coach took the Rec).
 
 ### 12. route_meta
 
@@ -422,3 +440,6 @@ audits `notes/security.md` after the sprint; no agent rewrites it.
   tag its branch `closed/20261022-turns`: still yours.
 * Wind up the streamline sprint: its folder to `winboard/`, its paused note resolved.
 * The Open Matters tab of the sprint doc is where the sprint raises what it cannot decide.
+* Post-sprint security audit: `notes/security.md`'s store_rulings amendment (near line 639) and its
+  stale_write/box_stored entry (near line 863) still say the route recipe sends meta whole; point
+  them at #252's amended Postgres entry (the Coach: "yes save for post-sprint audit").

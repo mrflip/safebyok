@@ -54,6 +54,11 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   fundamentally damaged in storage it should go"); garbled rows are the loud TODO's; a first unlock's
   two writes (gateless, then the gate) are accepted, and the bank births through `ensureVault`.
 
+* **Ruled, second batch** (the Coach, 2026-10-22): a guarantee may loosen for a while, and more
+  refusals are expected (the plan, ground rules 16, 17); same scope with another `vault_tok` is a
+  new life, so reload (18); audit 4 took A; a repeated delete refuses `stale_write`; capacity is
+  not the vault's own prop and stays in #252's main meta; the README-drift TODO is thread 11's.
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
@@ -65,7 +70,7 @@ rules* 3).
 | 2 | get_vault | merged | #244 |
 | 3 | wire_meta | merged | #246 |
 | 4 | store_verbs | merged | #251 |
-| 5 | demand | planned | |
+| 5 | demand | built, in review | #253 |
 | 6 | lease_box | planned | |
 | 7 | bank | planned | |
 | 8 | proving_gate | planned | |

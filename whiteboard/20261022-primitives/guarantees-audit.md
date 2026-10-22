@@ -58,7 +58,10 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    its base after it; `delVault` expects `{ vault_tok, gate_epoch }` (thread 4, sent as a
    directive). **This bends the preplan's rule 6** ("no call reads on its own, re-reads after a
    prompt"): it is hello's own knob, used once at the start of a chain, never a recovery. The
-   Coach's to rule; built this way meanwhile.
+   Coach's to rule; built this way meanwhile. *The Coach (2026-10-22):* took A, with "I worry about
+   staleMinutes 0 causing a traffic jam": the read goes through the refresh join, so attempts at
+   once share it, one per typed passphrase; thread 9 reports if it jams. Thread 5 pulled this
+   forward into `unlock()` and the ways-in changes.
 
 5. **A gating of one kind joined by a call of another (S; thread 9).** "A call that needs one
    while it stands joins it": `del()` during an `unlock_vault` gating would resolve void when the
@@ -111,7 +114,9 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
   counts a lease only when its stamp matches the gate (8), and keeps today's take-up path until
   thread 9 (2).
 * **6 lease_box:** a full `putBox` adopts the listing's attributes, its base the listed revision;
-  unlisted, it is a create, which the store accepts over no record or a tombstone (7).
+  unlisted, it is a create, which the store accepts over no record or a tombstone (7). A box read
+  names the `vault_tok` it was read under; another life at the same scope reloads (the plan,
+  ground rule 18).
 * **7 bank:** the take-up predicate at birth (3); the device record raised at birth, refresh,
   `putGate` and `delVault` (6); birth drops, never erases, a lease of another life (9).
 * **8 proving_gate:** `grantLease` step 7 demands on the proving and checks the stored record's
