@@ -146,10 +146,10 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`listBoxRecords(scope)`, `getVaultRecords(scope)` and `ensureVaultRecords(scope, draft)`, which
-hand on a vault's boxes as stored records, their two ciphered fields left out. A VaultDB's own
-`listBoxes`, `getVault` and `ensureVault` give summaries instead -- the shape a vault shows,
-without `format` -- which the browser's VaultDB may not hand back from its own listing. A
+`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault's boxes as stored
+records, their two ciphered fields left out. A VaultDB's own `getVault` and `ensureVault` give
+summaries instead -- the shape a vault shows, without `format` -- which the browser's VaultDB may
+not hand back from its own listing. A
 vault read is one query, its props and its boxes from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
@@ -217,6 +217,7 @@ by, exactly as safebyok wrote it:
 | -------------------- | ----------------------------------------------------------------- |
 | `SafebyokVaultProps` | every field of the `VaultProps`                                   |
 | `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
+| `SafebyokTombstone`  | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
@@ -224,10 +225,10 @@ by, exactly as safebyok wrote it:
 Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.
 
-* **Text is a `String`**, a count (`gate_epoch`) an `Int`, and a time a `Float` -- epoch
+* **Text is a `String`**, a count (`gate_epoch`, `vault_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
 * **A count is held to GraphQL's 32-bit `Int`**: `gate_epoch`, which goes up by one on each
-  change to a vault's ways in. Past 2,147,483,647 the field fails on the
+  change to a vault's ways in, and `vault_epoch`, which goes up with it and with a deletion. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
 * **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the

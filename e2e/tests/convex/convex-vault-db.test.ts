@@ -213,7 +213,7 @@ describe("convexVaultDB.subscribe", () => {
     here.subscribe(u1, onChange)
     await caughtUp(here)
     expect(onChange).not.toHaveBeenCalled()
-    await TH.ensureGated(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }), TH.vaultPropsOf('u1'))
+    await TH.expectingGood(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok })).ensureVault(TH.gatelessOf('u1'))
     await vi.waitFor(() => { expect(onChange).toHaveBeenCalledTimes(1) })
   })
 })

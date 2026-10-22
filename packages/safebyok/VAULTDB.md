@@ -22,7 +22,7 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
   box deletion reports, what a stale box write or a stale update of the vault props says stands,
-  and how full a `vault_full` says the vault is -- refuses what is malformed
+  the tombstone a vault deletion leaves, and how full a `vault_full` says the vault is -- refuses what is malformed
   before your code sees it, turns a `false` from you (from a box deletion, a `null`) into
   `stale_write`, and turns
   anything you throw that is not a
@@ -32,16 +32,19 @@ Three layers share the work, and each guarantee below belongs to one of them.
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
-  runs once, however often the host calls it. It lists a vault's records whole for a server to
-  serve (`listBoxRecords`), from your `doListBoxes`. It keeps the `logger`, as `this.logger`:
+  runs once, however often the host calls it. It hands a vault's records on, whole but for their
+  ciphertext, for a server to serve (`getVaultRecords`, `ensureVaultRecords`), from your
+  `doGetVault` and `doEnsureVault`. It keeps the `logger`, as `this.logger`:
   your adapter's own, else the one `Vault.make` hands it, else the console; and
   `this.watchTrouble(message)` warns once for each failing streak of a live watch.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
   failed resolves `false` (a box write or deletion, `null`), and the vault decides what
-  happens next. A box write that lands resolves the record as you now hold it, read back in
-  the same atomic step as the write; a box deletion that lands, what it removed (line 3.4).
+  happens next. A write that lands resolves what you now hold, read back in the same atomic
+  step as the write: the box for a box write, the vault props for an update of them (line 3.2),
+  the tombstone for a deletion of the vault (line 3.5); a box deletion that lands, what it
+  removed (line 3.4).
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
@@ -96,7 +99,9 @@ the host than this:
   for contention: the host writes no retry loop.
 * **Each write is atomic on its own.** One conditional statement, a condition expression, or a
   transaction the backend runs by itself (Convex's mutations, IndexedDB's transactions). This is
-  the one thing the contract asks of a backend beyond storing JSON.
+  the one thing the contract asks of a backend beyond storing JSON. A vault's deletion, its boxes
+  and the tombstone it leaves among them; a vault's creation over a tombstone, and the tombstone's
+  going: each is one such step.
 
 A stronger guarantee that would cost the host more -- operational work or upkeep, failures or
 retries the baseline does not have, or speed in normal or edge cases -- is opt-in, and the
@@ -159,7 +164,7 @@ that refuse to write one.
 ## 2. Reads
 
 **2.1. A write that resolved is seen by every read after it.** Once a write's promise resolves,
-every read that starts afterwards -- `getVault`, `getVaultProps`, `getBox`, `listBoxes`, on any device -- sees
+every read that starts afterwards -- `getVault`, `getBox`, on any device -- sees
 it, and once a deletion resolves, none sees what it deleted. Normal use gives the same answer from
 every device.
 
@@ -167,8 +172,8 @@ every device.
 vault holds, however many it holds -- even a vault that racing writers took past its limit (line
 4.2).
 
-**2.3. A listing is whole.** `listBoxes` returns every box in the vault: never a page, a
-sample, or the first so many. Asked twice with nothing written between, it gives the same
+**2.3. A listing is whole.** The listing `getVault` hands back holds every box in the vault: never a
+page, a sample, or the first so many. Asked twice with nothing written between, it gives the same
 listing, sorted by boxlabel. There is no limit to ask for; a listing that takes one would also say
 which boxes it keeps, and none does. Within the limits the adapter declares (section 7 and
 line 4.1) a listing succeeds; past them, a backend that cannot read so many boxes at once
@@ -176,8 +181,8 @@ refuses the listing with an error rather than return part of it, and once deleti
 back within its limits, the listing is whole again.
 
 **2.4. A vault is read in one step, its props and listing together.** `getVault` hands back the
-scope's vault props and its box listing -- the one `listBoxes` makes (line 2.3), of the vault those
-props name -- read in one atomic step, or null where no vault props stand. `ensureVault` reads the
+scope's vault props and its box listing (line 2.3) of the vault those props name, read in one atomic
+step, or null where no vault props stand -- a scope holding only a tombstone (line 3.5) among them. `ensureVault` reads the
 same, in the same step that creates the vault where none stands (line 3.1). No write lands between
 the two reads, so what is handed back is the vault as it stood at one moment: never one vault's
 props beside another's boxes, never a box deleted beside the props of the write that followed.
@@ -186,8 +191,8 @@ with the listing, nor does the vault, and an adapter neither repairs nor refuses
 it might find (line 1.3). The step is one statement (Postgres, whose listing is a subquery of
 the statement that reads or writes the vault row), one query or mutation (Convex, and over GraphQL
 the server's own step), one IndexedDB transaction, or one synchronous turn (`localVaultDB`).
-`getVaultRecords` and `ensureVaultRecords` read as these do, the boxes as `listBoxRecords` hands
-them on: what a server serves a browser's VaultDB, whose own step is then that one request.
+`getVaultRecords` and `ensureVaultRecords` read as these do, the boxes as stored but for their two
+ciphered fields: what a server serves a browser's VaultDB, whose own step is then that one request.
 
 Postgres's `ensureVault` over vault props another device created after its statement began
 finds them by its `ON CONFLICT`, which reads the row as it stands then, while its listing reads as
@@ -196,24 +201,36 @@ the props by the boxes written meanwhile, and never names another vault.
 
 ## 3. Versioned writes
 
-**3.1. Vault props are created once.** `ensureVault` and `ensureVaultProps` store the vault
-props only where the scope holds none, and return whichever vault props stand afterwards: the given
-ones, or, when the vault already exists, the ones standing, exactly as stored and under their own
-`vault_tok` -- another device's, perhaps created in the same moment. Two devices creating at once
-settle on one vault, and get one `vault_tok` back. `ensureVault` creates from a gateless draft
-alone (`gate_epoch` 0, no way in), and hands back the listing beside the props (line 2.4); a draft
-of another shape, or naming another scope, the base class refuses as `bad_record`.
+**3.1. Vault props are created once.** `ensureVault` stores the vault props only where the scope
+holds none, and returns whichever vault props stand afterwards, with the listing beside them (line
+2.4): the draft's, or, when the vault already exists, the ones standing, exactly as stored and under
+their own `vault_tok` -- another device's, perhaps created in the same moment. Two devices
+creating at once settle on one vault, and get one `vault_tok` back. It takes one argument, a
+gateless draft (`gate_epoch` 0, no way in, `vault_epoch` 0), which names the scope itself; a draft
+of another shape, or claiming a counter, the base class refuses as `bad_record`.
+
+Over a **tombstone** (line 3.5) the scope holds no vault, and the draft starts a new life: stored
+under the draft's own, fresh `vault_tok`, with its `vault_epoch` set to the tombstone's rather than
+0, and the tombstone gone, all in the one atomic step. The counter, which only goes up, so carries
+on past a vault's deletion.
 
 **3.2. An update of the vault props lands only over the props it read.** `putVaultProps`
 writes only while the standing vault props have the expected `vault_tok` and `gate_epoch`, and
-refuses as `stale_write` otherwise, including where no vault props stand: an update never
-creates. The refusal carries what stands as `err.meta.vault_props_stored`, read in the same atomic
+refuses as `stale_write` otherwise, including where no vault props stand, or only a tombstone does:
+an update never creates, and never revives. It resolves the vault props as stored, read in the same
+atomic step as the write, and the store has set their `vault_epoch` to the standing one plus one,
+whatever the writer sent: a counter that moves on every write of the gate, and only there. (No box
+write moves it, so a restored backup that rolls back boxes alone shows no sign of it; the README
+says what a host that restores one does.) The refusal carries what stands as
+`err.meta.vault_props_stored`, read in the same atomic
 step: the winner's vault props, whole, or null for none, so the caller takes them up with no second
 read. The adapter throws `Refusals.staleVaultProps(standing)` with the row exactly as stored, and
 a key-value store asks `Expectations.vaultPropsRefusalOf`; the base class checks what stands as
-`getVaultProps` checks a record, so vault props standing that fail that check refuse as a read of
+`getVault` checks a record, so vault props standing that fail that check refuse as a read of
 them does (`damaged_vault`, `newer_format`), and a stale write that names nothing standing is the
-adapter's bug, `corrupt_record`. A vault's first gate is such an update: written over its
+adapter's bug, `corrupt_record`. A landed write's answer is held to the same: vault props of the
+scope, the same `vault_tok` at the `gate_epoch` written, else `corrupt_record`, saying the write
+may have landed. A vault's first gate is such an update: written over its
 gateless props at `gate_epoch` 1, expecting 0, so of two devices setting it at once one lands and
 the other hears whose won. A server-side adapter, which a client of another version's may reach, also enforces what
 every update carries: it lands only vault props that keep the standing `vault_tok` and move
@@ -278,18 +295,29 @@ in any other shape as `corrupt_record`, saying the deletion may have landed. *Th
 core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
 plant a damaged record; the battery, through public verbs that do neither, cannot.
 
-**3.5. A vault is deleted whole, and alone.** `delVault` removes the vault props and every
-box of its scope, and nothing of any other scope, while the standing vault props have the
-expected `vault_tok`; otherwise it refuses as `stale_write` and removes nothing, so a vault made anew
-survives a device that missed its predecessor's end.
+**3.5. A vault is deleted whole, and alone, and leaves a tombstone.** `delVault` removes the vault
+props and every box of its scope, and nothing of any other scope, while the standing vault props have
+the expected `vault_tok` **and** `gate_epoch`; otherwise it refuses as `stale_write` and removes
+nothing, so a vault made anew survives a device that missed its predecessor's end, and a delete
+proven against a gate another device has since changed -- an old passphrase in a stale tab -- does
+not delete the vault. In the same atomic step it leaves a **tombstone** in the scope, the vault's
+place, and resolves it: the scope and a `vault_epoch` one past the vault's (format
+`safebyok-tombstone-v1`). The tombstone holds no `vault_tok`, so it meets no expectation: every
+write over it refuses as over no vault (`stale_write` for the vault props and the vault, `vault_mismatch`
+for a box), a second `delVault` of the vault already deleted included, and `getVault` reads it as
+no vault. Only `ensureVault` (line 3.1) replaces it, with a new life that carries its counter on. A
+key-value adapter keeps it in the row the vault props were in, so a scope holds one or the other;
+a typed one in a table of its own, moved in the same step. `Expectations.tombstoneOf` and
+`Expectations.newLifeOf` make the records.
 
-It compares the `vault_tok` and nothing else, so a vault whose props are damaged in any other field
-is still deleted, and vault props rewritten under the same `vault_tok` between a read and the
-deletion are deleted with them: it is the same vault. A typed backend (Convex, Postgres) cannot
+It compares the `vault_tok` and the `gate_epoch` and nothing else, so a vault whose props are
+damaged in any other field is still deleted, and vault props rewritten under the same `vault_tok`
+and gate between a read and the deletion are deleted with them: it is the same vault. A typed backend (Convex, Postgres) cannot
 hold damaged vault props, so there the hatch below has nothing to do: the vault's
 `delDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
-the vault props through `doGetVaultProps` as stored, takes their `vault_tok`, and aims this
-deletion at it. An adapter that hands each call on to another VaultDB's public verbs hands
+the vault through `doGetVault` as stored, takes the props' `vault_tok`, and aims this
+deletion at it with a `gate_epoch` of null: the props fail their checks and show none to name, so it
+expects the `vault_tok` alone, and counts a counter it cannot read from zero. An adapter that hands each call on to another VaultDB's public verbs hands
 `delDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
 battery cannot plant, and by the battery for a sound vault, which it refuses to delete.
 
@@ -355,7 +383,7 @@ the start of the write's statement, say, or its commit.
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`, or `null` from a box deletion, the base
+`VaultError`: `stale_write` (by resolving `null` from a deletion of a box or a vault, the base
 class refusing with it; a box write throws `Refusals.staleBox(standing)`, and an update of the
 vault props `Refusals.staleVaultProps(standing)`), `vault_mismatch`
 (a box write, `Refusals.vaultMismatch()`), `vault_full`,
@@ -366,13 +394,13 @@ class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_l
 
 A record that fails its checks is named for who is at fault. One the caller hands in is
 `bad_record` (a box handed to `putBox`, `invalid_box`). One read from storage is damaged:
-`damaged_vault` for vault props (from `getVault`, `ensureVault`, `getVaultProps`, `ensureVaultProps`,
+`damaged_vault` for vault props (from `getVault` and `ensureVault`,
 and a stale `putVaultProps`'s `meta.vault_props_stored`), `damaged_box` for a
 box (from `getBox`; a listing shows it as a `DamagedBox` instead, and a stale write's
 `meta.box_stored` likewise), Zod's own error its `cause` where a check failed. An answer the
 adapter owes in the protocol's shape that comes in another -- a box write's echo that fails a
 box's checks or holds another boxlabel or revision, a `Refusals.staleBox`, `Refusals.staleVaultProps`
-or `Refusals.vaultFull` missing what it must carry, a deletion's report or a capacity in another shape -- is
+or `Refusals.vaultFull` missing what it must carry, a deletion's report, a tombstone or the vault props an update stored, or a capacity, in another shape -- is
 `corrupt_record`: the adapter's bug, and the one thing that kind means. An adapter does not
 refuse a damaged record itself (line 1.3): it hands it up, and the base class names it. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
@@ -464,8 +492,7 @@ Lines 2.4, 3.1 to 3.5, 3.7 and 4.5 are promises about writes made at once, and a
 writes at once through one adapter, over a backend that runs one call at a time, proves only how
 they came out, not that they raced. So `describeVaultDB` races them.
 
-**What the battery runs, for every adapter.** Each race -- two creates of one vault (by
-`ensureVault` and by `ensureVaultProps`), a read of a vault against its deletion and remaking, two
+**What the battery runs, for every adapter.** Each race -- two creates of one vault, a read of a vault against its deletion and remaking, two
 updates of one vault, two first gates of a gateless one, two first writes or two replacements of one box, one first write sent twice, a deletion against a write, two
 writes that do not collide, four writers for a vault's last place -- runs under every schedule
 `raceEveryWay` makes, each over a fresh backend, and its outcome is checked after each: the two

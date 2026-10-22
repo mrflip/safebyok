@@ -7,6 +7,22 @@ What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your 
 **Potential Optimizations**: a user-facing rough edge the core leaves alone for now, to keep its
 control flow simple (STYLE.md, *Control flow and refusals*), with the argument for smoothing it.
 
+## Loud
+
+What every adapter author and reviewer should have in front of them, and not lose in a shelf below.
+
+* **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
+  (the primitives sprint, on keeping both the checked `getVault` / `ensureVault` and the relaying
+  `getVaultRecords` / `ensureVaultRecords` pairs): "the vaultdb closest to the database should
+  handle validation and consistency checks. I don't mind if graphql does checks as well. But
+  every vaultDB relies on the consistency guarantees of its backing store -- in the case that
+  you're a facade on another vaultDB this is particularly easy." Today the base class checks every
+  record each verb hands up, whichever layer it is: a facade (`safebyok-graphql`'s client, the
+  Postgres route recipe's, the demo's outage adapter) re-checks what its inner VaultDB already
+  checked, and the records pair relays it unchecked to be checked again in the browser. Settle
+  where the one check lives (the adapter next to the storage, with the others trusting it), and
+  strip the rest, once the stores' verbs have settled.
+
 ## Sand in the sandals
 
 Small irritants, each a few lines, picked up by whoever is nearby.

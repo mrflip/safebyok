@@ -39,8 +39,7 @@ import { SafebyokComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
 export const {
-  getVault, ensureVault, getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
-  putBox, getCapacity, delBox, delVault, watchVault,
+  getVault, ensureVault, putVaultProps, getBox, putBox, getCapacity, delBox, delVault, watchVault,
 } = new SafebyokComponent(components.safebyok).api({
   getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
 })
@@ -223,17 +222,14 @@ the core's own records, scopes and expectations.
 
 | Function                  | Kind     | Arguments                                                                   | Resolves                                                                                   |
 | ------------------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `getVault`                | query    | `{ scope }`                                                                 | `{ vaultProps, boxes }`, read in one query, each box as `listBoxSummaries` has it; or null |
+| `getVault`                | query    | `{ scope }`                                                                 | `{ vaultProps, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order; or null |
 | `ensureVault`             | mutation | `{ draft }`, gateless vault props                                           | `{ vaultProps, boxes }` standing afterwards: the draft, or another device's, with its boxes |
-| `getVaultProps`           | query    | `{ scope }`                                                                 | the `VaultProps`, or null                                                                  |
-| `ensureVaultProps` | mutation | `{ vaultProps }`                                                            | the vault props standing afterwards: these, or another device's already standing           |
-| `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true }` if written; else `{ landed: false, vault_props_stored }`, the vault props standing or null |
+| `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true, vault_props_stored }`, the vault props as stored (their `vault_epoch` one up) if written; else `{ landed: false, vault_props_stored }`, the vault props standing or null |
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `BoxRecord`, or null                                                               |
-| `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
 | `putBox`               | mutation | `{ scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ scope }`                                                                 | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
 | `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_tok, revision_tok } }`                | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
-| `delVault`             | mutation | `{ scope, expected: { vault_tok } }`                                        | `true` if deleted, `false` if not                                                          |
+| `delVault`             | mutation | `{ scope, expected: { vault_tok, gate_epoch } }`                            | the tombstone left (`{ format, ...scope, vault_epoch }`) if deleted, null if not          |
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_tok, gate_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
 `scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no box there; in a

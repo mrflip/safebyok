@@ -41,6 +41,45 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a deleted vault leaves a tombstone, and `vault_epoch`
+  is the record of a life.** The vault props carry `vault_epoch`, a counter the store, never the writer, moves up
+  by one on every write of the gate (`putVaultProps`) and on `delVault`; no box write moves it. `delVault` leaves
+  `{ format 'safebyok-tombstone-v1', scope, vault_epoch }` in the vault's place (a row in the vault props' row for
+  key-value adapters, a table of its own in Postgres and Convex), and the next `ensureVault` of the scope starts a
+  new life with the counter carried on, so it never goes down across a deletion. The tombstone holds no
+  `vault_tok`, so no expectation can name it: `putVaultProps`, `putBox`, `delBox` and a second `delVault` over
+  it all refuse as over no vault, which is how a stale writer is kept from reviving a deleted vault.
+  `getVault` reads a tombstone as no vault (`Expectations.isTombstone`, `Expectations.tombstoneOf`,
+  `packages/safebyok/src/expectations.ts`; VAULTDB.md 3.1, 3.2, 3.5).
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **`delVault` expects `{ vault_tok, gate_epoch }`,
+  and `delDamagedVault` expects the `vault_tok` alone.** A delete proven against a gate another device has since
+  changed (an old passphrase in a stale tab) refuses as stale and cannot delete the vault. The one path with no
+  gate to name, `delDamagedVault` over props that fail validation, passes `gate_epoch: null` and counts a
+  `vault_epoch` it cannot read from zero, so a damaged vault's tombstone can carry a counter lower than devices
+  have seen. Left as an open matter for the Coach.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a restored backup is not noticed by every device,
+  and the host must wipe what it restores.** `vault_epoch` moves only on writes to the gate and on deletion, so a
+  restore that rolls back boxes alone under the same gate is seen by no device (the toldjaso entry 1, already
+  ruled "left for the audit"). The README ("A deleted vault's tombstone, and restoring a backup") tells a server
+  that restores a backup to wipe the restored vaults (props, boxes, tombstones) rather than serve them, because a
+  restored vault shows an older counter than devices have seen and a vault deleted since the backup comes back.
+  It also tells a host deleting a user's data to sign the user out first and remove tombstones with the rows,
+  since rows removed straight from the tables leave no tombstone and no counter to carry on. Nothing in the
+  package enforces either.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **the first unlock is two writes, so a gateless
+  vault can stand in storage.** `ensureVault` stores a vault gateless (no wrapped vaultKey, no way in), and the
+  first gate is then written over it by `putVaultProps` expecting `gate_epoch` 0. Between the two writes, or for
+  good if the second never lands, the gateless props stand; `getVault` reads them as no vault yet, and the next
+  first unlock sets its passphrase over them. The wayin is sealed before the first write, so a failing key
+  deriver creates nothing. Gateless props carry no secret.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **`idbDeviceDB.getLease` is ordered against
+  `putLease` and `delLease`, and discards an unreadable row only in a transaction that re-checks it.** One
+  scope's DeviceDB calls land in the order they were made (stated in the `DeviceDB` interface, checked by
+  `describeDeviceDB`). `getLease` asks for its read before it sweeps stray rows, and deletes a row it found
+  unreadable only inside one readwrite transaction that re-checks the row is still unreadable, so a lock's
+  `delLease` or a newer `putLease` made after the read is never undone by that read's late discard (an undone lock
+  would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
+
 * 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
   travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
   Before, a `stale_write` put the winning vault props (both wayins' salts and wrapped vaultKeys: offline-guessing
@@ -767,7 +806,7 @@ added or folded into through the subagent, and no other entry changes.
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
   box listed as damaged with no readable revision); `delVault` and `delDamagedVault`
-  keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
+  keep the vault-only expectation (amended 2026-10-22, store_verbs: `delVault` now expects `vault_tok` and `gate_epoch`; `delDamagedVault` the `vault_tok` alone). The arbitration is unchanged: the adapter compares only
   `vault_id` and removes whatever box stands under the boxlabel, in one atomic step, so a
   deletion within the right vault still wins over any write; the revision never refuses. It only
   lets the adapter answer `deleted` (the revision named; for null, a record holding none that
@@ -1244,7 +1283,7 @@ added or folded into through the subagent, and no other entry changes.
   `vault_mismatch`, see the 2026-10-19 (returning) entry), writes nothing, and `putBox()` /
   `putWayin()` / `delBox()` / `del()`
   surface it on the first failure, with no retry. Deletions (`delBox`, `delVault`) carry a
-  `vault_id`-only expectation (the Coach's ruling): they land only while the scope's standing
+  `vault_id`-only expectation (amended 2026-10-22, store_verbs: `delVault` also expects the `gate_epoch`; the Coach's ruling for `delBox`): they land only while the scope's standing
   vault props have that `vault_id`, refuse where no vault props stand, and expect no revision, so within
   its vault a deletion wins over a concurrent update; deleting an absent box is quiet. The
   atomicity of check-and-write is each adapter's: `localVaultDB` checks and saves in one
@@ -1487,7 +1526,7 @@ added or folded into through the subagent, and no other entry changes.
   stored before reads as absent, and its rows, ciphertext only, stay in storage. An old lease (a leaseKey and the vaultKey wrapped under it) would otherwise linger in IndexedDB
   beyond the reach of `lock()` and of any expiry, so `idbDeviceDB` sweeps it: `getLease` and
   `delLease` list the device shelf's ckeys and delete, unread, every one that is not a lease
-  tuple (`Ckeys.isLease`). An open that finds the vault does it, and so does every lock; under
+  tuple (`Ckeys.isLease`). (Amended 2026-10-22, store_verbs: `getLease` now reads before it sweeps, and discards an unreadable row only in a re-checking transaction; see the entry at the top.) An open that finds the vault does it, and so does every lock; under
   `idbVaultDB` or `localVaultDB`, whose first open after an upgrade finds no vault (so reads no
   lease), the old row waits for the first lock or the next open after an unlock. A test proves
   no old value is fetched. `delAll()` clears the whole shelf. `memoryDeviceDB` keeps nothing past the

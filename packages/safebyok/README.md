@@ -298,8 +298,11 @@ validators of the host's, which are the vault's own. So an adapter that hands it
 another VaultDB's public verbs passes each call through as it came.
 
 A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keeps its records as
-it is handed them: `putLease` and `putMark` each replace what the scope held, and `delMark`
-forgets the scope's mark (`del()` calls it). Each verb resolves an `Outcome`, as a VaultDB's do:
+it is handed them: `putLease` and `putMark` each replace what the scope held, `putLease` resolving
+the record as stored, and `delMark` forgets the scope's mark (`del()` calls it). One scope's calls
+take effect in the order they were made, awaited or not (a `putLease` then a `delLease` leaves no
+lease: the lock that erases a lease must beat the grant that wrote it); `describeDeviceDB` checks
+it. Each verb resolves an `Outcome`, as a VaultDB's do:
 `{ ok: true, val }`, the record or null for a read, or `{ ok: false, err }` holding a
 `VaultError`, and never rejects. Answer each through `deviceOutcomeOf`, which says what your
 store throws as the vault's conditions: a browser's refusal that holds until something outside
@@ -309,7 +312,7 @@ which a host shows without offering a retry, and anything else as `storage_unava
 ```ts
 const deviceDB: DeviceDB = {
   getLease: (scope) => deviceOutcomeOf('getLease', () => myStore.read(leaseCkeyOf(scope))),
-  putLease: (record) => deviceOutcomeOf('putLease', () => myStore.write(leaseCkeyOf(record), record)),
+  putLease: (record) => deviceOutcomeOf('putLease', () => { myStore.write(leaseCkeyOf(record), record); return record }),
   // ...and the rest of the seven verbs alike
 }
 ```
@@ -318,7 +321,7 @@ const deviceDB: DeviceDB = {
 adapter over a store the browser withholds, and it checks each verb answers `storage_blocked`.
 
 Every refresh -- after each of the vault's own writes, and at each change your adapter's
-`subscribe` reports -- lists every box in the vault, one at a time per handle, so its cost
+`subscribe` reports -- reads the vault with every box in it (`getVault`), one at a time per handle, so its cost
 grows with the vault. That is the trade for a listing every adapter can give; measure before
 doing better.
 
@@ -870,7 +873,7 @@ const vault = Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `damaged_vault`       | the vault's props, read from storage, failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVaultProps` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
+| `damaged_vault`       | the vault's props, read from storage, failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVault` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passphrase, or the passkey. The other is still tried | A damaged passkey: unlock with the passphrase, and add the passkey again. A damaged passphrase: unlock with the passkey, if there is one, to read what the vault holds; it cannot be changed, so the vault is then removed and made again |
 | `damaged_box`     | a box failed its checks as read from storage (a `VaultDB`'s `getBox` refuses it so too), or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, moved there from elsewhere, or written by a vault deleted and made anew on another device since this one read it. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing | Nothing was changed. Read the vault again, `hello({ staleMinutes: 0 })`: a vault made anew elsewhere relocks this device. A box still damaged: offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `newer_format`        | the vault's stored props are in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
@@ -945,6 +948,30 @@ another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, lin
 deletion aims at the stored `vault_tok` alone, so vault props rewritten under that same
 `vault_tok` between its read and the deletion go too: it is the same vault, the one the user
 asked to delete.
+
+### A deleted vault's tombstone, and restoring a backup
+
+A vault carries a counter, its `vault_epoch`, which its storage moves up on every write of its gate
+(the passphrase and passkey ways in) and on its deletion; a box write never moves it. Deleting a
+vault leaves a **tombstone** in the scope, holding that counter plus one, and the next vault made
+there carries the counter on: it never goes back, so a device that has seen a vault at some
+`vault_epoch` can tell a copy older than that from the vault it knows. A tombstone is no vault:
+`hello()` reads a scope that holds one as a vault not yet made, and every write over it refuses as
+stale.
+
+Two things this asks of a host that handles its storage itself:
+
+* **A server that restores a backup must wipe the restored vaults** (their props, their boxes and
+  their tombstones) rather than serve them: a backup holds the counters of its day, so a restored
+  vault shows a `vault_epoch` older than the one devices have seen, a vault deleted since comes
+  back to life, and a backup taken between the writes of a deletion can hold both a vault and its
+  boxes' successors. Each user then makes their vault anew, and the devices that held the old one
+  forget it (*A vault rolled back*, below, for a device that must accept an older copy).
+  A restore that rolls back boxes alone, under a gate that did not change, shows no sign of it
+  to any device: the counter does not move with a box write.
+* **A host deleting a user's data signs the user out first**, then removes their rows, tombstones
+  included, and their devices with them: rows removed straight from the tables leave no tombstone
+  and no counter to carry on.
 
 ### A vault rolled back
 
@@ -1025,7 +1052,7 @@ refuses it with `damaged_box`, writing nothing: the user deletes it with `delBox
 stores again.
 A record that reads but will not decipher -- its ciphertext, sidecar or times altered -- is written
 over its revision, and carries nothing forward either: nothing vouches for its visible fields, so
-its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each box as a
+its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doGetVault` hands up each box as a
 `StoredBox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
 

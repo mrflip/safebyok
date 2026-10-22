@@ -34,7 +34,7 @@ export const VaultDBContract = Object.freeze({
   '3.2': 'An update of the vault props lands only over the props it read',
   '3.3': 'A box write lands only over the box it read, in the vault it was sealed for',
   '3.4': 'A deletion wins, within its vault, and says what it removed',
-  '3.5': 'A vault is deleted whole, and alone',
+  '3.5': 'A vault is deleted whole, and alone, and leaves a tombstone',
   '3.6': 'A refused write wrote nothing',
   '3.7': 'Writes that do not collide all land',
   '4.1': 'An adapter declares the most boxes it holds in one vault',

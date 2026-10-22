@@ -34,8 +34,14 @@ No vault stored before is read (each reads as damaged, its boxes with it), so dr
 the boxes too, or the new vaults table would stand without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
 
+**Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault props
+hold a `vault_epoch` now (the counter a gate write and a deletion move), and a deleted vault leaves
+a row in the new table `safebyok_vault_tombstones`. No vault stored before is read (each reads as
+damaged, its boxes with it, and `VaultTablesSql` never adds a column to a table already there), so
+drop the tables and run `VaultTablesSql` again; each user then makes their vault anew.
+
 ```sql
-DROP TABLE safebyok_boxes, safebyok_vaults;
+DROP TABLE safebyok_boxes, safebyok_vault_tombstones, safebyok_vaults;
 ```
 
 ```ts
@@ -140,12 +146,9 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 // VaultDB validates.
 const served = new Map<string, Served>([
   ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
-  ['ensureVault',  (vaultDB, [scope, draft]) => vaultDB.ensureVaultRecords(scope as VaultScope, draft as GatelessVaultProps)],
-  ['getVaultProps',   (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
-  ['ensureVaultProps', (vaultDB, [vaultProps]) => vaultDB.ensureVaultProps(vaultProps as VaultProps)],
+  ['ensureVault',  (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
-  ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
@@ -180,10 +183,12 @@ export async function POST(request: Request): Promise<Response> {
 ```
 
 `signedInUserId` is your own: the user id from the request's verified session cookie, or null.
-A listing goes through `listBoxRecords`, not `listBoxes`, and a vault read through
-`getVaultRecords` and `ensureVaultRecords`, not `getVault` and `ensureVault`: those hand back
-summaries, the shape a vault shows, and a VaultDB in the browser must hand back records as stored.
-Each is one statement on the server, so the browser's read of a vault is one request.
+A vault is read through `getVaultRecords` and `ensureVaultRecords`, not `getVault` and
+`ensureVault`: those hand back summaries, the shape a vault shows, and a VaultDB in the browser
+must hand back records as stored. Each is one statement on the server, so the browser's read of a
+vault, its listing included, is one request. An update of the vault props answers the props as
+stored, and a deletion of the vault the tombstone it left: both go to the browser as the route's
+`result`.
 
 The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
@@ -203,28 +208,13 @@ export class RouteVaultDB extends VaultDB {
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
-  protected async doEnsureVault(draft: GatelessVaultProps) {
-    const { applabel, user_id, vaultlabel } = draft
-    return storedVaultOf(await this.call('ensureVault', { applabel, user_id, vaultlabel }, draft))
-  }
-  protected doGetVaultProps(scope: VaultScope) { return this.call('getVaultProps', scope) }
-  protected doEnsureVaultProps(vaultProps: VaultProps) { return this.call('ensureVaultProps', vaultProps) }
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
-    await this.call('putVaultProps', vaultProps, expected)
-    return true
-  }
+  protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string) { return this.call('getBox', scope, boxlabel) }
-  protected async doListBoxes(scope: VaultScope) {
-    const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
-    return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
-  }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
-  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
-    await this.call('delVault', scope, expected)
-    return true
-  }
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
   // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
   // with how full it is), so a write that answers landed:
@@ -321,7 +311,7 @@ await pool.query(VaultNotifySql)    // once, as a migration: safe to run again
 Its trigger sends a notification on the channel `VaultChangeChannel` (`safebyok_vault_changes`)
 after every write that changes a vault, its payload the vault's scope as JSON: no record, nothing
 ciphered. **Why a trigger**: Postgres tells another connection of a write only by `NOTIFY`, and a
-trigger sends one from inside every write to the two tables, whatever made it -- any of your
+trigger sends one from inside every write to the vault and box tables, whatever made it -- any of your
 servers, another version of this adapter, your own SQL, a deleted vault's cascade -- and Postgres
 delivers it only once that write commits. It is the one trigger this package ships; the hard cap
 above is one you would write and own. A `listen` without the trigger hears nothing, by design,
@@ -384,6 +374,7 @@ its error as the cause, nothing written.
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
+| `safebyok_vault_tombstones` | deleted vault | `applabel`, `user_id`, `vaultlabel`   | `format` and `vault_epoch`: what a deleted vault leaves, until the scope gets a new vault |
 | `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_tok`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
