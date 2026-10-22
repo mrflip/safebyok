@@ -71,12 +71,12 @@ Every worker, beyond CLAUDE.md:
 7. **The Contract** is the *Contract* tab of the design doc
    (https://claude.ai/code/artifact/8ac26722-33ee-4082-a76f-f4c9b6722b70). Only thread 10 edits
    it; earlier threads list in their thread file the Contract lines their change makes untrue.
+8. **Size budgets**: no measure was taken while planning (it needs a build). Each thread runs
+   `pnpm size:budget` after its `pnpm justify` and follows PROCESS.md's rule.
 9. **Pull anticipated changes forward.** The Coach (2026-10-22): "Expect a lot of moving
    anticipated changes forward in this sprint." A thread that needs a later thread's change to
    stay simple may make it, declaring it in its PR; the orchestrator strikes it from the later
    thread.
-8. **Size budgets**: no measure was taken while planning (it needs a build). Each thread runs
-   `pnpm size:budget` after its `pnpm justify` and follows PROCESS.md's rule.
 
 ## Threads
 
