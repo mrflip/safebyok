@@ -13,7 +13,19 @@ const u1BoxCkey = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
 describe("localVaultDB", () => {
   it("resolves a vault never made as a good outcome holding null, as its first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    expect(await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+    expect(await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+  })
+
+  it("stores a gateless vault as its JSON, and reads it back beside its boxes in one step", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    await TH.expectingGood(vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1'))
+    expect(store.read(u1VaultPropsCkey)).to.eq(JSON.stringify(TH.gatelessOf('u1')))
+    await TH.expectingGood(vaultDB).putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
+    expect(read?.vaultProps).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
   })
 
   it("holds a mebibyte in one record, and sets no limit on a vault, in bytes or in boxes, or on a name", () => {

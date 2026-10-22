@@ -260,26 +260,60 @@ export type PasskeyAnswer = {
   prfBytes:     Uint8Array
 }
 
-/** The one record per vault that every device syncs: its scope, its `vault_tok`, and its wayins, each wrapping the one vaultKey.
- * None of it opens without a proof. `gate_epoch` goes up by one on every change of wayins, so
- * other devices and leases know to ask again.
- */
-export const VaultProps = Z.object({
+/** The fields every vault props record opens with, gated or gateless: its format, its scope and its `vault_tok`. */
+const VaultPropsHead = {
   format:              Z.literal('safebyok-vault-v6'),
   applabel:            NameFloor,
   user_id:             NameFloor,
   vaultlabel:          NameFloor,
   /** A random token minted when the vault is made, never changed, and bound into every encryption. */
   vault_tok:           Z.string().check(Z.minLength(1)),
+}
+
+/** The vault props of a vault whose gate is made: a `gate_epoch` of 1 or more, its passphrase wayin, and its passkey or null.
+ * `gate_epoch` goes up by one on every change of wayins, so other devices and leases know to ask
+ * again.
+ */
+export const GatedVaultProps = Z.object({
+  ...VaultPropsHead,
   gate_epoch:          Z.int().check(Z.positive()),
-  /** The vault's passphrase wayin, which every vault has. */
+  /** The vault's passphrase wayin, which every gated vault has. */
   passphrase:          PassphraseWayinRecord,
   /** The vault's passkey, or null when it has none: at most one. */
   passkey:             Z.nullable(PasskeyWayinRecord),
   /** When the vault was made; never changed. */
   registered_at:       EpochMillis,
 })
+export type GatedVaultProps = Z.infer<typeof GatedVaultProps>
+
+/** The vault props of a vault made with no gate yet: `gate_epoch` 0, and no way in.
+ * A vault is first stored so, by `VaultDB.ensureVault`. Its first gate is written over it at
+ * `gate_epoch` 1, expecting 0.
+ *
+ * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, gate_epoch: 0, passphrase: null, passkey: null }
+ */
+export const GatelessVaultProps = Z.object({
+  ...VaultPropsHead,
+  gate_epoch:          Z.literal(0),
+  passphrase:          Z.null(),
+  passkey:             Z.null(),
+  registered_at:       EpochMillis,
+})
+export type GatelessVaultProps = Z.infer<typeof GatelessVaultProps>
+
+/** The one record per vault that every device syncs: its scope, its `vault_tok`, and its wayins, each wrapping the one vaultKey.
+ * None of it opens without a proof. It is {@link GatedVaultProps} once the vault has a gate, and
+ * {@link GatelessVaultProps} before. Vault props at a `gate_epoch` of 1 or more with no
+ * passphrase are neither, and refused.
+ */
+export const VaultProps = Z.union([GatedVaultProps, GatelessVaultProps])
 export type VaultProps = Z.infer<typeof VaultProps>
+
+/** True for vault props whose gate is made: {@link GatedVaultProps}, as opposed to gateless ones.
+ *
+ * @example if (isGated(vaultProps)) { offerUnlock(vaultProps.passphrase) } else { offerNewPassphrase() }
+ */
+export const isGated = (vaultProps: VaultProps): vaultProps is GatedVaultProps => vaultProps.gate_epoch > 0
 
 /** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in

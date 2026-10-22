@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { Capacity, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
+import { Capacity, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import { InEnglish } from './options'
 import * as Names from './names'
@@ -10,18 +10,19 @@ import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
 import { type Outcome, isOutcomeShaped, outcomeOf, unexpectedError } from './outcome'
 
-// == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox
+// == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, ListedVault, VaultRecords
 
 /** What an update of the vault props was proven against: the vault, and the `gate_epoch` the writer read.
- * The update lands only while the standing vault props still have both.
+ * The update lands only while the standing vault props still have both. A `gate_epoch` of 0 is
+ * gateless vault props, which the vault's first gate is written over.
  *
  * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
  */
 export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
 
 const VaultPropsExpectation = Z.object({
-  vault_tok:        VaultProps.shape.vault_tok,
-  gate_epoch:       VaultProps.shape.gate_epoch,
+  vault_tok:        GatedVaultProps.shape.vault_tok,
+  gate_epoch:       Z.int().check(Z.nonnegative()),
 })
 
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
@@ -34,7 +35,7 @@ const VaultPropsExpectation = Z.object({
 export type BoxExpectation = Z.infer<typeof BoxExpectation>
 
 const BoxExpectation = Z.object({
-  vault_tok:    VaultProps.shape.vault_tok,
+  vault_tok:    GatedVaultProps.shape.vault_tok,
   revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
@@ -45,7 +46,7 @@ const BoxExpectation = Z.object({
 export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
 
 const VaultDelExpectation = Z.object({
-  vault_tok: VaultProps.shape.vault_tok,
+  vault_tok: GatedVaultProps.shape.vault_tok,
 })
 
 /** What a box deletion was aimed at: the vault, and the `revision_tok` the deleter read.
@@ -59,7 +60,7 @@ const VaultDelExpectation = Z.object({
 export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
 
 const BoxDelExpectation = Z.object({
-  vault_tok:    VaultProps.shape.vault_tok,
+  vault_tok:    GatedVaultProps.shape.vault_tok,
   revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
@@ -85,6 +86,25 @@ const BoxDeletion = Z.object({
  * @example { boxlabel: 'anthropic', box: storedRecord }
  */
 export type StoredBox = { boxlabel: string, box: unknown }
+
+/** One vault as a VaultDB's `doGetVault` and `doEnsureVault` hand it up: its vault props and its boxes, exactly as stored, from one atomic step.
+ * `vaultProps` is null when none stand. The base class checks both.
+ *
+ * @example { vaultProps: storedRow ?? null, boxes: [{ boxlabel: 'anthropic', box: storedBox }] }
+ */
+export type StoredVault = { vaultProps: unknown, boxes: StoredBox[] }
+
+/** One vault as {@link VaultDB.getVault} and {@link VaultDB.ensureVault} hand it back: its vault props, and its box listing as {@link VaultDB.listBoxes} makes it, read together.
+ *
+ * @example { vaultProps, boxes: [{ boxlabel: 'anthropic', revision_tok: 'r7...', sidecar: {}, registered_at, written_at, damaged: false }] }
+ */
+export type ListedVault = { vaultProps: VaultProps, boxes: (ListedSummary | DamagedBox)[] }
+
+/** One vault as {@link VaultDB.getVaultRecords} hands it on to a browser's VaultDB: its vault props checked, its boxes as stored but for their two ciphered fields.
+ *
+ * @example { vaultProps, boxes: [listedRecord] }
+ */
+export type VaultRecords = { vaultProps: VaultProps, boxes: unknown[] }
 // --
 
 // == [Options]: VaultDBOpts
@@ -131,7 +151,8 @@ export type VaultDBOpts = {
  *
  * Hand `super()` the host's {@link VaultDBOpts}. Never override the public verbs, but
  * `listBoxRecords` where your backend lists more cheaply, and `delDamagedVault` in an adapter
- * that hands each call on to another VaultDB.
+ * that hands each call on to another VaultDB. A server hands a browser's VaultDB what
+ * `getVaultRecords`, `ensureVaultRecords` and `listBoxRecords` resolve.
  *
  * For every public verb:
  *
@@ -222,9 +243,76 @@ export abstract class VaultDB {
 
   // --
 
-  // == [Vault props verbs]: getVaultProps, ensureVaultProps, putVaultProps
+  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, readVault, ensuredVault
 
   // ------------------------------------------------------------------- the verbs safebyok calls
+
+  /** The scope's vault props and box listing, read in one atomic step, or null when no vault props stand.
+   * The listing is the one {@link VaultDB.listBoxes} makes, of the vault the props name, and no
+   * write lands between the two reads, so the two agree as they are handed back. Nothing compares
+   * them, here or in the vault. Vault props it cannot use refuse as {@link VaultDB.getVaultProps}
+   * refuses them.
+   *
+   * @example
+   *   const { ok, val, err } = await vaultDB.getVault(scope)
+   *   if (ok && val === null) { offerNewVault() }
+   */
+  getVault(scope: VaultScope): Promise<Outcome<ListedVault | null>> {
+    return answering(() => this.#readVault(scope, listingOf))
+  }
+
+  /** The scope's vault, as {@link VaultDB.getVault} reads it, created first from `draft` when no vault props stand.
+   * The look, the create and the read are one atomic step, so two devices ensuring one new scope
+   * settle on one vault, and both get it back. Compare its `vault_tok` with the draft's to tell
+   * whether this call made it. Vault props already standing come back untouched, gated or not.
+   *
+   * Refuses 'bad_record', before storage sees it, for a draft that is not
+   * {@link GatelessVaultProps} (`gate_epoch` 0, no way in), or that names another scope than `scope`.
+   *
+   * @example
+   *   const { ok, val } = await vaultDB.ensureVault(scope, draft)
+   *   if (ok && val.vaultProps.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
+   */
+  ensureVault(scope: VaultScope, draft: GatelessVaultProps): Promise<Outcome<ListedVault>> {
+    return answering(() => this.#ensuredVault(scope, draft, listingOf))
+  }
+
+  /** The scope's vault props and every box as stored, read as {@link VaultDB.getVault} reads them: what a server hands a browser's VaultDB.
+   * The vault props are checked as `getVault` checks them. The boxes come as
+   * {@link VaultDB.listBoxRecords} hands them on, for the browser's VaultDB to check.
+   *
+   * @example
+   *   const { ok, val, err } = await vaultDB.getVaultRecords(scope)
+   *   if (! ok) { throw err }
+   *   return val   // what a server sends a browser's VaultDB
+   */
+  getVaultRecords(scope: VaultScope): Promise<Outcome<VaultRecords | null>> {
+    return answering(() => this.#readVault(scope, recordsOf))
+  }
+
+  /** The scope's vault as {@link VaultDB.ensureVault} ensures it, its boxes as {@link VaultDB.getVaultRecords} hands them on: what a server hands a browser's VaultDB. */
+  ensureVaultRecords(scope: VaultScope, draft: GatelessVaultProps): Promise<Outcome<VaultRecords>> {
+    return answering(() => this.#ensuredVault(scope, draft, recordsOf))
+  }
+
+  /** The vault `doGetVault` reads for `scope`, its vault props checked and its boxes as `boxesOf` makes them, or null for none. */
+  async #readVault<BoxesT>(scope: VaultScope, boxesOf: (stored: StoredBox[]) => BoxesT): Promise<{ vaultProps: VaultProps, boxes: BoxesT } | null> {
+    const asked = heldScope(this, scope)
+    const stored = await adapterAnswer('doGetVault', () => this.doGetVault(asked))
+    if (stored.vaultProps === null || stored.vaultProps === undefined) { return null }
+    return { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
+  }
+
+  /** The vault `doEnsureVault` ensures from `draft`, once the draft is checked, as {@link VaultDB.#readVault} hands one back. */
+  async #ensuredVault<BoxesT>(scope: VaultScope, draft: GatelessVaultProps, boxesOf: (stored: StoredBox[]) => BoxesT): Promise<{ vaultProps: VaultProps, boxes: BoxesT }> {
+    const asked = heldScope(this, scope)
+    const outgoing = checkDraft(draft, asked)
+    const stored = await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing))
+    return { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
+  }
+  // --
+
+  // == [Vault props verbs]: getVaultProps, ensureVaultProps, putVaultProps
 
   /** The scope's vault props, validated, or null when the vault has never been created.
    * Stored vault props in a `format` this version does not know refuse as `newer_format`: a newer
@@ -255,20 +343,26 @@ export abstract class VaultDB {
   }
 
   /** Replace the vault props with `vaultProps`, only while the standing ones have the `vault_tok` and `gate_epoch` in `expected`.
-   * Otherwise it refuses `stale_write` and writes nothing, as it does when no vault props stand. A
-   * vault's `vault_tok` never changes, so `vaultProps` must carry the one in `expected`:
-   * 'bad_record' otherwise.
+   * Otherwise it refuses `stale_write` and writes nothing, as it does when no vault props stand.
+   * `err.meta.vault_props_stored` then holds what stands, from the same atomic step, checked as
+   * {@link VaultDB.getVaultProps} checks it, or null for none; vault props standing that fail that
+   * check refuse as a read of them does. A vault's `vault_tok` never changes, so `vaultProps` must
+   * carry the one in `expected`: 'bad_record' otherwise.
+   *
+   * @example
+   *   const { ok, err } = await vaultDB.putVaultProps(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
+   *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_props_stored }   // what won
    */
   putVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<Outcome<void>> {
     return answering(async () => {
       const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
-      heldScope(this, outgoing)
+      const asked = heldScope(this, outgoing)
       const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
       if (outgoing.vault_tok !== expectation.vault_tok) {
         throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_tok must be the expected one, as a vault_tok never changes.")
       }
-      const landed = await adapterAnswer('doPutVaultProps', () => this.doPutVaultProps(outgoing, expectation))
-      if (! landed) { throw Refusals.staleWrite('vaultProps') }
+      const landed = await withStaleVaultPropsChecked(adapterAnswer('doPutVaultProps', () => this.doPutVaultProps(outgoing, expectation)), asked)
+      if (! landed) { throw unsaidVaultProps() }
     })
   }
   // --
@@ -296,11 +390,7 @@ export abstract class VaultDB {
   listBoxes(scope: VaultScope): Promise<Outcome<(ListedSummary | DamagedBox)[]>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const stored = await adapterAnswer('doListBoxes', () => this.doListBoxes(asked))
-      return stored
-        .filter((entry) => isNameable(entry))
-        .map((entry) => listedOrDamaged(entry))
-        .toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+      return listingOf(await adapterAnswer('doListBoxes', () => this.doListBoxes(asked)))
     })
   }
 
@@ -318,10 +408,7 @@ export abstract class VaultDB {
   listBoxRecords(scope: VaultScope): Promise<Outcome<unknown[]>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const stored = await adapterAnswer('doListBoxes', () => this.doListBoxes(asked))
-      return stored
-        .filter((entry) => isNameable(entry))
-        .map(({ box }) => withoutCiphered(box))
+      return recordsOf(await adapterAnswer('doListBoxes', () => this.doListBoxes(asked)))
     })
   }
 
@@ -527,9 +614,21 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [The half you write]: doGetVaultProps, doEnsureVaultProps, doDelVault, doSubscribe, others
+  // == [The half you write]: doGetVault, doEnsureVault, doGetVaultProps, doEnsureVaultProps, doPutVaultProps, doDelVault, doSubscribe, others
 
   // --------------------------------------------------------------------------- the half you write
+
+  /** The scope's vault props and every box of it, exactly as stored, read in one atomic step: one statement, query or transaction.
+   * `vaultProps` is null when none stand. `boxes` are as {@link VaultDB.doListBoxes} hands them up.
+   * No write may land between the two reads: that is the whole of what this owes beyond them.
+   */
+  protected abstract doGetVault(scope: VaultScope): Promise<StoredVault>
+  /** Store `draft` if its scope holds no vault props, then read the vault props standing and every box, all in one atomic step.
+   * The vault props are `draft` itself, or the ones already there, untouched, exactly as stored.
+   * The boxes are as {@link VaultDB.doGetVault} reads them, of the vault props it hands up. Two
+   * devices ensuring one scope at once settle on one vault.
+   */
+  protected abstract doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault>
 
   /** The stored vault props record for `scope`, exactly as saved, or null when there is none. */
   protected abstract doGetVaultProps(scope: VaultScope): Promise<unknown>
@@ -539,7 +638,10 @@ export abstract class VaultDB {
    */
   protected abstract doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown>
   /** Replace the standing vault props with `vaultProps` if, and only if, they have `expected.vault_tok` and `expected.gate_epoch`.
-   * True when written; false, writing nothing, when the expectation failed or no vault props stand.
+   * True when written. Otherwise write nothing, and throw `Refusals.staleVaultProps(standing)` from
+   * the same atomic step, `standing` the vault props exactly as stored, or null for none. A
+   * key-value backend asks `Expectations.vaultPropsRefusalOf`. False, which says nothing of what
+   * stands, refuses as `corrupt_record`.
    */
   protected abstract doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean>
   /** The stored box record under `boxlabel`, exactly as saved, or null when there is none. */
@@ -636,7 +738,22 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
 }
 // --
 
-// == [Listing helpers]: withoutCiphered, ListedBox, isNameable, listedOrDamaged, damagedOf, summaryOf, byCodeUnit
+// == [Listing helpers]: listingOf, recordsOf, withoutCiphered, ListedBox, isNameable, listedOrDamaged, damagedOf, summaryOf, byCodeUnit
+
+/** Stored boxes as a listing shows them: each nameable one's summary or {@link DamagedBox}, sorted by boxlabel. */
+const listingOf = (stored: StoredBox[]): (ListedSummary | DamagedBox)[] => (
+  stored
+    .filter((entry) => isNameable(entry))
+    .map((entry) => listedOrDamaged(entry))
+    .toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+)
+
+/** Stored boxes as a server hands them on: each nameable one's record, its two ciphered fields left out, unchecked and in no particular order. */
+const recordsOf = (stored: StoredBox[]): unknown[] => (
+  stored
+    .filter((entry) => isNameable(entry))
+    .map(({ box }) => withoutCiphered(box))
+)
 
 /** A stored box as {@link VaultDB.listBoxRecords} hands it on: its two ciphered fields left out, anything else as it came. */
 const withoutCiphered = (box: unknown): unknown => {
@@ -709,7 +826,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, remade, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing
+// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, withStaleVaultPropsChecked, unsaidVaultProps, remade, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing, checkDraft
 
 /** `body`'s outcome, as each verb answers: a throw that is no VaultError is the base's own bug, `unexpected_error`.
  * The adapter's throws reach it as VaultErrors already, through {@link adapterAnswer}.
@@ -765,6 +882,25 @@ const fullChecked = (err: VaultError): VaultError => {
   return remade(err, { capacity: capacity.data })
 }
 
+/** What an update of the vault props resolves, or its refusal, its `stale_write`'s `vault_props_stored` checked as a read checks them.
+ * Vault props standing that fail that check refuse as the read does: 'damaged_vault' or
+ * 'newer_format'. A stale write naming nothing standing refuses as `corrupt_record`.
+ */
+const withStaleVaultPropsChecked = async <ValT>(writing: Promise<ValT>, scope: VaultScope): Promise<ValT> => {
+  try {
+    return await writing
+  } catch (err) {
+    if (! isVaultError(err, 'stale_write')) { throw err }
+    const said = err.meta ?? {}
+    if (! ('vault_props_stored' in said)) { throw unsaidVaultProps({ cause: err }) }
+    const standing: unknown = said.vault_props_stored
+    throw remade(err, { vault_props_stored: standing === null || standing === undefined ? null : checkVaultProps(standing, scope) })
+  }
+}
+
+/** An update of the vault props refused without saying what stands: the adapter's bug, `corrupt_record`. */
+const unsaidVaultProps = (opts?: ErrorOptions) => new VaultError('corrupt_record', "Storage refused an update of the vault props, so nothing was written, but did not say what stands. The storage adapter needs a developer's look: its doPutVaultProps throws Refusals.staleVaultProps(standing).", opts)
+
 /** `err` made again with `meta`, its kind, message and cause kept. */
 const remade = (err: VaultError, meta: RefusalMeta): VaultError => (
   new VaultError(err.refusalkind, err.message, err.cause === undefined ? { meta } : { cause: err.cause, meta })
@@ -802,6 +938,15 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
 ))
+
+/** A draft handed to `ensureVault`, once it is gateless vault props of `scope`: 'bad_record' otherwise, quoting none of it. */
+const checkDraft = (draft: unknown, scope: VaultScope): GatelessVaultProps => {
+  const outgoing = checkOutgoing(GatelessVaultProps, draft, 'gateless vault props draft')
+  if (! Names.sameScope(outgoing, scope)) {
+    throw new VaultError('bad_record', "Nothing was written: that draft names another app, user or vault than the scope it came with. ensureVault creates a vault in its own scope: draft its props for that scope.")
+  }
+  return outgoing
+}
 // --
 
 // == [Vault props checks]: checkVaultProps, damagedVaultProps, unnamedVaultProps, newerVaultProps, mayBeNewer, readStoredVaultProps, isSoundVaultProps, others
@@ -833,7 +978,7 @@ const mayBeNewer = (raw: unknown): boolean => {
   // -- a field, a shape, a kind of way in, or a range a check accepts -- bumps `format`.
   if (typeof raw !== 'object' || raw === null) { return false }
   const { format } = raw as { format?: unknown }
-  const knownFormat = VaultProps.shape.format.safeParse(format).success || OlderVaultPropsFormats.has(format)
+  const knownFormat = GatedVaultProps.shape.format.safeParse(format).success || OlderVaultPropsFormats.has(format)
   return format !== undefined && ! knownFormat
 }
 
@@ -859,7 +1004,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 }
 
 /** The one field of stored vault props a deletion needs, as the vault's own check has it. */
-const StoredVaultTok = Z.object({ vault_tok: VaultProps.shape.vault_tok })
+const StoredVaultTok = Z.object({ vault_tok: GatedVaultProps.shape.vault_tok })
 // --
 
 // == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes

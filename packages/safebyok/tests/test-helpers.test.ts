@@ -12,11 +12,11 @@ import { type Outcome, bad, good } from '../src/outcome'
 import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
-import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
-import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts } from '../src/vault-db'
+import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
 
@@ -955,6 +955,10 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     maxVaultBytes:    shared.maxVaultBytes,
     maxBoxes:         shared.maxBoxes,
     maxNameBytes:     shared.maxNameBytes,
+    getVault:           (scope) => permitted(scope, () => shared.getVault(scope)),
+    ensureVault:        (scope, draft) => permitted(scope, () => shared.ensureVault(scope, draft)),
+    getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
+    ensureVaultRecords: (scope, draft) => permitted(scope, () => shared.ensureVaultRecords(scope, draft)),
     getVaultProps:    (scope) => permitted(scope, () => shared.getVaultProps(scope)),
     ensureVaultProps: (vaultProps) => permitted(vaultProps, () => shared.ensureVaultProps(vaultProps)),
     putVaultProps:    (vaultProps, expected) => permitted(vaultProps, () => shared.putVaultProps(vaultProps, expected)),
@@ -1133,6 +1137,8 @@ type RoundTripOpts = VaultDBOpts & {
   countsApart?:     boolean
   /** Lists no more boxes than its limit: a listing cut short. */
   listsToLimit?:    boolean
+  /** Reads a vault's props in one round trip and its boxes in the next, so a write may land between. */
+  readsApart?:      boolean
   /** Writes a new box into a full vault, then refuses it as full all the same: a refusal that leaves its box behind. */
   keepsRefused?:    boolean
   /** Rings only its own subscribers, so no device hears another's writes. */
@@ -1165,6 +1171,28 @@ class RoundTripVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes ?? Infinity
   }
 
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+    if (! this.opts.readsApart) { return await this.backend.atomically((rows) => vaultIn(rows, scope)) }
+    const vaultProps = await this.backend.atomically((rows) => rows.get(Ckeys.vaultProps(scope)) ?? null)
+    return { vaultProps, boxes: await this.backend.atomically((rows) => boxesIn(rows, scope)) }
+  }
+
+  // What it hands back is the vault as the step that checked, or that wrote, left it.
+  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    const ckey = Ckeys.vaultProps(draft)
+    const seen: { vault: StoredVault } = { vault: { vaultProps: null, boxes: [] } }
+    const absent = (rows: Rows) => {
+      seen.vault = vaultIn(rows, draft)
+      return ! rows.has(ckey)
+    }
+    const create = (rows: Rows) => {
+      rows.set(ckey, draft)
+      seen.vault = vaultIn(rows, draft)
+    }
+    await this.step({ check: absent, write: create })
+    return seen.vault
+  }
+
   protected doGetVaultProps(scope: VaultScope) { return this.backend.atomically((rows) => rows.get(Ckeys.vaultProps(scope)) ?? null) }
 
   protected async doEnsureVaultProps(vaultProps: VaultProps) {
@@ -1173,13 +1201,16 @@ class RoundTripVaultDB extends VaultDB {
     return created ? vaultProps : await this.backend.atomically((rows) => rows.get(ckey))
   }
 
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
+  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
     const ckey = Ckeys.vaultProps(vaultProps)
+    // The refusal a miss throws, from the row its check read.
+    const missed: { refusal: VaultError | null } = { refusal: null }
     const meets = (rows: Rows) => {
-      const standing = rows.get(ckey) as VaultProps | undefined
-      return standing?.vault_tok === expected.vault_tok && standing.gate_epoch === expected.gate_epoch
+      missed.refusal = Expectations.vaultPropsRefusalOf(rows.get(ckey), expected)
+      return missed.refusal === null
     }
-    return this.step({ check: meets, write: (rows) => { rows.set(ckey, vaultProps) } })
+    if (await this.step({ check: meets, write: (rows) => { rows.set(ckey, vaultProps) } })) { return true }
+    throw missed.refusal ?? new Error('a write that did not land, with no refusal from its check')
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string) { return this.backend.atomically((rows) => rows.get(Ckeys.box(scope, boxlabel)) ?? null) }
@@ -1271,6 +1302,9 @@ class RoundTripVaultDB extends VaultDB {
 
 const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string }) => (rows.get(Ckeys.vaultProps(scope)) as VaultProps | undefined)?.vault_tok === expected.vault_tok
 
+/** The vault of `scope` in `rows`: its vault props, or null, and its boxes. */
+const vaultIn = (rows: Rows, scope: VaultScope): StoredVault => ({ vaultProps: rows.get(Ckeys.vaultProps(scope)) ?? null, boxes: boxesIn(rows, scope) })
+
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => [...rows]
   .map(([ckey, box]) => ({ boxlabel: Ckeys.isBoxIn(scope)(ckey) ? Ckeys.boxlabelOf(ckey) : null, box }))
   .filter((stored): stored is StoredBox => stored.boxlabel !== null)
@@ -1311,7 +1345,7 @@ TH.describeVaultDB('an honest adapter making round trips through the turnstile',
 TH.describeVaultDB('an honest adapter that counts a vault apart from its write, as a best effort', ...roundTripBattery({ stepping: inOneStep, countsApart: true }))
 
 /** The races a write whose check and write are apart loses, in some interleaving. */
-const SplitLosses = ['rivalCreates', 'rivalVaultPropsUpdates', 'rivalFirstWrites', 'resentFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
+const SplitLosses = ['rivalCreates', 'rivalEnsures', 'rivalVaultPropsUpdates', 'rivalFirstGates', 'rivalFirstWrites', 'resentFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
 
 /** The battery's checks over a check-then-write adapter whose devices share one lock, a fresh one for each call. */
 const lockedChecks = () => checksOver({ stepping: checkThenWriteUnder(sharedLock()), overTheWire: true })
@@ -1385,6 +1419,14 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
     const apart = TH.vaultDBTimingChecks(theOne, { makeDevices: () => overItsOwn })
     await expect(apart.seenAcrossDevices.check()).rejects.toThrow()
     await expect(apart.rivalCreates.check()).rejects.toThrow(/^Under the schedule "made together"/)
+  })
+
+  it("fails a vault read whose props and boxes are two round trips apart, once a remaking lands between them", async () => {
+    await expect(checksOver({ stepping: inOneStep, readsApart: true, overTheWire: true }).readBesideRemake.check()).rejects.toThrow(/a read showed one vault beside another's boxes/)
+  })
+
+  it("passes a vault read in one round trip, whatever lands beside it", async () => {
+    await expectToHold(checksOver({ stepping: inOneStep, overTheWire: true }).readBesideRemake)
   })
 
   it("fails a listing cut short at the limit, once a roomier device has taken the vault past it", async () => {

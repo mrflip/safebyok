@@ -47,8 +47,23 @@ describe("Refusals.staleWrite", () => {
   }
 
   it("says which write was refused", () => {
-    expect(Refusals.staleWrite('vaultProps').message).to.include('this change was refused')
     expect(Refusals.staleWrite('del').message).to.include('this removal was refused')
+  })
+})
+
+describe("Refusals.staleVaultProps", () => {
+  it("refuses an update of the vault props as stale_write, carrying what stands as meta.vault_props_stored, as its example shows", () => {
+    const standing = TH.vaultPropsOf('u1', { gate_epoch: 2 })
+    const refusal = Refusals.staleVaultProps(standing)
+    expect(refusal.refusalkind).to.eq('stale_write')
+    expect(refusal.message).to.eq(Refusals.StaleVaultPropsMessage)
+    expect(refusal.message).to.include('this change was refused')
+    expect(refusal.meta).to.deep.equal({ vault_props_stored: standing })
+    expect(refusal).to.not.have.property('cause')
+  })
+
+  it("carries null for no vault props standing", () => {
+    expect(Refusals.staleVaultProps(null).meta).to.deep.equal({ vault_props_stored: null })
   })
 })
 
@@ -180,7 +195,7 @@ describe("Refusals.isStorageBlocked", () => {
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('vaultProps'), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull({ boxes: { used: 3, max: 3 }, bytes: { used: 0, max: Infinity } }), Refusals.notPermitted(), Refusals.storageBlocked()]
+    const refusals = [Refusals.staleWrite('del'), Refusals.staleVaultProps(null), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull({ boxes: { used: 3, max: 3 }, bytes: { used: 0, max: Infinity } }), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })

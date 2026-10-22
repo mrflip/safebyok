@@ -2,14 +2,14 @@ import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Z from 'zod/mini'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { VaultDB, jsonBytes, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
 import { VaultError } from '../src/errors'
 import { bad, good, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { BoxRecord } from '../src/box'
-import type { VaultProps, VaultScope } from '../src/types'
+import type { GatelessVaultProps, VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
 import { NameFloorBytes } from '../src/validators'
@@ -43,6 +43,15 @@ class MapVaultDB extends VaultDB {
 
   private standingVaultProps(scope: VaultScope) { return this.rows.get(Ckeys.vaultProps(scope)) as VaultProps | undefined }
 
+  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
+    return Promise.resolve({ vaultProps: this.rows.get(Ckeys.vaultProps(scope)) ?? null, boxes: this.storedBoxes(scope) })
+  }
+
+  protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    if (! this.rows.has(Ckeys.vaultProps(draft))) { this.rows.set(Ckeys.vaultProps(draft), draft) }
+    return Promise.resolve({ vaultProps: this.rows.get(Ckeys.vaultProps(draft)), boxes: this.storedBoxes(draft) })
+  }
+
   protected doGetVaultProps(scope: VaultScope): Promise<unknown> { return Promise.resolve(this.rows.get(Ckeys.vaultProps(scope)) ?? null) }
 
   protected doEnsureVaultProps(vaultProps: VaultProps) {
@@ -51,18 +60,21 @@ class MapVaultDB extends VaultDB {
   }
 
   protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
-    const standing = this.standingVaultProps(vaultProps)
-    if (standing?.vault_tok !== expected.vault_tok || standing.gate_epoch !== expected.gate_epoch) { return Promise.resolve(false) }
+    const missed = Expectations.vaultPropsRefusalOf(this.standingVaultProps(vaultProps), expected)
+    if (missed) { return Promise.reject(missed) }
     this.rows.set(Ckeys.vaultProps(vaultProps), vaultProps)
     return Promise.resolve(true)
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string) { return Promise.resolve(this.rows.get(Ckeys.box(scope, boxlabel)) ?? null) }
 
-  protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
+  protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> { return Promise.resolve(this.storedBoxes(scope)) }
+
+  /** Every box row of `scope`, under the boxlabel its ckey names. */
+  private storedBoxes(scope: VaultScope): StoredBox[] {
     const isBox = Ckeys.isBoxIn(scope)
     const listed = [...this.rows].filter(([ckey]) => isBox(ckey)).map(([ckey, row]) => ({ boxlabel: Ckeys.boxlabelOf(ckey), box: row }))
-    return Promise.resolve(listed.filter((stored): stored is StoredBox => stored.boxlabel !== null))
+    return listed.filter((stored): stored is StoredBox => stored.boxlabel !== null)
   }
 
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) {
@@ -405,13 +417,16 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), passphrase: omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped']) } as VaultProps), 'vault props whose passphrase is missing its wrapped vaultKey'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character, the record at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps({ ...TH.vaultPropsOf('u1'), user_id: 'u^1' }, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'an update of the vault props whose user_id holds a ^'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.scopeOf('u1'), TH.vaultPropsOf('u1') as unknown as GatelessVaultProps), 'a gated draft handed to ensureVault: a vault is first stored gateless'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultRecords(TH.scopeOf('u1'), { ...TH.gatelessOf('u1'), gate_epoch: 1 } as unknown as GatelessVaultProps), 'a draft at a gated epoch with no way in, handed to ensureVaultRecords'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u2')),                                       'a draft naming another scope than the one it came with'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { when: new Date() } as never })), 'a box whose sidecar no read would accept'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('key\u{D83D}', 'one')),                  'a box whose boxlabel is half of an emoji, the box at fault though only its label failed'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 })), 'a box time in epoch seconds'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, undefined as unknown as BoxRecord),               'no box at all'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, { boxlabel: 'anthropic' } as BoxRecord),           'a box holding nothing but its boxlabel'],
   // the expectations:
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: -1 }),         'an expectation of the vault props at a negative epoch'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1' } as BoxExpectation, TH.boxOf('anthropic', 'one')), 'a box expectation missing its revision_tok'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', { revision_tok: null } as BoxDelExpectation), 'a delete expectation naming no vault'],
@@ -717,7 +732,7 @@ describe("the abstract VaultDB, on a box write that misses", () => {
   }
 
   it("refuses as corrupt_record a stale write whose adapter names nothing standing, saying nothing was written and the adapter needs a look", async () => {
-    const thrown = Refusals.staleWrite('vaultProps')
+    const thrown = Refusals.staleWrite('del')
     const vaultDB = new RefusingVaultDB(thrown)
     const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two')), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
@@ -853,7 +868,7 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
 class ForgetfulVaultDB extends MapVaultDB {
   protected override async doGetVaultProps(scope: VaultScope): Promise<unknown> { return good(await super.doGetVaultProps(scope)) }
   protected override async doGetBox(scope: VaultScope, boxlabel: string) { return good(await super.doGetBox(scope, boxlabel)) }
-  protected override doPutVaultProps(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleWrite('vaultProps')) as unknown as boolean) }
+  protected override doPutVaultProps(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleVaultProps(null)) as unknown as boolean) }
   protected override doDelVault(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleWrite('del')) as unknown as boolean) }
 }
 
@@ -923,6 +938,92 @@ describe("the abstract VaultDB, listing", () => {
     expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['anthropic', 'openai'])
     const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
     expect(refusal.message).to.match(/did not read back in a shape/)
+  })
+})
+
+describe("the abstract VaultDB, reading a vault whole", () => {
+  it("hands back the vault props checked, and the listing as listBoxes makes it: a damaged box listed, a row below the floor left out, sorted", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), written_at: 'yesterday' })
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'tab\there'), TH.boxOf('tab\there', 'three'))
+    const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
+    expect(read).to.deep.equal({ vaultProps: TH.vaultPropsOf('u1'), boxes: await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1')) })
+    expect(read?.boxes.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])
+  })
+
+  it("refuses vault props that fail their checks as damaged_vault, and ones of a later format as newer_format, whatever boxes stand beside them", async () => {
+    await TH.expectBad(withDamagedVaultProps().getVault(TH.scopeOf('u1')), 'damaged_vault')
+    await TH.expectBad(withDamagedVaultProps((vaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v7' })).getVaultRecords(TH.scopeOf('u1')), 'newer_format')
+  })
+
+  it("reads no vault where no vault props stand, boxes under the scope or not, and repairs nothing", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one'))
+    expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.be.null
+    expect(vaultDB.rows.size).to.eq(1)
+  })
+
+  it("hands back from ensureVault the vault props standing, gated or not, and their listing", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one'))
+    const ensured = await TH.expectingGood(vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }))
+    expect(ensured.vaultProps).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(ensured.boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+  })
+})
+
+/** A MapVaultDB whose every update of the vault props answers `answer`: a refusal it throws, or what it resolves. */
+class StalePropsVaultDB extends MapVaultDB {
+  private readonly answer: { refusal: Error } | { landed: boolean }
+
+  constructor(answer: { refusal: Error } | { landed: boolean }) {
+    super()
+    this.answer = answer
+  }
+
+  protected override doPutVaultProps(): Promise<boolean> {
+    return 'refusal' in this.answer ? Promise.reject(this.answer.refusal) : Promise.resolve(this.answer.landed)
+  }
+}
+
+/** What a stale update's adapter may say stands, and the refusal and meta that then reach the caller. */
+const StandingPropsCases = [
+  [TH.vaultPropsOf('u1', { gate_epoch: 2 }),                       'stale_write',   { vault_props_stored: TH.vaultPropsOf('u1', { gate_epoch: 2 }) }, 'the winning vault props: stale_write, carrying them whole'],
+  [TH.gatelessOf('u1'),                                            'stale_write',   { vault_props_stored: TH.gatelessOf('u1') },                     'gateless vault props: stale_write, carrying them'],
+  [null,                                                           'stale_write',   { vault_props_stored: null },                                    'none: stale_write, carrying null'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 'two' },                'damaged_vault', undefined,                                                       'damaged vault props: damaged_vault, as a read of them'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },      'newer_format',  undefined,                                                       'vault props of a later format: newer_format, as a read of them'],
+  [TH.vaultPropsOf('u2'),                                          'damaged_vault', undefined,                                                       "another scope's vault props: damaged_vault, as a read of them"],
+] as const
+
+describe("the abstract VaultDB, on an update of the vault props that misses", () => {
+  for (const [standing, kind, meta, blurb] of StandingPropsCases) {
+    it(`refuses an update whose adapter says there stands ${blurb}`, async () => {
+      const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleVaultProps(standing) })
+      const refusal = await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), kind)
+      expect(refusal.meta).to.deep.equal(meta)
+    })
+  }
+
+  it("refuses as corrupt_record a stale write naming nothing standing, or a false that says nothing of what stands, saying nothing was written", async () => {
+    for (const answer of [{ refusal: Refusals.staleWrite('del') }, { landed: false }]) {
+      const vaultDB = new StalePropsVaultDB(answer)
+      const refusal = await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'corrupt_record')
+      expect(refusal.message).to.match(/nothing was written/)
+      expect(refusal.message).to.match(/Refusals.staleVaultProps/)
+    }
+  })
+
+  it("lands a vault's first gate over its gateless props, expecting gate_epoch 0, as its example writes over what it read", async () => {
+    const vaultDB = new MapVaultDB()
+    await TH.expectingGood(vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1'))
+    await TH.expectingGood(vaultDB).putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
+    const late = TH.vaultPropsOf('u1', { passphrase: TH.wayinOf('late') })
+    const refusal = await TH.expectBad(vaultDB.putVaultProps(late, { vault_tok: 'vault-tok-u1', gate_epoch: 0 }), 'stale_write')
+    expect(refusal.meta?.vault_props_stored).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 })
 

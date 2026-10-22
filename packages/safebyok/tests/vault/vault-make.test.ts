@@ -344,7 +344,7 @@ describe("the key deriver seam", () => {
       const world = makeWorld()
       await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, salt_bytes: saltBytes } })
       const stored = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
-      expect(fromB64(stored?.passphrase.salt_b64 ?? '')).to.have.lengthOf(saltBytes)
+      expect(fromB64(stored?.passphrase?.salt_b64 ?? '')).to.have.lengthOf(saltBytes)
     }
   })
 
@@ -366,7 +366,7 @@ describe("the key deriver seam", () => {
     const standIn: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: cheapDerive }
     await world.openUnlocked('pw', { keyDeriver: standIn })
     const stored = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
-    expect(stored?.passphrase.key_deriver_label).to.eq('argon2id_web_v1')
+    expect(stored?.passphrase?.key_deriver_label).to.eq('argon2id_web_v1')
   })
 
   it("refuses a deriver that hands back anything but 32 key bytes, and makes no vault of it", async () => {

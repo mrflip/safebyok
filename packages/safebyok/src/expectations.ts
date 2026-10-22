@@ -27,6 +27,18 @@ export const vaultPropsMeets = (standing: unknown, expected: VaultPropsExpectati
   && fieldOf(standing, 'gate_epoch') === expected.gate_epoch
 )
 
+/** The refusal an update of the vault props meets from the vault props standing, or null when it may land.
+ * It is {@link Refusals.staleVaultProps}, carrying what stands, unless {@link vaultPropsMeets}
+ * (VAULTDB.md, line 3.2).
+ *
+ * @example
+ *   const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
+ *   if (refusal) { throw refusal }
+ */
+export const vaultPropsRefusalOf = (standing: unknown, expected: VaultPropsExpectation): VaultError | null => (
+  vaultPropsMeets(standing, expected) ? null : Refusals.staleVaultProps(standing ?? null)
+)
+
 /** True when the vault props standing are `expected`'s vault, at any epoch: what a box deletion, and a box write's vault half, compare.
  * Vault props that show no `gate_epoch` fail.
  *
