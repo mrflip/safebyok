@@ -252,7 +252,7 @@ describe("DefaultValidators", () => {
     expect(DefaultValidators.userId).to.eq(UserId)
   })
 
-  it("is frozen: a host replaces a check in Vault.make's validators, never here", () => {
+  it("is frozen: a host replaces a check in Bank.make's validators, never here", () => {
     expect(Object.isFrozen(DefaultValidators)).to.be.true
   })
 
