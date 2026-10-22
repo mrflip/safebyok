@@ -38,8 +38,9 @@ localStorage.
   rows of the pretend-backend store and the device-local store, rendered straight from storage by
   machinery that never talks to the vault. The backend's panel has an outage switch
   ([src/lib/outage.ts](src/lib/outage.ts)): take the pretend backend down, sign out and back in,
-  and the dashboard says "Can't reach your vault" in place, with a Retry button -- what
-  `safebyok-react` hands an app as `useOpenError()`'s `openError` and `retryOpen`. **To delete them:** remove the two tagged lines (and
+  and the dashboard says "Can't reach your vault" in place, with a Retry button -- the refusal
+  `safebyok-react`'s `useVault('main')` hands an app in the bank's entry, and the ask again
+  through `useBank()`. **To delete them:** remove the two tagged lines (and
   imports) in [src/App.tsx](src/App.tsx), then delete `src/components/inspection/`. What remains
   is the app as a host would actually build it.
 
@@ -54,5 +55,5 @@ localStorage.
 
 Tests live in `tests/`, mirroring `src/`. The machinery's (auth scaffold, whisper text handling,
 the outage switch, the Anthropic request shape via an injected fetch) run under node; each
-component's renders it under jsdom, inside a VaultProvider over stores in memory, and works it as
+component's renders it under jsdom, inside a BankProvider over stores in memory, and works it as
 a user would (`tests/test-helpers.tsx`). The vault and provider are tested in their own packages.

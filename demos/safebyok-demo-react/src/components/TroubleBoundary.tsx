@@ -9,7 +9,7 @@ import { Component, type ReactNode } from 'react'
  *
  * @example
  *   <TroubleBoundary key={userId ?? 'signed-out'}>
- *     <VaultProvider ...><Page /></VaultProvider>
+ *     <BankProvider ...><Page /></BankProvider>
  *   </TroubleBoundary>
  */
 export class TroubleBoundary extends Component<{ children: ReactNode, onReload?: () => void }, { caught: boolean }> {

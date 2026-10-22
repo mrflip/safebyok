@@ -1,6 +1,6 @@
 /**
  * The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the
- * means to render a component as the demo's App does -- inside a VaultProvider -- over stores in
+ * means to render a component as the demo's App does -- inside a BankProvider -- over stores in
  * memory, to fill its vault beforehand as another device would, to answer the passphrase
  * dialog the provider raises, to watch the vault beside a component, and to stand in for Anthropic.
  */
@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
-import { VaultProvider, useVault, useVaultSnapshot } from 'safebyok-react'
+import { BankProvider, useVault, useVaultSnapshot } from 'safebyok-react'
 import { closeVault, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
@@ -20,7 +20,7 @@ export const Passphrase = 'correct horse battery staple'
 
 /**
  * A fresh world in memory for the demo's components: the vault's two stores; a render that wraps
- * a component in a VaultProvider over them, signed in as `userId` and deriving through the cheap
+ * a component in a BankProvider over them, signed in as `userId` and deriving through the cheap
  * test deriver; an opener for a look at the vault from outside the page; and a seeder that fills
  * the vault beforehand from another device, so the page finds it locked. Its vaults are in the
  * `acme` app, as `scopeOf` has them.
@@ -40,9 +40,10 @@ export const Passphrase = 'correct horse battery staple'
 export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: { vaultDB?: VaultDB } = {}) => {
   const opts = memoryVaultOpts({ vaultDB })
   const { deviceDB } = opts
+  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = opts
 
   const renderInVault = (ui: ReactNode, userId: string | null = 'u1') => (
-    render(<VaultProvider {...opts} userId={userId}>{ui}</VaultProvider>)
+    render(<BankProvider {...bankOpts} userId={userId}>{ui}</BankProvider>)
   )
 
   const open = async (userId = 'u1') => keepToClose(await settledVault({ ...opts, userId }))
@@ -138,8 +139,8 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
-  const vault = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')?.vault ?? null
+  const snapshot = useVaultSnapshot('main')
   return (
     <p>
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>

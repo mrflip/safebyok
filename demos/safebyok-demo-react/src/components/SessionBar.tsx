@@ -12,7 +12,7 @@ import { keepStorage } from '../lib/persist-storage'
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const vault = useVault()
+  const vault = useVault('main')?.vault ?? null
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -51,12 +51,10 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
 
   const deleteAccount = async () => {
     if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
-    // The account goes in the same task as the vault's deletion begins. Once its Vault object is
-    // gone, the provider asks for the vault again, as after the dialog's "Start over", and would
-    // store the next life, novel, under the account being deleted.
-    const deleting = vault?.del()
+    // The vault deleted stays gone: nothing asks for it again, so no new one is stored under the
+    // account as it goes.
+    await vault?.del()
     await auth.deleteAccount()
-    await deleting
   }
 
   return (

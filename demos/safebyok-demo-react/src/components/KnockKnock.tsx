@@ -21,8 +21,8 @@ const apiKeyOf = (whisper: unknown): string => {
 }
 
 export const KnockKnock = () => {
-  const vault = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')?.vault ?? null
+  const snapshot = useVaultSnapshot('main')
   const [whosThere, setWhosThere] = useState('')
   const [joke, setJoke] = useState<string | null>(null)
   const [telling, setTelling] = useState(false)
@@ -87,7 +87,7 @@ export const SavedFlashMillis = 2000
  * same key saved again included.
  */
 const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox: boolean, damaged: boolean, replaceable: boolean, savedAt?: number | undefined }) => {
-  const vault = useVault()
+  const vault = useVault('main')?.vault ?? null
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)

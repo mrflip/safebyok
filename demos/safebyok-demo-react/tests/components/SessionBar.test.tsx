@@ -71,7 +71,7 @@ describe("SessionBar", () => {
     expect(screen.getByTestId('state').textContent).to.eq('locked')
   })
 
-  it("deletes the account and its vault, once the user confirms: the provider, left signed in to u1 here, stores the next life, novel", async () => {
+  it("deletes the account and its vault, once the user confirms: the vault stays gone, nothing asking for it again", async () => {
     const { world, auth, dbStore } = renderBar()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     signInAs('margo')
@@ -84,12 +84,10 @@ describe("SessionBar", () => {
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     expect(dbStore.read('account:acme:margo')).to.be.null
-    // This provider's userId is not the auth's: it stays on u1, so it asks for the vault again once
-    // the deletion lets its Vault object go. In the app, signing out lets the bank go first.
-    await TH.expectProbeState('novel')
-    const standing = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
-    expect(standing?.vault_tok).to.not.eq(deleted?.vault_tok)
-    expect(standing?.passphrase).to.be.null
+    // This provider's userId is not the auth's: it stays on u1, and still asks for nothing anew.
+    await TH.expectProbeState('none')
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {

@@ -11,8 +11,8 @@ import { createPasskey, passkeysAvailable, useVault, useVaultSnapshot } from 'sa
  * "Use a passkey".
  */
 export const WaysIn = () => {
-  const vault = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')?.vault ?? null
+  const snapshot = useVaultSnapshot('main')
   // The passphrase fields are uncontrolled, so React never writes them into the page, and read at
   // the press, so a password manager's autofill counts even when it sends no input event.
   const formRef = useRef<HTMLFormElement>(null)
