@@ -967,7 +967,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses stale_write when another device's change lands first, leaving that change standing`, async () => {
+    it(`${callTitle} refuses stale_write when another device's change lands first, leaving that change standing, and carrying no stored vault props`, async () => {
       const { world, vault: there } = await vaultWithPasskey()
       const here = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
       let landed: string | null = null
@@ -978,7 +978,8 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
         landed = storedText(world)
         return await realPut(vaultProps, expected)
       })
-      await TH.expectRefusal(change(there), 'stale_write')
+      const err = await TH.expectRefusal(change(there), 'stale_write')
+      expect(err.meta).to.be.undefined
       expect(storedText(world)).to.eq(landed)
     })
 
