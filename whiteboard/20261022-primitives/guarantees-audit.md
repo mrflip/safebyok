@@ -1,7 +1,7 @@
 # primitives: guarantees the spec would let fall
 
 *Orchestrator*, 2026-10-22. An `opus` read of `primitives.md` against today's outward guarantees,
-before thread 4 landed, found nine places where the spec as written lets one fall. None is in
+before thread 4 landed, found nine places where the spec as written lets one fall (a tenth, from #253, added after). None is in
 `primitives-toldjaso.md`. Each fix below keeps today's contract with what the spec already has
 (a demand on another thing, a store expectation, the refresh join, a synchronous predicate), and
 adds no mechanism inside a primitive. They are YOLO decisions under the Coach's charge ("do not
@@ -107,6 +107,22 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    lease from another life without erasing it (`revised-outcomes.md`, ruling 5: never erase on
    a judgment); its record, naming the old `vault_tok`, is never taken up.
 
+10. **Awaits with no demand after them (S for a closed Vault object writing; U for the wrong kind;
+    threads 6 to 9).** *Orchestrator, 2026-10-22*, an audit of every `await` in `vault.ts` on #253,
+    after the Coach: "decryptWhisper should demand after each async op: its initial
+    ensureConsistent, the decipher, etc." and "Confused and worried by this message, and others,
+    that the consistency checks being applied are weak". The model holds on every success path. It
+    lapses in two patterns. (a) **Failure paths:** a throw or a null (`getBox` null, `box.open`
+    throwing, `valOf`, `delBox`'s `'absent'`) is acted on before the demand, so a box of a remade
+    vault reports `damaged_box` or `absent_box`. (b) **The gate-change flows and `putBox`'s seal**
+    (`#unlockCreating`, `#reviseWayins`, `tryPutWayin`'s `newProofOf`, `#unlockWith`, `tryDel`,
+    `tryPutBox` after `planSeal` / `sealPlanned`) lean on storage's expected tokens and one demand at
+    the grant, so a closed Vault object still writes the gate, and a lock landing before the seal
+    lands the write. Storage still refuses anything stale. **Fix:** after each `await`, demand
+    before acting on what it returned, its failures included; each thread fixes the paths it
+    rewrites (below), and the wrap-up review checks every `await`. `tryHello` / `tryRefresh` resolve
+    ok across a `close()` mid-read (thread 7).
+
 ## By thread
 
 * **4 store_verbs:** `delVault` expects `{ vault_tok, gate_epoch }` (4).
@@ -114,14 +130,18 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
   `gate_epoch` dropped (8); a lease of another life dropped, never erased (9). `ensureUnlocked`
   counts a lease only when its stamp matches the gate (8), and keeps today's take-up path until
   thread 9 (2).
-* **6 lease_box:** a full `putBox` adopts the listing's attributes, its base the listed revision;
+* **6 lease_box:** a demand after each `await` in `#getBoxUnlocked` / `tryGetBox`, `tryGetWhisper`,
+  `tryDecryptWhisper`, `tryDelBox` and `tryPutBox` (after `planSeal`, `sealPlanned`, `#writeOver`),
+  before acting on a null, a throw or `'absent'` (10); a full `putBox` adopts the listing's attributes, its base the listed revision;
   unlisted, it is a create, which the store accepts over no record or a tombstone (7). A box read
   names the `vault_tok` it was read under; another life at the same scope reloads (the plan,
   ground rule 18).
-* **7 bank:** the take-up predicate at birth (3); the device record raised at birth, refresh,
+* **7 bank:** a demand after each `await` in `#unlockCreating` (or the birth that replaces it), and
+  `#checkOpen` after `#helloWithin` in `tryHello` / `tryRefresh` (10); the take-up predicate at birth (3); the device record raised at birth, refresh,
   `putGate` and `delVault` (6); birth drops, never erases, a lease of another life (9).
-* **8 proving_gate:** `grantLease` step 7 demands on the proving and checks the stored record's
+* **8 proving_gate:** a demand after each `await` in `#reviseWayins` and `tryPutWayin`'s
+  `newProofOf` (10); `grantLease` step 7 demands on the proving and checks the stored record's
   stamp (1).
-* **9 gating:** the pantry consult inside the gating (2); the take-up predicate there (3); each
+* **9 gating:** a demand after each `await` in `#unlockWith` and `tryDel` (10); the pantry consult inside the gating (2); the take-up predicate there (3); each
   attempt opens with `hello({ staleMinutes: 0 })` (4); joins by kind (5); `del_vault` settles
   then locks (9).
