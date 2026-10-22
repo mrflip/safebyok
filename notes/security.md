@@ -49,11 +49,14 @@ added or folded into through the subagent, and no other entry changes.
   removed.** A review found it handed out `lease_key` (non-extractable, but usable to `unwrapKey`) and
   `vault_key_lease_wrapped`, so a holder of the Vault object could, through the public `vault.lease`, unwrap the
   vaultKey extractable and export it. A Lease now yields its record through no getter, field, spread or JSON; the
-  package's own code and tests reach it through a module-internal `leaseRecordOf(lease)` that no package entry point
-  exports. A test walks every field and getter reachable from an unlocked Vault object (its lease and snapshot
+  vault puts the record that `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered
+  (amended 2026-10-22 (lease_box review): no file in `src/` calls the module-internal `leaseRecordOf(lease)`, which
+  only tests use and no package entry point exports). A test walks every field and getter reachable from an unlocked Vault object (its lease and snapshot
   included) and finds no CryptoKey and no wrapped key. `box.record` still hands out the box's wrapped boxKey and
   ciphered whisper, which is what storage holds. Same-origin code in a browser with the IndexedDB device store can
-  read the stored lease record directly, as before.
+  read the stored lease record directly, as before (amended 2026-10-22 (lease_box review): so can a host's own
+  `DeviceDB`, which is pluggable: its `putLease` and `getLease` are handed every lease record, `lease_key` and the
+  wrapped vaultKey included, as their job requires).
 
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **storage is the ground truth, and the vault argues with none
   of it: every call demands, synchronously and at each of its steps, that the vault still stands at the stamp of what
@@ -406,8 +409,8 @@ added or folded into through the subagent, and no other entry changes.
   `vault_key_lease_wrapped`; each gave its full stored record before. Amended 2026-10-21
   (trust_lines): `Box`, `Wayin` and `Lease` keep their stored record once, privately, behind a
   `record` getter; their own enumerable fields are the visible ones only, and `toJSON()` is those
-  fields. Amended 2026-10-22 (lease_box rework): `Lease` has no `record` getter; its record is reached only
-  through the module-internal `leaseRecordOf(lease)` (see the 2026-10-22 `vault.lease` entry at the top). Ciphertext, wrapped keys, a passphrase wayin's salt and the leaseKey are on no own field
+  fields. Amended 2026-10-22 (lease_box rework): `Lease` has no `record` getter; its record is reached by no
+  path in `src/` (amended 2026-10-22 (lease_box review): only tests call the module-internal `leaseRecordOf(lease)`; see the 2026-10-22 `vault.lease` entry at the top). Ciphertext, wrapped keys, a passphrase wayin's salt and the leaseKey are on no own field
   and in no JSON or log output, nor is the vaultKey an opened `Lease` holds.
 * 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
   The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
@@ -444,7 +447,7 @@ added or folded into through the subagent, and no other entry changes.
   bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
   the lease or its record is that key; amended 2026-10-21 (trust_lines): a granted or opened lease
   keeps the pair's non-extractable session handle, the vaultKey, in an ES private field, and none of
-  the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): read through the module-internal `leaseRecordOf(lease)`, not a getter; once `lease.props`)
+  the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): not a getter; once `lease.props`; amended 2026-10-22 (lease_box review): `#grantLease` puts the record `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered, and no file in `src/` calls `leaseRecordOf`, which only `tests/lease.test.ts` uses)
   through `deviceDB.putLease`. leaseCtx is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
   applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
   'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
@@ -2918,7 +2921,7 @@ added or folded into through the subagent, and no other entry changes.
   anyone who can use this browser profile can open the vault with the lease's leaseKey, and
   `unwrapKey` can hand back the vaultKey extractable (the 2026-10-14 leaseKey entry above). Amended 2026-10-22
   (lease_box): the vault holds no vaultKey handle while it waits; one exists only inside a lease's cipher or decipher
-  call, and injected code can still reach the same operations through `vault.lease` or the vault's own API (amended 2026-10-22 (lease_box rework): `vault.lease` yields no record, leaseKey or wrapped vaultKey, so those operations are cipher and decipher only, not `unwrapKey`).
+  call, and injected code can still reach the same operations through `vault.lease` or the vault's own API (amended 2026-10-22 (lease_box rework): `vault.lease` yields no record, leaseKey or wrapped vaultKey, so those operations are cipher and decipher only, not `unwrapKey`; amended 2026-10-22 (lease_box review): that holds of `vault.lease` alone, a host's own pluggable `DeviceDB`, like same-origin IndexedDB, is handed every lease record, `lease_key` and the wrapped vaultKey included).
 * 2026-10-17 (thread sweep_small, [#143](https://github.com/mrflip/safebyok/pull/143)): **the Postgres README no longer ships a hard-cap trigger
   recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
   `safebyok_boxes` that refused a box past a hard limit, taking a transaction-scoped
