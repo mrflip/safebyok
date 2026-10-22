@@ -77,8 +77,8 @@ rules* 3).
 | 4 | store_verbs | merged | #251 |
 | 5 | demand | filed, on main | #253 |
 | 6 | lease_box | filed, stacked on #253 | #254 |
-| 6b | box_seal | built, in review | #256 |
-| 7 | bank | planned | |
+| 6b | box_seal | filed, stacked on #254 | #256 |
+| 7 | bank | building | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
 | 10 | react | planned | |
@@ -91,6 +91,17 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 6b, box_seal (#256)
+
+* The box ctx already binds every immutable field (`#boxCtxOf`, `cipherCtx`; `ctx-bytes.test.ts`
+  pins it): "we sign all immutable fields" holds. Thread 8's wayin ctx is the same `cipherCtx`.
+* A Box's stamp is non-enumerable (`decorate` before the freeze); `{ ...box }` and JSON show the
+  record. The Lease is private: read inside the package with `heldLeaseOf(vault)` from
+  `src/held-lease.ts`; the Vault object exposes `askPassphraseAt` and `leaseMillis`.
+* `getBox` of a missing box resolves `null`; `getWhisper` refuses `absent_box`.
+* **For every worker:** run lint without its cache (delete `.eslintcache`) before reporting green
+  when a public type changes: a stale cache hid a red demo in 6b.
 
 ### Thread 6, lease_box (#254)
 

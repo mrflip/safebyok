@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -319,7 +319,7 @@ a take-up (threads 7 to 9). *Second review:* **fixed**: the leak fix holds (no e
 build carries `leaseRecordOf`; a 10-deep probe reached no key); the surface-walk test now reads
 symbol-named and non-enumerable keys; two security-note lines corrected by the sonnet route.
 
-### 6b. box_seal
+### 6b. box_seal, filed ([#256](https://github.com/mrflip/safebyok/pull/256))
 
 > *Orchestrator*, from the Coach's rulings on #254's rows (2026-10-22), verbatim: "is there a good
 > reason to not authenticate the registered_at? "we sign all immutable fields" is a simple rule for
@@ -342,6 +342,15 @@ immutable field, so no stored change; the stamp hidden; `lock()`'s doc names wha
 Coach (2026-10-22): `vault.lease` private, with "selected methods via vault in a block of
 delegating functions/getters" (the lease's deadline first); `getWhisper` of a missing box refuses
 `absent_box` again ("just as if you said box = null box.whisper"); `getBox` keeps `null`.
+
+*Review:* **clean**, then the rework's **fixed**. The rework: `vault.lease` private, read in the
+package through the module-private registry `src/held-lease.ts` (`heldLeaseOf`, exported from no
+entry; a reviewer confirmed no entry, subclass or Proxy reaches it); the delegated block
+`askPassphraseAt`, `leaseMillis`; `#updateBoxListingOf` / `#dropBoxListingOf`; lock-on-`getProof`
+tests for `putBox` and `delBox`. The second reviewer fixed a demo left red by a stale
+`.eslintcache`, an untrue `now()` example, and two missing example tests. Left: a Box of another
+copy refuses `vault_locked`; `askPassphraseAt` under `leaseHours: Infinity`; a lock during
+`#ensureUnlocked`'s hello or take-up (threads 7 to 9): Open Matters.
 
 ### 7. bank
 
