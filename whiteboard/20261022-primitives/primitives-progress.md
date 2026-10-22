@@ -76,7 +76,8 @@ rules* 3).
 | 3 | wire_meta | merged | #246 |
 | 4 | store_verbs | merged | #251 |
 | 5 | demand | filed, on main | #253 |
-| 6 | lease_box | built, in review | #254 |
+| 6 | lease_box | filed, stacked on #253 | #254 |
+| 6b | box_seal | planned | |
 | 7 | bank | planned | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
@@ -90,6 +91,28 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 6, lease_box (#254)
+
+*Orchestrator,* from the report and two reviews. Thread file `thread-6-lease_box.md`, details
+`thread-6-lease_box-details.md`, on the thread's branch.
+
+* **Lease:** `sealLeaseRecord(vault, standing, vaultKey)` replaced `Lease.grant`; `#grantLease`
+  writes the record and calls `Lease.make(vault, stored)`, a pure constructor. No public `record`
+  getter: the package reaches it through `leaseRecordOf(lease)`, exported from no entry. A test
+  walks the Vault object's whole reachable surface for any key. `vault.lease` is public (Open
+  Matter: Rec private again, 6b). The Lease's stamp is scope, `vault_tok`, `gate_epoch`.
+* **Box calls** demand after each await, refusals included (`#demandAfterWait(settled, thing,
+  opts)`, there for threads 7 to 9's gate flows). A remake during `getBox`, `putBox` or `delBox`
+  refuses `vault_remade`.
+* **Store:** every adapter's `getBox` expects the `vault_tok` (`vault_mismatch` → `vault_gone`,
+  `#readAt = FarPast`). `getBox` and `getWhisper` of a missing box resolve `null`; `useWhisper`
+  and `delBox` refuse `absent_box`. `delBox` returns `DeletedBox { boxlabel, vault_tok, outcome }`.
+* **The triplet:** `vault.consistentWith(thing, opts?)` (query), `demandConsistentWith` (throws);
+  no `ensureConsistent` yet. `#ensureUnlocked(renewMillis, shouldAsk?)` resolves a boolean.
+* **For later:** the wayin's unused `sessionKey` unwrap is thread 8's; `TH` is published as
+  `safebyok/testing`, so nothing key-bearing goes in it; `delBox`'s tombstone discussion is in
+  thread 4's file.
 
 ### Thread 5, demand (#253)
 

@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 built (#254), review flagged, rework under way; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -279,7 +279,7 @@ opens before demanding (Open Matter, thread 11 picks the kind).
 of a missing box resolves `null`, not a refusal (the Coach: "I would like to do so when it's
 convenient, no rush").
 
-### 6. lease_box
+### 6. lease_box, filed ([#254](https://github.com/mrflip/safebyok/pull/254))
 
 > **lease_box**: the Lease and Box primitives as the spec's tables: `Lease.make(vault, record)`,
 > `lease.endsBy(instant)`, `lease.cipheredWith(serialized, visible)` and
@@ -315,7 +315,26 @@ missing box resolving `null` (the Coach), `putBox` declining to ask for an unlis
 `consistentWith` for `isConsistentWith` (the Coach). Left, minor: a held Lease past its own
 deadline still works (Open Matter); a double log on `vault_remade` in a partial put; the whisper
 serialized three times; `absent_vault` vs `vault_gone` from a direct `Box` call; `close()` during
-a take-up (threads 7 to 9). A second review over the rework's commits only follows.
+a take-up (threads 7 to 9). *Second review:* **fixed**: the leak fix holds (no entry point or
+build carries `leaseRecordOf`; a 10-deep probe reached no key); the surface-walk test now reads
+symbol-named and non-enumerable keys; two security-note lines corrected by the sonnet route.
+
+### 6b. box_seal
+
+> *Orchestrator*, from the Coach's rulings on #254's rows (2026-10-22), verbatim: "is there a good
+> reason to not authenticate the registered_at? "we sign all immutable fields" is a simple rule for
+> determining which are in there" and "stamp seems internal, can it be adorned (non enumerable)
+> before the box freezes?"
+
+*Gloss.* `box.ts` (`Box.seal`'s ctx, `Box.make`), `crypto.ts` only if the ctx builder lives there,
+`vault.ts` where a whole `putBox` adopts the listing. Bind every immutable visible field of a box
+into its AEAD ctx, `registered_at` included, by the construction the sidecar already uses (never a
+new one): a box sealed before reads as damaged (no back-compat before 1.0; the changeset says what
+a host sees). Name the rule in the doc block and the security note (sonnet subagent): "we sign all
+immutable fields". Make the Box's stamp non-enumerable with `adorn` before the freeze, so
+`{ ...box }` and `JSON.stringify(box)` show the record alone. If the Coach rules `vault.lease`
+private again (Open Matter), do it here. **Depends on:** 6. **Look-ahead:** thread 8 applies the
+same rule to ways in. **Size:** S. A stored-format change, pre-1.0.
 
 ### 7. bank
 
@@ -392,7 +411,8 @@ Declining to prove does not imply an imperative to switch from "unlocked" to "lo
 an imperative to NOT switch from locked to unlocked on that gating's say-so". So a cancel never
 locks, and a cancelled gating never attaches the lease it was writing; a later take-up of what it
 stored is the take-up's own judgment. Audit 1's step 7 checks both the proving and the stored
-record. Remove the `WayinStamp` type: `device_id` and `registered_at` are the wayin record's own
+record. Ways in follow 6b's rule, "we sign all immutable fields" (the Coach): bind each wayin's
+immutable visible fields into its ctx. Remove the `WayinStamp` type: `device_id` and `registered_at` are the wayin record's own
 stored fields (the Coach: "Wayin stamp will go away, right? aren't those own props of the wayin
 stored in the table?").
 
@@ -467,7 +487,9 @@ from a remade vault (`decryptWhisper` against the demand): settled, `vault_remad
 demands after each await. TODO entries from the Coach (2026-10-22): the Postgres README points to
 (a) the GraphQL client and (b) an AI prompt that builds a route, rather than a server nobody wants;
 an agent skill set; `capacity` as an attribute of the Vault object for the app; the Vault object
-adopting storage's capacity on `vault_full`. Write the get/demand/ensure triplet into STYLE.md
+adopting storage's capacity on `vault_full`; the stamp rather than the scope as VaultDB request
+params; sending the authenticated immutable fields with puts and reads for an early server-side
+check; whether `damaged_lease` should call `lock()` (without recursing). Write the get/demand/ensure triplet into STYLE.md
 beside the try pairs. `box_moved` is dropped from the kinds.
 
 ### 12. route_meta

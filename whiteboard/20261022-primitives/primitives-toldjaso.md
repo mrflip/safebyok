@@ -84,3 +84,9 @@ and 11 are restated for the demand model.
     expected tokens and the next read, never by a lock across tabs. A Web Locks layer for the
     gating line and the dialog is a later option. The Coach: "don't do cross-tab coordination
     additions this sprint, note your concern and carry on".
+20. **SEE IF THIS IS REALLY NEEDED: a partial `putBox` opens the box it reads.** Even when only the
+    sidecar is left out, `putBox` calls `getBox` and deciphers the stored box rather than re-wrapping
+    it blind, so nothing tampered in storage is re-sealed under this device's key. It costs a
+    decipher on every partial put. The Coach: "yes. can you make sure this is noted as a "see if
+    this is really needed" in the same place as you are noting the many "see if this is as bad as
+    it sounds" loosenings?" (#254)
