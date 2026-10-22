@@ -439,11 +439,12 @@ export class Vault {
    * and its ask's `lockLanded` settling; and the snapshot reads `locked`. What it returns is this
    * device's lease being erased, with {@link DeviceDB.delLease}. It awaits no hello.
    *
-   * A call under way ends by its own rule. A `getBox()`, `getWhisper()` or `useWhisper()` refuses
-   * 'vault_locked' once storage answers, unless an unlock has put a lease back in hand meanwhile. A
-   * `putBox()` refuses so when the lock lands before it seals, and lands when it comes during the
-   * seal or the write; a `delBox()` lands. An ask's `attempt` under way takes nothing up. An
-   * `unlock()` or `putWayin()` under way is not stopped, and leaves the vault unlocked.
+   * A call under way ends by its own rule. A `getWhisper()` or `useWhisper()` refuses 'vault_locked'
+   * once storage answers or the box opens, unless an unlock has put a lease back in hand meanwhile;
+   * a `getBox()` hands back the box, which holds nothing secret. A `putBox()` refuses so when the
+   * lock lands while it reads or seals, and lands when it comes during the write; a `delBox()`
+   * lands. An ask's `attempt` under way takes nothing up. An `unlock()` or `putWayin()` under way
+   * is not stopped, and leaves the vault unlocked.
    *
    * Refuses 'storage_unavailable' ('storage_blocked' when the browser withholds the store) when the
    * device store cannot erase the lease; the vault is locked all the same.
