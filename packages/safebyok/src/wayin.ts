@@ -87,7 +87,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   readonly device_id:     string
   /** When the wayin was sealed. */
   readonly registered_at: number
-  /** The id of the vault props it is one of: bound into its wrap. */
+  /** The token of the vault props it is one of: bound into its wrap. */
   readonly vault_tok:     string
 
   protected constructor(vault: WayinVault, vaultTok: string, record: RecordT) {
@@ -165,7 +165,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
     }
   }
 
-  /** A new wayin wrapping `vaultKey` for `proof`, into `vault`, one of the vault props whose id is `vaultTok`, stamped with `deviceId` and the vault's time now.
+  /** A new wayin wrapping `vaultKey` for `proof`, into `vault`, one of the vault props whose token is `vaultTok`, stamped with `deviceId` and the vault's time now.
    * A passphrase wayin gets a fresh passphraseSalt for the key deriver `proof` derives through, and
    * refuses as {@link PassphraseProof.wayinKeyFor} does. A passkey wayin keeps the credential's id
    * and salt to ask it again, never its answer. Check the proof first: a new passphrase with

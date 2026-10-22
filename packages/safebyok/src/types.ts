@@ -269,7 +269,7 @@ export const VaultProps = Z.object({
   applabel:            NameFloor,
   user_id:             NameFloor,
   vaultlabel:          NameFloor,
-  /** A random id minted when the vault is made, never changed, and bound into every encryption. */
+  /** A random token minted when the vault is made, never changed, and bound into every encryption. */
   vault_tok:           Z.string().check(Z.minLength(1)),
   gate_epoch:          Z.int().check(Z.positive()),
   /** The vault's passphrase wayin, which every vault has. */

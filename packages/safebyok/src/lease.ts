@@ -77,7 +77,7 @@ export class Lease {
   readonly user_id:           string
   /** The label of the vault it is for. */
   readonly vaultlabel:        string
-  /** The id of the vault props it was granted under. */
+  /** The token of the vault props it was granted under. */
   readonly vault_tok:         string
   /** The vault props' `gate_epoch` when it was granted: a change of wayins voids it. */
   readonly gate_epoch:        number

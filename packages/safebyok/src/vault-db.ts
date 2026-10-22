@@ -837,7 +837,7 @@ const mayBeNewer = (raw: unknown): boolean => {
   return format !== undefined && ! knownFormat
 }
 
-/** The vault props as the adapter stores them; an adapter's own `damaged_vault`, from a VaultDB it hands on to, refuses as one too damaged to name, the vault's id out of reach. */
+/** The vault props as the adapter stores them; an adapter's own `damaged_vault`, from a VaultDB it hands on to, refuses as one too damaged to name, the vault's token out of reach. */
 const readStoredVaultProps = async (reading: () => Promise<unknown>): Promise<unknown> => {
   try {
     return await reading()
