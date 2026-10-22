@@ -1,6 +1,6 @@
 # Thread 3: turns (2026-10-22)
 
-Branch `20261022-turns`, PR #PRNUM, stacked on [#244](https://github.com/mrflip/safebyok/pull/244).
+Branch `20261022-turns`, PR [#245](https://github.com/mrflip/safebyok/pull/245), stacked on [#244](https://github.com/mrflip/safebyok/pull/244).
 Justify: green (root 265; core 2727, 37 skipped; convex 311; postgres 297; graphql 300; indexeddb
 156; react 287; fastkey 49; demo 214; e2e 100, 109 skipped). Size budgets: none moved (`Vault`
 34.3 kB of 38, `everything` 41.8 kB of 45).

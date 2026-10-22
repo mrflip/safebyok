@@ -41,7 +41,7 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-10-22 (thread turns, sprint streamline, branch 20261022-turns): **the vault does one turn at a time, reads once per
+* 2026-10-22 (thread turns, sprint streamline, [#245](https://github.com/mrflip/safebyok/pull/245)): **the vault does one turn at a time, reads once per
   call, and a `lock()` lands after the turn in flight.** (1) Every piece of work against a Vault
   object's in-memory fields (a hello's read, an unlock, a change to the ways in, a box read or
   written, `lock()`, `del()`, `close()`, the expiry timer) runs as a turn in one `p-limit(1)` queue
