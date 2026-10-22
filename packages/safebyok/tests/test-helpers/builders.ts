@@ -197,10 +197,9 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
   return { credentialId, prfSaltB64: saltB64, prfBytes: await digestOf(`${credentialId}:${saltB64}`) }
 }
 
-/**
- * Shape-valid gated vault props for `userId`'s `main` vault, its passphrase's wrap fake and no
- * passkey: for storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<userId>`,
- * its gate_epoch 1, and its passphrase a {@link wayinOf} whose wrap is `vault-<userId>`.
+/** Shape-valid gated vault props for `userId`'s `main` vault, its passphrase's wrap fake and no passkey.
+ * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<userId>`, its
+ * gate_epoch 1, and its passphrase a {@link wayinOf} whose wrap is `vault-<userId>`.
  *
  * @example vaultPropsOf('u1', { gate_epoch: 2 })
  * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
@@ -216,9 +215,8 @@ export const vaultPropsOf = (userId: string, overrides: Partial<GatedVaultProps>
   ...overrides,
 })
 
-/**
- * The gateless vault props a vault is first stored as, for `userId`'s `main` vault: `gate_epoch` 0,
- * no way in, and otherwise as {@link vaultPropsOf} makes them, its vault_tok `vault-tok-<userId>`.
+/** The gateless vault props a vault is first stored as, for `userId`'s `main` vault: `gate_epoch` 0 and no way in.
+ * Otherwise as {@link vaultPropsOf} makes them, its vault_tok `vault-tok-<userId>`.
  *
  * @example vaultDB.ensureVault(scopeOf('u1'), gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })

@@ -132,7 +132,7 @@ describe("VaultProps", () => {
 
 const GatelessCases = [
   // regular usage:
-  [TH.gatelessOf('u1'),                                                     true,   'gateless vault props: gate_epoch 0, and no way in'],
+  [TH.gatelessOf('u1'),                                                     true,   "gateless vault props: gate_epoch 0, and no way in, as GatelessVaultProps' example shows"],
   [TH.vaultPropsOf('u1'),                                                   true,   'gated vault props: gate_epoch 1, and a passphrase'],
   // refused, as a damaged record:
   [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                               false,  'a gated epoch with no passphrase: a gate that lost its way in'],
