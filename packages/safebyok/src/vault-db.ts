@@ -243,7 +243,7 @@ export abstract class VaultDB {
 
   // --
 
-  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, readVault, ensuredVault
+  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -308,7 +308,6 @@ export abstract class VaultDB {
       return ensuredVault(await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing)), asked, recordsOf)
     })
   }
-
   // --
 
   // == [Vault props verbs]: getVaultProps, ensureVaultProps, putVaultProps
