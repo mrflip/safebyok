@@ -403,6 +403,11 @@ server and browser share: the changeset says what a host sees. **Model:** `sonne
 on:** 4 (it rewrites the same adapters' verbs). Independent of 5 to 11: it runs beside the line,
 and joins it at wrap-up just below the sprint PR. **Size:** S-M.
 
+*Review:* **fixed** ([#252](https://github.com/mrflip/safebyok/pull/252)). Fixed: the changeset
+headline overclaimed (the main meta's winner records cross whole, as ruled; only the refusal's own
+meta is stripped). Left, minor: a non-JSON body's SyntaxError quotes its first characters (the
+server's own body, as before); the README recipe and its test are hand-kept copies (Open Matter).
+
 ## Wrap-up
 
 `wrapup.md`'s restack, then one `opus`, `high` reviewer over the whole line, briefed with

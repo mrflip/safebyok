@@ -66,7 +66,7 @@ rules* 3).
 | 9 | gating | planned | |
 | 10 | react | planned | |
 | 11 | docs | planned | |
-| 12 | route_meta | planned, beside the line | |
+| 12 | route_meta | filed, beside the line | #252 |
 
 ## What the threads found
 
