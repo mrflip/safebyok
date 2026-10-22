@@ -41,6 +41,22 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
+  travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
+  Before, a `stale_write` put the winning vault props (both wayins' salts and wrapped vaultKeys: offline-guessing
+  material) and the winning box (`box_stored`), and a full vault its `capacity`, in `extensions.meta`, which GraphQL
+  servers, gateways and APM tools commonly log. The Coach ruled: move meta out of the error and into the body,
+  available on success or failure. `safebyokPutVaultProps` and `safebyokPutBox` now resolve answer types
+  (`SafebyokPutVaultPropsAnswer`, `SafebyokPutBoxAnswer`) with `landed`; on a `stale_write` (or a box write's
+  `vault_full`) `landed` is false with `refusalkind`, `message`, and `vault_props_stored`, `box_stored` or
+  `capacity`. A stored record, sound or damaged, travels as the `SafebyokStoredRecord` JSON scalar, which GraphQL
+  does not check; `graphqlVaultDB` reads the body and throws the same VaultError with the same
+  `meta`, so the VaultDB layer's `err.meta` is unchanged. Every other refusal still crosses as an error with kind
+  only; tests pin that no error's `extensions` carries a record
+  (`packages/safebyok-graphql/tests/vault-resolvers.test.ts`, "a write's answer in the body"). Residual: the records
+  are now in the response `data`, which a host's response logging can still write down; the README says so.
+  The Postgres route recipe and Convex already answer with the record in a body, not an error.
+
 * 2026-10-22 (thread get_vault, PR [#244](https://github.com/mrflip/safebyok/pull/244)): **the vault props record has two shapes,
   and `getVault` reads props and box listing in one atomic step.** (1) `VaultProps` (format
   `safebyok-vault-v6`, unchanged) is checked by the core's Zod schema at every read and write as one of
@@ -804,7 +820,9 @@ added or folded into through the subagent, and no other entry changes.
   key, so neither is offline-guessable, and it is what a `getBox` by the same signed-in user
   returns. What it changes: this is a refusal's `meta` now holding ciphertext of the winning box
   (never plaintext, never key material in the clear), and it crosses wires: GraphQL's
-  `extensions.meta.box_stored` and the Postgres route recipe's `refusal.box_stored`; the error's
+  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; over GraphQL it is the `box_stored` of
+  `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
+  `refusal.box_stored`; the error's
   `cause` still never crosses. A host that logs or reports a whole `VaultError` including `meta`
   now logs that ciphertext. An audit of where refusal meta can leak (logs, error reporters, a host
   serializing errors) is the Coach's, later. (An earlier line here said a refused write
@@ -1390,7 +1408,8 @@ added or folded into through the subagent, and no other entry changes.
   count and approximate size to the caller already authorized for that vault (the listing already
   shows the count). The base class validates the capacity (whole numbers; `Infinity` becomes
   `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
-  It crosses the GraphQL wire as `extensions.meta.capacity`; the Postgres route recipe in the
+  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; it is the `capacity`
+  of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
