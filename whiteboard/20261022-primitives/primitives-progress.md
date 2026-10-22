@@ -59,6 +59,11 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   new life, so reload (18); audit 4 took A; a repeated delete refuses `stale_write`; capacity is
   not the vault's own prop and stays in #252's main meta; the README-drift TODO is thread 11's.
 
+* **Design notes, not yet to build** (the Coach, 2026-10-22): `demandConsistent` may grow to take
+  several things, every prop present in any of them matching the others where present ("Add only
+  once desired"); no cross-tab coordination additions this sprint ("note your concern and carry
+  on").
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 

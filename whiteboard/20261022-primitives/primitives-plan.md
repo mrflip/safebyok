@@ -275,6 +275,10 @@ the read join weakens `del()`'s and the proving's promises (Open Matter, thread 
 family); `#demandLease` says `vault_locked` before `vault_gone` in edge orders; `decryptWhisper`
 opens before demanding (Open Matter, thread 11 picks the kind).
 
+*Coach follow-up (2026-10-22), for this thread's rework or the next that touches boxes:* `getBox`
+of a missing box resolves `null`, not a refusal (the Coach: "I would like to do so when it's
+convenient, no rush").
+
 ### 6. lease_box
 
 > **lease_box**: the Lease and Box primitives as the spec's tables: `Lease.make(vault, record)`,
@@ -378,7 +382,9 @@ Declining to prove does not imply an imperative to switch from "unlocked" to "lo
 an imperative to NOT switch from locked to unlocked on that gating's say-so". So a cancel never
 locks, and a cancelled gating never attaches the lease it was writing; a later take-up of what it
 stored is the take-up's own judgment. Audit 1's step 7 checks both the proving and the stored
-record. Rename `WayinStamp` (say `WayinOrigin`): it collides with thread 5's `Stamp`.
+record. Remove the `WayinStamp` type: `device_id` and `registered_at` are the wayin record's own
+stored fields (the Coach: "Wayin stamp will go away, right? aren't those own props of the wayin
+stored in the table?").
 
 ### 9. gating
 

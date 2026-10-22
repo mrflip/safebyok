@@ -79,3 +79,8 @@ and 11 are restated for the demand model.
     picture predates another tab's change to the ways in can erase that tab's valid lease, which
     re-prompts at its next read. A re-prompt, never a lease kept wrongly. The Coach: "yes record
     don't fix". (#253 review)
+19. **NO CROSS-TAB COORDINATION THIS SPRINT.** The mutexes are per tab. Races between tabs (audit
+    risks 5 and 9's cross-tab halves, toldjaso 17's lost ring) are settled by the VaultDB's
+    expected tokens and the next read, never by a lock across tabs. A Web Locks layer for the
+    gating line and the dialog is a later option. The Coach: "don't do cross-tab coordination
+    additions this sprint, note your concern and carry on".
