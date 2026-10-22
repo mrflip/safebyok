@@ -1,10 +1,11 @@
-import { DeviceMark, LeaseRecord, type VaultScope } from './types'
+import { DeviceRecord, LeaseRecord, type VaultScope } from './types'
 import * as Ckeys from './ckeys'
+import { sameScope } from './names'
 import { VaultError } from './errors'
 import { type Outcome, isOutcomeShaped, outcomeOf, valOf } from './outcome'
 import { isStorageBlocked } from './refusals'
 
-/** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device mark.
+/** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device record.
  * A {@link LeaseRecord} holds a non-extractable leaseKey, a CryptoKey with no JSON form. So an
  * adapter keeps records by structured clone (IndexedDB: `safebyok/idb`) or in memory. Nothing here
  * ever goes to the backend.
@@ -13,8 +14,9 @@ import { isStorageBlocked } from './refusals'
  * deviceOutcomeOf}. A vault guards a host's DeviceDB all the same, and says a throw as a condition.
  *
  * An adapter may answer a damaged or unreadable record with null rather than refuse. That is the
- * safe failure: a lost lease asks for the passphrase again, and a lost mark checks the vault
- * afresh. The vault checks whatever `getLease` and `getMark` hand back.
+ * safe failure: a lost lease asks for the passphrase again, and a lost device record checks the
+ * vault afresh. The vault checks whatever `getLease` hands back, and the bank and the vault
+ * whatever `getDeviceRecord` and `raiseDeviceRecord` do: a record of another scope reads as none.
  *
  * **Calls land in the order they were made.** One scope's calls take effect in the order the
  * vault made them, whether or not it awaited each: a `putLease` followed by a `delLease` leaves no
@@ -29,15 +31,17 @@ export interface DeviceDB {
   putLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>>
   /** Erase the lease of one vault: how a lock revokes it, and how a lease that no longer fits is discarded. */
   delLease(scope: VaultScope): Promise<Outcome<void>>
-  /** This device's mark for one vault, or null for none. The vault judges what it says. */
-  getMark(scope: VaultScope): Promise<Outcome<DeviceMark | null>>
-  /** Keep `mark` as this device's mark for its vault, in place of any before. */
-  putMark(mark: DeviceMark): Promise<Outcome<void>>
-  /** Erase this device's mark for one vault, as `del()` and `delDamagedVault` do.
-   * A host accepting storage restored from an older copy on purpose, after `rolled_back`, calls it.
+  /** This device's record of one scope, or null for none. The bank judges what it says. */
+  getDeviceRecord(scope: VaultScope): Promise<Outcome<DeviceRecord | null>>
+  /** Keep `record` as this device's record of its scope, raised and never lowered, resolving the record as stored.
+   * In one transaction: where a record stands, it keeps its `device_id` and the higher of the two
+   * `highest_vault_epoch`s, so a tab that saw less never lowers what another saw; where none
+   * stands, `record` is stored as it came. {@link raisedDeviceRecord} is that rule.
    */
-  delMark(scope: VaultScope): Promise<Outcome<void>>
-  /** Remove every lease and device mark on this device: the device's part of a full reset. */
+  raiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>>
+  /** Erase this device's record of one scope, as `bank.clearCachedVault` does. */
+  delDeviceRecord(scope: VaultScope): Promise<Outcome<void>>
+  /** Remove every lease and device record on this device: the device's part of a full reset. */
   delAll(): Promise<Outcome<void>>
 }
 
@@ -52,11 +56,11 @@ export type DeviceVerb = keyof DeviceDB
  *   const deviceDB = memoryDeviceDB()
  *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
- *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+ *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
  */
 export const memoryDeviceDB = (): DeviceDB => {
   const leases = new Map<string, LeaseRecord>()
-  const marks = new Map<string, DeviceMark>()
+  const records = new Map<string, DeviceRecord>()
   return {
     getLease: (scope) => deviceOutcomeOf('getLease', () => {
       const kept = leases.get(Ckeys.lease(scope))
@@ -77,27 +81,63 @@ export const memoryDeviceDB = (): DeviceDB => {
 
     delLease: (scope) => deviceOutcomeOf('delLease', () => { leases.delete(Ckeys.lease(scope)) }),
 
-    getMark: (scope) => deviceOutcomeOf('getMark', () => {
-      const kept = marks.get(Ckeys.mark(scope))
+    getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => {
+      const kept = records.get(Ckeys.deviceRecord(scope))
       if (kept === undefined) { return null }
-      const checked = DeviceMark.safeParse(kept)
-      // A malformed mark reads as none, as on a device that never saw the vault.
+      const checked = DeviceRecord.safeParse(kept)
+      // A malformed record reads as none, as on a device that never saw the vault.
       if (! checked.success) {
-        marks.delete(Ckeys.mark(scope))
+        records.delete(Ckeys.deviceRecord(scope))
         return null
       }
       return checked.data
     }),
 
-    putMark: (mark) => deviceOutcomeOf('putMark', () => { marks.set(Ckeys.mark(mark), mark) }),
+    raiseDeviceRecord: (record) => deviceOutcomeOf('raiseDeviceRecord', () => {
+      const ckey = Ckeys.deviceRecord(record)
+      const raised = raisedDeviceRecord(records.get(ckey), record)
+      records.set(ckey, raised)
+      return raised
+    }),
 
-    delMark: (scope) => deviceOutcomeOf('delMark', () => { marks.delete(Ckeys.mark(scope)) }),
+    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', () => { records.delete(Ckeys.deviceRecord(scope)) }),
 
     delAll: () => deviceOutcomeOf('delAll', () => {
       leases.clear()
-      marks.clear()
+      records.clear()
     }),
   }
+}
+
+/** The device record a {@link DeviceDB.raiseDeviceRecord} stores, given what stands under its ckey (`stored`, as read, unchecked) and the `record` handed to it.
+ * Where `stored` is a device record of the same scope, it keeps its `device_id`, and the higher
+ * `highest_vault_epoch` of the two: a lower one never replaces a higher. Anything else stored --
+ * none, or a row that fails its check -- gives way to `record` as it came. A DeviceDB of your own
+ * calls it inside the one transaction that reads and writes the row.
+ *
+ * @example raisedDeviceRecord(undefined, record)                                    // record
+ * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
+ */
+export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
+  const checked = DeviceRecord.safeParse(stored)
+  if (! checked.success || Ckeys.deviceRecord(checked.data) !== Ckeys.deviceRecord(record)) { return record }
+  const standing = checked.data
+  if (standing.highest_vault_epoch >= record.highest_vault_epoch) { return standing }
+  return { ...standing, highest_vault_epoch: record.highest_vault_epoch }
+}
+
+/** `answer`, a device record a DeviceDB handed back for `scope`, checked: the record, or null for one that fails its check or names another scope, as for none.
+ * The bank and the vault read every device record through it, as they read a lease through
+ * `Lease.make`: a record misfiled under another scope, or malformed, never reaches a way in, and
+ * the raise that follows starts the record again under its own scope.
+ *
+ * @example deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))   // the record, or null
+ * @example deviceRecordFor(scope, { ...record, user_id: 'someone-else' })             // null
+ */
+export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
+  const checked = DeviceRecord.safeParse(answer)
+  if (! checked.success || ! sameScope(checked.data, scope)) { return null }
+  return checked.data
 }
 
 // == [Device trouble]: deviceOutcomeOf, deviceTroubleAsConditions, DeviceTroubleSaid, deviceTrouble
@@ -109,8 +149,8 @@ export const memoryDeviceDB = (): DeviceDB => {
  *
  * @param verb - The DeviceDB verb answering, which the message names.
  *
- * @example getMark: (scope) => deviceOutcomeOf('getMark', () => myStore.read(markCkeyOf(scope)))   // { ok: true, val: the record, or null }
- * @example await deviceOutcomeOf('putMark', () => myStore.write(ckey, mark))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
+ * @example getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => myStore.read(recordCkeyOf(scope)))   // { ok: true, val: the record, or null }
+ * @example await deviceOutcomeOf('delDeviceRecord', () => myStore.erase(ckey))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => ValT | Promise<ValT>): Promise<Outcome<ValT>> => (
   outcomeOf(body, (thrown) => deviceTrouble(verb, thrown))
@@ -120,16 +160,16 @@ export const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => ValT | Promi
  * A throw, a rejection, or a bad outcome whose `err` is no VaultError, becomes what {@link
  * deviceOutcomeOf} makes of a failure. An answer that is no Outcome refuses 'bad_option'.
  *
- * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its mark of this vault..."
- * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
+ * @example await deviceTroubleAsConditions(deviceDB).getDeviceRecord(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its record of this vault..."
+ * @example await deviceTroubleAsConditions(deviceDB).getDeviceRecord(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
   getLease: (...args) => guarded('getLease', () => deviceDB.getLease(...args)),
   putLease: (...args) => guarded('putLease', () => deviceDB.putLease(...args)),
   delLease: (...args) => guarded('delLease', () => deviceDB.delLease(...args)),
-  getMark:  (...args) => guarded('getMark', () => deviceDB.getMark(...args)),
-  putMark:  (...args) => guarded('putMark', () => deviceDB.putMark(...args)),
-  delMark:  (...args) => guarded('delMark', () => deviceDB.delMark(...args)),
+  getDeviceRecord:   (...args) => guarded('getDeviceRecord', () => deviceDB.getDeviceRecord(...args)),
+  raiseDeviceRecord: (...args) => guarded('raiseDeviceRecord', () => deviceDB.raiseDeviceRecord(...args)),
+  delDeviceRecord:   (...args) => guarded('delDeviceRecord', () => deviceDB.delDeviceRecord(...args)),
   delAll:   (...args) => guarded('delAll', () => deviceDB.delAll(...args)),
 })
 
@@ -149,9 +189,9 @@ const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }
   getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
   delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
-  getMark:  { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
-  putMark:  { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
-  delMark:  { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
+  getDeviceRecord:   { failed: "reading its record of this vault (the newest copy of the vault it has seen), so the vault could not check storage against it" },
+  raiseDeviceRecord: { failed: "writing its record of this vault (the newest copy of the vault it has seen), so it may not be kept" },
+  delDeviceRecord:   { failed: "erasing its record of this vault, so it still holds the newest copy of the vault it had seen" },
   delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
 

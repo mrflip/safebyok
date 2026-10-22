@@ -6,18 +6,18 @@ import type { VaultDB } from './vault-db'
 export type RefusalResponse = 'lock' | 'none'
 
 /** What a vault does about a storage refusal beyond throwing it: the one place that decides.
- * `identity_revoked` and `rolled_back` answer `lock`: storage the vault cannot trust to serve this
+ * `identity_revoked` and `vault_behind` answer `lock`: storage the vault cannot trust to serve this
  * user's own vault locks it, as `lock()` does, removing nothing stored. Every other kind answers
  * `none`. No host option changes this.
  *
  * @param refusal - What a storage call threw, or what the vault made of what storage handed back.
  *
  * @example decide(new VaultError('identity_revoked', 'Signed out.'))  // 'lock'
- * @example decide(new VaultError('rolled_back', 'An older copy.'))     // 'lock'
+ * @example decide(new VaultError('vault_behind', 'An older copy.'))    // 'lock'
  * @example decide(new VaultError('not_permitted', 'Not yours.'))      // 'none'
  */
 export const decide = (refusal: unknown): RefusalResponse => (
-  isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'rolled_back') ? 'lock' : 'none'
+  isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'vault_behind') ? 'lock' : 'none'
 )
 
 /** The VaultDB verbs a vault calls, each resolving to an Outcome. */

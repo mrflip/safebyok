@@ -7,7 +7,7 @@ import type { VaultScope } from './types'
  *     vault^acme^u1^main
  *     box^acme^u1^main^anthropic
  *     lease^acme^u1^main
- *     mark^acme^u1^main
+ *     device^acme^u1^main
  *
  * No two rows share a ckey, and every ckey splits back into its names. A ckey is part of what is
  * stored: rows filed under these are where every other device's copy of the package looks.
@@ -35,11 +35,11 @@ export const box = (scope: VaultScope, boxlabel: string): string => join([['kind
  */
 export const lease = (scope: VaultScope): string => join([['kind', 'lease'], ...scopeParts(scope)])
 
-/** The ckey of `scope`'s device mark, on a device's own storage.
+/** The ckey of `scope`'s device record, on a device's own storage.
  *
- * @example mark(scope)  // 'mark^acme^u1^main'
+ * @example deviceRecord(scope)  // 'device^acme^u1^main'
  */
-export const mark = (scope: VaultScope): string => join([['kind', 'mark'], ...scopeParts(scope)])
+export const deviceRecord = (scope: VaultScope): string => join([['kind', 'device'], ...scopeParts(scope)])
 
 /** The text that begins the ckey of every box in `scope` and of nothing else, for a store that lists by prefix or key range.
  *
@@ -66,19 +66,19 @@ export const boxlabelOf = (ckey: string): string | null => {
 }
 
 /** True only for the ckeys {@link lease} gives, for any scope, and false for an earlier version's.
- * On a device shelf, a row both this and {@link isMark} reject is one this version did not write.
+ * On a device shelf, a row both this and {@link isDeviceRecord} reject is one this version did not write.
  *
  * @example isLease(lease(scope))           // true
  * @example isLease('unlock^acme^u1^main')  // false: an earlier version's ckey
  */
 export const isLease = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`lease${Delimiter}`)
 
-/** True only for the ckeys {@link mark} gives, for any scope.
+/** True only for the ckeys {@link deviceRecord} gives, for any scope: an earlier version's device mark (`mark^...`) is not one.
  *
- * @example isMark(mark(scope))     // true
- * @example isMark(lease(scope))    // false
+ * @example isDeviceRecord(deviceRecord(scope))    // true
+ * @example isDeviceRecord(lease(scope))           // false
  */
-export const isMark = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`mark${Delimiter}`)
+export const isDeviceRecord = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`device${Delimiter}`)
 
 /** One part of a ckey, beside what a refusal calls it: a row's kind, or one of its names. */
 type Part = readonly [said: string, part: string]

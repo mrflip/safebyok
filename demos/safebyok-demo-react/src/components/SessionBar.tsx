@@ -51,8 +51,12 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
 
   const deleteAccount = async () => {
     if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
-    await vault?.del()
+    // The account goes in the same task as the vault's deletion begins. Once its Vault object is
+    // gone, the provider asks for the vault again, as after the dialog's "Start over", and would
+    // store the next life, novel, under the account being deleted.
+    const deleting = vault?.del()
     await auth.deleteAccount()
+    await deleting
   }
 
   return (

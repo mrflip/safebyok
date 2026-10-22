@@ -28,8 +28,8 @@ export const KnockKnock = () => {
   const [telling, setTelling] = useState(false)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // The handle comes at once, its boxes listed only once its hello has read storage.
-  if (vault === null || snapshot === null || snapshot.state === 'opening') { return null }
+  // No Vault object until its birth has read storage, and with it the boxes it lists.
+  if (vault === null || snapshot === null) { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
   const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged

@@ -8,7 +8,7 @@ import type { VaultScope } from './types'
  */
 export type PassphraseVerdict = { strong: true } | { strong: false, reason: string }
 
-/** `Vault.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
+/** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
  * tries first. The vault runs it before any key derivation on each new passphrase: the one the
  * first `unlock()` creates a vault with, and each one `putWayin()` sets. It never runs on
@@ -16,7 +16,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * that answers no verdict 'bad_option'.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`. `hello()` runs it at every hello that reads storage, so make it cost nothing once it has
+ * `load`. `bank.hello()` runs it once it is called, so make it cost nothing once it has
  * succeeded, and forget a failure. A `load` that fails refuses the hello 'unexpected_error', so a
  * vault that cannot check a new passphrase never opens.
  *
@@ -32,7 +32,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  */
 export type StrengthChecker = {
   (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge; `hello()` runs it. */
+  /** Fetch or build what the checker needs before it can judge; `bank.hello()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 
@@ -48,7 +48,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** What {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Vault.make needs a strengthChecker, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.
@@ -63,7 +63,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** What Vault.make's options schema holds `strengthChecker` to. */
+/** What Bank.make's options schema holds `strengthChecker` to. */
 export const strengthChecker = Z.custom<StrengthChecker>(isStrengthChecker, {
   error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
 })
@@ -96,19 +96,24 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
       checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
     } catch {
-      throw new VaultError('unexpected_error', "The strengthChecker handed to Vault.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+      throw new VaultError('unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }
     if (! checked.success) {
-      throw new VaultError('bad_option', "The strengthChecker handed to Vault.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+      throw new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }
-  const load = async (): Promise<void> => {
-    try {
-      await hostChecker.load?.()
-    } catch (err) {
-      throw new VaultError('unexpected_error', "The strengthChecker's load() failed, so the vault could not check a new passphrase, and hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next hello().", { cause: err })
-    }
+  return Object.assign(check, { load: () => loadStrengthChecker(hostChecker) })
+}
+
+/** Run `hostChecker`'s `load`, if it has one: what `bank.hello()` does before any vault is born. Its failure is 'unexpected_error', what it threw the cause.
+ *
+ * @example await loadStrengthChecker(zxcvbnStrengthChecker)   // the zxcvbn chunk fetched, or 'unexpected_error'
+ */
+export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise<void> => {
+  try {
+    await hostChecker.load?.()
+  } catch (err) {
+    throw new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause: err })
   }
-  return Object.assign(check, { load })
 }

@@ -70,8 +70,8 @@ export const VaultDashboard = () => {
       </p>
     )
   }
-  // The handle comes at once, and says it is opening until its hello has read storage.
-  if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
+  // No Vault object until its birth has read storage: until then, the vault is opening.
+  if (vault === null || snapshot === null) { return <p className="quiet">Opening vault…</p> }
 
   // A read the user dismissed the passphrase dialog for is refused vault_locked, and a box gone
   // meanwhile absent_box: nothing to show.
@@ -97,8 +97,9 @@ export const VaultDashboard = () => {
       await vault.delBox(boxlabel)
     } catch (err) {
       // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
-      // the user deleted to start over from the passphrase dialog -- is what was asked for.
-      if (isVaultError(err, 'vault_locked')) { return }
+      // the user deleted to start over from the passphrase dialog, its Vault object gone with it
+      // -- is what was asked for.
+      if (isVaultError(err, 'vault_locked') || isVaultError(err, 'vault_gone')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
     hide(boxlabel)
@@ -240,6 +241,6 @@ const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassph
     )
   }
   if (state === 'locked') { return <span className="chip locked">🔒 locked</span> }
-  if (state === 'absent') { return <span className="chip">no vault yet</span> }
+  if (state === 'novel') { return <span className="chip">no vault yet</span> }
   return <span className="chip">…</span>
 }

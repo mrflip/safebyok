@@ -22,10 +22,11 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and tell
  * the user plainly that the vault lives only in this browser.
  *
- * @returns The VaultDB, to hand `Vault.make`. Kind 'bad_option' for a `dbName` that is not non-empty text.
+ * @returns The VaultDB, to hand `Bank.make`. Kind 'bad_option' for a `dbName` that is not non-empty text.
  *
  * @example
- *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
+ *   const bank = Bank.make({ applabel: 'acme', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
+ *   const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
  */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 

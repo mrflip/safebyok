@@ -53,14 +53,14 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * Unstyled markup under the `modal-scrim` / `modal` / `quiet` / `gripe` class names, for the
  * host's stylesheet to dress, with a dialog's semantics: the scrim is the `dialog`, named by its
  * heading, and Escape anywhere in it cancels, answering `declined`. Each submit is one
- * `ask.attempt`. Its behaviors are the contract: an ask whose `why` is `absent` reads as "choose a
- * passphrase" (it creates the vault); a wrong passphrase stays in the dialog with a calm message;
+ * `ask.attempt`. Its behaviors are the contract: an ask whose `why` is `novel` reads as "choose a
+ * passphrase" (it sets the vault's first); a wrong passphrase stays in the dialog with a calm message;
  * an attempt that is ok answers `unlocked`; and a lock that lands while it is up -- its ask's
  * `lockLanded` -- closes it, answering `declined`, as does an attempt the lock won. Whichever the
  * case, it says plainly that a forgotten passphrase cannot be recovered, and how long an unlock
  * lasts on this device. For a vault with a passkey, in a browser offering WebAuthn, "Use a
  * passkey" comes first, and takes the focus. A vault that comes to be unlocked while it asks for
- * a locked or absent one -- by `unlock()` elsewhere in the app, say -- answers it `unlocked`.
+ * a locked or novel one -- by `unlock()` elsewhere in the app, say -- answers it `unlocked`.
  *
  * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
  * into "unlock", a passkey added brings its button -- and handed another ask, it starts afresh,
@@ -72,11 +72,12 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * in place, in the vault's own calm words, through a live region a screen reader announces, and
  * the user may try again or cancel. A lock that won, storage out of reach, or any other refusal
  * closes it, answering `declined`. A first unlock that
- * lost the race to create the vault to another device (`created_elsewhere`) is shown as advice,
- * in the `quiet` style rather than the `gripe` one -- it is no typo -- and the dialog, now an
- * unlock of that vault, stays open: the field is emptied and focused for the passphrase chosen
- * there, and the advice stays, through typing, until the next submit. Anything else --
- * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
+ * lost the race to set the vault's first passphrase to another device (`gate_made_elsewhere`) is
+ * shown as advice, in the `quiet` style rather than the `gripe` one -- it is no typo. The dialog
+ * stays open, and has the vault say hello, so that it reads the passphrase set there and shows
+ * `locked`: the dialog is an unlock of that vault now. The field is emptied and focused for the
+ * passphrase chosen there, and the advice stays, through typing, until the next submit. Anything
+ * else -- misuse, such as a strength checker that answers no verdict, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
  * (or Escape) calls `onDone('declined')` -- unless a lock lands or the vault unlocks under it first,
  * as for the form -- and React reports the error, carrying nothing typed, through the root's
@@ -93,8 +94,10 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
  * Start a new vault" asks first, then deletes the vault (`vault.del()`, on every device). A
- * delete lands as a lock does, so the dialog then closes, answering `declined`, and the next call
- * that needs the vault asks the user to choose a passphrase for the new one. Off by default.
+ * delete ends the prompt as a lock does, so the dialog then closes, answering `declined`, and
+ * the call that asked is refused 'vault_gone'. The Vault object deleted is gone; the vault asked
+ * for again is a new one, `novel`, for the user to choose a passphrase for (`VaultProvider` asks
+ * for it on its own). Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
  * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing
@@ -323,7 +326,7 @@ const PassphraseField = ({ ref, creating, takesFocus, username, advice, onChange
 /**
  * The dialog's one answer to `ask`: `done`, which calls the host's `onDone` (as of the last
  * commit) the first time only. A lock landing answers `declined`, and a vault `unlocked` under a
- * dialog asking for a locked or absent one answers `unlocked`.
+ * dialog asking for a locked or novel one answers `unlocked`.
  */
 const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked: boolean) => {
   const onDoneRef = useRef(onDone)
@@ -362,9 +365,9 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
-  const advice = useAdvice(passphraseAdvice, vault, snapshot.state === 'absent', (err) => { setFailure({ err }) })
+  const advice = useAdvice(passphraseAdvice, vault, snapshot.state === 'novel', (err) => { setFailure({ err }) })
   if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
-  const creating = snapshot.state === 'absent'
+  const creating = snapshot.state === 'novel'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)
   // Asked only of a vault there is to delete: one deleted meanwhile has the user choose anew, and
@@ -376,12 +379,14 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   /** A refusal the user meets, as `attemptRefusalFlavor` groups them: in place, as advice, closing the dialog, or misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
-    if (flavor === 'created_elsewhere') {
-      // The passphrase typed has just been shown not to open the vault: the field is emptied for
-      // the one chosen on the other device, and the advice stays until the next submit.
+    if (flavor === 'gate_made_elsewhere') {
+      // The passphrase typed was not set: the field is emptied for the one chosen on the other
+      // device, and the advice stays until the next submit. The hello reads the gate set there,
+      // and the vault shows locked; a refusal it meets is the vault's to tell.
       setGripe({ text: (err as Error).message, fromPasskey: false, asAdvice: true })
       if (fieldRef.current !== null) { fieldRef.current.value = '' }
       fieldRef.current?.focus()
+      void vault.tryHello()
       return
     }
     if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false, asAdvice: false }); return }
@@ -405,7 +410,7 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
     const { ok, err } = await vault.tryDel()
     if (! isMounted()) { return }
     setDeleting(false)
-    // A delete lands as a lock: lockLanded closes the dialog.
+    // A delete ends the prompt as a lock does: lockLanded closes the dialog.
     if (ok) { setStartingOver(false); return }
     // The vault the user agreed to delete was deleted already, or made anew, elsewhere: what
     // stands now was never confirmed, so the question goes, to be asked afresh.

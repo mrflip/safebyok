@@ -28,7 +28,7 @@ export type KeyDeriverSpec = {
 /** The keyDeriverSpec safebyok supplies, which `browserOpts()` derives under: Argon2id over 64 MiB, 3 passes, 1 lane, a 16-byte salt.
  * It is above OWASP's Argon2id minimums. It is RFC 9106's second recommended option with one lane
  * in place of four, since a JavaScript deriver runs lanes one after another. A deriver wearing its
- * label must carry exactly these parameters, or Vault.make and `argon2idDeriver` refuse it.
+ * label must carry exactly these parameters, or Bank.make and `argon2idDeriver` refuse it.
  *
  * @example Argon2idWebV1.key_deriver_label  // 'argon2id_web_v1'
  * @example Argon2idWebV1.memory_kib         // 65536, i.e. 64 MiB
@@ -120,7 +120,7 @@ const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
 }
 
 /** `candidate` as a KeyDeriverSpec Argon2id can run, holding nothing but a spec's fields: the check for another Argon2id implementation to make.
- * `argon2idDeriver` makes it, and so does `Vault.make` of a deriver declaring `algorithm: 'argon2id'`.
+ * `argon2idDeriver` makes it, and so does `Bank.make` of a deriver declaring `algorithm: 'argon2id'`.
  * Weak parameters that run are allowed: choosing them is the host's call.
  *
  * It refuses 'bad_option', naming the field, for a spec Argon2id cannot run. That is a salt under
@@ -153,5 +153,5 @@ export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec =
 /** The label prefix that marks a deriver made cheap for tests, which no vault of real secrets should use. */
 export const TestLabelPrefix = 'test_'
 
-/** What `Vault.make` warns through the logger when the keyDeriver's label begins {@link TestLabelPrefix}. */
+/** What `Bank.make` warns through the logger when the keyDeriver's label begins {@link TestLabelPrefix}. */
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."

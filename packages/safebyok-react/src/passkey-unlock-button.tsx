@@ -20,8 +20,7 @@ import { askPasskey, passkeysAvailable } from './passkey'
  * press first tells `onGripe(null)`: whatever the button said before no longer stands. A
  * dismissed prompt then does nothing more; a refusal to show in place (a wrong or removed passkey,
  * an authenticator without PRF) goes to `onGripe` with its calm message, for the dialog to show.
- * Anything else -- misuse, such as an `rpId` that does not fit the page or a closed vault handle,
- * or a failure that is no VaultError -- never reaches the host's page: the button
+ * Anything else -- misuse, such as an `rpId` that does not fit the page, or a failure that is no VaultError -- never reaches the host's page: the button
  * takes itself away, `onGripe` hears "Your passkey can't be used here just now. Unlock with your
  * passphrase instead.", and React reports the error, carrying nothing typed, through the root's `onCaughtError` (the
  * console, by default, with the component stack), where the developer and an error tracker meet

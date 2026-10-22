@@ -2,19 +2,22 @@ import * as Names from './names'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
 import { deviceTroubleAsConditions } from './device-db'
-import { type MakeVaultOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
+import { randomId } from './crypto'
+import { DeviceRecordFormat } from './types'
+import { type MakeBankOpts, type VaultDraft, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
-/** What {@link delDamagedVault} needs of Vault.make's options: which vault, and the two stores it lives in. */
-export type DelDamagedVaultOpts = Pick<MakeVaultOpts, 'applabel' | 'userId' | 'vaultlabel' | 'vaultDB' | 'deviceDB' | 'validators'>
+/** What {@link delDamagedVault} needs of Bank.make's options and the vault's draft: which vault, and the two stores it lives in. */
+export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'deviceDB' | 'validators'> & Pick<VaultDraft, 'userId' | 'vaultlabel'>
 
-/** Delete a vault whose `hello()` refuses it as `damaged_vault`: its vault props, every box, and this device's lease and mark of it.
+/** Delete a vault whose birth refuses it as `damaged_vault`: its vault props, every box, and this device's lease of it.
  * There is no Vault object to `del()` it with, so this is how to clear it and start over. It takes
- * the options `Vault.make` took, and refuses misuse as `Vault.make` does, before touching storage.
- * What the vault held is gone for good: ask the user first. Goes through `VaultDB.delDamagedVault`,
- * then the DeviceDB's `delLease` and `delMark`.
+ * the options `Bank.make` took beside the vault's `userId` and `vaultlabel`, and refuses misuse as
+ * they do, before touching storage. What the vault held is gone for good: ask the user first. Goes
+ * through `VaultDB.delDamagedVault`, then the DeviceDB's `delLease`, and raises this device's
+ * record of the scope to the tombstone's `vault_epoch` with `raiseDeviceRecord`.
  *
- * Once it resolves, storage holds no vault in the scope and this device remembers none. With no
- * vault stored it only clears the device, so a call cut short can be made again.
+ * Once it resolves, storage holds no vault in the scope and this device holds no lease of it. With
+ * no vault stored it only clears the lease, so a call cut short can be made again.
  *
  * A sound vault refuses 'bad_option': delete it with `vault.del()`. Props too damaged to name
  * their vault refuse 'damaged_vault', which this cannot clear. A `format` this version does not
@@ -24,13 +27,14 @@ export type DelDamagedVaultOpts = Pick<MakeVaultOpts, 'applabel' | 'userId' | 'v
  * 'identity_revoked' locks nothing.
  *
  * @example
- *   const vault = Vault.make(opts)
- *   try { await vault.hello() } catch (err) {
- *     if (isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) { await delDamagedVault(opts); await vault.hello() }
+ *   const { ok, err } = await bank.tryEnsureVault({ userId, vaultlabel: 'main' })
+ *   if (! ok && isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) {
+ *     await delDamagedVault({ ...bankOpts, userId, vaultlabel: 'main' })
+ *     await bank.ensureVault({ userId, vaultlabel: 'main' })   // a new life, novel
  *   }
  */
 export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> => {
-  if (! isBag(opts)) { throw new VaultError('bad_option', 'delDamagedVault takes one bag of options: applabel, userId, vaultlabel, vaultDB and deviceDB, as Vault.make did.') }
+  if (! isBag(opts)) { throw new VaultError('bad_option', 'delDamagedVault takes one bag of options: applabel, userId, vaultlabel, vaultDB and deviceDB, as Bank.make and bank.ensureVault took them.') }
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const vaultDB = parseVaultDB(opts.vaultDB)
@@ -40,8 +44,10 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
-  valOf(await vaultDB.delDamagedVault(scope))
+  const tombstone = valOf(await vaultDB.delDamagedVault(scope))
   valOf(await deviceDB.delLease(scope))
-  valOf(await deviceDB.delMark(scope))
+  if (tombstone === null) { return }
+  // The device_id is kept where a record stands: raising keeps the first one stored.
+  valOf(await deviceDB.raiseDeviceRecord({ format: DeviceRecordFormat, ...scope, device_id: randomId(), highest_vault_epoch: tombstone.vault_epoch }))
 }
 

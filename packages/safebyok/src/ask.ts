@@ -4,9 +4,9 @@ import { VaultError } from './errors'
 import { type Outcome, bad, outcomeOf, unexpectedError } from './outcome'
 
 /** Why the vault asks for a proof: each `why` an {@link Ask} may carry. */
-export const AskWhyVals = ['absent', 'locked', 'lease_ending'] as const
-/** Why the vault asks for a proof: `absent`, `locked` or `lease_ending`.
- * `absent`: the vault has never been made, and this proof's passphrase makes it. `locked`: the
+export const AskWhyVals = ['novel', 'locked', 'lease_ending'] as const
+/** Why the vault asks for a proof: `novel`, `locked` or `lease_ending`.
+ * `novel`: the vault has no passphrase yet, and this proof's passphrase becomes its first. `locked`: the
  * vault stands and this device holds no lease. `lease_ending`: this device's lease ends within the
  * `renewMinutes` its call asked for.
  */
@@ -60,11 +60,11 @@ export type RaisedAsk = {
  * @example void ask.lockLanded.then(() => { closeDialog('declined') })
  */
 export class Ask {
-  /** Why the vault asks. `absent` is a create: offer strength advice. */
+  /** Why the vault asks. `novel` sets the first passphrase: offer strength advice. */
   readonly why: AskWhy
   /** The vault asking, its fields live while the dialog is up. */
   readonly vault: Vault
-  /** Settles only when a `lock()`, `close()` or `del()` lands while the prompt is up: close the dialog, answering `declined`.
+  /** Settles only when a `lock()` or `del()` lands while the prompt is up, or the bank lets the vault go: close the dialog, answering `declined`.
    * Every call waiting on the prompt is then refused 'vault_locked'.
    */
   readonly lockLanded: Promise<void>
@@ -85,8 +85,8 @@ export class Ask {
   }
 
   /** Try one proof, the passphrase typed or a passkey's answer: resolves the vault unlocked, or the refusal as `unlock()` refuses.
-   * Show 'wrong_passphrase' and 'wrong_passkey' in place and ask again; on `absent`, so too
-   * 'weak_passphrase' and 'created_elsewhere'. On 'absent_wayin' and 'damaged_wayin', offer the
+   * Show 'wrong_passphrase' and 'wrong_passkey' in place and ask again; on `novel`, so too
+   * 'weak_passphrase' and 'gate_made_elsewhere'. On 'absent_wayin' and 'damaged_wayin', offer the
    * other wayin. On anything else, 'vault_locked' among it, close the dialog, answering `declined`.
    *
    * Once the prompt is over (`lockLanded` settled, or the ask answered), it refuses 'vault_locked'
@@ -134,7 +134,7 @@ export class Ask {
     }
     // Neither refusal quotes the answer: a getProof gone wrong could hand back the passphrase.
     if (! ProofAnswerVals.includes(answered as ProofAnswer)) {
-      throw new VaultError('bad_option', "getProof answers one of 'unlocked', 'declined' or 'carry_on': fix the getProof passed to Vault.make.")
+      throw new VaultError('bad_option', "getProof answers one of 'unlocked', 'declined' or 'carry_on': fix the getProof passed to Bank.make.")
     }
     if (answered === 'carry_on' && this.why !== 'lease_ending') {
       throw new VaultError('bad_option', "getProof answered 'carry_on', which only a lease ending allows (ask.why 'lease_ending'): answer 'unlocked' once an attempt is ok, or 'declined'.")

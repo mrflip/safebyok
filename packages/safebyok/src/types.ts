@@ -162,7 +162,7 @@ export type DamagedBox = { boxlabel: string, damaged: true, revision_tok: string
 const roomLimit = Z.union([Z.int().check(Z.positive()), Z.literal(Infinity)])
 
 // A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
-// safe integer, as Vault.make keeps a declared limit: past this check, no limit is infinite.
+// safe integer, as Bank.make keeps a declared limit: past this check, no limit is infinite.
 const roomKept = Z.transform((most: number) => Math.min(most, Number.MAX_SAFE_INTEGER))
 
 /** How much of one limit a vault has used: a whole number `used`, against a whole number `max` above zero. */
@@ -377,47 +377,40 @@ export const LeaseRecord = Z.object({
 })
 export type LeaseRecord = Z.infer<typeof LeaseRecord>
 
-/** What a device mark holds of the vault it has seen under its scope: its own id for the vault, and the highest `gate_epoch` it has seen.
- * Older vault props that storage hands back later are refused as 'rolled_back'.
- */
-export const SeenVault = Z.object({
-  /** This device's random id for the vault, minted the first time it reads or makes the vault, and carried by every wayin it seals. */
-  device_id:       Z.string().check(Z.minLength(1)),
-  /** The vault this mark is of. */
-  vault_tok:       Z.string().check(Z.minLength(1)),
-  /** The highest `gate_epoch` this device has seen the vault props at. */
-  gate_epoch:      Z.int().check(Z.positive()),
-})
-export type SeenVault = Z.infer<typeof SeenVault>
+/** The `format` a {@link DeviceRecord} carries. */
+export const DeviceRecordFormat = 'safebyok-device-v1'
 
-/** What a device keeps of a vault's scope, locked or not: what it has `seen` of the vault there. Nothing in it is secret.
- * There is one per scope: a vault made anew there is seen afresh, under a new `device_id`.
- * `lock()` leaves the mark, and `del()` erases it.
+/** What this device keeps of one scope, locked or not, across the vault's lives there: its own id, and the highest `vault_epoch` it has seen. Nothing in it is secret.
+ * A vault served below `highest_vault_epoch` was rolled back, and the bank refuses it as
+ * 'vault_behind'. The DeviceDB raises it, never lowers it: a write of a lower epoch keeps the
+ * higher, and the first `device_id` stored stays. `bank.clearCachedVault` erases it.
  *
- * @example { format: 'safebyok-mark-v5', ...scope, seen: { device_id, vault_tok, gate_epoch: 1 } }
+ * @example { format: 'safebyok-device-v1', ...scope, device_id: 'Zm9vYmFy', highest_vault_epoch: 3 }
  */
-export const DeviceMark = Z.object({
-  format:     Z.literal('safebyok-mark-v5'),
-  applabel:   NameFloor,
-  user_id:    NameFloor,
-  vaultlabel: NameFloor,
-  /** The vault this device has seen under the scope. */
-  seen:       SeenVault,
+export const DeviceRecord = Z.object({
+  format:              Z.literal(DeviceRecordFormat),
+  applabel:            NameFloor,
+  user_id:             NameFloor,
+  vaultlabel:          NameFloor,
+  /** This device's random id for the scope, minted the first time it births the vault there, and carried by every wayin it seals. */
+  device_id:           Z.string().check(Z.minLength(1)),
+  /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */
+  highest_vault_epoch: Z.int().check(Z.nonnegative()),
 })
-export type DeviceMark = Z.infer<typeof DeviceMark>
+export type DeviceRecord = Z.infer<typeof DeviceRecord>
 
 /** The default `leaseHours`: how long a proof's unlock lasts on this device before the vault asks again. */
 export const LeaseHours = 168 // seven days
 
 /** The default `staleMinutes`: how long a `hello()` trusts the last read of storage, so a burst of hellos costs one read.
  *
- * @example Vault.make({ ...opts, staleMinutes: 1 })   // hello() reads at most once a minute
+ * @example Bank.make({ ...opts, staleMinutes: 1 })   // hello() reads at most once a minute
  */
 export const StaleMinutes = 5
 
 /** The longest finite `leaseHours` a vault takes, 24.5 days: the most one timer reaches. Above it, only `Infinity`, until `lock()`, is taken.
  *
- * @example Vault.make({ ...opts, leaseHours: MaxLeaseHours })   // the longest that ends by itself
+ * @example Bank.make({ ...opts, leaseHours: MaxLeaseHours })   // the longest that ends by itself
  */
 export const MaxLeaseHours = 588
 
@@ -429,8 +422,8 @@ export const MaxWhisperBytes = 40_444 // searchable: 40444
 /** The default `maxBoxes`: within what every supplied storage adapter can hold and still delete in one go, at the default largest whisper. */
 export const MaxBoxes = 100
 
-/** A source of the time, `Vault.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
- * `Vault.make` reads it once, and refuses 'bad_option' for a reading outside {@link FarPast} to
+/** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
+ * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside {@link FarPast} to
  * {@link FarFuture}, or a throw. The vault takes every later reading as it comes.
  */
 export type Clock = { now(): number }

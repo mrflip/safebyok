@@ -13,7 +13,7 @@ export type GraphqlVaultDBOpts = VaultDBOpts & {
   /** Your app's urql Client, its `url` your GraphQL server's. */
   client: GraphqlVaultClient
   /** The most boxes one vault holds, as the VaultDB behind your server enforces it: a whole number above zero, or `Infinity`, the default, for none.
-   * Declare your server's own, so that `Vault.make` refuses a vault asking for more up front,
+   * Declare your server's own, so that `Bank.make` refuses a vault asking for more up front,
    * rather than the server at the first box past it.
    */
   maxBoxes?: number | undefined
@@ -47,7 +47,7 @@ const ServerMaxNameBytes = 640
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
- *   const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB })
  * @example
  *   const vaultDB = graphqlVaultDB({ client, maxBoxes: 250 })  // the server's postgresVaultDB holds 250
  */
