@@ -194,4 +194,6 @@ banned names. STYLE.md is the real source.
 * A doc block's purpose goes on its `/**` line, a sentence that stands alone when the block is
   folded: `/** Read storage and settle the vault.`, the rest on ` * ` lines below. Never `/**`
   alone on its line, whatever the blocks around you do (STYLE.md, *Comments and doc blocks*).
+* Once that first line is written, check the member's name against it: a method that "puts the
+  box stored into the vault's listing" is `updateBoxListingOf`, not `takeStoredBox`.
 * Tests are chai-style (`expect(foo).to.eq(bar)`), their helpers star-imported as `TH`.
