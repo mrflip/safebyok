@@ -5,6 +5,17 @@ Justify: green (root 265; core 2727, 37 skipped; convex 311; postgres 297; graph
 156; react 287; fastkey 49; demo 214; e2e 100, 109 skipped). Size budgets: none moved (`Vault`
 34.3 kB of 38, `everything` 41.8 kB of 45).
 
+**Stopping point (2026-10-22): paused, PR in draft.** The Coach ruled against the lock-in-line
+design: "Lock should not get in line. I also didn't intend for writes to serialize. I only meant
+for each write to await unlock and for at-most-one unlocking process to be executing at once." A
+separate session reasons out the replacement; this thread does not start it. The branch stands
+green and merges cleanly onto `main` as it is (no rebase was needed: `main` has only #241's merge
+commit beyond this stack), so the Coach may merge it as a base to build on. The reviewer's two
+fixes (hello's doc block rewrapped, a VaultDB banner) are on the tip. What the rework replaces:
+`lock()`, `del()`, `close()` and the expiry as turns, and the serialized box reads and writes;
+what it likely keeps: hello's one-round read and judgment, no read inside a call, stale writes
+refusing at once, and the removals listed below.
+
 * **Built** (`packages/safebyok/src/vault.ts`):
   * One queue, `p-limit(1)` (`#turns`, `#turn`, which refuses `vault_closed` at a turn's start).
     `hello` is one turn: settle if timely (`#isTimely`: `#readAt` within `staleMillis`; `#readAt`
