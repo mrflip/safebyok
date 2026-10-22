@@ -1,6 +1,6 @@
 # Thread 5: demand (2026-10-22)
 
-Branch `20261022-demand`, PR #TBD, stacked on #251. Justify: green (core 2824 passed, 37 skipped;
+Branch `20261022-demand`, PR [#253](https://github.com/mrflip/safebyok/pull/253), stacked on [#251](https://github.com/mrflip/safebyok/pull/251). Justify: green (core 2824 passed, 37 skipped;
 react 287; convex 306; postgres 301; graphql 312; indexeddb 159; e2e 102). Size: no budget moves
 (Vault 34.7 kB, everything 42.4 kB; the rule's budgets are unchanged). The full account of races,
 open matters and Contract lines is `thread-5-demand-details.md` beside this file: the reviewer,
