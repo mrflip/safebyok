@@ -42,7 +42,7 @@ describe("vault.stamp", () => {
 })
 // --
 
-// == [The demand]: vault.demandConsistentWith, vault.isConsistentWith
+// == [The demand]: vault.demandConsistentWith, vault.consistentWith
 
 describe("vault.demandConsistentWith", () => {
   it("passes a box the vault handed out while the vault stands, as its first example shows", async () => {
@@ -148,14 +148,14 @@ describe("vault.demandConsistentWith", () => {
 
 })
 
-describe("vault.isConsistentWith", () => {
+describe("vault.consistentWith", () => {
   it("answers the demand's question without refusing: true while the thing stands, false once the vault moved on", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const stamp = stampOf(vault)
-    expect(vault.isConsistentWith(stamp)).to.be.true
-    expect(vault.isConsistentWith({ ...stamp, gate_epoch: 0 })).to.be.false
-    expect(vault.isConsistentWith({ ...stamp, vault_tok: 'vault-tok-other' })).to.be.false
+    expect(vault.consistentWith(stamp)).to.be.true
+    expect(vault.consistentWith({ ...stamp, gate_epoch: 0 })).to.be.false
+    expect(vault.consistentWith({ ...stamp, vault_tok: 'vault-tok-other' })).to.be.false
     expect(world.logged).to.have.lengthOf(0)
   })
 
@@ -164,29 +164,29 @@ describe("vault.isConsistentWith", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     let box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.putWayin('pw', 'pw two')
-    expect(vault.isConsistentWith(box)).to.be.false
+    expect(vault.consistentWith(box)).to.be.false
     const read = await vault.getBox(box.boxlabel)
     if (read === null) { throw new Error('expected the box') }
     box = read
-    expect(vault.isConsistentWith(box)).to.be.true
+    expect(vault.consistentWith(box)).to.be.true
   })
 
   it("asks for a lease in hand that has not ended when lease-bound, dropping none it finds ended", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { leaseHours: 1 })
     const stamp = stampOf(vault)
-    expect(vault.isConsistentWith(stamp, { leaseBound: true })).to.be.true
+    expect(vault.consistentWith(stamp, { leaseBound: true })).to.be.true
     world.advance(60 * 60 * 1000)
-    expect(vault.isConsistentWith(stamp, { leaseBound: true })).to.be.false
-    expect(vault.isConsistentWith(stamp)).to.be.true
+    expect(vault.consistentWith(stamp, { leaseBound: true })).to.be.false
+    expect(vault.consistentWith(stamp)).to.be.true
     expect(vault.lease).to.not.be.null
   })
 
   it("throws 'bad_option' for a thing with no vault_tok, or an option it does not take", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    TH.expectSyncRefusal(() => vault.isConsistentWith({} as never), 'bad_option')
-    TH.expectSyncRefusal(() => vault.isConsistentWith(stampOf(vault), { leasebound: true } as never), 'bad_option')
+    TH.expectSyncRefusal(() => vault.consistentWith({} as never), 'bad_option')
+    TH.expectSyncRefusal(() => vault.consistentWith(stampOf(vault), { leasebound: true } as never), 'bad_option')
   })
 })
 // --

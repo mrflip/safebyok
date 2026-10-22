@@ -1274,6 +1274,16 @@ describe("every data call, through ensureLease", () => {
     })
   }
 
+  it("refuses no_whisper at once for a putBox() leaving out the whisper of a box the listing does not show, asking nothing, and asks for one it shows", async () => {
+    const getProof = typingPw()
+    const { vault } = await lockedVaultWith({ getProof })
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai', sidecar: { note: 'work' } }), 'no_whisper')
+    expect(getProof).not.toHaveBeenCalled()
+    expect(vault.state).to.eq('locked')
+    await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work' } })
+    expect(getProof).toHaveBeenCalledOnce()
+  })
+
   it("refuses a whisper it cannot store before asking for anything: a call that cannot land never prompts", async () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })

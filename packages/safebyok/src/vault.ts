@@ -340,7 +340,7 @@ export class Vault {
   }
   // --
 
-  // == [Vault: demand]: stamp, demandConsistentWith, isConsistentWith
+  // == [Vault: demand]: stamp, demandConsistentWith, consistentWith
 
   /** The vault's {@link Stamp}, frozen: its scope, and the `vault_tok`, `vault_epoch` and `gate_epoch` of the vault it holds now; null while it holds none.
    * Each thing the vault hands out was made under the stamp it held then, and
@@ -380,9 +380,9 @@ export class Vault {
    * has not ended. It changes nothing, not even an ended lease, and logs nothing. A thing missing
    * its `vault_tok`, or an option it does not take, throws 'bad_option', as misuse.
    *
-   * @example if (! vault.isConsistentWith(box)) { box = await vault.getBox(box.boxlabel) }   // read it again once the vault moved on
+   * @example if (! vault.consistentWith(box)) { box = await vault.getBox(box.boxlabel) }   // read it again once the vault moved on
    */
-  isConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): boolean {
+  consistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
     const leaseStands = this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
     return this.#inconsistencyWith(checkedStamped(thing)) === null && (! leaseBound || leaseStands)
@@ -589,7 +589,8 @@ export class Vault {
    * snapshot lists under the boxlabel, keeping its `registered_at`, or as a new box when none is
    * listed. Leave either out to keep the box's own: it reads the box first, opens it (so what it
    * keeps is proven unaltered), and writes over the revision it read. With none standing, a sidecar
-   * left out is `{}`, and a whisper left out refuses 'no_whisper'.
+   * left out is `{}`, and a whisper left out refuses 'no_whisper': at once, asking nobody, for a
+   * box a locked vault's listing does not show.
    *
    * Refuses 'whisper_too_large' when the whisper's JSON and the sidecar's are together over
    * `maxWhisperBytes`; a sidecar kept counts as one given does. Refuses 'vault_full' for a new
@@ -639,7 +640,8 @@ export class Vault {
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
       this.#checkWhisperFits(given, sidecar ?? {})
-      await this.#ensureUnlocked(0)
+      // A whisper left out is kept from the box: one the listing does not show has none to keep.
+      if (! await this.#ensureUnlocked(0, () => given !== undefined || this.#isListed(label))) { throw noWhisper() }
       return good(await this.#sealAndPutBox(label, sidecar, given))
     } catch (err) { return this.#badOutcome(err) }
   }
