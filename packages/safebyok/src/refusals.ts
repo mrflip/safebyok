@@ -59,7 +59,7 @@ export const staleBox = (boxStored: unknown): VaultError => (
 )
 
 /** What a box write's `stale_write` says. */
-export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
+export const StaleBoxMessage = "That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
 
 /** A `stale_write` refusal of an update of the vault props, carrying the vault props standing as `meta.vault_props_stored`. Throw it from `doPutVaultProps`.
  * The `VaultDB` base class checks `vaultPropsStored` as `getVault` checks vault props, so a

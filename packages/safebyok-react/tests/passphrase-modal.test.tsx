@@ -575,6 +575,8 @@ describe("PassphraseModal", () => {
       const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       elsewhere.close()
+      // A read begun after the other device's writes: one rung by them may have begun before the last.
+      await act(async () => { await TH.readAfresh(vault) })
       await waitFor(() => { expect(screen.queryByText('Unlock your vault')).to.not.be.null })
       vault.close()
     })
@@ -713,10 +715,12 @@ describe("PassphraseModal", () => {
       const deleter = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await deleter.del() })
       deleter.close()
+      await act(async () => { await TH.readAfresh(vault) })
       await screen.findByText('Choose a vault passphrase')
       const maker = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await maker.unlock('another pw') })
       maker.close()
+      await act(async () => { await TH.readAfresh(vault) })
       await screen.findByText('Unlock your vault')
       expect(screen.queryByText('Remove and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
@@ -937,9 +941,11 @@ describe("PassphraseModal", () => {
       await gate.reached
       const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
+      await act(async () => { await TH.readAfresh(vault) })
       await screen.findByText('Unlock your vault')
       await act(async () => { await elsewhere.del() })
       elsewhere.close()
+      await act(async () => { await TH.readAfresh(vault) })
       await screen.findByText('Choose a vault passphrase')
       await act(async () => {
         gate.release()

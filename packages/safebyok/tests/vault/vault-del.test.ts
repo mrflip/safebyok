@@ -122,6 +122,8 @@ const worldWithDamagedBox = async (spoil: (row: Record<string, unknown>) => stri
   const vault = await world.openUnlocked('pw', overrides)
   await vault.putBox('anthropic', 'sk-ant-fake', { sidecar: { note: 'personal account' } })
   await vault.putBox('openai', 'sk-openai-fake', { sidecar: { note: 'work account' } })
+  // That write's bell is answered first: a ring during a read is answered by that read.
+  await TH.wakeupAtNextTick()
   world.dbStore.write(u1BoxCkey('anthropic'), spoil(storedRowOf(world, 'anthropic')))
   return { world, vault }
 }
@@ -184,6 +186,7 @@ describe("damaged boxes", () => {
   it("delBox of a sound box beside a damaged one lands without complaint, the damaged one still listed", async () => {
     const [spoil] = DamagedListings[2]
     const { world, vault } = await worldWithDamagedBox(spoil)
+    await TH.wakeupAtNextTick()
     await vault.delBox('openai')
     expect(world.dbStore.read(u1BoxCkey('openai'))).to.be.null
     expect(vault.getSnapshot().boxes).to.have.lengthOf(1)

@@ -759,7 +759,7 @@ const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
-const byCodeUnit = (one: string, two: string): number => {
+export const byCodeUnit = (one: string, two: string): number => {
   if (one === two) { return 0 }
   return one < two ? -1 : 1
 }

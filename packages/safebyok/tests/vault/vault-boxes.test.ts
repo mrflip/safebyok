@@ -555,7 +555,7 @@ describe("the box limit", () => {
     await TH.expectRefusal(here.putBox('mistral', 'sk-fake-three'), 'vault_full')
   })
 
-  it("catches up with storage before refusing: room another device made unheard is found", async () => {
+  it("counts from the listing in hand, reading nothing first: room another device made unheard is found by a hello", async () => {
     const world = makeWorld()
     // This handle hears nothing pushed from storage, so its snapshot falls behind.
     vi.spyOn(world.vaultDB, 'subscribe').mockReturnValueOnce(() => { /* nothing to unsubscribe */ })
@@ -564,6 +564,10 @@ describe("the box limit", () => {
     const there = await world.open()
     await there.delBox('openai')
     expect(boxlabelsOf(here)).to.deep.equal(['openai'])
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake'), 'vault_full')
+    expect(reads).not.toHaveBeenCalled()
+    await here.hello({ staleMinutes: 0 })
     await here.putBox('anthropic', 'sk-ant-fake')
     expect(boxlabelsOf(here)).to.deep.equal(['anthropic'])
   })
@@ -882,8 +886,10 @@ describe("the host's validators", () => {
     await roomy.putBox('OpenAI: work', 'sk-fake')
     await roomy.putBox('anthropic', 'sk-ant-fake')
     roomy.close()
-    const narrow = await world.openUnlocked('pw')
-    const getBox = vi.spyOn(world.vaultDB, 'getBox')
+    // Deaf, so no read rung by its first delete lands over its second.
+    const deaf = world.deafVaultDB()
+    const narrow = await world.openUnlocked('pw', { vaultDB: deaf })
+    const getBox = vi.spyOn(deaf, 'getBox')
     await narrow.delBox('OpenAI: work')
     await narrow.delBox('anthropic')
     await TH.expectRefusal(narrow.delBox('OpenAI: work'), 'absent_box')
@@ -1257,11 +1263,14 @@ describe("what a vault hands its boxes", () => {
 
   it("lists each sidecar as the listing's check made it, frozen where it stands, never serialized and parsed again", async () => {
     const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
+    const writer = await world.openUnlocked('pw')
+    await writer.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    writer.close()
     const listings = vi.spyOn(world.vaultDB, 'getVault')
     const parses = vi.spyOn(JSON, 'parse')
     const stringifies = vi.spyOn(JSON, 'stringify')
-    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    // Opened anew, so its listing is a read's.
+    const vault = await world.open()
     const sidecar = TH.summaryOf(vault.boxes[0])?.sidecar
     const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['getVault']>))?.boxes ?? []))
     expect(listed.some(([box]) => box !== undefined && ! box.damaged && box.sidecar === sidecar)).to.be.true

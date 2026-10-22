@@ -327,6 +327,48 @@ describe("holdNextCall", () => {
   })
 })
 
+describe("holdNextAnswer", () => {
+  it("holds the next call's answer once the call has run, until released; a later call goes straight through", async () => {
+    const heard: string[] = []
+    const target = { fetchRow: (ckey: string) => { heard.push(ckey); return Promise.resolve(ckey) } }
+    const gate = TH.holdNextAnswer(target, 'fetchRow')
+    let answered = false
+    const held = (async () => { const row = await target.fetchRow('held'); answered = true; return row })()
+    await gate.reached
+    expect(heard).to.deep.equal(['held'])
+    expect(await target.fetchRow('later')).to.eq('later')
+    expect(answered).to.be.false
+    gate.release()
+    expect(await held).to.eq('held')
+  })
+
+  it("lands a lock's erase after a lease the store has already taken, as its @example has it", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    const written = TH.holdNextAnswer(opts.deviceDB, 'putLease')
+    const unlocking = vault.tryUnlock('pw')
+    await written.reached
+    await vault.lock()
+    written.release()
+    await unlocking
+    const kept = await opts.deviceDB.getLease(TH.scopeOf('u1'))
+    expect(await TH.expectGood(kept)).to.be.null
+  })
+})
+
+describe("readAfresh", () => {
+  it("waits out a read under way and reads again, so a change made while it ran shows, as its @example has it", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    await vault.unlock('pw')
+    const reads = vi.spyOn(opts.vaultDB, 'getVault')
+    const underWay = vault.refresh()
+    await TH.readAfresh(vault)
+    await underWay
+    expect(reads).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe("settledVault", () => {
   it("makes a vault and awaits its hello, as its first example shows", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())

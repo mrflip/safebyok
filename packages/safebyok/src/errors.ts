@@ -13,7 +13,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`.
+ *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
+ *   `vault_gone`, `vault_remade`, `gate_moved`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `rolled_back`,
  *   `identity_revoked`.
@@ -73,6 +74,10 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
  *   storage sees it. A vault reports the same as `bad_record`, since it built the box.
+ * * `vault_gone`, `vault_remade`, `gate_moved`: a call found the vault moved on from what it held,
+ *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
+ *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The
+ *   picture is already the new one: unlock again, or read the vault (`hello()`) and call again.
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
@@ -110,6 +115,9 @@ export const RefusalKindVals = [
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
   'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
+  'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
+  'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
+  'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
 ] as const
 export type RefusalKind = typeof RefusalKindVals[number]
 
@@ -158,6 +166,9 @@ export const RefusalFamilyForKind = {
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   storage_blocked:     'condition',
+  vault_gone:          'condition',
+  vault_remade:        'condition',
+  gate_moved:          'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** What a refusal learned, each fact under its own name, filled only by the refusals that name it.

@@ -417,6 +417,8 @@ describe("the logger", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
+    // That write's bell is answered first: a ring during a read is answered by that read.
+    await TH.wakeupAtNextTick()
     world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v6"}')
     await TH.wakeupAtNextTick()
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
@@ -498,6 +500,8 @@ describe("when storage says the user is no longer signed in", () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw one')
       await vault.putBox('anthropic', 'sk-fake-one')
+      // That write's bell is answered first, so the refusal below is this call's to meet.
+      await TH.wakeupAtNextTick()
       const refusal = signedOut()
       vi.spyOn(world.vaultDB, verb).mockResolvedValueOnce(bad(refusal))
       expect(await TH.expectRefusal(call(vault), 'identity_revoked')).to.eq(refusal)
@@ -721,31 +725,26 @@ describe("vault props rolled back", () => {
     expect(await seenIn(world)).to.deep.include({ gate_epoch: 3 })
   })
 
-  it("refuses an older copy at unlock, so a removed way in stays removed on this device", async () => {
+  it("ignores an older copy at unlock, the newer in hand standing, so a removed way in stays removed on this device", async () => {
     const { world, vault, older } = await rolledBackWorld()
     await vault.lock()
     const deaf = await world.open({ vaultDB: world.deafVaultDB() })
     world.dbStore.write(u1VaultPropsCkey, older)
-    await TH.expectRefusal(deaf.unlock(await TH.passkeyOf('laptop')), 'rolled_back')
-    // Nothing of the vault is held until the host accepts the older copy, or storage is mended.
-    expect(deaf.getSnapshot().state).to.eq('opening')
-    expect(deaf.getSnapshot().passphrase).to.be.null
+    await TH.expectRefusal(deaf.unlock(await TH.passkeyOf('laptop')), 'absent_wayin')
+    expect(deaf.getSnapshot().state).to.eq('locked')
+    expect(deaf.getSnapshot().gate_epoch).to.eq(3)
     expect(deaf.getSnapshot().passkey).to.be.null
     expect(await world.getLease()).to.be.null
   })
 
-  it("locks on an older copy met by a background refresh, taking nothing from it and forgetting the vault props it held, and says so through the logger", async () => {
+  it("ignores an older copy met by a background refresh, taking nothing from it: the newer in hand stands, and a handle made anew refuses it", async () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultPropsCkey, older)
-    await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().state).to.eq('opening')
-    expect(vault.getSnapshot().passphrase).to.be.null
+    await vault.refresh()
+    expect(vault.getSnapshot().gate_epoch).to.eq(3)
     expect(vault.getSnapshot().passkey).to.be.null
-    expect(await world.getLease()).to.be.null
-    // The next call says hello afresh, and meets the older copy again.
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'rolled_back')
-    expect(world.logged.map((call) => [call.level, call.story, (call.err as VaultError | null | undefined)?.refusalkind]))
-      .to.deep.equal([['log', { call: 'untrustedStorage' }, undefined], ['warn', { call: 'refresh' }, 'rolled_back']])
+    expect(world.logged).to.have.lengthOf(0)
+    await TH.expectRefusal(world.open(), 'rolled_back')
   })
 
   it("refuses no copy that was the newest when storage handed it back, though another tab of this device raised the mark meanwhile", async () => {
@@ -815,39 +814,24 @@ describe("vault props rolled back", () => {
     expect(await seenIn(world)).to.deep.include({ gate_epoch: 2 })
   })
 
-  it("is accepted on the very handle that refused it, its mark erased and hello said again, as the Vault's class doc says: unlock and a change to the ways in then land", async () => {
-    const { world, vault, older } = await rolledBackWorld()
-    world.dbStore.write(u1VaultPropsCkey, older)
-    await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'rolled_back')
-    expect(vault.state).to.eq('opening')
-    expect(vault.vault_tok).to.be.null
-    expect(vault.boxes).to.deep.equal([])
-    await TH.expectGood(world.deviceDB.delMark(TH.scopeOf('u1')))
-    await vault.hello({ staleMinutes: 0 })
-    expect(vault.gate_epoch).to.eq(2)
-    expect(vault.passkey?.credential_id).to.eq(storedWayinOf(world, 'passkey')?.['credential_id'])
-    await vault.unlock('pw')
-    await vault.putWayin('pw', 'pw two')
-    expect(vault.gate_epoch).to.eq(3)
-    expect(vault.state).to.eq('unlocked')
-  })
-
-  it("met by a background refresh while a hello takes up the lease, is met again by the next hello, which reads afresh", async () => {
+  it("met by a background refresh while a hello takes up the lease, is ignored: the newer copy the hello read stands", async () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()
     const late = Vault.make(world.optsWith())
-    const gate = TH.holdNextCall(world.deviceDB, 'getLease')
+    // The hello's read of storage passes; its take-up of the lease is held as it unwraps.
+    const takingUp = TH.holdNextCall(crypto.subtle, 'unwrapKey')
     const saying = late.hello()
-    await gate.reached
+    await takingUp.reached
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.wakeupAtNextTick()
-    gate.release()
+    takingUp.release()
     await saying
-    expect(late.state).to.eq('opening')
-    await TH.expectRefusal(late.hello(), 'rolled_back')
+    expect(late.gate_epoch).to.eq(3)
+    expect(late.passkey).to.be.null
+    await TH.expectRefusal(world.open(), 'rolled_back')
   })
 
-  it("met while a del() waits on the hello, refuses that del() as rolled_back, deleting nothing and keeping the mark", async () => {
+  it("met while a del() waits on the hello, refuses that del() as stale, deleting nothing and keeping the mark", async () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()
     const late = Vault.make(world.optsWith())
@@ -857,7 +841,7 @@ describe("vault props rolled back", () => {
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.wakeupAtNextTick()
     gate.release()
-    await TH.expectRefusal(deleting, 'rolled_back')
+    await TH.expectRefusal(deleting, 'stale_write')
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
     expect(await seenIn(world)).to.deep.include({ gate_epoch: 3 })
   })
@@ -896,7 +880,7 @@ describe("older stored formats", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, format: 'safebyok-box-v6', vault_key_epoch: 1 }))
-    await TH.wakeupAtNextTick()
+    await TH.readAfresh(vault)
     expect(vault.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: row['revision_tok'] }])
     await vault.putBox('anthropic', 'sk-fake-again')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-again')

@@ -197,6 +197,55 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
 }
 
 /**
+ * Holds the answer of the next call to `target[verb]` at a gate (see {@link makeGate}) once the
+ * call itself has run, until the test releases it: the store has done the work, and the caller
+ * has not yet heard. Later calls go straight through.
+ *
+ * Use it, not {@link holdNextCall}, to land a call while a write is in flight to a store that
+ * applies calls in the order made, as a DeviceDB does: a hold at the door would let a later call
+ * land first, which that store never does. Arm it before any spy of the test's own on the same
+ * method, which then counts each call once.
+ *
+ * @param target - The object whose method's answer to hold: an adapter.
+ * @param verb - The method, one returning a promise.
+ * @returns The gate: await `reached`, then `release()`.
+ *
+ * @example
+ *   const written = TH.holdNextAnswer(deviceDB, 'putLease')
+ *   const unlocking = vault.unlock('pw')   // the lease is in the store; the unlock has not heard
+ *   await written.reached
+ *   await vault.lock()                     // its erase lands after the write
+ *   written.release()
+ */
+export const holdNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
+  const gate = makeGate()
+  const original = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
+  if (original === undefined) { throw new TypeError(`holdNextAnswer found no method ${verb} to hold.`) }
+  vi.spyOn(target as unknown as Record<string, AsyncFn>, verb).mockImplementationOnce(async (...args: unknown[]) => {
+    const answer = await original.apply(target, args)
+    await gate.pass()
+    return answer
+  })
+  return gate
+}
+
+/**
+ * Has `vault` read storage afresh, as it stands once this is called: a read already under way may
+ * have begun before the test's last write, and a refresh asked for meanwhile shares it, so this
+ * awaits that one, then asks for another.
+ *
+ * @param vault - The Vault object to read into: anything with a `refresh()`.
+ *
+ * @example
+ *   world.dbStore.write(boxCkey, spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
+ *   await TH.readAfresh(vault)              // the snapshot shows it
+ */
+export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Promise<void> => {
+  await vault.refresh()
+  await vault.refresh()
+}
+
+/**
  * A count of the storage watches `vaultDB` opens and closes from here on, kept by spying on its
  * `subscribe`: for a test that a close or a lock leaves no watch running that
  * nobody could end. Each watch still reaches the adapter's own `subscribe`.

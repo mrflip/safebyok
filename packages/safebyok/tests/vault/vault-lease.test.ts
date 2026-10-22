@@ -484,6 +484,16 @@ describe("natural expiry", () => {
     await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
+  it("drops the lease from memory alone at askPassphraseAt, erasing nothing: another tab may hold one renewed under the scope", async () => {
+    const world = makeTimedWorld()
+    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
+    const erases = vi.spyOn(world.deviceDB, 'delLease')
+    world.pass(HourMillis)
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(erases).not.toHaveBeenCalled()
+    expect(await world.getLease()).to.not.be.null
+  })
+
   it("drops a key whose timer has not run by its deadline at the next look: the threshold is the truth", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
@@ -1040,36 +1050,6 @@ describe("vault.ensureLease, by the Contract", () => {
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
-  it("takes up nothing from the lease a stood-down attempt wrote, though a hello reads it before it is erased (Contract: getProof, attempt refuses: vault_locked)", async () => {
-    const prompt = heldPrompt()
-    const world = makeRacingWorld()
-    const maker = await world.openUnlocked('pw')
-    await maker.lock()
-    maker.close()
-    const vault = await world.open({ getProof: prompt.getProof })
-    const ensuring = vault.tryEnsureLease()
-    const ask = await prompt.asked
-    const writing = world.holdNextLease()
-    const attempting = ask.attempt('pw')
-    await writing.reached
-    await vault.lock()
-    // The attempt's erasure, and a hello's read of the device store, each held at the door.
-    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
-    const fetching = TH.holdNextCall(world.deviceDB, 'getLease')
-    const hello = vault.hello({ staleMinutes: 0 })
-    await fetching.reached
-    writing.release()
-    await erasing.reached
-    // The hello reads the attempt's lease, written and not yet erased.
-    fetching.release()
-    await hello
-    erasing.release()
-    await TH.expectBad(attempting, 'vault_locked')
-    expect(vault.state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    await TH.expectBad(ensuring, 'vault_locked')
-  })
-
   it("stays locked, with no lease, when the user cancels during an attempt and the app then locks: the answer stands the attempt down (Contract: getProof, attempt refuses: vault_locked)", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
@@ -1089,27 +1069,6 @@ describe("vault.ensureLease, by the Contract", () => {
     gate.release()
     const err = await TH.expectBad(attempting, 'vault_locked')
     expect(err.message).to.include('while this proof was being checked')
-    expect(vault.state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    expect(await world.stateOnOpen()).to.eq('locked')
-  })
-
-  it("erases the lease an attempt wrote when the user cancels as it writes it, so a reload opens locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
-    const prompt = heldPrompt()
-    const world = makeRacingWorld()
-    const maker = await world.openUnlocked('pw')
-    await maker.lock()
-    maker.close()
-    const vault = await world.open({ getProof: prompt.getProof })
-    const ensuring = vault.tryEnsureLease()
-    const ask = await prompt.asked
-    const gate = world.holdNextLease()
-    const attempting = ask.attempt('pw')
-    await gate.reached
-    prompt.answer('declined')
-    await TH.expectBad(ensuring, 'vault_locked')
-    gate.release()
-    await TH.expectBad(attempting, 'vault_locked')
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')

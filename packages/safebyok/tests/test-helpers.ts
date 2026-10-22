@@ -14,7 +14,7 @@ export { testDeriver, vaultSliceOf, SliceNow, anyStrengthChecker, memoryVaultOpt
   summaryOf, noBoxYet, thisVault, deleting, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { MarkOverrides, VaultSlice } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,
-  holdNextCall, tallyWatches } from './test-helpers/timing'
+  holdNextCall, holdNextAnswer, readAfresh, tallyWatches } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'
 export { throughTurnstile, raceEveryWay } from './test-helpers/racing'
 export type { Turnstile, RaceOutcome, MakeDevices, Race } from './test-helpers/racing'

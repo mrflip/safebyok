@@ -147,6 +147,9 @@ const FamilyCases = [
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
   ["storage_blocked",     "condition", 'a browser withholding its storage is told to the user, without a retry'],
+  ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
+  ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
+  ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
 ] as const
 
 describe("each kind's family", () => {
