@@ -7,7 +7,7 @@ safebyok's storage over [GraphQL](https://graphql.org), in two halves:
   the signed-in user -- [`safebyok-postgres`](../safebyok-postgres)'s, or one of your own. They
   drop into any GraphQL server beside your own schema.
 * **In the browser**, `safebyok-graphql`: **`graphqlVaultDB({ client })`**, the VaultDB over your
-  app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Vault.make`.
+  app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
 
 Your server and your database hold ciphertext and a few unencrypted fields; neither ever sees a
 whisper, a passphrase, or any key that opens one.
@@ -70,14 +70,15 @@ export { handleRequest as GET, handleRequest as POST }
 
 `signedInUserId` is your own: the user id from the request's verified session cookie, or null.
 
-The browser half, handed to `Vault.make` as its `vaultDB`:
+The browser half, handed to `Bank.make` as its `vaultDB`:
 
 ```ts
 import { Client, fetchExchange } from '@urql/core'
 import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB: graphqlVaultDB({ client }) })
+const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB: graphqlVaultDB({ client }) })
+const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is
@@ -191,7 +192,7 @@ through the recipe, that line included.
 * **It declares the box limit your server holds a vault to**: none (`Infinity`), as the
   Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
   (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's
-  VaultDB enforces, so `Vault.make` refuses a vault asking for more up front; the server refuses a
+  VaultDB enforces, so `Bank.make` refuses a vault asking for more up front; the server refuses a
   new box past its own with kind `vault_full` either way, and the refusal crosses, with how full
   the vault is. `getCapacity` asks the server's VaultDB the same, through `safebyokGetCapacity`.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
@@ -199,7 +200,7 @@ through the recipe, that line included.
   again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
   vault goes on refreshing after its own writes.
 * **`logger`**, when given, hears what the VaultDB has to say (`graphqlVaultDB({ client, logger
-  })`); left out, it is the one `Vault.make` is given, else the console.
+  })`); left out, it is the one `Bank.make` is given, else the console.
 * **Client and server move in step.** The browser half and `safebyok-graphql/server` are one
   version of one package: a client of one version against a server of another can fail every
   call on a field one of them does not know, and the user sees `storage_unavailable`, which

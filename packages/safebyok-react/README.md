@@ -3,18 +3,20 @@
 The thin React binding for safebyok: no vault logic, only the React-shaped plumbing a host app would
 otherwise write itself.
 
-* `VaultProvider` -- makes the vault for the signed-in user (`userId` prop from your auth) from
-  `Vault.make`'s options, its props; says its first `hello()`; closes it as the user signs out,
-  and makes a new one for the next. It is the vault's `getProof`, unless you pass one of your own:
+* `VaultProvider` -- makes a bank (`Bank.make`) from its props, and asks it for the signed-in
+  user's vault (`bank.ensureVault`, with the `userId` prop from your auth and the `vaultlabel`);
+  lets it go as the user signs out (`bank.closeVaults()`), and asks for the next user's. It is the
+  vault's `getProof`, unless you pass one of your own:
   whenever a call on the vault needs it unlocked and finds it not -- `vault.getWhisper(...)`,
   `vault.putBox(...)`, or `vault.ensureLease()` on an Unlock button -- it shows the passphrase
   dialog, one at a time, and the call waits on it (*Asking for the passphrase*, below).
-* `useVault()` -- the vault itself, or `null` while nobody is signed in. Its fields read live in
-  an event handler; render from the snapshot.
+* `useVault()` -- the vault itself (its Vault object), or `null` while there is none: nobody
+  signed in, or the vault being born or refused. Its fields read live in an event handler; render
+  from the snapshot.
 * `useVaultSnapshot()` -- the vault's live snapshot, through
-  `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while nobody is signed in.
-* `useOpenError()` -- `openError`, `retryOpen()` and `delDamagedVault()`, for an open that failed
-  (below).
+  `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while there is no vault.
+* `useOpenError()` -- `openError`, `retryOpen()` and `delDamagedVault()`, for a vault that could
+  not be opened (below).
 * `PassphraseModal` -- the shipped `getProof`'s dialog, handed one `Ask` and answering it: unstyled markup under `modal-scrim` / `modal` class
   names for the host's stylesheet to dress. It says how long an unlock lasts on the device -- "Locks
   again on this device in 7 days", "in 15 minutes", "Stays unlocked ... until you lock it"
@@ -62,23 +64,25 @@ import { VaultProvider } from 'safebyok-react'
 </VaultProvider>
 ```
 
-The provider takes every `Vault.make` option as a prop, and throws one it does not take -- a misspelling, or a name it no longer uses -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
+The provider takes every `Bank.make` option as a prop, beside the vault's own `userId` and
+`vaultlabel`, and throws one it does not take -- a misspelling, or a name it no longer uses -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
 browser app answers like any other, `keyDeriver`, `deviceDB` and `strengthChecker`;
 `vaultDB` is your backend's adapter. It answers the same bag on every call, so it is safe in a
-render: the provider reopens the vault whenever a prop changes identity. So define a `logger`, a
+render: the provider makes a new bank, and asks it for the vault anew, whenever a prop changes
+identity. So define a `logger`, a
 `clock` or a `strengthChecker` of your own once, outside the component (or memoize it): a
 function or object literal written in the props is a new one at every render, and reopens the
 vault each time, ending any dialog. The provider warns of it once, the first time any of them
 changes, through the one logger it and its vault share: your `logger` prop, or, when you pass
-none, the logger your `vaultDB` was made with (the default logger, if it was given none). The vault keeps the checker it
-was opened with for its life; one that is no function is thrown, as `Vault.make` refuses it, as
+none, the logger your `vaultDB` was made with (the default logger, if it was given none). The bank keeps the checker it
+was made with for its life; one that is no function is thrown, as `Bank.make` refuses it, as
 `bad_option`, to the nearest error boundary. Its `load`, if it carries one (`zxcvbnStrengthChecker`
-fetches its dictionary), runs at the provider's `hello()`, and a load that fails is thrown, as
-`unexpected_error`, to the nearest error boundary. Leave it out and every new passphrase is refused as
+fetches its dictionary), runs at the bank's `hello()`, before the vault is born, and a load that
+fails is thrown, as `unexpected_error`, to the nearest error boundary. Leave it out and every new passphrase is refused as
 too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md). `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
-(`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Vault.make` would refuse
+(`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Bank.make` would refuse
 it.
 
 A handler is the other exception: `onBadNews` and `getProof` make no new vault as they change, so
@@ -91,24 +95,27 @@ they may be written inline. The vault calls whichever the last render passed:
 </VaultProvider>
 ```
 
-The provider owns the vault it makes: a new user, a sign-out or a changed option closes it. Under
-React's `StrictMode`, whose rehearsal in development makes a vault and closes it again at once,
-that rehearsed vault reads nothing from storage: only the vault kept says hello.
+The provider owns the bank it makes, and the vault in it: a new user, a sign-out or a changed
+option lets it go (`bank.closeVaults()`). Under React's `StrictMode`, whose rehearsal in
+development makes a bank and lets it go again at once, that rehearsed bank reads nothing from
+storage: only the vault kept is born.
 
-**The vault arrives one render after the props that make it.** The provider makes its vault in an
-effect and hands it down by setting state from that effect -- what React's `set-state-in-effect`
-lint rule warns of, done here on purpose: a vault made during render would be made twice under
-`StrictMode`, and one of the two never closed. For your app:
+**The vault arrives once it is born.** The provider makes its bank in an effect, sets it as state
+from that effect -- what React's `set-state-in-effect` lint rule warns of, done here on purpose: a
+bank made during render would be made twice under `StrictMode`, and one of the two never let go --
+and then asks it for the vault, which is handed down once its one read of storage settles. For
+your app:
 
-* `useVault()` and `useVaultSnapshot()` are `null` for the first render after a user signs in,
-  and on the server, just as while nobody is signed in. Tell "signed out" from "not here yet" by
-  your own session, so that first frame shows a spinner rather than a sign-in prompt.
-* Each vault made renders everything under the provider a second time. A prop that is a new
-  object at every render (above) makes a vault, and that second render, at every render.
-* A changed prop or a new user closes the old vault as the new one is made, and a call still under
-  way on the old one is refused: `vault_locked` if it was waiting on the dialog, `vault_closed`
-  otherwise. Where your code catches refusals around a sign-out or a changed option, expect
-  `vault_closed` there, though anywhere else it is misuse.
+* `useVault()` and `useVaultSnapshot()` are `null` for the renders after a user signs in, while
+  the vault is being born, and on the server, just as while nobody is signed in. Tell "signed
+  out" from "not here yet" by your own session, so those frames show a spinner rather than a
+  sign-in prompt.
+* Each bank made renders everything under the provider again, and so does each vault born. A prop
+  that is a new object at every render (above) makes a bank, and those renders, at every render.
+* A changed prop or a new user lets the old vault go as the new one is asked for, and every call
+  on the old Vault object, one still under way or waiting on the dialog among them, is refused
+  `vault_gone`. Where your code catches refusals around a sign-out or a changed option, expect
+  `vault_gone` there.
 
 Read the vault with the hooks:
 
@@ -121,34 +128,43 @@ const LockButton = () => {
 
 const BoxCount = () => {
   const snapshot = useVaultSnapshot()
-  if (snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
+  if (snapshot === null) { return <p>Opening your vault…</p> }
   return <p>{snapshot.boxes.length} keys stored</p>
 }
 ```
 
 ## When opening fails
 
-The provider makes the vault with `Vault.make` as soon as there is a signed-in user, and hands it
-down at once, its snapshot saying `opening` until its `hello()` has read storage. What happens
-when `Vault.make` throws, or the hello is refused, depends on the error's family (safebyok's
-`RefusalFamilyForKind`): who has to act. The `safebyok` README's *Errors* section lists every
+The provider makes its bank with `Bank.make` as soon as there is a signed-in user, and asks it for
+the vault: one read of storage that births the Vault object, or is refused. Until it settles there
+is no vault, and `useVault()` is `null`. What happens when `Bank.make` throws, or the birth is
+refused, depends on the error's family (safebyok's `RefusalFamilyForKind`): who has to act. The `safebyok` README's *Errors* section lists every
 kind, its family, and what it means.
 
 **A condition or bad news stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
-signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
-`openError`, a `VaultError`: what the provider's own first `hello()` was refused with, the vault still `opening`. (A damaged box never stops the open:
+signed in to it), a vault whose stored props fail their checks (`damaged_vault`), or storage
+serving an older copy of the vault than this device has seen (`vault_behind`) arrives as
+`openError`, a `VaultError`: what the birth was refused with, no vault handed down. (A damaged box never stops the birth:
 the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show it where the vault's UI
-would be, and offer `retryOpen()`, which has the vault say hello again: `openError` clears once it
-settles, or names what the retry met. A browser that keeps the app from storing
+would be, and offer `retryOpen()`, which asks for the vault again, reading storage afresh:
+`openError` clears while it reads, and stays clear once the vault is born, or names what the
+retry met. A browser that keeps the app from storing
 anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend
 until the browser's settings or room change: say so, rather than offering `retryOpen()`.
 
-A vault already open can come back to this. Should a later read find storage handing back an older
-copy of the vault than this device has seen (`rolled_back`), the vault locks, forgets what it
-held, and reads `opening` again; that refusal, the vault's `trouble`, is `openError` then. A retry
-will not mend it until you accept the older copy (the `safebyok` README's *A vault rolled back*).
+A vault already born can come back to this. Should a later read find storage handing back an
+older copy of the vault than this device has seen (`vault_behind`), the vault takes nothing from
+it, and locks; that refusal, the vault's `trouble`, is `openError` then, the locked vault still
+handed down. A retry will not mend
+`vault_behind`, at birth or after: it holds until storage serves the newer copy again, or this
+device is made to accept the older one (the `safebyok` README's *A vault behind this device*).
+
+A vault deleted never comes to this: deleted by its own `del()`, as the dialog's "Start over"
+does, or found deleted (`vault_gone`) or deleted and made anew (`vault_remade`) by a later read,
+its Vault object is gone, and the provider asks for the vault again on its own. It hands down the
+one that stands, `novel` after a deletion, and `useVault()` changes to it, never an `openError`.
 
 ```tsx
 const VaultPanel = () => {
@@ -156,7 +172,7 @@ const VaultPanel = () => {
   const snapshot = useVaultSnapshot()
   const { openError, retryOpen } = useOpenError()
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
-  if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
+  if (vault === null || snapshot === null) { return <p>Opening your vault…</p> }
   return <Boxes vault={vault} />
 }
 ```
@@ -168,14 +184,14 @@ show.
 
 `openError` is not the vault's `trouble`. `trouble` (on the vault and its snapshot) is the latest
 bad news the vault met on any read, for as long as the vault stands -- a damaged record, a box
-listed damaged, storage rolled back -- and never a condition. `openError` is only why the
-provider's own hello could not open the vault, a condition among them, and clears once the vault
-opens. A damaged record is both, as is a vault rolled back: the very same error.
+listed damaged, storage behind what this device has seen -- and never a condition. `openError` is
+only why there is no vault to use: the birth's refusal, a condition among them, or a later read's
+`vault_behind`. A vault behind is both: the very same error.
 
 For a `damaged_vault`, the one way forward is to delete the vault and start over:
 `delDamagedVault()` from `useOpenError()` does that (the `safebyok` README's *A vault that cannot be
-opened*) and has the vault say hello again, finding it absent. The user's boxes in it are lost for
-good, so ask first:
+opened*) and asks for the vault again: a new one, `novel`, for the user to choose a passphrase for.
+The user's boxes in it are lost for good, so ask first:
 
 ```tsx
 const { openError, delDamagedVault } = useOpenError()
@@ -186,15 +202,15 @@ if (openError?.refusalkind === 'damaged_vault') {
 
 It does nothing for any other `openError`, or none, and rejects with storage's refusal (say,
 `storage_unavailable`) if deleting it fails, leaving `openError` as it was. A `stale_write` means
-the vault was made anew meanwhile, so it says hello again as well; any other refusal says nothing anew
-(`retryOpen()` will, should the vault read sound now).
+the vault was made anew meanwhile, so it asks for the vault again as well; any other refusal asks
+nothing anew (`retryOpen()` will, should the vault read sound now).
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
-the vault as storage refusing it, kind `identity_revoked`, and an open vault locks itself
+the vault as storage refusing it, kind `identity_revoked`, and a vault already born locks itself
 (the `safebyok` README's *When the user signs out*). The snapshot reads `locked`; the next call
 that needs the vault opens the passphrase dialog, whose unlock meets the same refusal and closes
 it, the call refused `vault_locked`. Once your auth says the
-user signed out, pass `userId={null}`, which closes the handle.
+user signed out, pass `userId={null}`, which lets the vault go.
 
 **Misuse goes to your error boundary.** A bad label or option -- a bug in the app's code -- is
 thrown while rendering, as is anything rejected that is not a `VaultError`. Wrap the provider in
@@ -211,8 +227,8 @@ shows it and a different user (or a sign-out and back in) gets a fresh attempt:
 
 ## Asking for the passphrase
 
-Data calls never contain UI: a call that needs the vault unlocked and finds it locked (or the vault
-not yet made) asks through the vault's `getProof`, which the provider is unless you pass your own.
+Data calls never contain UI: a call that needs the vault unlocked and finds it locked (or `novel`,
+with no passphrase yet) asks through the vault's `getProof`, which the provider is unless you pass your own.
 So a component just calls the vault, and the dialog comes up on its own:
 
 ```tsx
@@ -223,10 +239,11 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 * **One dialog at a time.** Calls that overlap wait on the one dialog, and its answer settles
   them all: unlocked, each goes on; dismissed, each is refused `vault_locked`. The throwing forms
   (`vault.getWhisper(...)`) throw that refusal; the `try` forms resolve it as `err`.
-* **A lock closes it.** A `lock()`, a sign-out, another user or the provider unmounting closes the
-  dialog, and every call waiting on it is refused `vault_locked`. A lock that lands while the
-  passphrase is being checked wins: the vault stays locked. So does the start over (below): a
-  delete lands as a lock does.
+* **A lock closes it.** A `lock()` closes the dialog, and every call waiting on it is refused
+  `vault_locked`. A lock that lands while the passphrase is being checked wins: the vault stays
+  locked. A sign-out, another user, a changed prop or the provider unmounting lets the vault go,
+  which closes it too, and so does the start over (below): a delete lands as a lock does. Either
+  way the Vault object is gone, and the calls waiting on the dialog are refused `vault_gone`.
 * **Only at the user's word.** The dialog shows only while the user's gesture is in hand
   (`navigator.userActivation`, where the browser has it): a call a timer or a background sync
   makes is declined unasked, and refused `vault_locked`, or carries on under a lease that is about
@@ -236,7 +253,7 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
   vault.tryEnsureLease() }}`; `vault.ensureLease({ renewMinutes: 60 })` asks now if the lease ends
   within the hour.
 * **Your own dialog**: pass `getProof={(ask) => ...}`, which the vault hands an `Ask` -- `why`
-  (`absent`, `locked` or `lease_ending`), the `vault`, `attempt(proof)` and `lockLanded` -- and
+  (`novel`, `locked` or `lease_ending`), the `vault`, `attempt(proof)` and `lockLanded` -- and
   which answers `'unlocked'`, `'declined'` or (for `lease_ending` only) `'carry_on'`. It may render
   `PassphraseModal` itself: `<PassphraseModal ask={ask} onDone={answer} />`. `getProof={null}`
   asks no one: each such call is refused `vault_locked`, and the app prompts on its own,
@@ -246,7 +263,10 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 
 **The user sees what they can mend.** A wrong passphrase, a passkey that does not answer, a way in
 stored damaged: each shows in the dialog in the vault's own calm words, to try again or cancel.
-Storage out of reach, a lock that won, or a refusal the dialog cannot mend closes it, answering
+A first passphrase that lost the race to one set on another device (`gate_made_elsewhere`) shows
+as advice, not as a typo: the dialog has the vault say hello, so it shows `locked`, and becomes an
+unlock of the vault that stands, for the passphrase chosen there.
+Storage out of reach, a lock that won, a vault gone, or a refusal the dialog cannot mend closes it, answering
 `declined`, so the call that asked is refused `vault_locked`. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
 reason the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`,
 which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
@@ -255,7 +275,7 @@ your own can ask the vault's checker, held to the same contract, as the user typ
 `const verdict = await vault.checkPassphrase(typed)`, then show `verdict.reason` while
 `verdict.strong` is false.
 
-**Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that
+**Anything else never takes your page down.** Misuse -- an `rpId` that
 does not fit the page, a vault made with a key deriver this build lacks (as in a tab left open
 across a deployment) -- or a failure that is no `VaultError` is not the user's to mend, and its
 message is written for you, not them. The dialog shows "Something went wrong", that their secrets
@@ -292,8 +312,9 @@ A forgotten passphrase cannot be recovered: the vault and its whispers are gone 
 user starts a new one. `<VaultProvider allowStartOver ...>` (or `<PassphraseModal allowStartOver
 ... />`) has the dialog offer that: "Forgot it? Start a new vault" asks first, then deletes the
 vault on every device (`vault.del()`, which needs no passphrase). A delete lands as a lock does,
-so the dialog closes and the call that summoned it is refused `vault_locked`; the next call that
-needs the vault asks the user to choose a passphrase for the new one. It is off by default:
+so the dialog closes and the call that summoned it is refused `vault_gone`: that Vault object is
+gone. The provider asks for the vault again on its own and hands down the new one, `novel`, whose
+next call that needs it asks the user to choose a passphrase. It is off by default:
 a vault with a passkey still unlocks with it (though neither the passphrase nor the passkey can
 be changed without the passphrase), and starting over loses every box.
 

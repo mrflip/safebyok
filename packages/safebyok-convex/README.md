@@ -31,8 +31,8 @@ export default app
 ```
 
 Serve its functions to your clients, from a module of your own, `convex/safebyok.ts`. They call
-your `getUserId` first: say who is signed in, the same id your app passes to `Vault.make` as
-`userId`.
+your `getUserId` first: say who is signed in, the same id your app passes to `bank.ensureVault`
+as `userId`.
 
 ```ts
 import { SafebyokComponent } from 'safebyok-convex/server'
@@ -90,11 +90,11 @@ mistake for the first request.
 
 `convexVaultDB({ client, api: api.safebyok })`, from `safebyok-convex`, is a vault's storage: a `VaultDB`
 whose every call is one call to the functions above, through the Convex client your app already
-has. Hand it to `Vault.make`:
+has. Hand it to `Bank.make`:
 
 ```ts
 import { ConvexClient } from 'convex/browser'
-import { Vault } from 'safebyok'
+import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { convexVaultDB } from 'safebyok-convex'
 import { api } from '../convex/_generated/api'
@@ -102,29 +102,30 @@ import { api } from '../convex/_generated/api'
 const convex = new ConvexClient(import.meta.env.VITE_CONVEX_URL)
 convex.setAuth(fetchToken) // your auth provider's token, as for any Convex call
 
-const vault = Vault.make({
-  applabel: 'acme', userId, vaultlabel: 'main',
+const bank = Bank.make({
+  applabel: 'acme',
   vaultDB:  convexVaultDB({ client: convex, api: api.safebyok }),
   ...browserOpts(), // the key deriver and device store a browser wants
 })
+const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
 ```
 
 In a React app, pass the `ConvexReactClient` you give `ConvexProvider`, so the vault shares its
 socket and its signed-in user. `safebyok-convex` itself imports nothing of React's. A `logger`,
 when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB has to say -- a
 `ConvexClient` watch that failed, once for each failing streak -- and left out, it is the one
-`Vault.make` is given, else the console.
+`Bank.make` is given, else the console.
 
 * **Sign in first.** `userId` is the id your `getUserId` answers for the signed-in user. Open
   the vault once the Convex client is authenticated (in React, once `useConvexAuth()` says so):
-  a call made before then is refused with kind `identity_revoked`, which also makes this device
-  revoke its lease, so the user types their passphrase again. A hello refused
-  that way leaves the vault `opening`, the refusal its caller's (and, as bad news, the vault's
-  `trouble`): call `hello()` again once signed in.
+  a call made before then is refused with kind `identity_revoked`, which also makes a vault
+  already open revoke its lease, so the user types their passphrase again. A `bank.ensureVault`
+  refused that way hands out no vault, its entry in the bank's snapshot `refused`: call it
+  again once signed in.
 * **Signing out locks the vault.** Once the Convex client signs out (or signs in as someone
   else), the vault's live `watchVault` query is refused, the vault looks again, meets
   `identity_revoked`, and locks itself, as `lock()` does: an idle vault in another tab included.
-  Close the vault when your user signs out all the same: in React, pass `userId={null}` to the provider.
+  Let the vault go (`bank.closeVaults()`) when your user signs out all the same: in React, pass `userId={null}` to the provider.
 * **Other devices' writes arrive live.** The vault watches `watchVault` and refreshes whenever
   it changes, so its snapshot (and a React render) follows writes from anywhere.
 * **Refusals** are `VaultError`s, each the `err` of the `Outcome` a call resolves, of the kinds in
@@ -142,7 +143,7 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
   show progress, but don't report it failed. The adapter sets no timeout of its own: a write that
   lands late lands only over what its writer read, in the vault it was sealed for, so the only
   cost of waiting is the wait.
-* A record holds at most 1 MiB, Convex's document limit; `Vault.make` keeps `maxWhisperBytes`
+* A record holds at most 1 MiB, Convex's document limit; `Bank.make` keeps `maxWhisperBytes`
   under half of it. A vault holds at most 8 MiB in all (`maxVaultBytes`; see *How big a vault
   can be*).
 
@@ -189,13 +190,13 @@ pick the `safebyok` component); each user then makes their vault anew.
 in one Convex transaction -- watching reads each box whole, ciphertext and all, to sign it by
 its revision, since a Convex query cannot read some of a document's fields -- which may read 16 MiB and 32,000 documents, and write 16,000 documents;
 deleting reads it twice, so `convexVaultDB` declares a `maxVaultBytes` of 8 MiB. A vault holds 100 boxes by default, raised with
-`maxBoxes` as far as `maxVaultBytes` allows: `Vault.make` refuses, with kind `bad_option`, a
+`maxBoxes` as far as `maxVaultBytes` allows: `Bank.make` refuses, with kind `bad_option`, a
 `maxBoxes` whose boxes at `maxWhisperBytes` each might not fit, and its message says how
 many would. At the default `maxWhisperBytes` (40444) that is at most 102; at a `maxWhisperBytes`
 of 2048, ample for API keys, it is 1638. A store past the limit is refused with kind
 `vault_full`, until a box is deleted. Each record must also fit Convex's 1 MiB document limit,
 which the core's `maxWhisperBytes` keeps well inside. `convexVaultDB` declares the component's own
-8,000 as its `maxBoxes`, so `Vault.make` also refuses a `maxBoxes` above that.
+8,000 as its `maxBoxes`, so `Bank.make` also refuses a `maxBoxes` above that.
 
 The component holds every vault to limits of its own, whatever its client asks, so that even a
 modified client cannot grow a vault past what deleting can reach: **8,000 boxes**, and
