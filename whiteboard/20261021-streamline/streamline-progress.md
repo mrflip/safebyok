@@ -5,6 +5,12 @@ keeps it. Newer than the plan and the preplan wherever they disagree.
 
 ## Rulings in force
 
+* **PAUSED (2026-10-22): lock() stays out of the line, writes are not serialized,** each write
+  awaits unlock, at most one unlocking at a time, and work that passed `checkUnlocked()`
+  completes or throws as it does. This replaces the preplan's *Turns*; the design that replaces
+  it is open (`human/20261022-sprint_streamline_paused.md`).
+* **Cancel declines this prompt only** (2026-10-22): it never locks an unlocked vault (thread 8).
+
 * **Row 1, a whisper asked before a lock (2026-10-22):** keep the current contract; a sync
   `checkUnlocked` inside each call's turn, with a TODO. No contract-level calls without a ruling.
 * **When a lease stops counting (confirmed 2026-10-22):** unlocked until a lock lands (`lock()`,
@@ -47,7 +53,7 @@ rules* 3).
 | 8 | gating | planned | |
 | 9 | react | planned | |
 | 10 | docs | planned | |
-| 11 | wire_meta | building (from #244) | |
+| 11 | wire_meta | in review | #246 |
 
 ## What the threads found
 

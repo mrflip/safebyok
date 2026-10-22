@@ -9,10 +9,10 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns, #245) **flagged in review, waiting
-  unfiled** on the Coach's ruling on a lock during work in flight; threads 4-10 wait on it.
-  Thread 11 (wire_meta) building from #244's tip. Thread 5 is vault_epoch, waiting on one ruling. Branches cut on or after
-  2026-10-22 carry that date (`20261022-get_vault`, `20261022-turns`).
+* **Status:** **paused 2026-10-22** by the Coach for a rethink of thread 3's turns (lock out of
+  the line, writes not serialized, at most one unlock at a time). Threads 1-2 filed (#243, #244);
+  thread 3 (#245) flagged, unfiled, in `/workspace/byok-turns`; thread 11 (#246) in review.
+  See `human/20261022-sprint_streamline_paused.md`.
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
 [#241](https://github.com/mrflip/safebyok/pull/241)'s branch `20261021-better_paths`. Its ten
