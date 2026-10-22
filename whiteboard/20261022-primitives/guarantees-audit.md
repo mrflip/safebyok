@@ -142,6 +142,6 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
 * **8 proving_gate:** a demand after each `await` in `#reviseWayins` and `tryPutWayin`'s
   `newProofOf` (10); `grantLease` step 7 demands on the proving and checks the stored record's
   stamp (1).
-* **9 gating:** a demand after each `await` in `#unlockWith` and `tryDel` (10); the pantry consult inside the gating (2); the take-up predicate there (3); each
+* **9 gating:** a demand after each `await` in `#unlockWith` and `tryDel` (10); `#checkOpen()` after the take-up in `#ensureUnlocked` (#254 review); the pantry consult inside the gating (2); the take-up predicate there (3); each
   attempt opens with `hello({ staleMinutes: 0 })` (4); joins by kind (5); `del_vault` settles
   then locks (9).

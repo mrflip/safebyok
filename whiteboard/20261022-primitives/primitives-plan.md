@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 built (#254), in review; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 built (#254), review flagged, rework under way; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -306,6 +306,16 @@ scope and `gate_epoch`), and full stamps are this thread's.
 *Tests.* `box.test.ts` (43), `lease.test.ts` (27), `vault-boxes.test.ts` (107): rewritten to the
 new names; the races "a whisper-omitted put racing another device's write" and "a renewal during
 a box write in flight" live here.
+
+*Review:* **flagged** ([#254](https://github.com/mrflip/safebyok/pull/254)). Fixed: a whisper-omitted
+`putBox()` prompted before weighing its sidecar; `lock()`'s doc left untrue; two bare `/**`.
+Significant: `Lease`'s public `record` getter, with `vault.lease` public, let any holder unwrap and
+export the raw vaultKey: the worker removes it (YOLO, the guarantee holds), with `getBox` of a
+missing box resolving `null` (the Coach), `putBox` declining to ask for an unlisted box, and
+`consistentWith` for `isConsistentWith` (the Coach). Left, minor: a held Lease past its own
+deadline still works (Open Matter); a double log on `vault_remade` in a partial put; the whisper
+serialized three times; `absent_vault` vs `vault_gone` from a direct `Box` call; `close()` during
+a take-up (threads 7 to 9). A second review over the rework's commits only follows.
 
 ### 7. bank
 
