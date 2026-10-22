@@ -115,9 +115,10 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
   write them, say. Opening a vault writes, even one that stands: its birth is `ensureVault`, one
   statement that deletes the scope's tombstone and inserts the vault props or meets the ones
-  standing (`ON CONFLICT ... DO UPDATE`). So the role needs `SELECT`, `INSERT` and `UPDATE` on
-  `safebyok_vaults`, and `SELECT` and `DELETE` on `safebyok_vault_tombstones`, to open a vault at
-  all: a read-only role is refused `not_permitted` at the birth. A policy that hides rows
+  standing (`ON CONFLICT ... DO UPDATE`), and lists their boxes. So the role needs `SELECT`,
+  `INSERT` and `UPDATE` on `safebyok_vaults`, `SELECT` and `DELETE` on
+  `safebyok_vault_tombstones`, and `SELECT` on `safebyok_boxes`, to open a vault at all: a
+  read-only role is refused `not_permitted` at the birth. A policy that hides rows
   refuses nothing: Postgres filters them, so the vault reads as absent and a write over a hidden
   row as `stale_write`. So when users who should reach
   their vaults see `not_permitted`, check the grants of the role your server connects as: a
