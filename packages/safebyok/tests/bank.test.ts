@@ -650,6 +650,19 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     expect(Object.isFrozen(settled.vaults)).to.be.true
   })
 
+  it("births once when a listener asks for the vault as each change lands: every ask, the bank's own 'starting' and the entry's among them, joins the birth under way", async () => {
+    const world = makeWorld()
+    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const bank = bankIn(world)
+    const asked: Promise<Vault>[] = []
+    bank.subscribe(() => { if (bank.entryOf(U1)?.status !== 'timely') { asked.push(bank.ensureVault(U1)) } })
+    const vault = await bank.ensureVault(U1)
+    expect(asked.length).to.be.at.least(2)
+    for (const ask of asked) { expect(await ask).to.eq(vault) }
+    expect(ensureVault).toHaveBeenCalledOnce()
+    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+  })
+
   it("moves an entry from starting to refused when its birth is refused, the refusal kept", async () => {
     const world = makeWorld()
     const unreachable = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')

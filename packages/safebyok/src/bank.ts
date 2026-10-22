@@ -304,7 +304,7 @@ export class Bank {
   }
   // --
 
-  // == [Birth]: ensureEntry, bearEntry, readForBirth, draftOf, heardGone, letGoOf, setView
+  // == [Birth]: ensureEntry, bearEntry, settleBirth, bear, bearFrom, revokeLease, heardGone, letGoOf, setView
 
   /** The Vault object for `parts`' scope: the one held, the birth under way, or a birth begun now. */
   #ensureEntry(parts: VaultParts): Promise<Vault> {
@@ -319,25 +319,31 @@ export class Bank {
   #bearEntry(ckey: string, parts: VaultParts): Promise<Vault> {
     const entry: HeldEntry = { view: frozenEntry(parts.scope, 'starting', null, null), birth: null }
     this.#entries.set(ckey, entry)
+    entry.birth = this.#settleBirth(ckey, entry, parts)
     this.#publish()
-    const birth = (async () => {
-      const born = await outcomeOf(() => this.#bear(ckey, parts), unexpectedError)
-      // Let go while it was born: the Vault object goes with it, and the caller hears so.
-      if (this.#entries.get(ckey) !== entry) {
-        if (born.ok) { born.val[letGo]() }
-        throw goneError()
-      }
-      entry.birth = null
-      if (born.ok) {
-        this.#setView(entry, frozenEntry(parts.scope, 'timely', born.val, null))
-        return born.val
-      }
-      this.#setView(entry, frozenEntry(parts.scope, 'refused', null, born.err))
-      this.#tellBadNews(born.err)
-      throw born.err
-    })()
-    entry.birth = birth
-    return birth
+    return entry.birth
+  }
+
+  /** Birth `entry`'s Vault object and settle the entry: `timely` holding it, `refused` with why, or, for an entry let go meanwhile, the Vault object let go too and the caller refused 'vault_gone'. */
+  async #settleBirth(ckey: string, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
+    // Begun a microtask on, so the birth is held before anything is published -- the entry's
+    // 'starting', or the bank's as the birth says hello: a listener asking for the vault as it
+    // hears either joins this birth, rather than beginning another from inside this one.
+    await Promise.resolve()
+    const born = await outcomeOf(() => this.#bear(ckey, parts), unexpectedError)
+    // Let go while it was born: the Vault object goes with it, and the caller hears so.
+    if (this.#entries.get(ckey) !== entry) {
+      if (born.ok) { born.val[letGo]() }
+      throw goneError()
+    }
+    entry.birth = null
+    if (born.ok) {
+      this.#setView(entry, frozenEntry(parts.scope, 'timely', born.val, null))
+      return born.val
+    }
+    this.#setView(entry, frozenEntry(parts.scope, 'refused', null, born.err))
+    this.#tellBadNews(born.err)
+    throw born.err
   }
 
   /** One birth: the libraries loaded, one read of storage and this device's store, the judgment, the device record raised, and the Vault object born of it all.
