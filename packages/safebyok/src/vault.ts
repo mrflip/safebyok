@@ -1963,9 +1963,13 @@ const withoutStoredVaultProps = async (writing: Promise<void>): Promise<void> =>
     await writing
   } catch (err) {
     if (! isVaultError(err, 'stale_write') || err.meta?.vault_props_stored === undefined) { throw err }
-    throw new VaultError(err.refusalkind, err.message, err.cause === undefined ? {} : { cause: err.cause })
+    // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
+    throw new VaultError(err.refusalkind, StaleWayinsMessage, err.cause === undefined ? {} : { cause: err.cause })
   }
 }
+
+/** What a change to the ways in says when storage refuses it as stale. */
+const StaleWayinsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 
 /** The refusal of a first unlock that met gateless vault props another device made: no passphrase is set there to open. */
 const gatelessElsewhereError = () => new VaultError('created_elsewhere', 'A vault was just made for this label on another device, which has not set its passphrase yet. Nothing was created on this device. Set the passphrase on that device, then unlock with it here.')
