@@ -385,6 +385,23 @@ describe("the vault's leaseMillis", () => {
   })
 })
 
+/** The minutes left before `vault` locks of itself, as `Vault.askPassphraseAt`'s example counts them; null while locked. */
+const minutesLeftOf = (vault: Vault): number | null => (
+  vault.askPassphraseAt === null ? null : Math.ceil((vault.askPassphraseAt - vault.now()) / MinuteMillis)
+)
+
+describe("the vault's askPassphraseAt", () => {
+  it("lets a UI say how many minutes are left before the vault locks of itself, as its example shows; null once locked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one', { leaseHours: 0.25 })
+    expect(minutesLeftOf(vault)).to.eq(15)
+    world.advance(5 * MinuteMillis)
+    expect(minutesLeftOf(vault)).to.eq(10)
+    await vault.lock()
+    expect(minutesLeftOf(vault)).to.be.null
+  })
+})
+
 const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  "a record under the format tag from before the package's rename"],
   [({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }: Record<string, unknown>) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }), 'a record from before the lease, under safebyok-unlock-v1'],
