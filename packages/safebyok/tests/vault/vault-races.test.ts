@@ -420,6 +420,42 @@ describe("a read that began before this device's own change to the ways in lande
   })
 })
 
+describe("a change to the ways in whose vault moves elsewhere as the change lands", () => {
+  it("deleted: the vault stays absent, as the read found it, and nothing is unlocked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    const landed = TH.holdNextAnswer(world.vaultDB, 'putVaultProps')
+    const changing = vault.putWayin('pw one', 'pw two')
+    await landed.reached
+    const there = await world.open({ deviceDB: memoryDeviceDB() })
+    await there.del()
+    await TH.readAfresh(vault)
+    expect(vault.state).to.eq('absent')
+    landed.release()
+    await changing
+    expect(vault.state).to.eq('absent')
+    expect(vault.stamp).to.be.null
+  })
+
+  it("deleted and made anew: the vault shows the new one, locked, never the deleted one's ways in", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    const landed = TH.holdNextAnswer(world.vaultDB, 'putVaultProps')
+    const changing = vault.putWayin('pw one', 'pw two')
+    await landed.reached
+    const there = await world.open({ deviceDB: memoryDeviceDB() })
+    await there.del()
+    await there.unlock('pw three')
+    await TH.readAfresh(vault)
+    const remadeTok = vault.vault_tok
+    expect(remadeTok).to.eq(there.vault_tok)
+    landed.release()
+    await changing
+    expect(vault.vault_tok).to.eq(remadeTok)
+    expect(vault.state).to.eq('locked')
+  })
+})
+
 describe("a lock in another handle on this device", () => {
   it("leaves an unlock begun after it alone", async () => {
     const world = makeRacingWorld()

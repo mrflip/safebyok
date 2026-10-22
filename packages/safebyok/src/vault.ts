@@ -1489,9 +1489,11 @@ export class Vault {
     // The change has landed, whatever happens now: what follows is this device's own, and a
     // failure of it is said through the logger, never thrown as though the change had not landed.
     const raised = await this.#raiseMarkAfter(next, plan.call)
-    // The picture takes what was written, unless a read took up a later one meanwhile: should it
+    // The picture takes what was written while it still holds that vault, unless a read took up a
+    // later copy meanwhile; a read that found it deleted or made anew stands. Should the picture
     // differ, the grant below finds the vault moved on, and takes nothing up.
-    if (! isOlderPicture(this.#vaultProps, next)) {
+    const held = this.#vaultProps
+    if (held !== null && held !== UnreadVaultProps && held.vault_tok === next.vault_tok && ! isOlderPicture(held, next)) {
       this.#deviceMark = raised
       this.#vaultProps = next
     }
