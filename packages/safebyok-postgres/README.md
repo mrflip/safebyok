@@ -131,7 +131,7 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, VaultProps, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, DamagedBox, GatelessVaultProps, VaultProps, VaultScope, WayinSummary } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -165,20 +165,42 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
   }
 }
 
+/**
+ * What a route answers, as JSON: `meta` always, the facts about what stands that a write's
+ * refusal learned (the record that won the race, how full the vault is) or nothing, and either
+ * the `result` or a `refusal`. A refusal's own `meta` holds error information only (a damaged
+ * record's listing), rebuilt from the fields a browser may see: no wrapped or ciphered field of
+ * a record, whatever the refusal carried. A record in the main `meta` crosses whole, as a read
+ * would send it; the browser's VaultDB checks each.
+ */
+const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
+  if (ok) { return { result: val, meta: {} } }
+  const { box_stored, vault_props_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
+  const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
+  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
+  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_props_stored, capacity } }
+}
+
+/** A listed damaged box, rebuilt from its three public fields. */
+const boxShown = ({ boxlabel, damaged, revision_tok }: DamagedBox) => ({ boxlabel, damaged, revision_tok })
+
+/** A listed wayin, rebuilt from the fields a snapshot shows while the vault is locked: none of its salt, its wrapped vaultKey or the rest. */
+const wayinShown = (wayin: WayinSummary) => {
+  const { wayinkind, device_id, registered_at, vault_tok } = wayin
+  return 'credential_id' in wayin
+    ? { wayinkind, device_id, registered_at, vault_tok, credential_id: wayin.credential_id, prf_salt_b64: wayin.prf_salt_b64 }
+    : { wayinkind, device_id, registered_at, vault_tok }
+}
+
 export async function POST(request: Request): Promise<Response> {
   const { verb, args } = await postedCall(request)
   const serve = typeof verb === 'string' ? served.get(verb) : undefined
   if (! serve || ! Array.isArray(args)) {
-    return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' } }, { status: 400 })
+    return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} }, { status: 400 })
   }
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
-  const { ok, val = null, err } = await serve(vaultDB, args)
-  // A refusal crosses as its kind, its calm message, and its meta -- what a stale write says
-  // stands (a box write's box_stored, an update's vault_props_stored, as a read would send
-  // them), or a vault_full's capacity -- never its cause, the driver's own error.
-  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
-  return Response.json({ result: val })
+  return Response.json(answerOf(await serve(vaultDB, args)))
 }
 ```
 
@@ -189,6 +211,28 @@ must hand back records as stored. Each is one statement on the server, so the br
 vault, its listing included, is one request. An update of the vault props answers the props as
 stored, and a deletion of the vault the tombstone it left: both go to the browser as the route's
 `result`.
+
+**The answer has one shape, whichever way a call went**: `{ result, meta }` when it was served,
+`{ refusal, meta }` when it was refused. Both carry the main `meta`, and a refusal's own
+`refusal.meta` beside it:
+
+* **The main `meta`** holds what a call learned about what stands, the facts that are not errors
+  but the caller's next step: a stale box write's `box_stored`, a stale update's
+  `vault_props_stored` (a record whole, as a read would send it, or null for none), and a full
+  vault's `capacity`. A served call has none today, and sends `meta: {}`. Records here are
+  ciphertext and visible fields, as a read sends them; the browser's VaultDB checks each.
+* **`refusal.meta`** holds error information only, a damaged record's listing (`box_listed`,
+  `wayin_listed`), **rebuilt field by field** by `answerOf`: a refusal never carries a record's
+  wrapped keys, its ciphertext or a passphrase wayin's salt, whatever the VaultDB's refusal held.
+  Add a field to it only by adding it to `boxShown` or `wayinShown`.
+* **A refusal's cause** (the driver's own error) never crosses.
+
+The browser's `checkedAnswer` refuses an answer that is not this shape (a `meta` field out of
+its place, a missing `meta`, both a `result` and a `refusal`), as `storage_unavailable`, and
+rethrows a refusal as the `VaultError` the server made, with both metas merged into its `meta`.
+**Redeploy the route and the app together**: a route that sends the older `{ refusal: { meta } }`
+and no main `meta` is refused by a newer browser, and an older browser reads a newer route's
+refusal without the main meta's `box_stored`, `vault_props_stored` or `capacity`.
 
 The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
@@ -217,24 +261,60 @@ export class RouteVaultDB extends VaultDB {
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
   // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
-  // with how full it is), so a write that answers landed:
-  // a box write answers with the box as the server's storage holds it, and a box
-  // deletion with what it removed.
+  // with how full it is), so a write that answers landed: a box write answers with the box as the
+  // server's storage holds it, and a box deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await fetch(VaultRouteUrl, {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({ verb, args }),
     })
-    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown, meta?: RefusalMeta } }
-    if (refusal && isKind(refusal.kind) && typeof refusal.message === 'string') {
-      // What stands, or how full the vault is, handed on unchecked: the VaultDB checks each.
-      throw new VaultError(refusal.kind, refusal.message, refusal.meta === undefined ? {} : { meta: refusal.meta })
+    const answer = checkedAnswer(await response.json())
+    if (answer.refusal) {
+      // What stands, or how full the vault is, from the main meta, beside the refusal's own: handed
+      // on unchecked, for the VaultDB checks each.
+      const meta = { ...answer.meta, ...answer.refusal.meta }
+      throw new VaultError(answer.refusal.kind, answer.refusal.message, Object.keys(meta).length === 0 ? {} : { meta })
     }
     if (! response.ok) { throw new Error(`The vault route answered ${String(response.status)}`) }
-    return result
+    return answer.result
   }
 }
+
+// An answer is the route's, or it is nothing the browser's vault believes: a `meta` of the fields
+// the main meta may hold, and either a `result` or a `refusal` of a kind this package knows, a
+// message, and a `meta` of the fields only a refusal's own may hold. The records in them are the
+// VaultDB's to check. A thrown Error is met as storage_unavailable, quoting nothing it was sent.
+type RouteAnswer = { result: unknown, refusal?: undefined, meta: RefusalMeta } | { result?: undefined, refusal: { kind: RefusalKind, message: string, meta: RefusalMeta }, meta: RefusalMeta }
+
+const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_props_stored', 'capacity']
+const RefusalMetaCkeys: readonly string[] = ['box_listed', 'wayin_listed']
+
+const isObject = (sent: unknown): sent is object => typeof sent === 'object' && sent !== null && ! Array.isArray(sent)
+
+// `sent` as a meta if it is an object holding no field but `ckeys`, else null.
+const metaWithin = (sent: unknown, ckeys: readonly string[]): RefusalMeta | null => (
+  isObject(sent) && Object.keys(sent).every((ckey) => ckeys.includes(ckey)) ? sent : null
+)
+
+const checkedAnswer = (sent: unknown): RouteAnswer => {
+  if (! isObject(sent)) { throw misshapen() }
+  const answer = sent as { result?: unknown, refusal?: unknown, meta?: unknown }
+  const meta = metaWithin(answer.meta, MainMetaCkeys)
+  if (meta === null) { throw misshapen() }
+  if (answer.refusal === undefined) {
+    if (! ('result' in answer)) { throw misshapen() }
+    return { result: answer.result, meta }
+  }
+  // A refusal comes with no result; its own meta, if it has one, holds only error information.
+  if (! isObject(answer.refusal) || 'result' in answer) { throw misshapen() }
+  const refusal = answer.refusal as { kind?: unknown, message?: unknown, meta?: unknown }
+  const refusalMeta = metaWithin(refusal.meta ?? {}, RefusalMetaCkeys)
+  if (refusalMeta === null || typeof refusal.message !== 'string' || ! isKind(refusal.kind)) { throw misshapen() }
+  return { refusal: { kind: refusal.kind, message: refusal.message, meta: refusalMeta }, meta }
+}
+
+const misshapen = () => new Error('The vault route answered something that is not a vault answer.')
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 

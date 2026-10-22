@@ -1892,7 +1892,27 @@ added or folded into through the subagent, and no other entry changes.
   core's VaultDB validates them. A driver's error rides as `cause` and may quote key columns, or
   (a malformed record refused by a NOT NULL) the whole failing row, its ciphertext included; the
   README's route recipe sends the browser only a refusal's kind and message (amended 2026-10-21
-  (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb).
+  (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb;
+  amended 2026-10-22 (route_meta, branch 20261022-route_meta): no longer whole, and it sent more than that: a
+  refusal that listed a record (`box_listed`, `wayin_listed`) carried a wrapped vaultKey, ciphertext or a
+  passphrase wayin's salt (`salt_b64`, `vault_key_wayin_wrapped`, ciphered box fields) to the browser and into any
+  log of browser traffic, which is offline-guessing material. Every answer is now `{ result, meta }` or
+  `{ refusal: { kind, message, meta }, meta }`. The main `meta` holds a write's not-quite-error facts
+  (`box_stored`, `vault_props_stored`, `capacity`) as whole records, as a read would send them, which the browser
+  needs to recompose its picture and its VaultDB validates. The refusal's own `meta` holds error information
+  only and is rebuilt by an allowlist (`answerOf`, `boxShown`, `wayinShown`): a damaged box listing is only
+  `boxlabel`, `damaged`, `revision_tok`; a wayin listing is only `wayinkind`, `device_id`, `registered_at`,
+  `vault_tok` and, for a passkey, `credential_id` and `prf_salt_b64` (what a locked vault's snapshot already
+  shows). A new field crosses only by being added to the allowlist; a denylist of `*_wrapped`/`*_ciphered`
+  names was rejected as it fails open. The refusal's `cause` never crosses. The browser's `checkedAnswer`
+  believes an answer only whole: a main-meta field in the refusal's `meta`, an unknown `meta` field, a result
+  beside a refusal, or an unknown kind is refused as `storage_unavailable`. Residual: the main `meta`'s winner
+  records remain in the response body of a stale write (a stale update's `vault_props_stored` carries both
+  wayins with salts and wrapped vaultKeys), to the signed-in owner of that vault only, since the VaultDB refuses
+  any other user's scope; a host that logs response bodies would log them. The GraphQL wire keeps its shape
+  (see the 2026-10-22 wire_meta entry) and is unchanged. Coach's ruling 2026-10-22; code in
+  `packages/safebyok-postgres/README.md`, "The route recipe", run by
+  `packages/safebyok-postgres/tests/route-recipe.test.ts`).
 * 2026-10-15: `safebyok-graphql` carries the verbs over GraphQL and authorizes nothing itself:
   each resolver calls the VaultDB `vaultDBFor(context)` makes for the request, so the rule is
   `postgresVaultDB`'s (or the host's own ServedVaultDB's), fed the user the host's auth verified.

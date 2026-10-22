@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, DamagedBox, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope, WayinSummary } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -43,22 +43,44 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
   }
 }
 
+/**
+ * What a route answers, as JSON: `meta` always, the facts about what stands that a write's
+ * refusal learned (the record that won the race, how full the vault is) or nothing, and either
+ * the `result` or a `refusal`. A refusal's own `meta` holds error information only (a damaged
+ * record's listing), rebuilt from the fields a browser may see: no wrapped or ciphered field of
+ * a record, whatever the refusal carried. A record in the main `meta` crosses whole, as a read
+ * would send it; the browser's VaultDB checks each.
+ */
+const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
+  if (ok) { return { result: val, meta: {} } }
+  const { box_stored, vault_props_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
+  const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
+  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
+  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_props_stored, capacity } }
+}
+
+/** A listed damaged box, rebuilt from its three public fields. */
+const boxShown = ({ boxlabel, damaged, revision_tok }: DamagedBox) => ({ boxlabel, damaged, revision_tok })
+
+/** A listed wayin, rebuilt from the fields a snapshot shows while the vault is locked: none of its salt, its wrapped vaultKey or the rest. */
+const wayinShown = (wayin: WayinSummary) => {
+  const { wayinkind, device_id, registered_at, vault_tok } = wayin
+  return 'credential_id' in wayin
+    ? { wayinkind, device_id, registered_at, vault_tok, credential_id: wayin.credential_id, prf_salt_b64: wayin.prf_salt_b64 }
+    : { wayinkind, device_id, registered_at, vault_tok }
+}
+
 /** The README's POST handler, over `pool`, its signed-in user found by `signedInUserId`. */
 const vaultRoute = (pool: PostgresClient, signedInUserId: (request: Request) => Promise<string | null>) => (
   async (request: Request): Promise<Response> => {
     const { verb, args } = await postedCall(request)
     const serve = typeof verb === 'string' ? served.get(verb) : undefined
     if (! serve || ! Array.isArray(args)) {
-      return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' } }, { status: 400 })
+      return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} }, { status: 400 })
     }
     // Made per request, for the user your own auth signed in -- never one the request names.
     const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
-    const { ok, val = null, err } = await serve(vaultDB, args)
-    // A refusal crosses as its kind, its calm message, and its meta -- what a stale write says
-    // stands (a box write's box_stored, an update's vault_props_stored, as a read would send
-    // them), or a vault_full's capacity -- never its cause, the driver's own error.
-    if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
-    return Response.json({ result: val })
+    return Response.json(answerOf(await serve(vaultDB, args)))
   }
 )
 
@@ -102,15 +124,52 @@ class RouteVaultDB extends VaultDB {
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({ verb, args }),
     })
-    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown, meta?: RefusalMeta } }
-    if (refusal && isKind(refusal.kind) && typeof refusal.message === 'string') {
-      // What stands, or how full the vault is, handed on unchecked: the VaultDB checks each.
-      throw new VaultError(refusal.kind, refusal.message, refusal.meta === undefined ? {} : { meta: refusal.meta })
+    const answer = checkedAnswer(await response.json())
+    if (answer.refusal) {
+      // What stands, or how full the vault is, from the main meta, beside the refusal's own: handed
+      // on unchecked, for the VaultDB checks each.
+      const meta = { ...answer.meta, ...answer.refusal.meta }
+      throw new VaultError(answer.refusal.kind, answer.refusal.message, Object.keys(meta).length === 0 ? {} : { meta })
     }
     if (! response.ok) { throw new Error(`The vault route answered ${String(response.status)}`) }
-    return result
+    return answer.result
   }
 }
+
+// An answer is the route's, or it is nothing the browser's vault believes: a `meta` of the fields
+// the main meta may hold, and either a `result` or a `refusal` of a kind this package knows, a
+// message, and a `meta` of the fields only a refusal's own may hold. The records in them are the
+// VaultDB's to check. A thrown Error is met as storage_unavailable, quoting nothing it was sent.
+type RouteAnswer = { result: unknown, refusal?: undefined, meta: RefusalMeta } | { result?: undefined, refusal: { kind: RefusalKind, message: string, meta: RefusalMeta }, meta: RefusalMeta }
+
+const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_props_stored', 'capacity']
+const RefusalMetaCkeys: readonly string[] = ['box_listed', 'wayin_listed']
+
+const isObject = (sent: unknown): sent is object => typeof sent === 'object' && sent !== null && ! Array.isArray(sent)
+
+// `sent` as a meta if it is an object holding no field but `ckeys`, else null.
+const metaWithin = (sent: unknown, ckeys: readonly string[]): RefusalMeta | null => (
+  isObject(sent) && Object.keys(sent).every((ckey) => ckeys.includes(ckey)) ? sent : null
+)
+
+const checkedAnswer = (sent: unknown): RouteAnswer => {
+  if (! isObject(sent)) { throw misshapen() }
+  const answer = sent as { result?: unknown, refusal?: unknown, meta?: unknown }
+  const meta = metaWithin(answer.meta, MainMetaCkeys)
+  if (meta === null) { throw misshapen() }
+  if (answer.refusal === undefined) {
+    if (! ('result' in answer)) { throw misshapen() }
+    return { result: answer.result, meta }
+  }
+  // A refusal comes with no result; its own meta, if it has one, holds only error information.
+  if (! isObject(answer.refusal) || 'result' in answer) { throw misshapen() }
+  const refusal = answer.refusal as { kind?: unknown, message?: unknown, meta?: unknown }
+  const refusalMeta = metaWithin(refusal.meta ?? {}, RefusalMetaCkeys)
+  if (refusalMeta === null || typeof refusal.message !== 'string' || ! isKind(refusal.kind)) { throw misshapen() }
+  return { refusal: { kind: refusal.kind, message: refusal.message, meta: refusalMeta }, meta }
+}
+
+const misshapen = () => new Error('The vault route answered something that is not a vault answer.')
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 
@@ -212,6 +271,7 @@ describe("the README route recipe", () => {
     for (const body of [{ verb: 'subscribe', args: [] }, { verb: 'constructor', args: [] }, { verb: 'getVault', args: 'nope' }, null, 42]) {
       const response = await route(postOf(body))
       expect(response.status).to.eq(400)
+      expect(await response.json()).to.deep.equal({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} })
     }
     const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultProps", ' }))
     expect(notJson.status).to.eq(400)
@@ -226,6 +286,95 @@ describe("the README route recipe", () => {
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')
     expect(sent).to.not.include('vault_owner')
+  })
+})
+
+/** A wayin record as storage holds it, its salt and wrapped vaultKey in place, for a test of what crosses. */
+const fullWayin = (extra: Record<string, unknown> = {}) => ({
+  wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1',
+  salt_b64: 'c2FsdC1ub3QtcmVhbA', vault_key_wayin_wrapped: 'wrapped-not-real', ...extra,
+}) as unknown as WayinSummary
+
+/** What `answer` is on the wire: sent as the route sends it, and read back as the browser reads it. */
+const crossed = async (answer: object) => await Response.json(answer).json() as { refusal: { kind: string, message: string, meta: object }, meta: object }
+
+describe("the README route recipe's answer, which every call makes in one shape", () => {
+  it("answers a served call with its result and a main meta that holds nothing", () => {
+    expect(answerOf({ ok: true, val: { here: 1 } })).to.deep.equal({ result: { here: 1 }, meta: {} })
+    expect(answerOf({ ok: true, val: undefined })).to.deep.equal({ result: null, meta: {} })
+  })
+
+  it("carries what a stale write or a full vault learned in the main meta, and none of it in the refusal's own", async () => {
+    const boxStored = { boxlabel: 'a', damaged: true, revision_tok: 'rev1' } as const
+    const stale = new VaultError('stale_write', 'Another device wrote first.', { meta: { box_stored: boxStored } })
+    expect(await crossed(answerOf({ ok: false, err: stale }))).to.deep.equal({ refusal: { kind: 'stale_write', message: 'Another device wrote first.', meta: {} }, meta: { box_stored: boxStored } })
+    // A null is a fact too: no vault props stand.
+    const none = new VaultError('stale_write', 'x', { meta: { vault_props_stored: null } })
+    const noneSent = await crossed(answerOf({ ok: false, err: none }))
+    expect(noneSent.meta).to.deep.equal({ vault_props_stored: null })
+    const capacity = { boxes: { used: 3, max: 3 }, bytes: { used: 10, max: 100 } }
+    const full = await crossed(answerOf({ ok: false, err: new VaultError('vault_full', 'x', { meta: { capacity } }) }))
+    expect(full.meta).to.deep.equal({ capacity })
+    expect(full.refusal.meta).to.deep.equal({})
+  })
+
+  it("rebuilds a damaged record's listing without its wrapped vaultKey, salt or any other field a record holds", async () => {
+    const boxListed = { boxlabel: 'a', damaged: true, revision_tok: 'rev1', box_key_wrapped: 'wrapped-not-real', whisper_ciphered: 'ciphered-not-real' } as unknown as DamagedBox
+    const err = new VaultError('damaged_wayin', 'x', { meta: { box_listed: boxListed, wayin_listed: fullWayin() } })
+    const sent = await crossed(answerOf({ ok: false, err }))
+    expect(sent).to.deep.equal({
+      refusal: {
+        kind: 'damaged_wayin', message: 'x',
+        meta: { box_listed: { boxlabel: 'a', damaged: true, revision_tok: 'rev1' }, wayin_listed: { wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1' } },
+      },
+      meta: {},
+    })
+    const text = JSON.stringify(sent)
+    for (const material of ['wrapped', 'ciphered', 'salt_b64', 'not-real']) { expect(text).to.not.include(material) }
+  })
+
+  it("keeps a passkey's credential id and PRF salt in a listing, which a locked vault's snapshot shows as well", async () => {
+    const passkey = fullWayin({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'prfsalt1' })
+    const sent = await crossed(answerOf({ ok: false, err: new VaultError('damaged_wayin', 'x', { meta: { wayin_listed: passkey } }) }))
+    expect(sent.refusal.meta).to.deep.equal({ wayin_listed: { wayinkind: 'passkey', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1', credential_id: 'cred1', prf_salt_b64: 'prfsalt1' } })
+  })
+
+  it("sends a refusal's kind and message, never its cause", async () => {
+    const cause = new Error('password authentication failed for user "vault_owner"')
+    const sent = await crossed(answerOf({ ok: false, err: new VaultError('storage_unavailable', 'Storage is down.', { cause }) }))
+    expect(JSON.stringify(sent)).to.not.include('vault_owner')
+    expect(sent).to.deep.equal({ refusal: { kind: 'storage_unavailable', message: 'Storage is down.', meta: {} }, meta: {} })
+  })
+
+  it("is believed by the browser only whole: a missing or misplaced meta, a refusal of no known kind, a result beside a refusal, or no object at all is storage_unavailable", async () => {
+    const refusal = { kind: 'bad_option', message: 'Nope.' }
+    const bodies: unknown[] = [
+      { result: null }, { result: null, meta: [] }, { result: null, meta: { surprise: 1 } }, { meta: {} },
+      { refusal: { kind: 'invented_kind', message: 'x' }, meta: {} }, { refusal: { kind: 'bad_option' }, meta: {} },
+      { refusal: { ...refusal, meta: { box_stored: null } }, meta: {} }, { refusal: { ...refusal, meta: { box_listed: null, extra: 1 } }, meta: {} },
+      { refusal, result: null, meta: {} }, { refusal: 'bad_option', meta: {} }, [], null, 'result',
+    ]
+    for (const body of bodies) {
+      const broken = new RouteVaultDB(() => Promise.resolve(Response.json(body)))
+      await TH.expectBad(broken.getVault(TH.scopeOf('u1')), 'storage_unavailable')
+    }
+  })
+
+  it("rethrows a refusal's kind and message, and merges its main meta with its own", async () => {
+    const wayinListed = { wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1' }
+    const body = { refusal: { kind: 'damaged_wayin', message: 'Damaged.', meta: { wayin_listed: wayinListed } }, meta: { vault_props_stored: null } }
+    const browser = new RouteVaultDB(() => Promise.resolve(Response.json(body)))
+    let thrown: unknown = null
+    try {
+      await (browser as unknown as { call: (verb: string) => Promise<unknown> }).call('getVault')
+    } catch (err) {
+      thrown = err
+    }
+    expect(thrown).to.be.instanceOf(VaultError)
+    const refusal = thrown as VaultError
+    expect(refusal.refusalkind).to.eq('damaged_wayin')
+    expect(refusal.message).to.eq('Damaged.')
+    expect(refusal.meta).to.deep.equal({ vault_props_stored: null, wayin_listed: wayinListed })
   })
 })
 
