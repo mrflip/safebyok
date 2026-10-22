@@ -10,7 +10,7 @@ import type {
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import {
-  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope,
+  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -20,7 +20,7 @@ import * as TH from '../test-helpers'
  * a field may be null, as the vault props' `passkey` may.
  */
 type Shape =
-  | { kind: 'string' | 'number' }
+  | { kind: 'string' | 'number' | 'null' }
   | { kind: 'literal', values: string[] }
   | { kind: 'object', fields: Record<string, { optional: boolean, shape: Shape }> }
   | { kind: 'array', element: Shape }
@@ -34,6 +34,7 @@ type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, s
 const zodShape = (schema: ZodLike): Shape => {
   const { def } = schema
   if (def.type === 'string' || def.type === 'number') { return { kind: def.type } }
+  if (def.type === 'null') { return { kind: 'null' } }
   if (def.type === 'literal') { return { kind: 'literal', values: (def.values ?? []).map(String).toSorted((one, two) => one.localeCompare(two)) } }
   if (def.type === 'object') {
     const fields = Object.entries(def.shape ?? {}).map(([ckey, field]) => {
@@ -60,6 +61,7 @@ const convexShape = (validator: GenericValidator): Shape => {
   switch (validator.kind) {
   case 'string':  { return { kind: 'string' } }
   case 'float64': { return { kind: 'number' } }
+  case 'null':    { return { kind: 'null' } }
   case 'literal': { return { kind: 'literal', values: [String(validator.value)] } }
   case 'union': {
     const nonNulls = validator.members.filter((member) => member.kind !== 'null')
@@ -84,10 +86,15 @@ const convexShape = (validator: GenericValidator): Shape => {
 
 const listedZod = Z.omit(Records.BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
 
+// Convex holds both shapes of the core's vault props in one table: the gated shape, its passphrase
+// nullable as a gateless vault has it. The core alone tells the two apart.
+const eitherVaultPropsZod = Z.object({ ...Records.GatedVaultProps.shape, passphrase: Z.nullable(Records.PassphraseWayinRecord) })
+
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope, 'VaultScope: what names one vault'],
-  [Records.VaultProps,   VaultProps,   'VaultProps: every field, the passphrase and the nullable passkey with their ciphered wraps nested'],
+  [eitherVaultPropsZod,  VaultProps,   'VaultProps: every field, the passphrase and passkey both nullable, with their ciphered wraps nested'],
+  [Records.GatelessVaultProps, GatelessVaultProps, 'GatelessVaultProps: every field, gate_epoch 0 and no way in'],
   [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as an object of any JSON values, both ciphered fields nested'],
   [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
 ] as const
@@ -100,7 +107,8 @@ describe("the Convex validators, field for field with the core's Zod records", (
   }
 
   it("type the same records, expectations and summaries as the core", () => {
-    expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
+    expectTypeOf<Records.VaultProps>().toExtend<Infer<typeof VaultProps>>()
+    expectTypeOf<Infer<typeof GatelessVaultProps>>().toEqualTypeOf<Records.GatelessVaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
     // A box's sidecar is an object of any values to Convex, which the core holds to JSON values on every read.
     expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'sidecar'>>()

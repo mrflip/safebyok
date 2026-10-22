@@ -40,14 +40,43 @@ describe("getVaultProps and ensureVaultProps", () => {
   })
 })
 
+describe("getVault and ensureVault", () => {
+  it("has no vault until one is ensured, then reads its props and its boxes, without their ciphered fields or Convex's, from one query", async () => {
+    const CVX = TH.componentTest()
+    expect(await CVX.query(TH.vaults.getVault, { scope: u1 })).to.be.null
+    expect(await CVX.mutation(TH.vaults.ensureVault, { draft: TH.gatelessOf('u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    await CVX.mutation(TH.vaults.putVaultProps, { vaultProps: TH.vaultPropsOf('u1'), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 0 } })
+    await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
+    const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = TH.boxOf('anthropic_api_key', 'a1')
+    expect(await CVX.query(TH.vaults.getVault, { scope: u1 })).to.deep.equal({ vaultProps: TH.vaultPropsOf('u1'), boxes: [listed] })
+    expect(await CVX.mutation(TH.vaults.ensureVault, { draft: TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }) })).to.deep.equal({ vaultProps: TH.vaultPropsOf('u1'), boxes: [listed] })
+  })
+
+  it("refuses a draft with a way in, which Convex's validators do not accept, writing nothing", async () => {
+    const CVX = TH.componentTest()
+    await expect(CVX.mutation(TH.vaults.ensureVault, { draft: TH.vaultPropsOf('u1') as never })).rejects.toThrow(/Validator error/)
+    const { vaults } = await allRows(CVX)
+    expect(vaults).to.have.lengthOf(0)
+  })
+})
+
 describe("putVaultProps", () => {
   const ThisVaultAtOne = { vault_tok: 'vault-tok-u1', gate_epoch: 1 }
   const rewrapped = TH.vaultPropsOf('u1', { gate_epoch: 2, passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } }) })
 
   it("lands vault props that keep the vault_tok and move gate_epoch forward", async () => {
     const CVX = await withVaultProps()
-    expect(await CVX.mutation(TH.vaults.putVaultProps, { vaultProps: rewrapped, expected: ThisVaultAtOne })).to.be.true
+    expect(await CVX.mutation(TH.vaults.putVaultProps, { vaultProps: rewrapped, expected: ThisVaultAtOne })).to.deep.equal({ landed: true })
     expect(await CVX.query(TH.vaults.getVaultProps, { scope: u1 })).to.deep.equal(rewrapped)
+  })
+
+  it("answers a miss with the vault props standing, from the same transaction, or null where none stand, as PutVaultPropsAnswer's second example shows", async () => {
+    const CVX = await withVaultProps()
+    await CVX.mutation(TH.vaults.putVaultProps, { vaultProps: rewrapped, expected: ThisVaultAtOne })
+    const late = TH.vaultPropsOf('u1', { gate_epoch: 2 })
+    expect(await CVX.mutation(TH.vaults.putVaultProps, { vaultProps: late, expected: ThisVaultAtOne })).to.deep.equal({ landed: false, vault_props_stored: rewrapped })
+    const empty = TH.componentTest()
+    expect(await empty.mutation(TH.vaults.putVaultProps, { vaultProps: late, expected: ThisVaultAtOne })).to.deep.equal({ landed: false, vault_props_stored: null })
   })
 
   // The core never sends either -- its VaultDB refuses the first, and its vault moves the epoch on
@@ -60,7 +89,7 @@ describe("putVaultProps", () => {
   for (const [vaultProps, blurb] of UnmovedCases) {
     it(`${blurb}, writing nothing`, async () => {
       const CVX = await withVaultProps()
-      expect(await CVX.mutation(TH.vaults.putVaultProps, { vaultProps, expected: ThisVaultAtOne })).to.be.false
+      expect(await CVX.mutation(TH.vaults.putVaultProps, { vaultProps, expected: ThisVaultAtOne })).to.deep.equal({ landed: false, vault_props_stored: TH.vaultPropsOf('u1') })
       expect(await CVX.query(TH.vaults.getVaultProps, { scope: u1 })).to.deep.equal(TH.vaultPropsOf('u1'))
     })
   }
