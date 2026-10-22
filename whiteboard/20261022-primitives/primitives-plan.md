@@ -10,23 +10,19 @@
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4), reused:
   Open Matters, Progress, Resolved.
 * **Supersedes:** `whiteboard/20261021-streamline/` (the streamline sprint,
-  [#242](https://github.com/mrflip/safebyok/pull/242)), paused 2026-10-22 when its thread 3
-  serialized every call through a turn queue. Its threads 1, 2 and 11 are this sprint's first
-  three, already filed ([#243](https://github.com/mrflip/safebyok/pull/243),
-  [#244](https://github.com/mrflip/safebyok/pull/244),
-  [#246](https://github.com/mrflip/safebyok/pull/246)) and merged first. Its thread 3
-  ([#245](https://github.com/mrflip/safebyok/pull/245)) is closed unmerged; what it learned is
-  listed under thread 5. The old folder moves to `winboard/` when the Coach winds that sprint up.
+  [#242](https://github.com/mrflip/safebyok/pull/242)). Its threads 1, 2 and 11 are this sprint's
+  first three, filed as [#243](https://github.com/mrflip/safebyok/pull/243),
+  [#244](https://github.com/mrflip/safebyok/pull/244) and
+  [#246](https://github.com/mrflip/safebyok/pull/246), left open; the line builds on their tip.
+  [#245](https://github.com/mrflip/safebyok/pull/245) is not in the line.
 
 The spec is `primitives.md` in this directory, the *Primitives* tab of the contract doc
 (https://claude.ai/artifact/J8ooBpFq7tyAAPFrxb3qRq, tab *Primitives*) as exported at the sprint's
-start. Where this plan and `primitives.md` disagree, `primitives.md` wins on what a primitive
-does and this plan wins on which thread builds it; the progress document
-(`primitives-progress.md`) wins over both. The preplan
-(`whiteboard/20261021-better_paths/better_paths-plan.md`) is history: read it only where a
-thread's gloss points at a section of it.
+start; `primitives-preplan.md` is the whole design in one document. Where this plan and
+`primitives.md` disagree, `primitives.md` wins on what a primitive does and this plan wins on
+which thread builds it; the progress document (`primitives-progress.md`) wins over both.
 
-The Coach's charge, from the streamline invocation, still stands (verbatim):
+The Coach's charge (verbatim):
 
 > That plan was authored in part by an AI. Use flexible thinking, as we are making big changes to
 > the contract. The goal of the sprint is clean confident control flow, and simplified methods.
@@ -35,16 +31,14 @@ The Coach's charge, from the streamline invocation, still stands (verbatim):
 > should not be altered; if we told you to do something that is contradictory, or eliminates a
 > safety/consistency guarantee, call it out.
 
-And from the rethink (2026-10-22): "throw whenever things disagree"; "what we have is so much
-better I want to land it and then consider ergonomics"; "ship what we have, tell people to report
-what is wrong and we'll fix from both ends".
-
 ## Read first
 
 Every worker, beyond CLAUDE.md:
 
-* `primitives.md` in this directory, whole. *The rules* and *The mutexes* bind every thread; the
-  tables are the spec of what your thread builds, and of what the threads before yours built.
+* `primitives-preplan.md` in this directory, whole: the design in one document, and how to
+  search the other whiteboard files by section.
+* `primitives.md`, whole. *The rules* and *The mutexes* bind every thread; the tables are the
+  spec of what your thread builds, and of what the threads before yours built.
 * `revised-outcomes.md` in this directory, the sprint doc's *Revised Outcomes* tab as exported:
   the lock's order, what work under way does when a lock lands (today's per-method contract,
   kept), the memory-only drop, and the tests the turns rethink asked for. Where it and
@@ -77,9 +71,8 @@ Every worker, beyond CLAUDE.md:
 3. **The Open Matters already raised** are the orchestrator's to carry back. Until ruled, a thread
    that meets one takes its row's Rec, says so in its PR, and keeps the choice easy to undo,
    **except** where the Rec would change the Contract (what a caller is promised): then the
-   thread keeps the current contract and lists the question. The Coach: "Don't make YOLO calls
-   that alter contract at this level". The spec supersedes the sprint doc's *Resolved* tab
-   except on tombstones and `vault_epoch`, which stand.
+   thread keeps the current contract and lists the question. The spec supersedes the sprint
+   doc's *Resolved* tab except on tombstones and `vault_epoch`, which stand.
 4. **One thread, one PR**, "Stacked on #N" in its body. Every PR's base is `main`.
 5. **No format bumps, no back-compat.** Each changeset says what a host with records written
    before it will see.
@@ -120,23 +113,23 @@ Every worker, beyond CLAUDE.md:
 
 ## Threads
 
-Threads 1 to 3 are the streamline sprint's, filed and merged first; the line starts at their tip.
+Threads 1 to 3 are filed and open; the line is cut from their restacked tip.
 
 ### 1. renames, filed ([#243](https://github.com/mrflip/safebyok/pull/243))
 
-`unlock_epoch` is `gate_epoch`, `vault_id` is `vault_tok`, everywhere. Merged before the line
-starts; nothing for a worker to do.
+`unlock_epoch` is `gate_epoch`, `vault_id` is `vault_tok`, everywhere. The base; nothing for a
+worker to do.
 
 ### 2. get_vault, filed ([#244](https://github.com/mrflip/safebyok/pull/244))
 
 `VaultDB.getVault(scope)` and `ensureVault(scope, draft)` resolve props and listing from one
-read; gateless props admitted; a stale `putVaultProps` carries the winner. Merged before the
-line starts. Thread 4 changes `ensureVault` to one argument and the expectations.
+read; gateless props admitted; a stale `putVaultProps` carries the winner. The base. Thread 4
+changes `ensureVault` to one argument and the expectations.
 
 ### 3. wire_meta, filed ([#246](https://github.com/mrflip/safebyok/pull/246))
 
 Over GraphQL, what a write's answer carries travels in the response body, never in error
-extensions. Merged before the line starts.
+extensions. The base.
 
 ### 4. store_verbs
 
@@ -158,8 +151,8 @@ IndexedDB), `VAULTDB.md`, `tests/test-helpers/vault-db-conformance.ts` and each 
 The core's `vault.ts` keeps working through the wrapper with the fewest edits that compile; the
 call paths are thread 5's. `idb.ts`'s `getLease` must not delete a row it found unparseable after
 a newer `putLease` (the ordering obligation). The README says a server that restores a backup
-must wipe the restored vaults. **Model:** `sonnet`. **Depends on:** 3 (cut from the tip of the
-restacked #243, #244, #246). **Look-ahead:** thread 5 writes through these expectations; thread 7
+must wipe the restored vaults. **Model:** `sonnet`. **Depends on:** 3 (cut from the restacked tip of
+#243, #244 and #246). **Look-ahead:** thread 5 writes through these expectations; thread 7
 reads the tombstone and `vault_epoch` at birth. **Size:** L (five adapters and the conformance
 suite); may split into VaultDB and DeviceDB.
 
@@ -194,11 +187,7 @@ demand replaces their checks; their primitives are thread 6's. `lock()`'s order,
 call under way does when a lock lands (today's contract per method, unchanged), are
 `revised-outcomes.md`, *Lock*; the memory-only drop that serves the expiry, `close` and the
 revocation is `#dropLease()` there. A stale write's message says "another call, here or on
-another device", since two calls on one label from one tab are ordinary. **From #245, reusable:** `hello`
-reading `vaultDB.getVault` beside the lease in one round; the module functions `foundVault` and
-`ensuredVault`; `byCodeUnit` exported; the deterministic-order tests of `vault-turns.test.ts`,
-rewritten to the demand's answers. **Not reusable:** the queue, the turns, the lock-as-turn, and
-every test that pins a queue order. **Depends on:** 4. **Look-ahead:** thread 7 births through
+another device", since two calls on one label from one tab are ordinary. **Depends on:** 4. **Look-ahead:** thread 7 births through
 the refresh's judgment, so keep it a function of what one read returned plus the fields in hand.
 **Size:** L. Lowers the `Vault` and `everything` lines (code out).
 
@@ -358,10 +347,7 @@ audits `notes/security.md` after the sprint; no agent rewrites it.
 
 ## For the Coach
 
-* Merge, in order, #243, #244, #246 (restacked onto main) before `/sprint primitives` is issued;
-  close #245 unmerged, tagging its branch `closed/20261022-turns`.
+* Restack #243, #244 and #246 onto main and leave them open; close #245 and tag its branch
+  `closed/20261022-turns`; issue `/sprint primitives`.
 * Wind up the streamline sprint: its folder to `winboard/`, its paused note resolved.
-* The Open Matters this plan leaves for the sprint to raise: the shape of a proven change from
-  the app (a gating raised by `putWayin`, or provings the app makes itself); whether a refresh
-  landing after a local box write may keep that entry; the ergonomics of a whisper-omitted
-  `putBox` reading first.
+* The Open Matters tab of the sprint doc is where the sprint raises what it cannot decide.

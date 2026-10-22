@@ -19,6 +19,12 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   people to report what is wrong and we'll fix from both ends".
 * **`cipheredWith` / `decipherWith`** for like-for-like, `extractWhisper` where one thing becomes
   another (2026-10-22).
+* **The dialog is the only door** (2026-10-22): the app invokes the call, the gating is raised,
+  the dialog's output becomes provings, and the attempt makes the change. The app never holds a
+  proving.
+* **No refresh bookkeeping** (2026-10-22): a refresh does not note a box this tab wrote while it
+  ran; the next write refuses `stale_write` and a hello cures it.
+* **A sidecar-only change is `getBox` then `putBox`** (2026-10-22); ergonomics after the sprint.
 * From the streamline sprint, still in force: `putVaultProps` resolves the stored props;
   `ensureVault(draft)`; tombstones on `del()` and `delDamagedVault`; `vault_epoch` moves on the
   vault's core fields only; no back-compat for pre-rename vaults; security notes through a
@@ -45,10 +51,7 @@ rules* 3).
 
 ## What the threads found
 
-### From the streamline sprint (threads 1, 2 and its thread 3, #245)
+### From the streamline sprint (threads 1 and 2)
 
-See `whiteboard/20261021-streamline/streamline-progress.md` (moved to `winboard/` at its
-wind-up) for threads 1 and 2. From #245, closed unmerged: `hello` reading `vaultDB.getVault`
-beside the lease in one round, the module functions `foundVault` and `ensuredVault`, and
-`byCodeUnit` exported from `vault-db.ts` are worth lifting; the `p-limit` queue, the turns and
-every test that pins a queue order are not.
+See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
+#243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
