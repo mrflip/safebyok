@@ -1,6 +1,6 @@
 # Thread 6: lease_box (2026-10-22)
 
-Branch `20261022-lease_box`, PR #PRNUM, stacked on [#253](https://github.com/mrflip/safebyok/pull/253). Justify: green (core 2900 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). Size: everything 47 kB, Vault 39 kB, idbVaultDB 2.7 kB (raised by the rule). The open matters, the refusals where today coped, the Contract lines this thread makes untrue and the races are in `thread-6-lease_box-details.md` beside this file: the reviewer, whoever files the thread, and thread 11 should read it.
+Branch `20261022-lease_box`, PR [#254](https://github.com/mrflip/safebyok/pull/254), stacked on [#253](https://github.com/mrflip/safebyok/pull/253). Justify: green (core 2900 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). Size: everything 47 kB, Vault 39 kB, idbVaultDB 2.7 kB (raised by the rule). The open matters, the refusals where today coped, the Contract lines this thread makes untrue and the races are in `thread-6-lease_box-details.md` beside this file: the reviewer, whoever files the thread, and thread 11 should read it.
 
 * **Built**:
   * `src/lease.ts`: `Lease.make(vault, record)`, a pure constructor over a record, nothing unwrapped;
