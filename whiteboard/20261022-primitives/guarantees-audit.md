@@ -82,7 +82,8 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    the refresh from what each fetched, and from what `putGate` and `delVault` returned. In the
    refresh, "older than the picture in hand → ignore" is tested **before** `vault_behind`, so a
    late read of this tab's own write is never a false `vault_behind`. Thread 5 orders the
-   refresh's tests; thread 7 adds the record and its writes.
+   refresh's tests; thread 7 adds the record and its writes. *The Coach (2026-10-22):* took A (one
+   number per scope, kept on the device, raised at each refresh too).
 
 7. **A full `putBox`'s base revision is unnamed (S; thread 6).** With whisper and sidecar both
    given there is no read, and the spec names no base. **Fix:** the base is the listed revision,

@@ -68,3 +68,14 @@ and 11 are restated for the demand model.
     the local store are unaffected. The cure, if it shows: keep the tombstone as a state of the
     vault row, so one `INSERT ... ON CONFLICT DO UPDATE` decides. (#251 review; the Coach: "don't
     let rollback protection drive any large revisions")
+17. **A CHANGE-BELL RING DURING A `vault.refresh()` IN FLIGHT JOINS IT, AND ITS CHANGE IS LOST** until
+    the next ring or hello: a write that landed after that refresh's `getVault` began is not shown
+    (say, a vault made on another device while this tab shows "Choose a passphrase"). No demand
+    catches it, since nothing disagrees: the picture is only old. The Coach: "no, note the concern,
+    don't fix: I think it points to the weakness in cross-tab coordination, but the read-re-read
+    business is what landed us here." (#253)
+18. **THE TAKE-UP KEPT UNTIL THREAD 9 ERASES ON A STALE JUDGMENT.** `#ensureUnlocked` judges a stored
+    lease against a picture up to `staleMinutes` old and erases what it cannot open, so a tab whose
+    picture predates another tab's change to the ways in can erase that tab's valid lease, which
+    re-prompts at its next read. A re-prompt, never a lease kept wrongly. The Coach: "yes record
+    don't fix". (#253 review)

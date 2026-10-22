@@ -129,7 +129,12 @@ Every worker, beyond CLAUDE.md:
     to it; the implementation goes on whichever half is easier to write, and `valOf` or one
     try/catch derives the other; a method whose Outcome carries meta is implemented on the `try`
     side. A method named `try` that makes no sense as an outcome is renamed. The VaultDB adapters
-    keep returning `Outcome`: the core's `vault-db.ts` wrapper offers both halves.
+    keep returning `Outcome`: the core's `vault-db.ts` wrapper offers both halves. *A check is a
+    triplet, not a pair* (the Coach, 2026-10-22, verbatim): "no that's an ensureConsistent() and get
+    consistent() triplet. Add that triplet -- get foo(), demandFoo() and sometimes ensureFoo() near
+    where the pair is documented": a sync yes/no query, `demandFoo()` that throws, and where a
+    caller needs it an async `ensureFoo()` that makes it so. `tryDemandConsistentWith` goes (thread 6).
+    Name operations exactly in PRs and thread files: `getBox`, `vault.refresh()`, never "the read".
 13. **Flag races, never solve them with a mechanism.** A race the spec does not close goes in the
     PR's open questions and `primitives-toldjaso.md`, with what a user would see.
 14. **Fluid design, no feature jealousy.** The spec's placement of a method is a guess the Coach
@@ -322,6 +327,15 @@ provider's tests; the race "a stale device writing a vault made anew" needs the 
 lands in thread 8, so this thread writes its birth half (the tombstone, the new life, the device
 record lowered across tabs).
 
+*Orchestrator, rulings for this thread (2026-10-22):* the device record is option A (audit 6):
+one highest `vault_epoch` per scope, kept on the device, raised at birth, at each refresh, and
+from our own gate writes and `delVault`. A Vault object whose vault was deleted becomes gone for
+good (every call `vault_gone`), and the bank hands out a fresh one when asked; the Coach on how a
+fresh Vault object comes about after a deletion or a rollback, verbatim: "the process for getting a
+new vault is not well thought through, perhaps impossible at the current time, for deletions and
+for rollback": build the smallest path (`clearCachedVault`) and raise what is still unsettled.
+Thread 5 left the first-hello memo `#birth` / `#born` and the device mark for this thread to remove.
+
 ### 8. proving_gate
 
 > **proving_gate**: `Proof` becomes `Proving`, abstract, with `PassphraseProving` and
@@ -350,6 +364,14 @@ fresh proving mints, where passkey bytes are zeroed, the demand before `putLease
 gate change racing another device's gate change", "a superseded passphrase proving a change" and
 "a stale device writing a vault made anew" (the write half) live here; `lock()` and `decline`
 during `grantLease` is written here against the placeholder and re-pointed in thread 9.
+
+*Orchestrator, rulings for this thread (2026-10-22):* a cancel during the lease write, the Coach
+verbatim: "If I enter my password and then somehow am prompted again I will as a human hit cancel.
+Declining to prove does not imply an imperative to switch from "unlocked" to "locked", it is only
+an imperative to NOT switch from locked to unlocked on that gating's say-so". So a cancel never
+locks, and a cancelled gating never attaches the lease it was writing; a later take-up of what it
+stored is the take-up's own judgment. Audit 1's step 7 checks both the proving and the stored
+record. Rename `WayinStamp` (say `WayinOrigin`): it collides with thread 5's `Stamp`.
 
 ### 9. gating
 
@@ -382,8 +404,8 @@ misuse (`bad_option`), and the README says that a lease of zero is how to prompt
 **Size:** L. *Orchestrator:*
 thread 5 pulled `hello({ staleMinutes: 0 })` forward into `unlock()` and `#reviseWayins` (audit 4)
 and kept `#takeUp`'s AbortController for this thread to remove; the kept take-up erases on a stale
-judgment, which the pantry consult here ends (take up only after a read begun at or after the
-call; drop, never erase).
+judgment, which the Coach rules recorded, not fixed ("yes record don't fix"): fix it here only if the
+pantry consult's shape gives it for free.
 
 *Tests.* `ask.test.ts` and the gating halves of `vault-lease.test.ts` and `vault-wayins.test.ts`;
 one test per gatingkind's happy path, one injected failure per chain step, the open-on-typo, the
@@ -418,7 +440,12 @@ the one tested (Open Matters, from #252's review, the Coach took the Rec). Threa
 lines made untrue are in `thread-5-demand-details.md` on #253, and its review adds two: `del()`
 can resolve over a vault made elsewhere during a joined read, and the proving's "as storage holds
 them now" may be a joined read's moment older. Pick `vault_locked` or `vault_remade` for a box
-from a remade vault (`decryptWhisper` against the demand).
+from a remade vault (`decryptWhisper` against the demand): settled, `vault_remade`, since thread 6
+demands after each await. TODO entries from the Coach (2026-10-22): the Postgres README points to
+(a) the GraphQL client and (b) an AI prompt that builds a route, rather than a server nobody wants;
+an agent skill set; `capacity` as an attribute of the Vault object for the app; the Vault object
+adopting storage's capacity on `vault_full`. Write the get/demand/ensure triplet into STYLE.md
+beside the try pairs. `box_moved` is dropped from the kinds.
 
 ### 12. route_meta
 
