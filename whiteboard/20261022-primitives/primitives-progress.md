@@ -41,6 +41,10 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   a caller's guarantee fall, keep the guarantee by the smallest means outside the primitive, raise
   it loudly, and carry on.
 
+* *Orchestrator:* **`guarantees-audit.md` binds threads 4 to 9** (2026-10-22): nine places the
+  spec as written lets a guarantee fall, each fix by thread (*By thread*), each an Open Matters
+  row. It wins over `primitives.md` until ruled.
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
