@@ -304,6 +304,18 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
     await TH.expectRefusal(sealing, 'vault_locked')
   })
 
+  it("refuse as the demand finds the vault, never 'damaged_box', when the vault moves on while a box that will not open is deciphered", async () => {
+    const { lease, vault } = await leasedVault()
+    const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf())
+    const other = await lease.cipheredWith(bytesOf('"sk-other"'), visibleOf())
+    const deciphering = TH.holdNextCall(crypto.subtle, 'decrypt')
+    const opening = lease.decipherWith({ ...ciphered, whisper_ciphered: other.whisper_ciphered }, visibleOf())
+    await deciphering.reached
+    vault.stamp = vault.stamp === null ? null : { ...vault.stamp, vault_tok: 'vault-tok-new' }
+    deciphering.release()
+    await TH.expectRefusal(opening, 'vault_remade')
+  })
+
   const TamperCases = [
     // what a device store may hand back, which still must not open:
     [(record: LeaseRecord) => Promise.resolve({ ...record, ask_passphrase_at: record.ask_passphrase_at + HourMillis }), 'a deadline moved later where the record is kept'],

@@ -246,10 +246,17 @@ export class Box {
       const { lease } = this.#vault
       if (lease === null) { throw lockedError() }
       const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
-      const whisperBytes = await lease.decipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+      const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+      // What the decipher brought, a refusal included, is used only while the box still stands as it was made.
       try {
-        // What the decipher brought is used only while the box still stands as it was made.
-        this.#vault.demandConsistentWith(this, { leaseBound: true })
+        // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+        this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
+      } catch (err) {
+        if (deciphered.ok) { deciphered.val.fill(0) }
+        throw err
+      }
+      const whisperBytes = valOf(deciphered)
+      try {
         const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
         if (! checked.success) {
           throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")

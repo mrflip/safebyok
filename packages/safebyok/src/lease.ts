@@ -150,14 +150,18 @@ export class Lease {
       try {
         const header = checkedVisible(visible)
         this.#demand()
-        const vaultKey = await this.#unwrapVaultKey('wrapKey')
-        const boxKey = await makeBoxKey()
-        const ciphered = {
-          box_key_wrapped:  await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped')),
-          whisper_ciphered: await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered')),
-        }
+        const vaultKey = await this.#vaultKeyOrNull('wrapKey')
         this.#demand()
-        return ciphered
+        if (vaultKey === null) { throw this.#dropDamaged() }
+        const sealing = await outcomeOf(async () => {
+          const boxKey = await makeBoxKey()
+          return {
+            box_key_wrapped:  await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped')),
+            whisper_ciphered: await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered')),
+          }
+        }, unexpectedError)
+        this.#demand()
+        return valOf(sealing)
       } finally {
         bytes.fill(0)
       }
@@ -181,17 +185,21 @@ export class Lease {
       const sealed = checkedCiphered(ciphered)
       const header = checkedVisible(visible)
       this.#demand()
-      const vaultKey = await this.#unwrapVaultKey('unwrapKey')
-      let bytes: Uint8Array
-      try {
-        const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, this.#boxCtxOf(header, 'box_key_wrapped'), BoxKeyUsage)
-        bytes = await decipherBytes(boxKey, sealed.whisper_ciphered, this.#boxCtxOf(header, 'whisper_ciphered'))
-      } catch {
-        // WebCrypto's own refusal says nothing a caller can act on.
-        throw damagedBox()
-      }
+      const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
       this.#demand()
-      return bytes
+      if (vaultKey === null) { throw this.#dropDamaged() }
+      // WebCrypto's own refusal says nothing a caller can act on: a box that will not open is damaged.
+      const opened = await outcomeOf(async () => {
+        const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, this.#boxCtxOf(header, 'box_key_wrapped'), BoxKeyUsage)
+        return await decipherBytes(boxKey, sealed.whisper_ciphered, this.#boxCtxOf(header, 'whisper_ciphered'))
+      }, damagedBox)
+      try {
+        this.#demand()
+      } catch (err) {
+        if (opened.ok) { opened.val.fill(0) }
+        throw err
+      }
+      return valOf(opened)
     }, unexpectedError)
   }
 
@@ -223,15 +231,19 @@ export class Lease {
     this.#vault.demandConsistentWith(this, { leaseBound: true })
   }
 
-  /** The vaultKey, unwrapped under the leaseKey as a non-extractable handle that may only `usage`: 'damaged_lease' when it will not, the lease dropped as `lock()` drops it. */
-  async #unwrapVaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
+  /** The vaultKey, unwrapped under the leaseKey as a non-extractable handle that may only `usage`; null when it will not unwrap. */
+  async #vaultKeyOrNull(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey | null> {
     try {
       return await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, leaseCtxOf(this), { extractable: false, usage: [usage] })
     } catch {
-      // Only the lease the vault holds is dropped: a newer one, granted meanwhile, stands.
-      if (this.#vault.lease === this) { void this.#vault.tryLock() }
-      throw damagedLease()
+      return null
     }
+  }
+
+  /** Drop this lease, damaged, as `lock()` drops it, when it is the one its vault holds, and say so as 'damaged_lease': a newer lease, granted meanwhile, stands. */
+  #dropDamaged(): VaultError {
+    if (this.#vault.lease === this) { void this.#vault.tryLock() }
+    return damagedLease()
   }
 
   /** The ctx a box's ciphered field is bound to: the box format, this lease's scope and `vault_tok`, the purpose, and every other visible field, the sidecar as its JSON with keys sorted. See VOCABULARY.md on ctx. */

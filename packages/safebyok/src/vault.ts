@@ -727,7 +727,10 @@ export class Vault {
       // lets storage say whether it removed that one or another.
       const expected = { vault_tok: lease.vault_tok, revision_tok: this.#listedRevisionOf(label) }
       const showedDamaged = this.#isListedDamaged(label)
-      const { outcome } = await this.#vaultDB.delBox(this.#scope, label, expected)
+      const deleted = await outcomeOf(() => this.#vaultDB.delBox(this.#scope, label, expected), unexpectedError)
+      // A lock landing meanwhile lets the deletion land.
+      this.#demandAfterWait(deleted, { vault_tok: lease.vault_tok }, { call: 'delBox' })
+      const { outcome } = valOf(deleted)
       // Storage arbitrates: nothing stood there to delete.
       if (outcome === 'absent') { throw absentBox() }
       if (outcome === 'deleted_other') {
@@ -1192,7 +1195,7 @@ export class Vault {
   }
   // --
 
-  // == [Demand]: checkOpen, demand, inconsistencyWith, leaseRefusal, demandLease, currentVaultProps
+  // == [Demand]: checkOpen, demand, demandAfterWait, inconsistencyWith, leaseRefusal, demandLease, currentVaultProps
 
   #checkOpen() {
     if (this.#closed) { throw closedError() }
@@ -1205,6 +1208,16 @@ export class Vault {
     // The thing's fields never reach the logger: a lease's are its scope and epoch, but the rule is one.
     this.#logger.log(`A call found the vault moved on from what it held, and refused it: ${refusal.refusalkind}.`, { call: opts.call, refusalkind: refusal.refusalkind })
     throw refusal
+  }
+
+  /** Demand `thing` right after a wait whose answer is `settled`, before anything is made of that answer, a refusal included: the vault moving on meanwhile refuses as the demand finds it.
+   * A refusal from storage about the vault itself (`UntrustedStorageKinds`) comes as it came: heeding
+   * it is what moved the picture. A lease-bound demand asks for the lease only of an answer that
+   * came: a lease that refused its own use (`damaged_lease`) has dropped itself.
+   */
+  #demandAfterWait(settled: Outcome<unknown>, thing: Stamped, opts: { leaseBound?: boolean, call: VaultCall }) {
+    if (! settled.ok && UntrustedStorageKinds.some((kind) => isVaultError(settled.err, kind))) { throw settled.err }
+    this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, call: opts.call })
   }
 
   /** Why `thing` is not consistent with the picture in hand, the vault half (closed, gone, made anew, ways in moved), or null when it is. */
@@ -1744,7 +1757,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, readBox, fetchBox, boxUnder
+  // == [Reading boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, readBox, boxReadRefusal, boxUnder
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1773,28 +1786,24 @@ export class Vault {
    * opening it is what demands the lease.
    */
   async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
-    const record = await this.#fetchBox(boxlabel, vaultTok)
-    if (record === null) {
-      this.#demand({ vault_tok: vaultTok }, { call })
-      return null
-    }
-    const fetched = this.#boxUnder(record, vaultTok)
+    const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }), unexpectedError)
+    // A vault that moved on meanwhile refuses as the demand finds it, never as what its read found.
+    this.#demandAfterWait(read, { vault_tok: vaultTok }, { call })
+    if (! read.ok) { throw this.#boxReadRefusal(read.err) }
+    if (read.val === null) { return null }
+    const fetched = this.#boxUnder(read.val, vaultTok)
     this.#demand(fetched, { call })
     return fetched
   }
 
-  /** The record under `boxlabel`, read from storage only while the vault `vaultTok` stands there; 'vault_gone' when another stands, or none.
-   * A vault deleted or made anew elsewhere leaves this device's picture behind: the next hello
-   * reads storage afresh, whatever `staleMinutes` says.
+  /** What a box read that storage refused refuses with: storage's 'vault_mismatch' as 'vault_gone', the next hello reading storage afresh whatever `staleMinutes` says; any other as it came.
+   * The vault this device read was deleted, or deleted and made anew, elsewhere, which its picture
+   * does not show yet.
    */
-  async #fetchBox(boxlabel: string, vaultTok: string): Promise<BoxRecord | null> {
-    try {
-      return await this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok })
-    } catch (err) {
-      if (! isVaultError(err, 'vault_mismatch')) { throw err }
-      this.#readAt = FarPast
-      throw new VaultError('vault_gone', 'The vault this device holds was deleted, or deleted and made anew, on another device, so no box was read: what stands now is another vault, or none. Read the vault again (hello) to see what stands, and unlock it to carry on.', { cause: err })
-    }
+  #boxReadRefusal(err: VaultError): VaultError {
+    if (! isVaultError(err, 'vault_mismatch')) { return err }
+    this.#readAt = FarPast
+    return new VaultError('vault_gone', 'The vault this device holds was deleted, or deleted and made anew, on another device, so no box was read: what stands now is another vault, or none. Read the vault again (hello) to see what stands, and unlock it to carry on.', { cause: err })
   }
 
   /** `record` as a {@link Box}, lying in the vault `vaultTok`, which the read or write that handed it back expected; stamped with the picture's scope and epochs.
@@ -1815,18 +1824,26 @@ export class Vault {
    */
   async #sealAndPutBox(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<Box> {
     const lease = this.#demandLease('putBox')
-    const { base, sidecar, whisper } = givenSidecar === undefined || givenWhisper === undefined
+    const readFirst = givenSidecar === undefined || givenWhisper === undefined
+    const { base, sidecar, whisper } = readFirst
       ? await this.#storedBase(boxlabel, lease.vault_tok, givenSidecar, givenWhisper)
       : { base: this.#listedBase(boxlabel), sidecar: givenSidecar, whisper: givenWhisper }
+    // A lock landing while the box was read and opened refuses, sealing nothing.
+    if (readFirst) { this.#demand(lease, { leaseBound: true, call: 'putBox' }) }
     // A sidecar kept counts toward the limit as one given does, weighed before any key is made.
     this.#checkWhisperFits(whisper, sidecar)
     this.#checkRoomFor(boxlabel, base)
-    const box = await Box.seal(this, { boxlabel, sidecar, base }, whisper)
+    const sealed = await Box.trySeal(this, { boxlabel, sidecar, base }, whisper)
+    // A lock landing during the seal refuses, writing nothing.
+    this.#demandAfterWait(sealed, lease, { leaseBound: true, call: 'putBox' })
+    const box = valOf(sealed)
     this.#demand(box, { call: 'putBox' })
     // Lands only in the vault this whisper is sealed for, over the revision it was sealed from: a
     // vault reborn elsewhere, or a box written meanwhile by another device, refuses it.
-    const stored = await this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok })
-    return this.#takeStoredBox(stored, box.vault_tok)
+    const written = await outcomeOf(() => this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }), unexpectedError)
+    // A lock landing during the write lets it land; the vault moving on meanwhile refuses as the demand finds it.
+    this.#demandAfterWait(written, { vault_tok: box.vault_tok }, { call: 'putBox' })
+    return this.#takeStoredBox(valOf(written), box.vault_tok)
   }
 
   /** What a whole `putBox()` seals over, reading nothing: the listing's entry for `boxlabel`, its revision and `registered_at` adopted as they stand, or none for a box it does not show, which is a new box.
@@ -1849,6 +1866,7 @@ export class Vault {
    */
   async #storedBase(boxlabel: string, vaultTok: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
     const read = await outcomeOf(() => this.#readBox(boxlabel, vaultTok, 'putBox'), unexpectedError)
+    this.#demandAfterWait(read, { vault_tok: vaultTok }, { call: 'putBox' })
     if (! read.ok) {
       if (givenWhisper === undefined || ! isVaultError(read.err, 'damaged_box')) { throw read.err }
       return { base: this.#damagedBase(boxlabel), sidecar: givenSidecar ?? {}, whisper: givenWhisper }
@@ -1859,6 +1877,7 @@ export class Vault {
       return { base: null, sidecar: givenSidecar ?? {}, whisper: givenWhisper }
     }
     const opened = await stored.tryExtractWhisper()
+    this.#demandAfterWait(opened, stored, { leaseBound: true, call: 'putBox' })
     if (! opened.ok) {
       if (givenWhisper === undefined || ! isVaultError(opened.err, 'damaged_box')) { throw opened.err }
       // Nothing in a box that will not open vouches for its fields: it is written over as new.

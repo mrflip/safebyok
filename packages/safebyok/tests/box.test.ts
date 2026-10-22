@@ -4,7 +4,7 @@ import { Box, BoxRecord, type SealBoxProps } from '../src/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
-import { valOf } from '../src/outcome'
+import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
 import { BoxSummary, FarFuture, type Stamp, type Whisper } from '../src/types'
@@ -473,9 +473,9 @@ describe("box.extractWhisper", () => {
 
   it("zeroes the whisper's bytes once parsed", async () => {
     const { box } = await sealedOf()
-    const deciphering = vi.spyOn(Lease.prototype, 'decipherWith')
+    const deciphering = vi.spyOn(Lease.prototype, 'tryDecipherWith')
     await box.extractWhisper()
-    const bytes = await (deciphering.mock.results[0]?.value as Promise<Uint8Array>)
+    const bytes = await TH.expectGood(deciphering.mock.results[0]?.value as Promise<Outcome<Uint8Array>>)
     expect([...bytes].every((byte) => byte === 0)).to.be.true
   })
 })

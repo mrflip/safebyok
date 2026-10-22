@@ -276,6 +276,40 @@ describe("vault.lease", () => {
   })
 })
 
+/** A vault this device unlocked, holding a box, whose VaultDB hears no bells, and a second device on the same storage. */
+const remadeWorld = async () => {
+  const world = makeWorld()
+  const deaf = world.deafVaultDB()
+  const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-mine')
+  const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+  /** Delete and remake the vault from the second device, and have this one read the new life. */
+  const remake = async () => {
+    await there.del()
+    await there.unlock('pw two')
+    await vault.hello({ staleMinutes: 0 })
+  }
+  return { world, deaf, vault, there, remake }
+}
+
+describe("a box call whose vault is made anew elsewhere during its wait", () => {
+  for (const [verb, call] of [
+    ['getBox',  (vault: Vault) => vault.getWhisper('anthropic')],
+    ['putBox',  (vault: Vault) => vault.putBox({ boxlabel: 'anthropic', sidecar: {} }, 'sk-mine-again')],
+    ['delBox',  (vault: Vault) => vault.delBox('anthropic')],
+  ] as const) {
+    it(`refuses 'vault_remade' when the vault is made anew while ${verb} waits on storage, never what storage answered`, async () => {
+      const { deaf, vault, remake } = await remadeWorld()
+      const waiting = TH.holdNextCall(deaf, verb)
+      const calling = call(vault)
+      await waiting.reached
+      await remake()
+      waiting.release()
+      await TH.expectRefusal(calling, 'vault_remade')
+    })
+  }
+})
+
 describe("the times a vault keeps", () => {
   it("stamps a new box's registered_at and written_at with the clock's time", async () => {
     const world = makeWorld()
