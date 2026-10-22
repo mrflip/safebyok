@@ -441,10 +441,13 @@ export class Vault {
    *
    * A call under way ends by its own rule. A `getWhisper()` or `useWhisper()` refuses 'vault_locked'
    * once storage answers or the box opens, unless an unlock has put a lease back in hand meanwhile;
-   * a `getBox()` hands back the box, which holds nothing secret. A `putBox()` refuses so when the
-   * lock lands while it reads or seals, and lands when it comes during the write; a `delBox()`
-   * lands. An ask's `attempt` under way takes nothing up. An `unlock()` or `putWayin()` under way
-   * is not stopped, and leaves the vault unlocked.
+   * a `getBox()` hands back the box, which holds nothing secret. A `putBox()` or `delBox()` refuses
+   * 'vault_locked', writing nothing, when the lock lands before its write is sent: while it waits on
+   * `getProof`, reads the box (`VaultDB.getBox`, `box.extractWhisper()`), or seals it (`Box.seal`).
+   * Only the write itself is past a lock's reach: once `VaultDB.putBox` or `VaultDB.delBox` is sent,
+   * it lands or refuses as storage decides, a stale `putBox()` refusing 'stale_write' as ever. An
+   * ask's `attempt` under way takes nothing up. An `unlock()` or `putWayin()` under way is not
+   * stopped, and leaves the vault unlocked.
    *
    * Refuses 'storage_unavailable' ('storage_blocked' when the browser withholds the store) when the
    * device store cannot erase the lease; the vault is locked all the same.
@@ -603,10 +606,12 @@ export class Vault {
    * this box since the revision it was sealed from: nothing was written, and the refusal's
    * `meta.box_stored` is what stands. A whole store over a listing a moment stale refuses so too: a
    * hello shows what stands, or leave out the sidecar to read the box first. A vault deleted or made
-   * anew elsewhere refuses 'stale_write' too, writing nothing. A lock landing before the write,
-   * while the box is read or sealed, refuses 'vault_locked'; one landing during the write lets it
-   * land. Once the write lands, the listing takes the box as storage stored it; a vault made anew
-   * meanwhile refuses 'vault_remade' after the write landed.
+   * anew elsewhere refuses 'stale_write' too, writing nothing. A lock landing before the write is
+   * sent refuses 'vault_locked', writing nothing: while the call waits on `getProof`, reads the box
+   * (`VaultDB.getBox`, `box.extractWhisper()`), or seals it (`Box.seal`). Once `VaultDB.putBox` is
+   * sent, a lock does not stop it: the write lands or refuses as storage decides. Once it lands, the
+   * listing takes the box as storage stored it; a vault made anew meanwhile refuses 'vault_remade'
+   * after the write landed.
    *
    * Every store stamps `written_at`, the same whisper stored again included; `registered_at` keeps
    * the box's first store. A box that will not read or open is written over as new, keeping neither
@@ -711,8 +716,10 @@ export class Vault {
    * anew, elsewhere, nothing is removed, and the call refuses 'stale_write': `hello()` to see what
    * stands. Within that vault the delete wins: a revision another device or tab wrote meanwhile
    * is deleted all the same, its `outcome` 'deleted_other', and the logger warns. Deleted is gone: a
-   * later `putBox()` from a device that never saw the delete is refused as stale. Once it lands,
-   * the listing drops the box; a lock landing meanwhile lets it land.
+   * later `putBox()` from a device that never saw the delete is refused as stale. A lock landing
+   * while the call waits on `getProof` refuses 'vault_locked', removing nothing. Once `VaultDB.delBox`
+   * is sent, a lock does not stop it: the delete lands or refuses as storage decides, and once it
+   * lands the listing drops the box.
    *
    * @example const { outcome } = await vault.delBox('anthropic_api_key')   // 'deleted', or 'deleted_other' when another write stood
    */

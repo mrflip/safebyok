@@ -445,8 +445,12 @@ passphrase again afterwards. Use it for a real lock signal: a Lock button, a loc
 sign-out. The key is dropped at once, and every call that needs it throws kind `vault_locked`. A
 `getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing back, unless an
 unlock has put a key back in hand by the time its whisper is ready. An `unlock()` or
-`putWayin()` under way is not stopped: it finishes, and leaves the vault unlocked. A write
-already sent to storage lands. `del()` locks the same way, and so does storage the vault cannot
+`putWayin()` under way is not stopped: it finishes, and leaves the vault unlocked. A `putBox()`
+or `delBox()` under way refuses with `vault_locked`, writing nothing, when the lock comes before
+its write is sent to storage: while it waits on `getProof`, reads and opens the box, or seals it
+(`Box.seal`). Only the write itself is past a lock's reach: once `VaultDB.putBox` or
+`VaultDB.delBox` is sent, it lands or refuses as storage decides, and a stale write still refuses
+`stale_write`, never landing. `del()` locks the same way, and so does storage the vault cannot
 trust (below). A refresh that finds the vault's ways in changed on another device, or the vault
 gone, drops the key the same way for this handle.
 
