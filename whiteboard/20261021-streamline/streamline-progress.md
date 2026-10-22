@@ -16,6 +16,9 @@ keeps it. Newer than the plan and the preplan wherever they disagree.
   needed (thread 4).
 * **Rollback (2026-10-22):** a `vault_epoch` counter, tombstoned vaults, a device refusing storage
   behind what it has seen, `clearCachedVault`: thread 5, rewritten, pending three rulings.
+* **`ensureVault(draft)`**, one argument (2026-10-22; thread 4).
+* **Tombstones** on `del()` and `delDamagedVault`, `clearCachedVault` with them (2026-10-22;
+  thread 5).
 * **Pull anticipated changes forward** (the plan, *Ground rules* 9).
 * **Security notes:** the subagent may modernize an entry it touches; the Coach audits the file
   after the sprint, and no agent rewrites it.
@@ -36,7 +39,7 @@ rules* 3).
 |---|---|---|---|
 | 1 | renames | filed | #243 |
 | 2 | get_vault | filed | #244 |
-| 3 | turns | building | |
+| 3 | turns | flagged, waits on a ruling | #245 |
 | 4 | bank | planned | |
 | 5 | vault_epoch | waits on rulings | |
 | 6 | proving | planned | |
@@ -44,7 +47,7 @@ rules* 3).
 | 8 | gating | planned | |
 | 9 | react | planned | |
 | 10 | docs | planned | |
-| 11 | wire_meta | planned (after 3) | |
+| 11 | wire_meta | building (from #244) | |
 
 ## What the threads found
 
@@ -82,3 +85,16 @@ this environment, so the live suites skip here.
   can return a listing lagging the props, never another vault's. Existing tables need
   `ALTER ... DROP NOT NULL` on `passphrase`.
 * **Contract lines now untrue** are listed in `thread-2-get_vault.md` for thread 10.
+
+### Thread 3, turns (#245): flagged, waiting
+
+*Orchestrator:* each call's work is one turn in a `p-limit(1)` queue (`p-limit` 7.3.3, no Node
+built-in); `lock()`, `del()`, `close()`'s key drop and the expiry are turns. `hello` reads
+`getVault` beside the lease, the mark and the strength checker's load in one round, judges,
+commits, then erases a dropped lease and raises the mark (logged on failure). Props and their mark
+are held together (`#held`). An attempt's turn refuses `vault_locked` when its prompt ended first,
+off Ask's `promptOver` (thread 8 takes it over). The sync `#checkUnlocked()` sits in each turn
+before the lease is used. Thread 3 moved `getVault`/`ensureVault`'s checks into module functions
+(`foundVault`, `ensuredVault`) so `Object.create(vaultDB)` works; `byCodeUnit` is exported from
+`vault-db.ts`. The review's significant finding (a hung storage call keeps the key and blocks the
+lock) waits on the Coach.

@@ -12,7 +12,9 @@ would see, and where it was decided. The orchestrator keeps it; threads report n
    the same gate is accepted. If it proves blocking: bind `vault_epoch` into each box's ctx.
    Otherwise left for the audit. (thread 5)
 2. **A LOCK LANDS AFTER THE TURN IN FLIGHT** *(pending the Coach's ruling)*: a call already at
-   work when `lock()` is asked finishes and hands back its result, a whisper included. The
+   work when `lock()` is asked finishes and hands back its result, a whisper included. **AND IF
+   A STORAGE CALL HANGS RATHER THAN FAILS, THE LOCK NEVER LANDS AND THE VAULTKEY STAYS IN
+   MEMORY** (the same for `close()` and the expiry); before, `lock()` dropped it at once. The
    Contract still says a lock locks at once. Each call checks `checkUnlocked` inside its turn.
    (#245, thread 3)
 3. **NO WAY OUT IN THE APP FOR A VAULT STORED BEFORE THE RENAMES.** Its props read as
@@ -25,8 +27,10 @@ would see, and where it was decided. The orchestrator keeps it; threads report n
 4. **A picture up to `staleMinutes` old is timely**, by hello's definition; a call that needs
    more asks `hello({ staleMinutes: 0 })`. (preplan, *The rules*)
 5. **A just-made vault's listing can lag its props** in Postgres, when another device creates
-   the vault during this device's `ensureVault`; it never names another vault, and the next hello
-   catches up. (#244)
+   the vault during this device's `ensureVault`: props and listing may describe two instants a
+   few milliseconds apart. It never names another vault, and the next hello catches up.
+   *(Re-raised: the Coach approved it only if inconsistency is impossible, which strictly it is
+   not.)* (#244)
 6. **The stores are looser than the core's door**: Postgres's nullable `passphrase` column and
    Convex's one-object validator would hold a gated vault with no passphrase, if something
    wrote past the core. It reads back `damaged_vault`. Our app never writes one. (#244)

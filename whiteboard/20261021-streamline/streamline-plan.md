@@ -9,8 +9,9 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns) building; thread 5 rewritten as
-  vault_epoch, waiting on two rulings; thread 11 (wire_meta) added. Branches cut on or after
+* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns, #245) **flagged in review, waiting
+  unfiled** on the Coach's ruling on a lock during work in flight; threads 4-10 wait on it.
+  Thread 11 (wire_meta) building from #244's tip. Thread 5 is vault_epoch, waiting on one ruling. Branches cut on or after
   2026-10-22 carry that date (`20261022-get_vault`, `20261022-turns`).
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
@@ -165,6 +166,16 @@ read returned plus the fields in hand, so the bank's birth can reuse it. Thread 
 is an unlock turn. **Size:** L. Likely lowers the `Vault` and `everything` lines (code out) less
 `p-limit`'s ~0.5 kB.
 
+*Review:* **flagged** (sonnet, medium). Every name the line removes is gone, tests pin the order
+turns give, the test accounting holds, `p-limit` is clean. Fixed: a broken `hello()` doc block
+and a stale banner. **Significant, the Coach's:** `lock()`, `close()` and the expiry wait behind
+the turn in flight with no bound, so a storage call that hangs keeps the vaultKey in memory and the
+lock never lands, where before `lock()` dropped it at once. Joined to the open matter "What a lock
+does to work already under way". Minor, left: `#ensureLease`'s post-answer `#checkUnlocked()`
+runs outside a turn and can drop the key (Open Matter, for thread 8); no test covers the mark
+lowered across tabs until thread 5; `vault.cjs` `require`s ESM-only `p-limit` (Node 22.12+, the
+`engines` floor). Waits unfiled in `/workspace/byok-turns` at `1dee1c3e` (pushed).
+
 ### 4. bank
 
 > **bank**: `Bank` with `make`, `hello`, `ensureVault`, `reopenVault`, `closeVault`,
@@ -188,7 +199,9 @@ to `bank.hello()`). The read turn's judgment depends only on the round's results
 no props/listing consistency check in the core: the VaultDB checks server side, in its
 transaction, and reports damage (`damaged_vault`); a check an adapter lacks becomes a TODO
 (this replaces Open Matter 4's Rec). `putVaultProps` resolves the stored props, the new
-contract, made here where the first gate is written. Add the line to
+contract, made here where the first gate is written. `ensureVault` takes one argument, the draft
+(`ensureVault(draft)`): the draft carries its scope (the Coach: "what's wrong with
+ensureVault(vault)?"). Add the line to
 `.changeset/20261021-renames.md` telling hosts to upgrade every client together and clear storage
 once. Two features (core bank,
 React provider) in one thread, because `pnpm justify` builds the React package against the core:
@@ -220,9 +233,14 @@ props, bumped by writes; tombstones on `del()`; the device record remembering th
 `vault_epoch` seen; a read behind it refused; `clearCachedVault`. **Ruled (2026-10-22):** "Writes to vault's core
 fields should bump the epoch" (the props, not box writes). The concern that a restored backup of
 boxes alone goes unnoticed is entry 1 of `streamlined-toldjaso.md`; bind `vault_epoch` into a
-box's ctx only if leaving it is blocking. **Still waits on two Open Matters** (where the device
-remembers it and what "not serve" refuses; tombstones, new lives and the way out) and on the
-Coach's wording for CLAUDE.md's ground-truth paragraph. From thread 3: a device record's value can
+box's ctx only if leaving it is blocking. **Tombstones ruled (2026-10-22):** `del()` and
+`delDamagedVault` leave a tombstone holding the scope and `vault_epoch`; `ensureVault` over one
+starts a new life with a fresh `vault_tok` and the counter carried on; `clearCachedVault` is built
+with the thread, as the way out of the refusal; the README says a server that restores a backup
+must wipe the restored vaults (the Coach: "the server can restore but must wipe their vaults as
+we'll describe in the readme"). **Still waits on one Open Matter** (where the device remembers
+it and what "not serve" refuses) and on the Coach's wording for CLAUDE.md's ground-truth
+paragraph. From thread 3: a device record's value can
 be lowered across tabs (toldjaso entry 9), so "highest seen" must be written so that a lower value
 never replaces a higher one, or the loss is accepted and written down; and `del()` over props a
 rollback refusal forgot refuses `rolled_back` today, which this thread replaces. Touches every adapter (the counter and the tombstone), `device-db.ts`,
@@ -306,8 +324,8 @@ travels in the mutation's result body, never in error `extensions`; the core's `
 and stop. Also renames the records verbs if the Coach rules on that row (the plural misleads).
 Touches `packages/safebyok-graphql/` (schema, resolvers, `graphql-vault-db.ts`, `fields.ts`), the
 Postgres route recipe if it carries meta in an error, their tests, a changeset. **Model:**
-`sonnet`. **Depends on:** 3 (cut from its tip; runs beside thread 4, joins the line at the
-restack). **Size:** S-M.
+`sonnet`. **Depends on:** 2 (cut from #244's tip while thread 3 waits; joins the line above
+thread 3 at the restack). **Size:** S-M.
 
 ## Wrap-up
 
