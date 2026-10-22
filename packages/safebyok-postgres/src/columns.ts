@@ -55,13 +55,13 @@ export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_ke
 
 /** The columns' names, as an INSERT or an UPDATE lists them.
  *
- * @example names([['vault_tok', 'text'], ['registered_at', 'bigint']]) // 'vault_tok, registered_at'
+ * @example names([['vault_tok', 'text'], ['registered_at', 'bigint']])  // 'vault_tok, registered_at'
  */
 export const names = (columns: readonly Column[]): string => columns.map(([field]) => field).join(', ')
 
 /** Numbered parameters for the columns from `$first`, each cast to its column's type.
  *
- * @example placeholders([['vault_tok', 'text'], ['registered_at', 'bigint']], 4) // '$4::text, $5::bigint'
+ * @example placeholders([['vault_tok', 'text'], ['registered_at', 'bigint']], 4)  // '$4::text, $5::bigint'
  */
 export const placeholders = (columns: readonly Column[], first: number): string => (
   columns.map(([_field, kind], ii) => `$${String(first + ii)}::${kind}`).join(', ')
@@ -83,7 +83,7 @@ export const placeholderOf = (columns: readonly Column[], field: string, first: 
  * A bigint comes back as a double, exact up to 2^53, where some drivers hand back text. A jsonb
  * comes back as its text, which {@link recordOf} parses.
  *
- * @example selected([['vault_tok', 'text'], ['registered_at', 'bigint']]) // 'vault_tok, registered_at::float8 AS registered_at'
+ * @example selected([['vault_tok', 'text'], ['registered_at', 'bigint']])  // 'vault_tok, registered_at::float8 AS registered_at'
  */
 export const selected = (columns: readonly Column[]): string => columns.map(([field, kind]) => {
   if (kind === 'bigint') { return `${field}::float8 AS ${field}` }

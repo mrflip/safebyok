@@ -69,7 +69,7 @@ export const boxRefusalOf = (standingVaultProps: unknown, standingBox: unknown, 
  * (VAULTDB.md, line 3.4). A null `revision_tok` matches a row holding none that reads as one, as the
  * listing shows a damaged box.
  *
- * @example Expectations.deletionOf(standingBox, { vault_tok: 'v1', revision_tok: 'r7' }) // { outcome: 'deleted' } while r7 stands
+ * @example Expectations.deletionOf(standingBox, { vault_tok: 'v1', revision_tok: 'r7' })  // { outcome: 'deleted' } while r7 stands
  */
 export const deletionOf = (standingBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (standingBox === undefined || standingBox === null) { return { outcome: 'absent' } }

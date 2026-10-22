@@ -159,7 +159,7 @@ const VaultPropsCases = [
   // both refuse -- what Convex can see:
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
-  [vaultPropsWithoutVaultTok,                                               false,  false,  'vault props missing their vault_tok'],
+  [vaultPropsWithoutVaultTok,                                              false,  false,  'vault props missing their vault_tok'],
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: '1' },                          false,  false,  'an epoch written as text'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, false, 'a wayinkind this package does not know'],
