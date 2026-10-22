@@ -125,7 +125,7 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -139,6 +139,8 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 // vault's own validators' to say. A listing goes as the stored records, which the browser's
 // VaultDB validates.
 const served = new Map<string, Served>([
+  ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
+  ['ensureVault',  (vaultDB, [scope, draft]) => vaultDB.ensureVaultRecords(scope as VaultScope, draft as GatelessVaultProps)],
   ['getVaultProps',   (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
   ['ensureVaultProps', (vaultDB, [vaultProps]) => vaultDB.ensureVaultProps(vaultProps as VaultProps)],
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
@@ -169,23 +171,25 @@ export async function POST(request: Request): Promise<Response> {
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
   const { ok, val = null, err } = await serve(vaultDB, args)
-  // A refusal crosses as its kind, its calm message, and its meta -- a stale box write's
-  // box_stored (the box that stands, as a read would send it), or a vault_full's capacity --
-  // never its cause, the driver's own error.
+  // A refusal crosses as its kind, its calm message, and its meta -- what a stale write says
+  // stands (a box write's box_stored, an update's vault_props_stored, as a read would send
+  // them), or a vault_full's capacity -- never its cause, the driver's own error.
   if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
   return Response.json({ result: val })
 }
 ```
 
 `signedInUserId` is your own: the user id from the request's verified session cookie, or null.
-A listing goes through `listBoxRecords`, not `listBoxes`: `listBoxes` hands back summaries, the
-shape a vault shows, and a VaultDB in the browser must hand back records as stored.
+A listing goes through `listBoxRecords`, not `listBoxes`, and a vault read through
+`getVaultRecords` and `ensureVaultRecords`, not `getVault` and `ensureVault`: those hand back
+summaries, the shape a vault shows, and a VaultDB in the browser must hand back records as stored.
+Each is one statement on the server, so the browser's read of a vault is one request.
 
 The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -198,6 +202,11 @@ export class RouteVaultDB extends VaultDB {
   // Its logger: the host's `logger`, or the default logger when it gives none.
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
+  protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
+  protected async doEnsureVault(draft: GatelessVaultProps) {
+    const { applabel, user_id, vaultlabel } = draft
+    return storedVaultOf(await this.call('ensureVault', { applabel, user_id, vaultlabel }, draft))
+  }
   protected doGetVaultProps(scope: VaultScope) { return this.call('getVaultProps', scope) }
   protected doEnsureVaultProps(vaultProps: VaultProps) { return this.call('ensureVaultProps', vaultProps) }
   protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
@@ -217,8 +226,8 @@ export class RouteVaultDB extends VaultDB {
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands for a box write
-  // (a full vault, with how full it is), so a write that answers landed:
+  // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
+  // with how full it is), so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
   // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
@@ -238,6 +247,14 @@ export class RouteVaultDB extends VaultDB {
 }
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+
+// A vault as the route sends it -- its vault props, and its boxes as stored records -- or null for
+// none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
+const storedVaultOf = (sent: unknown): StoredVault => {
+  if (sent === null) { return { vaultProps: null, boxes: [] } }
+  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: { boxlabel: string }[] }
+  return { vaultProps, boxes: boxes.map((box) => ({ boxlabel: box.boxlabel, box })) }
+}
 ```
 
 * **Authenticate by your session**, the cookie `fetch` sends to its own origin, and never by a

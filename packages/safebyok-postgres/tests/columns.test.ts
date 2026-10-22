@@ -39,6 +39,13 @@ describe("Columns.selected", () => {
   })
 })
 
+describe("Columns.jsonSelected", () => {
+  it("reads a jsonb column as its text and every other as it is, as its example shows", () => {
+    expect(Columns.jsonSelected([['vault_tok', 'text'], ['sidecar', 'jsonb']])).to.eq('vault_tok, sidecar::text AS sidecar')
+    expect(Columns.jsonSelected([['registered_at', 'bigint']])).to.eq('registered_at')
+  })
+})
+
 describe("Columns.paramsOf", () => {
   it("is the record's values in column order, a null or missing field as null, as its example shows", () => {
     expect(Columns.paramsOf({ vault_tok: 'v1', passkey: null }, [['vault_tok', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])

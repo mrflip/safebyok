@@ -91,6 +91,16 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
   return field
 }).join(', ')
 
+/** The columns as a subquery hands them to `json_agg`, in forms every driver hands back alike once the JSON is text.
+ * A bigint stays a bigint, which JSON carries as an exact whole number. A jsonb goes as its text,
+ * which {@link recordOf} parses, as for {@link selected}.
+ *
+ * @example jsonSelected([['vault_tok', 'text'], ['sidecar', 'jsonb']])  // 'vault_tok, sidecar::text AS sidecar'
+ */
+export const jsonSelected = (columns: readonly Column[]): string => columns.map(([field, kind]) => (
+  kind === 'jsonb' ? `${field}::text AS ${field}` : field
+)).join(', ')
+
 /** The record's values for its columns, in the order {@link placeholders} numbers them.
  * A jsonb value goes as its JSON text, and a null or missing field as null.
  *
