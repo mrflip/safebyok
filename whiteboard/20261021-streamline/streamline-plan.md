@@ -9,7 +9,8 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** thread 1 filed (#243); thread 2 (get_vault) building on it.
+* **Status:** threads 1-2 filed (#243, #244); thread 3 (turns) building. Branches cut on or after
+  2026-10-22 carry that date (`20261022-get_vault`, `20261022-turns`).
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
 [#241](https://github.com/mrflip/safebyok/pull/241)'s branch `20261021-better_paths`. Its ten
@@ -117,6 +118,12 @@ conformance suite; thread 4's `gate_made_elsewhere` and the gate change's `stale
 it rather than read. The vault itself keeps calling the old verbs: switching `hello` over is
 thread 3's. **Depends on:** 1. **Look-ahead:** thread 3 reads through `getVault`; thread 4 births
 through `ensureVault`. **Size:** L (five adapters and the conformance suite).
+
+*Review:* fixed (sonnet, medium). Fixed: the vault's stripped stale write kept a message pointing
+at the field it stripped; two doc blocks opened on a bare `/**`. Left: Postgres and Convex
+stores looser than the door (Open Matter); GraphQL error extensions carry the winning props
+(Open Matter); `isGated` not exported (thread 4 decides); `jsonSelected`'s doc overclaims exact
+bigints (thread 10); the interim gateless handling in `vault.ts`, which thread 4 replaces.
 
 ### 3. turns
 

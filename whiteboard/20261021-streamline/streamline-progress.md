@@ -13,8 +13,8 @@ rules* 3).
 | # | Label | Status | PR |
 |---|---|---|---|
 | 1 | renames | filed | #243 |
-| 2 | get_vault | building | |
-| 3 | turns | planned | |
+| 2 | get_vault | filed | #244 |
+| 3 | turns | building | |
 | 4 | bank | planned | |
 | 5 | device_id | planned | |
 | 6 | proving | planned | |
@@ -34,3 +34,28 @@ rules* 3).
 change. VOCABULARY's rule: an `_id` is a hard identifier, a `_tok` is only compared. Postgres
 tests run on PGlite locally; CI also has a live Postgres job; `SAFEBYOK_PG_URL` is unset in
 this environment, so the live suites skip here.
+
+### Thread 2, get_vault (#244)
+
+*Orchestrator:*
+
+* **Reads:** `vaultDB.getVault(scope)` and `vaultDB.ensureVault(scope, draft)` resolve
+  `ListedVault` = `{ vaultProps, boxes }` from one consistent read. Servers use
+  `getVaultRecords`/`ensureVaultRecords` (beside `listBoxRecords`).
+* **Shapes:** `VaultProps` = `GatedVaultProps | GatelessVaultProps` (a `Z.union`); `isGated`
+  narrows (not exported). Tests build a draft with `TH.gatelessOf(userId)`.
+* **The first gate:** `putVaultProps(gated, { vault_tok, gate_epoch: 0 })`.
+* **Stale writes:** a stale `putVaultProps` carries the winner as `err.meta.vault_props_stored`.
+  `Refusals.staleVaultProps(standing)` replaced `staleWrite('vaultProps')`. The vault strips
+  that meta from `putWayin`/`delWayin`'s rethrow (security note).
+* **Interim, for thread 4 to replace:** gateless props read as `absent`, and a first unlock over
+  gateless props made elsewhere refuses `created_elsewhere` (`gatelessElsewhereError`). Thread 4
+  writes the first gate with `putVaultProps` expecting `gate_epoch: 0`.
+* **Old verbs:** `ensureVaultProps` goes in thread 4. After it, `getVaultProps`, `listBoxes`,
+  `listBoxRecords` and their `do*` hooks go, and `delDamagedVault` reads `doGetVault`.
+* **The device mark:** its `gate_epoch` is positive-only, so a novel vault cannot be marked.
+  Thread 4 raises no mark for a novel vault; thread 5 drops the epoch.
+* **Postgres:** reads and ensures in one statement; an `ensureVault` that loses the insert race
+  can return a listing lagging the props, never another vault's. Existing tables need
+  `ALTER ... DROP NOT NULL` on `passphrase`.
+* **Contract lines now untrue** are listed in `thread-2-get_vault.md` for thread 10.
