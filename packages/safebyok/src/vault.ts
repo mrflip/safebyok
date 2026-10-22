@@ -1366,6 +1366,8 @@ export class Vault {
     } catch (err) {
       const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
       if (winner === undefined || winner === null || ! isGated(winner) || winner.vault_tok !== gate.vault_tok) { throw err }
+      // The gate that stands is another device's, so this device drafted nothing of the vault: a passphrase it does not open is 'created_elsewhere'.
+      this.#drafted = null
       return winner
     }
   }

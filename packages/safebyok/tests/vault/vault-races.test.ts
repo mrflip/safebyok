@@ -267,6 +267,19 @@ describe("a first unlock that loses the race to create the vault", () => {
     expect(here.getSnapshot().state).to.eq('unlocked')
   })
 
+  it("refuses as created_elsewhere when another device gates the vault ensured gateless between this unlock's ensure and its gate, under a passphrase this one does not open", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const there = await world.open({ vaultDB: deafDB })
+    const here = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-ensured-elsewhere' }))
+    TH.beforeNextCall(deafDB, 'putVaultProps', async () => { await here.unlock('pw one') })
+    await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    expect(there.getSnapshot().state).to.eq('locked')
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: 'vault-tok-ensured-elsewhere', gate_epoch: 1 })
+    expect(await world.getLease()).to.be.null
+  })
+
   it("is still created_elsewhere when the catch-up after it fails, the snapshot saying it is not syncing, and the failure warned of", async () => {
     const { world, deafDB, there } = await raceLostToPwOne()
     // The read that opens the unlock is served; the catch-up after the lost race is not.
