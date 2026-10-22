@@ -113,30 +113,17 @@ class ConvexVaultDB extends VaultDB {
     return { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
   }
 
-  protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
-    return refusing(() => this.client.query(this.api.getVaultProps, { scope }))
-  }
-
-  protected doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.ensureVaultProps, { vaultProps }))
-  }
-
-  // The component answers what stands when an update misses, from the transaction that refused
-  // it: the base class checks it.
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+  // The component answers the props as stored, or what stands when an update misses, from the
+  // transaction that decided it: the base class checks it.
+  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultProps, { vaultProps, expected }))
     if (! isPutVaultPropsAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
-    if (answer.landed) { return true }
+    if (answer.landed) { return answer.vault_props_stored }
     throw Refusals.staleVaultProps(answer.vault_props_stored)
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return refusing(() => this.client.query(this.api.getBox, { scope, boxlabel }))
-  }
-
-  // Each row is stored under its own boxlabel column, so that is the boxlabel it is listed under.
-  protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
-    return storedBoxesOf(await refusing(() => this.client.query(this.api.listBoxSummaries, { scope })))
   }
 
   // The component answers why a write did not land, from the transaction that refused it; what
@@ -158,7 +145,7 @@ class ConvexVaultDB extends VaultDB {
     return refusing(() => this.client.mutation(this.api.delBox, { scope, boxlabel, expected }))
   }
 
-  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return refusing(() => this.client.mutation(this.api.delVault, { scope, expected }))
   }
 
@@ -212,11 +199,11 @@ const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> =
   return refusalkind === 'vault_mismatch'
 }
 
-/** True when `answer` is an update of the vault props' answer as this version's component makes it: `landed`, or a miss carrying what stands. */
+/** True when `answer` is an update of the vault props' answer as this version's component makes it: `landed` or not, carrying the vault props as stored or what stands. */
 const isPutVaultPropsAnswer = (answer: unknown): answer is Infer<typeof PutVaultPropsAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
   const { landed } = answer as { landed?: unknown }
-  return landed === true || (landed === false && 'vault_props_stored' in answer)
+  return (landed === true || landed === false) && 'vault_props_stored' in answer
 }
 
 const ConvexTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. Convex's own error is not carried here, as it may quote the call: see your Convex deployment's logs, or, for trouble before the call left, the browser console, where the Convex client reports its connection."
@@ -249,7 +236,7 @@ const isConvexClient = (client: unknown): client is ConvexVaultClient => {
 }
 
 const SafebyokFnNames = [
-  'getVault', 'ensureVault', 'getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxSummaries', 'putBox', 'getCapacity', 'delBox', 'delVault', 'watchVault',
+  'getVault', 'ensureVault', 'putVaultProps', 'getBox', 'putBox', 'getCapacity', 'delBox', 'delVault', 'watchVault',
 ] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any

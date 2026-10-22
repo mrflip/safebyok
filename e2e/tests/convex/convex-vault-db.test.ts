@@ -114,7 +114,7 @@ describe("convexVaultDB, refusing", () => {
     // The app's own watch of the same query, signed out: the client keeps its refusal, and
     // answers a one-shot query of it from there, synchronously.
     const watched = vi.fn()
-    reactClient.watchQuery(deployment.api.safebyok.getVaultProps, { scope: u1 }).onUpdate(watched)
+    reactClient.watchQuery(deployment.api.safebyok.getVault, { scope: u1 }).onUpdate(watched)
     await vi.waitFor(() => { expect(watched).toHaveBeenCalled() })
     await TH.expectBad(convexVaultDB({ client: reactClient, api: deployment.api.safebyok }).getVaultProps(u1), 'identity_revoked')
   })

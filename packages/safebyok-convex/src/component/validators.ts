@@ -71,6 +71,7 @@ export const VaultProps = v.object({
   user_id:          v.string(),
   vaultlabel:       v.string(),
   vault_tok:        v.string(),
+  vault_epoch:      v.number(),
   gate_epoch:       v.number(),
   passphrase:       v.nullable(PassphraseWayin),
   passkey:          v.nullable(PasskeyWayin),
@@ -87,6 +88,7 @@ export const GatelessVaultProps = v.object({
   user_id:          v.string(),
   vaultlabel:       v.string(),
   vault_tok:        v.string(),
+  vault_epoch:      v.number(),
   gate_epoch:       v.literal(0),
   passphrase:       v.null(),
   passkey:          v.null(),
@@ -168,24 +170,42 @@ export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
 )
 
-/** What an update of the vault props answers, from its one transaction: `landed`, or the vault props standing that it did not land over.
- * A miss carries them as a read returns them (`vault_props_stored`; null for none).
+/** What an update of the vault props answers, from its one transaction: `landed` with the vault props as stored, or the vault props standing that it did not land over.
+ * A landed update carries them as stored, their `vault_epoch` moved up by one (`vault_props_stored`).
+ * A miss carries what stands as a read returns it (`vault_props_stored`; null for none).
  *
- * @example { landed: true }
+ * @example { landed: true, vault_props_stored: stored }
  * @example { landed: false, vault_props_stored: winner }
  */
 export const PutVaultPropsAnswer = v.union(
-  v.object({ landed: v.literal(true) }),
+  v.object({ landed: v.literal(true), vault_props_stored: VaultProps }),
   v.object({ landed: v.literal(false), vault_props_stored: v.nullable(VaultProps) }),
 )
 
-/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_tok`.
- * So a stale session never deletes a vault made anew elsewhere.
+/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_tok` and `gate_epoch`.
+ * So a stale session never deletes a vault made anew elsewhere, nor one whose gate has changed.
+ * A null `gate_epoch` is for deleting a vault whose props are damaged, and expects the `vault_tok` alone.
  *
- * @example { vault_tok: vaultProps.vault_tok }
+ * @example { vault_tok: vaultProps.vault_tok, gate_epoch: vaultProps.gate_epoch }
  */
 export const VaultDelExpectation = v.object({
-  vault_tok: v.string(),
+  vault_tok:  v.string(),
+  gate_epoch: v.nullable(v.number()),
+})
+
+/** The format a {@link Tombstone} carries. */
+export const TombstoneFormat = v.union(v.literal('safebyok-tombstone-v1'))
+
+/** What a deleted vault leaves in its scope: its counter, which the next vault made there carries on.
+ *
+ * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
+ */
+export const Tombstone = v.object({
+  format:       TombstoneFormat,
+  applabel:     v.string(),
+  user_id:      v.string(),
+  vaultlabel:   v.string(),
+  vault_epoch:  v.number(),
 })
 
 /** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none.

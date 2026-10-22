@@ -2,7 +2,7 @@ import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
-import type { Sidecar, StringStore, Whisper } from 'safebyok'
+import type { GatedVaultProps, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
 import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
@@ -20,6 +20,33 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
  * `transactionLimits`, it enforces Convex's own per-transaction limits.
  */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
+
+/**
+ * Store `vaultProps` in a component test's CVX as a first unlock does: the vault ensured gateless,
+ * then its gate written over it expecting `gate_epoch` 0. Resolves the vault props as stored, their
+ * `vault_epoch` the component's.
+ *
+ * @example const stored = await ensureGatedIn(CVX, vaultPropsOf('u1'))   // stored.vault_epoch is 1
+ */
+export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultProps: GatedVaultProps) => {
+  const { vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, passphrase: _passphrase, passkey: _passkey, ...head } = vaultProps
+  await CVX.mutation(vaults.ensureVault, { draft: { ...head, vault_epoch: 0, gate_epoch: 0, passphrase: null, passkey: null } })
+  const answer = await CVX.mutation(vaults.putVaultProps, { vaultProps, expected: { vault_tok: vaultProps.vault_tok, gate_epoch: 0 } })
+  if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }
+  return answer.vault_props_stored
+}
+
+/** The vault props a component test's CVX holds for `scope`, as `getVault` reads them, or null. */
+export const propsIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
+  const read = await CVX.query(vaults.getVault, { scope })
+  return read?.vaultProps ?? null
+}
+
+/** The listing a component test's CVX shows for `scope`, as `getVault` reads it: empty where no vault stands. */
+export const boxesIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
+  const read = await CVX.query(vaults.getVault, { scope })
+  return read?.boxes ?? []
+}
 
 /**
  * A host app as the README has it: no tables of its own, the component installed as `safebyok`,
