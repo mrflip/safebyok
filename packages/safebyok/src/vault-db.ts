@@ -258,7 +258,10 @@ export abstract class VaultDB {
    *   if (ok && val === null) { offerNewVault() }
    */
   getVault(scope: VaultScope): Promise<Outcome<ListedVault | null>> {
-    return answering(() => this.#readVault(scope, listingOf))
+    return answering(async () => {
+      const asked = heldScope(this, scope)
+      return foundVault(await adapterAnswer('doGetVault', () => this.doGetVault(asked)), asked, listingOf)
+    })
   }
 
   /** The scope's vault, as {@link VaultDB.getVault} reads it, created first from `draft` when no vault props stand.
@@ -274,7 +277,11 @@ export abstract class VaultDB {
    *   if (ok && val.vaultProps.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
    */
   ensureVault(scope: VaultScope, draft: GatelessVaultProps): Promise<Outcome<ListedVault>> {
-    return answering(() => this.#ensuredVault(scope, draft, listingOf))
+    return answering(async () => {
+      const asked = heldScope(this, scope)
+      const outgoing = checkDraft(draft, asked)
+      return ensuredVault(await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing)), asked, listingOf)
+    })
   }
 
   /** The scope's vault props and every box as stored, read as {@link VaultDB.getVault} reads them: what a server hands a browser's VaultDB.
@@ -287,29 +294,21 @@ export abstract class VaultDB {
    *   return val   // what a server sends a browser's VaultDB
    */
   getVaultRecords(scope: VaultScope): Promise<Outcome<VaultRecords | null>> {
-    return answering(() => this.#readVault(scope, recordsOf))
+    return answering(async () => {
+      const asked = heldScope(this, scope)
+      return foundVault(await adapterAnswer('doGetVault', () => this.doGetVault(asked)), asked, recordsOf)
+    })
   }
 
   /** The scope's vault as {@link VaultDB.ensureVault} ensures it, its boxes as {@link VaultDB.getVaultRecords} hands them on: what a server hands a browser's VaultDB. */
   ensureVaultRecords(scope: VaultScope, draft: GatelessVaultProps): Promise<Outcome<VaultRecords>> {
-    return answering(() => this.#ensuredVault(scope, draft, recordsOf))
+    return answering(async () => {
+      const asked = heldScope(this, scope)
+      const outgoing = checkDraft(draft, asked)
+      return ensuredVault(await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing)), asked, recordsOf)
+    })
   }
 
-  /** The vault `doGetVault` reads for `scope`, its vault props checked and its boxes as `boxesOf` makes them, or null for none. */
-  async #readVault<BoxesT>(scope: VaultScope, boxesOf: (stored: StoredBox[]) => BoxesT): Promise<{ vaultProps: VaultProps, boxes: BoxesT } | null> {
-    const asked = heldScope(this, scope)
-    const stored = await adapterAnswer('doGetVault', () => this.doGetVault(asked))
-    if (stored.vaultProps === null || stored.vaultProps === undefined) { return null }
-    return { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
-  }
-
-  /** The vault `doEnsureVault` ensures from `draft`, once the draft is checked, as {@link VaultDB.#readVault} hands one back. */
-  async #ensuredVault<BoxesT>(scope: VaultScope, draft: GatelessVaultProps, boxesOf: (stored: StoredBox[]) => BoxesT): Promise<{ vaultProps: VaultProps, boxes: BoxesT }> {
-    const asked = heldScope(this, scope)
-    const outgoing = checkDraft(draft, asked)
-    const stored = await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing))
-    return { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
-  }
   // --
 
   // == [Vault props verbs]: getVaultProps, ensureVaultProps, putVaultProps
@@ -738,6 +737,20 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
 }
 // --
 
+// == [Vault reads]: foundVault, ensuredVault
+
+/** The vault `stored`, as `doGetVault` handed it up for `asked`, its vault props checked and its boxes as `boxesOf` makes them; null when no vault props stand. */
+const foundVault = <BoxesT>(stored: StoredVault, asked: VaultScope, boxesOf: (boxes: StoredBox[]) => BoxesT): { vaultProps: VaultProps, boxes: BoxesT } | null => {
+  if (stored.vaultProps === null || stored.vaultProps === undefined) { return null }
+  return { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
+}
+
+/** The vault `stored`, as `doEnsureVault` handed it up for `asked`, as {@link foundVault} makes one: never none. */
+const ensuredVault = <BoxesT>(stored: StoredVault, asked: VaultScope, boxesOf: (boxes: StoredBox[]) => BoxesT): { vaultProps: VaultProps, boxes: BoxesT } => (
+  { vaultProps: checkVaultProps(stored.vaultProps, asked), boxes: boxesOf(stored.boxes) }
+)
+// --
+
 // == [Listing helpers]: listingOf, recordsOf, withoutCiphered, ListedBox, isNameable, listedOrDamaged, damagedOf, summaryOf, byCodeUnit
 
 /** Stored boxes as a listing shows them: each nameable one's summary or {@link DamagedBox}, sorted by boxlabel. */
@@ -790,7 +803,7 @@ const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
-const byCodeUnit = (one: string, two: string): number => {
+export const byCodeUnit = (one: string, two: string): number => {
   if (one === two) { return 0 }
   return one < two ? -1 : 1
 }
