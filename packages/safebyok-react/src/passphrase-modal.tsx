@@ -47,7 +47,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 }
 
 /**
- * The passphrase dialog: safebyok-react's `getProof`, which `VaultProvider` shows for each
+ * The passphrase dialog: safebyok-react's `getProof`, which `BankProvider` shows for each
  * {@link Ask} the vault hands it, unless given a `getProof` of the host's own. A host writing its
  * own `getProof` may render it too: hand it the ask, and answer with what `onDone` is told.
  * Unstyled markup under the `modal-scrim` / `modal` / `quiet` / `gripe` class names, for the
@@ -95,9 +95,9 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
  * Start a new vault" asks first, then deletes the vault (`vault.del()`, on every device). A
  * delete ends the prompt as a lock does, so the dialog then closes, answering `declined`, and
- * the call that asked is refused 'vault_gone'. The Vault object deleted is gone; the vault asked
- * for again is a new one, `novel`, for the user to choose a passphrase for (`VaultProvider` asks
- * for it on its own). Off by default.
+ * the call that asked is refused 'vault_gone'. The Vault object deleted is gone; once it is,
+ * `onStartedOver` is called, for the host to ask for the vault again: a new one, `novel`, for the
+ * user to choose a passphrase for (`BankProvider` asks for it so). Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
  * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing
@@ -165,6 +165,8 @@ export type PassphraseModalProps = {
   onDone:              (answer: ProofAnswer) => void
   /** Whether to offer a user who has forgotten the passphrase to delete the vault and start a new one. */
   allowStartOver?:     boolean | undefined
+  /** Called once the user's start over has deleted the vault, the dialog closed or closing: where the host asks for the vault again, to hand down a new one, `novel`. */
+  onStartedOver?:      (() => void) | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
   /** What to say beside the field as the user chooses a passphrase. Default: `vault.checkPassphrase`'s reason for a weak one. */
@@ -348,7 +350,7 @@ const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked
 }
 
 /** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
-const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+const UnlockForm = ({ ask, onDone: done, allowStartOver, onStartedOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
   const { vault } = ask
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
@@ -408,6 +410,8 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
     setDeleting(true)
     setGripe(null)
     const { ok, err } = await vault.tryDel()
+    // Told even once the dialog has closed: the delete lands as the prompt ends, and the user asked for a new vault.
+    if (ok) { onStartedOver?.() }
     if (! isMounted()) { return }
     setDeleting(false)
     // A delete ends the prompt as a lock does: lockLanded closes the dialog.
