@@ -1858,11 +1858,10 @@ export class Vault {
   // Watch the backend so boxes written elsewhere (another tab, the inspector's reset button) show
   // up without a manual refresh: through the first hello while none is under way or has succeeded,
   // so a lease is taken up as the vault settles, and otherwise through the refresh, joining one
-  // under way. A
-  // failure here has nobody to throw to, so it leaves the snapshot standing and tells any bad news
-  // it met. A first hello's failure is warned of as itself, in the words `tryHello()` would refuse
-  // with, once until a hello succeeds. A refresh's leaves the snapshot saying `syncing: false`, and
-  // warns once for a failing streak; the next read that succeeds says so once.
+  // under way. A failure here has nobody to throw to, so it leaves the snapshot standing and tells
+  // any bad news it met. A first hello's failure is warned of as itself, in the words `tryHello()`
+  // would refuse with, once until a hello succeeds. A refresh's leaves the snapshot saying
+  // `syncing: false`, and warns once for a failing streak; the next read that succeeds says so once.
   async #watchRefresh() {
     if (this.#birth === null) {
       const { ok, err } = await outcomeOf(() => this.#ensureBorn(), unexpectedError)
