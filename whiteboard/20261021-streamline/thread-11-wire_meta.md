@@ -1,6 +1,6 @@
 # Thread 11: wire_meta (2026-10-22)
 
-Branch `20261022-wire_meta`, PR pending, stacked on #244. Justify: green (graphql 310 passed, 15
+Branch `20261022-wire_meta`, PR [#246](https://github.com/mrflip/safebyok/pull/246), stacked on #244. Justify: green (graphql 310 passed, 15
 skipped; core 2769; postgres 297; convex 311; e2e 100); `pnpm size:budget` within every budget.
 
 * **Built**: over GraphQL a write's refusal that learned something answers in the mutation's body,
