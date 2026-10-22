@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { Stamp } from '../../src/types'
 import { memoryDeviceDB } from '../../src/device-db'
 import { Vault } from '../../src/vault'
+import { heldLeaseOf } from '../../src/held-lease'
 import type { Ask } from '../../src/ask'
 import * as TH from '../test-helpers'
 import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxCkey } from './world'
@@ -179,7 +180,7 @@ describe("vault.consistentWith", () => {
     world.advance(60 * 60 * 1000)
     expect(vault.consistentWith(stamp, { leaseBound: true })).to.be.false
     expect(vault.consistentWith(stamp)).to.be.true
-    expect(vault.lease).to.not.be.null
+    expect(heldLeaseOf(vault)).to.not.be.null
   })
 
   it("throws 'bad_option' for a thing with no vault_tok, or an option it does not take", async () => {
@@ -361,6 +362,31 @@ describe("vault.lock, at once", () => {
 })
 
 describe("a lock landing during a box call", () => {
+  const BoxWrites = [
+    ['putBox()', (vault: Vault) => vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')],
+    ['delBox()', (vault: Vault) => vault.delBox('anthropic')],
+  ] as const
+
+  for (const [blurb, call] of BoxWrites) {
+    it(`refuses a ${blurb} 'vault_locked' when it lands on the call's getProof prompt, writing nothing`, async () => {
+      const world = makeWorld()
+      const maker = await world.openUnlocked('pw')
+      await maker.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+      await maker.lock()
+      const row = storedRowOf(world, 'anthropic')
+      const seen: { ask: Ask | null } = { ask: null }
+      const vault = await world.open({ getProof: (ask) => {
+        seen.ask = ask
+        return new Promise(() => { /* the user never answers */ })
+      } })
+      const calling = call(vault)
+      await TH.eventually(() => seen.ask !== null)
+      await vault.lock()
+      await TH.expectRefusal(calling, 'vault_locked')
+      expect(storedRowOf(world, 'anthropic')).to.deep.equal(row)
+    })
+  }
+
   it("refuses a putBox() 'vault_locked' when it lands while the box is read, writing nothing", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw')

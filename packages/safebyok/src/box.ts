@@ -3,6 +3,7 @@ import * as Z from 'zod/mini'
 import { decorate } from './adorn'
 import { Ciphered, randomId } from './crypto'
 import { VaultError } from './errors'
+import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
@@ -58,8 +59,8 @@ export type BoxRecord = Z.infer<typeof BoxRecord>
 
 // == [Box]: BoxVault, BoxView, BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper, toJSON
 
-/** The slice of a {@link Vault} a box reads: the stamp it is made under, the lease that seals and opens it, its demand, and the time a seal stamps. */
-export type BoxVault = Pick<Vault, 'stamp' | 'lease' | 'now' | 'demandConsistentWith'>
+/** The slice of a {@link Vault} a box reads: the stamp it is made under, its demand, and the time a seal stamps. The lease that seals and opens it the box reads inside the package, as no getter shows it. */
+export type BoxVault = Pick<Vault, 'stamp' | 'now' | 'demandConsistentWith'>
 
 /** A box's visible fields, each once: what `{ ...box }` and `box.toJSON()` hold, its stamp left out. A {@link BoxSummary} holds them and `vault_tok`. */
 export type BoxView = Omit<BoxSummary, 'damaged' | 'vault_tok'>
@@ -177,7 +178,7 @@ export class Box {
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
-   * The whisper is serialized as its JSON with keys sorted, then ciphered by `vault.lease.sealProps`
+   * The whisper is serialized as its JSON with keys sorted, then ciphered by the vault's lease (`sealProps`)
    * under a boxKey made fresh for this box alone, wrapped under the vaultKey. We sign all immutable
    * fields: both are bound to the scope, the lease's `vault_tok`, the boxlabel and `registered_at`,
    * and to every other visible field, the sidecar among them, so the record moved or altered
@@ -205,7 +206,7 @@ export class Box {
       const base = checkedBase(props.base)
       const whisperBytes = whisperBytesOf(whisper)
       try {
-        const { lease } = vault
+        const lease = heldLeaseOf(vault)
         if (lease === null) { throw lockedError() }
         const { stamp } = vault
         if (stamp === null) { throw absentVault() }
@@ -227,7 +228,7 @@ export class Box {
     }, unexpectedError)
   }
 
-  /** The whisper this box holds, opened under the vault's lease: `vault.lease.decipherWith` its ciphered fields, bound to its visible ones, then its JSON parsed.
+  /** The whisper this box holds, opened under the vault's lease: its `decipherWith` of the ciphered fields, bound to its visible ones, then its JSON parsed.
    * A whisper handed back is the one sealed under this boxlabel, in this vault, with this sidecar
    * and these times. Nothing partial is handed back, and the whisper's bytes are zeroed once parsed.
    * It demands first that the box is consistent with its vault, lease-bound: 'vault_locked' with no
@@ -247,7 +248,7 @@ export class Box {
   async tryExtractWhisper(): Promise<Outcome<Whisper>> {
     return await outcomeOf(async () => {
       this.#vault.demandConsistentWith(this, { leaseBound: true })
-      const { lease } = this.#vault
+      const lease = heldLeaseOf(this.#vault)
       if (lease === null) { throw lockedError() }
       const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
       const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)

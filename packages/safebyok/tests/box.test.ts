@@ -80,7 +80,11 @@ const Secret = 'sk-ant-SUPERSECRET'
 const otherCopyBox = async (): Promise<unknown> => {
   vi.resetModules()
   const { Box: OtherBox } = await import('../src/box')
-  return await OtherBox.seal(await vaultOf(), { boxlabel: 'anthropic_api_key' }, Secret)
+  const { registerLeaseReader: otherRegister } = await import('../src/held-lease')
+  // Each copy reads a vault's lease through its own registry: the other copy's vault registers there too.
+  const vault = await vaultOf()
+  otherRegister(vault, () => vault.lease)
+  return await OtherBox.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret)
 }
 
 /** `whisper` sealed into `u1`'s vault at {@link T0} under a lease on a fresh vaultKey: the box, the vault and the key. */

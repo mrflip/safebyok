@@ -153,9 +153,9 @@ describe("vault.getWhisper", () => {
     expect(apiKey).to.eq('sk-fake')
   })
 
-  it("resolves null for an empty label, and throws what getWhisper refuses with: 'vault_locked' while locked", async () => {
+  it("refuses 'absent_box' for an empty label, as its example shows, and 'vault_locked' while locked", async () => {
     const { vault } = await twinVault()
-    expect(await vault.getWhisper('openai')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
     await vault.lock()
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
   })

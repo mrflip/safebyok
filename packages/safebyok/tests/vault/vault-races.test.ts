@@ -829,7 +829,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
     expect(here.getSnapshot().state).to.eq('unlocked')
-    expect(await there.getWhisper('anthropic')).to.be.null
+    await TH.expectRefusal(there.getWhisper('anthropic'), 'absent_box')
   })
 
   it("a store of a box that did not exist, and is created meanwhile elsewhere, is refused as stale: theirs stands", async () => {

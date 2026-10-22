@@ -2,6 +2,7 @@ import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
 import { Ciphered, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
+import { heldLeaseOf } from './held-lease'
 import { sameScope } from './names'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
@@ -15,8 +16,8 @@ import type { Vault } from './vault'
  * are the vault's.
  */
 
-/** The slice of a {@link Vault} a lease reads: the scope every lease of it names, how long a grant lasts, its clock, the lease it holds, its demand, and its lock. */
-export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now' | 'lease' | 'demandConsistentWith' | 'tryLock'>
+/** The slice of a {@link Vault} a lease reads: the scope every lease of it names, how long a grant lasts, its clock, its demand, and its lock. Whether it is the lease the vault holds, it asks inside the package, as no getter shows that one. */
+export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now' | 'demandConsistentWith' | 'tryLock'>
 
 /** The vault props a lease is granted under: their `vault_tok` and `gate_epoch`, which its wrap is bound to. A whole {@link VaultProps} is one. */
 export type LeaseStanding = Pick<VaultProps, 'vault_tok' | 'gate_epoch'>
@@ -142,7 +143,7 @@ export class Lease {
    * zeroed, ciphered or not. Refuses 'damaged_lease' when the vaultKey will not unwrap, dropping
    * the lease as `lock()` does. `Box.seal` is the call.
    *
-   * @example const { box_key_wrapped, whisper_ciphered } = await vault.lease.cipheredWith(whisperBytes, visible)
+   * @example const { box_key_wrapped, whisper_ciphered } = await lease.cipheredWith(whisperBytes, visible)
    */
   async cipheredWith(serialized: Uint8Array, visible: BoxVisible): Promise<BoxCiphered> { return valOf(await this.tryCipheredWith(serialized, visible)) }
 
@@ -178,7 +179,7 @@ export class Lease {
    * boxlabel or vault, or sealed under another vaultKey. The bytes are the caller's to zero.
    * `box.extractWhisper` is the call.
    *
-   * @example const whisperBytes = await vault.lease.decipherWith(ciphered, visible)
+   * @example const whisperBytes = await lease.decipherWith(ciphered, visible)
    */
   async decipherWith(ciphered: BoxCiphered, visible: BoxVisible): Promise<Uint8Array> { return valOf(await this.tryDecipherWith(ciphered, visible)) }
 
@@ -209,7 +210,7 @@ export class Lease {
   /** The record `visible` makes with its whisper sealed: `visible`, beside the two ciphered fields {@link Lease.cipheredWith} makes of `props.whisper`, its one wait.
    * It refuses as `cipheredWith` does. `Box.seal` is the call.
    *
-   * @example const record = await vault.lease.sealProps(visible, { whisper: whisperBytes })
+   * @example const record = await lease.sealProps(visible, { whisper: whisperBytes })
    */
   async sealProps(visible: BoxVisible, props: { whisper: Uint8Array }): Promise<BoxRecord> { return valOf(await this.trySealProps(visible, props)) }
 
@@ -245,7 +246,7 @@ export class Lease {
 
   /** Drop this lease, damaged, as `lock()` drops it, when it is the one its vault holds, and say so as 'damaged_lease': a newer lease, granted meanwhile, stands. */
   #dropDamaged(): VaultError {
-    if (this.#vault.lease === this) { void this.#vault.tryLock() }
+    if (heldLeaseOf(this.#vault) === this) { void this.#vault.tryLock() }
     return damagedLease()
   }
 
@@ -257,8 +258,8 @@ export class Lease {
 }
 
 /** The record `lease` stands for, frozen, its leaseKey and wrapped vaultKey among it: for this package's own code and tests alone.
- * A Lease shows no getter, field or JSON of it, as `vault.lease` is public and its holder could
- * otherwise unwrap the vaultKey extractable. The package's entry points export none of this.
+ * A Lease shows no getter, field or JSON of it, so whatever holds one cannot unwrap the vaultKey
+ * extractable. The package's entry points export none of this.
  */
 export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
 

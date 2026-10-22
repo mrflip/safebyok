@@ -1294,7 +1294,7 @@ describe("every data call, through ensureLease", () => {
 
   for (const [call, blurb, unlisted] of [
     [(vault: Vault, boxlabel: string) => vault.getBox(boxlabel), 'getBox', 'resolves null'],
-    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper', 'resolves null'],
+    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper', 'refuses absent_box'],
     [(vault: Vault, boxlabel: string) => vault.useWhisper(boxlabel, (whisper) => whisper), 'useWhisper', 'refuses absent_box'],
     [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox', 'refuses absent_box'],
   ] as const) {
@@ -1321,7 +1321,7 @@ describe("every data call, through ensureLease", () => {
     })
   }
 
-  it("answers from the listing in hand, reading nothing more, though another device stored the box meanwhile: getWhisper resolves null and delBox refuses absent_box, the listing as fresh as staleMinutes keeps it", async () => {
+  it("answers from the listing in hand, reading nothing more, though another device stored the box meanwhile: getWhisper and delBox refuse absent_box, the listing as fresh as staleMinutes keeps it", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
@@ -1333,7 +1333,7 @@ describe("every data call, through ensureLease", () => {
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     world.advance(MinuteMillis)
     const reads = vi.spyOn(world.vaultDB, 'getVault')
-    expect(await vault.getWhisper('anthropic')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(reads).not.toHaveBeenCalled()
     expect(getProof).not.toHaveBeenCalled()
@@ -1351,18 +1351,18 @@ describe("every data call, through ensureLease", () => {
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    expect(await vault.getWhisper('anthropic')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     world.advance(StaleMinutes * MinuteMillis)
     expect(await TH.expectGood(vault.tryGetWhisper('anthropic'))).to.eq('sk-fake')
     expect(getProof).toHaveBeenCalledOnce()
     expect(getProof.mock.calls[0]?.[0].why).to.eq('locked')
   })
 
-  it("answers at once for a vault never made, rather than asking to make one only to find nothing in it: getWhisper resolves null, delBox refuses absent_box", async () => {
+  it("answers at once for a vault never made, rather than asking to make one only to find nothing in it: getWhisper and delBox refuse absent_box", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ getProof })
-    expect(await vault.getWhisper('anthropic')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(getProof).not.toHaveBeenCalled()
     expect(vault.state).to.eq('absent')
@@ -1372,7 +1372,7 @@ describe("every data call, through ensureLease", () => {
     const { world, vault } = await lockedVaultWith({ getProof: typingPw() })
     await vault.ensureLease()
     const reads = vi.spyOn(world.vaultDB, 'getBox')
-    expect(await vault.getWhisper('openai')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
     expect(reads).toHaveBeenCalledOnce()
   })
 })

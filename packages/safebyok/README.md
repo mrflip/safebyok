@@ -106,12 +106,14 @@ code, the stored records and these docs all use its words.
 * The vault is made with `Vault.make(opts)`, which answers at once, and `hello()` reads what
   storage and this device hold of it, so the snapshot's `state` is `absent`, `locked` or
   `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
-  whisper, or null) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault. A `Box` in hand
+  whisper, refusing `absent_box` for none) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault. A `Box` in hand
   opens with `box.extractWhisper()`, under the vault's lease, reading nothing.
   A `Box` holds its stored record as `box.record`, and shows (and serializes as) its visible
-  fields and the stamp of the vault it was made under, each once. While unlocked, the vault
-  keeps the vaultKey in one place, its `Lease`, opened: a box seals and opens under it
-  (`Box.seal(vault, lease, ...)`, `box.open(lease)`), and locking drops it. Two devices that write at once
+  fields alone, each once; the stamp of the vault it was made under reads as `box.vault_tok` and
+  the like, but no spread or JSON shows it. While unlocked, the vault keeps the vaultKey in one
+  place, wrapped in its `Lease`, which is the Vault object's own: no getter shows it. A box seals
+  and opens under it (`Box.seal(vault, props, whisper)`, `box.extractWhisper()`), and locking
+  drops it; `vault.askPassphraseAt` is when it ends. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to create the vault, and whose passphrase does not open
   the vault made there, is `created_elsewhere`.
@@ -242,8 +244,9 @@ await vault.putBox({ boxlabel: 'מפתח OpenAI: עבודה', sidecar: { note: '
   a name enters the vault: `Vault.make` (the scope) and `putBox()` (the boxlabel). `getBox()`,
   `getWhisper()`, `useWhisper()` and `delBox()` check a boxlabel against the floor only, so a box
   already stored under a name your checks refuse -- by another client, or before you narrowed
-  them -- lists, reads and deletes as any other, and a name with nothing under it reads as null
-  (`useWhisper()` and `delBox()` refuse it `absent_box`), whatever your checks say of it.
+  them -- lists, reads and deletes as any other, and a name with nothing under it reads as none
+  (`getBox()` resolves null; `getWhisper()`, `useWhisper()` and `delBox()` refuse it
+  `absent_box`), whatever your checks say of it.
 * **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
   does, and widen only once every client you serve runs the wider check: an older one refuses at
   its door the names a newer one stores.
@@ -446,11 +449,11 @@ sign-out. The key is dropped at once, and every call that needs it throws kind `
 `getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing back, unless an
 unlock has put a key back in hand by the time its whisper is ready. An `unlock()` or
 `putWayin()` under way is not stopped: it finishes, and leaves the vault unlocked. A `putBox()`
-or `delBox()` under way refuses with `vault_locked`, writing nothing, when the lock comes before
-its write is sent to storage: while it waits on `getProof`, reads and opens the box, or seals it
-(`Box.seal`). Only the write itself is past a lock's reach: once `VaultDB.putBox` or
-`VaultDB.delBox` is sent, it lands or refuses as storage decides, and a stale write still refuses
-`stale_write`, never landing. `del()` locks the same way, and so does storage the vault cannot
+under way refuses with `vault_locked`, writing nothing, when the lock comes while it waits on
+`getProof`, reads and opens the box (`VaultDB.getBox`, `box.extractWhisper()`), or seals it
+(`Box.seal`); a `delBox()` does when it comes while it waits on `getProof`. Only the write itself
+is past a lock's reach: once `VaultDB.putBox` or `VaultDB.delBox` is sent, it lands or refuses as
+storage decides, and a stale write still refuses `stale_write`, never landing. `del()` locks the same way, and so does storage the vault cannot
 trust (below). A refresh that finds the vault's ways in changed on another device, or the vault
 gone, drops the key the same way for this handle.
 

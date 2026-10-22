@@ -6,6 +6,8 @@ import type { VaultError } from '../../src/errors'
 import type { GetProof } from '../../src/ask'
 import { valOf } from '../../src/outcome'
 import { Vault } from '../../src/vault'
+import { heldLeaseOf, registerLeaseReader } from '../../src/held-lease'
+import { Lease } from '../../src/lease'
 import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxBoxes, VaultScope } from '../../src/types'
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
@@ -119,12 +121,15 @@ describe("putBox and getWhisper", () => {
     await TH.expectRefusal(vault.putBox({ boxlabel: 'not a label' }, 'whatever'), 'bad_label')
   })
 
-  it("refuses a use of an absent box without quoting the boxlabel, which may be any text a host admits; a get of one resolves null", async () => {
+  it("refuses a get or a use of an absent box without quoting the boxlabel, which may be any text a host admits; getBox of one resolves null", async () => {
     const world = makeWorld({ validators: AnyTextValidators })
     const vault = await world.openUnlocked('pw')
-    expect(await vault.getWhisper('sk-fake-pasted-by-mistake')).to.be.null
-    const err = await TH.expectRefusal(vault.useWhisper('sk-fake-pasted-by-mistake', (whisper) => whisper), 'absent_box')
-    expect(err.message).not.to.include('sk-fake-pasted-by-mistake')
+    expect(await vault.getBox('sk-fake-pasted-by-mistake')).to.be.null
+    const calls = [() => vault.getWhisper('sk-fake-pasted-by-mistake'), () => vault.useWhisper('sk-fake-pasted-by-mistake', (whisper) => whisper)]
+    for (const call of calls) {
+      const err = await TH.expectRefusal(call(), 'absent_box')
+      expect(err.message).not.to.include('sk-fake-pasted-by-mistake')
+    }
   })
 })
 
@@ -256,22 +261,31 @@ describe("vault.delBox, what it removed", () => {
   })
 })
 
-describe("vault.lease", () => {
-  it("is the lease the vault holds, and null once locked", async () => {
+describe("the lease a vault holds", () => {
+  it("is no getter or field of the Vault object: the package reads it with heldLeaseOf, as its example shows, null once locked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    expect(vault.lease).to.not.be.null
-    expect(vault.lease?.vault_tok).to.eq(vault.vault_tok)
+    expect('lease' in vault).to.be.false
+    expect(heldLeaseOf(vault)?.vault_tok).to.eq(vault.vault_tok)
     await vault.lock()
-    expect(vault.lease).to.be.null
+    expect(heldLeaseOf(vault)).to.be.null
   })
 
-  it("deciphers what a box holds, as its example shows: what box.extractWhisper does", async () => {
+  it("keeps the reader the Vault object registered as it was made: a second registration changes nothing", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    registerLeaseReader(vault, () => null)
+    expect(heldLeaseOf(vault)).to.not.be.null
+  })
+
+  it("deciphers what a box holds, as decipherWith's example shows: what box.extractWhisper does", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = box.record
-    const whisperBytes = await vault.lease?.decipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+    const lease = heldLeaseOf(vault)
+    if (lease === null) { throw new Error('expected the vault to hold a lease') }
+    const whisperBytes = await lease.decipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
     expect(new TextDecoder().decode(whisperBytes)).to.eq('"sk-fake"')
   })
 })
@@ -1007,7 +1021,7 @@ describe("the host's validators", () => {
     await vault.putBox({ boxlabel: '  Padded Box  ' }, 'sk-fake')
     expect(boxlabelsOf(vault)).to.deep.equal(['  Padded Box  '])
     expect(await vault.getWhisper('  Padded Box  ')).to.eq('sk-fake')
-    expect(await vault.getWhisper('padded box')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('padded box'), 'absent_box')
   })
 
   it("never pass a host schema's issues along, which may quote the name", async () => {
@@ -1091,12 +1105,12 @@ describe("the host's validators", () => {
     expect(boxlabelsOf(narrow)).to.deep.equal([])
   })
 
-  it("reads a name the host's check refuses, with nothing under it, as none: getBox and getWhisper resolve null, useWhisper and delBox refuse absent_box; the check gates writes alone", async () => {
+  it("reads a name the host's check refuses, with nothing under it, as none: getBox resolves null, getWhisper, useWhisper and delBox refuse absent_box; the check gates writes alone", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(await vault.getBox('Other: box')).to.be.null
-    expect(await vault.getWhisper('Other: box')).to.be.null
+    await TH.expectRefusal(vault.getWhisper('Other: box'), 'absent_box')
     for (const call of [() => vault.useWhisper('Other: box', (whisper) => whisper), () => vault.delBox('Other: box')]) {
       await TH.expectRefusal(call(), 'absent_box')
     }
@@ -1479,14 +1493,14 @@ const reachableFrom = (root: unknown, depth = 8): unknown[] => {
 }
 
 describe("the Vault object's public surface", () => {
-  it("yields no CryptoKey and no wrapped key through any field or getter, its lease's included", async () => {
+  it("yields no Lease, no CryptoKey and no wrapped key through any field or getter", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putWayin('pw', await TH.passkeyOf('laptop'))
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    expect(vault.lease).to.not.be.null
+    expect(heldLeaseOf(vault)).to.not.be.null
     const reached = reachableFrom(vault)
-    expect(reached).to.include(vault.lease)
+    expect(reached.filter((val) => val instanceof Lease)).to.have.lengthOf(0)
     expect(reached.filter((val) => val instanceof CryptoKey)).to.have.lengthOf(0)
     const wrapped = reached.filter((val) => typeof val === 'object' && val !== null && 'ciphertext_b64' in val)
     expect(wrapped).to.have.lengthOf(0)

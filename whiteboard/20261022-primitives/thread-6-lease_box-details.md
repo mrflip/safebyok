@@ -73,7 +73,7 @@ holds nothing secret); `getWhisper()` still refuses `vault_locked`.
 
 * `vault.putBox(boxlabel, whisper, { sidecar })` is `putBox({ boxlabel, sidecar? }, whisper?)`,
   resolving the `Box` stored (it resolved void).
-* `vault.getBox()` and `getWhisper()` resolve null for none (they refused `absent_box`).
+* `vault.getBox()` resolves null for none (it refused `absent_box`). `getWhisper()` resolved null here too, until 6b: it refuses `absent_box` again, as the Coach ruled.
 * `vault.delBox()` resolves `DeletedBox` (it resolved void).
 * `vault.decryptWhisper` / `tryDecryptWhisper`, `box.tryOpen`, `box.open`, `Lease.grant`,
   `lease.tryOpen`, `lease.wrapBoxKey`, `lease.unwrapBoxKey`, `vault.tryDemandConsistentWith` are
@@ -85,7 +85,7 @@ holds nothing secret); `getWhisper()` still refuses `vault_locked`.
 
 ## Races flagged (for `primitives-toldjaso.md`)
 
-* `#takeStoredBox` splices the stored box into the listing over a newer revision a refresh listed
+* `#takeStoredBox` (since 6b `#updateBoxListingOf`) splices the stored box into the listing over a newer revision a refresh listed
   in the gap (toldjaso 13's family): left as thread 5 left it.
 * A take-up now judges the lease it read against the picture standing when the read answers (no
   wait after it): a lease outdated meanwhile is discarded, erased, where the old unwrap's wait left

@@ -12,6 +12,7 @@ import type { VaultDB } from '../../src/vault-db'
 import { good, valOf } from '../../src/outcome'
 import { VaultError } from '../../src/errors'
 import { Lease, sealLeaseRecord } from '../../src/lease'
+import { registerLeaseReader } from '../../src/held-lease'
 
 
 /**
@@ -108,6 +109,8 @@ export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrid
     },
   }
   slice.lease = Lease.make(slice, await sealLeaseRecord(slice, { vault_tok: vaultTok, gate_epoch: 1 }, vaultKey))
+  // A box and a lease read the lease the slice holds as they read a Vault object's.
+  registerLeaseReader(slice, () => slice.lease)
   return slice
 }
 

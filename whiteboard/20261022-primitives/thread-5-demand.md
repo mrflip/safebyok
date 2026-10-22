@@ -22,7 +22,7 @@ whoever files the thread, and thread 11 (the Contract) should read it.
   * `#replaceSnapshot()` the one swap; `lock()` synchronous then the erase (`#lockNow`); the
     expiry, `close()` and revocation drop memory only (`#dropLease`).
   * Box calls: `await #ensureUnlocked()`, demand the lease, read, demand the box (lease-bound),
-    write, take what was stored into the listing (`#takeStoredBox`, `#takeBoxDeletion`). Room
+    write, take what was stored into the listing (`#takeStoredBox`, `#takeBoxDeletion`; since 6b `#updateBoxListingOf`, `#dropBoxListingOf`). Room
     judged from the listing in hand.
   * `del()` takes the deletion into the picture. `TH.holdNextAnswer`, `TH.readAfresh`.
   * Out: `#refreshOnStale`, `#catchUp`, `#isCaughtUpStale`, `#refuseCreatedElsewhere`'s read,
