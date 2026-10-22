@@ -4,11 +4,11 @@ import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, 
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, the ones handing on records in place of those handing back summaries.
- * That is `getVaultRecords`, `ensureVaultRecords` and `listBoxRecords` in place of `getVault`,
- * `ensureVault` and `listBoxes`: the browser's VaultDB checks stored records. Every VaultDB is
- * one: `safebyok-postgres`'s, or one of your own.
+ * That is `getVaultRecords` and `ensureVaultRecords` in place of `getVault` and `ensureVault`:
+ * the browser's VaultDB checks stored records. Every VaultDB is one: `safebyok-postgres`'s, or one
+ * of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'getVaultRecords' | 'ensureVaultRecords' | 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'getVaultRecords' | 'ensureVaultRecords' | 'putVaultProps' | 'getBox' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -41,14 +41,11 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
 export type VaultResolvers<ContextT> = {
   Query: {
     safebyokGetVault:         VaultFieldResolver<ContextT>
-    safebyokGetVaultProps:    VaultFieldResolver<ContextT>
     safebyokGetBox:           VaultFieldResolver<ContextT>
-    safebyokListBoxes:        VaultFieldResolver<ContextT>
     safebyokGetCapacity:      VaultFieldResolver<ContextT>
   }
   Mutation: {
     safebyokEnsureVault:      VaultFieldResolver<ContextT>
-    safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
     safebyokPutVaultProps:    VaultFieldResolver<ContextT>
     safebyokPutBox:           VaultFieldResolver<ContextT>
     safebyokDelBox:           VaultFieldResolver<ContextT>
@@ -128,19 +125,15 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Query: {
       // As stored records, which the browser's VaultDB validates: not getVault's summaries.
       safebyokGetVault:      served((vaultDB, args) => vaultDB.getVaultRecords(scopeIn(args))),
-      safebyokGetVaultProps: served((vaultDB, args) => vaultDB.getVaultProps(scopeIn(args))),
       safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string)),
-      // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
-      safebyokListBoxes:  served((vaultDB, args) => vaultDB.listBoxRecords(scopeIn(args))),
       safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
-      safebyokEnsureVault:      served((vaultDB, args) => vaultDB.ensureVaultRecords(scopeIn(args), recordOf(args.draft, VaultPropsFields) as GatelessVaultProps)),
-      safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
-      safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), () => ({ landed: true }), staleVaultPropsInBody),
+      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultPropsFields) as GatelessVaultProps)),
+      safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), (stored) => ({ landed: true, vault_props_stored: stored }), staleVaultPropsInBody),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
-      safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args)), () => true),
+      safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args))),
     },
     Subscription: {
       safebyokVaultChanged: {
@@ -179,9 +172,10 @@ const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
   return { vault_tok, revision_tok }
 }
 
+// A gate_epoch left out, as a GraphQL client may leave out a null, is the null it means: the damaged path's.
 const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {
-  const { vault_tok } = args.expected as VaultDelExpectation
-  return { vault_tok }
+  const { vault_tok, gate_epoch = null } = args.expected as { vault_tok: string, gate_epoch?: number | null }
+  return { vault_tok, gate_epoch }
 }
 
 // A revision_tok left out, as for a box write, is the null it means.

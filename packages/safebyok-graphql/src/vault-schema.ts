@@ -55,7 +55,8 @@ input SafebyokVaultScopeInput {
 }
 
 """
-A vault's props, as stored: its scope, its vault_tok, and its two ways in, each wrapping the
+A vault's props, as stored: its scope, its vault_tok, its vault_epoch (a counter its storage moves),
+and its two ways in, each wrapping the
 one vaultKey: its passphrase, and its passkey, null when it has none. Both are null while the vault
 has no gate (gate_epoch 0). Times are epoch milliseconds.
 """
@@ -65,23 +66,34 @@ type SafebyokVaultProps {
   user_id:          String!
   vaultlabel:       String!
   vault_tok:        String!
+  vault_epoch:      Int!
   gate_epoch:       Int!
   passphrase:       SafebyokWayin
   passkey:          SafebyokWayin
   registered_at:    Float!
 }
 
-"""A vault's props, as stored. Times are epoch milliseconds."""
+"""A vault's props, as stored. Times are epoch milliseconds. A vault_epoch sent is ignored: the storage moves it."""
 input SafebyokVaultPropsInput {
   format:           String!
   applabel:         String!
   user_id:          String!
   vaultlabel:       String!
   vault_tok:        String!
+  vault_epoch:      Int!
   gate_epoch:       Int!
   passphrase:       SafebyokWayin
   passkey:          SafebyokWayin
   registered_at:    Float!
+}
+
+"""What a deleted vault leaves in its scope: its counter, which the next vault made there carries on."""
+type SafebyokTombstone {
+  format:       String!
+  applabel:     String!
+  user_id:      String!
+  vaultlabel:   String!
+  vault_epoch:  Int!
 }
 
 """
@@ -149,9 +161,14 @@ input SafebyokBoxExpectationInput {
   revision_tok: String
 }
 
-"""What a delete of a vault was aimed at: it lands only while the vault has that vault_tok."""
+"""
+What a delete of a vault was aimed at: it lands only while the vault has that vault_tok and
+gate_epoch. A null gate_epoch is for deleting a vault whose props are damaged, and expects the
+vault_tok alone.
+"""
 input SafebyokVaultDelExpectationInput {
-  vault_tok: String!
+  vault_tok:  String!
+  gate_epoch: Int
 }
 
 """
@@ -189,7 +206,8 @@ type SafebyokCapacity {
 }
 
 """
-What an update of the vault props answered. It \`landed\`, or it was refused and nothing was written:
+What an update of the vault props answered. It \`landed\`, and \`vault_props_stored\` is the vault props
+as stored, their vault_epoch moved up by one; or it was refused and nothing was written:
 \`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_props_stored\` carries the vault
 props standing, whole, or null when none stand. Those are the ways in, so they ride in this body,
 never in an error's \`extensions\`.
@@ -218,29 +236,23 @@ type SafebyokPutBoxAnswer {
 type Query {
   """The vault's props and every box, read in one step, or null when the vault has never been made."""
   safebyokGetVault(scope: SafebyokVaultScopeInput!): SafebyokVault
-  """The vault's props, or null when the vault has never been made."""
-  safebyokGetVaultProps(scope: SafebyokVaultScopeInput!): SafebyokVaultProps
   """One box, or null when there is none under that boxlabel."""
   safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!): SafebyokBox
-  """Every box in the vault, in any order, without its encrypted fields."""
-  safebyokListBoxes(scope: SafebyokVaultScopeInput!): [SafebyokListedBox!]!
   """How full the vault is, as its storage reckons it; nothing used for a vault never made."""
   safebyokGetCapacity(scope: SafebyokVaultScopeInput!): SafebyokCapacity!
 }
 
 type Mutation {
-  """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its props and every box, from one step: these, or another device's already standing."""
-  safebyokEnsureVault(scope: SafebyokVaultScopeInput!, draft: SafebyokVaultPropsInput!): SafebyokVault!
-  """Stores the vault props if their vault has none, and answers with whichever vault props stand there afterwards: these, or another device's already standing."""
-  safebyokEnsureVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
-  """Replaces the vault props, only while those standing are the ones expected, and answers whether it landed, or the vault props standing when it did not."""
+  """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its props and every box, from one step: these, or another device's already standing. Over a tombstone it starts a new life, the counter carried on."""
+  safebyokEnsureVault(draft: SafebyokVaultPropsInput!): SafebyokVault!
+  """Replaces the vault props, only while those standing are the ones expected, and answers with the vault props as stored when it landed, or the vault props standing when it did not."""
   safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): SafebyokPutVaultPropsAnswer!
   """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
   safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
   safebyokDelBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
-  """Deletes the vault, its props and every box, removing them for good, only while the vault is the one expected."""
-  safebyokDelVault(scope: SafebyokVaultScopeInput!, expected: SafebyokVaultDelExpectationInput!): Boolean!
+  """Deletes the vault, its props and every box, removing them for good, only while the vault is the one expected, and answers with the tombstone it leaves."""
+  safebyokDelVault(scope: SafebyokVaultScopeInput!, expected: SafebyokVaultDelExpectationInput!): SafebyokTombstone!
 }
 
 type Subscription {

@@ -1,4 +1,4 @@
-import type { BoxRecord, VaultProps, VaultScope } from 'safebyok'
+import type { BoxRecord, Tombstone, VaultProps, VaultScope } from 'safebyok'
 
 /** How one field crosses the wire: `plain`, as it is, or `ciphered`, a Ciphered sent as its own two fields.
  * A plain field is text, a number, or one of the vault props' two ways in, each one opaque JSON.
@@ -34,10 +34,20 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['user_id',          'plain'],
   ['vaultlabel',       'plain'],
   ['vault_tok',        'plain'],
+  ['vault_epoch',      'plain'],
   ['gate_epoch',       'plain'],
   ['passphrase',       'plain'],
   ['passkey',          'plain'],
   ['registered_at',    'plain'],
+] as const)
+
+/** Every field of a Tombstone, as `SafebyokTombstone` has them: what a deleted vault leaves. */
+export const TombstoneFields = everyFieldOf<Tombstone>()([
+  ['format',           'plain'],
+  ['applabel',         'plain'],
+  ['user_id',          'plain'],
+  ['vaultlabel',       'plain'],
+  ['vault_epoch',      'plain'],
 ] as const)
 
 /** Every field of a BoxRecord, as `SafebyokBox` has them: the one place naming them for the wire. */
