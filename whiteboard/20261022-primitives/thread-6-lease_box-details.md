@@ -32,7 +32,10 @@ Each with what I built (the Rec taken) and what the other answer would mean.
 5. **The ciphered fields stay `Ciphered` objects** (`{ cipher_iv_b64, ciphertext_b64 }`), where the
    spec's `cipheredWith` row says strings: a string would change the stored box. **Rec:** keep.
 6. **`vault.lease` is public.** `Box.seal` and `box.extractWhisper` are public and read it, as the
-   spec's rows have them. A host holding it can decipher what `getWhisper` already opens. **Rec:** keep.
+   spec's rows have them. A host holding it can decipher what `getWhisper` already opens, and no
+   more: the Lease's `record` getter, which handed out the leaseKey and the wrapped vaultKey, is
+   gone (the review's significant finding), and a test walks the Vault object finding no key or
+   wrapped key. **Rec:** keep.
 7. **`{ ...box }` and a box's JSON show its whole stamp** (scope, `vault_tok`, both epochs): six
    more fields than a `BoxSummary`. `baseRevisionTok` is a getter, out of the view. **Rec:** keep.
 8. **`useWhisper()` of none refuses `absent_box`**; the spec's row is silent, and a callback handed
@@ -43,7 +46,7 @@ Each with what I built (the Rec taken) and what the other answer would mean.
     `sealProps`**; none on the static `make`s, which refuse only misuse. **Rec:** keep.
 11. **`damaged_lease` drops the lease through `vault.tryLock()`**: memory, the prompt landed, and the
     erase, only when it is the lease the vault holds now. **Rec:** keep.
-12. **`isConsistentWith`** is the query's name (the triplet ruling). It drops no ended lease and logs
+12. **`consistentWith`** is the query's name (the triplet ruling). It drops no ended lease and logs
     nothing. **Rec:** keep.
 
 ## Refusals where today coped (toldjaso-style; expected, not blockers)
@@ -75,8 +78,9 @@ holds nothing secret); `getWhisper()` still refuses `vault_locked`.
 * `vault.decryptWhisper` / `tryDecryptWhisper`, `box.tryOpen`, `box.open`, `Lease.grant`,
   `lease.tryOpen`, `lease.wrapBoxKey`, `lease.unwrapBoxKey`, `vault.tryDemandConsistentWith` are
   gone; `box.extractWhisper`, `Box.seal`'s new shape, `lease.cipheredWith` / `decipherWith` /
-  `sealProps`, `vault.lease`, `vault.isConsistentWith` are new.
+  `sealProps`, `vault.lease`, `vault.consistentWith` are new.
 * `VaultDB.getBox` takes `expected` and refuses `vault_mismatch`.
+* `lease.record` is gone (the package reaches it through the internal `leaseRecordOf`).
 * Kinds added: `damaged_lease`, `no_whisper`.
 
 ## Races flagged (for `primitives-toldjaso.md`)
