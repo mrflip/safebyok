@@ -10,7 +10,7 @@
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
 * **Status:** threads 1-2 filed (#243, #244); thread 3 (turns) building; thread 5 rewritten as
-  vault_epoch, waiting on three rulings. Branches cut on or after
+  vault_epoch, waiting on two rulings; thread 11 (wire_meta) added. Branches cut on or after
   2026-10-22 carry that date (`20261022-get_vault`, `20261022-turns`).
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
@@ -67,7 +67,8 @@ Every worker, beyond CLAUDE.md:
 6. **Security decisions** go to `notes/security.md` through a `sonnet` subagent, in the thread
    that makes them. *Orchestrator (2026-10-22), the Coach's ruling:* the subagent may bring an
    entry it touches up to today's terms and interfaces, where it is certain of them; it does not
-   bulk-rewrite the file. One agent modernizes the whole file at the sprint's end.
+   bulk-rewrite the file. The Coach audits and corrects the file after the sprint; no agent
+   modernizes it wholesale.
 7. **The Contract** is the *Contract* tab of the design doc
    (https://claude.ai/code/artifact/8ac26722-33ee-4082-a76f-f4c9b6722b70). Only thread 10 edits
    it; earlier threads list in their thread file the Contract lines their change makes untrue.
@@ -178,7 +179,12 @@ is an unlock turn. **Size:** L. Likely lowers the `Vault` and `everything` lines
 *Gloss.* A new `src/bank.ts` and its tests; `vault.ts` (birth, states, `close`), `vault-opts.ts`
 and `options.ts` (what the bank holds versus the vault), `refusals.ts` (`vault_gone`,
 `gate_made_elsewhere`, and Open Matter 4's kind), `index.ts`; `safebyok-react/src/vault-provider.tsx`
-and `tests/vault-provider/`; `demos/` and `e2e/` that build a vault. **Rulings (2026-10-22):**
+and `tests/vault-provider/`; `demos/` and `e2e/` that build a vault. **From thread 3, interim code this thread replaces:**
+`#raiseAsk` refuses `vault_closed` on a closed vault (becomes `vault_gone`); a first unlock that
+loses to another device's create shows `locked` with its listing at the next hello (becomes
+`gate_made_elsewhere`); a failed strength-checker load leaves the vault `opening` (the loads move
+to `bank.hello()`). The read turn's judgment depends only on the round's results plus
+`#held`/`#lease`, for the birth to reuse. **Rulings (2026-10-22):**
 no props/listing consistency check in the core: the VaultDB checks server side, in its
 transaction, and reports damage (`damaged_vault`); a check an adapter lacks becomes a TODO
 (this replaces Open Matter 4's Rec). `putVaultProps` resolves the stored props, the new
@@ -211,10 +217,15 @@ and the `rolled_back` removal. What survives of the old line: the mark becomes t
 record (`device_id`, minted at first need, carried by every way in this device seals), and
 `heedMark`, `raiseMarkAfter` and the other mark machinery go. New: a `vault_epoch` on the vault
 props, bumped by writes; tombstones on `del()`; the device record remembering the highest
-`vault_epoch` seen; a read behind it refused; `clearCachedVault`. **Waits on three Open Matters**
-(which writes move it; where the device remembers it and what "not serve" refuses; tombstones,
-new lives and the way out), each a contract change, and on the Coach's wording for CLAUDE.md's
-ground-truth paragraph. Touches every adapter (the counter and the tombstone), `device-db.ts`,
+`vault_epoch` seen; a read behind it refused; `clearCachedVault`. **Ruled (2026-10-22):** "Writes to vault's core
+fields should bump the epoch" (the props, not box writes). The concern that a restored backup of
+boxes alone goes unnoticed is entry 1 of `streamlined-toldjaso.md`; bind `vault_epoch` into a
+box's ctx only if leaving it is blocking. **Still waits on two Open Matters** (where the device
+remembers it and what "not serve" refuses; tombstones, new lives and the way out) and on the
+Coach's wording for CLAUDE.md's ground-truth paragraph. From thread 3: a device record's value can
+be lowered across tabs (toldjaso entry 9), so "highest seen" must be written so that a lower value
+never replaces a higher one, or the loss is accepted and written down; and `del()` over props a
+rollback refusal forgot refuses `rolled_back` today, which this thread replaces. Touches every adapter (the counter and the tombstone), `device-db.ts`,
 `idb.ts`, `vault.ts`'s read judgment, `refusals.ts`, the README's *A vault rolled back*
 (rewritten, not removed), VOCABULARY. **Depends on:** 4. **Look-ahead:** thread 6's Proving
 seals ways in carrying the device id. **Size:** L; may split into the counter and tombstone
@@ -283,12 +294,27 @@ keep, or delete) in the PR, and a dependency added needs the Coach's yes first (
 the sweep proposes and does not add. **Depends on:** 9. **Size:** M-L. May split: docs, then the
 sweep.
 
+### 11. wire_meta (side thread, from the Coach's ruling)
+
+The Coach, on "GraphQL error extensions now carry ways in" (2026-10-22, verbatim): "I think we
+need to move meta out of the error and into the body, available on success or failure."
+
+*Gloss (Orchestrator).* Read as the wire: over GraphQL (and any HTTP recipe that does the same),
+what a write's answer carries (`vault_props_stored`, `box_stored`, the stored record on success)
+travels in the mutation's result body, never in error `extensions`; the core's `Result` and
+`err.meta` are unchanged. If the Coach meant the core's `Result` too, this thread is bigger: say so
+and stop. Also renames the records verbs if the Coach rules on that row (the plural misleads).
+Touches `packages/safebyok-graphql/` (schema, resolvers, `graphql-vault-db.ts`, `fields.ts`), the
+Postgres route recipe if it carries meta in an error, their tests, a changeset. **Model:**
+`sonnet`. **Depends on:** 3 (cut from its tip; runs beside thread 4, joins the line at the
+restack). **Size:** S-M.
+
 ## Wrap-up
 
-`wrapup.md`'s restack; one agent modernizes `notes/security.md` to today's terms and interfaces
-(the Coach, 2026-10-22: once, at the end, not bulk updates as we go); then the preplan's end pass: one `opus`, `high` reviewer over the whole
+`wrapup.md`'s restack, then the preplan's end pass: one `opus`, `high` reviewer over the whole
 line, brief *Trust, checks and races*, grepping for the vestiges threads 3 and 5 name in their
-"out" lines, the security notes, and the Contract. Its findings are Open Matters, not fixes.
+"out" lines, the security notes, and the Contract. Its findings are Open Matters, not fixes. (The Coach audits
+`notes/security.md` after the sprint, 2026-10-22: no agent rewrites it.)
 
 ## For the Coach
 

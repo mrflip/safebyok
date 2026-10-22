@@ -17,7 +17,14 @@ keeps it. Newer than the plan and the preplan wherever they disagree.
 * **Rollback (2026-10-22):** a `vault_epoch` counter, tombstoned vaults, a device refusing storage
   behind what it has seen, `clearCachedVault`: thread 5, rewritten, pending three rulings.
 * **Pull anticipated changes forward** (the plan, *Ground rules* 9).
-* **Security notes:** the subagent may modernize an entry it touches; one full pass at the end.
+* **Security notes:** the subagent may modernize an entry it touches; the Coach audits the file
+  after the sprint, and no agent rewrites it.
+* **vault_epoch moves on writes to the vault's core fields only** (2026-10-22); box rollback is
+  toldjaso entry 1.
+* **Wire meta:** over GraphQL, what a write's answer carries goes in the response body, never in
+  error extensions (thread 11).
+* **`streamlined-toldjaso.md`** in this directory lists every guarantee relaxed; a thread that
+  relaxes one more reports it for the list.
 * **No back-compat** for pre-rename vaults (confirmed); pending changesets stay as written.
 
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
@@ -37,6 +44,7 @@ rules* 3).
 | 8 | gating | planned | |
 | 9 | react | planned | |
 | 10 | docs | planned | |
+| 11 | wire_meta | planned (after 3) | |
 
 ## What the threads found
 
