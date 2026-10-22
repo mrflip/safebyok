@@ -1,6 +1,6 @@
 # Thread 12: route_meta (2026-10-22)
 
-Branch `20261022-route_meta`, PR to be linked below, stacked on [#251](https://github.com/mrflip/safebyok/pull/251) (thread 4), beside the line's threads 5 to 11; it joins the line at wrap-up.
+Branch `20261022-route_meta`, PR [#252](https://github.com/mrflip/safebyok/pull/252), stacked on [#251](https://github.com/mrflip/safebyok/pull/251) (thread 4), beside the line's threads 5 to 11; it joins the line at wrap-up.
 Justify: green (core 2803, indexeddb 159, postgres 308, convex 306, graphql 312, react 287, demo 216, e2e 102; `pnpm size:budget` within every budget).
 
 * **Built**: the Postgres route recipe answers every call in one shape
