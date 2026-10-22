@@ -63,7 +63,11 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    `ensureUnlocked` joins any standing gating whose chain ends in a lease (every kind but
    `del_vault`); `putWayin`, `delWayin` and `del` join only a gating of their own kind, and
    otherwise wait for the standing one to settle (the gating line's "a second such call waits"),
-   then raise their own.
+   then raise their own. *The Coach (2026-10-22):* "which join are you referring to? this smells
+   weird, can you carry on but note that". The join is the spec's *Gating* paragraph ("one
+   gating stands per vault, and a call that needs one while it stands joins it", the dialog
+   mutex). Thread 9 builds the fix and says in its PR where joining across calls fights the code,
+   so the Coach can reconsider the join itself.
 
 6. **Nothing raises the device record but birth (S, plus a false positive; threads 7 and 5).**
    *Smallest form, per the ruling: remembering the highest `vault_epoch` seen is not bumping it.*
@@ -83,6 +87,8 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    unchanged), so every lease demand throws `gate_moved` and `ensureUnlocked` never prompts.
    **Fix:** the refresh drops (memory only) a lease whose `gate_epoch` differs from the fetched
    gate's, and `ensureUnlocked`'s synchronous check counts a lease only when its stamp matches.
+   *The Coach (2026-10-22):* "yes if a passkey or passphrase changes elsewhere other devices
+   should lock".
 
 9. **"Delete my vault" reports a failure after deleting; a refresh erases another tab's lease
    (U; threads 9, 5, 7).** The `del_vault` chain's `lock()` lands its own gating before it
