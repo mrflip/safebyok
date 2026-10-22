@@ -70,8 +70,8 @@ rules* 3).
 | 2 | get_vault | merged | #244 |
 | 3 | wire_meta | merged | #246 |
 | 4 | store_verbs | merged | #251 |
-| 5 | demand | built, in review | #253 |
-| 6 | lease_box | planned | |
+| 5 | demand | filed, on main | #253 |
+| 6 | lease_box | building | |
 | 7 | bank | planned | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
@@ -85,6 +85,32 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 5, demand (#253)
+
+*Orchestrator,* from the report and review. Thread file `thread-5-demand.md`, details
+`thread-5-demand-details.md` (*Races flagged*, *Contract lines this thread makes untrue*,
+*Refusals where today coped*), on the thread's branch.
+
+* **The demand** is `#demand(thing, { leaseBound, call })`, public as `demandConsistentWith` /
+  `tryDemandConsistentWith`. It reads a partial `Stamped` (fields a thing carries): Box carries only
+  `vault_tok`, Lease the scope and `gate_epoch`. Full stamps are thread 6's. New kinds `vault_gone`,
+  `vault_remade`, `gate_moved`; `box_moved` not added (Open Matter).
+* **Box calls** demand the lease, read, demand the box, then `#takeStoredBox` / `#takeBoxDeletion`
+  put what storage stored into the listing.
+* **The refresh** is `#takeStorage` + `#takePicture`, a pure judgment of one read plus the fields in
+  hand: older than the picture → ignore, before the mark's rollback check and again after its wait;
+  a revoked lease dropped from memory, never erased; nothing taken up. `oneAtATime` joins the read
+  in flight, and the ring goes through it (a ring mid-read loses its change: Open Matter).
+* **`#leaseSince`**: a pantry read begun before this tab's lease was taken cannot revoke it (Open
+  Matter, Rec keep).
+* **Kept for later threads:** the first-hello memo `#birth` / `#born` and the device mark (thread 7);
+  `#grantLease` checks the Ask's `overtaken` beside the demand (thread 8's proving replaces it);
+  `#takeUp`'s AbortController (thread 9); the public name `ensureLease` (thread 9).
+* **Test helpers:** `TH.holdNextAnswer`, `TH.readAfresh`; `world.holdNextLease` holds the lease write's
+  answer, since a hold at the device store's door misorders its writes.
+* **Priority** (the Coach, audit 9): "Ergonomics around a deleted vault are of very little concern,
+  safety is of course at max concern".
 
 ### Thread 4, store_verbs (#251)
 

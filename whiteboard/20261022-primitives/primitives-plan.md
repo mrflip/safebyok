@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 built (#253), in review; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -216,7 +216,7 @@ its backing store -- in the case that you're a facade on another vaultDB this is
 easy." This thread writes it, since it rewrites every adapter's verbs. The Postgres route
 recipe's meta is thread 12's, not this thread's.
 
-### 5. demand
+### 5. demand, filed ([#253](https://github.com/mrflip/safebyok/pull/253))
 
 > **demand**: the turn queue, the abort controllers and every in-call refresh go; in their place
 > the stamp `{ ...scope, vault_tok, vault_epoch, gate_epoch }` on the Vault and on every thing it
@@ -252,6 +252,16 @@ change most. Each in-call catch-up, abort and after-wait check is a ledger line 
 rule 10. The races the spec lists (*Races the contract tests own*) that need only this thread's
 surface are written here: the late read of this tab's own write, and the lock landing during a
 box call. Chain tests are the happy path plus one injected failure per step.
+
+*Review:* **fixed** ([#253](https://github.com/mrflip/safebyok/pull/253)). Fixed: `#reviseWayins` put
+its written props back over a read that found the vault deleted or remade meanwhile (the base's
+`#outrun`; two race tests now pin it); three doc blocks opened on a bare `/**`; a comment reflowed.
+Left, minor: the kept take-up judges against a stale picture and erases (Open Matter, thread 9);
+the read join weakens `del()`'s and the proving's promises (Open Matter, thread 11's Contract);
+`#leaseSince` compares `>=` (errs toward a re-prompt); `standsBeside` reads an earlier
+`ask_passphrase_at` as older; `#takeStoredBox` splices over a newer listed revision (toldjaso 13's
+family); `#demandLease` says `vault_locked` before `vault_gone` in edge orders; `decryptWhisper`
+opens before demanding (Open Matter, thread 11 picks the kind).
 
 ### 6. lease_box
 
@@ -369,7 +379,11 @@ host that sets the twilight at least as long as the lease "likely didn't underst
 `ensureUnlocked({ renewMinutes })` with `renewMinutes` at least the lease's length refuses as a
 misuse (`bad_option`), and the README says that a lease of zero is how to prompt every time.
 **Depends on:** 8. **Look-ahead:** thread 10 dispatches on `gatingkind`.
-**Size:** L.
+**Size:** L. *Orchestrator:*
+thread 5 pulled `hello({ staleMinutes: 0 })` forward into `unlock()` and `#reviseWayins` (audit 4)
+and kept `#takeUp`'s AbortController for this thread to remove; the kept take-up erases on a stale
+judgment, which the pantry consult here ends (take up only after a read begun at or after the
+call; drop, never erase).
 
 *Tests.* `ask.test.ts` and the gating halves of `vault-lease.test.ts` and `vault-wayins.test.ts`;
 one test per gatingkind's happy path, one injected failure per chain step, the open-on-typo, the
@@ -400,7 +414,11 @@ the preplan's *Libraries* candidates no earlier thread decided: each gets a verd
 keep, or delete) in the PR, and a dependency added needs the Coach's yes first, so the sweep
 proposes and does not add. **Depends on:** 10. **Size:** M-L. May split: docs, then the sweep. *Orchestrator:* add a TODO entry
 for a test that reads the Postgres README's route-recipe code blocks, so the copy a host takes is
-the one tested (Open Matters, from #252's review, the Coach took the Rec).
+the one tested (Open Matters, from #252's review, the Coach took the Rec). Thread 5's Contract
+lines made untrue are in `thread-5-demand-details.md` on #253, and its review adds two: `del()`
+can resolve over a vault made elsewhere during a joined read, and the proving's "as storage holds
+them now" may be a joined read's moment older. Pick `vault_locked` or `vault_remade` for a box
+from a remade vault (`decryptWhisper` against the demand).
 
 ### 12. route_meta
 
