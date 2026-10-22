@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { BoxFormat, type BoxRecord } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { type BoxVisible, Lease, type LeaseStanding, sealLeaseRecord } from '../src/lease'
+import { type BoxVisible, Lease, type LeaseStanding, leaseRecordOf, sealLeaseRecord } from '../src/lease'
 import { FarFuture, ForeverMillis, MinuteMillis, type LeaseRecord } from '../src/types'
 import * as TH from './test-helpers'
 
@@ -123,8 +123,8 @@ describe("Lease.make", () => {
   it("makes the lease a stored record stands for, unwrapping nothing, as its first example shows", async () => {
     const { record } = await sealedRecord()
     const made = Lease.make(await standIn(), record)
-    expect(made.record).to.deep.equal(record)
-    expect(made.record.lease_key).to.eq(record.lease_key)
+    expect(leaseRecordOf(made)).to.deep.equal(record)
+    expect(leaseRecordOf(made).lease_key).to.eq(record.lease_key)
     expect(made.ask_passphrase_at).to.eq(Deadline)
     expect(TH.shownOf(made)).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline })
   })
@@ -136,12 +136,22 @@ describe("Lease.make", () => {
     expect(made.vault_tok).to.eq('vault-tok-u1')
   })
 
-  it("keeps its record frozen as record, out of sight, its fields read-only", async () => {
+  it("hands out no record: no getter, field, spread or JSON of it yields the leaseKey or the wrapped vaultKey", async () => {
+    const { record } = await sealedRecord()
+    const made = Lease.make(await standIn(), record)
+    expect(made).to.not.have.property('record')
+    expect(Object.getOwnPropertyNames(Lease.prototype)).to.not.include('record')
+    const shown = [...Object.values(made) as unknown[], ...Object.values(made.toJSON()) as unknown[]]
+    expect(shown).to.not.include(record.lease_key)
+    expect(JSON.stringify(made)).to.not.include(record.vault_key_lease_wrapped.ciphertext_b64)
+  })
+
+  it("keeps its record frozen, out of sight, its fields read-only", async () => {
     const { record } = await sealedRecord()
     const made = Lease.make(await standIn(), { ...record })
     expect(Object.isFrozen(made)).to.be.true
-    expect(Object.isFrozen(made.record)).to.be.true
-    expect(Object.isFrozen(made.record.vault_key_lease_wrapped)).to.be.true
+    expect(Object.isFrozen(leaseRecordOf(made))).to.be.true
+    expect(Object.isFrozen(leaseRecordOf(made).vault_key_lease_wrapped)).to.be.true
     expect(Reflect.set(made, 'vault_tok', 'other')).to.be.false
   })
 
@@ -152,13 +162,13 @@ describe("Lease.make", () => {
     expect(Object.keys(lease)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(lease))).to.deep.equal(visible)
     expect(lease.toJSON()).to.deep.equal(TH.shownOf(lease))
-    const wrapped = lease.record.vault_key_lease_wrapped
+    const wrapped = leaseRecordOf(lease).vault_key_lease_wrapped
     for (const hidden of ['lease_key', 'vault_key_lease_wrapped', 'CryptoKey', 'safebyok-lease', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {
       expect(JSON.stringify(lease)).to.not.include(hidden)
       expect(inspect(lease)).to.not.include(hidden)
     }
     expect(inspect(lease).match(/vault_tok/g)).to.have.lengthOf(1)
-    const held: unknown[] = [...Object.values(lease) as unknown[], ...Object.values(lease.record) as unknown[]]
+    const held: unknown[] = [...Object.values(lease) as unknown[], ...Object.values(leaseRecordOf(lease)) as unknown[]]
     expect(held).to.not.include(vaultKey)
   })
 
@@ -329,7 +339,7 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
   for (const [tamper, blurb] of TamperCases) {
     it(`refuse a lease with ${blurb} as 'damaged_lease', quoting nothing of it, and drop it as lock() does`, async () => {
       const { vault, lease } = await leasedVault()
-      const tampered = Lease.make(vault, await tamper(lease.record))
+      const tampered = Lease.make(vault, await tamper(leaseRecordOf(lease)))
       vault.lease = tampered
       const err = await TH.expectRefusal(tampered.cipheredWith(bytesOf('"sk-fake"'), visibleOf()), 'damaged_lease')
       expect(err.message).to.not.include('vault-tok-u1')
@@ -341,8 +351,8 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
 
   it("refuse 'damaged_lease' for a damaged lease the vault no longer holds without locking: the lease it holds now stands", async () => {
     const { vault, lease } = await leasedVault()
-    const wrapped = lease.record.vault_key_lease_wrapped
-    const tampered = Lease.make(vault, { ...lease.record, vault_key_lease_wrapped: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } })
+    const wrapped = leaseRecordOf(lease).vault_key_lease_wrapped
+    const tampered = Lease.make(vault, { ...leaseRecordOf(lease), vault_key_lease_wrapped: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } })
     const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf())
     await TH.expectRefusal(tampered.decipherWith(ciphered, visibleOf()), 'damaged_lease')
     expect(vault.locks).to.eq(0)
@@ -418,7 +428,7 @@ describe("the lease's wrap, by hand", () => {
   it("opens a record wrapped by hand under the ctx a lease is documented to bind: its format, scope, vault_tok, gate_epoch, deadline and purpose", async () => {
     const { vault, vaultKey, lease } = await leasedVault()
     const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-tok-u1', 1, Deadline, 'vault_key_lease_wrapped')
-    const byHand = { ...lease.record, vault_key_lease_wrapped: await wrapKeyUnder(lease.record.lease_key, vaultKey, leaseCtx) }
+    const byHand = { ...leaseRecordOf(lease), vault_key_lease_wrapped: await wrapKeyUnder(leaseRecordOf(lease).lease_key, vaultKey, leaseCtx) }
     vault.lease = Lease.make(vault, byHand)
     const ciphered = await vault.lease.cipheredWith(bytesOf('1'), visibleOf())
     expect(ciphered).to.have.keys(['box_key_wrapped', 'whisper_ciphered'])

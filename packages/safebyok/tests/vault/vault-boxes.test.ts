@@ -1457,6 +1457,44 @@ describe("box.extractWhisper, through a vault", () => {
   })
 })
 
+/** Every value reachable from `root` through its own fields and the getters of its prototypes, `depth` steps deep: what a host holding it can read without calling a method. */
+const reachableFrom = (root: unknown, depth = 4): unknown[] => {
+  const seen = new Set<unknown>()
+  const walk = (val: unknown, left: number): void => {
+    if (val === null || typeof val !== 'object' || seen.has(val)) { return }
+    seen.add(val)
+    if (left === 0) { return }
+    const fieldnames = new Set<string>(Object.keys(val))
+    for (let proto = Object.getPrototypeOf(val) as object | null; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
+      const descriptors = Object.entries(Object.getOwnPropertyDescriptors(proto))
+      for (const [fieldname, descriptor] of descriptors) {
+        if (descriptor.get !== undefined) { fieldnames.add(fieldname) }
+      }
+    }
+    for (const fieldname of fieldnames) {
+      walk(Reflect.get(val, fieldname), left - 1)
+    }
+  }
+  walk(root, depth)
+  return [...seen]
+}
+
+describe("the Vault object's public surface", () => {
+  it("yields no CryptoKey and no wrapped key through any field or getter, its lease's included", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(vault.lease).to.not.be.null
+    const reached = reachableFrom(vault)
+    expect(reached).to.include(vault.lease)
+    expect(reached.filter((val) => val instanceof CryptoKey)).to.have.lengthOf(0)
+    const wrapped = reached.filter((val) => typeof val === 'object' && val !== null && 'ciphertext_b64' in val)
+    expect(wrapped).to.have.lengthOf(0)
+    expect(reached.filter((val) => typeof val === 'object' && val !== null && 'lease_key' in val)).to.have.lengthOf(0)
+  })
+})
+
 describe("what a vault hands its boxes", () => {
   it("exposes the logger and key deriver it was made with, read-only", async () => {
     const world = makeWorld()
