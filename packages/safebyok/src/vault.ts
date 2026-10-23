@@ -422,7 +422,7 @@ export class Vault {
    * decides, a stale `putBox()` refusing 'stale_write' as ever. A gating's attempt under way, of
    * whatever kind, holds no lease once the lock lands: it refuses 'gating_landed' at its next step,
    * and a change to the ways in it already stored stays stored.
-
+   *
    * Refuses 'storage_unavailable' ('storage_blocked' when the browser withholds the store) when the
    * device store cannot erase the lease; the vault is locked all the same.
    *
@@ -1839,7 +1839,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, gateMadeElsewhereError, isGateMadeElsewhere, strippedOfStoredProps
+// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, gateMadeElsewhereError, isGateMadeElsewhere, strippedOfStoredProps
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
