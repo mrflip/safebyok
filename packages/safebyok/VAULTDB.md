@@ -13,12 +13,13 @@ reach says so, and says where it is proven instead.
 
 Three layers share the work, and each guarantee below belongs to one of them.
 
-* **The vault** (`Vault.make`) decides what to write. It reads a box, seals a new revision over
-  it, and writes with an expectation of what it read. When storage refuses the write as stale, or
-  as `vault_mismatch`, it catches up with storage once and refuses the store as `stale_write` (or
-  `vault_locked`, when the catch-up relocks it), never trying again: what
-  the other device wrote or deleted stands, and the host hears that its write lost. A box read
-  that storage refuses as `vault_mismatch` (line 2.5) reaches the host as it came. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
+* **The vault** (a Vault object, from `bank.ensureVault`) decides what to write. It seals a new
+  revision over the one it read or listed, and writes with an expectation of it. When storage
+  refuses the write as stale, it refuses the store as `stale_write`, as it came, reading nothing
+  after and never trying again; one storage refuses as `vault_mismatch` it refuses `stale_write`
+  too, as the vault it read is gone: what the other device wrote or deleted stands, and the host
+  hears that its write lost. A box read that storage refuses as `vault_mismatch` (line 2.5) is
+  `vault_gone` to the host, and the Vault object goes with it. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
@@ -36,7 +37,7 @@ Three layers share the work, and each guarantee below belongs to one of them.
   runs once, however often the host calls it. It hands a vault's records on, whole but for their
   ciphertext, for a server to serve (`getVaultRecords`, `ensureVaultRecords`), from your
   `doGetVault` and `doEnsureVault`. It keeps the `logger`, as `this.logger`:
-  your adapter's own, else the one `Vault.make` hands it, else the console; and
+  your adapter's own, else the one `Bank.make` hands it, else the console; and
   `this.watchTrouble(message)` warns once for each failing streak of a live watch.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
@@ -62,10 +63,10 @@ wins, and the second hears of it" is the vault's policy over the adapter's guara
 an adapter implements.
 
 Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox()` that
-meets someone else's is news the user must hear, refused once as `stale_write`. Before it names a
-stale write the vault catches up with storage once, so a vault deleted and made anew elsewhere
-relocks the device. It names a box that will not open `damaged_box` at once, reading nothing
-more: the host reads again (`hello()`) to see what stands. There is no conflict handler beyond this, and no hook for one: whatever landed first
+meets someone else's is news the user must hear, refused once as `stale_write`, as storage
+answered it: the vault reads nothing after a refusal, and a gate write refused after this device
+heard of another device's change is `gate_moved`. It names a box that will not open `damaged_box`
+at once, reading nothing more: the host reads again (`hello()`) to see what stands. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
 a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
 one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that
