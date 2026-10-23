@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); thread 11's core half filed (#263, stacked on #262); 9c (core_cleanups, #264, beside it on #262) in review. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); 9c filed (#264, stacked on #262); thread 11's core half filed and restacked onto it (#263, stacked on #264), a docs follow-up on #263 under way. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -577,7 +577,7 @@ guard's log line wrote any `refusalkind` a host's thrown `VaultError` carried (n
 identity (9c words the message); `clearCachedVault` / `delDamagedVault` don't check stores (the
 Coach's); a host `keyDeriver`'s throw keeps its `cause` (9c); doubled blank lines (9c).
 
-### 9c. core_cleanups
+### 9c. core_cleanups, filed ([#264](https://github.com/mrflip/safebyok/pull/264))
 
 > *Orchestrator (YOLO), 2026-10-23:* the key deriver's (and every cleartext hook's) thrown
 > `cause` dropped, as 9b did for `requestCleartext`; the `bad_option` message saying stores are
@@ -586,6 +586,14 @@ Coach's); a host `keyDeriver`'s throw keeps its `cause` (9c); doubled blank line
 
 *Gloss.* `packages/safebyok/src/` only; README lines it makes untrue go to thread 11's follow-up.
 **Depends on:** 9b. Runs beside 11. **Size:** S.
+
+*Review:* **fixed** (opus). The worker's tip was red under a stale, content-keyed lint cache (a
+cast in `proving.test.ts` the new overloads made unneeded); fixed with five doc-and-test fixes. No
+side door left; `#gateWriteRefusal` matches the three helpers case by case. Left: a strength
+checker's `reason` shown as given (docs only); a deriver condition's message gives no remedy;
+`ProvingVault` requires `logger` (changeset line, in 11's follow-up); stale README lines (11's
+follow-up). Undoing the deriver change, should the Coach keep "Leave it, we will audit these", is one
+hand commit.
 
 ### 10. react
 
