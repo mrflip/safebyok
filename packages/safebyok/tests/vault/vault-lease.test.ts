@@ -11,7 +11,7 @@ import { toB64 } from '../../src/crypto'
 import type { StrengthChecker } from '../../src/passphrase-strength'
 import { heldLeaseOf } from '../../src/held-lease'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf, storedVaultPropsOf } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -677,11 +677,12 @@ describe("an unlock this device cannot keep a lease for", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
-  it("refuses the first unlock as 'storage_blocked' too, the vault created in storage and locked here", async () => {
+  it("sets the first passphrase though the device store has no room for the lease: the first gate stands, the call refuses vault_locked, and the vault is locked here", async () => {
     const world = makeWorld()
     const vault = await world.open()
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
-    await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'storage_blocked')
+    await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'vault_locked')
+    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
     expect(vault.getSnapshot().state).to.eq('locked')
     await TH.unlock(vault, 'pw one')
     expect(vault.getSnapshot().state).to.eq('unlocked')
