@@ -1651,3 +1651,62 @@ describe("VaultDBContract", () => {
   })
 })
 // --
+
+// == [Gating helpers]: scriptedRequestCleartext, answering, tryUnlock, unlock, putWayin, delWayin, del
+
+describe("the gating helpers", () => {
+  it("answer a bank's gatings as scripted, given scriptedRequestCleartext, as its example shows", async () => {
+    const { userId, vaultlabel, requestCleartext: _scripted, ...opts } = TH.memoryVaultOpts()
+    const bank = Bank.make({ ...opts, requestCleartext: TH.scriptedRequestCleartext })
+    const vault = await bank.ensureVault({ userId, vaultlabel })
+    await TH.unlock(vault, 'pw')
+    expect(vault.state).to.eq('unlocked')
+  })
+
+  it("decline the next gating when answering scripts it so, as answering's example shows", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    TH.answering(vault, (gating) => { gating.decline() })
+    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+    expect(vault.state).to.eq('novel')
+  })
+
+  it("resolve a wrong passphrase's refusal from tryUnlock, as its example shows", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    await TH.unlock(vault, 'pw')
+    await vault.lock()
+    const { ok, err } = await TH.tryUnlock(vault, 'wrong')
+    expect(ok).to.be.false
+    expect(err?.refusalkind).to.eq('wrong_passphrase')
+  })
+
+  it("unlock by the passphrase and by a passkey's answer, as unlock's examples show", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    await TH.unlock(vault, 'correct horse battery staple')
+    await TH.putWayin(vault, 'correct horse battery staple', await TH.passkeyOf('laptop'))
+    await vault.lock()
+    await TH.unlock(vault, await TH.passkeyOf('laptop'))
+    expect(vault.state).to.eq('unlocked')
+  })
+
+  it("put a new passphrase and a passkey, resolving each one's summary, as putWayin's examples show", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    const passphrase = 'pw'
+    await TH.unlock(vault, passphrase)
+    const summary = await TH.putWayin(vault, passphrase, 'a new passphrase')
+    expect(summary).to.deep.equal(vault.passphrase)
+    const passkey = await TH.putWayin(vault, 'a new passphrase', await TH.passkeyOf('laptop'))
+    expect(passkey).to.deep.equal(vault.passkey)
+  })
+
+  it("take the passkey away, and delete the vault, as delWayin's and del's examples show", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    const passphrase = 'pw'
+    await TH.unlock(vault, passphrase)
+    await TH.putWayin(vault, passphrase, await TH.passkeyOf('laptop'))
+    await TH.delWayin(vault, passphrase)
+    expect(vault.passkey).to.be.null
+    await TH.del(vault, passphrase)
+    await TH.expectRefusal(vault.hello(), 'vault_gone')
+  })
+})
+// --

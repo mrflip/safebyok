@@ -415,7 +415,9 @@ const requestCleartext: RequestCleartext = async (gating) => {
   second submit while an attempt runs refuses `attempt_in_flight`; disable the button meanwhile.
 * **Cancel** resolves your `requestCleartext`, or calls `gating.decline()`: a gating still open
   then is declined, and its calls refuse `vault_locked`. Declining never locks a vault that is
-  unlocked. A `requestCleartext` that throws is `unexpected_error`, never logged.
+  unlocked, and is no lock: a decline that lands while an attempt's lease is being written to this
+  device's store attaches nothing here, but leaves that proven lease in the store, and the next
+  call takes it up without asking. To have the vault locked, call `lock()`. A `requestCleartext` that throws is `unexpected_error`, never logged.
 * **One gating at a time.** Every call that needs the vault while a gating stands waits on it:
   `ensureUnlocked()` joins any but a deletion, and `putWayin`, `delWayin` and `del` join one of
   their own kind and wait out any other. A `lock()` landing while it stands refuses every one of

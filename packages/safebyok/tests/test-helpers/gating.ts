@@ -14,7 +14,7 @@ import { eventually } from './timing'
  */
 
 /** How a test answers one gating: attempts on it, and resolves once done, as a dialog closing does. */
-export type GatingAnswer = (gating: Gating) => Promise<void>
+export type GatingAnswer = (gating: Gating) => void | Promise<void>
 
 // The answer each vault's next gating hears, taken once. A vault with none scripted is declined.
 const scripts = new WeakMap<Vault, GatingAnswer>()
@@ -33,7 +33,7 @@ export const scriptedRequestCleartext: RequestCleartext = async (gating) => {
 /** Script `vault`'s next gating to be answered by `answer`, as the user at the dialog: a vault made with {@link scriptedRequestCleartext} hands it there.
  *
  * @example
- *   TH.answering(vault, async (gating) => { gating.decline() })
+ *   TH.answering(vault, (gating) => { gating.decline() })
  *   await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
  */
 export const answering = (vault: Vault, answer: GatingAnswer): void => {

@@ -20,6 +20,19 @@ const SpoiledBoxes = [
 ] as const
 
 describe("delBox and del()", () => {
+  it("deletes as del()'s example shows: storage holds a tombstone, and bank.ensureVault births the next life, novel", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    TH.answering(vault, async (gating) => {
+      if (gating.gatingkind === 'del_vault') { await gating.attempt('pw') }
+    })
+    await vault.del()
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    expect(next.state).to.eq('novel')
+    expect(next.vault_tok).to.not.eq(vault.vault_tok)
+  })
+
   for (const [spoil, blurb] of SpoiledBoxes) {
     it(`delBox removes a box ${blurb}, and leaves the vault's other boxes as they were`, async () => {
       const world = makeWorld()
