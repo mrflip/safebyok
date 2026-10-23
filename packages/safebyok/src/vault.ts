@@ -419,7 +419,9 @@ export class Vault {
    * opens the box (`VaultDB.getBox`, `box.extractWhisper()`), or seals it (`Box.seal`); a
    * `delBox()` does when it lands while it waits on a gating. Only the write itself is past a
    * lock's reach: once `VaultDB.putBox` or `VaultDB.delBox` is sent, it lands or refuses as storage
-   * decides, a stale `putBox()` refusing 'stale_write' as ever. A gating's attempt under way, of
+   * decides, a stale `putBox()` refusing 'stale_write' as ever. So is a deletion's: once a
+   * `del_vault` attempt has sent `VaultDB.delVault`, `del()` resolves when it lands, and refuses
+   * 'vault_locked' when storage refuses it. A gating's attempt under way, of
    * whatever kind, holds no lease once the lock lands: it refuses 'gating_landed' at its next step,
    * and a change to the ways in it already stored stays stored.
    *
@@ -759,10 +761,11 @@ export class Vault {
    * lease is only logged: the vault is deleted all the same.
    *
    * A gating of another kind standing is waited out first. Refuses 'vault_locked' when the user
-   * declines or a `lock()` lands while the gating stands, and with what the attempt refused when it
-   * settled it: 'stale_write' when the vault changed in storage first, or as
-   * {@link Vault.demandConsistentWith} finds it moved on. A `novel` vault has no passphrase to prove
-   * it with, and refuses 'absent_vault'.
+   * declines or a `lock()` lands while the gating stands, unless the attempt has sent its write: a
+   * deletion that lands then resolves, as storage decides. Refuses with what the attempt refused
+   * when it settled it: 'stale_write' when the vault changed in storage first, or as
+   * {@link Vault.demandConsistentWith} finds it moved on. A `novel` vault has no passphrase to
+   * prove it with, and refuses 'absent_vault'.
    *
    * @example await vault.del()   // storage holds a tombstone; bank.ensureVault(draft) births the next life, novel
    */

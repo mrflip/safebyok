@@ -417,13 +417,16 @@ const requestCleartext: RequestCleartext = async (gating) => {
   then is declined, and its calls refuse `vault_locked`. Declining never locks a vault that is
   unlocked, and is no lock: a decline that lands while an attempt's lease is being written to this
   device's store attaches nothing here, but leaves that proven lease in the store, and the next
-  call takes it up without asking. To have the vault locked, call `lock()`. A `requestCleartext` that throws is `unexpected_error`, never logged.
+  call takes it up without asking. To have the vault locked, call `lock()`. A `requestCleartext`
+  that throws is `unexpected_error`, never logged.
 * **One gating at a time.** Every call that needs the vault while a gating stands waits on it:
   `ensureUnlocked()` joins any but a deletion, and `putWayin`, `delWayin` and `del` join one of
   their own kind and wait out any other. A `lock()` landing while it stands refuses every one of
   them `vault_locked`, and the bank letting the vault go (`bank.closeVault`) refuses them
   `vault_gone`; either way `gating.lockLanded` settles: close the dialog. An attempt under way
-  then attaches no lease, and one after refuses `gating_landed`.
+  then attaches no lease, and one after refuses `gating_landed`. A deletion whose write is sent is
+  past a lock's or a decline's reach: `del()` resolves when it lands, and refuses `vault_locked`
+  when storage refuses it.
 * **Another tab's unlock is used first.** Before your `requestCleartext` hears of it, an
   unlocking gating takes up this device's lease when another tab granted one that fits.
 * **No `requestCleartext`** means every gating is declined at once: the call refuses

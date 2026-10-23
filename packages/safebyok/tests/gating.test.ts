@@ -347,6 +347,32 @@ describe("a lock or a decline landing during an attempt", () => {
     })
   }
 
+  for (const [landing, blurb, landsLock] of [
+    [async (vault: Vault) => { await vault.lock() }, 'lock()', true],
+    [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()', false],
+  ] as const) {
+    it(`refuses del() vault_locked when a ${blurb} lands while the deletion's write is sent and storage refuses it, as the ${blurb} would have`, async () => {
+      const world = makeWorld()
+      const dialog = TH.heldDialog()
+      const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+      const deleting = vault.tryDel()
+      const gating = TH.asKind(await dialog.asked(), 'del_vault')
+      let lockLanded = false
+      void gating.lockLanded.then(() => { lockLanded = true })
+      vi.spyOn(world.vaultDB, 'delVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached."))
+      const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+      const attempting = gating.attempt('pw')
+      await writing.reached
+      await landing(vault, gating)
+      writing.release()
+      await TH.expectBad(attempting, 'gating_landed')
+      await TH.expectBad(deleting, 'vault_locked')
+      await TH.wakeupAtNextTick()
+      expect(lockLanded).to.eq(landsLock)
+      expect(storedVaultPropsOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
+    })
+  }
+
   it("has ensureUnlocked wait out a deletion whose write was sent when a lock() lands, raising no second dialog, and refuse vault_gone once the vault is deleted", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()

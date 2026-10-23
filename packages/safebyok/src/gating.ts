@@ -30,9 +30,13 @@ export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
 type GatingCommon = {
   /** The vault asking, its fields live while the dialog is up. */
   readonly vault:      Vault
-  /** Settles only when a `lock()` lands while the gating stands, or the vault goes gone: close the dialog. Every call waiting on it is then refused 'vault_locked'. */
+  /** Settles only when a `lock()` lands while the gating stands, or the vault goes gone: close the dialog. Every call waiting on it is then refused 'vault_locked'.
+   * A deletion whose write is sent is past its reach: it settles only once storage refuses that write.
+   */
   readonly lockLanded: Promise<void>
-  /** Close the gating unanswered: every call waiting on it refuses 'vault_locked', and an attempt under way unlocks nothing. Declining is no lock: a lease in hand stands. A second call does nothing. */
+  /** Close the gating unanswered: every call waiting on it refuses 'vault_locked', and an attempt under way unlocks nothing. Declining is no lock: a lease in hand stands. A second call does nothing.
+   * A deletion whose write is sent is past its reach: `del()` resolves when it lands, and refuses 'vault_locked' when storage refuses it.
+   */
   decline:             () => void
 }
 
@@ -149,9 +153,10 @@ export class RaisedGating implements ProvingGating {
   #landLock: () => void = () => undefined
   #over = false
   // Set once a del_vault attempt has sent its VaultDB.delVault: a lock, a decline or a let-go then
-  // marks the gating landed, and its chain settles it, as the deletion went or did not.
+  // only marks the gating landed, keeping what it would have refused, and its chain settles it:
+  // with success when the deletion landed, else as that landing would have.
   #deletionSent = false
-  #landedLate = false
+  #lateLanding: { refusal: VaultError, lock: boolean } | null = null
   #attempting = false
 
   private constructor(gatingkind: GatingKind, call: GatingCall, vault: Vault, inside: GatingInside, onOver: () => void) {
@@ -176,23 +181,28 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** True once it settled, was declined, or a lock landed: its provings open nothing more. */
-  get landed(): boolean { return this.#over || this.#landedLate }
+  get landed(): boolean { return this.#over || this.#lateLanding !== null }
 
-  /** Settle it with `outcome`, once: every waiter hears it. Later settles do nothing. */
+  /** Settle it with `outcome`, once: every waiter hears it. Later settles do nothing.
+   * A deletion refused after a lock, a decline or a let-go landed settles as that landing would
+   * have, `lockLanded` settling for a lock or a let-go.
+   */
   settle(outcome: Outcome<void>): void {
     if (this.#over) { return }
     this.#over = true
     this.#onOver()
-    this.#settle(outcome)
+    const late = outcome.ok ? null : this.#lateLanding
+    this.#settle(late === null ? outcome : bad(late.refusal))
+    if (late?.lock === true) { this.#landLock() }
   }
 
   /** A `lock()` landed, or the vault went gone, while it stood: every waiter refuses 'vault_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
   landLock(told?: VaultError): void {
     // A deletion whose write is sent is settled by its chain, which knows whether the write landed
-    // -- a read that heard it first, a lock or a let-go meanwhile alike. Its dialog stays up till
-    // then: a host closing it on lockLanded would decline the gating first.
+    // -- a read that heard it first, a lock or a let-go meanwhile alike. lockLanded waits for it:
+    // a host closing the dialog on lockLanded would decline the gating first.
     if (this.#deletionSent) {
-      this.#landedLate = true
+      this.#lateLanding ??= { refusal: told ?? lockLandedError(), lock: true }
       return
     }
     this.settle(bad(told ?? lockLandedError()))
@@ -202,7 +212,7 @@ export class RaisedGating implements ProvingGating {
   /** Decline it: every waiter refuses 'vault_locked'. Once a deletion's write is sent, it only marks the gating landed, and the chain settles it. */
   #decline(): void {
     if (this.#deletionSent) {
-      this.#landedLate = true
+      this.#lateLanding ??= { refusal: declinedError(true), lock: false }
       return
     }
     this.settle(bad(declinedError(true)))
