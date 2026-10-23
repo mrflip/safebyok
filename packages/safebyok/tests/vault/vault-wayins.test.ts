@@ -1241,6 +1241,6 @@ describe("vault.checkStrength", () => {
     const weak = await vault.tryCheckStrength(blank)
     expect(weak.err?.refusalkind).to.eq('weak_passphrase')
     const strong = await vault.tryCheckStrength('fine passphrase')
-    expect(strong.ok).to.eq(true)
+    expect(strong.ok).to.be.true
   })
 })

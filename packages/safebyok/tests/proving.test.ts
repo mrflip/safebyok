@@ -108,7 +108,7 @@ describe("PasskeyProving.seal", () => {
     const props = propsOf(world)
     const proving = await PasskeyProving.seal(vault, headerOf(props.passkey!), laptop)
     expect(proving.slotlabel).to.eq('passkey')
-    expect([...laptop.prfBytes].every((byte) => byte === 0)).to.eq(true)
+    expect([...laptop.prfBytes].every((byte) => byte === 0)).to.be.true
   })
 
   it("runs one HKDF over the answer's bytes, and no key derivation", async () => {
@@ -136,7 +136,7 @@ describe("PasskeyProving.seal", () => {
     const header = headerOf(propsOf(world).passkey!)
     const phone = await TH.passkeyOf('phone')
     await TH.expectRefusal(PasskeyProving.seal(vault, header, phone), 'wrong_passkey')
-    expect([...phone.prfBytes].every((byte) => byte === 0)).to.eq(true)
+    expect([...phone.prfBytes].every((byte) => byte === 0)).to.be.true
     const otherSalt = toB64(new Uint8Array(32).fill(9))
     const overOtherSalt = await TH.passkeyOf('laptop', otherSalt)
     await TH.expectRefusal(PasskeyProving.seal(vault, header, overOtherSalt), 'wrong_passkey')
@@ -225,7 +225,7 @@ describe("passphraseProving.sealWayins", () => {
     const vault = await makeWorld().open()
     const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
     const wayins = await proving.sealWayins()
-    expect(wayins.passkey).to.eq(null)
+    expect(wayins.passkey).to.be.null
   })
 })
 
@@ -244,7 +244,7 @@ describe("proving.grantLease", () => {
     const { world, vault, props } = await lockedWorld()
     const mistyped = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope')
     await TH.expectRefusal(mistyped.grantLease(), 'wrong_passphrase')
-    expect(await world.getLease()).to.eq(null)
+    expect(await world.getLease()).to.be.null
   })
 
   it("refuses gating_landed for a lock landing while putLease is in flight, holding no lease in memory or in the device store", async () => {
@@ -260,8 +260,8 @@ describe("proving.grantLease", () => {
     await vault.lock()
     held.release()
     await TH.expectRefusal(granting, 'gating_landed')
-    expect(heldLeaseOf(vault)).to.eq(null)
-    expect(await world.getLease()).to.eq(null)
+    expect(heldLeaseOf(vault)).to.be.null
+    expect(await world.getLease()).to.be.null
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
@@ -280,7 +280,7 @@ describe("proving.grantLease", () => {
 describe("passphraseKeyOf", () => {
   it("makes the non-extractable passphraseKey, as its example shows", async () => {
     const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16).fill(7))
-    expect(wayinKey.extractable).to.eq(false)
+    expect(wayinKey.extractable).to.be.false
     expect(wayinKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
   })
 })
@@ -350,7 +350,7 @@ describe("passphraseKeyOf, deriving", () => {
     expect(derivations).toHaveBeenCalledOnce()
     expect(derivations.mock.calls[0]?.[0]).to.eq('pw')
     expect([...derivations.mock.calls[0]?.[1] ?? []]).to.deep.equal(bytesOf(7, 16))
-    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.eq(true)
+    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.be.true
   })
 
   it("makes another key of another passphrase, or another salt", async () => {
@@ -386,7 +386,7 @@ describe("a key deriver's bytes", () => {
     expect(handed).to.have.lengthOf(1)
     expect([...handed[0] ?? []]).to.deep.equal(bytesOf(0, 32))
     // The key made of them still opens what it wrapped: zeroing is after the import.
-    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.eq(true)
+    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.be.true
   })
 
   it("are zeroed after every proving of a vault's passphrase, a wrong passphrase's included", async () => {
@@ -400,7 +400,7 @@ describe("a key deriver's bytes", () => {
     const proven = await PassphraseProving.seal(vault, header, 'pw')
     await proven.checkWayin()
     expect(handed.length).to.be.greaterThanOrEqual(3)
-    for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.eq(true) }
+    for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.be.true }
   })
 
   it("are zeroed through a view with an offset, touching nothing around it", async () => {
@@ -565,7 +565,7 @@ describe("a proving's secret", () => {
     const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2')
     const spread = Object.fromEntries(Object.entries(proving))
     expect(JSON.stringify(spread)).to.not.include('hunter2')
-    expect(Object.values(proving).some((val) => val instanceof CryptoKey)).to.eq(false)
+    expect(Object.values(proving).some((val) => val instanceof CryptoKey)).to.be.false
     expect(inspect(proving, { depth: 4 })).to.not.include('hunter2')
     expect(inspect(proving, { depth: 4 })).to.not.include('CryptoKey')
   })
@@ -573,7 +573,7 @@ describe("a proving's secret", () => {
   it("holds no passkey answer bytes in a key, a spread or a log line", async () => {
     const { vault } = await lockedWorld()
     const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
-    expect(Object.values(proving).some((val) => val instanceof Uint8Array || val instanceof CryptoKey)).to.eq(false)
+    expect(Object.values(proving).some((val) => val instanceof Uint8Array || val instanceof CryptoKey)).to.be.false
     expect(inspect(proving, { depth: 4 })).to.not.include('Uint8Array')
     expect(inspect(proving, { depth: 4 })).to.not.include('CryptoKey')
   })
@@ -589,12 +589,12 @@ describe("a proving's secret", () => {
     const { vault, props } = await lockedWorld()
     const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
     const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
-    expect(Object.isFrozen(passphrase)).to.eq(true)
-    expect(Object.isFrozen(passkey)).to.eq(true)
+    expect(Object.isFrozen(passphrase)).to.be.true
+    expect(Object.isFrozen(passkey)).to.be.true
     for (const field of ['slotlabel', 'vault_tok', 'vault', 'header', 'gating']) {
-      expect(Reflect.set(passphrase, field, 'other'), field).to.eq(false)
+      expect(Reflect.set(passphrase, field, 'other'), field).to.be.false
     }
-    expect(Object.isFrozen(passphrase.header)).to.eq(true)
+    expect(Object.isFrozen(passphrase.header)).to.be.true
     expect(passphrase.slotlabel).to.eq('passphrase')
   })
 })

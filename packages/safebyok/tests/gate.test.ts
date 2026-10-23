@@ -18,7 +18,7 @@ describe("Gate.make", () => {
     const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
     const gate = Gate.make(vault, { base: null, ...await proving.sealWayins() })
     expect(gate).to.include({ gate_epoch: 1, base_epoch: 0, vault_tok: vault.vault_tok })
-    expect(gate.passkey).to.eq(null)
+    expect(gate.passkey).to.be.null
   })
 
   it("builds one epoch past its base, keeping the wayins it is handed, as its second example shows", async () => {
@@ -38,7 +38,7 @@ describe("Gate.make", () => {
 
   it("is frozen", async () => {
     const { vault, props } = await gatedWorld()
-    expect(Object.isFrozen(Gate.of(vault, props))).to.eq(true)
+    expect(Object.isFrozen(Gate.of(vault, props))).to.be.true
   })
 })
 

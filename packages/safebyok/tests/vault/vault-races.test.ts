@@ -1148,7 +1148,7 @@ describe("the races the contract tests own, of a gate change", () => {
     await vault.hello({ staleMinutes: 0 })
     writing.release()
     await TH.expectRefusal(changing, 'gate_moved')
-    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+    expect(storedWayinOf(world, 'passkey')).to.be.null
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await fresh.unlock('pw theirs')
     expect(fresh.state).to.eq('unlocked')
@@ -1167,7 +1167,7 @@ describe("the races the contract tests own, of a gate change", () => {
     writing.release()
     const err = await TH.expectRefusal(changing, 'stale_write')
     expect(err.meta).to.be.undefined
-    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+    expect(storedWayinOf(world, 'passkey')).to.be.null
   })
 
   it("a superseded passphrase proving a change refuses gate_moved, writing nothing: the passphrase was replaced elsewhere while it was proven", async () => {
@@ -1184,7 +1184,7 @@ describe("the races the contract tests own, of a gate change", () => {
     deriving.release()
     await TH.expectRefusal(changing, 'gate_moved')
     expect(putVaultProps).not.toHaveBeenCalled()
-    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+    expect(storedWayinOf(world, 'passkey')).to.be.null
   })
 
   it("a stale device writing the gate of a vault made anew refuses vault_remade, the new vault's boxes untouched", async () => {
