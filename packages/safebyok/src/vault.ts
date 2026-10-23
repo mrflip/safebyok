@@ -1240,11 +1240,12 @@ export class Vault {
     return raised
   }
 
-  /** A `lock()` has landed, or the vault went gone: the gating standing, if any, refuses its waiters, 'vault_locked' or `told`, and settles `lockLanded`. */
+  /** A `lock()` has landed, or the vault went gone: the gating standing, if any, refuses its waiters, 'vault_locked' or `told`, and settles `lockLanded`.
+   * It stops standing as it settles. A deletion whose write is sent stands until its chain settles
+   * it, so no call raises a gating over a vault being deleted.
+   */
   #landGating(told?: VaultError) {
-    const standing = this.#gating
-    this.#gating = null
-    standing?.landLock(told)
+    this.#gating?.landLock(told)
   }
 
   /** An attempt's first step: storage read now through the refresh join, the Vault object demanded to stand and `gating` not to have landed, resolving the vault props in hand. */
