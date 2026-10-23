@@ -362,7 +362,7 @@ describe("a proving's refusals of a way in", () => {
     expect(err.cause).to.be.undefined
   })
 
-  it("passes a key deriver's own refusal through as it came", async () => {
+  it("refuses bad_option when the key deriver hands back 31 bytes, not a 256-bit key", async () => {
     const { vault, props, keyDeriver } = await lockedWorld()
     vi.spyOn(keyDeriver, 'deriveKeyBytes').mockResolvedValue(new Uint8Array(31))
     await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating }), 'bad_option')
