@@ -48,8 +48,11 @@ const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as 
 // list, so it carries the narrowest one.
 const TransientUsage = { extractable: true, usage: ['wrapKey'] } as const
 
-/** The ctx a wayin's wrap is bound to, and a passkey's key made with: the vault it lets into, and its own visible header. */
-const wayinCtxOf = (vault: WayinVault, vaultTok: string, header: WayinHeader): Uint8Array => (
+/** The ctx a wayin's wrap is bound to, and a passkey's key made with: the vault it lets into (its scope and `vault_tok`), its purpose, and its whole visible header.
+ *
+ * @example await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vault, vault.vault_tok, header))
+ */
+export const wayinCtxOf = (vault: Pick<WayinVault, 'applabel' | 'user_id' | 'vaultlabel'>, vaultTok: string, header: WayinHeader): Uint8Array => (
   cipherCtx(VaultPropsFormat, vault.applabel, vault.user_id, vault.vaultlabel, vaultTok, PurposeForWayinkind[header.wayinkind], header)
 )
 

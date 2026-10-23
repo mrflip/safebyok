@@ -1207,3 +1207,29 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
   })
 })
 // --
+
+describe("vault.checkStrength", () => {
+  it("refuses a weak passphrase as weak_passphrase, the checker's reason its message, as its first example shows", async () => {
+    const vault = await makeWorld({ strengthChecker: () => ({ strong: false, reason: 'Too easy to guess.' }) }).open()
+    const err = await TH.expectRefusal(vault.checkStrength('chosen'), 'weak_passphrase')
+    expect(err.message).to.eq('Too easy to guess.')
+  })
+
+  it("resolves for a strong one, as its second example shows", async () => {
+    const vault = await makeWorld().open()
+    const checked = await vault.tryCheckStrength('correct horse battery staple')
+    expect(checked).to.deep.eq({ ok: true, val: undefined })
+    await vault.checkStrength('correct horse battery staple')
+  })
+
+  it("refuses a blank passphrase as weak_passphrase, and one that is not text as bad_option; tryCheckStrength resolves each as its Outcome", async () => {
+    const vault = await makeWorld().open()
+    const blank = ' '.repeat(3)
+    await TH.expectRefusal(vault.checkStrength(blank), 'weak_passphrase')
+    await TH.expectRefusal(vault.checkStrength(42 as unknown as string), 'bad_option')
+    const weak = await vault.tryCheckStrength(blank)
+    expect(weak.err?.refusalkind).to.eq('weak_passphrase')
+    const strong = await vault.tryCheckStrength('fine passphrase')
+    expect(strong.ok).to.eq(true)
+  })
+})

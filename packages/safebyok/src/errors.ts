@@ -14,7 +14,7 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `no_whisper`.
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
  *   `vault_behind`, `identity_revoked`.
@@ -80,6 +80,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
  *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The
  *   picture is already the new one: unlock again, or read the vault (`hello()`) and call again.
+ * * `gating_landed`: a proof under way was for a prompt that has since ended -- a `lock()`
+ *   landed, or the prompt was answered or declined -- so it unlocked nothing. Ask again.
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
@@ -119,6 +121,7 @@ export const RefusalKindVals = [
   'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
   'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
+  'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
 ] as const
@@ -171,6 +174,7 @@ export const RefusalFamilyForKind = {
   vault_gone:          'condition',
   vault_remade:        'condition',
   gate_moved:          'condition',
+  gating_landed:       'condition',
   damaged_lease:       'bad_news',
   no_whisper:          'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>

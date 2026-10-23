@@ -20,6 +20,8 @@ import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './dev
 import type { KeyDeriver } from './key-deriver'
 import { Lease, type LeaseView, sealLeaseRecord } from './lease'
 import { registerLeaseReader } from './held-lease'
+import { Proving, registerProvingInside } from './proving'
+import { Gate } from './gate'
 import { Ask, type AskWhy, type GetProof, type RaisedAsk, raiseAsk } from './ask'
 
 // == [Public types]: VaultState, VaultFreshness, VaultSnapshot, bear, letGo
@@ -505,6 +507,25 @@ export class Vault {
     return this.#strengthChecker(typed)
   }
 
+  /** Refuse a new passphrase too easy to guess, by the `strengthChecker` the vault was made with: 'weak_passphrase', the checker's reason its message.
+   * It is {@link Vault.checkPassphrase}'s verdict as a refusal: a blank passphrase is weak before
+   * the checker hears it, and a checker that breaks its contract refuses as there. What a chain
+   * asks of a new passphrase before it becomes a way in. Reads nothing, and awaits no hello.
+   *
+   * @example await vault.checkStrength(chosen)   // throws 'weak_passphrase' with the checker's reason
+   * @example await vault.checkStrength('correct horse battery staple')   // resolves
+   */
+  async checkStrength(passphrase: string): Promise<void> { valOf(await this.tryCheckStrength(passphrase)) }
+
+  /** Refuse a new passphrase too easy to guess, as an {@link Outcome}: the non-throwing form of {@link Vault.checkStrength}. */
+  async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
+    try {
+      const verdict = await this.checkPassphrase(passphrase)
+      if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
+      return good(undefined)
+    } catch (err) { return this.#badOutcome(err) }
+  }
+
   /** Put a new way into the vault, proven by its standing `passphrase`, resolving the new way in's summary.
    * A new passphrase replaces the passphrase, and removes the passkey, if any: the user adds a
    * passkey again under the new passphrase. A passkey's answer puts the vault's passkey, replacing
@@ -872,6 +893,17 @@ export class Vault {
     this.#deviceId = born.record.device_id
     this.#snapshot = this.#picture()
     registerLeaseReader(this, () => this.#lease)
+    registerProvingInside(this, {
+      vaultProps: () => this.#vaultProps,
+      deviceId:   () => this.#deviceId,
+      putLease:   async (record) => {
+        // A take-up under way stands down before this lease is written, not after: one that read an
+        // older lease could otherwise erase this one as it discards that.
+        this.#standDownTakeUp()
+        return valOf(await this.#deviceDB.putLease(record))
+      },
+      holdLease: (stored) => this.#holdLease(stored),
+    })
     this.#takePicture({ fresh: this.#vaultProps, listed: born.listed, leaseKept: null, readAt: born.readAt })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
@@ -1136,7 +1168,22 @@ export class Vault {
       && (thing.user_id ?? this.#scope.user_id) === this.#scope.user_id
       && (thing.vaultlabel ?? this.#scope.vaultlabel) === this.#scope.vaultlabel
     if (! sameScope || thing.vault_tok !== held.vault_tok) { return remadeError() }
+    if (thing instanceof Proving) { return this.#provingInconsistency(thing as Proving) }
+    if (thing instanceof Gate) {
+      return thing.base_epoch === held.gate_epoch || thing.gate_epoch === held.gate_epoch ? null : gateMovedError()
+    }
     if ((thing.gate_epoch ?? held.gate_epoch) !== held.gate_epoch || (thing.vault_epoch ?? held.vault_epoch) > held.vault_epoch) { return gateMovedError() }
+    return null
+  }
+
+  /** Why `proving` is not consistent with the gate in hand: its header is in no wayin of the gate, which moved since it was sealed ('gate_moved'), or its gating landed ('gating_landed').
+   * A fresh header is in no gate until the one carrying it is stored: until then the gate it was
+   * sealed under must stand.
+   */
+  #provingInconsistency(proving: Proving): VaultError | null {
+    const held = this.#vaultProps
+    if (! proving.isCarriedBy(held) && proving.gate_epoch !== held.gate_epoch) { return gateMovedError() }
+    if (proving.gating.landed) { return gatingLandedError() }
     return null
   }
 
@@ -1496,6 +1543,16 @@ export class Vault {
     this.#demandGranting(proven, overtaken)
     const stored = valOf(await this.#deviceDB.putLease(record))
     this.#demandGranting(proven, overtaken)
+    const lease = Lease.make(this, stored)
+    this.#lease = lease
+    this.#leaseSince = this.#clockNow()
+    this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
+    this.#replaceSnapshot()
+    return lease
+  }
+
+  /** Hold `stored`, a lease record just written to this device's store, as the vault's lease: its expiry armed, the snapshot replaced. */
+  #holdLease(stored: LeaseRecord): Lease {
     const lease = Lease.make(this, stored)
     this.#lease = lease
     this.#leaseSince = this.#clockNow()
@@ -1967,6 +2024,8 @@ const remadeError = () => new VaultError('vault_remade', 'The vault this call wa
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage.")
 
 const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in changed while this call was under way -- its passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
+
+const gatingLandedError = () => new VaultError('gating_landed', 'The prompt this proof answered ended while it was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
 const promptEndedError = () => new VaultError('vault_locked', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
