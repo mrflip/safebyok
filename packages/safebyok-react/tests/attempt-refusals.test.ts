@@ -18,6 +18,8 @@ const FlavorCases: readonly (readonly [RefusalKind, string, string])[] = [
   ["storage_unavailable", 'close',             'storage out of reach closes the dialog'],
   ["damaged_vault",       'close',             'bad news the Contract does not name closes the dialog'],
   ["vault_gone",          'close',             'a vault let go, or found deleted, closes the dialog'],
+  // waiting out the attempt under way:
+  ["attempt_in_flight",   'in_flight',         'a second attempt while one runs closes nothing: the first answers'],
   // the boundary:
   ["bad_option",          'trouble',           'misuse goes to the boundary, to be reported'],
   ["unexpected_error",    'trouble',           'a bug goes to the boundary, to be reported'],

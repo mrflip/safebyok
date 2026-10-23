@@ -11,8 +11,10 @@ import { isVaultError } from 'safebyok'
  *   gone, and any other refusal).
  * * `trouble`: misuse or a failure that is no VaultError at all, which goes to the dialog's error
  *   boundary, to be reported, and whose Close answers `declined` too.
+ * * `in_flight`: a second attempt while one runs ('attempt_in_flight'), which was not tried. Do
+ *   nothing: the attempt under way answers for the dialog.
  */
-export type AttemptRefusalFlavor = 'in_place' | 'gate_made_elsewhere' | 'close' | 'trouble'
+export type AttemptRefusalFlavor = 'in_place' | 'gate_made_elsewhere' | 'close' | 'trouble' | 'in_flight'
 
 /** The refusals a dialog shows in place, asking again. */
 const InPlaceKinds: ReadonlySet<string> = new Set(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'])
@@ -21,5 +23,6 @@ const InPlaceKinds: ReadonlySet<string> = new Set(['wrong_passphrase', 'wrong_pa
 export const attemptRefusalFlavor = (err: unknown): AttemptRefusalFlavor => {
   if (! isVaultError(err) || err.family === 'misuse') { return 'trouble' }
   if (err.refusalkind === 'gate_made_elsewhere') { return 'gate_made_elsewhere' }
+  if (err.refusalkind === 'attempt_in_flight') { return 'in_flight' }
   return InPlaceKinds.has(err.refusalkind) ? 'in_place' : 'close'
 }

@@ -70,7 +70,8 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * The refusals an attempt meets it handles as `attemptRefusalFlavor` groups them. A wrong
  * passphrase or passkey, a weak new passphrase, or a way in that cannot answer shows in the dialog
  * in place, in the vault's own calm words, through a live region a screen reader announces, and
- * the user may try again or cancel. A lock that won, storage out of reach, or any other refusal
+ * the user may try again or cancel. A submit, or a press of the passkey, while an attempt runs
+ * changes nothing: that attempt answers. A lock that won, storage out of reach, or any other refusal
  * closes it, answering `declined`, `gate_made_elsewhere` among them: the gating it answered is
  * over, and the next call asks for the passphrase chosen on the other device. Anything
  * else -- misuse, such as a strength checker that answers no verdict, or a failure that is no VaultError -- never reaches the
@@ -371,6 +372,8 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
   /** A refusal the user meets, as `attemptRefusalFlavor` groups them: in place, closing the dialog, or misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
+    // A second submit while the first runs: the first answers for the dialog.
+    if (flavor === 'in_flight') { return }
     if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false, asAdvice: false }); return }
     // The gating is over, gate_made_elsewhere among it: the next call asks afresh.
     if (flavor === 'close' || flavor === 'gate_made_elsewhere') { done('declined'); return }

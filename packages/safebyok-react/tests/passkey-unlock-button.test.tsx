@@ -121,6 +121,20 @@ describe("PasskeyUnlockButton", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
+  it("leaves an attempt under way to answer when pressed during it: attempt_in_flight reaches neither onDone nor onGripe's word", async () => {
+    const { authenticator } = await lockedVaultWithPasskey()
+    const [credentialId = ''] = authenticator.credentialIds()
+    const heard: DialogAnswer[] = []
+    const gripes: (string | null)[] = []
+    const attempt = vi.fn(() => Promise.reject(new VaultError('attempt_in_flight', 'An attempt is already under way.')))
+    render(<PasskeyUnlockButton gating={stubUnlockGating(credentialId, { attempt })} onDone={(answer) => { heard.push(answer) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
+    fireEvent.click(screen.getByText('Use a passkey'))
+    await waitFor(() => { expect(attempt).toHaveBeenCalledTimes(1) })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(heard).to.deep.equal([])
+    expect(gripes).to.deep.equal([null])
+  })
+
   it("meets misuse by taking itself away and pointing to the passphrase, reporting the very error to React", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()

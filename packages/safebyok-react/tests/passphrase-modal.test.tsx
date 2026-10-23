@@ -97,6 +97,25 @@ describe("PassphraseModal", () => {
     await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
   })
 
+  it("waits out the attempt under way when the user submits again: the second, refused attempt_in_flight, closes nothing", async () => {
+    const unlocking = TH.held()
+    let tries = 0
+    const gating = TH.gatingUnlockingWith(async () => {
+      tries += 1
+      if (tries > 1) { throw new VaultError('attempt_in_flight', 'An attempt is already under way.') }
+      await unlocking.promise
+    })
+    const heard: DialogAnswer[] = []
+    render(<PassphraseModal gating={gating} onDone={(answer) => { heard.push(answer) }} />)
+    TH.submitPassphrase('pw one')
+    TH.submitPassphrase('pw one')
+    await waitFor(() => { expect(tries).to.eq(2) })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(heard).to.deep.equal([])
+    unlocking.resolve(undefined)
+    await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+  })
+
   describe("a wrong passphrase", () => {
 
     it("stays in the dialog with the vault's calm message, and does not report done", async () => {

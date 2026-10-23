@@ -88,6 +88,8 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, autoFocus }: PasskeyUnloc
   /** What the attempt, or the authenticator asked before it, refused with. */
   const heard = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
+    // Pressed while a passphrase attempt runs: that attempt answers for the dialog.
+    if (flavor === 'in_flight') { return }
     if (flavor === 'close') { onDone('declined'); return }
     // Misuse, or no VaultError at all: rethrown in render, for PasskeyUnlockButton's boundary.
     if (flavor === 'trouble') { setFailure({ err }); return }
