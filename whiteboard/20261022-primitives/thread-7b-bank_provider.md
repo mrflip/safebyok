@@ -42,5 +42,12 @@ Branch `20261022-bank_provider`, PR #259, stacked on #258. Justify: green (see t
   * `useVault`'s ask is keyed on "no entry": after `clearCachedVault` or `delDamagedVault`, both of
     which let the entry go, a mounted `useVault` asks again on its own. Only refusals held in the
     entry (`vault_gone`, `vault_remade`, conditions) wait for the app.
-  * The demo has no test yet for its new "Start a new vault" and "Accept this copy" branches.
+* **Review and rework** (2026-10-23): the reviewer's four commits fixed a replaced dialog left
+  unanswered, a start over asking an abandoned bank, two doc lines, and added the demo's tests.
+  Reworked here: `tryDelDamagedVault` lets the entry go on `stale_write` (core test, the retired
+  provider test's counterpart); `tryClearCachedVault` erases first, then lets go (test held at
+  `delLease`); the demo's account deletion uses `tryDel` and shows the refusal; the ledger has 7b's
+  seven retired rows; the changeset says the recursion is fixed and nothing stored changes shape.
+  Left open: a child mounting in a user-change commit asks the old bank (review minor); a Vault
+  object held through `clearCachedVault` could write a lease meanwhile (not the `vault_behind` path).
 * **For the Coach**: see the PR's *Open questions*.
