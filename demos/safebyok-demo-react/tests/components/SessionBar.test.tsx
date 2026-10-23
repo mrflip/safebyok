@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStore } from 'safebyok'
+import { VaultError, memoryStore } from 'safebyok'
 import { SessionBar } from '../../src/components/SessionBar'
 import { createAuth } from '../../src/lib/auth'
 import * as TH from '../test-helpers'
@@ -88,6 +88,20 @@ describe("SessionBar", () => {
     await TH.expectProbeState('none')
     await new Promise((resolve) => { setTimeout(resolve, 50) })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+  })
+
+  it("keeps the account and says why when the vault cannot be deleted", async () => {
+    const { world, auth } = renderBar()
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('locked')
+    vi.spyOn(world.vaultDB, 'delVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(await screen.findByText('The vault storage could not be reached: try again shortly.')).to.not.be.null
+    expect(auth.getSnapshot()?.userlabel).to.eq('margo')
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {
