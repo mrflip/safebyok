@@ -81,7 +81,8 @@ rules* 3).
 | 7 | bank | filed, stacked on #256 | #258 |
 | 7b | bank_provider | filed, stacked on #258 | #259 |
 | 8 | proving_gate | filed, stacked on #259 | #260 |
-| 9 | gating | building | |
+| 9 | gating | filed, stacked on #260 | #261 |
+| 9b | gating_followups | building, on #261 | |
 | 10 | react | planned | |
 | 11 | docs | planned | |
 | 12 | route_meta | filed, beside the line | #252 |
@@ -92,6 +93,35 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 9, gating (#261)
+
+*Orchestrator:*
+- **Built.** `Ask` is gone, and a gating replaces it: a union on `gatingkind`, handed to the host through `requestCleartext`. Its attempt holds the dialog's slot and runs its kind's chain.
+- **Public surface.**
+  - `unlock()` and `getProof` are gone, and `ensureLease` is `ensureUnlocked`.
+  - `putWayin(slotlabel)`, `delWayin(slotlabel)` and `del()` raise gatings, and no vault call takes cleartext.
+  - New kinds: `attempt_in_flight`, `passphrase_required`, `same_passphrase`.
+- **Ordering.**
+  - The pantry consult is the gating's first step, and each chain opens with a hello at 0 through the join.
+  - A change kind checks the current passphrase before sealing the new one; only `initialize_gate` seals side by side.
+  - A sent deletion is past a lock's reach: once `delVault` is sent, a lock, decline or let-go marks the gating landed and the chain settles it.
+  - `getBox`, `getWhisper` and `useWhisper` demand the lease again after storage answers (the Coach's ruling on #254).
+  - The refresh tells a read begun before the lease in hand by counting leases (`#leasesHeld`), not by the millisecond.
+  - A decline is no lock: one that lands during `putLease` leaves the proven lease in the device store.
+- **React (minimal).**
+  - `BankProvider`'s own dialog answers only `unlock_vault` and `initialize_gate`, and declines the rest; thread 10 closes this loosening.
+  - `PassphraseModal` and `PasskeyUnlockButton` take a `gating`; `allowStartOver` does nothing.
+  - `attemptRefusalFlavor` has `in_flight`, which the dialogs ignore.
+- **Test helpers.**
+  - Core: `TH.scriptedRequestCleartext` (the default in `memoryVaultOpts`, `makeWorld` and `settledVault`), `TH.answering`, `TH.unlock`, `TH.putWayin`, `TH.delWayin` and `TH.del`, with their try forms, plus `TH.heldDialog` and `TH.asKind`.
+  - React: `gatingOf`, `stubGating`, `gatedBy`.
+- **Coach's rulings (2026-10-23).**
+  - Joins: "whatever is safe; given safe, whatever is simplest; given both, whatever is most ergonomic; as a tiebreaker go with the plan".
+  - Correctable kinds: yes, "but not if it means a retry".
+  - Start over: a TODO; clear the local copy only, never the vaultDB.
+  - No lease of zero: a TODO for the policy.
+  - The 9b entry in the plan carries what these change.
 
 ### Thread 8, proving_gate (#260)
 
