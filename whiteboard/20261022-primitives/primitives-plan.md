@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 in its second review (#261, stacked on #260); threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b (gating_followups) building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -482,7 +482,7 @@ lost first-gate race told `gate_moved` instead of `gate_made_elsewhere` (a regre
 key-handling checklist held. Left for thread 9: `StandingGating` on `unlock()` / `putWayin()` /
 `delWayin()` (audit 1 on every path), the seal order in `putWayin`, the demand's call name.
 
-### 9. gating
+### 9. gating, filed ([#261](https://github.com/mrflip/safebyok/pull/261))
 
 > **gating**: `Ask` becomes a gating, a discriminated union on `gatingkind` (`initialize_gate`,
 > `unlock_vault`, `change_passphrase`, `put_passkey`, `del_passkey`, `del_vault`), each shape
@@ -533,13 +533,51 @@ Coach's TODO: only the passphrase proving (or a parent) holds the lease expiry.
 one test per gatingkind's happy path, one injected failure per chain step, the open-on-typo, the
 second attempt, the stale-state settle, and "a write that lands and then a lock".
 
+*Review:* **flagged**, then **flagged** (opus, both). First review fixed four (a second submit
+declined the unlock under way; a deletion heard by its own read refused `vault_gone`; two doc
+blocks) and flagged `del()` misreporting a deletion a lock or decline overtook after the write was
+sent (risk 9 on this path). The rework made a sent deletion past a lock's reach, demanded after the
+strength check (risk 10), routed the first gate's grant through `#grantAfterChange`, and closed the
+small items. Second review fixed four (closing the dialog mid-delete skipped `decline()`'s guard; a
+lock mid-delete took the gating out of the slot so a second dialog could rise; a refused deletion
+after a landing refused `gating_landed`; quotes) and flagged the first gate's grant under
+`ensureUnlocked` (success shown, then `vault_locked` with a wrong message): thread 9b. Left: a
+host `requestCleartext` throwing mid-delete settles `unexpected_error` (9b, if simple);
+`#strengthUnder`'s purpose line is long (9b).
+
+### 9b. gating_followups
+
+> *Orchestrator (YOLO), 2026-10-23:* the core changes the Coach's rulings on #261 and #258 ask
+> for, before thread 10's dialogs build on them.
+
+*Gloss.* `gating.ts`, `vault.ts`, `bank.ts`, their tests and the README. **Depends on:** 9.
+**Size:** S-M. The Coach's rulings, verbatim:
+* **Joins** (three rows: a declined passkey dialog refuses a joined `getWhisper`; a joined
+  `ensureUnlocked` ignores its own `renewMinutes`; `putWayin('passkey')` on a novel vault joins
+  `initialize_gate` and may set only the passphrase): "whatever is safe; given safe, whatever is
+  simplest; given both, whatever is most ergonomic; as a tiebreaker go with the plan". Apply that
+  order to each, and say in the PR what each chose and why.
+* **Correctable kinds** (`absent_wayin`, `damaged_wayin`, `passkey_unavailable`): "I'd like them
+  to be correctable but not if it means a retry or anything. We'll add that back". Correctable
+  means the gating stays open for the user's next try; nothing inside the core retries.
+* **A Vault object gone during its own birth** (#258 review): "as long as it's done before end of
+  sprint". The birth's settle refuses the entry when the Vault is already gone.
+* **A draft naming other stores for a held scope** (#258 review): "\"Supplying different stores
+  for the same scope is undefined behavior\" -- that or a crash. it shouldn't be OK". Refuse
+  `bad_option`.
+* **The second review's finding:** when `ensureUnlocked` raised `initialize_gate` and the device
+  store refuses the grant, let that refusal through, with a message saying the passphrase was set
+  but this device could not keep the unlock; `putWayin` keeps the warning. If simple, a host
+  `requestCleartext` throwing after a deletion's write is sent follows the sent-deletion rule.
+  Shorten `#strengthUnder`'s purpose line.
+
 ### 10. react
 
 > **react**: the dialogs dispatch on `gatingkind`, one per kind; `passphrase-modal`,
 > `passkey-unlock-button`, `attempt-refusals`, `messages` follow; a correctable refusal is shown
 > in place and the dialog asks again.
 
-*Gloss.* `packages/safebyok-react/src/*` and its tests, `demos/`, `e2e/`. **Depends on:** 9.
+*Gloss.* `packages/safebyok-react/src/*` and its tests, `demos/`, `e2e/`. **Depends on:** 9b.
 **Size:** M. Moves the React lines.
 *Orchestrator, from thread 9 ([#261](https://github.com/mrflip/safebyok/pull/261)):* `BankProvider`'s own
 dialog answers only `unlock_vault` and `initialize_gate` and declines the other four kinds, so the
@@ -594,7 +632,11 @@ I'm sure is uncleaer in the contract"); a stale write never succeeds, refusing `
 beside the try pairs. `box_moved` is dropped from the kinds.
 *Orchestrator, 2026-10-23:* TODO entries from the Coach's rulings: `bank.hello` checks that the
 device store answers, not only loads the strength checker ("scheduling is up to you", #258); the
-demo shows how to trigger the bank when Auth.js gets an identity (#259). Contract lines from
+demo shows how to trigger the bank when Auth.js gets an identity (#259). From #261 (2026-10-23): a forgetful user's start over clears only this device's copy without a
+password, never the vaultDB ("low priority, make it a TODO"; `bank.clearCachedVault` is that
+clear); a policy for prompting every time ("figure out how to give that policy"; `leaseHours`
+keeps its floor above zero); the demo shows an account-like badge while active, clicking it logs
+out with an in-place confirmation. Contract lines from
 thread 9 (#261): `getBox`, `getWhisper` and `useWhisper` refuse `vault_locked` when a lock lands
 mid-read (the Coach's ruling on #254; the README and doc blocks already say so); a decline is no
 lock (README has it); `del()` needs the passphrase and refuses `absent_vault` on a novel vault;
