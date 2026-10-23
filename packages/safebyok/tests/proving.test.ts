@@ -378,13 +378,13 @@ describe("passphraseKeyOf, deriving", () => {
 /** What a key deriver might throw, quoting the passphrase 'pw-the-passphrase', and the kind it is refused as. */
 const DeriverThrowCases = [
   // a condition, for the caller to show or retry, its kind kept:
-  [new VaultError('storage_unavailable', 'The word list for pw-the-passphrase could not be loaded.'), 'storage_unavailable', null, "keeps the kind of a condition, in safebyok's words"],
-  [new VaultError('wrong_passphrase', "pw-the-passphrase can't be empty.", { meta: { typed: 'pw-the-passphrase' } as RefusalMeta }), 'wrong_passphrase', null, "keeps the kind of a condition, none of its meta"],
+  [new VaultError('storage_unavailable', 'The word list for pw-the-passphrase could not be loaded.'),                         "storage_unavailable", null,            'keeps the kind of a condition, in words of safebyok'],
+  [new VaultError('wrong_passphrase', "pw-the-passphrase can't be empty.", { meta: { typed: 'pw-the-passphrase' } as RefusalMeta }), "wrong_passphrase",    null,            'keeps the kind of a condition, none of its meta'],
   // anything else:
-  [new VaultError('bad_option', 'pw-the-passphrase is no passphrase I can judge.'), 'unexpected_error', 'bad_option', "refuses a VaultError of misuse as unexpected_error, logging its kind"],
-  [new VaultError('damaged_vault', 'pw-the-passphrase broke me.'), 'unexpected_error', 'damaged_vault', "refuses a VaultError of bad news as unexpected_error, never to be told to onBadNews"],
-  [new VaultError('pw-the-passphrase' as RefusalKind, 'A refusal made up.'), 'unexpected_error', null, "refuses a VaultError whose kind is off the list as unexpected_error, logging no kind: that is the host's own text"],
-  [new TypeError('could not judge pw-the-passphrase'), 'unexpected_error', null, "refuses a throw that is no VaultError as unexpected_error"],
+  [new VaultError('bad_option', 'pw-the-passphrase is no passphrase I can judge.'),                                          "unexpected_error",    "bad_option",    'refuses a VaultError of misuse as unexpected_error, logging its kind'],
+  [new VaultError('damaged_vault', 'pw-the-passphrase broke me.'),                                                           "unexpected_error",    "damaged_vault", 'refuses a VaultError of bad news as unexpected_error, never to be told to onBadNews'],
+  [new VaultError('pw-the-passphrase' as RefusalKind, 'A refusal made up.'),                                                 "unexpected_error",    null,            'refuses a VaultError whose kind is off the list as unexpected_error, logging no kind, as the host wrote that kind'],
+  [new TypeError('could not judge pw-the-passphrase'),                                                                       "unexpected_error",    null,            'refuses a throw that is no VaultError as unexpected_error'],
 ] as const
 
 describe("passphraseKeyOf, when its key deriver throws", () => {
