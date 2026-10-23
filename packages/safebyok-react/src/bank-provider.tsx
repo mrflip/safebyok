@@ -112,13 +112,13 @@ type Showing = { round: number, gating: PassphraseGating, close: () => void }
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** True for a gating the passphrase dialog answers: a first passphrase, or an unlock. The other kinds are a host's own dialog's, for now. */
+/** True for a gating the passphrase dialog answers: a first passphrase, or an unlock. The other kinds are a host's own dialog's. */
 const isPassphraseGating = (gating: Gating): gating is PassphraseGating => gating.gatingkind === 'initialize_gate' || gating.gatingkind === 'unlock_vault'
 
 /** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the passphrase dialog.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
  * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own passphrase
- * dialog. The dialog's three: whether it offers a forgetful user to start over (nothing, for now), what a password
+ * dialog. The dialog's three: whether it offers a forgetful user to start over (it offers nothing), what a password
  * manager files the passphrase under, and the advice it shows as the user chooses one
  * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
  * the `keyDeriver`, `deviceDB` and `strengthChecker` Bank.make asks for. `BankProvider` says
@@ -131,12 +131,12 @@ export type BankProviderProps = MakeBankOpts & {
    * Left out, the provider's own: its passphrase dialog, `PassphraseModal`, for an `unlock_vault`
    * or `initialize_gate` gating, one at a time, shown only while the user's gesture is in hand
    * (`navigator.userActivation`) -- a call a timer makes is declined unasked -- and closing as a
-   * lock lands. A change to the ways in or a deletion is declined unasked, for now: hand a
+   * lock lands. A change to the ways in or a deletion is declined unasked: hand a
    * `requestCleartext` of your own to answer those. Null: none, every gating declined, so a call
    * needing the vault locked refuses 'vault_locked'. Written inline, it makes no new bank.
    */
   requestCleartext?:   RequestCleartext | null | undefined
-  /** `PassphraseModal`'s `allowStartOver`: taken, and offers nothing for now, as deleting a vault needs its passphrase. */
+  /** `PassphraseModal`'s `allowStartOver`: taken, and offers nothing, as deleting a vault needs its passphrase. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files a vault's passphrase under: `PassphraseModal`'s `passphraseUsername`.
    * Default: the user and the vault, as 'u1 (main vault)'. Never the user's sign-in name alone, or
@@ -192,7 +192,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * 'vault_locked'. Another vault's gating replaces the dialog showing, whose calls are refused
  * likewise. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
  * or the provider unmounting lets the vault go, closing the dialog, its calls refused
- * 'vault_gone'. `allowStartOver` offers nothing for now: deleting a vault needs its passphrase.
+ * 'vault_gone'. `allowStartOver` offers nothing: deleting a vault needs its passphrase.
  *
  * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
  * birth refused as misuse or with a value that is no VaultError at all, which `useVault` throws

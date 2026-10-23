@@ -89,7 +89,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * It needs `Intl.RelativeTimeFormat`, which a host on an engine without it (Hermes, an older
  * browser) supplies with the standard polyfill: the README says how.
  *
- * `allowStartOver` and `onStartedOver` are taken and offer nothing for now: deleting a vault is
+ * `allowStartOver` and `onStartedOver` are taken and offer nothing: deleting a vault is
  * proven by its passphrase (`vault.del()` raises a `del_vault` gating), so a user who has
  * forgotten it cannot start over from here.
  *
@@ -164,9 +164,9 @@ export type PassphraseModalProps = {
   gating:              PassphraseGating
   /** Called once, with the dialog's answer: 'unlocked' once an attempt is ok, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** Taken, and offers nothing for now: deleting a vault is proven by its passphrase. */
+  /** Taken, and offers nothing: deleting a vault is proven by its passphrase. */
   allowStartOver?:     boolean | undefined
-  /** Taken, and never called for now: see `allowStartOver`. */
+  /** Taken, and never called: see `allowStartOver`. */
   onStartedOver?:      (() => void) | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
