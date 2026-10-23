@@ -487,7 +487,7 @@ const deriverThrewRefusal = (thrown: unknown, logger: VaultLogger): VaultError =
     return new VaultError(refusalkind, `The key deriver could not make a key of this passphrase, and refused it as '${refusalkind}'. What it said is left out of this report, as it heard the passphrase.`)
   }
   logger.error("The keyDeriver handed to Bank.make threw rather than deriving a key, so the call that asked was refused. What it threw is left out, as the deriver hears the passphrase.", { call: 'deriveKeyBytes', refusalkind })
-  return new VaultError('unexpected_error', "The keyDeriver handed to Bank.make threw rather than deriving a key, so this call was not answered. What it threw is left out of this report, as the deriver hears the passphrase; the log says the refusalkind of a VaultError it threw. Have it refuse only with a condition-family VaultError, and catch its own failures.")
+  return new VaultError('unexpected_error', "The keyDeriver handed to Bank.make threw rather than deriving a key, so this call was not answered. What it threw is left out of this report, as the deriver hears the passphrase; the log says the refusalkind of a VaultError it threw. Look there first, then at the deriver and how it is set up.")
 }
 
 /** True when a key deriver's bytes sit in shared memory, told even across realms and where `SharedArrayBuffer` is absent. */
