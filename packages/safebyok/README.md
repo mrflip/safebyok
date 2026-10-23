@@ -424,7 +424,8 @@ const requestCleartext: RequestCleartext = async (gating) => {
   unlocked, and is no lock: a decline that lands while an attempt's lease is being written to this
   device's store attaches nothing here, but leaves that proven lease in the store, and the next
   call takes it up without asking. To have the vault locked, call `lock()`. A `requestCleartext`
-  that throws is `unexpected_error`, never logged.
+  that throws refuses its calls `unexpected_error`, carrying nothing of the throw (it may quote
+  the passphrase): the logger hears only that it threw.
 * **One gating at a time.** Every call that needs the vault while a gating stands waits on it,
   and joins it only when its settling answers the call. `ensureUnlocked()` -- and so every box
   call -- joins an unlock (`unlock_vault`, `initialize_gate`) and hears its answer: a decline

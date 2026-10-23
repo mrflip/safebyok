@@ -1,7 +1,7 @@
 import * as Z from 'zod/mini'
 import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, StaleMinutes, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
 import type { VaultValidators } from './validators'
-import { VaultError } from './errors'
+import { VaultError, isVaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
@@ -11,7 +11,6 @@ import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthCheck
 import { InEnglish, issuesText } from './options'
 import * as Names from './names'
 import type { Gating, RequestCleartext } from './gating'
-import { unexpectedError } from './outcome'
 
 /** The type of {@link MakeBankOpts.onBadNews}: told each piece of bad news, and never awaited. */
 export type BadNewsHandler = (news: VaultError) => void | Promise<void>
@@ -359,11 +358,14 @@ export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
   return candidate as BadNewsHandler
 }
 
-/** The host's {@link RequestCleartext}, guarded: it resolves once the host's resolves, and refuses 'unexpected_error' for whatever the host's throws, its cause the throw, so no refusal of the host's is mistaken for the vault's. */
+/** The host's {@link RequestCleartext}, guarded: it resolves once the host's resolves, and refuses 'unexpected_error' for whatever the host's throws, carrying none of it, so no refusal of the host's is mistaken for the vault's. */
 export type GuardedRequestCleartext = (gating: Gating) => Promise<void>
 
-/** The host's `requestCleartext`, guarded, or null for none: 'bad_option' for anything but a function. */
-export const parseRequestCleartext = (candidate: unknown): GuardedRequestCleartext | null => {
+/** The host's `requestCleartext`, guarded, or null for none: 'bad_option' for anything but a function.
+ * What the host's throws is never kept: its dialog hears the passphrase, so a throw may quote it.
+ * `logger` hears only that it threw, and the refusalkind of a VaultError it threw.
+ */
+export const parseRequestCleartext = (candidate: unknown, logger: VaultLogger): GuardedRequestCleartext | null => {
   if (candidate === undefined || candidate === null) { return null }
   if (typeof candidate !== 'function') {
     throw new VaultError('bad_option', 'requestCleartext is a function the vault hands a gating whenever it needs the user, resolving once its dialog closes: pass one, or leave it out.')
@@ -373,11 +375,16 @@ export const parseRequestCleartext = (candidate: unknown): GuardedRequestClearte
     try {
       await host(gating)
     } catch (err) {
-      // A bug in the host's dialog, a VaultError it let escape too: never a refusal of the call that asked.
-      throw unexpectedError(err)
+      // A bug in the host's dialog, a VaultError it let escape too: never a refusal of the call
+      // that asked, and never its cause, which may quote what the user typed.
+      logger.error("The requestCleartext handed to Bank.make threw: the call that asked refuses 'unexpected_error'. What it threw is left out, as the dialog hears the passphrase.", { call: 'requestCleartext', refusalkind: isVaultError(err) ? err.refusalkind : null })
+      throw requestThrewError()
     }
   }
 }
+
+/** The refusal of a call whose `requestCleartext` threw: nothing of the throw, which may quote the passphrase. */
+const requestThrewError = () => new VaultError('unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
 
 /** What a Clock must carry: a `now()` function. */
 const clockShape = Z.object({
@@ -529,9 +536,9 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const leaseMillis = parseLeaseHours(opts.leaseHours)
   const staleMillis = parseStaleMinutes(opts.staleMinutes, 'Bank.make')
   const onBadNews = parseOnBadNews(opts.onBadNews)
-  const requestCleartext = parseRequestCleartext(opts.requestCleartext)
   // The host's logger for the vaults, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
+  const requestCleartext = parseRequestCleartext(opts.requestCleartext, logger)
   const clock = parseClock(opts.clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)

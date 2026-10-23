@@ -1177,14 +1177,16 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(vault.state).to.eq('locked')
   })
 
-  it("refuses unexpected_error when requestCleartext throws, the throw its cause, never logged nor told as bad news (Contract: ensureUnlocked, Refuses)", async () => {
-    const thrown = new Error('typed: pw-the-passphrase')
+  it("refuses unexpected_error when requestCleartext throws an error quoting the passphrase, carrying nothing of it, no cause among it, never told as bad news, the logger hearing only that it threw (Contract: ensureUnlocked, Refuses)", async () => {
+    const thrown = new Error('invalid: pw-the-passphrase')
     const onBadNews = vi.fn()
     const { world, vault } = await lockedVaultWith({ requestCleartext: () => { throw thrown }, onBadNews })
     const err = await TH.expectRefusal(vault.ensureUnlocked(), 'unexpected_error')
-    expect(err.cause).to.eq(thrown)
+    expect(err.cause).to.be.undefined
+    expect(JSON.stringify(err)).to.not.include('pw-the-passphrase')
     expect(err.message).to.not.include('pw-the-passphrase')
     expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.include(['error', { call: 'requestCleartext', refusalkind: null }])
     expect(onBadNews).not.toHaveBeenCalled()
   })
 
@@ -1194,7 +1196,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
       const onBadNews = vi.fn()
       const { vault } = await lockedVaultWith({ requestCleartext: () => Promise.reject(thrown), onBadNews })
       const err = await TH.expectRefusal(vault.ensureUnlocked(), 'unexpected_error')
-      expect(err.cause).to.eq(thrown)
+      expect(err.cause).to.be.undefined
       expect(onBadNews).not.toHaveBeenCalled()
     }
   })

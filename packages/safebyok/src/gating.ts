@@ -107,8 +107,8 @@ export type Gating = InitializeGateGating | UnlockVaultGating | ChangePassphrase
  * vault. Call the gating's attempt on each submit; on Cancel, resolve (or call `decline()`). A
  * gating still open when this resolves is declined: the call that raised it refuses
  * 'vault_locked'. It hears the passphrase the user types: keep it on the device, and never log it
- * or let it reach an error tracker. Whatever it throws refuses the call 'unexpected_error', and is
- * never logged.
+ * or let it reach an error tracker. Whatever it throws refuses the call 'unexpected_error', which
+ * carries none of it: the logger hears only that it threw.
  *
  * @example
  *   const requestCleartext: RequestCleartext = async (gating) => {
@@ -244,7 +244,10 @@ export class RaisedGating implements ProvingGating {
     }
   }
 
-  /** One attempt: `check` the arguments, take the slot, run `chain`, and settle with what it made, unless the user can correct its refusal. */
+  /** One attempt: `check` the arguments, take the slot, run `chain`, and settle with what it made, unless the user can correct its refusal.
+   * A chain that ran through resolves what the gating settled with: a lock or a decline that
+   * landed before the chain's own settle is what every waiter heard, and the attempt says the same.
+   */
   async #attempt(check: () => void, chain: () => Promise<void>): Promise<Outcome<Vault>> {
     if (this.#over) { return bad(gatingOverError()) }
     try {
@@ -257,7 +260,8 @@ export class RaisedGating implements ProvingGating {
     try {
       await chain()
       this.settle(good(undefined))
-      return good(this.#vault)
+      const settled = await this.settled
+      return settled.ok ? good(this.#vault) : bad(settled.err)
     } catch (err) {
       const refused = this.#inside.badOutcome(err)
       if (! (CorrectableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
