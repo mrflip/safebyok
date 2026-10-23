@@ -89,27 +89,24 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   declare readonly gating: ProvingGating
   /** Which slot of the gate it opens or fills. */
   readonly slotlabel: HeaderT['wayinkind']
-  /** The scope's app. */
-  readonly applabel: string
-  /** The scope's user. */
-  readonly user_id: string
-  /** The scope's vault label. */
-  readonly vaultlabel: string
-  /** The `vault_tok` it was sealed under, which its wraps are bound to. */
-  readonly vault_tok: string
-  /** The `gate_epoch` it was sealed under. */
-  readonly gate_epoch: number
+  /** The scope's app. Not enumerable. */
+  declare readonly applabel: string
+  /** The scope's user. Not enumerable. */
+  declare readonly user_id: string
+  /** The scope's vault label. Not enumerable. */
+  declare readonly vaultlabel: string
+  /** The `vault_tok` it was sealed under, which its wraps are bound to. Not enumerable. */
+  declare readonly vault_tok: string
+  /** The `gate_epoch` it was sealed under. Not enumerable. */
+  declare readonly gate_epoch: number
   /** The wayinKey: non-extractable, never handed out. */
   readonly #wayinKey: CryptoKey
 
   protected constructor(vault: ProvingVault, stamp: Stamp, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
-    decorate<Proving<HeaderT>>(this, { vault, header: Object.freeze({ ...header }), gating })
+    // The stamp is the vault's, for its demand to judge: readable, but no field a spread or JSON shows.
+    const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = stamp
+    decorate<Proving<HeaderT>>(this, { vault, header: Object.freeze({ ...header }), gating, applabel, user_id, vaultlabel, vault_tok, gate_epoch })
     this.slotlabel = header.wayinkind
-    this.applabel = stamp.applabel
-    this.user_id = stamp.user_id
-    this.vaultlabel = stamp.vaultlabel
-    this.vault_tok = stamp.vault_tok
-    this.gate_epoch = stamp.gate_epoch
     this.#wayinKey = wayinKey
   }
 

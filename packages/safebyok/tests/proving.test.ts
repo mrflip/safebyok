@@ -41,6 +41,27 @@ describe("PassphraseProving.seal", () => {
     expect(proving.gating).to.eq(StandingGating)
   })
 
+  it("keeps its stamp readable for the demand, but shows none of it in a spread or a log line", async () => {
+    const { vault, props } = await lockedWorld()
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    expect(proving).to.include({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel, vault_tok: vault.vault_tok, gate_epoch: props.gate_epoch })
+    expect(Object.keys(proving)).to.deep.eq(['slotlabel'])
+    expect(Object.fromEntries(Object.entries(proving))).to.deep.eq({ slotlabel: 'passphrase' })
+    expect(inspect(proving)).to.not.include(vault.vault_tok)
+  })
+
+  it("derives its key once, and runs no HKDF", async () => {
+    const { keyDeriver, derivations } = countingDeriver()
+    const world = makeWorld({ keyDeriver })
+    const vault = await world.openUnlocked('pw')
+    await vault.lock()
+    derivations.mockClear()
+    const deriveKey = vi.spyOn(crypto.subtle, 'deriveKey')
+    await PassphraseProving.seal(vault, headerOf(propsOf(world).passphrase), 'pw')
+    expect(derivations).toHaveBeenCalledOnce()
+    expect(deriveKey).not.toHaveBeenCalled()
+  })
+
   it("mints a fresh header for { slotlabel }, as its second example shows: the vault's deriver, a fresh salt, this device's id, and the time now", async () => {
     const { vault, props } = await lockedWorld()
     const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next')
@@ -88,6 +109,19 @@ describe("PasskeyProving.seal", () => {
     const proving = await PasskeyProving.seal(vault, headerOf(props.passkey!), laptop)
     expect(proving.slotlabel).to.eq('passkey')
     expect([...laptop.prfBytes].every((byte) => byte === 0)).to.eq(true)
+  })
+
+  it("runs one HKDF over the answer's bytes, and no key derivation", async () => {
+    const { keyDeriver, derivations } = countingDeriver()
+    const world = makeWorld({ keyDeriver })
+    const vault = await world.openUnlocked('pw')
+    await vault.lock()
+    derivations.mockClear()
+    const deriveKey = vi.spyOn(crypto.subtle, 'deriveKey')
+    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    expect(deriveKey).toHaveBeenCalledOnce()
+    expect(deriveKey.mock.calls[0]?.[0]).to.include({ name: 'HKDF' })
+    expect(derivations).not.toHaveBeenCalled()
   })
 
   it("mints a fresh header of the answer's credential and salt, as its second example shows", async () => {
