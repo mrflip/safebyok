@@ -1,7 +1,7 @@
 import * as Z from 'zod/mini'
 import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, StaleMinutes, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
 import type { VaultValidators } from './validators'
-import { VaultError, isVaultError } from './errors'
+import { RefusalKindVals, VaultError, isVaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
@@ -363,7 +363,7 @@ export type GuardedRequestCleartext = (gating: Gating) => Promise<void>
 
 /** The host's `requestCleartext`, guarded, or null for none: 'bad_option' for anything but a function.
  * What the host's throws is never kept: its dialog hears the passphrase, so a throw may quote it.
- * `logger` hears only that it threw, and the refusalkind of a VaultError it threw.
+ * `logger` hears only that it threw, and the refusalkind of a VaultError it threw, when that is one of {@link RefusalKindVals}.
  */
 export const parseRequestCleartext = (candidate: unknown, logger: VaultLogger): GuardedRequestCleartext | null => {
   if (candidate === undefined || candidate === null) { return null }
@@ -377,7 +377,9 @@ export const parseRequestCleartext = (candidate: unknown, logger: VaultLogger): 
     } catch (err) {
       // A bug in the host's dialog, a VaultError it let escape too: never a refusal of the call
       // that asked, and never its cause, which may quote what the user typed.
-      logger.error("The requestCleartext handed to Bank.make threw: the call that asked refuses 'unexpected_error'. What it threw is left out, as the dialog hears the passphrase.", { call: 'requestCleartext', refusalkind: isVaultError(err) ? err.refusalkind : null })
+      // A kind off the list is the host's own text, and may quote what the user typed too.
+      const refusalkind = isVaultError(err) && (RefusalKindVals as readonly string[]).includes(err.refusalkind) ? err.refusalkind : null
+      logger.error("The requestCleartext handed to Bank.make threw: the call that asked refuses 'unexpected_error'. What it threw is left out, as the dialog hears the passphrase.", { call: 'requestCleartext', refusalkind })
       throw requestThrewError()
     }
   }

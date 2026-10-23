@@ -1214,6 +1214,15 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     }
   })
 
+  it("logs no refusalkind for a VaultError requestCleartext throws whose kind is off the list: that is the host's own text, and may quote the passphrase", async () => {
+    const forged = new VaultError('invalid: pw-the-passphrase' as RefusalKind, 'A refusal made up inside requestCleartext.')
+    const { world, vault } = await lockedVaultWith({ requestCleartext: () => Promise.reject(forged) })
+    const err = await TH.expectRefusal(vault.ensureUnlocked(), 'unexpected_error')
+    expect(err.cause).to.be.undefined
+    expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.include(['error', { call: 'requestCleartext', refusalkind: null }])
+  })
+
   it("refuses a renewMinutes that is not zero or more minutes, and a misspelt option, as bad_option", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
