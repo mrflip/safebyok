@@ -232,7 +232,7 @@ describe("putWayin, with a new passphrase", () => {
     expect(derivations).toHaveBeenCalledTimes(2)
   })
 
-  it("two devices changing at once: the second write is stale, and changes nothing (Contract: putWayin, Does 6)", async () => {
+  it("two devices changing at once: the second write refuses gate_moved once its device heard of the first, and changes nothing (Contract: putWayin, Does 6)", async () => {
     const world = makeWorld()
     const here = await world.openUnlocked('pw')
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
@@ -242,7 +242,7 @@ describe("putWayin, with a new passphrase", () => {
       await here.putWayin('pw', 'here pw')
       return await realUpdate(vaultProps, expected)
     })
-    await TH.expectRefusal(there.putWayin('pw', 'there pw'), 'stale_write')
+    await TH.expectRefusal(there.putWayin('pw', 'there pw'), 'gate_moved')
     spied.mockRestore()
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('there pw'), 'wrong_passphrase')
@@ -481,7 +481,7 @@ describe("the vault's passkey", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("putWayin with a passkey refuses as stale_write when another device changed the ways in meanwhile, writing nothing (Contract: putWayin, Refuses)", async () => {
+  it("putWayin with a passkey refuses as gate_moved when another device changed the ways in meanwhile and this one heard of it, writing nothing (Contract: putWayin, Refuses)", async () => {
     const { world, vault } = await vaultWithPasskey()
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const realUpdate = world.vaultDB.putVaultProps.bind(world.vaultDB)
@@ -489,7 +489,7 @@ describe("the vault's passkey", () => {
       await elsewhere.putWayin('pw', 'pw two')
       return await realUpdate(vaultProps, expected)
     })
-    await TH.expectRefusal(vault.putWayin('pw', await TH.passkeyOf('phone')), 'stale_write')
+    await TH.expectRefusal(vault.putWayin('pw', await TH.passkeyOf('phone')), 'gate_moved')
     spied.mockRestore()
     // The other device's new passphrase took the laptop's passkey with it, and the phone's never landed.
     expect(storedWayinOf(world, 'passkey')).to.be.null
@@ -1032,7 +1032,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses stale_write when another device's change lands first, leaving that change standing, and carrying no stored vault props`, async () => {
+    it(`${callTitle} refuses gate_moved when another device's change lands first and this device hears of it, leaving that change standing, and carrying no stored vault props`, async () => {
       const { world, vault: there } = await vaultWithPasskey()
       const here = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
       let landed: string | null = null
@@ -1043,7 +1043,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
         landed = storedText(world)
         return await realPut(vaultProps, expected)
       })
-      const err = await TH.expectRefusal(change(there), 'stale_write')
+      const err = await TH.expectRefusal(change(there), 'gate_moved')
       expect(err.meta).to.be.undefined
       expect(storedText(world)).to.eq(landed)
     })

@@ -37,14 +37,14 @@ export const testDeriver: KeyDeriver = {
 }
 
 /**
- * The slice of a vault a proof, a box, a way in or a lease reads, for a test that makes one with
+ * The slice of a vault a box, a way in or a lease reads, for a test that makes one with
  * no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it, holding the vault props
  * `vault-tok-<userId>`, deriving with `keyDeriver`, admitting any passphrase
  * ({@link anyStrengthChecker}, held to its contract as a vault holds it), granting leases of
  * seven days, and reading {@link SliceNow} on its clock -- each as `overrides` does not say
  * otherwise.
  *
- * @example Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw')
+ * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'vault-tok-u1', TH.passkeyWayinOf('laptop'))
  * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
  */
 export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
@@ -63,7 +63,7 @@ export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDerive
 /** The time a {@link vaultSliceOf} slice's clock reads, unless told otherwise: noon, 19 October 2026. */
 export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
-/** What {@link vaultSliceOf} makes: the slice of a vault a proof, a box, a way in and a lease read. */
+/** What {@link vaultSliceOf} makes: the slice of a vault a box, a way in and a lease read. */
 export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
 
 /** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */

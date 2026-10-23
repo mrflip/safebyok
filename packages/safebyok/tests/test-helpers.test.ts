@@ -11,7 +11,7 @@ import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
 import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
-import { Proof } from '../src/proof'
+import { Wayin } from '../src/wayin'
 import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceRecord, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
@@ -697,12 +697,14 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the scope, vault token, key deriver, passphrase check, lease length and clock a proof, box, way in or lease reads, as its first example shows", () => {
+  it("vaultSliceOf: the scope, vault token, key deriver, passphrase check, lease length and clock a box, way in or lease reads, as its first example shows", () => {
     const { checkPassphrase, now, ...rest } = TH.vaultSliceOf('u1')
     expect(checkPassphrase).to.be.a('function')
     expect(now()).to.eq(TH.SliceNow)
     expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
-    expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
+    const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
+    expect(slice.keyDeriver).to.eq(argon2idWebV1Deriver)
+    expect(Wayin.make(slice, 'vault-tok-u1', TH.passkeyWayinOf('laptop')).wayinkind).to.eq('passkey')
   })
 
   it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {

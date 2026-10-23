@@ -1016,11 +1016,11 @@ describe("versioned updates: two devices writing at once", () => {
     for (const unsaid of [damagedRevision, theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
   })
 
-  it("a passphrase change racing another device's is refused as stale; theirs stands", async () => {
+  it("a passphrase change racing another device's is refused gate_moved once this device heard of it; theirs stands", async () => {
     const { here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     beforeNextWrite('putVaultProps', async () => { await there.putWayin('shared pw', 'their pw') })
-    await TH.expectRefusal(here.putWayin('shared pw', 'my pw'), 'stale_write')
+    await TH.expectRefusal(here.putWayin('shared pw', 'my pw'), 'gate_moved')
     expect(here.getSnapshot().state).to.eq('locked')
     await TH.expectRefusal(here.unlock('my pw'), 'wrong_passphrase')
     await here.unlock('their pw')
@@ -1118,3 +1118,75 @@ describe("refreshes, one at a time", () => {
   })
 })
 // --
+
+describe("the races the contract tests own, of a gate change", () => {
+  it("a gate change racing another device's gate change refuses gate_moved, the other change kept", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const there = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
+    await there.unlock('pw')
+    const writing = TH.holdNextCall(world.vaultDB, 'putVaultProps')
+    const changing = vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await writing.reached
+    await there.putWayin('pw', 'pw theirs')
+    await vault.hello({ staleMinutes: 0 })
+    writing.release()
+    await TH.expectRefusal(changing, 'gate_moved')
+    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    await fresh.unlock('pw theirs')
+    expect(fresh.state).to.eq('unlocked')
+  })
+
+  it("a gate change racing another device's that this device has not heard of is refused by storage as stale_write, the other change kept", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
+    const there = await world.open({ deviceDB: memoryDeviceDB() })
+    await there.unlock('pw')
+    const writing = TH.holdNextCall(deafDB, 'putVaultProps')
+    const changing = vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await writing.reached
+    await there.putWayin('pw', 'pw theirs')
+    writing.release()
+    const err = await TH.expectRefusal(changing, 'stale_write')
+    expect(err.meta).to.be.undefined
+    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+  })
+
+  it("a superseded passphrase proving a change refuses gate_moved, writing nothing: the passphrase was replaced elsewhere while it was proven", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    const there = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
+    await there.unlock('pw')
+    const putVaultProps = vi.spyOn(world.vaultDB, 'putVaultProps')
+    const deriving = world.holdNextDerive()
+    const changing = vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await deriving.reached
+    await there.putWayin('pw', 'pw theirs')
+    await vault.hello({ staleMinutes: 0 })
+    deriving.release()
+    await TH.expectRefusal(changing, 'gate_moved')
+    expect(putVaultProps).not.toHaveBeenCalled()
+    expect(storedWayinOf(world, 'passkey')).to.eq(null)
+  })
+
+  it("a stale device writing the gate of a vault made anew refuses vault_remade, the new vault's boxes untouched", async () => {
+    const world = makeRacingWorld()
+    const deafDB = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
+    const deriving = world.holdNextDerive()
+    const changing = vault.putWayin('pw', 'pw two')
+    await deriving.reached
+    const there = await world.open({ deviceDB: memoryDeviceDB() })
+    await there.del()
+    const reborn = await TH.bankOf(there).ensureVault(u1Main)
+    await reborn.unlock('pw three')
+    await reborn.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-new')
+    const before = storedRowOf(world, 'anthropic')
+    deriving.release()
+    await TH.expectRefusal(changing, 'vault_remade')
+    expect(storedRowOf(world, 'anthropic')).to.deep.equal(before)
+    expect(await reborn.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
+  })
+})

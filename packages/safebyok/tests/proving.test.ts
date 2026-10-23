@@ -1,7 +1,10 @@
+import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import { toB64 } from '../src/crypto'
-import { GatedVaultProps } from '../src/types'
-import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
+import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import type { KeyDeriver } from '../src/key-deriver'
+import { GatedVaultProps, type PasskeyAnswer } from '../src/types'
+import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
+import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
 import { leaseRecordOf } from '../src/lease'
 import { heldLeaseOf } from '../src/held-lease'
@@ -264,3 +267,292 @@ describe("headerOf", () => {
     expect(headerOf(props.passphrase)).to.include({ salt_b64: props.passphrase.salt_b64 })
   })
 })
+
+// == [Key bytes and answers]: passphraseKeyOf, a key deriver's bytes, checkedPasskeyAnswer, checkFreshSalt, a proving's secret
+
+/** A fresh 16-byte salt, as a passphrase's wayin keeps it. */
+const saltBytes = new Uint8Array(16).fill(7)
+
+/** `count` bytes of `filler`, as an array to compare a view's bytes with. */
+const bytesOf = (filler: number, count: number): number[] => Array.from({ length: count }, () => filler)
+
+/** True when `wayinKey` wraps a vaultKey that `again` unwraps: the two are the same key. */
+const wrapsAlike = async (wayinKey: CryptoKey, again: CryptoKey): Promise<boolean> => {
+  const ctx = new Uint8Array(1)
+  const wrapped = await wrapKeyUnder(wayinKey, await makeVaultKey(), ctx)
+  return (await unwrapKeyUnder(again, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })) instanceof CryptoKey
+}
+
+/** A testDeriver that counts its derivations: the deriver, and the spy that counts. */
+const countingDeriver = () => {
+  const derivations = vi.fn(async (passphrase: string, salt: Uint8Array) => await TH.testDeriver.deriveKeyBytes(passphrase, salt))
+  return { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations }, derivations }
+}
+
+/** A testDeriver whose handed-back bytes the test keeps hold of, to look at once the proving is through with them. */
+const keepingDeriver = () => {
+  const handed: Uint8Array[] = []
+  const keyDeriver: KeyDeriver = {
+    ...TH.testDeriver,
+    deriveKeyBytes: async (passphrase, salt) => {
+      const bytes = await TH.testDeriver.deriveKeyBytes(passphrase, salt)
+      handed.push(bytes)
+      return bytes
+    },
+  }
+  return { keyDeriver, handed }
+}
+
+/** The passphraseKey of 'pw' over {@link saltBytes}, by `keyDeriver`. */
+const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, 'pw', saltBytes)
+
+/** A key deriver handing back `handed` whatever it is asked. */
+const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as Uint8Array) })
+
+describe("passphraseKeyOf, deriving", () => {
+  it("is the key deriver's bytes over the passphrase and salt, derived once: the same two make the same key", async () => {
+    const { keyDeriver, derivations } = countingDeriver()
+    const wayinKey = await passphraseKeyOf(keyDeriver, 'pw', saltBytes)
+    expect(derivations).toHaveBeenCalledOnce()
+    expect(derivations.mock.calls[0]?.[0]).to.eq('pw')
+    expect([...derivations.mock.calls[0]?.[1] ?? []]).to.deep.equal(bytesOf(7, 16))
+    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.eq(true)
+  })
+
+  it("makes another key of another passphrase, or another salt", async () => {
+    const wayinKey = await keyBy(TH.testDeriver)
+    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, 'pW', saltBytes)
+    await expect(wrapsAlike(wayinKey, otherPassphrase)).rejects.toThrow()
+    const otherSalt = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16))
+    await expect(wrapsAlike(wayinKey, otherSalt)).rejects.toThrow()
+  })
+
+  it("refuses what a key deriver throws as unexpected_error, the throw its cause, quoting none of it", async () => {
+    const thrown = new Error('the deriver fell over on hunter2-hunter2')
+    const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, 'hunter2-hunter2', saltBytes), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
+    expect(err.message).to.not.include('hunter2')
+  })
+
+  it("lets a vault's proving refuse what its key deriver throws as unexpected_error, logging nothing", async () => {
+    const thrown = new Error('the deriver fell over on hunter2-hunter2')
+    const world = makeWorld({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) } })
+    const vault = await world.open()
+    const heard = world.logged.length
+    const err = await TH.expectRefusal(PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'hunter2-hunter2'), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
+    expect(world.logged).to.have.lengthOf(heard)
+  })
+})
+
+describe("a key deriver's bytes", () => {
+  it("are zeroed once they have made the passphraseKey, which still wraps and unwraps", async () => {
+    const { keyDeriver, handed } = keepingDeriver()
+    const wayinKey = await keyBy(keyDeriver)
+    expect(handed).to.have.lengthOf(1)
+    expect([...handed[0] ?? []]).to.deep.equal(bytesOf(0, 32))
+    // The key made of them still opens what it wrapped: zeroing is after the import.
+    expect(await wrapsAlike(wayinKey, await keyBy(TH.testDeriver))).to.eq(true)
+  })
+
+  it("are zeroed after every proving of a vault's passphrase, a wrong passphrase's included", async () => {
+    const { keyDeriver, handed } = keepingDeriver()
+    const world = makeWorld({ keyDeriver })
+    const vault = await world.openUnlocked('pw')
+    await vault.lock()
+    const header = headerOf(propsOf(world).passphrase)
+    const mistyped = await PassphraseProving.seal(vault, header, 'wrong')
+    await TH.expectRefusal(mistyped.checkWayin(), 'wrong_passphrase')
+    const proven = await PassphraseProving.seal(vault, header, 'pw')
+    await proven.checkWayin()
+    expect(handed.length).to.be.greaterThanOrEqual(3)
+    for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.eq(true) }
+  })
+
+  it("are zeroed through a view with an offset, touching nothing around it", async () => {
+    const backing = new Uint8Array(48).fill(9)
+    const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, salt) => {
+      backing.set(await TH.testDeriver.deriveKeyBytes(passphrase, salt), 8)
+      return backing.subarray(8, 40)
+    } }
+    await keyBy(keyDeriver)
+    expect([...backing.subarray(8, 40)]).to.deep.equal(bytesOf(0, 32))
+    expect([...backing.subarray(0, 8)]).to.deep.equal(bytesOf(9, 8))
+    expect([...backing.subarray(40)]).to.deep.equal(bytesOf(9, 8))
+  })
+
+  it("are refused as bad_option, untouched, when they sit in shared memory, saying so and not quoting them", async () => {
+    const shared = new Uint8Array(new SharedArrayBuffer(32)).fill(5)
+    const err = await TH.expectRefusal(keyBy(handingBack(shared)), 'bad_option')
+    expect(err.message).to.include('SharedArrayBuffer')
+    expect(err.message).to.not.include('5,5')
+    expect([...shared]).to.deep.equal(bytesOf(5, 32))
+  })
+
+  it("are zeroed when refused for their length, as when imported", async () => {
+    const long = new Uint8Array(64).fill(5)
+    await TH.expectRefusal(keyBy(handingBack(long)), 'bad_option')
+    expect([...long]).to.deep.equal(bytesOf(0, 64))
+  })
+
+  it("are refused as bad_option when they are 32 zero bytes, a key anyone could rebuild", async () => {
+    const zeros = new Uint8Array(32)
+    const err = await TH.expectRefusal(keyBy(handingBack(zeros)), 'bad_option')
+    expect(err.message).to.include('zero bytes')
+  })
+
+  it("are refused as bad_option when they are not 32 bytes of a view at all", async () => {
+    for (const handed of [new Uint8Array(31), new Uint8Array(33), 'thirty-two bytes, honest', null, new ArrayBuffer(32)]) {
+      await TH.expectRefusal(keyBy(handingBack(handed)), 'bad_option')
+    }
+  })
+})
+
+describe("PassphraseProving.seal, the passphrase", () => {
+  it("refuses anything but text as bad_option, a passkey's answer among it", async () => {
+    const { vault, props } = await lockedWorld()
+    for (const given of [42, null, undefined, await TH.passkeyOf('laptop')]) {
+      await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), given as unknown as string), 'bad_option')
+    }
+  })
+
+  it("refuses every blank over a current header as wrong_passphrase, deriving nothing", async () => {
+    const { keyDeriver, derivations } = countingDeriver()
+    const world = makeWorld({ keyDeriver })
+    const vault = await world.openUnlocked('pw')
+    await vault.lock()
+    const header = headerOf(propsOf(world).passphrase)
+    derivations.mockClear()
+    for (const blank of ['', ' '.repeat(3), '\t\n']) {
+      await TH.expectRefusal(PassphraseProving.seal(vault, header, blank), 'wrong_passphrase')
+    }
+    expect(derivations).not.toHaveBeenCalled()
+  })
+
+  it("takes the passphrase as typed, spaces and all: a padded one does not open the wayin its bare words sealed", async () => {
+    const { vault, props } = await lockedWorld()
+    const padded = await PassphraseProving.seal(vault, headerOf(props.passphrase), '  pw  ')
+    await TH.expectRefusal(padded.checkWayin(), 'wrong_passphrase')
+  })
+})
+
+describe("PasskeyProving.seal, the key", () => {
+  it("is HKDF over the answer's bytes with the header's wayin ctx as its info, and over no other info", async () => {
+    const { vault } = await lockedWorld()
+    const { prfBytes } = await TH.passkeyOf('laptop')
+    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const ctx = wayinCtxOf(vault, vault.vault_tok, proving.header)
+    const wrapped = await proving.wrappedWith(await makeVaultKey(), proving.header)
+    const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
+    expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    const elsewhere = await deriveWrappingKey(prfBytes, new Uint8Array(1))
+    await expect(unwrapKeyUnder(elsewhere, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
+  })
+})
+
+/** What is no passkey's answer, each refused as bad_option. */
+const misshapenAnswers = (answer: PasskeyAnswer) => [
+  [{ ...answer, prfBytes: [...answer.prfBytes] },          'its bytes an array, not a Uint8Array'],
+  [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'its bytes one short of 32'],
+  [{ ...answer, credentialId: '' },                         'an empty credential'],
+  [{ ...answer, prfSaltB64: undefined },                    'no salt'],
+  ["pw",                                                   'a passphrase: text is no answer'],
+  [42,                                                     'a number'],
+  [null,                                                   'nothing at all'],
+] as const
+
+describe("checkedPasskeyAnswer", () => {
+  it("takes a passkey's answer as it is, as its first example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const checked = checkedPasskeyAnswer(answer)
+    expect(checked).to.include({ credentialId: answer.credentialId, prfSaltB64: answer.prfSaltB64 })
+    expect(checked.prfBytes).to.eq(answer.prfBytes)
+  })
+
+  it("refuses an answer short of its fields as bad_option, as its second example shows", () => {
+    TH.expectSyncRefusal(() => checkedPasskeyAnswer({ credentialId: 'abc' }), 'bad_option')
+  })
+
+  it("refuses a misshapen answer as bad_option, quoting none of it", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    for (const [given, blurb] of misshapenAnswers(answer)) {
+      const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(given), 'bad_option')
+      expect(err.message, blurb).to.include('credentialId, prfSaltB64, prfBytes')
+      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credentialId)
+    }
+  })
+})
+
+/** Salts no new passkey's wayin is sealed over. */
+const SaltShapeCases = [
+  [toB64(new Uint8Array(16)), 'a salt of 16 bytes, not 32'],
+  ["not base64url!",          'a salt that is not base64url'],
+] as const
+
+describe("checkFreshSalt", () => {
+  it("passes an answer over a fresh 32-byte salt, as its first example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    expect(() => { checkFreshSalt(answer) }).to.not.throw()
+  })
+
+  it("refuses an answer over a salt too short as bad_option, as its second example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    TH.expectSyncRefusal(() => { checkFreshSalt({ ...answer, prfSaltB64: 'c2hvcnQ' }) }, 'bad_option')
+  })
+
+  for (const [prfSaltB64, blurb] of SaltShapeCases) {
+    it(`refuses an answer over ${blurb} as bad_option, naming createPasskey`, async () => {
+      const answer = await TH.passkeyOf('laptop', prfSaltB64)
+      expect(() => { checkFreshSalt(answer) }).to.throw(/createPasskey/).with.property('refusalkind', 'bad_option')
+    })
+  }
+})
+
+describe("a proving's secret", () => {
+  it("shows in no JSON: toJSON is the slotlabel alone, as the Proving's second example shows", async () => {
+    const { vault, props } = await lockedWorld()
+    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2')
+    expect(JSON.stringify(passphrase)).to.eq('{"slotlabel":"passphrase"}')
+    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    expect(JSON.stringify(passkey)).to.eq('{"slotlabel":"passkey"}')
+  })
+
+  it("is in no key, spread or log line: neither the passphrase nor the wayinKey made of it", async () => {
+    const { vault, props } = await lockedWorld()
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2')
+    const spread = Object.fromEntries(Object.entries(proving))
+    expect(JSON.stringify(spread)).to.not.include('hunter2')
+    expect(Object.values(proving).some((val) => val instanceof CryptoKey)).to.eq(false)
+    expect(inspect(proving, { depth: 4 })).to.not.include('hunter2')
+    expect(inspect(proving, { depth: 4 })).to.not.include('CryptoKey')
+  })
+
+  it("holds no passkey answer bytes in a key, a spread or a log line", async () => {
+    const { vault } = await lockedWorld()
+    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    expect(Object.values(proving).some((val) => val instanceof Uint8Array || val instanceof CryptoKey)).to.eq(false)
+    expect(inspect(proving, { depth: 4 })).to.not.include('Uint8Array')
+    expect(inspect(proving, { depth: 4 })).to.not.include('CryptoKey')
+  })
+
+  it("holds its vault, not enumerable, so a proving serializes in no circle", async () => {
+    const { vault, props } = await lockedWorld()
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    expect(proving.vault).to.eq(vault)
+    expect(Object.keys(proving)).to.not.include('vault')
+  })
+
+  it("cannot be written over: a proving is frozen", async () => {
+    const { vault, props } = await lockedWorld()
+    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    expect(Object.isFrozen(passphrase)).to.eq(true)
+    expect(Object.isFrozen(passkey)).to.eq(true)
+    for (const field of ['slotlabel', 'vault_tok', 'vault', 'header', 'gating']) {
+      expect(Reflect.set(passphrase, field, 'other'), field).to.eq(false)
+    }
+    expect(Object.isFrozen(passphrase.header)).to.eq(true)
+    expect(passphrase.slotlabel).to.eq('passphrase')
+  })
+})
+// --
