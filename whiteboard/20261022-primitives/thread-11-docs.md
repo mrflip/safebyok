@@ -42,6 +42,26 @@ runs beside this in `packages/safebyok/src/`, so `src/` is touched only in doc b
   * **VAULTDB.md, CUSTOMIZATION.md, the root README**: `Bank.make` for `Vault.make`, no catch-up
     after a refusal.
 
+  * **`tests-retired.md`**: a roll-up at its head, by thread and by ruling (105 retired; 9b
+    none), with the core's `it(` count at #262 beside the sprint's start.
+
+* **The hand-roll sweep** (proposes; adds nothing). The preplan's *Libraries* candidates:
+
+  | file | verdict | why |
+  | --- | --- | --- |
+  | `stable-jsonify.ts` | keep | already `safe-stable-stringify`; the file is a one-line name for the operation |
+  | `adorn.ts` | keep | `Object.defineProperty` for a non-enumerable field: the platform's own primitive, nothing to replace |
+  | `mask.ts` | keep | a display rule of our own (NFC, strip marks and controls, head and tail); no library does this cut |
+  | `sanitizer.ts` | keep | one line making a `VaultError` that carries nothing: a contract, not a mechanism |
+  | `string-store.ts` | keep | a Map or `Storage` with a subscribe, for the local adapters; `unstorage` and the like would add far more than it holds |
+  | `utils.ts` | keep | the `safebyok/utils` entry's barrel, not code |
+  | `report-error.ts` | keep | a guarded call of the platform's `reportError` |
+  | `change-bell.ts` | keep | native `BroadcastChannel` plus an in-tab set; `broadcast-channel` (npm) polyfills what every target now has |
+  | `idb.ts` | keep | already on `idb-keyval` |
+  | `one-at-a-time.ts` | keep | the plan keeps it for the refresh's join |
+
+  No deletion and no new dependency proposed.
+
 * **Checked and left**: `checkPassphrase` stays (React uses it until thread 10; it is not
   retired). The plan's `old_vocabulary` list named it, but it is current.
 
@@ -51,3 +71,26 @@ runs beside this in `packages/safebyok/src/`, so `src/` is touched only in doc b
     `Lease.grant`), so a rewrite in place is a new tab anyway. Beside it, the Coach can compare
     the two and retire the old one; nothing the Coach wrote or commented on is lost. Test titles
     cite sections by name ("Contract: Bank.make, Does 1"), which the new tab keeps.
+
+* **Deviations**:
+  * **`TH.makeGate`'s callers' local `gate` variables stay `gate`** in the core, React and
+    Postgres tests: renaming them touches thread 10's React tests for no change of meaning. Only
+    the helper and its own timing helpers say "latch".
+  * **No security notes**: the thread writes down decisions earlier threads made; it makes none.
+
+* **Discoveries**:
+  * The old *Contract* tab still describes the vault before the reform sprints (`Vault.make`,
+    `getProof`, `close()`, `rolled_back`, `too_many_wayins`, `vault_key_epoch`), not only before
+    this one: its *Box*, *Wayin*, *Proof* and *Lease* sections were already out of date.
+  * `vault_not_novel` (the spec's *Kinds this tab adds*) was never built: an `initialize_gate`
+    over a gate standing refuses `gate_made_elsewhere`.
+  * `checkPassphrase` is current, not retired: the plan's `old_vocabulary` list names it.
+
+* **For the Coach**:
+  * **Retire the old *Contract* tab** once the new one reads right (delete it, or rename the new
+    one *Contract*). Rec: rename, so the tests' "(Contract: ...)" cites read as they are.
+  * **"cleartext" for what the user hands a gating**, retiring "proof" (VOCABULARY, README).
+    Rec: keep; it is the word `requestCleartext` already uses. The other answer is to keep
+    "proof" for the input and "proving" for the key made from it.
+
+* **Not done here (thread 10's)**: `safebyok-react`'s README and docs; the React demo's names.
