@@ -63,7 +63,7 @@ describe("VaultDashboard, opening", () => {
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/No boxes yet/)
     const elsewhere = await world.open()
-    await elsewhere.del()
+    await TH.del(elsewhere, TH.Passphrase)
     const startNew = await screen.findByRole('button', { name: 'Start a new vault' })
     expect(screen.getByText(/This vault was deleted/)).to.not.be.null
     await TH.wakeupAtNextTick()

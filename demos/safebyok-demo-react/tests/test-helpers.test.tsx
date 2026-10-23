@@ -44,7 +44,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.open()
-    await vault.unlock(TH.Passphrase)
+    await TH.unlock(vault, TH.Passphrase)
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
@@ -69,7 +69,7 @@ describe("makeWorld's vaults opened from outside the page", () => {
 
   it("are let go once that test has ended", async () => {
     if (opened === null) { throw new Error('the test before this one opens a vault') }
-    await TH.expectRefusal(opened.unlock(TH.Passphrase), 'vault_gone')
+    await TH.expectRefusal(TH.unlock(opened, TH.Passphrase), 'vault_gone')
   })
 })
 
@@ -116,12 +116,13 @@ describe("fakeAnthropic", () => {
 })
 
 describe("VaultProbe", () => {
-  it("unlocks the vault with the tests' passphrase, through its unlock button", async () => {
+  it("unlocks the vault through its unlock button, the provider's dialog answered with the tests' passphrase", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     world.renderInVault(<TH.VaultProbe />)
     await TH.expectProbeState('locked')
     fireEvent.click(screen.getByRole('button', { name: 'unlock' }))
+    await TH.answerPassphraseDialog()
     await TH.expectProbeState('unlocked')
     expect(screen.getByTestId('vault').textContent).to.eq('open')
   })

@@ -64,6 +64,7 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     fireEvent.click(await screen.findByRole('button', { name: 'unlock' }))
+    await TH.answerPassphraseDialog()
     await TH.expectProbeState('unlocked')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')

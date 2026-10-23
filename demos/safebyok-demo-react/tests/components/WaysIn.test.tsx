@@ -81,7 +81,7 @@ describe("WaysIn", () => {
     await waitFor(() => { expect(field.value).to.eq('') })
     expect(document.querySelector('.gripe')).to.be.null
     const vault = await world.open()
-    await vault.unlock('a new horse battery staple')
+    await TH.unlock(vault, 'a new horse battery staple')
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
@@ -97,7 +97,7 @@ describe("WaysIn", () => {
     installDismissedAuthenticator()
     const { field } = await renderWaysIn(async (world) => {
       const vault = await world.openUnlocked()
-      await vault.putWayin(TH.Passphrase, await TH.passkeyOf('laptop'))
+      await TH.putWayin(vault, TH.Passphrase, await TH.passkeyOf('laptop'))
     })
     expect(screen.getByRole('button', { name: 'Replace fingerprint' })).to.not.be.null
     fireEvent.change(field, { target: { value: TH.Passphrase } })

@@ -9,7 +9,7 @@ import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
 import { BankProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { closeVault, memoryVaultOpts, settledVault } from 'safebyok/testing'
+import { closeVault, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
@@ -40,7 +40,8 @@ export const Passphrase = 'correct horse battery staple'
 export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: { vaultDB?: VaultDB } = {}) => {
   const opts = memoryVaultOpts({ vaultDB })
   const { deviceDB } = opts
-  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = opts
+  // The provider shows its own dialog: the scripted requestCleartext is for the vaults open() hands out.
+  const { userId: _userId, vaultlabel: _vaultlabel, requestCleartext: _scripted, ...bankOpts } = opts
 
   const renderInVault = (ui: ReactNode, userId: string | null = 'u1') => (
     render(<BankProvider {...bankOpts} userId={userId}>{ui}</BankProvider>)
@@ -50,14 +51,14 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
 
   const openUnlocked = async (userId = 'u1') => {
     const vault = await open(userId)
-    await vault.unlock(Passphrase)
+    await unlock(vault, Passphrase)
     return vault
   }
 
   const seed = async (whispers: Record<string, Whisper>, userId = 'u1') => {
     const vault = await settledVault({ ...opts, userId, deviceDB: memoryDeviceDB() })
     try {
-      await vault.unlock(Passphrase)
+      await unlock(vault, Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
         await vault.putBox({ boxlabel }, whisper)
       }
@@ -134,7 +135,7 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
  * The vault as a page sees it, to render beside a component under test: whether there is one
  * (`vault`: `none` or `open`), its `state` (`none` while there is none), its `boxes` (boxlabels,
  * comma-joined), a `read` button that reads `anthropic_api_key`, asking through the provider's dialog, and an
- * `unlock` button that unlocks it with {@link Passphrase} directly.
+ * `unlock` button that has it unlocked (`ensureUnlocked`), asking through the provider's dialog too.
  *
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
@@ -147,7 +148,7 @@ export const VaultProbe = () => {
       <span data-testid="state">{snapshot?.state ?? 'none'}</span>
       <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
       <button onClick={() => { void vault?.tryGetWhisper('anthropic_api_key') }}>read</button>
-      <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
+      <button onClick={() => { void vault?.tryEnsureUnlocked() }}>unlock</button>
     </p>
   )
 }
