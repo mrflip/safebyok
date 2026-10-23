@@ -2659,6 +2659,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-23 (proving_gate): the zeroing is in `src/proving.ts` (`passphraseKeyOf`, as before), and
   `PasskeyProving.seal` likewise zeroes the answer's PRF bytes (`prfBytes.fill(0)`) in a `finally` once the HKDF key is
   imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
+  Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
