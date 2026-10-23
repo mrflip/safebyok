@@ -347,6 +347,23 @@ describe("a lock or a decline landing during an attempt", () => {
     })
   }
 
+  it("leaves a deletion whose write was sent to settle by its chain when the dialog closes, resolving requestCleartext: del() resolves, and storage holds the tombstone", async () => {
+    const world = makeWorld()
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    const deleting = vault.tryDel()
+    const gating = TH.asKind(await dialog.asked(), 'del_vault')
+    const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+    const attempting = gating.attempt('pw')
+    await writing.reached
+    dialog.close()
+    await TH.wakeupAtNextTick()
+    writing.release()
+    await TH.expectGood(attempting)
+    await TH.expectGood(deleting)
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+  })
+
   for (const [landing, blurb] of [
     [async (vault: Vault) => { await vault.lock() }, 'lock()'],
     [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()'],

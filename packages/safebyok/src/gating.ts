@@ -208,7 +208,7 @@ export class RaisedGating implements ProvingGating {
     this.settle(bad(declinedError(true)))
   }
 
-  /** The pantry consult, then the host's request: a gating still open once the host's request resolves is declined. */
+  /** The pantry consult, then the host's request: a gating still open once the host's request resolves is declined, as `decline()` declines it. */
   async #run(renewMillis: number | null): Promise<void> {
     try {
       if (renewMillis !== null && await this.#inside.takeUp(this, renewMillis)) {
@@ -222,7 +222,7 @@ export class RaisedGating implements ProvingGating {
         return
       }
       await request(this.gating)
-      this.settle(bad(declinedError(true)))
+      this.#decline()
     } catch (err) {
       this.settle(this.#inside.badOutcome(err))
     }
