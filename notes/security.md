@@ -108,6 +108,10 @@ added or folded into through the subagent, and no other entry changes.
   A gone Vault object writes no lease: `#grantLease` demands that the object still stands before `putLease`, and
   `#takeOwnWrite` takes nothing into the gone object's picture, so a change to the wayins that lands as the vault is
   deleted leaves no fresh lease row in the DeviceDB (`packages/safebyok/src/vault.ts`).
+  Amended 2026-10-23 (proving_gate): **`proving.grantLease()` makes two demands before `putLease`**: on the proving
+  (its header still carried by the gate, its gating not landed: refusal `gating_landed`) and on the stored lease
+  record's stamp (`vault.demandConsistentWith(stampOfRecord(record))`), synchronously with nothing awaited between
+  them and `putLease`, and again on the stored record after the write.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **`lock()` acts before it returns, and the device's erase of
   the lease is issued last.** In order, with nothing awaited between: the lease in memory is dropped and its expiry
   disarmed, a lease take-up under way is stood down, the prompt up (if any) is landed on, and the snapshot swaps to
@@ -488,7 +492,9 @@ added or folded into through the subagent, and no other entry changes.
   a change to the ways in settles: the proof lives in the call's locals only, and no field of the
   vault or its ask holds one. No test could observe this without depending on garbage collection,
   which would be flaky; the Coach's ruling: "note it in security md, don't write a test we can't
-  write".
+  write". Amended 2026-10-23 (proving_gate): there is no `Proof` now; the same holds of a `PassphraseProving` or
+  `PasskeyProving`, which holds the non-extractable wayinKey in a private `#wayinKey` field and lives in the call's
+  locals only.
 * 2026-10-19 (thread a_sec2, #206): **`Lease.grant` validates its input.** `Lease.grant(vault,
   holder, vaultKeyPair, askPassphraseAt)` parses `holder`'s `vault_id` and `unlock_epoch` and
   `askPassphraseAt` with `LeaseRecord`'s own Zod checks at entry and lets a bad input throw as
@@ -756,7 +762,13 @@ added or folded into through the subagent, and no other entry changes.
   `damaged_wayin`, each before deriving; a key deriver that throws anything but a VaultError becomes
   `unexpected_error` with the throw as `cause`, and nothing is logged. (Amended 2026-10-19, slots:
   `Wayin.tryOpenAmong`, a search across a list of wayins, is gone; the vault picks the slot by the
-  proof's kind and calls `wayin.tryOpen(proof)`.)
+  proof's kind and calls `wayin.tryOpen(proof)`.) Amended 2026-10-23 (proving_gate, PR #260, branch
+  20261023-proving_gate): **`Proof`, `PassphraseProof`, `PasskeyProof`, `wayinKeyFor` and `wayin.tryOpen` are gone;
+  `src/proving.ts` replaces `src/proof.ts`, and no object holds the secret or hands out the wayinKey.** A
+  `PassphraseProving` or `PasskeyProving`, made by its `seal`, holds the wayinKey as a non-extractable CryptoKey in a
+  private `#wayinKey` field, never handed out, and the vaultKey it unwraps never crosses out of its methods
+  (`checkWayin`, `resealWayinFor`, `sealWayins`, `grantLease`). `tryOpen`'s returned vaultKey pair (session and
+  transient) no longer exists.
 * 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
   (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
@@ -1295,6 +1307,10 @@ added or folded into through the subagent, and no other entry changes.
   which wayins one device added to one vault and nothing more -- no link between a user's
   vaults, or between users on one device. It is visible to the server in the clear. No
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
+  Amended 2026-10-23 (proving_gate): **a caller no longer supplies a wayin's `device_id` or time.** Sealing a proving
+  over `{ slotlabel }`, rather than over a current wayin's header, mints a fresh header: for a passphrase, the vault's
+  key deriver label, a fresh random salt (the deriver's `salt_bytes`), this device's `device_id` and `registered_at` =
+  the vault's clock now; for a passkey, the answer's `credential_id` and PRF salt, `device_id` and `registered_at`.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to `safebyok-vault-v3`,
   `safebyok-box-v6` and `safebyok-mark-v3` (amended 2026-10-19 (put_wayin): this said "today's" of `safebyok-vault-v3`; the vault props' format is now `safebyok-vault-v5`, as follows); the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day and on to `safebyok-vault-v5` (slots), so a stored `safebyok-vault-v3` or `-v4` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
@@ -2038,6 +2054,11 @@ added or folded into through the subagent, and no other entry changes.
   record, so never bound. Were an Argon2 setting ever to go in, it would be as a difficulty
   measure -- a floor on the cost a vault accepts from its stored deriver label -- not as part of
   the ctx (the Coach, 2026-10-16).
+  Amended 2026-10-23 (proving_gate): **"sign all immutable fields" holds for ways in.** A wayin's wrap is bound
+  (AEAD additional data; HKDF `info` for a passkey) to a ctx of the scope (`applabel`, `user_id`, `vaultlabel`),
+  `vault_tok`, and each visible header field (`wayinkind`, `device_id`, `registered_at`, `key_deriver_label`,
+  `salt_b64`, `credential_id`, `prf_salt_b64`), but not `gate_epoch`, which changes as the gate moves, nor the vault
+  props' own `registered_at`.
   (2026-10-18, with the rename of the device record to the "lease": the device record's context
   changed spelling, not construction. Its first part, the format, is now `safebyok-lease-v1`, and
   its last, the purpose, `vault_key_lease_wrapped`; the parts between and their order are as
@@ -2069,7 +2090,9 @@ added or folded into through the subagent, and no other entry changes.
   bounds it). Acceptable because the handle lives only in a closure inside `reviseWayins`, never in
   the snapshot, a field or an error, so no host script can reach it, and a script able to hook
   SubtleCrypto already sees every unwrap; while unlocked the session's non-extractable handle opens
-  every box anyway, and extractability adds only the export of the raw bytes. The cost of the
+  every box anyway, and extractability adds only the export of the raw bytes. Amended 2026-10-23 (proving_gate):
+  `putWayin` unwraps the vaultKey extractable (`wrapKey` usage only) twice, each unwrap confined to one proving method
+  and never leaving it. The cost of the
   change is the orphan (see the put_wayin entry). Amended 2026-10-19 (put_wayin): this entry said a
   `lock()` during the prompt does not cut the change short, "the passkey still lands and the vault
   stays locked". The vault never stayed locked: `reviseWayins` grants this device's lease once the
@@ -2633,6 +2656,9 @@ added or folded into through the subagent, and no other entry changes.
   keeps (a cache, a constant) would see it zeroed under it; the `KeyDeriver` doc and the README
   say to hand back a fresh array. A result over a `SharedArrayBuffer` is refused (`bad_option`)
   before it is touched: another thread could read it, and WebCrypto will not import it.
+  Amended 2026-10-23 (proving_gate): the zeroing is in `src/proving.ts` (`passphraseKeyOf`, as before), and
+  `PasskeyProving.seal` likewise zeroes the answer's PRF bytes (`prfBytes.fill(0)`) in a `finally` once the HKDF key is
+  imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
