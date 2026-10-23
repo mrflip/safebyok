@@ -185,9 +185,10 @@ export class RaisedGating implements ProvingGating {
   /** A `lock()` landed, or the vault went gone, while it stood: every waiter refuses 'vault_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
   landLock(told?: VaultError): void {
     // A deletion under way that a read finds landed -- its own write, heard before it answered --
-    // is settled by its chain, which knows whether the write was its own.
-    const ownDeletion = this.gatingkind === 'del_vault' && this.#attempting && told?.refusalkind === 'vault_gone'
-    if (! ownDeletion) { this.settle(bad(told ?? lockLandedError())) }
+    // is settled by its chain, which knows whether the write was its own. Its dialog stays up
+    // till then: a host closing it on lockLanded would decline the gating first.
+    if (this.gatingkind === 'del_vault' && this.#attempting && told?.refusalkind === 'vault_gone') { return }
+    this.settle(bad(told ?? lockLandedError()))
     this.#landLock()
   }
 
