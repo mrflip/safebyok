@@ -14,6 +14,31 @@ Rulings that retire a test, by name: **in-call refresh** (ground rule 10), **abo
 **turn-queue order** (ground rule 10), **Outcome shape** (ground rule 12), **primitive moved**
 (the primitive it tested no longer exists, named).
 
+## Roll-up (thread 11, 2026-10-23, at #262)
+
+105 tests retired across threads 4 to 9b; 9b retired none. Every row names its ruling.
+
+| thread | retired | | ruling, as the rows name it | retired |
+|---|---|---|---|---|
+| 4 store_verbs | 6 | | primitive moved (the primitive named in the row is gone) | 61 |
+| 5 demand | 17 | | in-call refresh (ground rule 10) | 13 |
+| 6 lease_box | 13 | | `Vault.make`, the opening state and the first-hello memo go (thread 7) | 8 |
+| 7 bank | 22 | | the device mark and `rolled_back` go (thread 7, option A) | 7 |
+| 7b bank_provider | 7 | | `openError` / `retryOpen` go (thread 7b) | 4 |
+| 8 proving_gate | 15 | | a lease is taken up at birth only (revised-outcomes) | 3 |
+| 9 gating | 25 | | `close()` and `vault_closed` go (thread 7) | 2 |
+| 9b gating_followups | 0 | | `created_elsewhere` becomes `gate_made_elsewhere` (thread 7) | 2 |
+| | | | turn-queue order, abort controller, lease take-up outside birth, after-wait erase, a late read of this tab's own write ignored | 1 each, 5 |
+
+By package: `safebyok` 76, `safebyok-react` 25, the React demo 4. The core's tests, by
+`grep -rc 'it(' packages/safebyok/tests`, number 1860 at #262 (1472 at the sprint's start, by
+the same count; it counts helpers' and conformance suites' cases too); vitest runs 3121 core
+cases, 37 skipped. Each "primitive moved" row names the primitive gone and, where its behaviour
+survives, the test that now holds it; checking those against the code is the wrap-up reviewer's
+(the plan, *Wrap-up*), not done here.
+
+## The ledger
+
 | thread | file | title | ruling |
 |---|---|---|---|
 | 4 | `packages/safebyok/tests/test-helpers/vault-db-conformance.ts` | lists every box as stored through listBoxRecords, for a server to serve: each record whole but for its two ciphered fields (one case per adapter battery) | primitive moved: `listBoxRecords` is gone; the same guarantee is `getVaultRecords`' (line 2.4's test) |
