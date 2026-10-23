@@ -517,8 +517,8 @@ export class Vault {
    * for `'passkey'` on a vault with no passphrase yet; 'vault_locked'
    * when the user declines or a `lock()` lands while the gating stands; and with what the gating's
    * attempt refused when it settled it: 'stale_write' or 'gate_moved' when the vault changed
-   * first, here or elsewhere, 'damaged_wayin' when the passphrase is stored damaged. A wrong or
-   * weak passphrase, or the same one again, the dialog meets in place.
+   * first, here or elsewhere. A wrong or weak passphrase, the same one again, or a way in stored
+   * damaged ('damaged_wayin'), the dialog meets in place.
    *
    * Replacing is not revoking: whoever holds the old passphrase or passkey, and kept a copy of the
    * vault props from before, can still open that copy. The vaultKey inside it is the one the vault
