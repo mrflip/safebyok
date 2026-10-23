@@ -94,3 +94,15 @@ runs beside this in `packages/safebyok/src/`, so `src/` is touched only in doc b
     "proof" for the input and "proving" for the key made from it.
 
 * **Not done here (thread 10's)**: `safebyok-react`'s README and docs; the React demo's names.
+
+* **Follow-up, after the restack onto #264 (thread 9c)**: 9c made some doc lines untrue, and
+  they are fixed here. The core README's *Errors* `unexpected_error` row and safebyok-fastkey's
+  README (*Errors* and the paragraph above it) no longer promise a key deriver's throw as the
+  refusal's `cause`: it is kept nowhere, a condition-family `VaultError` keeps its kind in
+  safebyok's own words, and the logger hears the call and a listed kind. CUSTOMIZATION.md says a
+  strength checker's `reason` is shown as given, so it must never quote the passphrase. The 9c
+  changeset notes that the exported `ProvingVault` type now requires `logger`. TODO.md: the badge
+  entry says "log out", as the Coach wrote, and the line the worker added to *Lock timing*
+  ("confirm with a test once the React dialogs settle") is dropped. Still stale, for thread 10:
+  safebyok-react's README, *React reports it to you* (about line 296), says a key deriver's throw
+  is `unexpected_error` "with that throw as the cause".
