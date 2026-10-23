@@ -2,4 +2,12 @@
 "safebyok": minor
 ---
 
-**Provings and gates.** A passphrase or a passkey's answer now becomes a `Proving` (`PassphraseProving`, `PasskeyProving`), sealed over a wayin's header, which opens, reseals and grants a lease from the vault's ways in without a vaultKey ever leaving it; a `Gate` holds a vault's ways in at one `gate_epoch`. `vault.checkStrength(passphrase)` / `tryCheckStrength` refuse a weak new passphrase as `weak_passphrase`, the checker's reason its message. A new refusal kind, `gating_landed` (a condition): a proof under way for a prompt that ended meanwhile -- a `lock()` landed, or it was answered -- unlocked nothing. Nothing stored changes shape: a host with vaults and leases written before this release sees them read and open as before.
+**Unlocks and changes to the ways in now run through provings and gates.** A passphrase or a passkey's answer becomes a `Proving` (`PassphraseProving`, `PasskeyProving`), sealed over a wayin's header, which opens, reseals and grants a lease from the vault's ways in without a vaultKey ever leaving it; a `Gate` holds a vault's ways in at one `gate_epoch`, and the vault stores one over the gate it was built on. What a host sees:
+
+* `vault.checkStrength(passphrase)` / `tryCheckStrength` refuse a weak new passphrase as `weak_passphrase`, the checker's reason its message. `checkPassphrase` stays, for a form's live verdict.
+* A new refusal kind, `gating_landed` (a condition): an ask's `attempt` under way when a `lock()` lands or the prompt is answered or declined now refuses `gating_landed`, where it refused `vault_locked`. Nothing is unlocked either way, and a cancel never locks.
+* `putWayin()` and `delWayin()` whose write lands just as the vault is deleted or made anew elsewhere now refuse `vault_gone` or `vault_remade` (they resolved before); nothing is unlocked, as before.
+* A passkey's answer is zeroed once it is used: hand `unlock()`, `putWayin()` and an ask's `attempt` a fresh answer each time, as `askPasskey` and `createPasskey` give one.
+* `Proof`, `PassphraseProof`, `PasskeyProof`, `VaultKeyPair`, `WayinStamp`, `Wayin.seal` and `wayin.tryOpen` are gone.
+
+Nothing stored changes shape: vaults and leases written before this release read and open as before.

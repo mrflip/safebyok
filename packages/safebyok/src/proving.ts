@@ -149,12 +149,13 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    *
    * @example const wayin = await currentProving.resealWayinFor(newProving)
    */
-  async resealWayinFor<NewT extends WayinHeader>(newProving: Proving<NewT>): Promise<Wayin> {
+  async resealWayinFor(newProving: Proving): Promise<PassphraseWayin | PasskeyWayin> {
     this.#demand()
     const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
     const wrapped = await newProving.wrappedWith(vaultKey, newProving.header)
     this.#demand()
-    return Wayin.make(this.vault, this.vault_tok, { ...newProving.header, vault_key_wayin_wrapped: wrapped })
+    const record: unknown = { ...newProving.header, vault_key_wayin_wrapped: wrapped }
+    return Wayin.make(this.vault, this.vault_tok, record)
   }
 
   /** Grant this device a lease on the vault, by the wayin this proving opens in the gate that stands, resolving the Lease as stored and held.
@@ -309,14 +310,11 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts))
    */
   static async seal(vault: ProvingVault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating?: ProvingGating } = {}): Promise<PasskeyProving> {
-    const checked = passkeyAnswerShape.safeParse(answer)
-    if (! checked.success) {
-      throw new VaultError('bad_option', `A passkey's answer is { credentialId, prfSaltB64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
-    }
-    const { prfBytes } = checked.data
+    const checked = checkedPasskeyAnswer(answer)
+    const { prfBytes } = checked
     try {
       const { stamp } = vault
-      const sealing = 'slotlabel' in header ? mintedPasskeyHeader(vault, checked.data) : checkedPasskeyHeader(header, checked.data)
+      const sealing = 'slotlabel' in header ? mintedPasskeyHeader(vault, checked) : checkedPasskeyHeader(header, checked)
       const wayinKey = await deriveWrappingKey(prfBytes, wayinCtxOf(vault, stamp.vault_tok, sealing))
       const proving = new PasskeyProving(vault, stamp, sealing, opts.gating ?? StandingGating, wayinKey)
       vault.demandConsistentWith(proving)
@@ -331,7 +329,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 }
 
-// == [Headers]: headerOf, wayinRecordAt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, stampOfRecord, gateMovedPast
+// == [Headers]: headerOf, wayinRecordAt, checkedPasskeyAnswer, checkFreshSalt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, stampOfRecord, gateMovedPast
 
 /** `record`'s visible fields: the header a proving of the wayin it is seals over.
  *
@@ -371,11 +369,33 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
   return header
 }
 
-/** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now. */
-const mintedPasskeyHeader = (vault: ProvingVault, answer: PasskeyAnswer): PasskeyWayinHeader => {
+/** `given`, once it is a passkey's answer: two non-empty strings and 32 bytes, as `safebyok-react`'s `askPasskey` gives it; 'bad_option' otherwise, quoting none of it.
+ *
+ * @example checkedPasskeyAnswer(await askPasskey(vault.passkey))
+ * @example checkedPasskeyAnswer({ credentialId: 'abc' })   // throws 'bad_option'
+ */
+export const checkedPasskeyAnswer = (given: unknown): PasskeyAnswer => {
+  const checked = passkeyAnswerShape.safeParse(given)
+  if (! checked.success) {
+    throw new VaultError('bad_option', `A passkey's answer is { credentialId, prfSaltB64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
+  }
+  return checked.data
+}
+
+/** Refuse 'bad_option' for a new passkey's answer over a salt that is not {@link PasskeySaltBytes} bytes as base64url text: a passkey wayin sealed over another would read as damaged at every later unlock.
+ *
+ * @example checkFreshSalt(await createPasskey(opts))   // passes
+ * @example checkFreshSalt({ ...answer, prfSaltB64: 'c2hvcnQ' })   // throws 'bad_option'
+ */
+export const checkFreshSalt = (answer: PasskeyAnswer): void => {
   if (fromB64OrNull(answer.prfSaltB64)?.length !== PasskeySaltBytes) {
     throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
   }
+}
+
+/** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now. */
+const mintedPasskeyHeader = (vault: ProvingVault, answer: PasskeyAnswer): PasskeyWayinHeader => {
+  checkFreshSalt(answer)
   return {
     wayinkind:     'passkey',
     credential_id: answer.credentialId,

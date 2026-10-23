@@ -5,9 +5,7 @@ import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
-import { makeVaultKey } from './crypto'
-import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type VaultKeyPair } from './wayin'
-import { Proof, PassphraseProof, PasskeyProof, checkSaltShape } from './proof'
+import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
 import { byCodeUnit, jsonBytes, type BoxExpectation, type ListedVault } from './vault-db'
@@ -18,9 +16,9 @@ import { type BadNewsHandler, type VaultParts, parseRenewMinutes, parseStaleMinu
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { Lease, type LeaseView, sealLeaseRecord } from './lease'
+import { Lease, type LeaseView } from './lease'
 import { registerLeaseReader } from './held-lease'
-import { Proving, registerProvingInside } from './proving'
+import { PasskeyProving, PassphraseProving, Proving, type ProvingGating, StandingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, registerProvingInside } from './proving'
 import { Gate } from './gate'
 import { Ask, type AskWhy, type GetProof, type RaisedAsk, raiseAsk } from './ask'
 
@@ -563,20 +561,33 @@ export class Vault {
   async tryPutWayin(passphrase: string, newProof: string | PasskeyAnswer): Promise<Outcome<WayinSummary>> {
     try {
       this.#checkStanding()
-      const proof = standingPassphraseOf(this, passphrase, 'putWayin')
-      const putting = await newProofOf(this, newProof)
-      const stored = await this.#reviseWayins(proof, {
-        call:   'putWayin',
-        // A new passphrase takes the passkey with it: a passkey is matched to the passphrase that
-        // proved it, and the user makes a new one under the new passphrase. A new passkey leaves
-        // the passphrase as it stood.
-        revise: async (standing, proven, deviceId) => {
-          const wayin = await Wayin.seal(this, standing.vault_tok, putting, deviceId, proven.transientKey)
-          return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.record, passkey: null } : { passphrase: standing.passphrase, passkey: wayin.record }
-        },
-      })
-      const { passphrase: storedPassphrase, passkey: storedPasskey } = this.#wayinsOf(stored)
-      return good(storedPasskey === null || putting.kind === 'passphrase' ? storedPassphrase.toJSON() : storedPasskey.toJSON())
+      checkStandingPassphrase(passphrase, 'putWayin')
+      if (typeof newProof === 'string') {
+        await this.checkStrength(newProof)
+      } else {
+        checkFreshSalt(checkedPasskeyAnswer(newProof))
+      }
+      // The proof is made against the vault props as storage holds them now, not a picture a change
+      // elsewhere has outdated: a passphrase replaced there proves nothing here.
+      this.#checkStanding()
+      await this.#helloWithin(0)
+      this.#checkStanding()
+      const standing = this.#gatedProps()
+      const base = Gate.of(this, standing)
+      const current = await PassphraseProving.seal(this, headerOf(standing.passphrase), passphrase)
+      const next = typeof newProof === 'string'
+        ? await PassphraseProving.seal(this, { slotlabel: 'passphrase' }, newProof)
+        : await PasskeyProving.seal(this, { slotlabel: 'passkey' }, newProof)
+      const wayin = await current.resealWayinFor(next)
+      // A new passphrase takes the passkey with it: a passkey is matched to the passphrase that
+      // proved it, and the user makes a new one under the new passphrase. A new passkey leaves
+      // the passphrase as it stood.
+      const wayins = wayin.wayinkind === 'passphrase' ? { passphrase: wayin, passkey: null } : { passphrase: base.passphrase, passkey: wayin }
+      const gate = Gate.make(this, { base, ...wayins })
+      const stored = await this.#putGate(gate, 'putWayin')
+      // A new passphrase grants the lease by itself; a new passkey's change by the passphrase that stays.
+      await this.#grantAfterChange(next instanceof PassphraseProving ? next : current, 'putWayin')
+      return good(wayin.wayinkind === 'passphrase' ? stored.passphrase.toJSON() : (stored.passkey ?? stored.passphrase).toJSON())
     } catch (err) { return this.#badOutcome(err) }
   }
 
@@ -597,16 +608,20 @@ export class Vault {
   async tryDelWayin(passphrase: string): Promise<Outcome<Vault>> {
     try {
       this.#checkStanding()
-      const proof = standingPassphraseOf(this, passphrase, 'delWayin')
-      await this.#reviseWayins(proof, {
-        call:   'delWayin',
-        check:  (standing) => {
-          if (standing.passkey === null) {
-            throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
-          }
-        },
-        revise: (standing) => ({ passphrase: standing.passphrase, passkey: null }),
-      })
+      checkStandingPassphrase(passphrase, 'delWayin')
+      await this.#helloWithin(0)
+      this.#checkStanding()
+      const standing = this.#gatedProps()
+      if (standing.passkey === null) {
+        throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
+      }
+      const base = Gate.of(this, standing)
+      // The passphrase proves it: the passkey's wayin is the one leaving, and the lease is granted
+      // by a wayin that stays.
+      const proving = await PassphraseProving.seal(this, headerOf(standing.passphrase), passphrase)
+      await proving.checkWayin()
+      await this.#putGate(Gate.make(this, { base, passphrase: base.passphrase, passkey: null }), 'delWayin')
+      await this.#grantAfterChange(proving, 'delWayin')
       return good(this)
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -1280,98 +1295,90 @@ export class Vault {
   /** An ask's `attempt`: one proof's unlock, as an Outcome, taking nothing up once `overtaken` aborts as the prompt ends. */
   async #tryAttempt(givenProof: string | PasskeyAnswer, overtaken: AbortSignal): Promise<Outcome<Vault>> {
     try {
-      await this.#unlockWith(givenProof, overtaken)
+      await this.#unlockWith(givenProof, { get landed() { return overtaken.aborted } })
       return good(this)
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** Unlock with one proof, as `unlock()` and an ask's `attempt` do, against the vault props as storage holds them now.
-   * It creates the vault when absent, and grants a lease, demanding at each step that the vault
-   * still stands as proven and, for an ask's attempt, that its prompt has not ended.
+  /** Unlock with one proof, as `unlock()` and an ask's `attempt` do, against the vault props as storage holds them now, for `gating`.
+   * A novel vault's first passphrase makes its first gate ({@link Vault.#unlockCreating}).
+   * Otherwise the proof is sealed over the gate's wayin of its kind, and grants the lease
+   * (`proving.grantLease()`), which demands at each step that the vault still stands as proven and
+   * that `gating` has not landed: an ask's attempt's gating lands as its prompt ends; `unlock()`'s
+   * never does.
    */
-  async #unlockWith(givenProof: string | PasskeyAnswer, overtaken?: AbortSignal): Promise<void> {
+  async #unlockWith(givenProof: string | PasskeyAnswer, gating: ProvingGating = StandingGating): Promise<void> {
     this.#checkStanding()
-    const proof = Proof.parse(this, givenProof)
+    if (typeof givenProof !== 'string') { checkedPasskeyAnswer(givenProof) }
     // The proof proves itself against the vault props as storage holds them now, not a picture a
     // change elsewhere has outdated: a passphrase replaced there opens nothing here.
     await this.#helloWithin(0)
-    const unlocked = await this.#settleUnlock(proof)
-    await this.#grantLease(unlocked, unlocked.standing, overtaken)
+    this.#checkStanding()
+    const held = this.#vaultProps
+    if (! isGated(held)) {
+      await this.#unlockCreating(givenProof, held, gating)
+      return
+    }
+    const proving = await this.#provingOf(held, givenProof, gating)
+    await proving.grantLease()
   }
   // --
 
-  // == [Unlock and ways in]: unwrapWith, draftGate, settleUnlock, unlockCreating, takeOwnWrite, reviseWayins
+  // == [Unlock and ways in]: provingOf, unlockCreating, putGate, takeOwnWrite, grantAfterChange
 
-  /** The vaultKey out of `standing`'s way in of `proof`'s kind, whose refusal is the passphrase or passkey check.
-   * Refuses 'absent_wayin' for a passkey's answer to a vault with no passkey.
-   */
-  async #unwrapWith(standing: GatedVaultProps, proof: Proof): Promise<VaultKeyPair> {
-    const { passphrase, passkey } = this.#wayinsOf(standing)
-    const wayin = proof.kind === 'passphrase' ? passphrase : passkey
-    if (wayin === null) {
+  /** The proving of `givenProof` over `held`'s wayin of its kind, for `gating`: 'absent_wayin' for a passkey's answer to a vault with no passkey. */
+  async #provingOf(held: GatedVaultProps, givenProof: string | PasskeyAnswer, gating: ProvingGating): Promise<Proving> {
+    if (typeof givenProof === 'string') { return await PassphraseProving.seal(this, headerOf(held.passphrase), givenProof, { gating }) }
+    if (held.passkey === null) {
       throw new VaultError('absent_wayin', "This vault has no passkey: it may have been removed on another device. Unlock with the passphrase.")
     }
-    return valOf(await wayin.tryOpen(proof))
+    return await PasskeyProving.seal(this, headerOf(held.passkey), givenProof, { gating })
   }
 
-  /** The gate for a gateless vault: its one way in `passphrase`'s, sealed under `deviceId` around a brand-new vaultKey, at `gate_epoch` 1.
-   * The vaultKey is not handed back: the vault takes it out of the way in as stored, as any unlock
-   * does. `vault_epoch` is the one the store will set, the standing one plus one; the store
-   * ignores what it is handed.
+  /** The first unlock of a novel vault, `base`: its first gate, its one wayin `givenProof`'s fresh passphrase around a brand-new vaultKey, stored over `base`, and the lease granted by it.
+   * A passkey's answer refuses 'absent_vault'. The passphrase must pass {@link Vault.checkStrength}
+   * first. Another device's first gate landing first refuses 'gate_made_elsewhere', whatever its
+   * passphrase: nothing was written, and the next hello reads it.
    */
-  async #draftGate(base: GatelessVaultProps, passphrase: PassphraseProof, deviceId: string): Promise<GatedVaultProps> {
-    const wayin = await Wayin.seal(this, base.vault_tok, passphrase, deviceId, await makeVaultKey())
-    return {
-      ...base,
-      vault_epoch:         base.vault_epoch + 1,
-      gate_epoch:          1,
-      passphrase:          wayin.record,
-      passkey:             null,
-    }
-  }
-
-  /** The vaultKey for an unlock, and the vault props it was proven against: the first gate written when the vault is novel.
-   * Only a passphrase sets the first gate, and it must pass the strength check as a new passphrase;
-   * a passkey's answer refuses 'absent_vault'.
-   */
-  async #settleUnlock(proof: Proof): Promise<{ standing: GatedVaultProps } & VaultKeyPair> {
-    const held = this.#vaultProps
-    if (! isGated(held)) { return await this.#unlockCreating(proof, held) }
-    return { standing: held, ...await this.#unwrapWith(held, proof) }
-  }
-
-  /** The first unlock of a novel vault, `base`: its first gate, sealed around `proof`'s passphrase and written over `base`, expecting `gate_epoch` 0.
-   * Each wait is followed by a demand that the vault still stands at `base`, so a vault deleted or
-   * made anew meanwhile writes nothing. Another device's first gate landing first refuses
-   * 'gate_made_elsewhere', whatever its passphrase: nothing was written, and the next hello reads it.
-   */
-  async #unlockCreating(proof: Proof, base: GatelessVaultProps): Promise<{ standing: GatedVaultProps } & VaultKeyPair> {
-    if (! (proof instanceof PassphraseProof)) {
+  async #unlockCreating(givenProof: string | PasskeyAnswer, base: GatelessVaultProps, gating: ProvingGating): Promise<void> {
+    if (typeof givenProof !== 'string') {
       throw new VaultError('absent_vault', 'This vault has no passphrase yet, so no passkey opens it: the first unlock(), with a passphrase, sets it.')
     }
-    const based = stampOf(this.#scope, base)
-    await proof.checkStrongEnough()
-    this.#demand(based, { call: 'unlock' })
+    await this.checkStrength(givenProof)
+    this.#demand(stampOf(this.#scope, base), { call: 'unlock' })
     // Sealed before storage is touched, so a deriver that fails writes nothing.
-    const sealed = await this.#draftGate(base, proof, this.#deviceId)
-    this.#demand(based, { call: 'unlock' })
-    const written = await outcomeOf(() => this.#vaultDB.putVaultProps(sealed, { vault_tok: base.vault_tok, gate_epoch: 0 }), unexpectedError)
-    // The vault half only: a read meanwhile may have taken up the gate this write set, or another's.
-    this.#demandAfterWait(written, { vault_tok: base.vault_tok }, { call: 'unlock' })
+    const proving = await PassphraseProving.seal(this, { slotlabel: 'passphrase' }, givenProof, { gating })
+    const wayins = await proving.sealWayins()
+    await this.#putGate(Gate.make(this, { base: null, ...wayins }), 'unlock')
+    await proving.grantLease()
+  }
+
+  /** Store `gate` over its base, the gate in hand, with `VaultDB.putVaultProps` expecting its `vault_tok` and base epoch, resolving the gate as stored.
+   * It demands on the gate before and after the write. The picture takes what was stored, unless
+   * a read has already taken a later copy, and the device record is raised to its `vault_epoch`.
+   * A first gate losing to another device's refuses 'gate_made_elsewhere', and the next hello reads
+   * the gate that stands; any other stale write refuses 'stale_write', naming nothing stored.
+   */
+  async #putGate(gate: Gate, call: 'unlock' | 'putWayin' | 'delWayin'): Promise<Gate> {
+    this.#demand(gate, { call })
+    const held = this.#vaultProps
+    // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
+    const drafted = frozenVaultProps({ ...held, vault_epoch: held.vault_epoch + 1, ...gate.storedFields })
+    const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
+    this.#demandAfterWait(written, gate, { call })
     if (! written.ok) {
-      if (! isGateMadeElsewhere(written.err, base.vault_tok)) { throw strippedOfStoredProps(written.err) }
+      if (gate.base_epoch > 0 || ! isGateMadeElsewhere(written.err, gate.vault_tok)) { throw strippedOfStoredProps(written.err) }
       // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
       this.#readAt = FarPast
       throw gateMadeElsewhereError()
     }
     const next = frozenVaultProps(written.val) as GatedVaultProps
+    const stored = Gate.of(this, next)
+    this.#demand(stored, { call })
+    // The picture takes it first, so the record raised after never outruns the picture.
     this.#takeOwnWrite(next)
-    await this.#raiseRecordAfter(next.vault_epoch, 'unlock')
-    // The vaultKey comes out of the way in as stored, so the lease keeps only the non-extractable
-    // handle an unwrap makes.
-    const unlocked = await this.#unwrapWith(next, proof)
-    this.#demand({ vault_tok: next.vault_tok }, { call: 'unlock' })
-    return { standing: next, ...unlocked }
+    await this.#raiseRecordAfter(next.vault_epoch, call)
+    return stored
   }
 
   /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease. */
@@ -1381,51 +1388,15 @@ export class Vault {
     this.#replaceSnapshot()
   }
 
-  /** Rewrite the vault's ways in, proven by `proof`, the standing passphrase, resolving the vault props as stored.
-   * Every change to the ways in goes through here. It proves `proof` against the vault props as
-   * storage holds them now, and writes the ways in `plan.revise` makes under the next gate epoch,
-   * only if no other device changed them meanwhile. It then takes up the unlock under them, the
-   * lease starting again from now, unless the vault moved on meanwhile. `plan.check` runs first, on the standing vault props, so a
-   * change refused for what it asks costs no key derivation.
-   */
-  async #reviseWayins(
-    proof: PassphraseProof,
-    plan: {
-      call:    'putWayin' | 'delWayin'
-      check?:  (standing: GatedVaultProps) => void
-      // Runs once the proof holds, given this device's id for the vault.
-      revise:  (standing: GatedVaultProps, proven: VaultKeyPair, deviceId: string) => StandingWayins | Promise<StandingWayins>
-    },
-  ): Promise<GatedVaultProps> {
-    // The proof is made against the vault props as storage holds them now, not a picture a change
-    // elsewhere has outdated: a passphrase replaced there proves nothing here.
-    await this.#helloWithin(0)
-    this.#checkStanding()
-    const standing = this.#gatedProps()
-    plan.check?.(standing)
-    const proven = await this.#unwrapWith(standing, proof)
-    const drafted = frozenVaultProps({
-      ...standing,
-      gate_epoch:       standing.gate_epoch + 1,
-      ...await plan.revise(standing, proven, this.#deviceId),
-    })
-    const stored = await withoutStoredVaultProps(this.#vaultDB.putVaultProps(drafted, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }))
-    // The vault as storage now holds it, its counter moved by the store.
-    const next = frozenVaultProps(stored) as GatedVaultProps
-    // The change has landed, whatever happens now: what follows is this device's own, and a
-    // failure of it is said through the logger, never thrown as though the change had not landed.
-    // The picture takes it first, so the record raised after never outruns the picture.
-    this.#takeOwnWrite(next)
-    await this.#raiseRecordAfter(next.vault_epoch, plan.call)
+  /** Grant the lease by `proving` once a change to the ways in has landed: a failure is said through the logger, never thrown as though the change had not landed. */
+  async #grantAfterChange(proving: Proving, call: 'putWayin' | 'delWayin') {
     try {
-      await this.#grantLease(proven, next)
+      await proving.grantLease()
     } catch (err) {
-      this.#logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call: plan.call }, asError(err))
+      this.#logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call }, asError(err))
     }
     this.#replaceSnapshot()
-    return next
   }
-
   // --
 
   // == [Locking and expiry]: lockNow, heedRefusal, letGo, dropLease, armExpiry, disarmExpiry
@@ -1511,45 +1482,7 @@ export class Vault {
   }
   // --
 
-  // == [Lease]: grantLease, demandGranting, takeUpLease, takeUp, standDownTakeUp, takeUpUnder, discardLease
-
-  /** Grant this device a lease, `leaseHours` from now, write it, and hold it: the vault is then unlocked, resolving the lease.
-   * {@link sealLeaseRecord} wraps the vaultKey under a fresh leaseKey, {@link DeviceDB.putLease}
-   * writes the record, and the lease held is made from the record as stored. Before each wait and
-   * after the last it demands that the
-   * vault still stands at `standing`, the vault props the key was proven against, and that
-   * `overtaken` (an ask's attempt, which its prompt's end stands down) has not aborted; one that
-   * refuses takes nothing up. A lock that lands during the write erases the lease behind it, as
-   * the device store applies one scope's calls in the order made. A lease written before some
-   * other refusal stays in the device store, naming vault props that no longer stand, and is
-   * never taken up.
-   *
-   * A Vault object gone meanwhile (let go, or its vault found deleted or made anew) refuses at the
-   * demand before the write, as its demand refuses every call: a gone Vault object writes no lease.
-   *
-   * Every proof passes through here: an `unlock()`, or a change to the ways in. Nothing else moves
-   * the deadline.
-   */
-  async #grantLease(unlocked: VaultKeyPair, standing: GatedVaultProps, overtaken?: AbortSignal): Promise<Lease> {
-    const proven = stampOf(this.#scope, standing)
-    this.#demandGranting(proven, overtaken)
-    // A take-up under way stands down before this lease is written, not after: one that read an
-    // older lease could otherwise erase this one as it discards that.
-    this.#standDownTakeUp()
-    // The transient's last act: wrapped into this device's lease, then dropped. The deadline is
-    // leaseHours from now, and never past FarFuture, which is how leaseHours: Infinity reads.
-    const record = await sealLeaseRecord(this, standing, unlocked.transientKey)
-    // Nothing is awaited between this demand and the write.
-    this.#demandGranting(proven, overtaken)
-    const stored = valOf(await this.#deviceDB.putLease(record))
-    this.#demandGranting(proven, overtaken)
-    const lease = Lease.make(this, stored)
-    this.#lease = lease
-    this.#leaseSince = this.#clockNow()
-    this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
-    this.#replaceSnapshot()
-    return lease
-  }
+  // == [Lease]: holdLease, takeUpLease, takeUp, standDownTakeUp, takeUpUnder, discardLease
 
   /** Hold `stored`, a lease record just written to this device's store, as the vault's lease: its expiry armed, the snapshot replaced. */
   #holdLease(stored: LeaseRecord): Lease {
@@ -1559,12 +1492,6 @@ export class Vault {
     this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
     this.#replaceSnapshot()
     return lease
-  }
-
-  /** Demand, for a lease being granted, that the vault still stands at `proven`, and that the prompt the attempt answers, if any, has not ended. */
-  #demandGranting(proven: Stamp, overtaken: AbortSignal | undefined) {
-    this.#demand(proven, { call: 'unlock' })
-    if (overtaken?.aborted === true) { throw promptEndedError() }
   }
 
   /** Take up this device's lease when it fits the vault props in hand and opens: the vault is then unlocked until its `askPassphraseAt`.
@@ -2006,7 +1933,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, goneError, remadeError, behindError, gateMovedError, promptEndedError, gateMadeElsewhereError, isGateMadeElsewhere, strippedOfStoredProps, withoutStoredVaultProps
+// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, gateMadeElsewhereError, isGateMadeElsewhere, strippedOfStoredProps
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
@@ -2025,9 +1952,8 @@ const behindError = () => new VaultError('vault_behind', "This device has alread
 
 const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in changed while this call was under way -- its passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
-const gatingLandedError = () => new VaultError('gating_landed', 'The prompt this proof answered ended while it was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
+const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
-const promptEndedError = () => new VaultError('vault_locked', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
 /** The refusal of a first unlock that lost the race to another device setting the vault's first passphrase. It carries nothing of that device's gate. */
 const gateMadeElsewhereError = () => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
@@ -2045,21 +1971,13 @@ const strippedOfStoredProps = (err: unknown): unknown => {
   return new VaultError(err.refusalkind, StaleWayinsMessage, err.cause === undefined ? {} : { cause: err.cause })
 }
 
-/** What `writing` resolves, or its refusal stripped as {@link strippedOfStoredProps} strips it. */
-const withoutStoredVaultProps = async (writing: Promise<VaultProps>): Promise<VaultProps> => {
-  try {
-    return await writing
-  } catch (err) {
-    throw strippedOfStoredProps(err)
-  }
-}
 
 /** What a change to the ways in says when storage refuses it as stale. */
 const StaleWayinsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 
 // --
 
-// == [Vocabulary]: BirthRead, frozenVaultProps, StandingWayins, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds
+// == [Vocabulary]: BirthRead, frozenVaultProps, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds
 
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it.
  * `vaultProps` and `listed` are what `vaultDB.ensureVault` resolved; `leaseKept` what
@@ -2080,8 +1998,6 @@ const frozenVaultProps = (props: VaultProps): VaultProps => {
   return Object.freeze({ ...props, passphrase: frozenRecord(props.passphrase), passkey: props.passkey === null ? null : frozenRecord(props.passkey) })
 }
 
-/** The ways in of vault props, as a change to them writes them anew. */
-type StandingWayins = Pick<GatedVaultProps, 'passphrase' | 'passkey'>
 
 /** The {@link Stamp} of `props` in `scope`, frozen. */
 const stampOf = (scope: VaultScope, props: VaultProps): Stamp => Object.freeze({
@@ -2128,7 +2044,7 @@ type VaultCall = 'birth' | 'hello' | 'refresh' | 'unlock' | 'del' | 'untrustedSt
 const UntrustedStorageKinds = ['identity_revoked', 'vault_behind', 'newer_format'] as const satisfies readonly RefusalKind[]
 // --
 
-// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, standingPassphraseOf, newProofOf, absentBox, noWhisper
+// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkStandingPassphrase, absentBox, noWhisper
 
 /** What a call that takes options most likely had in place of its bag, and what to do: an event, as `call` was handed to `addEventListener` or `onClick` itself. */
 const eventHint = (call: 'hello' | 'ensureLease', tried: 'tryHello' | 'tryEnsureLease') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
@@ -2179,28 +2095,11 @@ const putBoxPropsOf = (props: unknown): { boxlabel: unknown, sidecar: Sidecar | 
 /** What `delBox()` removed: the boxlabel, the vault it lay in, and whether the revision removed was the one the snapshot listed (`deleted`) or another written over it meanwhile (`deleted_other`). Storage keeps nothing of it. */
 export type DeletedBox = Readonly<{ boxlabel: string, vault_tok: string, outcome: 'deleted' | 'deleted_other' }>
 
-/** The proof of a change to the ways in, `call`'s: the vault's standing passphrase, as text.
- * Refuses 'bad_option' for anything else, a passkey's answer among it, and as
- * {@link PassphraseProof.parse} refuses.
- */
-const standingPassphraseOf = (vault: Vault, given: unknown, call: 'putWayin' | 'delWayin'): PassphraseProof => {
+/** Refuse 'bad_option' for a proof of a change to the ways in, `call`'s, that is not the vault's standing passphrase as text: a passkey's answer among it. */
+const checkStandingPassphrase = (given: unknown, call: 'putWayin' | 'delWayin'): void => {
   if (typeof given !== 'string') {
     throw new VaultError('bad_option', `${call} takes the vault's passphrase as it stands, as the text the user typed: only the passphrase proves a change to the vault's ways in, never a passkey.`)
   }
-  return PassphraseProof.parse(vault, given)
-}
-
-/** `putWayin`'s new way in, checked: a new passphrase strong enough by the vault's strength checker, or a passkey's answer over a salt of a new passkey's shape.
- * Refuses as {@link Proof.parse}, `proof.checkStrongEnough()` and `checkSaltShape` do.
- */
-const newProofOf = async (vault: Vault, given: unknown): Promise<PassphraseProof | PasskeyProof> => {
-  const proof = Proof.parse(vault, given)
-  if (proof instanceof PasskeyProof) {
-    checkSaltShape(proof)
-  } else {
-    await proof.checkStrongEnough()
-  }
-  return proof
 }
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.

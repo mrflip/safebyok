@@ -110,7 +110,7 @@ describe("putWayin, with a new passphrase", () => {
     await TH.expectRefusal(vault.delWayin('pw'), 'vault_gone')
   })
 
-  it("lands though the vault is deleted elsewhere as storage answers it, but the gone Vault object writes no lease and takes nothing into its picture", async () => {
+  it("lands though the vault is deleted elsewhere as storage answers it, but refuses vault_gone: the gone Vault object writes no lease and takes nothing into its picture", async () => {
     const world = makeWorld()
     // Deaf, so only the refresh the test makes finds the vault deleted.
     const deaf = world.deafVaultDB()
@@ -126,7 +126,7 @@ describe("putWayin, with a new passphrase", () => {
     await there.del()
     await TH.expectBad(vault.tryRefresh(), 'vault_gone')
     answering.release()
-    await TH.expectGood(putting)
+    await TH.expectBad(putting, 'vault_gone')
     expect(putLease).not.toHaveBeenCalled()
     expect(await world.getLease()).to.deep.equal(leaseBefore)
     expect(vault.getSnapshot().gate_epoch).to.eq(shown.gate_epoch)
@@ -464,7 +464,8 @@ describe("the vault's passkey", () => {
     expect(storedVaultPropsOf(world)['gate_epoch']).to.eq(3)
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock(laptop), 'wrong_passkey')
-    await fresh.unlock(phone)
+    // Each answer's bytes are zeroed once used: the authenticator answers afresh at each ask.
+    await fresh.unlock(await TH.passkeyOf('phone'))
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 

@@ -268,7 +268,7 @@ describe("BankProvider", () => {
       await TH.expectBad(second, 'vault_locked')
     })
 
-    it("stands an attempt down when the user cancels during it: a newer dialog stays asking, and the vault stays locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    it("stands an attempt down when the user cancels during it: a newer dialog stays asking, and the vault stays locked (Contract: getProof, attempt refuses: gating_landed)", async () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
@@ -302,7 +302,7 @@ describe("BankProvider", () => {
       expect(second.outcome).to.eq('pending')
       gate.release()
       const outcomes = await Promise.all(attempts)
-      expect(outcomes.map((outcome) => (outcome.ok ? 'unlocked' : outcome.err.refusalkind))).to.deep.equal(['vault_locked'])
+      expect(outcomes.map((outcome) => (outcome.ok ? 'unlocked' : outcome.err.refusalkind))).to.deep.equal(['gating_landed'])
       expect(vault.getSnapshot().state).to.eq('locked')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(second.outcome).to.eq('pending')

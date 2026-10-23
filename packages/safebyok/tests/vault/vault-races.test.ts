@@ -424,7 +424,7 @@ describe("a read that began before this device's own change to the ways in lande
 })
 
 describe("a change to the ways in whose vault moves elsewhere as the change lands", () => {
-  it("deleted: the Vault object is gone, as the read found it, and nothing is unlocked", async () => {
+  it("deleted: the Vault object is gone, as the read found it, the change refuses vault_gone, and nothing is unlocked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const landed = TH.holdNextAnswer(world.vaultDB, 'putVaultProps')
@@ -434,14 +434,14 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     await there.del()
     await TH.expectBad(vault.tryRefresh(), 'vault_gone')
     landed.release()
-    // The change landed before the deletion: it resolves, and unlocks nothing.
-    await changing
+    // The change landed before the deletion, but the demand after the write finds the Vault object gone.
+    await TH.expectRefusal(changing, 'vault_gone')
     expect(vault.state).to.not.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
     expect(await world.stateOnOpen()).to.eq('novel')
   })
 
-  it("deleted and made anew: the Vault object is gone as vault_remade, and the bank's next shows the new one, locked, never the deleted one's ways in", async () => {
+  it("deleted and made anew: the Vault object is gone as vault_remade, the change refuses so, and the bank's next shows the new one, locked, never the deleted one's ways in", async () => {
     const world = makeWorld()
     // Deaf, so the deletion is not heard before the remake.
     const deafDB = world.deafVaultDB()
@@ -455,8 +455,8 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     await reborn.unlock('pw three')
     await TH.expectBad(vault.tryRefresh(), 'vault_remade')
     landed.release()
-    // The change landed before the deletion: it resolves, and unlocks nothing.
-    await changing
+    // The change landed before the deletion, but the demand after the write finds the vault made anew.
+    await TH.expectRefusal(changing, 'vault_remade')
     expect(vault.state).to.not.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_remade')
     const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
