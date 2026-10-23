@@ -41,12 +41,24 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **a lease of an old gate is never shown as unlocked.**
+  After this tab's own change to the ways in (a new `gate_epoch`), a lease in memory that no longer fits the new gate is
+  dropped from memory, never erased from the device store, as the write is taken into the picture, so a change whose grant
+  failed leaves the vault showing locked and not unlocked under a lease from the previous gate.
+* 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **one vault, one place.** `bank.ensureVault(draft)` refuses `bad_option` when
+  the draft names a `vaultDB` or `deviceDB` other than the stores the held (or being-born) Vault object was born from
+  (`packages/safebyok/src/bank.ts`), so a vault read from one store is never written to another. A Vault object found
+  gone (deleted or remade) in the microtasks before its birth was filed is never handed out.
 * 2026-10-23 (primitives sprint, thread 9, gating): **cleartext has one door: a gating's attempt.** No vault call takes a
   passphrase or a passkey's answer (`packages/safebyok/src/gating.ts`, `src/vault-opts.ts`); `Bank.make`'s
   `requestCleartext(gating)` replaces `getProof`, and the user's text reaches the package only as the argument of the typed
   attempt the host calls on the gating it was handed (`attempt`, `attemptPassphrase`, `attemptPasskey`), which seals it into
-  a proving. A host's `requestCleartext` that throws, or rejects, is refused `unexpected_error` with the throw as `cause`
-  and is never logged, because it heard the passphrase. A gating still open when `requestCleartext` resolves is declined
+  a proving. A host's `requestCleartext` that throws, or rejects, is refused `unexpected_error` and is never
+  logged, because it heard the passphrase. Amended 2026-10-23 (thread 9b, gating_followups, PR #262): **the refusal carries no `cause`.**
+  It once kept the throw, so a host error such as "invalid: <typed value>" reached every waiting call's error and any error
+  tracker; now `parseRequestCleartext` (`src/vault-opts.ts`) refuses every waiting call with nothing of the throw, as the
+  strength checker's guard already does. The host's logger hears only that it threw, with `{ call: 'requestCleartext',
+  refusalkind }` (the `refusalkind` only when the throw was a `VaultError`, else null). A gating still open when `requestCleartext` resolves is declined
   (`vault_locked`); a malformed argument is `bad_option`, quoting none of it. One gating stands per vault; a second attempt
   while one runs refuses `attempt_in_flight`. Entries below that name `unlock()`, `putWayin()` with a passphrase, `Ask`, `attempt(proof)`
   or `getProof` describe the calls this replaced.
@@ -61,6 +73,13 @@ added or folded into through the subagent, and no other entry changes.
   placeholder gatings on every path, so the proving's demand on its gating (`src/proving.ts`, `grantLease`) refuses
   `gating_landed` before and after the write; a lock landing then is also erased behind the write in the device store's
   order. A gate already stored stays stored: the change to the ways in landed, the lease did not.
+  Amended 2026-10-23 (thread 9b, gating_followups, PR #262): **a lock wins over a failed wait.** `grantLease` takes the device store's
+  `putLease` answer as an Outcome and demands on the proving (and on the record's stamp) before acting on a failure, so a
+  `lock()` or decline landing while the lease is written refuses `gating_landed`, never the device store's refusal. A key
+  deriver's or HKDF's failure during `PassphraseProving.seal` or `PasskeyProving.seal` is demanded on likewise (the vault's stamp
+  at the seal's start, and the gating not landed) before it is thrown. A gating's attempt resolves with whatever its gating
+  settled with, so an attempt never reports success over a gating a lock settled first. `seal` requires its `{ gating }`, with no
+  default to a gating that never lands, so no later internal caller can reopen the hole by omitting it.
 * 2026-10-23 (primitives sprint, thread 9, gating): **each attempt reads storage afresh first.** `hello({ staleMinutes: 0 })`
   through the refresh join (`#freshen`), then a demand that the Vault object stands and the gating has not landed, so a
   passphrase another device has replaced opens nothing here; a vault whose gate another device set while the user typed
@@ -79,7 +98,9 @@ added or folded into through the subagent, and no other entry changes.
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
   from `putLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
   device; a grant stopped by `gating_landed`, or by the vault moving on, still throws. The warning carries the call and the
-  refusal, no key material.
+  refusal, no key material. Amended 2026-10-23 (thread 9b, gating_followups, PR #262): the demand on the gating now comes first, so a
+  lock landing during the write is `gating_landed`, no longer a refusal swallowed as this warning over a gating already settled
+  (see the entry on `putLease` above).
 * 2026-10-22 (thread 7b, bank_provider, [#259](https://github.com/mrflip/safebyok/pull/259), stacked on #258): **`safebyok-react` holds a Bank, not
   a Vault object, and a vault deleted elsewhere is no longer asked for again by the app on its own.** `BankProvider`
   (`packages/safebyok-react/src/bank-provider.tsx`) makes one `Bank.make` per signed-in user and lets every vault go
@@ -937,8 +958,8 @@ added or folded into through the subagent, and no other entry changes.
   `PassphraseModal`, still shown only while the user's gesture is in hand) and gates its refs per bank, not per vault: a
   vault of a bank let go tells no bad news and asks for no proof (declined).
   Amended 2026-10-23 (thread 9, gating): **`getProof` is replaced by `Bank.make`'s `requestCleartext(gating)`, and its answers by the
-  host resolving.** Points (1) to (4) now read: whatever `requestCleartext` throws is refused `unexpected_error` and never
-  logged (it heard the passphrase); a gating still open when it resolves is declined (the call refuses `vault_locked`); with
+  host resolving.** Points (1) to (4) now read: whatever `requestCleartext` throws is refused `unexpected_error`, with no `cause`, and never
+  logged (it heard the passphrase; amended 2026-10-23 (thread 9b): the logger hears only `{ call, refusalkind }`); a gating still open when it resolves is declined (the call refuses `vault_locked`); with
   none every gating is declined. The host answers nothing, so `'unlocked'`, `'carry_on'` and their `bad_option` are gone, and
   no `lease_ending` ask exists. See the entry on the one door.
 * 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
