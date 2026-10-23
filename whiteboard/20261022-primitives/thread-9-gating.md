@@ -1,6 +1,6 @@
 # Thread 9: gating (2026-10-23)
 
-Branch `20261023-gating`, PR (not yet opened), stacked on #260. Justify: not yet run whole.
+Branch `20261023-gating`, PR [#261](https://github.com/mrflip/safebyok/pull/261), stacked on #260. Justify: core green (3086 passed), adapters green; React and demo tests in port.
 
 **Status:** building. (a) core built and committed (local checkpoints): `src/gating.ts`, the
 vault's `ensureUnlocked` / `putWayin` / `delWayin` / `del`, `requestCleartext`, the chains, the
@@ -44,6 +44,14 @@ pantry consult. Core tests being ported by two helpers (lease/demand/boxes/bank 
     seals.
   * **requestCleartext resolving with the gating open declines it.** Its return value means nothing.
   * **A malformed attempt argument refuses `bad_option` and leaves the gating open.**
+  * **A grant after a change to the ways in that the device store refuses only warns**, as today
+    (no ruling to change the contract): the change landed, `putWayin` resolves. A grant stopped by
+    `gating_landed` or the vault moving on still throws.
+  * **A let-go during a deletion's own write** (its bell heard before the write answered) does not
+    preempt the chain: the `del_vault` gating settles by its chain. A let-go lands any other
+    gating with the gone refusal itself.
+  * **An ended lease is dropped before a gating is raised** (the threshold is the truth, as
+    `#whyAsk` did).
   * **The pantry consult never erases** a lease that does not fit (the "record don't fix" erase
     goes for free); an unreadable record is warned of and left.
   * **A storage refusal that locks** (`identity_revoked`, `vault_behind`) lands the gating with
@@ -62,4 +70,27 @@ pantry consult. Core tests being ported by two helpers (lease/demand/boxes/bank 
   * React's start over is off: a forgotten passphrase can no longer delete the vault (ruling on
     proven delete). Demo ways-in changes are declined by the provider's dialog until thread 10.
 
-* **For the Coach**: see the PR's open questions.
+* **Discoveries**:
+  * The refresh's revocation compares `readAt >= #leaseSince` in whole milliseconds: under load a
+    refresh begun in the same millisecond as a grant revokes it (seen once in
+    `safebyok-convex`'s "locks over a ConvexClient while idle", passing on rerun). Thread 5's.
+  * A storage refusal that locks lands the gating before its read has unwound, so a call made right
+    after the refused unlock may join that read and hear the same refusal: two tests wait a tick.
+
+* **For the Coach** (also the PR's open questions):
+  * **Start over**: a proven `del()` means a user who forgot the passphrase cannot delete a sound
+    vault from the client; React's start over is off. Rec: a `bank.startOver(draft)` that deletes
+    without proof (the server lets the owner delete anyway), or accept the loss.
+  * **Joins across calls**: `ensureUnlocked` joining a `put_passkey` gating means a declined passkey
+    dialog refuses an unrelated `getWhisper`; `putWayin` waiting out an unlock then raising its
+    own shows two dialogs for one click. Rec: keep, as built, until the dialogs (thread 10) show it.
+  * **Grant failure after a change**: kept today's warn; the spec's "never catches" would refuse.
+    Rec: keep the warn.
+  * **Settling kinds**: `absent_wayin`, `damaged_wayin`, `passkey_unavailable` settle the gating
+    (spec); today they asked again. Rec: add them to the correctable list.
+  * **`vault_not_novel`**: not added; `gate_made_elsewhere` covers the state. Rec: drop it from
+    the kinds list.
+  * **A lease of zero**: `leaseHours` must be above zero, and a zero lease would end as granted;
+    the README says to `lock()` once done instead. Rec: keep the floor.
+  * **Demo**: its ways-in buttons and Delete account are declined by the provider's dialog until
+    thread 10 (a loosening, closed by 10).
