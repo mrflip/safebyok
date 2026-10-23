@@ -1363,7 +1363,9 @@ export class Vault {
     // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
     const drafted = frozenVaultProps({ ...held, vault_epoch: held.vault_epoch + 1, ...gate.storedFields })
     const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
-    this.#demandAfterWait(written, gate, { call })
+    // A refused first gate demands the vault half only: a read meanwhile may have taken up the
+    // other device's first gate, which is 'gate_made_elsewhere', not a gate moved.
+    this.#demandAfterWait(written, gate.base_epoch === 0 && ! written.ok ? { vault_tok: gate.vault_tok } : gate, { call })
     if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
     const next = frozenVaultProps(written.val) as GatedVaultProps
     const stored = Gate.of(this, next)

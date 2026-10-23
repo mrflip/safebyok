@@ -282,6 +282,22 @@ describe("a first unlock that loses the race to create the vault", () => {
     await here.unlock('pw one')
   })
 
+  it("refuses as gate_made_elsewhere when a hello reads the winner's gate in while this unlock's gate is being written", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const there = await world.open({ vaultDB: deafDB })
+    const here = await world.open({ deviceDB: memoryDeviceDB() })
+    TH.beforeNextCall(deafDB, 'putVaultProps', async () => {
+      await here.unlock('pw one')
+      await there.hello({ staleMinutes: 0 })
+    })
+    await TH.expectRefusal(there.unlock('pw two'), 'gate_made_elsewhere')
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
+    expect(await world.getLease()).to.be.null
+    await there.unlock('pw one')
+    expect(there.state).to.eq('unlocked')
+  })
+
   it("is plain wrong_passphrase when the other device's vault was in storage before this unlock looked: the look finds it", async () => {
     const world = makeWorld()
     const there = await world.open()
