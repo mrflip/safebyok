@@ -62,9 +62,9 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * lasts on this device. For a vault with a passkey, in a browser offering WebAuthn, "Use a
  * passkey" comes first, and takes the focus.
  *
- * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
- * into "unlock", a passkey added brings its button -- and handed another gating, it starts afresh,
- * keeping nothing typed for the last. Taken away, it lets go: an attempt, a delete or advice still
+ * It follows the vault as it changes -- a passkey added brings its button; whether it chooses or
+ * unlocks is its gating's kind, fixed when raised -- and handed another gating, it starts afresh,
+ * keeping nothing typed for the last. Taken away, it lets go: an attempt or advice still
  * under way finishes unheard, calling `onDone` no more and showing nothing. It calls `onDone` once.
  *
  * The refusals an attempt meets it handles as `attemptRefusalFlavor` groups them. A wrong
@@ -75,7 +75,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * over, and the next call asks for the passphrase chosen on the other device. Anything
  * else -- misuse, such as a strength checker that answers no verdict, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
- * (or Escape) calls `onDone('declined')` -- unless a lock lands or the vault unlocks under it first,
+ * (or Escape) calls `onDone('declined')` -- unless a lock lands under it first,
  * as for the form -- and React reports the error, carrying nothing typed, through the root's
  * `onCaughtError` (the console, by default, with the component stack), where the developer and an
  * error tracker meet it. A passkey that fails that way takes its button away and leaves the
@@ -115,7 +115,10 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * on as it is.
  *
  * @example
- *   const requestCleartext: RequestCleartext = (gating) => new Promise((closed) => { showDialog(<PassphraseModal gating={gating} onDone={() => { closed() }} />) })
+ *   const requestCleartext: RequestCleartext = (gating) => new Promise((closed) => {
+ *     if (gating.gatingkind !== 'unlock_vault' && gating.gatingkind !== 'initialize_gate') { closed(); return }
+ *     showDialog(<PassphraseModal gating={gating} onDone={() => { closed() }} />)
+ *   })
  * @example <PassphraseModal gating={gating} passphraseUsername={`${email} (vault)`} onDone={close} />
  * @example <PassphraseModal gating={gating} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={close} />
  */

@@ -118,7 +118,7 @@ const isPassphraseGating = (gating: Gating): gating is PassphraseGating => gatin
 /** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the passphrase dialog.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
  * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own passphrase
- * dialog. The dialog's three: whether it offers a forgetful user to start over, what a password
+ * dialog. The dialog's three: whether it offers a forgetful user to start over (nothing, for now), what a password
  * manager files the passphrase under, and the advice it shows as the user chooses one
  * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
  * the `keyDeriver`, `deviceDB` and `strengthChecker` Bank.make asks for. `BankProvider` says
@@ -136,7 +136,7 @@ export type BankProviderProps = MakeBankOpts & {
    * needing the vault locked refuses 'vault_locked'. Written inline, it makes no new bank.
    */
   requestCleartext?:   RequestCleartext | null | undefined
-  /** Whether the passphrase dialog offers a user who has forgotten the passphrase to delete the vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by default. */
+  /** `PassphraseModal`'s `allowStartOver`: taken, and offers nothing for now, as deleting a vault needs its passphrase. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files a vault's passphrase under: `PassphraseModal`'s `passphraseUsername`.
    * Default: the user and the vault, as 'u1 (main vault)'. Never the user's sign-in name alone, or
@@ -192,9 +192,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * 'vault_locked'. Another vault's gating replaces the dialog showing, whose calls are refused
  * likewise. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
  * or the provider unmounting lets the vault go, closing the dialog, its calls refused
- * 'vault_gone'. A user who starts over from the dialog (`allowStartOver`) has asked for a new
- * vault: once the old one is deleted, the provider asks the bank for the vault again, and the
- * hooks hand down the new one, `novel`.
+ * 'vault_gone'. `allowStartOver` offers nothing for now: deleting a vault needs its passphrase.
  *
  * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
  * birth refused as misuse or with a value that is no VaultError at all, which `useVault` throws
