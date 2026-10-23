@@ -414,7 +414,7 @@ export class Vault {
    *
    * A call under way ends by its own rule. A `getWhisper()` or `useWhisper()` refuses 'vault_locked'
    * once storage answers or the box opens, unless a gating has put a lease back in hand meanwhile;
-   * a `getBox()` hands back the box, which holds nothing secret. A `putBox()` refuses
+   * a `getBox()` refuses so too, handing back no box. A `putBox()` refuses
    * 'vault_locked', writing nothing, when the lock lands while it waits on a gating, reads and
    * opens the box (`VaultDB.getBox`, `box.extractWhisper()`), or seals it (`Box.seal`); a
    * `delBox()` does when it lands while it waits on a gating. Only the write itself is past a
@@ -649,8 +649,8 @@ export class Vault {
    * or made anew elsewhere refuses 'vault_gone', reading no box of the vault that stands now, and
    * this Vault object is gone with it: ask the bank for the vault again (`bank.ensureVault`).
    * Deleted or made anew while storage is read, it refuses
-   * 'vault_gone' or 'vault_remade', as when the bank lets the vault go; a lock landing then lets the box
-   * through, as it holds nothing secret. The boxlabel is held to the floor alone, 'bad_label'
+   * 'vault_gone' or 'vault_remade', as when the bank lets the vault go; a lock landing then refuses
+   * 'vault_locked', handing back no box. The boxlabel is held to the floor alone, 'bad_label'
    * below it: the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
    *
    * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
@@ -1572,18 +1572,23 @@ export class Vault {
     return await this.#readBox(label, lease.vault_tok, call)
   }
 
-  /** The box under `boxlabel` as storage holds it in the vault `vaultTok`, or null when none stands; the box demanded after the read, the vault half.
-   * A box another device wrote is what storage holds, not drift. A lock meanwhile lets it through:
-   * opening it is what demands the lease.
+  /** The box under `boxlabel` as storage holds it in the vault `vaultTok`, or null when none stands; the box demanded after the read, then the lease.
+   * A box another device wrote is what storage holds, not drift. The read's stamp demand cannot see
+   * a lock, which moves no `vault_tok`, so the lease is demanded again before anything is handed
+   * back: a lock landing while storage is read refuses 'vault_locked', a box or none.
    */
   async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
     const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }), unexpectedError)
     // A vault that moved on meanwhile refuses as the demand finds it, never as what its read found.
     this.#demandAfterWait(read, { vault_tok: vaultTok }, { call })
     if (! read.ok) { throw this.#boxReadRefusal(read.err) }
-    if (read.val === null) { return null }
+    if (read.val === null) {
+      this.#demandLease(call)
+      return null
+    }
     const fetched = this.#boxUnder(read.val, vaultTok)
     this.#demand(fetched, { call })
+    this.#demandLease(call)
     return fetched
   }
 

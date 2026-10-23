@@ -1312,18 +1312,42 @@ describe("vault.getBox", () => {
     await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
   })
 
-  it("lets a lock landing while storage is read through, handing back the box, which opens to nothing: 'vault_locked'", async () => {
+  it("refuses 'vault_locked' when a lock lands while storage is read, handing back no box", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const reading = TH.holdNextCall(world.vaultDB, 'getBox')
-    const getting = vault.getBox('anthropic')
+    const getting = TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
     await reading.reached
     await vault.lock()
     reading.release()
-    const box = await getting
-    expect(box?.boxlabel).to.eq('anthropic')
-    await TH.expectRefusal(box!.extractWhisper(), 'vault_locked')
+    await getting
+  })
+
+  it("refuses 'vault_locked' from getWhisper when a lock lands while storage is read, opening nothing", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const reading = TH.holdNextCall(world.vaultDB, 'getBox')
+    const getting = TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
+    await reading.reached
+    await vault.lock()
+    reading.release()
+    await getting
+  })
+
+  it("refuses 'vault_locked' from useWhisper when a lock lands while storage is read, never calling back", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const callback = vi.fn(() => 'used')
+    const reading = TH.holdNextCall(world.vaultDB, 'getBox')
+    const using = TH.expectRefusal(vault.useWhisper('anthropic', callback), 'vault_locked')
+    await reading.reached
+    await vault.lock()
+    reading.release()
+    await using
+    expect(callback).to.not.have.been.called
   })
 })
 

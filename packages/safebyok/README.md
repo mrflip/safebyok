@@ -468,8 +468,8 @@ setting, and the user is asked again, the safe direction.
 **`vault.lock()`** forgets the unlock in memory and on this device alike, so the user types their
 passphrase again afterwards. Use it for a real lock signal: a Lock button, a locked screen, a
 sign-out. The key is dropped at once, and every call that needs it throws kind `vault_locked`. A
-`getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing back, unless an
-unlock has put a key back in hand by the time its whisper is ready. A gating's attempt under way
+`getBox()`, `getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing
+back, unless an unlock has put a key back in hand by the time storage answers. A gating's attempt under way
 attaches no lease: it refuses `gating_landed` at its next step, and a change to the ways in it
 already stored stays stored. A `putBox()` under way refuses with `vault_locked`, writing nothing,
 when the lock comes while it waits on a gating, reads and opens the box (`VaultDB.getBox`,

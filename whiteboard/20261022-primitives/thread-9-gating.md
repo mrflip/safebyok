@@ -1,12 +1,9 @@
 # Thread 9: gating (2026-10-23)
 
-Branch `20261023-gating`, PR [#261](https://github.com/mrflip/safebyok/pull/261), stacked on #260. Justify: core green (3086 passed), adapters green; React and demo tests in port.
+Branch `20261023-gating`, PR [#261](https://github.com/mrflip/safebyok/pull/261), stacked on #260. Justify: green, every package (see the PR's Tests line).
 
-**Status:** building. (a) core built and committed (local checkpoints): `src/gating.ts`, the
-vault's `ensureUnlocked` / `putWayin` / `delWayin` / `del`, `requestCleartext`, the chains, the
-pantry consult. Core tests being ported by two helpers (lease/demand/boxes/bank + a new
-`tests/gating.test.ts`; races/wayins/del/storage/hello/twins/make). React src adapted minimally
-(builds); React tests, demo tests, e2e not yet run.
+**Status:** ready. Core, adapters, React and demo all ported and green; the Coach's getBox ruling
+added. e2e typechecks (its Convex test needs a deployment, not run here).
 
 * **Built**:
   * `src/gating.ts`: `Gating`, a union on `gatingkind` (six kinds), each with its typed attempt,
@@ -59,6 +56,16 @@ pantry consult. Core tests being ported by two helpers (lease/demand/boxes/bank 
   * **`vault_not_novel` is not added**: the spec's `initialize_gate` row names it, its *Gating*
     paragraph says the same state settles `gate_made_elsewhere`; built as the paragraph.
 
+* **The Coach's ruling on getBox** (#254, thread 6), added here: after `getBox`'s `VaultDB.getBox`
+  and its stamp demand, the lease is demanded again (`#demandLease`) before a box, or none, is
+  handed back, so a lock landing mid-read refuses `vault_locked`; `getWhisper` and `useWhisper` go
+  through it. Tests in `vault-boxes.test.ts` (one per method; the old "lets a lock ... through,
+  handing back the box" test is rewritten to it). Docs: `getBox`, `lock()`, `#readBox`, README.
+* **The refresh's revocation counts leases** (`#leasesHeld` / `#leaseSerial`) in place of
+  comparing milliseconds (`readAt >= #leaseSince`), so a read begun in the same millisecond as a
+  grant no longer drops it: it flaked `safebyok-convex`'s "locks over a ConvexClient while idle"
+  under `pnpm justify`.
+
 * **Deviations / refusals where today coped** (ground rule 17, for toldjaso):
   * `del()` needs the passphrase (ruled); on a `novel` vault it refuses `absent_vault`.
   * A `lock()` during `putWayin` / `delWayin` now stops them: no lease attached; the call refuses
@@ -71,9 +78,6 @@ pantry consult. Core tests being ported by two helpers (lease/demand/boxes/bank 
     proven delete). Demo ways-in changes are declined by the provider's dialog until thread 10.
 
 * **Discoveries**:
-  * The refresh's revocation compares `readAt >= #leaseSince` in whole milliseconds: under load a
-    refresh begun in the same millisecond as a grant revokes it (seen once in
-    `safebyok-convex`'s "locks over a ConvexClient while idle", passing on rerun). Thread 5's.
   * A storage refusal that locks lands the gating before its read has unwound, so a call made right
     after the refused unlock may join that read and hear the same refusal: two tests wait a tick.
 
