@@ -44,7 +44,7 @@ const getNothing = () => null
  * The entry is `starting` while the vault's birth reads storage, `timely` holding the Vault object
  * (`novel`, `locked` or `unlocked`), or `refused` with why: storage that cannot be reached
  * (`storage_unavailable`), a user storage no longer serves (`identity_revoked`), a vault whose
- * stored props fail their checks (`damaged_vault`, which `delDamagedVault` from safebyok answers),
+ * stored props fail their checks (`damaged_vault`, which `bank.delDamagedVault` answers),
  * a browser that will not let the app keep anything on this device (`storage_blocked`), storage
  * serving an older copy than this device has seen (`vault_behind`, which `bank.clearCachedVault`
  * answers), or a vault deleted (`vault_gone`) or made anew elsewhere (`vault_remade`).
@@ -164,9 +164,10 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
 }
 
 /** Makes the app's bank from its props, and hands it down to {@link useBank}, and the signed-in user's vaults to {@link useVault} and {@link useVaultSnapshot}.
- * It makes the bank (`Bank.make`) as it renders: that checks the options, and reads nothing. A
- * vault is asked for only by a hook that names it, `useVault('main')`; until its birth settles,
- * there is no Vault object. A vault refused or deleted stays so until the app asks again.
+ * It makes the bank (`Bank.make`) in an effect, once a user is signed in: that checks the
+ * options, and reads nothing. A vault is asked for only by a hook that names it,
+ * `useVault('main')`; until its birth settles, there is no Vault object. A vault refused or
+ * deleted stays so until the app asks again.
  *
  * The provider owns the bank. It lets every vault go (`bank.closeVaults()`) when the user signs
  * out or changes, and when it unmounts. It makes the bank anew, letting the last one's vaults go,
@@ -194,9 +195,9 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * vault: once the old one is deleted, the provider asks the bank for the vault again, and the
  * hooks hand down the new one, `novel`.
  *
- * Misuse -- a bad label or option, which `Bank.make` throws as the provider renders, or a birth
- * refused as misuse or with a value that is no VaultError at all, which `useVault` throws --
- * reaches the nearest error boundary.
+ * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
+ * birth refused as misuse or with a value that is no VaultError at all, which `useVault` throws
+ * -- reaches the nearest error boundary.
  *
  * @example
  *   <BankProvider {...browserOpts()} applabel="acme" userId={session?.userId ?? null} vaultDB={vaultDB}>
