@@ -1,10 +1,11 @@
 # Thread 8: proving_gate (2026-10-23)
 
 Branch `20261023-proving_gate`, PR [#260](https://github.com/mrflip/safebyok/pull/260), stacked on
-#259. Justify: green at each pushed commit. Retired and moved tests: `thread-8-proving_gate-tests.md`.
+#259. Justify: green at each pushed commit (core 1779 -> 1804 `it(` cases). Fifteen retired tests,
+each with its ruling, in `tests-retired.md` (thread 8's rows).
 
-**Status:** primitives built and today's paths rewired through them; `proof.ts` and Wayin's
-`seal` / `tryOpen` removed, their tests being ported.
+**Status:** ready. Primitives built and today's paths rewired through them; `proof.ts` and
+Wayin's `seal` / `tryOpen` removed, their tests ported to `proving.test.ts` and `wayin.test.ts`.
 
 * **Built**:
   * `src/proving.ts`: `Proving` (abstract), `PassphraseProving.seal` / `PasskeyProving.seal(vault,
@@ -51,6 +52,8 @@ Branch `20261023-proving_gate`, PR [#260](https://github.com/mrflip/safebyok/pul
     three-argument shape has no place for the gating. Thread 9 may move it.
   * **A write refused with another `vault_tok` standing** (or none) makes the Vault object gone,
     `vault_remade` / `vault_gone`, as a refresh finding it does (ground rule 18).
+  * **A proving's stamp is not enumerable** (`decorate`, as the Box's stamp): readable for the
+    demand, but a spread, JSON or a log line shows only its slotlabel, as its doc says.
   * **`wrappedWith` returns a `Ciphered`** (the record's wrap object), not a string.
   * `Wayin.make` keeps `(vault, vaultTok, record)`; `#putGate` stays private (thread 9's
     `gating.ts` will need it reachable); provings reach the vault's inside through
