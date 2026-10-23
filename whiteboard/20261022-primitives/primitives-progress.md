@@ -75,17 +75,17 @@ rules* 3).
 | 2 | get_vault | merged | #244 |
 | 3 | wire_meta | merged | #246 |
 | 4 | store_verbs | merged | #251 |
-| 5 | demand | filed, on main | #253 |
-| 6 | lease_box | filed, stacked on #253 | #254 |
-| 6b | box_seal | filed, stacked on #254 | #256 |
+| 5 | demand | merged | #253 |
+| 6 | lease_box | merged | #254 |
+| 6b | box_seal | merged | #256 |
 | 7 | bank | filed, stacked on #256 | #258 |
 | 7b | bank_provider | filed, stacked on #258 | #259 |
 | 8 | proving_gate | filed, stacked on #259 | #260 |
 | 9 | gating | filed, stacked on #260 | #261 |
 | 9b | gating_followups | filed, stacked on #261 | #262 |
 | 9c | core_cleanups | filed, stacked on #262 | #264 |
-| 11 | docs (core half) | filed, restacked onto #264; follow-up under way | #263 |
-| 10 | react | planned | |
+| 11 | docs (core half) | filed, stacked on #264 | #263 |
+| 10 | react | after the pause | |
 | 12 | route_meta | filed, beside the line | #252 |
 
 ## What the threads found

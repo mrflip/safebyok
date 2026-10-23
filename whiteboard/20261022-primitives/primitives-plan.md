@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); 9c filed (#264, stacked on #262); thread 11's core half filed and restacked onto it (#263, stacked on #264), a docs follow-up on #263 under way. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** **paused, 2026-10-23 04:45 UTC** (the Coach's request; `human/20261023-sprint_primitives_paused.md`). Merged by the Coach: #243, #244, #246, #251, #256 (with #253 and #254). The line waiting: #258 → #259 → #260 → #261 → #262 → #264 → #263, all filed and green; #252 beside it on main. Next: thread 10 (react), the Coach's rulings, the wrap-up.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
