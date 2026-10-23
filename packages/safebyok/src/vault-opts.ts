@@ -10,7 +10,8 @@ import { type VaultLogger, parseLogger } from './logger'
 import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthChecker, guardStrengthChecker, strengthChecker } from './passphrase-strength'
 import { InEnglish, issuesText } from './options'
 import * as Names from './names'
-import type { GetProof } from './ask'
+import type { Gating, RequestCleartext } from './gating'
+import { unexpectedError } from './outcome'
 
 /** The type of {@link MakeBankOpts.onBadNews}: told each piece of bad news, and never awaited. */
 export type BadNewsHandler = (news: VaultError) => void | Promise<void>
@@ -60,14 +61,14 @@ export type MakeBankOpts = {
    * @example Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.refusalkind) } })
    */
   onBadNews?: BadNewsHandler | null | undefined
-  /** Your method that asks the user for a proof: the one place UI meets the vault.
-   * Every call that needs the vault unlocked, and finds it not, goes through `ensureLease()`. That
-   * hands it an `Ask` and awaits its answer, one prompt at a time. Left out or null, every ask is
-   * `declined`: the call refuses 'vault_locked', and the app prompts on its own.
+  /** Your method that asks the user for a passphrase or passkey: the one place UI meets the vault (see {@link RequestCleartext}).
+   * Every call that needs the user -- `ensureUnlocked()` on a vault not unlocked, `putWayin()`,
+   * `delWayin()`, `del()` -- raises a {@link Gating}, and hands it here, one at a time per vault.
+   * Left out or null, every gating is declined at once: the call refuses 'vault_locked'.
    *
-   * @example Bank.make({ ...opts, getProof: (ask) => showPassphraseDialog(ask) })
+   * @example Bank.make({ ...opts, requestCleartext: (gating) => showDialogFor(gating) })
    */
-  getProof?: GetProof | null | undefined
+  requestCleartext?: RequestCleartext | null | undefined
   /** Time source for expiry and for the times stored with each record; tests inject one. Default: the wall clock.
    * Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255 ({@link FarPast}
    * to {@link FarFuture}); fractions are rounded down. `Bank.make` reads it once, and refuses
@@ -101,9 +102,9 @@ export type MakeBankOpts = {
    * sidecar is the host's to check.
    */
   validators?: VaultValidators | undefined
-  /** The check every new passphrase must pass, as a {@link StrengthChecker}: when the first `unlock()` creates the vault, and at each `putWayin()`.
-   * It runs before any key derivation, handed the passphrase and the vault's scope; never on
-   * `unlock()` of a vault that stands. A passphrase it finds weak refuses 'weak_passphrase', its
+  /** The check every new passphrase must pass, as a {@link StrengthChecker}: in the `initialize_gate` gating that sets the first, and in each `change_passphrase`.
+   * It runs before any key derivation, handed the passphrase and the vault's scope; never on a
+   * passphrase that unlocks a vault that stands. A passphrase it finds weak refuses 'weak_passphrase', its
    * reason the message. Left out, every new passphrase refuses so, the message saying a checker
    * must be chosen (CUSTOMIZATION.md). In a browser, `browserOpts()` supplies
    * `zxcvbnStrengthChecker`.
@@ -152,7 +153,7 @@ const makeBankOptsShape = Z.strictObject({
   leaseHours:             anyOpt,
   staleMinutes:           anyOpt,
   onBadNews:              anyOpt,
-  getProof:               anyOpt,
+  requestCleartext:       anyOpt,
   clock:                  anyOpt,
   maxWhisperBytes:        anyOpt,
   maxBoxes:               anyOpt,
@@ -340,11 +341,11 @@ export const parseStaleMinutes = (candidate: unknown, where: 'Bank.make' | 'hell
 
 const renewMinutesAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
 
-/** `ensureLease()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
+/** `ensureUnlocked()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
 export const parseRenewMinutes = (candidate: unknown): number => {
   const checked = renewMinutesAsMillis.safeParse(candidate)
   if (! checked.success) {
-    throw new VaultError('bad_option', "ensureLease's renewMinutes is a number of minutes, zero or more, fractions too, or Infinity: ask for a proof when the lease ends within that many minutes.")
+    throw new VaultError('bad_option', "ensureUnlocked's renewMinutes is a number of minutes, zero or more, fractions too, or Infinity: ask the user when the lease ends within that many minutes.")
   }
   return checked.data
 }
@@ -358,13 +359,24 @@ export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
   return candidate as BadNewsHandler
 }
 
-/** The host's `getProof`, or null for none: 'bad_option' for anything but a function. */
-export const parseGetProof = (candidate: unknown): GetProof | null => {
+/** The host's {@link RequestCleartext}, guarded: it resolves once the host's resolves, and refuses 'unexpected_error' for whatever the host's throws, its cause the throw, so no refusal of the host's is mistaken for the vault's. */
+export type GuardedRequestCleartext = (gating: Gating) => Promise<void>
+
+/** The host's `requestCleartext`, guarded, or null for none: 'bad_option' for anything but a function. */
+export const parseRequestCleartext = (candidate: unknown): GuardedRequestCleartext | null => {
   if (candidate === undefined || candidate === null) { return null }
   if (typeof candidate !== 'function') {
-    throw new VaultError('bad_option', 'getProof is a function the vault hands an Ask whenever it needs a proof, answering unlocked, declined or carry_on: pass one, or leave it out.')
+    throw new VaultError('bad_option', 'requestCleartext is a function the vault hands a gating whenever it needs the user, resolving once its dialog closes: pass one, or leave it out.')
   }
-  return candidate as GetProof
+  const host = candidate as RequestCleartext
+  return async (gating) => {
+    try {
+      await host(gating)
+    } catch (err) {
+      // A bug in the host's dialog, a VaultError it let escape too: never a refusal of the call that asked.
+      throw unexpectedError(err)
+    }
+  }
 }
 
 /** What a Clock must carry: a `now()` function. */
@@ -487,7 +499,7 @@ export type ParsedBankOpts = {
   leaseMillis:      number
   staleMillis:      number
   onBadNews:        BadNewsHandler | null
-  getProof:         GetProof | null
+  requestCleartext: GuardedRequestCleartext | null
   logger:           VaultLogger
   clock:            Clock
   keyDeriver:       KeyDeriver
@@ -517,7 +529,7 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const leaseMillis = parseLeaseHours(opts.leaseHours)
   const staleMillis = parseStaleMinutes(opts.staleMinutes, 'Bank.make')
   const onBadNews = parseOnBadNews(opts.onBadNews)
-  const getProof = parseGetProof(opts.getProof)
+  const requestCleartext = parseRequestCleartext(opts.requestCleartext)
   // The host's logger for the vaults, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
   const clock = parseClock(opts.clock)
@@ -525,7 +537,7 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   // Held to the default vaultDB now, so misuse is refused at Bank.make, not at the first birth.
   limitsOf(vaultDB, whisperByteLimit, opts.maxBoxes)
-  return { applabel, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, whisperByteLimit, maxBoxes: opts.maxBoxes }
+  return { applabel, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, whisperByteLimit, maxBoxes: opts.maxBoxes }
 }
 
 /** What each vault is made of: the bank's parts, its own scope and stores, and its limits as held to its own vaultDB. */

@@ -272,7 +272,7 @@ describe("a real vault's records", () => {
       reread.write(ckey, JSON.stringify(stored))
     }
     const vault = await TH.openOver(reread)
-    await vault.unlock(TH.RealPassphrase)
+    await TH.unlock(vault, TH.RealPassphrase)
     for (const [boxlabel, { whisper }] of Object.entries(TH.RealWhispers)) {
       expect(await vault.getWhisper(boxlabel)).to.deep.equal(whisper)
     }

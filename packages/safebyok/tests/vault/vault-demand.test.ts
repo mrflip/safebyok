@@ -2,16 +2,16 @@ import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { Vault } from '../../src/vault'
 import { heldLeaseOf } from '../../src/held-lease'
-import type { Ask } from '../../src/ask'
+import type { Gating } from '../../src/gating'
 import * as TH from '../test-helpers'
 import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxCkey } from './world'
 
 /** Delete the vault from another device and make it anew there under 'pw two': a new life, of another vault_tok. */
 const remakeElsewhere = async (world: ReturnType<typeof makeWorld>) => {
   const there = await world.open({ deviceDB: memoryDeviceDB() })
-  await there.del()
+  await TH.del(there, 'pw')
   const anew = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
-  await anew.unlock('pw two')
+  await TH.unlock(anew, 'pw two')
   return anew
 }
 
@@ -37,7 +37,7 @@ describe("vault.stamp", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const before = vault.stamp.gate_epoch
-    await vault.putWayin('pw', 'pw two')
+    await TH.putWayin(vault, 'pw', 'pw two')
     expect(vault.stamp.gate_epoch).to.eq(before + 1)
     expect(vault.stamp.vault_epoch).to.eq(2)
   })
@@ -59,7 +59,7 @@ describe("vault.demandConsistentWith", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    await vault.del()
+    await TH.del(vault, 'pw')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(box) }, 'vault_gone')
   })
 
@@ -102,7 +102,7 @@ describe("vault.demandConsistentWith", () => {
   it("takes a vault_epoch at or below the vault's, and refuses one past it as 'gate_moved'", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putWayin('pw', 'pw two')
+    await TH.putWayin(vault, 'pw', 'pw two')
     const { stamp } = vault
     expect(() => { vault.demandConsistentWith({ vault_tok: stamp.vault_tok, vault_epoch: stamp.vault_epoch - 1 }) }).to.not.throw()
     expect(() => { vault.demandConsistentWith({ vault_tok: stamp.vault_tok, vault_epoch: stamp.vault_epoch }) }).to.not.throw()
@@ -163,7 +163,7 @@ describe("vault.consistentWith", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     let box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    await vault.putWayin('pw', 'pw two')
+    await TH.putWayin(vault, 'pw', 'pw two')
     expect(vault.consistentWith(box)).to.be.false
     const read = await vault.getBox(box.boxlabel)
     if (read === null) { throw new Error('expected the box') }
@@ -240,7 +240,7 @@ describe("the refresh's judgment", () => {
       reading.done = vault.hello({ staleMinutes: 0 })
       await reading.served.reached
     })
-    await vault.putWayin('pw', 'pw two')
+    await TH.putWayin(vault, 'pw', 'pw two')
     expect(vault.gate_epoch).to.eq(2)
     reading.served?.release()
     await reading.done
@@ -272,7 +272,7 @@ describe("the refresh's judgment", () => {
       await reading.answered.reached
       world.advance(1)
     })
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     reading.answered?.release()
     await reading.done
     expect(vault.state).to.eq('unlocked')
@@ -282,7 +282,7 @@ describe("the refresh's judgment", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    await there.putWayin('pw', 'pw two')
+    await TH.putWayin(there, 'pw', 'pw two')
     await vault.refresh()
     expect(vault.state).to.eq('locked')
     const kept = await world.getLease()
@@ -295,7 +295,7 @@ describe("the refresh's judgment", () => {
     const formerTok = vault.vault_tok
     const anew = await remakeElsewhere(world)
     await TH.expectRefusal(vault.refresh(), 'vault_remade')
-    await TH.expectRefusal(vault.ensureLease(), 'vault_remade')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_remade')
     const kept = await world.getLease()
     expect(kept?.vault_tok).to.eq(formerTok)
     const reborn = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
@@ -305,19 +305,19 @@ describe("the refresh's judgment", () => {
     expect(stillKept?.vault_tok).to.eq(formerTok)
   })
 
-  it("takes no lease up: another tab's unlock shows here at the next ensureLease, without a prompt", async () => {
+  it("takes no lease up: another tab's unlock shows here at the next ensureUnlocked, without a prompt", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    const getProof = vi.fn()
-    const thisTab = await world.open({ getProof })
+    const requestCleartext = vi.fn()
+    const thisTab = await world.open({ requestCleartext })
     const otherTab = await world.open()
-    await otherTab.unlock('pw')
+    await TH.unlock(otherTab, 'pw')
     await thisTab.refresh()
     expect(thisTab.state).to.eq('locked')
-    await thisTab.ensureLease()
+    await thisTab.ensureUnlocked()
     expect(thisTab.state).to.eq('unlocked')
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 })
 // --
@@ -342,18 +342,18 @@ describe("vault.lock, at once", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("lands on the prompt up before it returns: lockLanded settles, and every caller waiting refuses 'vault_locked'", async () => {
+  it("lands on the gating standing before it returns: lockLanded settles, and every caller waiting refuses 'vault_locked'", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
-    const seen: { ask: Ask | null, landed: boolean } = { ask: null, landed: false }
-    const vault = await world.open({ getProof: (ask) => {
-      seen.ask = ask
-      void ask.lockLanded.then(() => { seen.landed = true })
+    const seen: { gating: Gating | null, landed: boolean } = { gating: null, landed: false }
+    const vault = await world.open({ requestCleartext: (gating) => {
+      seen.gating = gating
+      void gating.lockLanded.then(() => { seen.landed = true })
       return new Promise(() => { /* the user never answers */ })
     } })
-    const waiting = vault.tryEnsureLease()
-    await TH.eventually(() => seen.ask !== null)
+    const waiting = vault.tryEnsureUnlocked()
+    await TH.eventually(() => seen.gating !== null)
     const locking = vault.lock()
     await TH.expectBad(waiting, 'vault_locked')
     expect(seen.landed).to.be.true
@@ -368,19 +368,19 @@ describe("a lock landing during a box call", () => {
   ] as const
 
   for (const [blurb, call] of BoxWrites) {
-    it(`refuses a ${blurb} 'vault_locked' when it lands on the call's getProof prompt, writing nothing`, async () => {
+    it(`refuses a ${blurb} 'vault_locked' when it lands on the call's gating, writing nothing`, async () => {
       const world = makeWorld()
       const maker = await world.openUnlocked('pw')
       await maker.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       await maker.lock()
       const row = storedRowOf(world, 'anthropic')
-      const seen: { ask: Ask | null } = { ask: null }
-      const vault = await world.open({ getProof: (ask) => {
-        seen.ask = ask
+      const seen: { gating: Gating | null } = { gating: null }
+      const vault = await world.open({ requestCleartext: (gating) => {
+        seen.gating = gating
         return new Promise(() => { /* the user never answers */ })
       } })
       const calling = call(vault)
-      await TH.eventually(() => seen.ask !== null)
+      await TH.eventually(() => seen.gating !== null)
       await vault.lock()
       await TH.expectRefusal(calling, 'vault_locked')
       expect(storedRowOf(world, 'anthropic')).to.deep.equal(row)

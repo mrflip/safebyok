@@ -3,7 +3,7 @@ import * as ZClassic from 'zod'
 import * as Z from 'zod/mini'
 import { Box, BoxRecord } from '../../src/box'
 import type { VaultError } from '../../src/errors'
-import type { GetProof } from '../../src/ask'
+import type { RequestCleartext } from '../../src/gating'
 import { valOf } from '../../src/outcome'
 import { Vault } from '../../src/vault'
 import { heldLeaseOf, registerLeaseReader } from '../../src/held-lease'
@@ -299,9 +299,9 @@ const remadeWorld = async () => {
   const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
   /** Delete and remake the vault from the second device, and have this one read the new life, which makes it gone as 'vault_remade'. */
   const remake = async () => {
-    await there.del()
+    await TH.del(there, 'pw')
     const reborn = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
-    await reborn.unlock('pw two')
+    await TH.unlock(reborn, 'pw two')
     await TH.expectBad(vault.tryHello({ staleMinutes: 0 }), 'vault_remade')
   }
   return { world, deaf, vault, remake }
@@ -421,7 +421,7 @@ describe("the times a vault keeps", () => {
     const madeAt = world.clock.now()
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt })
     world.advance(60_000)
-    await vault.putWayin('pw one', 'pw two')
+    await TH.putWayin(vault, 'pw one', 'pw two')
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, gate_epoch: 2 })
   })
 
@@ -596,15 +596,15 @@ describe("the sidecar", () => {
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'n'.repeat(20) })
   })
 
-  it("refuses a sidecar over maxWhisperBytes alone, its whisper left out, before asking for a proof", async () => {
+  it("refuses a sidecar over maxWhisperBytes alone, its whisper left out, before raising a gating", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw', { maxWhisperBytes: 64 })
     await warm.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await warm.lock()
-    const getProof = vi.fn<GetProof>(() => 'declined')
-    const cold = await world.open({ maxWhisperBytes: 64, getProof })
+    const requestCleartext = vi.fn<RequestCleartext>()
+    const cold = await world.open({ maxWhisperBytes: 64, requestCleartext })
     await TH.expectRefusal(cold.putBox({ boxlabel: 'anthropic', sidecar: { note: 'n'.repeat(60) } }), 'whisper_too_large')
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
   it("weighs a sidecar kept from the box before any key is made for the new one (Contract: vault.putBox, Does)", async () => {
@@ -1050,9 +1050,9 @@ describe("the host's validators", () => {
     const vault = await world.openUnlocked('pw one')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
-    await vault.putWayin('pw one', 'pw two')
+    await TH.putWayin(vault, 'pw one', 'pw two')
     await vault.delBox('anthropic')
-    await vault.del()
+    await TH.del(vault, 'pw two')
     for (const [ii, spy] of spies.entries()) {
       expect(spy.mock.calls.length, verbs[ii]).to.be.above(0)
       for (const args of spy.mock.calls) {
@@ -1289,17 +1289,17 @@ describe("vault.getBox", () => {
     expect(box).to.be.instanceOf(Box)
   })
 
-  it("asks for no proof where the listing shows no box under the boxlabel, resolving null, and asks when one is there", async () => {
+  it("raises no gating where the listing shows no box under the boxlabel, resolving null, and raises one when one is there", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
     await warm.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await warm.lock()
-    const getProof = vi.fn<GetProof>(() => 'declined')
-    const cold = await world.open({ getProof })
+    const requestCleartext = vi.fn<RequestCleartext>()
+    const cold = await world.open({ requestCleartext })
     expect(await cold.getBox('openai')).to.be.null
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
     await TH.expectRefusal(cold.getBox('anthropic'), 'vault_locked')
-    expect(getProof).toHaveBeenCalledTimes(1)
+    expect(requestCleartext).toHaveBeenCalledTimes(1)
   })
 
   it("hands back a box whose whisper will not open, which only extracting it finds out", async () => {
@@ -1380,16 +1380,17 @@ describe("box.extractWhisper, through a vault", () => {
     vi.restoreAllMocks()
   })
 
-  it("opens a box with the lease in hand, reading no storage and asking for no proof, as its example shows", async () => {
+  it("opens a box with the lease in hand, reading no storage and raising no gating, as its example shows", async () => {
     const world = makeWorld()
-    const getProof = vi.fn<GetProof>(() => 'declined')
-    const vault = await world.openUnlocked('pw', { getProof })
+    const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
+    const vault = await world.openUnlocked('pw', { requestCleartext })
+    requestCleartext.mockClear()
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
     const box = Box.make(vault, storedBoxOf(world))
     const reads = (['getBox', 'getVault'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await box.extractWhisper()).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
   it("opens a stored record made a box by any handle on the vault, each under its own handle's lease", async () => {
@@ -1422,15 +1423,16 @@ describe("box.extractWhisper, through a vault", () => {
     expect(whisper).to.deep.equal({ apiKey: 'sk-fake' })
   })
 
-  it("refuses 'vault_locked' with no lease in hand, asking for no proof", async () => {
+  it("refuses 'vault_locked' with no lease in hand, raising no gating", async () => {
     const world = makeWorld()
-    const getProof = vi.fn<GetProof>(() => 'declined')
-    const vault = await world.openUnlocked('pw', { getProof })
+    const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
+    const vault = await world.openUnlocked('pw', { requestCleartext })
+    requestCleartext.mockClear()
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const box = await gotBox(vault)
     await vault.lock()
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
   it("refuses a box that will not open as 'damaged_box', which getWhisper tells onBadNews and returns, quoting nothing of it", async () => {
@@ -1496,7 +1498,7 @@ describe("the Vault object's public surface", () => {
   it("yields no Lease, no CryptoKey and no wrapped key through any field or getter", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(heldLeaseOf(vault)).to.not.be.null
     const reached = reachableFrom(vault)

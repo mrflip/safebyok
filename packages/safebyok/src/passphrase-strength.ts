@@ -11,8 +11,8 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
  * tries first. The vault runs it before any key derivation on each new passphrase: the one the
- * first `unlock()` creates a vault with, and each one `putWayin()` sets. It never runs on
- * `unlock()` of a standing vault. One that throws refuses its call 'unexpected_error', and one
+ * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
+ * It never runs on an unlock of a standing vault. One that throws refuses its call 'unexpected_error', and one
  * that answers no verdict 'bad_option'.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as

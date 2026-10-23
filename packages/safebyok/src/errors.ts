@@ -6,7 +6,7 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *
  * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`,
- *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`. Let it reach an error boundary
+ *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`, `passphrase_required`. Let it reach an error boundary
  *   or the dev overlay.
  *   Never show it to the user, and never retry it.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
@@ -14,7 +14,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`.
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
+ *   `same_passphrase`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
  *   `vault_behind`, `identity_revoked`.
@@ -46,12 +47,13 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  * * `wrong_passphrase`, `wrong_passkey`: the proof did not open its wayin. That is all the vault
  *   can tell even when the stored vault was altered, since decryption fails alike; the message
  *   says so. A blank passphrase offered as proof is `wrong_passphrase` too.
- * * `gate_made_elsewhere`: a first unlock found the vault's first passphrase just set on another
- *   device. Nothing was set here; the next `hello()` shows the vault `locked` as the other device
+ * * `gate_made_elsewhere`: an `initialize_gate` attempt found the vault's first passphrase just
+ *   set on another device. Nothing was set here; the next `hello()` shows the vault `locked` as the other device
  *   made it, and the user enters the passphrase chosen there.
- * * `weak_passphrase`: a new passphrase (the one a vault is created with, or one `putWayin()`
- *   sets) that the `strengthChecker` finds too easy to guess, or a blank one. Its message is the
- *   checker's reason, fit to show beside the field. `unlock()` of a standing vault never raises it.
+ * * `weak_passphrase`: a new passphrase (the one an `initialize_gate` attempt sets, or a
+ *   `change_passphrase` attempt's next) that the `strengthChecker` finds too easy to guess, or a
+ *   blank one. Its message is the checker's reason, fit to show beside the field. An unlock of a
+ *   standing vault never raises it.
  * * `insecure_context`: a page served over plain http (anywhere but localhost), where the browser
  *   withholds WebCrypto. The host serves it over https.
  * * `newer_format`: a stored vault in a form this version does not know, perhaps written by a newer
@@ -80,8 +82,14 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
  *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The
  *   picture is already the new one: unlock again, or read the vault (`hello()`) and call again.
- * * `gating_landed`: a proof under way was for a prompt that has since ended -- a `lock()`
- *   landed, or the prompt was answered or declined -- so it unlocked nothing. Ask again.
+ * * `gating_landed`: a gating's attempt under way, or made, was for a gating that has since
+ *   ended -- a `lock()` landed, or it was settled or declined -- so it unlocked nothing. Ask again.
+ * * `attempt_in_flight`: a second attempt at a gating while its first runs: nothing was tried.
+ *   Disable the dialog's submit while an attempt runs.
+ * * `same_passphrase`: a `change_passphrase` attempt whose next passphrase is the current one.
+ *   The dialog shows it in place, and the gating stays open.
+ * * `passphrase_required`: `delWayin('passphrase')`, refused at once: a vault keeps its
+ *   passphrase, which `putWayin('passphrase')` replaces.
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
@@ -124,6 +132,9 @@ export const RefusalKindVals = [
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
+  'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
+  'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
+  'same_passphrase',     // a new passphrase that is the one the vault already has
 ] as const
 export type RefusalKind = typeof RefusalKindVals[number]
 
@@ -177,6 +188,9 @@ export const RefusalFamilyForKind = {
   gating_landed:       'condition',
   damaged_lease:       'bad_news',
   no_whisper:          'condition',
+  attempt_in_flight:   'condition',
+  passphrase_required: 'misuse',
+  same_passphrase:     'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** What a refusal learned, each fact under its own name, filled only by the refusals that name it.

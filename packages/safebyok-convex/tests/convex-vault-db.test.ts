@@ -197,7 +197,7 @@ describe("convexVaultDB, refusing", () => {
       return await TH.bySubject(ctx)
     })
     const vault = await openOver(deployment.client('u1'), deployment.api.safebyok)
-    await vault.unlock(TH.RealPassphrase)
+    await TH.unlock(vault, TH.RealPassphrase)
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     refusing.now = true
     await TH.expectRefusal(vault.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
@@ -240,7 +240,7 @@ describe("convexVaultDB, refusing", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const vault = await openOver(client, deployment.api.safebyok)
-    await vault.unlock(TH.RealPassphrase)
+    await TH.unlock(vault, TH.RealPassphrase)
     // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
     const vaultProps = await TH.propsOf(vaultDB, u1)
@@ -482,14 +482,14 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const deviceDB = memoryDeviceDB()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
-      await vault.unlock(TH.RealPassphrase)
+      await TH.unlock(vault, TH.RealPassphrase)
       await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
       // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
-      await TH.expectRefusal(vault.unlock(TH.RealPassphrase), 'identity_revoked')
+      await TH.expectRefusal(TH.unlock(vault, TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
       const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
       expect(stored?.boxes).to.have.lengthOf(1)

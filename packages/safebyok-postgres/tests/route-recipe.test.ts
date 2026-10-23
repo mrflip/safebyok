@@ -182,7 +182,7 @@ describe("the README route recipe", () => {
     const vault = await TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     TH.closeVault(vault)
@@ -194,7 +194,7 @@ describe("the README route recipe", () => {
     const deviceDB = memoryDeviceDB()
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger }
     const vault = await TH.settledVault(opts)
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     session.userId = null
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
@@ -202,7 +202,7 @@ describe("the README route recipe", () => {
     expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
     session.userId = 'u1'
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     TH.closeVault(vault)
   })

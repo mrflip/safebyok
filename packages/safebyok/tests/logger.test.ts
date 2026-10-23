@@ -222,7 +222,7 @@ const warnAtFirstUnlock = async (logger: VaultLogger, overrides: Partial<TH.Born
   const bank = Bank.make(bankOpts)
   const vault = await bank.ensureVault({ userId, vaultlabel })
   vi.spyOn(bankOpts.deviceDB, 'raiseDeviceRecord').mockRejectedValue(new Error('the disk said no'))
-  await vault.unlock('pw')
+  await TH.unlock(vault, 'pw')
   bank.closeVaults()
 }
 

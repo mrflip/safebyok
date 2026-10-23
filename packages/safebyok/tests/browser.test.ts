@@ -58,18 +58,18 @@ describe("browserOpts", () => {
 
   it("yields to a strength checker of the host's own, passed after it, as its third example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
+    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext })
     const vault = await bank.ensureVault({ userId: 'u1', vaultlabel: 'main' })
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     bank.closeVaults()
   })
 
   it("brings the zxcvbn test to Bank.make: a common password is refused at a first unlock, as zxcvbnStrengthChecker's first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver })
+    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext })
     const vault = await bank.ensureVault({ userId: 'u1', vaultlabel: 'main' })
-    await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
+    await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
     expect(vault.getSnapshot().state).to.eq('novel')
     bank.closeVaults()
   })
@@ -96,10 +96,10 @@ describe("safebyok/browser", () => {
 describe("zxcvbnStrengthChecker, as Bank.make's strengthChecker", () => {
   it("refuses a common password at a first unlock with kind 'weak_passphrase', and gates the vault with a strong one", async () => {
     const vault = await TH.settledVault({ ...TH.memoryVaultOpts(), strengthChecker: zxcvbnStrengthChecker })
-    const err = await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
+    const err = await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
     expect(err.message).to.match(/commonly used password/)
     expect(vault.getSnapshot().state).to.eq('novel')
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     TH.closeVault(vault)
   })

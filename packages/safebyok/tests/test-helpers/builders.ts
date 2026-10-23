@@ -14,6 +14,7 @@ import { good, valOf } from '../../src/outcome'
 import { VaultError } from '../../src/errors'
 import { Lease, sealLeaseRecord } from '../../src/lease'
 import { registerLeaseReader } from '../../src/held-lease'
+import { scriptedRequestCleartext } from './gating'
 
 
 /**
@@ -130,7 +131,9 @@ export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'userId' | 'vaultlab
 
 /** Everything a bank and its vault need, over stores in memory made fresh for each call.
  * That is `u1`'s `main` vault in the `acme` app (as {@link scopeOf} has it), deriving through
- * {@link testDeriver}, and admitting any passphrase ({@link anyStrengthChecker}). `overrides`
+ * {@link testDeriver}, admitting any passphrase ({@link anyStrengthChecker}), and answering each
+ * gating as a test scripts it ({@link scriptedRequestCleartext}, which `TH.unlock` and its kin
+ * script). `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
@@ -147,6 +150,7 @@ export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVau
   deviceDB:   memoryDeviceDB(),
   keyDeriver: testDeriver,
   strengthChecker: anyStrengthChecker,
+  requestCleartext: scriptedRequestCleartext,
   ...overrides,
 })
 
@@ -154,7 +158,8 @@ export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVau
 const banksOf = new WeakMap<Vault, Bank>()
 
 /** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of `userId` and `vaultlabel`.
- * Its snapshot says `novel`, `locked` or `unlocked`. A bank of its own each time, so two calls
+ * Its snapshot says `novel`, `locked` or `unlocked`. A bag naming no `requestCleartext` is given
+ * {@link scriptedRequestCleartext}, so `TH.unlock` and its kin answer its gatings. A bank of its own each time, so two calls
  * over one deviceDB are two tabs of one device. Rejects as `Bank.make` throws for misuse, and as
  * `ensureVault` rejects.
  *
@@ -168,7 +173,9 @@ const banksOf = new WeakMap<Vault, Bank>()
  *   const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
  */
 export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
-  const { userId, vaultlabel, ...bankOpts } = opts
+  const { userId, vaultlabel, ...given } = opts
+  // A bag that names no requestCleartext answers gatings as TH.unlock and its kin script them.
+  const bankOpts = 'requestCleartext' in given ? given : { ...given, requestCleartext: scriptedRequestCleartext }
   const bank = Bank.make(bankOpts)
   const vault = await bank.ensureVault({ userId, vaultlabel })
   banksOf.set(vault, bank)
@@ -270,8 +277,8 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
  *
- * @example await vault.putWayin('pw', await passkeyOf('laptop'))
- * @example await vault.unlock(await passkeyOf('laptop'))
+ * @example await TH.putWayin(vault, 'pw', await passkeyOf('laptop'))
+ * @example await TH.unlock(vault, await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
 export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<PasskeyAnswer> => {

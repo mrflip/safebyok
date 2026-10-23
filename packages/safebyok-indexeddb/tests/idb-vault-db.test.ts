@@ -296,11 +296,11 @@ describe("idbVaultDB", () => {
     const dbName = TH.freshDbName()
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
     const vault = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
-    await vault.unlock('correct horse')
+    await TH.unlock(vault, 'correct horse')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-not-a-real-key')
     TH.closeVault(vault)
     const reopened = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
-    await reopened.unlock('correct horse')
+    await TH.unlock(reopened, 'correct horse')
     expect(await reopened.getWhisper('anthropic')).to.eq('sk-not-a-real-key')
     TH.closeVault(reopened)
   })

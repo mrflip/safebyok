@@ -24,7 +24,7 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
     expect(fresh.getSnapshot().state).to.eq('novel')
-    await fresh.unlock('another pw')
+    await TH.unlock(fresh, 'another pw')
     await fresh.putBox({ boxlabel: 'anthropic' }, 'sk-new-fake')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
   })
@@ -153,7 +153,7 @@ describe("delDamagedVault", () => {
     const world = makeWorld()
     const opts = world.optsWith({ userId: 'u1@example', validators: { userId: Z.string() } })
     const vault = await TH.settledVault(opts)
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     TH.closeVault(vault)
     const ckey = Ckeys.vaultProps({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
     const vaultProps = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object

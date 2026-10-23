@@ -244,14 +244,14 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const deviceDB = memoryDeviceDB()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
-      await vault.unlock(TH.RealPassphrase)
+      await TH.unlock(vault, TH.RealPassphrase)
       await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
       // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
-      await TH.expectRefusal(vault.unlock(TH.RealPassphrase), 'identity_revoked')
+      await TH.expectRefusal(TH.unlock(vault, TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
       const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
       expect(stored?.boxes).to.have.lengthOf(1)
@@ -273,7 +273,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     expect(laptop.getSnapshot().state).to.eq('novel')
 
     // The laptop makes the vault and stores a whisper; the phone hears of both.
-    await laptop.unlock(TH.RealPassphrase)
+    await TH.unlock(laptop, TH.RealPassphrase)
     await laptop.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, anthropicKey)
     await vi.waitFor(() => {
       expect(phone.getSnapshot().state).to.eq('locked')
@@ -281,7 +281,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     })
 
     // The phone unlocks and reads what the laptop wrote; what the deployment holds is ciphertext.
-    await phone.unlock(TH.RealPassphrase)
+    await TH.unlock(phone, TH.RealPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
     const standing = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
     const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vaultProps.vault_tok } })
@@ -298,14 +298,14 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The laptop changes the passphrase: the phone is locked out of its old unlock, and only the
     // new passphrase opens it again.
-    await laptop.putWayin(TH.RealPassphrase, NewPassphrase)
+    await TH.putWayin(laptop, TH.RealPassphrase, NewPassphrase)
     await vi.waitFor(() => { expect(phone.getSnapshot().state).to.eq('locked') })
-    await TH.expectRefusal(phone.unlock(TH.RealPassphrase), 'wrong_passphrase')
-    await phone.unlock(NewPassphrase)
+    await TH.expectRefusal(TH.unlock(phone, TH.RealPassphrase), 'wrong_passphrase')
+    await TH.unlock(phone, NewPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
 
     // The phone deletes the vault; the laptop hears it gone, and its bank hands out no Vault object for it.
-    await phone.del()
+    await TH.del(phone, NewPassphrase)
     await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ userId: 'u1', vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
     TH.closeVault(laptop)
     TH.closeVault(phone)

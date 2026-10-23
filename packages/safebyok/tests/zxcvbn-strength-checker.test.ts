@@ -186,7 +186,7 @@ describe("zxcvbnStrengthChecker's loading", () => {
       expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
       const vault = await bank.ensureVault({ userId, vaultlabel })
       expect(vault.getSnapshot().state).to.eq('novel')
-      await vault.unlock('correct horse battery staple')
+      await TH.unlock(vault, 'correct horse battery staple')
       expect(vault.getSnapshot().state).to.eq('unlocked')
     } finally {
       bank.closeVaults()

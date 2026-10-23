@@ -122,6 +122,7 @@ const FamilyCases = [
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
+  ["passphrase_required", "misuse",    "asking to remove a vault's passphrase is a bug: it can only be replaced"],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
   ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
@@ -149,9 +150,11 @@ const FamilyCases = [
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
   ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
-  ["gating_landed",       "condition", 'a prompt ended while its proof was checked is the user moving on, not a fault'],
+  ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
   ["no_whisper",          "condition", 'a store keeping a whisper where none stands is told to the caller, who hands one in'],
+  ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
+  ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
 ] as const
 
 describe("each kind's family", () => {

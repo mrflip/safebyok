@@ -6,7 +6,7 @@ import { PassphraseKeyBytes } from './key-deriver-spec'
 import { type Lease, sealLeaseRecord } from './lease'
 import { hostThrewRefusal } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type VaultProps, type WayinKind, isGated } from './types'
+import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
@@ -26,10 +26,15 @@ export type PassphraseWayinHeader = Omit<PassphraseWayinRecord, 'vault_key_wayin
 /** A passkey wayin's visible fields: its record but the wrap. */
 export type PasskeyWayinHeader = Omit<PasskeyWayinRecord, 'vault_key_wayin_wrapped'>
 
-/** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more. */
-export type ProvingGating = { readonly landed: boolean }
+/** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more.
+ * `call` is the vault call that raised it, which a demand's refusal names in the log.
+ */
+export type ProvingGating = { readonly landed: boolean, readonly call?: ProvingCall | undefined }
 
-/** The gating of a proving made outside any prompt, which never lands. */
+/** The vault calls a proving's demand names: those that raise a gating, and the demand itself for a proving made outside one. */
+export type ProvingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del' | 'demandConsistentWith'
+
+/** The gating of a proving made outside any gating, as a test makes one, which never lands. Every vault call's proving is made for a real gating. */
 export const StandingGating: ProvingGating = Object.freeze({ landed: false })
 
 /** What a proving reaches of its Vault object inside the package, which no getter of the Vault object shows. */
@@ -38,10 +43,12 @@ export type ProvingInside = {
   vaultProps: () => VaultProps
   /** This device's id for the vault, from the bank's device record: what a fresh header carries. */
   deviceId:   () => string
-  /** Store `record` as this device's lease, {@link DeviceDB.putLease}, resolving the record as stored; a take-up under way stands down first. */
+  /** Store `record` as this device's lease, {@link DeviceDB.putLease}, resolving the record as stored. */
   putLease:   (record: LeaseRecord) => Promise<LeaseRecord>
   /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
   holdLease:  (stored: LeaseRecord) => Lease
+  /** The vault's demand on `thing`, a refusal logged as `call`'s. */
+  demand:     (thing: Stamped, call: ProvingCall) => void
 }
 
 /** Each registered vault's inside: a weak map, so a vault let go is let go here too. */
@@ -141,7 +148,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** A Wayin for `newProving`'s slotlabel: the vaultKey unwrapped from the gate's wayin at this proving's slotlabel and wrapped under `newProving`, bound to its header.
    * The vaultKey is not kept. It demands on this proving before and after its waits, which is what
-   * refuses 'gate_moved' for a passphrase another device has since replaced. It refuses as
+   * refuses 'gate_moved' for a passphrase another device has since replaced, and on `newProving`
+   * after them. It refuses as
    * {@link Proving.checkWayin} does for a proving that does not open its wayin.
    *
    * @example const wayin = await currentProving.resealWayinFor(newProving)
@@ -151,6 +159,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
     const wrapped = await newProving.wrappedWith(vaultKey, newProving.header)
     this.#demand()
+    newProving.#demand()
     const record: unknown = { ...newProving.header, vault_key_wayin_wrapped: wrapped }
     return Wayin.make(this.vault, this.vault_tok, record)
   }
@@ -175,10 +184,10 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const record = await sealLeaseRecord(this.vault, standing, vaultKey)
     // Nothing is awaited between these demands and the write.
     this.#demand()
-    this.vault.demandConsistentWith(stampOfRecord(record))
+    inside.demand(stampOfRecord(record), this.#call())
     const stored = await inside.putLease(record)
     this.#demand()
-    this.vault.demandConsistentWith(stampOfRecord(stored))
+    inside.demand(stampOfRecord(stored), this.#call())
     return inside.holdLease(stored)
   }
 
@@ -190,9 +199,19 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The refusal of a wayin this proving does not open. */
   protected abstract wrongProof(): VaultError
 
-  /** The demand on this proving, through its vault. */
+  /** The demand on this proving, through its vault, a refusal logged as its gating's call. */
   #demand() {
-    this.vault.demandConsistentWith(this)
+    insideOf(this.vault).demand(this, this.#call())
+  }
+
+  /** The vault call its gating was raised by, as a refusal logs it. */
+  #call(): ProvingCall {
+    return this.gating.call ?? 'demandConsistentWith'
+  }
+
+  /** The demand on this proving, for a method of a subclass. */
+  protected demandSelf() {
+    this.#demand()
   }
 
   /** The wrap of the gate's wayin at this proving's slotlabel, as the vault holds it now; a gate with none there has moved past it. */
@@ -235,7 +254,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    * strength: {@link Vault.checkStrength} does. It refuses 'bad_option' for a passphrase that is not
    * text, and as {@link passphraseKeyOf} does. It demands on the proving after the derivation.
    *
-   * @param opts.gating - The gating it is made for; {@link StandingGating} when left out.
+   * @param opts.gating - The gating it is made for; every vault call passes its own. {@link StandingGating} when left out, as a test may.
    *
    * @example await PassphraseProving.seal(vault, headerOf(vaultProps.passphrase), typed)
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen)
@@ -249,12 +268,12 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const sealing = 'slotlabel' in header ? mintedPassphraseHeader(vault, keyDeriver) : checkedPassphraseHeader(header, keyDeriver, passphrase)
     const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, fromB64(sealing.salt_b64))
     const proving = new PassphraseProving(vault, stamp, sealing, opts.gating ?? StandingGating, wayinKey)
-    vault.demandConsistentWith(proving)
+    proving.demandSelf()
     return proving
   }
 
   /** The wayins of a novel vault, the first gate's: a fresh vaultKey wrapped under this proving's header and, when given, `passkeyProving`'s, in one method so the vaultKey never crosses.
-   * The vaultKey is not kept. Both provings are fresh. It demands on this proving after its waits.
+   * The vaultKey is not kept. Both provings are fresh. It demands on both provings after its waits.
    *
    * @example const { passphrase, passkey } = await passphraseProving.sealWayins(passkeyProving)
    */
@@ -262,7 +281,8 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const vaultKey = await makeVaultKey()
     const passphraseWrap = await this.wrappedWith(vaultKey, this.header)
     const passkeyWrap = passkeyProving === undefined ? null : await passkeyProving.wrappedWith(vaultKey, passkeyProving.header)
-    this.vault.demandConsistentWith(this)
+    this.demandSelf()
+    if (passkeyProving !== undefined) { insideOf(this.vault).demand(passkeyProving, this.gating.call ?? 'demandConsistentWith') }
     return {
       passphrase: Wayin.make(this.vault, this.vault_tok, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }),
       passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vault, this.vault_tok, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }),
@@ -301,7 +321,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * 'damaged_wayin' for a salt its kind never makes and 'wrong_passkey' for another credential's
    * answer or one over another salt, deriving nothing. It demands on the proving after the HKDF.
    *
-   * @param opts.gating - The gating it is made for; {@link StandingGating} when left out.
+   * @param opts.gating - The gating it is made for; every vault call passes its own. {@link StandingGating} when left out, as a test may.
    *
    * @example await PasskeyProving.seal(vault, headerOf(vaultProps.passkey), await askPasskey(vault.passkey))
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts))
@@ -314,7 +334,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
       const sealing = 'slotlabel' in header ? mintedPasskeyHeader(vault, checked) : checkedPasskeyHeader(header, checked)
       const wayinKey = await deriveWrappingKey(prfBytes, wayinCtxOf(vault, stamp.vault_tok, sealing))
       const proving = new PasskeyProving(vault, stamp, sealing, opts.gating ?? StandingGating, wayinKey)
-      vault.demandConsistentWith(proving)
+      proving.demandSelf()
       return proving
     } finally {
       prfBytes.fill(0)

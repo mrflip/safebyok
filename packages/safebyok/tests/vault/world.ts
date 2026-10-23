@@ -38,12 +38,12 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<TH.BornVaultOpts>): TH.BornVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger, ...defaults, ...overrides }
+    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<TH.BornVaultOpts>) => TH.settledVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
-    await vault.unlock(passphrase)
+    await TH.unlock(vault, passphrase)
     return vault
   }
   const getLease = () => TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
@@ -131,14 +131,14 @@ export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'ge
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
-  await vault.putWayin('pw', await TH.passkeyOf('laptop'))
+  await TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
 }
 
 /** A vault in a fresh world, unlocked with `pw`, holding one box and the passkey `laptop`. */
 export const vaultWithPasskey = async () => {
   const world = makeWorld()
   const vault = await world.open()
-  await vault.unlock('pw')
+  await TH.unlock(vault, 'pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
   await addLaptopPasskey(vault)
@@ -174,7 +174,7 @@ export const rolledBackWorld = async () => {
   const vault = await world.openUnlocked('pw')
   await addLaptopPasskey(vault)
   const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
-  await vault.delWayin('pw')
+  await TH.delWayin(vault, 'pw')
   const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
   return { world, vault, older, newer }
 }

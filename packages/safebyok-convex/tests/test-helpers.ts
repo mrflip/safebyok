@@ -3,7 +3,7 @@ import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { GatedVaultProps, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, closeVault, memoryVaultOpts, settledVault } from 'safebyok/testing'
+import { boxOf, closeVault, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -129,7 +129,7 @@ export const openOver = (store: StringStore, userId = 'u1') => settledVault(memo
 export const realRecords = async (userId = 'u1') => {
   const store = memoryStore()
   const vault = await openOver(store, userId)
-  await vault.unlock(RealPassphrase)
+  await unlock(vault, RealPassphrase)
   for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
     await vault.putBox({ boxlabel, sidecar }, whisper)
   }

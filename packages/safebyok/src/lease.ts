@@ -126,7 +126,7 @@ export class Lease {
   }
 
   /** True when this lease has ended by `instant`: its `ask_passphrase_at` is at or before it.
-   * `endsBy(now + renewMillis)` is how `ensureLease({ renewMinutes })` asks ahead of the end.
+   * `endsBy(now + renewMillis)` is how `ensureUnlocked({ renewMinutes })` asks ahead of the end.
    *
    * @example lease.endsBy(vault.now())                       // true once it has ended
    * @example lease.endsBy(vault.now() + 60 * MinuteMillis)   // true when it ends within the hour

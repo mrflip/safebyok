@@ -313,17 +313,17 @@ describe("holdNextCall", () => {
     expect(heard).to.deep.equal(['later', 'held'])
   })
 
-  it("lands a lock in the middle of an unlock, as its @example has it", async () => {
+  it("lands a lock in the middle of an unlock, as its @example has it: the unlock refuses at once, nothing unlocked", async () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     const gate = TH.holdNextCall(opts.vaultDB, 'getVault')
-    let settled = false
-    const unlocking = (async () => { await vault.unlock('pw'); settled = true })()
+    const unlocking = TH.tryUnlock(vault, 'pw')
     await gate.reached
     await vault.lock()
-    expect(settled).to.be.false
+    const unlocked = await unlocking
     gate.release()
-    await unlocking
+    expect(unlocked.ok).to.be.false
+    expect(vault.state).to.not.eq('unlocked')
   })
 })
 
@@ -346,7 +346,7 @@ describe("holdNextAnswer", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     const written = TH.holdNextAnswer(opts.deviceDB, 'putLease')
-    const unlocking = vault.tryUnlock('pw')
+    const unlocking = TH.tryUnlock(vault, 'pw')
     await written.reached
     await vault.lock()
     written.release()
@@ -360,7 +360,7 @@ describe("readAfresh", () => {
   it("waits out a read under way and reads again, so a change made while it ran shows, as its @example has it", async () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     const reads = vi.spyOn(opts.vaultDB, 'getVault')
     const underWay = vault.refresh()
     await TH.readAfresh(vault)
@@ -381,7 +381,7 @@ describe("settledVault", () => {
   it("makes a bank of its own each call, so two calls over one deviceDB are two tabs of one device", async () => {
     const opts = TH.memoryVaultOpts()
     const here = await TH.settledVault(opts)
-    await here.unlock('pw')
+    await TH.unlock(here, 'pw')
     const there = await TH.settledVault(opts)
     expect(TH.bankOf(there)).to.not.eq(TH.bankOf(here))
     expect(there).to.not.eq(here)
@@ -391,7 +391,7 @@ describe("settledVault", () => {
   it("makes two devices over one vaultDB, each with a device store of its own, as its second example shows", async () => {
     const opts = TH.memoryVaultOpts()
     const here = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
-    await here.unlock('pw')
+    await TH.unlock(here, 'pw')
     const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
     expect(there.getSnapshot().state).to.eq('locked')
   })
@@ -422,7 +422,7 @@ describe("closeVault", () => {
   it("lets the vault go, every call then refusing 'vault_gone', and leaves the lease for the next vault settled over this deviceDB, as its example shows", async () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     TH.closeVault(vault)
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
@@ -647,7 +647,7 @@ describe("memoryVaultOpts", () => {
     const opts = TH.memoryVaultOpts()
     expect(opts).to.include({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver })
     const vault = await TH.settledVault(opts)
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1'))).to.not.be.null
     expect(await TH.expectingGood(opts.deviceDB).getLease(TH.scopeOf('u1'))).to.not.be.null
   })
@@ -670,10 +670,10 @@ describe("freshDbName", () => {
 describe("testDeriver", () => {
   it("opens a vault, deterministic in passphrase and salt", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     await vault.lock()
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
@@ -959,7 +959,7 @@ describe("expectRefusal", () => {
 
   it("lets a test look closer at what refused", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
-    const err = await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
+    const err = await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
     expect(err.message).to.be.a('string').and.not.be.empty
   })
 })
@@ -1021,7 +1021,7 @@ describe("omitting", () => {
   it("leaves out the one field named, and keeps the rest", () => {
     const without = TH.omitting(opts, 'keyDeriver')
     expect(without).to.not.have.property('keyDeriver')
-    expect(Object.keys(without)).to.have.members(['applabel', 'userId', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker'])
+    expect(Object.keys(without)).to.have.members(['applabel', 'userId', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker', 'requestCleartext'])
     expect(opts.keyDeriver).to.eq(TH.testDeriver)
   })
 

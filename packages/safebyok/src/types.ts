@@ -252,7 +252,7 @@ export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().passkey)   // null when the user dismissed it
- *   if (passkey !== null) { await vault.unlock(passkey) }
+ *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
 export type PasskeyAnswer = {
   credentialId: string

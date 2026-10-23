@@ -8,7 +8,7 @@ import { makeWorld, vaultWithPasskey, u1VaultPropsCkey, storedVaultPropsOf } fro
 // == [The pairs]: TwinCases, each X over its tryX
 
 /** Every call that comes in two forms, by its throwing name. */
-type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'getWhisper' | 'delBox' | 'del'
+type TwinName = 'hello' | 'ensureUnlocked' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'getWhisper' | 'delBox' | 'del'
 
 /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
 type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -21,23 +21,38 @@ const twinVault = vaultWithPasskey
 
 type Twin = Awaited<ReturnType<typeof twinVault>>
 
+/** Script `vault`'s next gating to be answered with its passphrase `pw`, the next one `new phrase` for a change of passphrase. */
+const answerWithPw = (vault: Vault) => {
+  TH.answering(vault, async (gating) => {
+    if (gating.gatingkind === 'change_passphrase') {
+      await gating.attempt('pw', 'new phrase')
+    } else if (gating.gatingkind === 'del_passkey' || gating.gatingkind === 'del_vault') {
+      await gating.attempt('pw')
+    }
+  })
+}
+
+/** Script `vault`'s next gating to be declined, as a user pressing Cancel. */
+const answerWithDecline = (vault: Vault) => {
+  TH.answering(vault, (gating) => { gating.decline(); return Promise.resolve() })
+}
+
 /**
  * Each pair: its name; the kind it refuses with, and the arguments, given the vault, that it
  * refuses (a vault let go first, where only that refuses); the arguments it answers, and what its
  * answer must be.
  */
 const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unknown[], (twin: Twin) => unknown[], (val: unknown, twin: Twin) => void])[] = [
-  ["hello",            "bad_option",       () => [{ staleMinute: 0 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
-  ["ensureLease",      "bad_option",       () => [{ renewMinute: 5 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
-  ["unlock",           "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
-  ["lock",             "vault_gone",       ({ vault }) => { TH.closeVault(vault); return [] },  () => [],                                          (val) => { expect(val).to.be.undefined }],
-  ["putWayin",         "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val, { vault }) => { expect(val).to.deep.equal(vault.passphrase) }],
-  ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val, { vault }) => { expect(val).to.eq(vault) }],
-  ["putBox",           "bad_whisper",      () => [{ boxlabel: 'openai' }, null],               () => [{ boxlabel: 'openai' }, 'sk-fake-two'],     (val) => { expect(val).to.have.property('boxlabel', 'openai') }],
-  ["getBox",           "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
-  ["getWhisper",       "bad_label",        () => ['tab\there'],                                () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
-  ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val, { vault }) => { expect(val).to.deep.eq({ boxlabel: 'anthropic', vault_tok: vault.vault_tok, outcome: 'deleted' }) }],
-  ["del",              "vault_gone",       ({ vault }) => { TH.closeVault(vault); return [] },  () => [],                                          (val) => { expect(val).to.be.undefined }],
+  ["hello",           "bad_option",           () => [{ staleMinute: 0 }],                                          () => [],                                                       (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["ensureUnlocked",  "bad_option",           () => [{ renewMinute: 5 }],                                          () => [],                                                       (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["lock",            "vault_gone",           ({ vault }) => { TH.closeVault(vault); return [] },                  () => [],                                                       (val) => { expect(val).to.be.undefined }],
+  ["putWayin",        "vault_locked",         ({ vault }) => { answerWithDecline(vault); return ['passphrase'] },  ({ vault }) => { answerWithPw(vault); return ['passphrase'] },  (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["delWayin",        "passphrase_required",  () => ['passphrase'],                                                ({ vault }) => { answerWithPw(vault); return ['passkey'] },     (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["putBox",          "bad_whisper",          () => [{ boxlabel: 'openai' }, null],                                () => [{ boxlabel: 'openai' }, 'sk-fake-two'],                  (val) => { expect(val).to.have.property('boxlabel', 'openai') }],
+  ["getBox",          "bad_label",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
+  ["getWhisper",      "bad_label",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.eq('sk-fake') }],
+  ["delBox",          "absent_box",           () => ['openai'],                                                    () => ['anthropic'],                                            (val, { vault }) => { expect(val).to.deep.eq({ boxlabel: 'anthropic', vault_tok: vault.vault_tok, outcome: 'deleted' }) }],
+  ["del",             "vault_gone",           ({ vault }) => { TH.closeVault(vault); return [] },                  ({ vault }) => { answerWithPw(vault); return [] },              (val) => { expect(val).to.be.undefined }],
 ]
 
 /** `callname`'s two forms on `vault`: its `try` form and its throwing one. */
@@ -100,14 +115,15 @@ describe("each call's two forms (Contract: Shapes, Two forms of every call)", ()
     expect(onBadNews).toHaveBeenCalledTimes(2)
   })
 
-  it("answers as the vault class's fourth example shows: a wrong passphrase branched on, never thrown", async () => {
+  it("answers as the vault class's fourth example shows: a locked vault branched on, never thrown", async () => {
     const { vault } = await twinVault()
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     await vault.lock()
-    const gripes: string[] = []
-    const askAgain = (gripe: string) => { gripes.push(gripe) }
-    const { ok, err } = await vault.tryUnlock('not it')
-    if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
-    expect(gripes).to.have.lengthOf(1)
+    const offers: string[] = []
+    const offerUnlock = () => { offers.push('unlock') }
+    const { ok, err } = await vault.tryGetWhisper('anthropic_api_key')
+    if (! ok && err.refusalkind === 'vault_locked') { offerUnlock() }
+    expect(offers).to.have.lengthOf(1)
   })
 })
 // --
@@ -122,7 +138,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
     const world = makeWorld()
     const thrown = new TypeError('the key deriver is down')
     const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
-    const err = await TH.expectBad(vault.tryUnlock('pw'), 'unexpected_error')
+    const err = await TH.expectBad(TH.tryUnlock(vault, 'pw'), 'unexpected_error')
     expect(err.family).to.eq('misuse')
     expect(err.cause).to.eq(thrown)
   })
@@ -130,7 +146,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
   it("never logs what was thrown: a host's function that threw may have been handed the passphrase", async () => {
     const world = makeWorld()
     const vault = await world.open({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: (passphrase) => { throw new TypeError(`cannot derive ${passphrase}`) } } })
-    await TH.expectBad(vault.tryUnlock('SUPERSECRET staple'), 'unexpected_error')
+    await TH.expectBad(TH.tryUnlock(vault, 'SUPERSECRET staple'), 'unexpected_error')
     expect(TH.loggedText(world.logged)).to.not.include('SUPERSECRET')
   })
 
@@ -138,7 +154,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
     const world = makeWorld()
     const thrown = new TypeError('the key deriver is down')
     const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
-    const err = await TH.expectRefusal(vault.unlock('pw'), 'unexpected_error')
+    const err = await TH.expectRefusal(TH.unlock(vault, 'pw'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
   })
 

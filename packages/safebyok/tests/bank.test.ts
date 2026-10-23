@@ -11,7 +11,7 @@ import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import { browserOpts } from '../src/browser'
 import { type MakeBankOpts, type VaultDraft, parseMakeBankOpts, parseVaultDraft } from '../src/vault-opts'
-import type { Ask } from '../src/ask'
+import type { Gating } from '../src/gating'
 import type { Vault } from '../src/vault'
 import * as TH from './test-helpers'
 import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
@@ -190,7 +190,7 @@ describe("bank.ensureVault", () => {
     expect(vault.getSnapshot()).to.deep.include({ state: 'novel', gate_epoch: 0, passphrase: null })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ vault_tok: vault.vault_tok, gate_epoch: 0, passphrase: null, passkey: null })
     const bornAs = vault.vault_tok
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     await vault.hello({ staleMinutes: 0 })
     expect(vault.vault_tok).to.eq(bornAs)
   })
@@ -249,14 +249,14 @@ describe("a lease taken up at birth", () => {
     [(world) => { world.advance(SevenDaysMillis + 1); return Promise.resolve({}) },        'a lease that has ended'],
     [async (world) => {
       const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-      await elsewhere.putWayin('pw', 'new phrase')
+      await TH.putWayin(elsewhere, 'pw', 'new phrase')
       return {}
     },                                                                                          'a lease of another gate_epoch, the passphrase changed elsewhere'],
     [async (world) => {
       const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-      await elsewhere.del()
+      await TH.del(elsewhere, 'pw')
       const remade = await TH.bankOf(elsewhere).ensureVault(U1)
-      await remade.unlock('pw')
+      await TH.unlock(remade, 'pw')
       return {}
     },                                                                                          'a lease of another vault_tok, another life of the vault'],
     [() => Promise.resolve({ leaseHours: 1 }),                                                 'a lease ending past leaseHours from now, granted under a longer leaseHours'],
@@ -310,7 +310,7 @@ describe("a vault served behind this device's record", () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(U1)
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     expect(await world.getLease()).to.not.be.null
     const asked: Promise<Vault>[] = []
     bank.subscribe(() => { if (bank.entryOf(U1) === null && asked.length === 0) { asked.push(bank.ensureVault(U1)) } })
@@ -427,7 +427,7 @@ describe("this device's record of the vault", () => {
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     expect(await highestEpochOf(world)).to.eq(1)
-    await elsewhere.putWayin('pw', 'new phrase')
+    await TH.putWayin(elsewhere, 'pw', 'new phrase')
     expect(await highestEpochOf(world)).to.eq(1)
     await vault.hello({ staleMinutes: 0 })
     expect(await highestEpochOf(world)).to.eq(2)
@@ -437,7 +437,7 @@ describe("this device's record of the vault", () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     const seen: number[] = []
-    for (const write of [() => vault.unlock('pw'), async () => vault.putWayin('pw', await TH.passkeyOf('laptop')), () => vault.delWayin('pw')]) {
+    for (const write of [() => TH.unlock(vault, 'pw'), async () => TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop')), () => TH.delWayin(vault, 'pw')]) {
       await write()
       seen.push(await highestEpochOf(world) ?? -1)
       expect(seen.at(-1)).to.eq(vault.stamp.vault_epoch)
@@ -450,7 +450,7 @@ describe("this device's record of the vault", () => {
     const vaultDB = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB })
     const tombstones = keptTombstones(vaultDB)
-    await vault.del()
+    await TH.del(vault, 'pw')
     expect(tombstones).to.have.lengthOf(1)
     const tombstoneEpoch = tombstones[0]?.vault_epoch ?? -1
     expect(tombstoneEpoch).to.be.greaterThan(1)
@@ -460,7 +460,7 @@ describe("this device's record of the vault", () => {
   it("names the device that sealed each way in: the record's device_id", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putWayin('pw', await TH.passkeyOf('laptop'))
+    await TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     const record = await recordOf(world)
     const deviceId = record?.device_id
     expect(vault.passphrase?.device_id).to.eq(deviceId)
@@ -475,7 +475,7 @@ describe("this device's record of the vault", () => {
     const served = TH.holdNextAnswer(deaf, 'getVault')
     const refreshing = otherTab.tryRefresh()
     await served.reached
-    await tab.putWayin('pw', 'new phrase')
+    await TH.putWayin(tab, 'pw', 'new phrase')
     expect(await highestEpochOf(world)).to.eq(2)
     served.release()
     await TH.expectGood(refreshing)
@@ -494,10 +494,10 @@ describe("a vault deleted, and its next life", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const bank = TH.bankOf(vault)
     const tombstones = keptTombstones(world.vaultDB)
-    await vault.del()
+    await TH.del(vault, 'pw')
     expect(tombstones).to.have.lengthOf(1)
     const tombstoneEpoch = tombstones[0]?.vault_epoch ?? -1
-    for (const call of [() => vault.hello(), () => vault.unlock('pw'), () => vault.getBox('anthropic'), () => vault.lock(), () => vault.del()]) {
+    for (const call of [() => vault.hello(), () => TH.unlock(vault, 'pw'), () => vault.getBox('anthropic'), () => vault.lock(), () => vault.del()]) {
       await TH.expectRefusal(call(), 'vault_gone')
     }
     expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null })
@@ -516,13 +516,13 @@ describe("a vault deleted, and its next life", () => {
     const stale = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     await stale.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    await elsewhere.del()
+    await TH.del(elsewhere, 'pw')
     const remade = await TH.bankOf(elsewhere).ensureVault(U1)
-    await remade.unlock('another phrase')
+    await TH.unlock(remade, 'another phrase')
     await remade.putBox({ boxlabel: 'openai' }, 'sk-fake-two')
     await TH.expectRefusal(stale.hello({ staleMinutes: 0 }), 'vault_remade')
     await TH.expectRefusal(stale.getWhisper('anthropic'), 'vault_remade')
-    await TH.expectRefusal(stale.unlock('pw'), 'vault_remade')
+    await TH.expectRefusal(TH.unlock(stale, 'pw'), 'vault_remade')
     const bank = TH.bankOf(stale)
     expect(bank.entryOf(U1)?.status).to.eq('refused')
     expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_remade')
@@ -536,7 +536,7 @@ describe("a vault deleted, and its next life", () => {
     const world = makeWorld()
     const stale = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    await elsewhere.del()
+    await TH.del(elsewhere, 'pw')
     await TH.expectRefusal(stale.refresh(), 'vault_gone')
     await TH.expectRefusal(stale.lock(), 'vault_gone')
     const bank = TH.bankOf(stale)
@@ -576,17 +576,17 @@ describe("bank.closeVault", () => {
     expect(bank.snapshot.vaults).to.deep.equal({})
   })
 
-  it("ends a prompt up: its lockLanded settles, and the call waiting on it refuses vault_gone", async () => {
+  it("ends the gating standing: its lockLanded settles, and the call waiting on it refuses vault_gone", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() }))
-    const seen: { ask: Ask | null, landed: boolean } = { ask: null, landed: false }
-    const vault = await world.open({ getProof: (ask) => {
-      seen.ask = ask
-      void ask.lockLanded.then(() => { seen.landed = true })
+    const seen: { gating: Gating | null, landed: boolean } = { gating: null, landed: false }
+    const vault = await world.open({ requestCleartext: (gating) => {
+      seen.gating = gating
+      void gating.lockLanded.then(() => { seen.landed = true })
       return new Promise(() => { /* the user never answers */ })
     } })
-    const waiting = vault.tryEnsureLease()
-    await TH.eventually(() => seen.ask !== null)
+    const waiting = vault.tryEnsureUnlocked()
+    await TH.eventually(() => seen.gating !== null)
     TH.closeVault(vault)
     await TH.expectBad(waiting, 'vault_gone')
     expect(seen.landed).to.be.true
@@ -633,33 +633,33 @@ describe("bank.closeVaults and bank.reopenVault", () => {
 })
 
 describe("a let-go landing mid-call", () => {
-  it("refuses ensureLease 'vault_gone' when it lands during the call's hello, never calling getProof", async () => {
+  it("refuses ensureUnlocked 'vault_gone' when it lands during the call's hello, never calling requestCleartext", async () => {
     const world = makeRacingWorld()
     TH.closeVault(await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() }))
-    const getProof = vi.fn(() => Promise.resolve('declined' as const))
-    const vault = await world.open({ staleMinutes: 0, getProof })
+    const requestCleartext = vi.fn()
+    const vault = await world.open({ staleMinutes: 0, requestCleartext })
     const looking = world.holdNextLook()
-    const leasing = vault.tryEnsureLease()
+    const leasing = vault.tryEnsureUnlocked()
     await looking.reached
     TH.closeVault(vault)
     looking.release()
     await TH.expectBad(leasing, 'vault_gone')
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
-  it("refuses ensureLease 'vault_gone' when it lands during the call's lease take-up, never calling getProof", async () => {
+  it("refuses ensureUnlocked 'vault_gone' when it lands during the gating's pantry consult, never calling requestCleartext", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() }))
-    const getProof = vi.fn(() => Promise.resolve('declined' as const))
-    const vault = await world.open({ getProof })
+    const requestCleartext = vi.fn()
+    const vault = await world.open({ requestCleartext })
     // The hello within staleMinutes of the birth reads nothing: this device's store is next read by the take-up.
     const takingUp = TH.holdNextCall(world.deviceDB, 'getLease')
-    const leasing = vault.tryEnsureLease()
+    const leasing = vault.tryEnsureUnlocked()
     await takingUp.reached
     TH.closeVault(vault)
     takingUp.release()
     await TH.expectBad(leasing, 'vault_gone')
-    expect(getProof).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
   for (const [callname, call] of [['tryHello', (vault: Vault) => vault.tryHello({ staleMinutes: 0 })], ['tryRefresh', (vault: Vault) => vault.tryRefresh()]] as const) {
@@ -684,7 +684,7 @@ describe("the first unlock of a novel vault", () => {
     const world = makeRacingWorld()
     const vault = await world.open()
     const deriving = world.holdNextDerive()
-    const unlocking = vault.tryUnlock('pw')
+    const unlocking = TH.tryUnlock(vault, 'pw')
     await deriving.reached
     TH.closeVault(vault)
     deriving.release()
@@ -698,9 +698,9 @@ describe("the first unlock of a novel vault", () => {
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     expect([here.state, there.state]).to.deep.equal(['novel', 'novel'])
     const deriving = world.holdNextDerive()
-    const unlocking = here.tryUnlock('there phrase')
+    const unlocking = TH.tryUnlock(here, 'there phrase')
     await deriving.reached
-    await there.unlock('there phrase')
+    await TH.unlock(there, 'there phrase')
     const gated = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
     deriving.release()
     await TH.expectBad(unlocking, 'gate_made_elsewhere')
@@ -708,7 +708,7 @@ describe("the first unlock of a novel vault", () => {
     expect(here.state).to.eq('novel')
     await here.hello()
     expect(here.state).to.eq('locked')
-    await here.unlock('there phrase')
+    await TH.unlock(here, 'there phrase')
     expect(here.state).to.eq('unlocked')
   })
 })

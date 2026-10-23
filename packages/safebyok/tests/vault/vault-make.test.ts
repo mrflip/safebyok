@@ -112,17 +112,17 @@ describe("Bank.make and bank.ensureVault", () => {
     const heard = vi.fn()
     const unsubscribe = subscribe(heard)
     await vault.hello()
-    await vault.unlock('correct horse')
+    await TH.unlock(vault, 'correct horse')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test')
     expect(await vault.useWhisper('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
     await vault.delBox('anthropic_api_key')
-    await vault.putWayin('correct horse', 'battery staple')
-    await vault.putWayin('battery staple', await TH.passkeyOf('laptop'))
-    await vault.delWayin('battery staple')
+    await TH.putWayin(vault, 'correct horse', 'battery staple')
+    await TH.putWayin(vault, 'battery staple', await TH.passkeyOf('laptop'))
+    await TH.delWayin(vault, 'battery staple')
     await vault.lock()
     expect(getSnapshot().state).to.eq('locked')
-    await vault.del()
+    await TH.del(vault, 'battery staple')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
     expect(getSnapshot().state).to.eq('locked')
     expect(heard).toHaveBeenCalled()
@@ -255,7 +255,7 @@ describe("the host's clock", () => {
     reading /= 1000
     await vault.hello({ staleMinutes: 0 })
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await vault.ensureLease()).to.eq(vault)
+    expect(await vault.ensureUnlocked()).to.eq(vault)
   })
 
   it("lets a clock that throws after the open fail the call that reads it, as the clock's own error", async () => {
@@ -301,7 +301,7 @@ describe("the key deriver seam", () => {
     await world.openUnlocked('pw')
     const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
     const alien = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: alienDeriver })
-    await TH.expectRefusal(alien.unlock('pw'), 'unknown_key_deriver')
+    await TH.expectRefusal(TH.unlock(alien, 'pw'), 'unknown_key_deriver')
   })
 
   it("asks for a keyDeriver outright: there is no default to fall back on", () => {
@@ -367,7 +367,7 @@ describe("the key deriver seam", () => {
       const world = makeWorld()
       const shortDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
       const vault = await world.open({ keyDeriver: shortDeriver })
-      await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
+      await TH.expectRefusal(TH.unlock(vault, 'pw'), 'bad_option')
       expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, passphrase: null })
       expect(vault.getSnapshot().state).to.eq('novel')
     }
@@ -379,7 +379,7 @@ describe("the key deriver seam", () => {
       const world = makeWorld()
       const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
       const vault = await world.open({ keyDeriver: zeroDeriver })
-      const err = await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
+      const err = await TH.expectRefusal(TH.unlock(vault, 'pw'), 'bad_option')
       expect(err.message).to.match(/zero bytes/)
       expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, passphrase: null })
     }
@@ -390,7 +390,7 @@ describe("the key deriver seam", () => {
     await world.openUnlocked('pw')
     const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) }
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: zeroDeriver })
-    await TH.expectRefusal(fresh.unlock('pw'), 'bad_option')
+    await TH.expectRefusal(TH.unlock(fresh, 'pw'), 'bad_option')
     expect(fresh.getSnapshot().state).to.eq('locked')
   })
 
@@ -400,7 +400,7 @@ describe("the key deriver seam", () => {
       const throwing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }
       const told: unknown[] = []
       const vault = await world.open({ keyDeriver: throwing, onBadNews: (news) => { told.push(news) } })
-      const err = await TH.expectRefusal(vault.unlock('pw-the-passphrase'), 'unexpected_error')
+      const err = await TH.expectRefusal(TH.unlock(vault, 'pw-the-passphrase'), 'unexpected_error')
       expect(err.cause).to.eq(thrown)
       expect(err.message).to.not.include('pw-the-passphrase')
       expect(vault.getSnapshot().state).to.eq('novel')
@@ -415,7 +415,7 @@ describe("the key deriver seam", () => {
     const unreachable = new VaultError('storage_unavailable', "The key deriver's module could not be loaded: try again shortly.")
     const refusing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(unreachable) }
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: refusing })
-    const err = await TH.expectRefusal(fresh.unlock('pw'), 'storage_unavailable')
+    const err = await TH.expectRefusal(TH.unlock(fresh, 'pw'), 'storage_unavailable')
     expect(err).to.eq(unreachable)
   })
 
@@ -708,7 +708,7 @@ describe("the vault's fields, by the Contract", () => {
     const vault = await world.open()
     const helloWrittenOver = vi.fn(() => Promise.resolve(vault))
     Object.defineProperties(vault, { hello: { value: helloWrittenOver } })
-    await vault.unlock('pw')
+    await TH.unlock(vault, 'pw')
     expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(helloWrittenOver).not.toHaveBeenCalled()
