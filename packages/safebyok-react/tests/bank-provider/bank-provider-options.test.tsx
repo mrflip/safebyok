@@ -211,6 +211,28 @@ describe("BankProvider", () => {
     expect(ok).to.be.true
   })
 
+  it("asks no bank it has let go for the new vault, when another user signs in while a start over deletes the vault", async () => {
+    const world = await lockedWorld()
+    const gate = TH.makeGate()
+    const delVault = world.vaultDB.delVault.bind(world.vaultDB)
+    vi.spyOn(world.vaultDB, 'delVault').mockImplementation(async (...args) => { await gate.pass(); return await delVault(...args) })
+    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const { rerender } = render(<BankProvider {...world.props} userId="u1" allowStartOver><world.Grab /></BankProvider>)
+    const vault = await world.opened()
+    const reading = vault.tryGetWhisper('anthropic_api_key')
+    fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
+    fireEvent.click(screen.getByText('Remove and start over'))
+    await gate.reached
+    rerender(<BankProvider {...world.props} userId="u2" allowStartOver><world.Grab /></BankProvider>)
+    await TH.expectBad(reading, 'vault_gone')
+    await waitFor(() => { expect(world.latest().vault?.user_id).to.eq('u2') })
+    gate.release()
+    await waitFor(async () => { expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null })
+    await TH.wakeupAtNextTick()
+    // One birth for u1, before the start over: none after it, in the bank let go as u2 signed in.
+    expect(ensureVault.mock.calls.filter(([draft]) => draft.user_id === 'u1')).to.have.lengthOf(1)
+  })
+
   it("passes passphraseUsername and passphraseAdvice to the dialog: what a password manager files it under, and what is said as the user chooses", async () => {
     const world = makeWorld()
     render(

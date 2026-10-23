@@ -280,6 +280,9 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
   // The bank the provider holds now and the user it is for, made and let go together by the effect
   // below: the hooks never see one user beside another's bank.
   const [held, setHeld] = useState<Provided>(NoneHeld)
+  // The same, set and cleared by the effect itself. A start over lands after its dialog has closed,
+  // when the bank of that render may have been let go: it asks this one for the new vault.
+  const heldNow = useRef<Provided>(NoneHeld)
 
   useEffect(() => {
     // Nobody signed in: no bank, so nothing is asked for and nothing refused.
@@ -298,9 +301,12 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
     const made = Bank.make(bankOpts)
-    setHeld({ bank: made, userId }) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
+    const holding = { bank: made, userId }
+    heldNow.current = holding
+    setHeld(holding) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
     return () => {
       kept.held = false
+      heldNow.current = NoneHeld
       // Letting a vault go ends its prompt: its waiters are refused 'vault_gone', and the dialog
       // over it answers declined and closes.
       made.closeVaults()
@@ -324,12 +330,13 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     heldLogger?.warn(`BankProvider made its bank anew, letting its vaults go, because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and does so each time: define it once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
   }, [logger, clock, strengthChecker, heldLogger])
 
-  // The user started over from the dialog, deleting the vault the ask was for: they asked for a new one.
+  // The user started over from the dialog, deleting the vault the ask was for: they asked for a new
+  // one, of the bank held now, never of one let go while the delete ran.
   const askAfresh = useCallback((ask: Ask) => {
-    const { bank, userId: heldUserId } = held
+    const { bank, userId: heldUserId } = heldNow.current
     if (bank === null || heldUserId === null || ask.vault.user_id !== heldUserId) { return }
     void bank.tryEnsureVault({ userId: heldUserId, vaultlabel: ask.vault.vaultlabel })
-  }, [held])
+  }, [])
 
   return (
     <BankContext.Provider value={held}>
