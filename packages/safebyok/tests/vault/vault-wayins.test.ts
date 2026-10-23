@@ -196,9 +196,9 @@ describe("putWayin, with a new passphrase", () => {
     expect(storedWayinOf(world, 'passkey')).to.be.null
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock(laptop), 'absent_wayin')
-    await TH.expectRefusal(vault.putWayin('pw', laptop), 'wrong_passphrase')
-    await vault.putWayin('a new passphrase', laptop)
-    await fresh.unlock(laptop)
+    await TH.expectRefusal(vault.putWayin('pw', await TH.passkeyOf('laptop')), 'wrong_passphrase')
+    await vault.putWayin('a new passphrase', await TH.passkeyOf('laptop'))
+    await fresh.unlock(await TH.passkeyOf('laptop'))
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
@@ -427,7 +427,17 @@ describe("the vault's passkey", () => {
     const phone = await TH.passkeyOf('phone')
     await TH.expectRefusal(vault.putWayin(laptop as unknown as string, phone), 'bad_option')
     await TH.expectRefusal(vault.putWayin('not the passphrase', phone), 'wrong_passphrase')
-    await TH.expectRefusal(vault.putWayin(' '.repeat(3), phone), 'wrong_passphrase')
+    await TH.expectRefusal(vault.putWayin(' '.repeat(3), await TH.passkeyOf('phone')), 'wrong_passphrase')
+    expect(storedVaultPropsOf(world)).to.deep.equal(before)
+  })
+
+  it("putWayin refuses as bad_option a passkey's answer handed in again after a mistyped passphrase: its bytes were zeroed, and would seal under a key anyone could rebuild", async () => {
+    const { world, vault } = await vaultWithPasskey()
+    const before = storedVaultPropsOf(world)
+    const phone = await TH.passkeyOf('phone')
+    await TH.expectRefusal(vault.putWayin('not the passphrase', phone), 'wrong_passphrase')
+    await TH.expectRefusal(vault.putWayin('pw', phone), 'bad_option')
+    await TH.expectRefusal(vault.unlock(phone), 'bad_option')
     expect(storedVaultPropsOf(world)).to.deep.equal(before)
   })
 
@@ -475,9 +485,9 @@ describe("the vault's passkey", () => {
     const vault = await world.open({ deviceDB: memoryDeviceDB() })
     expect(vault.trouble?.refusalkind).to.eq('damaged_wayin')
     await TH.expectRefusal(vault.unlock(laptop), 'damaged_wayin')
-    await vault.putWayin('pw', laptop)
+    await vault.putWayin('pw', await TH.passkeyOf('laptop'))
     await vault.lock()
-    await vault.unlock(laptop)
+    await vault.unlock(await TH.passkeyOf('laptop'))
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 

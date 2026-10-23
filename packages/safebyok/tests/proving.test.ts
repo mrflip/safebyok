@@ -507,6 +507,15 @@ describe("checkedPasskeyAnswer", () => {
     TH.expectSyncRefusal(() => checkedPasskeyAnswer({ credentialId: 'abc' }), 'bad_option')
   })
 
+  it("refuses an answer already used, its bytes zeroed, as bad_option, as its third example shows", async () => {
+    const { vault } = await lockedWorld()
+    const usedAnswer = await TH.passkeyOf('laptop')
+    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer)
+    const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(usedAnswer), 'bad_option')
+    expect(err.message).to.include('used already')
+    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer), 'bad_option')
+  })
+
   it("refuses a misshapen answer as bad_option, quoting none of it", async () => {
     const answer = await TH.passkeyOf('laptop')
     for (const [given, blurb] of misshapenAnswers(answer)) {

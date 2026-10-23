@@ -296,10 +296,10 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
   /** The proving `answer` makes over `header`: the current passkey wayin's visible fields, or `{ slotlabel: 'passkey' }` for a fresh one, its credential and salt the answer's.
    * The answer's PRF bytes are zeroed once imported, whatever happens, so hand in an answer for
-   * this one call. It refuses 'bad_option' for what is no passkey's answer, and, fresh, for a salt
-   * that is not {@link PasskeySaltBytes} bytes; over a current header, 'damaged_wayin' for a salt
-   * its kind never makes and 'wrong_passkey' for another credential's answer or one over another
-   * salt, deriving nothing. It demands on the proving after the HKDF.
+   * this one call. It refuses 'bad_option' for what is no passkey's answer, or one already used,
+   * and, fresh, for a salt that is not {@link PasskeySaltBytes} bytes; over a current header,
+   * 'damaged_wayin' for a salt its kind never makes and 'wrong_passkey' for another credential's
+   * answer or one over another salt, deriving nothing. It demands on the proving after the HKDF.
    *
    * @param opts.gating - The gating it is made for; {@link StandingGating} when left out.
    *
@@ -367,14 +367,20 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
 }
 
 /** `given`, once it is a passkey's answer: two non-empty strings and 32 bytes, as `safebyok-react`'s `askPasskey` gives it; 'bad_option' otherwise, quoting none of it.
+ * An answer already used, its bytes zeroed by the proving sealed of it, is refused 'bad_option'
+ * too: sealed again, it would make a key anyone could rebuild.
  *
  * @example checkedPasskeyAnswer(await askPasskey(vault.passkey))
  * @example checkedPasskeyAnswer({ credentialId: 'abc' })   // throws 'bad_option'
+ * @example checkedPasskeyAnswer(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
 export const checkedPasskeyAnswer = (given: unknown): PasskeyAnswer => {
   const checked = passkeyAnswerShape.safeParse(given)
   if (! checked.success) {
     throw new VaultError('bad_option', `A passkey's answer is { credentialId, prfSaltB64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
+  }
+  if (isAllZero(checked.data.prfBytes)) {
+    throw new VaultError('bad_option', "This passkey's answer was used already: the vault zeroes an answer's bytes once it has used them. Ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer.")
   }
   return checked.data
 }
