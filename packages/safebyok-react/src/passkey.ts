@@ -57,11 +57,11 @@ export type AskPasskeyOpts = {
  * PRF extension, and 'bad_option' when the relying party's `id` does not fit this page. A passkey
  * made but never answered for -- no PRF, or the second touch dismissed -- is useless to the
  * vault, and stays on the authenticator until the user deletes it; so does one made for a
- * `putWayin` that is then refused (a mistyped passphrase, say): make another to try again.
+ * `put_passkey` attempt that is then refused: make another to try again.
  *
  * @example
  *   const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
- *   if (answer !== null) { await vault.putWayin(passphrase, answer) }    // null: dismissed
+ *   if (answer !== null) { await gating.attempt(passphrase, answer) }    // a put_passkey gating's; null: dismissed
  */
 export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   checkAvailable()
@@ -102,7 +102,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
 }
 
 /**
- * The answer of the vault's one passkey: what `vault.unlock` (or `ask.attempt`) takes. `passkey`
+ * The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes. `passkey`
  * is the snapshot's, as it stands (`vault.getSnapshot().passkey`); the browser asks the user to
  * touch it, and asks it for its answer over its own salt.
  *
@@ -115,7 +115,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().passkey)
- *   if (passkey !== null) { await vault.unlock(passkey) }
+ *   if (passkey !== null) { await gating.attemptPasskey(passkey) }
  */
 export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   checkAvailable()

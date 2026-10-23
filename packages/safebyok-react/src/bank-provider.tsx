@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Bank, type Ask, type GetProof, type ProofAnswer, checkValidators, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
-import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
+import { Bank, type Gating, type RequestCleartext, checkValidators, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { PassphraseModal, type PassphraseAdvice, type PassphraseGating } from './passphrase-modal'
 
 // == [Hooks]: useBank, useVault, useEntry, useVaultSnapshot
 
@@ -104,20 +104,20 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture, unshownAnswerOf
+// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture, isPassphraseGating
 
-/** One showing of the passphrase dialog: which one, the ask it answers, and how it answers. */
-type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void }
+/** One showing of the passphrase dialog: which one, the gating it answers, and how it closes. */
+type Showing = { round: number, gating: PassphraseGating, close: () => void }
 
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** The answer to an ask the dialog does not show: carry on under a lease ending, declined otherwise. */
-const unshownAnswerOf = (ask: Ask): ProofAnswer => (ask.why === 'lease_ending' ? 'carry_on' : 'declined')
+/** True for a gating the passphrase dialog answers: a first passphrase, or an unlock. The other kinds are a host's own dialog's, for now. */
+const isPassphraseGating = (gating: Gating): gating is PassphraseGating => gating.gatingkind === 'initialize_gate' || gating.gatingkind === 'unlock_vault'
 
 /** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the passphrase dialog.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
- * boundary. `userId` may be null, and `getProof` left out means the provider's own passphrase
+ * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own passphrase
  * dialog. The dialog's three: whether it offers a forgetful user to start over, what a password
  * manager files the passphrase under, and the advice it shows as the user chooses one
  * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
@@ -127,14 +127,15 @@ const unshownAnswerOf = (ask: Ask): ProofAnswer => (ask.why === 'lease_ending' ?
 export type BankProviderProps = MakeBankOpts & {
   /** The signed-in user from the host's auth, or null when nobody is: then the hooks hand down no vault, and ask for none. */
   userId:              string | null
-  /** What asks the user for a proof when a call needs a vault unlocked (Bank.make's `getProof`).
-   * Left out, the provider's own: its passphrase dialog, `PassphraseModal`, one at a time, shown
-   * only while the user's gesture is in hand (`navigator.userActivation`) -- a call a timer makes
-   * is declined unasked, or carries on under a lease ending -- and closing as a lock lands. Null:
-   * none, every ask declined, so a call needing the vault locked refuses 'vault_locked' and the app
-   * prompts on its own. Written inline, it makes no new bank.
+  /** What asks the user for a passphrase or passkey when a call needs one (Bank.make's `requestCleartext`).
+   * Left out, the provider's own: its passphrase dialog, `PassphraseModal`, for an `unlock_vault`
+   * or `initialize_gate` gating, one at a time, shown only while the user's gesture is in hand
+   * (`navigator.userActivation`) -- a call a timer makes is declined unasked -- and closing as a
+   * lock lands. A change to the ways in or a deletion is declined unasked, for now: hand a
+   * `requestCleartext` of your own to answer those. Null: none, every gating declined, so a call
+   * needing the vault locked refuses 'vault_locked'. Written inline, it makes no new bank.
    */
-  getProof?:           GetProof | null | undefined
+  requestCleartext?:   RequestCleartext | null | undefined
   /** Whether the passphrase dialog offers a user who has forgotten the passphrase to delete the vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by default. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files a vault's passphrase under: `PassphraseModal`'s `passphraseUsername`.
@@ -177,18 +178,18 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * once -- at module level, or memoized -- never inline in the props; each schema in `validators`
  * likewise, though the bag around them may be built in render. A `logger`, `clock` or
  * `strengthChecker` that changes identity is warned of once, through the logger. A handler makes
- * no new bank: `onBadNews` and `getProof` may be written inline, and the bank's vaults call
+ * no new bank: `onBadNews` and `requestCleartext` may be written inline, and the bank's vaults call
  * whichever the last render passed. Under React's StrictMode, whose rehearsal asks for a vault and
  * lets it go in development, the rehearsal reads nothing: only the vault kept is born.
  *
  * The provider and its bank say things through one logger: the `logger` given here, else the one
  * the `vaultDB` was made with (the default logger when it was given none). Unless given a
- * `getProof` of the host's own, it renders the passphrase dialog, `PassphraseModal`, whenever a
+ * `requestCleartext` of the host's own, it renders the passphrase dialog, `PassphraseModal`, whenever a
  * call on one of the bank's vaults needs it unlocked and finds it not -- `vault.getWhisper(...)`
- * and the rest, or `vault.ensureLease()` on an Unlock button -- one at a time: unstyled markup
+ * and the rest, or `vault.ensureUnlocked()` on an Unlock button -- one at a time: unstyled markup
  * under the `modal-scrim` / `modal` class names, for the host's stylesheet to dress. The call
  * waits on the dialog, and goes on once it unlocks; dismissed, it refuses with kind
- * 'vault_locked'. Another vault's ask replaces the dialog showing, whose calls are refused
+ * 'vault_locked'. Another vault's gating replaces the dialog showing, whose calls are refused
  * likewise. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
  * or the provider unmounting lets the vault go, closing the dialog, its calls refused
  * 'vault_gone'. A user who starts over from the dialog (`allowStartOver`) has asked for a new
@@ -213,7 +214,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
 export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: BankProviderProps) => {
-  const { applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, getProof, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, strengthChecker, ...unlisted } = opts
+  const { applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, requestCleartext, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, strengthChecker, ...unlisted } = opts
   // Each prop Bank.make does not take, by name -- a misspelling, a deleted name, a `vaultlabel`,
   // which each hook names -- handed on to it, so it is refused, to the error boundary, rather than
   // dropped here unseen.
@@ -246,44 +247,41 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
   // Anything but a function, or none, is misuse: handed to Bank.make as it came, to be refused.
   const badNewsOpt = onBadNews === undefined || onBadNews === null || typeof onBadNews === 'function' ? tellBadNews : onBadNews
 
-  /** Closes `ending` if it is still the dialog showing, and answers its ask. */
-  const endShowing = useCallback((ending: Showing, answer: ProofAnswer) => {
+  /** Closes `ending` if it is still the dialog showing, and resolves its request: a gating still open then is declined. */
+  const endShowing = useCallback((ending: Showing) => {
     if (showingRef.current === ending) {
       showingRef.current = null
       setShowing(null)
     }
-    ending.answer(answer)
+    ending.close()
   }, [])
 
-  // The provider's own getProof: its passphrase dialog, shown only while the user's gesture is in
-  // hand, one at a time. A vault asks one at a time, but the bank's other vaults may ask over
-  // it: the newest is shown, and the ask it replaces answered as one unshown, never left waiting.
-  const askByDialog = useCallback<GetProof>((ask) => new Promise<ProofAnswer>((answer) => {
-    if (! hasUserGesture()) { answer(unshownAnswerOf(ask)); return }
-    if (showingRef.current !== null) { endShowing(showingRef.current, unshownAnswerOf(showingRef.current.ask)) }
+  // The provider's own requestCleartext: its passphrase dialog, shown only while the user's gesture
+  // is in hand, one at a time. A vault raises one gating at a time, but the bank's other vaults may
+  // raise over it: the newest is shown, and the one it replaces declined, never left waiting.
+  const askByDialog = useCallback<RequestCleartext>((gating) => new Promise<void>((close) => {
+    if (! isPassphraseGating(gating) || ! hasUserGesture()) { close(); return }
+    if (showingRef.current !== null) { endShowing(showingRef.current) }
     showingRounds.current += 1
-    const next = { round: showingRounds.current, ask, answer }
+    const next = { round: showingRounds.current, gating, close: () => { close() } }
     showingRef.current = next
     setShowing(next)
   }), [endShowing])
 
-  // The host's getProof as of the last commit, held as onBadNews is: the bank is handed one asker
-  // that keeps its identity, so a getProof written inline makes no new bank.
-  const hostAskerRef = useRef(getProof)
-  useEffect(() => { hostAskerRef.current = getProof })
-  const askProof = useCallback<GetProof>((ask) => {
+  // The host's requestCleartext as of the last commit, held as onBadNews is: the bank is handed
+  // one asker that keeps its identity, so one written inline makes no new bank.
+  const hostAskerRef = useRef(requestCleartext)
+  useEffect(() => { hostAskerRef.current = requestCleartext })
+  const askUser = useCallback<RequestCleartext>(async (gating) => {
     const hosts = hostAskerRef.current
-    if (hosts === undefined) { return askByDialog(ask) }
-    return hosts === null ? 'declined' : hosts(ask)
+    if (hosts === undefined) { await askByDialog(gating); return }
+    if (hosts !== null) { await hosts(gating) }
   }, [askByDialog])
-  const getProofOpt = getProof === undefined || getProof === null || typeof getProof === 'function' ? askProof : getProof
+  const requestOpt = requestCleartext === undefined || requestCleartext === null || typeof requestCleartext === 'function' ? askUser : requestCleartext
 
   // The bank the provider holds now and the user it is for, made and let go together by the effect
   // below: the hooks never see one user beside another's bank.
   const [held, setHeld] = useState<Provided>(NoneHeld)
-  // The same, set and cleared by the effect itself. A start over lands after its dialog has closed,
-  // when the bank of that render may have been let go: it asks this one for the new vault.
-  const heldNow = useRef<Provided>(NoneHeld)
 
   useEffect(() => {
     // Nobody signed in: no bank, so nothing is asked for and nothing refused.
@@ -296,25 +294,23 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     // changed -- is told to no one: the handler now may be the next user's.
     const kept = { held: true }
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
-    // Likewise, a vault let go asks no one: the getProof now may be the next user's.
-    const askWhileHeld: GetProof = (ask) => (kept.held ? askProof(ask) : 'declined')
-    const bankOpts = { ...refusable, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, getProof: getProofOpt === askProof ? askWhileHeld : getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, validators: checks, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
+    // Likewise, a vault let go asks no one: the requestCleartext now may be the next user's.
+    const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
+    const bankOpts = { ...refusable, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, validators: checks, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
     const made = Bank.make(bankOpts)
     const holding = { bank: made, userId }
-    heldNow.current = holding
     setHeld(holding) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
     return () => {
       kept.held = false
-      heldNow.current = NoneHeld
       // Letting a vault go ends its prompt: its waiters are refused 'vault_gone', and the dialog
       // over it answers declined and closes.
       made.closeVaults()
-      if (showingRef.current !== null) { endShowing(showingRef.current, 'declined') }
+      if (showingRef.current !== null) { endShowing(showingRef.current) }
       setHeld(NoneHeld)
     }
-  }, [userId, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askProof, endShowing])
+  }, [userId, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askUser, endShowing])
 
   // A logger, clock or strength checker written inline in the props is new at every render, and
   // makes the bank anew each time: said once, the first time any changes.
@@ -331,13 +327,6 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     heldLogger?.warn(`BankProvider made its bank anew, letting its vaults go, because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and does so each time: define it once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
   }, [logger, clock, strengthChecker, heldLogger])
 
-  // The user started over from the dialog, deleting the vault the ask was for: they asked for a new
-  // one, of the bank held now, never of one let go while the delete ran.
-  const askAfresh = useCallback((ask: Ask) => {
-    const { bank, userId: heldUserId } = heldNow.current
-    if (bank === null || heldUserId === null || ask.vault.user_id !== heldUserId) { return }
-    void bank.tryEnsureVault({ userId: heldUserId, vaultlabel: ask.vault.vaultlabel })
-  }, [])
 
   return (
     <BankContext.Provider value={held}>
@@ -345,12 +334,11 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
       {showing !== null && (
         <PassphraseModal
           key={showing.round}
-          ask={showing.ask}
+          gating={showing.gating}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
           passphraseAdvice={passphraseAdvice}
-          onStartedOver={() => { askAfresh(showing.ask) }}
-          onDone={(answer) => { endShowing(showing, answer) }}
+          onDone={() => { endShowing(showing) }}
         />
       )}
     </BankContext.Provider>

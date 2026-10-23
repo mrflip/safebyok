@@ -8,7 +8,7 @@
 export { BankProvider, useBank, useVault, useVaultSnapshot } from './bank-provider'
 export type { BankProviderProps } from './bank-provider'
 export { PassphraseModal } from './passphrase-modal'
-export type { PassphraseAdvice, PassphraseModalProps } from './passphrase-modal'
+export type { DialogAnswer, PassphraseAdvice, PassphraseGating, PassphraseModalProps } from './passphrase-modal'
 export { PasskeyUnlockButton } from './passkey-unlock-button'
 export { WhisperField } from './whisper-field'
 export type { WhisperFieldProps } from './whisper-field'

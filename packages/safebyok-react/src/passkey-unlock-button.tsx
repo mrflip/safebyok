@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import type { Ask, ProofAnswer, VaultSnapshot } from 'safebyok'
+import type { UnlockVaultGating, VaultSnapshot } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Messages } from './messages'
@@ -7,12 +7,13 @@ import { useIsMounted } from './is-mounted'
 import { askPasskey, passkeysAvailable } from './passkey'
 
 /**
- * A button that answers an {@link Ask} with the vault's passkey: rendered only when the
+ * A button that answers an `unlock_vault` gating with the vault's passkey: rendered only when the
  * vault has one and the browser offers WebAuthn, so a dialog can place it beside its passphrase
  * field unconditionally. `PassphraseModal` does, first, ahead of the field. A press asks the user
  * to touch the passkey -- the press is the user gesture WebAuthn needs -- then hands its answer to
- * `ask.attempt`. It follows the vault's snapshot as it changes: a passkey added on another device
- * brings the button, one removed takes it away. Handed another ask, it starts afresh. Taken away,
+ * `gating.attemptPasskey`. It follows the vault's snapshot as it changes: a passkey added on
+ * another device brings the button, one removed takes it away. Handed another gating, it starts
+ * afresh. Taken away,
  * it lets go: a press still under way finishes unheard, calling `onDone` and `onGripe` no more.
  *
  * `onDone('unlocked')` once the attempt is ok; `onDone('declined')` for a refusal that closes the
@@ -27,22 +28,22 @@ import { askPasskey, passkeysAvailable } from './passkey'
  * it. Focus the button held falls to the page then: a dialog of the host's own moves it to its
  * passphrase field, as `PassphraseModal` does.
  *
- * @example <PasskeyUnlockButton ask={ask} onDone={close} onGripe={setGripe} />
- * @example <PasskeyUnlockButton ask={ask} rpId="acme.example" onDone={close} onGripe={setGripe} />  // passkeys made under that rp.id
- * @example <PasskeyUnlockButton ask={ask} autoFocus onDone={close} onGripe={setGripe} />  // the dialog's first choice
+ * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
+ * @example <PasskeyUnlockButton gating={gating} rpId="acme.example" onDone={close} onGripe={setGripe} />  // passkeys made under that rp.id
+ * @example <PasskeyUnlockButton gating={gating} autoFocus onDone={close} onGripe={setGripe} />  // the dialog's first choice
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
-  <Boundary key={useRoundFor(props.ask)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
+  <Boundary key={useRoundFor(props.gating)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
     <PasskeyPress {...props} />
   </Boundary>
 )
 
 /** What PasskeyUnlockButton is handed. */
 type PasskeyUnlockButtonProps = {
-  /** The ask the passkey answers, as the vault handed it to `getProof`. */
-  ask:        Ask
-  /** Called once the ask is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
-  onDone:     (answer: ProofAnswer) => void
+  /** The gating the passkey answers, as the vault handed it to `requestCleartext`. */
+  gating:     UnlockVaultGating
+  /** Called once the gating is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
+  onDone:     (answer: 'unlocked' | 'declined') => void
   /** What the button has to say: a calm message, or null when what it said last no longer stands. */
   onGripe:    (gripe: string | null) => void
   rpId?:      string | undefined
@@ -56,8 +57,8 @@ export const offersPasskey = (snapshot: VaultSnapshot): boolean => (
 )
 
 /** The button itself, inside PasskeyUnlockButton's boundary. */
-const PasskeyPress = ({ ask, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockButtonProps) => {
-  const snapshot = useSyncExternalStore(ask.vault.subscribe, ask.vault.getSnapshot)
+const PasskeyPress = ({ gating, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockButtonProps) => {
+  const snapshot = useSyncExternalStore(gating.vault.subscribe, gating.vault.getSnapshot)
   const [asking, setAsking] = useState(false)
   // Wrapped, so that a rejection carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
@@ -73,7 +74,7 @@ const PasskeyPress = ({ ask, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockBu
     try {
       const passkey = await askPasskey(snapshot.passkey, { rpId })
       if (passkey === null || ! isMounted()) { return }
-      const { ok, err } = await ask.attempt(passkey)
+      const { ok, err } = await gating.attemptPasskey(passkey)
       if (! isMounted()) { return }
       if (ok) { onDone('unlocked'); return }
       heard(err)

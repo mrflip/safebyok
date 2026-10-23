@@ -1,6 +1,6 @@
 import { isVaultError } from 'safebyok'
 
-/** What a dialog does with a refusal an ask's `attempt` met, as `Ask.attempt` groups them.
+/** What a dialog does with a refusal a gating's attempt met.
  * * `in_place`: show its message beside the field and ask again (a wrong passphrase or passkey, a
  *   weak new passphrase, and the ways in that cannot answer: a way in absent or damaged, a passkey
  *   the browser cannot ask).
@@ -17,7 +17,7 @@ export type AttemptRefusalFlavor = 'in_place' | 'gate_made_elsewhere' | 'close' 
 /** The refusals a dialog shows in place, asking again. */
 const InPlaceKinds: ReadonlySet<string> = new Set(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'])
 
-/** What a dialog does with `err`, a refusal an ask's `attempt` met: see {@link AttemptRefusalFlavor}. */
+/** What a dialog does with `err`, a refusal a gating's attempt met: see {@link AttemptRefusalFlavor}. */
 export const attemptRefusalFlavor = (err: unknown): AttemptRefusalFlavor => {
   if (! isVaultError(err) || err.family === 'misuse') { return 'trouble' }
   if (err.refusalkind === 'gate_made_elsewhere') { return 'gate_made_elsewhere' }
