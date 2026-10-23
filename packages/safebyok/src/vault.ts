@@ -1855,7 +1855,6 @@ const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in c
 
 const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
-
 /** True when `err`, a first gate's write refused, says another device's first gate stands on the vault `vaultTok`: a stale write whose stored vault props are gated, of that vault. */
 const isGateMadeElsewhere = (err: VaultError, vaultTok: string): boolean => {
   const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined

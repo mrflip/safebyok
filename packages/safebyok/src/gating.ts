@@ -359,7 +359,7 @@ export class RaisedGating implements ProvingGating {
   /** `del_passkey`: the passkey removed, proven by the passphrase, whose wayin stays and grants the lease; 'absent_wayin' when the vault has none. */
   async #delPasskey(passphrase: string): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    if (held.passkey === null) { throw absentPasskey('Nothing was changed.') }
+    if (held.passkey === null) { throw absentPasskey("Nothing was changed.") }
     const base = Gate.of(this.#vault, held)
     const proving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
     await proving.checkWayin()
