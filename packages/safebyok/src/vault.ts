@@ -140,9 +140,10 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *    `checkPassphrase()` refuses 'vault_gone', or 'vault_remade' for a vault made anew. The bank
  *    hands out a new Vault object when asked again.
  *  * A throw that is no refusal (a bug, in safebyok or in a function handed to it) is refused
- *    'unexpected_error', what was thrown its cause. It is never logged. What a function that hears
+ *    'unexpected_error', what was thrown its cause, and is not logged. What a function that hears
  *    the passphrase throws -- the key deriver, the strengthChecker, requestCleartext -- is kept
- *    nowhere, cause, message or log: each says how it refuses.
+ *    nowhere, cause, message or log: the logger hears at most that it threw, and the kind of a
+ *    VaultError it threw. Each says how it refuses.
  *
  * This device keeps a record of the highest `vault_epoch` it has seen in the scope (its device
  * record, in the deviceDB), raised at each read and at each write of its own, never lowered. A
