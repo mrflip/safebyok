@@ -82,9 +82,10 @@ rules* 3).
 | 7b | bank_provider | filed, stacked on #258 | #259 |
 | 8 | proving_gate | filed, stacked on #259 | #260 |
 | 9 | gating | filed, stacked on #260 | #261 |
-| 9b | gating_followups | building, on #261 | |
+| 9b | gating_followups | filed, stacked on #261 | #262 |
+| 9c | core_cleanups | building, on #262 | |
+| 11 | docs (core half) | building, on #262 | |
 | 10 | react | planned | |
-| 11 | docs | planned | |
 | 12 | route_meta | filed, beside the line | #252 |
 
 ## What the threads found

@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b (gating_followups) building; an opus review of the whole core line running beside it. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); threads 9c (core_cleanups) and 11 (docs, core half) building beside each other on #262. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -545,7 +545,7 @@ after a landing refused `gating_landed`; quotes) and flagged the first gate's gr
 host `requestCleartext` throwing mid-delete settles `unexpected_error` (9b, if simple);
 `#strengthUnder`'s purpose line is long (9b).
 
-### 9b. gating_followups
+### 9b. gating_followups, filed ([#262](https://github.com/mrflip/safebyok/pull/262))
 
 > *Orchestrator (YOLO), 2026-10-23:* the core changes the Coach's rulings on #261 and #258 ask
 > for, before thread 10's dialogs build on them.
@@ -571,6 +571,22 @@ host `requestCleartext` throwing mid-delete settles `unexpected_error` (9b, if s
   `requestCleartext` throwing after a deletion's write is sent follows the sent-deletion rule.
   Shorten `#strengthUnder`'s purpose line.
 
+*Review:* **fixed** (opus). The S1, joins, U1, U2, U4 and U5 paths hold, each tested. Fixed: the
+guard's log line wrote any `refusalkind` a host's thrown `VaultError` carried (now only kinds in
+`RefusalKindVals`); `putWayin`'s doc still had `damaged_wayin` settling. Left: stores compared by
+identity (9c words the message); `clearCachedVault` / `delDamagedVault` don't check stores (the
+Coach's); a host `keyDeriver`'s throw keeps its `cause` (9c); doubled blank lines (9c).
+
+### 9c. core_cleanups
+
+> *Orchestrator (YOLO), 2026-10-23:* the key deriver's (and every cleartext hook's) thrown
+> `cause` dropped, as 9b did for `requestCleartext`; the `bad_option` message saying stores are
+> compared as the same object; the review's M4 folds (one gate-write refusal classifier,
+> `leaseRecordOf` test-only, the wayin casts), no behaviour change.
+
+*Gloss.* `packages/safebyok/src/` only; README lines it makes untrue go to thread 11's follow-up.
+**Depends on:** 9b. Runs beside 11. **Size:** S.
+
 ### 10. react
 
 > **react**: the dialogs dispatch on `gatingkind`, one per kind; `passphrase-modal`,
@@ -595,6 +611,9 @@ joins across calls feel (the Coach's audit 5 worry; three rows in Open Matters).
 Coach took the Rec): demo tests for the dashboard's "Start a new vault" and "Accept this copy".
 
 ### 11. docs
+
+*Orchestrator (2026-10-23):* run before 10, core and repo-wide docs only, per the Coach's core-first order; safebyok-react's docs go with thread 10.
+
 
 > **docs**: README, VOCABULARY (Bank, Gate, Gating, Proving, gatingkind, the stamp, `vault_tok`
 > with the `_tok` rule reading "changes on every life", novel, freshness, requestCleartext, the
