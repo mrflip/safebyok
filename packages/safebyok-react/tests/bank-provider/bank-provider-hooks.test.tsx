@@ -104,7 +104,7 @@ describe("BankProvider", () => {
   })
 
   describe("under StrictMode", () => {
-    it("reads storage once: the bank its rehearsal makes and lets go reads nothing, and only the vault kept is born (Contract: getProof, in React)", async () => {
+    it("reads storage once: the bank its rehearsal makes and lets go reads nothing, and only the vault kept is born (Contract: requestCleartext, in React)", async () => {
       const world = makeWorld()
       const counts = countStoreCalls(world)
       const { Grab, opened } = grabber()

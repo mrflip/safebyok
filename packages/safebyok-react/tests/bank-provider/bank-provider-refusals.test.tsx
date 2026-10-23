@@ -203,7 +203,7 @@ describe("BankProvider", () => {
       const older = world.store.read(vaultPropsCkey) ?? ''
       // This device changes the passphrase, so its record of the vault is newer than `older`.
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
-      await changer.putWayin('correct horse', 'another horse')
+      await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       const { Grab, latest } = grabber()
       render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
@@ -224,7 +224,7 @@ describe("BankProvider", () => {
       const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
       const older = world.store.read(vaultPropsCkey) ?? ''
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
-      await changer.putWayin('correct horse', 'another horse')
+      await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       // Storage hands back the older copy before the provider's birth reads it.
       world.store.write(vaultPropsCkey, older)
@@ -247,7 +247,7 @@ describe("BankProvider", () => {
       await expectShown('unlocked')
       // Another tab of this device changes the passphrase; storage then hands back the older copy.
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
-      await changer.putWayin('correct horse', 'another horse')
+      await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       world.store.write(vaultPropsCkey, older)
       const shown = latest().vault
@@ -265,7 +265,7 @@ describe("BankProvider", () => {
       render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
       const deleter = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1', deviceDB: memoryDeviceDB() })
-      await deleter.del()
+      await TH.del(deleter, 'correct horse')
       const readsBefore = reads.mock.calls.length
       const shown = latest().vault
       await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_gone') } })
@@ -286,9 +286,9 @@ describe("BankProvider", () => {
       await expectShown('unlocked')
       const elsewhere = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1', deviceDB: memoryDeviceDB() })
       const shown = latest().vault
-      await elsewhere.del()
+      await TH.del(elsewhere, 'correct horse')
       const remade = await TH.bankOf(elsewhere).ensureVault({ userId: 'u1', vaultlabel: 'main' })
-      await remade.unlock('a new pw')
+      await TH.unlock(remade, 'a new pw')
       // The provider's watch hears it all; however its reads fall, its Vault object is gone.
       await waitFor(() => { expect(shownState()).to.match(/^refused: vault_(gone|remade)$/) })
       fireEvent.click(screen.getByText('Retry'))

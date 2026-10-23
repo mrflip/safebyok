@@ -23,7 +23,7 @@ const FlavorCases: readonly (readonly [RefusalKind, string, string])[] = [
   ["unexpected_error",    'trouble',           'a bug goes to the boundary, to be reported'],
 ]
 
-describe("attemptRefusalFlavor, as the Contract's getProof groups attempt's refusals", () => {
+describe("attemptRefusalFlavor, as the Contract's Gating groups its attempt's refusals", () => {
   for (const [kind, flavor, blurb] of FlavorCases) {
     it(blurb, () => { expect(attemptRefusalFlavor(new VaultError(kind, 'A refusal.'))).to.eq(flavor) })
   }

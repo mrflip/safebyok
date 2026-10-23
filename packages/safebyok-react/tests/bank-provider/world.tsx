@@ -110,7 +110,7 @@ export const madeWorld = async () => {
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
   const made = await TH.settledVault({ ...props, userId: 'u1', vaultlabel: 'main' })
-  await made.unlock('correct horse')
+  await TH.unlock(made, 'correct horse')
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(made)
   const spoil = () => {
@@ -170,7 +170,7 @@ export const hushConsole = () => vi.spyOn(console, 'error').mockImplementation((
 export const lockedWorld = async () => {
   const world = makeWorld()
   const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1', vaultlabel: 'main' })
-  await maker.unlock('pw')
+  await TH.unlock(maker, 'pw')
   await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(maker)
   const grab = grabber()

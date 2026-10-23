@@ -6,7 +6,7 @@ import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, refuseAcme, shownState, expectShown, CatchingBoundary, hushConsole, lockedWorld, providerOf, twelveOrMore } from './world'
 
 describe("BankProvider", () => {
-  // == [Options passed through]: keyDeriver, Bank.make options, validators, strengthChecker, logger, allowStartOver, others
+  // == [Options passed through]: keyDeriver, Bank.make options, validators, strengthChecker, logger, others
 
   it("asks for a keyDeriver outright, as Bank.make does", () => {
     expectTypeOf<Pick<BankProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
@@ -22,7 +22,7 @@ describe("BankProvider", () => {
     render(
       <BankProvider applabel="acme" userId="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
         keyDeriver={TH.testDeriver} strengthChecker={TH.anyStrengthChecker} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
-        staleMinutes={0} onBadNews={onBadNews}>
+        staleMinutes={0} onBadNews={onBadNews} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>,
     )
@@ -33,7 +33,7 @@ describe("BankProvider", () => {
     await TH.expectRefusal(vault.hello(), 'identity_revoked')
     expect(told).to.deep.equal([revoked])
 
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     // One hour, 3,600,000 ms, after the clock's time.
     expect(vault.getSnapshot().askPassphraseAt).to.eq(ClockMillis + 3_600_000)
     // 'sk-fake' is nine bytes of JSON, one over the limit given.
@@ -48,13 +48,13 @@ describe("BankProvider", () => {
     const { props } = makeWorld()
     // A bag written in the props, as a host might: new at every render, around the same schemas.
     const tree = (boxlabelCheck: VaultValidators['boxlabel']) => (
-      <BankProvider {...props} userId="u1" validators={{ boxlabel: boxlabelCheck }}>
+      <BankProvider {...props} userId="u1" validators={{ boxlabel: boxlabelCheck }} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
     const { rerender } = render(tree(AnyTextValidators.boxlabel))
     const first = await opened()
-    await first.unlock('correct horse battery staple')
+    await TH.unlock(first, 'correct horse battery staple')
     await first.putBox({ boxlabel: 'Anthropic API key' }, 'sk-fake')
     rerender(tree(AnyTextValidators.boxlabel))
     expect(latest().vault).to.eq(first)
@@ -68,11 +68,11 @@ describe("BankProvider", () => {
   it("passes strengthChecker through: the vault it opens refuses a weak new passphrase with the checker's reason", async () => {
     const { Grab, opened } = grabber()
     const { props } = makeWorld()
-    render(<BankProvider {...props} userId="u1" strengthChecker={refuseAcme}><Grab /></BankProvider>)
+    render(<BankProvider {...props} userId="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>)
     const vault = await opened()
-    const err = await TH.expectRefusal(vault.unlock('acme acme acme acme'), 'weak_passphrase')
+    const err = await TH.expectRefusal(TH.unlock(vault, 'acme acme acme acme'), 'weak_passphrase')
     expect(err.message).to.eq('Not the name of the app, please.')
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
@@ -100,19 +100,19 @@ describe("BankProvider", () => {
   it("keeps its vault for a strengthChecker that keeps its identity, the vault running that checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
-    const tree = () => <BankProvider {...props} userId="u1" strengthChecker={refuseAcme}><Grab /></BankProvider>
+    const tree = () => <BankProvider {...props} userId="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>
     const { rerender } = render(tree())
     const first = await opened()
     rerender(tree())
     expect(latest().vault).to.eq(first)
-    await TH.expectRefusal(first.unlock('acme acme acme acme'), 'weak_passphrase')
+    await TH.expectRefusal(TH.unlock(first, 'acme acme acme acme'), 'weak_passphrase')
   })
 
   it("makes the bank anew for a strengthChecker that changes identity, as for any option: the new vault runs the new checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
     const tree = (reason: string) => (
-      <BankProvider {...props} userId="u1" strengthChecker={(_typed) => ({ strong: false, reason })}>
+      <BankProvider {...props} userId="u1" strengthChecker={(_typed) => ({ strong: false, reason })} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
@@ -122,22 +122,22 @@ describe("BankProvider", () => {
     await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
     const second = latest().vault
     if (second === null) { throw new Error('the provider opened no vault') }
-    const err = await TH.expectRefusal(second.unlock('correct horse battery staple'), 'weak_passphrase')
+    const err = await TH.expectRefusal(TH.unlock(second, 'correct horse battery staple'), 'weak_passphrase')
     expect(err.message).to.eq('Second reason.')
-    await TH.expectRefusal(first.unlock('correct horse battery staple'), 'vault_gone')
+    await TH.expectRefusal(TH.unlock(first, 'correct horse battery staple'), 'vault_gone')
   })
 
   it("shows the vault locked when storage says its user signed out, as the vault locks itself", async () => {
     const { Grab, opened } = grabber()
     const { props, vaultDB } = makeWorld()
     render(
-      <BankProvider {...props} userId="u1">
+      <BankProvider {...props} userId="u1" requestCleartext={TH.scriptedRequestCleartext}>
         <Probe />
         <Grab />
       </BankProvider>,
     )
     const vault = await opened()
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     await expectShown('unlocked')
     vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
@@ -150,12 +150,12 @@ describe("BankProvider", () => {
     const vaultDB = localVaultDB({ store })
     const { Grab, opened } = grabber()
     render(
-      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" logger={spy.logger}>
+      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" logger={spy.logger} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>,
     )
     const vault = await opened()
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     // A change pushed from storage that the vault cannot read: its background refresh warns.
     vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
@@ -170,7 +170,7 @@ describe("BankProvider", () => {
     const reading = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
     const providing = (clock: { now: () => number }) => (
-      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" clock={clock}>
+      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" clock={clock} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
@@ -179,58 +179,11 @@ describe("BankProvider", () => {
     rerender(providing({ now: () => reading }))
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('BankProvider') })
     const vault = await opened()
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'BankProvider'], ['warn', 'refresh']])
-  })
-
-  it("passes allowStartOver to the dialog: a user who forgot the passphrase may start a new vault, which the provider asks for, handing it down novel", async () => {
-    const world = await lockedWorld()
-    render(<BankProvider {...world.props} userId="u1" allowStartOver><world.Grab /></BankProvider>)
-    const vault = await world.opened()
-    const reading = vault.tryGetWhisper('anthropic_api_key')
-    fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
-    fireEvent.click(screen.getByText('Remove and start over'))
-    // The delete ends the prompt: the dialog closes, and the read that asked is refused, its Vault object gone.
-    const { err } = await reading
-    expect(err?.refusalkind).to.eq('vault_gone')
-    await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
-    // The user asked for a new vault: the provider asks the bank for it, the next life, novel, never a refusal.
-    await waitFor(() => { expect(world.latest().vault).to.not.be.null.and.not.eq(vault) })
-    expect(world.latest().err).to.be.null
-    const next = await world.opened()
-    expect(next.getSnapshot().state).to.eq('novel')
-    // The next call asks the user to choose a passphrase for the new vault.
-    const storing = next.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-new-fake')
-    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
-    expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
-    fireEvent.click(screen.getByText('Create vault'))
-    const { ok } = await storing
-    expect(ok).to.be.true
-  })
-
-  it("asks no bank it has let go for the new vault, when another user signs in while a start over deletes the vault", async () => {
-    const world = await lockedWorld()
-    const gate = TH.makeGate()
-    const delVault = world.vaultDB.delVault.bind(world.vaultDB)
-    vi.spyOn(world.vaultDB, 'delVault').mockImplementation(async (...args) => { await gate.pass(); return await delVault(...args) })
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
-    const { rerender } = render(<BankProvider {...world.props} userId="u1" allowStartOver><world.Grab /></BankProvider>)
-    const vault = await world.opened()
-    const reading = vault.tryGetWhisper('anthropic_api_key')
-    fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
-    fireEvent.click(screen.getByText('Remove and start over'))
-    await gate.reached
-    rerender(<BankProvider {...world.props} userId="u2" allowStartOver><world.Grab /></BankProvider>)
-    await TH.expectBad(reading, 'vault_gone')
-    await waitFor(() => { expect(world.latest().vault?.user_id).to.eq('u2') })
-    gate.release()
-    await waitFor(async () => { expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null })
-    await TH.wakeupAtNextTick()
-    // One birth for u1, before the start over: none after it, in the bank let go as u2 signed in.
-    expect(ensureVault.mock.calls.filter(([draft]) => draft.user_id === 'u1')).to.have.lengthOf(1)
   })
 
   it("passes passphraseUsername and passphraseAdvice to the dialog: what a password manager files it under, and what is said as the user chooses", async () => {
