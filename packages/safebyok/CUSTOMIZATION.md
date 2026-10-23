@@ -30,7 +30,7 @@ type StrengthChecker = {
   `refused`: a bank that cannot judge a new passphrase births no vault, rather than failing
   later, when the user chooses one.
 * A blank passphrase (empty, or only spaces) is weak before the checker hears it.
-* The reason is for your user: calm, saying what to do, and never quoting the passphrase.
+* The reason is for your user: calm, saying what to do. It is shown to the user as given, so it must never quote the passphrase.
 * It runs on the device, keeps nothing, and sends nothing anywhere: it hears the passphrase in
   plain text.
 * `scope` names the vault: words a guesser who knows the user tries first. Treat them as the

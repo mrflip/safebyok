@@ -92,7 +92,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **The demo triggers the bank when Auth.js gets an identity** (the Coach, on #259): show the
   `BankProvider` keyed on the session's user, made once the identity is known.
 * **The demo shows an account-like badge while the vault is unlocked** (the Coach, on #261):
-  clicking it locks and signs out, with an in-place confirmation.
+  you can click it to log out with an in-place confirmation.
 * **The React demo offers a format helper for the lease's deadline** (the Coach, 2026-10-22):
   `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` in the user's locale for
   `vault.askPassphraseAt`, as a `passphraseDeadlineText` ("Tue, Oct 27, 3:00 PM") and a
@@ -164,7 +164,7 @@ it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19
   birth on this device takes it up. Decide whether a lease a lock failed to erase is marked, or
   the next birth asks first.
 * **A sign-out with an unlock in flight in another tab**: harmless today, a lease being scoped by
-  user id; confirm with a test once the React dialogs (thread 10) settle.
+  user id.
 
 ### Must the passphrase be asked again once a vault has a passkey?
 
