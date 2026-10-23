@@ -187,7 +187,7 @@ describe("proving.resealWayinFor", () => {
     const next = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     const wayin = await current.resealWayinFor(next)
     expect(wayin.wayinkind).to.eq('passphrase')
-    expect(headerOf(wayin.record as typeof props.passphrase)).to.deep.eq(next.header)
+    expect(headerOf(wayin.record)).to.deep.eq(next.header)
   })
 
   it("refuses wrong_passphrase for a current proving that does not open its wayin", async () => {
