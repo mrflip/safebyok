@@ -78,6 +78,30 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   are built, and this builds on them (`whiteboard/20261016-push_to_100_a/store-base-design.md`,
   while it stands).
 
+* **A test that reads the Postgres README's route recipe.** From #252's review (the Coach took
+  the Rec, 2026-10-22): the route recipe in `safebyok-postgres`'s README and the route its tests
+  run are hand-kept copies, so the copy a host takes can drift from the one tested. Have the test
+  read the README's code blocks and run those.
+* **The Postgres README points past a server nobody wants.** The Coach (2026-10-22): rather than
+  a hand-written route server, point to (a) the GraphQL client (`safebyok-graphql`) and (b) an AI
+  prompt that builds a route for the host's own framework.
+* **An agent skill set** for integrating safebyok (the Coach, 2026-10-22): skills a host's coding
+  agent loads to wire a bank, a VaultDB and the dialogs into an app.
+* **`bank.hello()` checks that the device store answers**, not only that the strength checker
+  loads (the Coach, on #258: "scheduling is up to you").
+* **The demo triggers the bank when Auth.js gets an identity** (the Coach, on #259): show the
+  `BankProvider` keyed on the session's user, made once the identity is known.
+* **The demo shows an account-like badge while the vault is unlocked** (the Coach, on #261):
+  clicking it locks and signs out, with an in-place confirmation.
+* **The React demo offers a format helper for the lease's deadline** (the Coach, 2026-10-22):
+  `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` in the user's locale for
+  `vault.askPassphraseAt`, as a `passphraseDeadlineText` ("Tue, Oct 27, 3:00 PM") and a
+  `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
+* **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
+  priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
+  (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the
+  passphrase (`vault.del()`).
+
 ## Soonish
 
 Wanted; each has a design question to settle first, named here.
@@ -127,38 +151,20 @@ shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the 
 in their home ([#111](https://github.com/mrflip/safebyok/pull/111)). First check whether big_feats
 changed either.
 
-### Lock timing vs. work in flight: a policy is owed before 1.0
+### Lock timing vs. work in flight: what is left of the policy
 
-**`softlock_gone` (2026-10-19) removed the soft lock (`lockSoon()`), the minute past
-`askPassphraseAt`, the in-handle lock counters and the device mark's lock generation.** Each decided
-who wins when a lock lands while something is in flight. Today nothing decides: the last writer
-wins, and the user may be surprised. The Coach's ruling: let these be annoyances until the store
-reform is done, then write one defensible policy and tests to it, rather than re-deriving a
-mechanism per case now. The scenarios, each with today's outcome:
+The primitives sprint (2026-10-22 and 23) wrote the policy as a per-method contract: **a lock
+spares only the transactional part.** A VaultDB write once sent completes or refuses as storage
+decides; every step before it refuses `vault_locked`; a stale write refuses `stale_write`, never
+`vault_locked`. The core README's *Locking* and the Contract tab's *A lock landing mid-call* say
+it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19) listed:
 
-1. `lock()` lands during an unlock's derivation or its lease write, same handle: the unlock
-   finishes; the vault is unlocked and a lease written. A `lock()` while a `hello()` reads the
-   lease is the exception: since the contract sprint's A3 (a stale hello re-reads the lease, so
-   this became routine) a key dropped or replaced during a lease take-up aborts it, and the hello
-   takes nothing up.
-2. The same, the lock in another tab on this device: as 1; the lease write is no longer refused.
-3. A read's fetch or decipher straddles a lock: refused `vault_locked` if no key is in hand when
-   the whisper is ready; handed back if another unlock has put a key in hand meanwhile.
-4. A store sealed before a lock lands after it: it lands (it needs no key after sealing).
-5. The lease ends at `askPassphraseAt` mid-operation: as 3 and 4, with no grace; a store not yet
-   sealed is refused.
-6. The device store throws when a lock erases the lease: the lease survives; the next hello that
-   reads afresh, or the next page load, takes it up.
-7. A sign-out with an unlock in flight in another tab: as 2; harmless, since a lease is scoped by
-   user id.
-
-The policy session decides, for each, what the vault promises, and writes the test first. The
-tests this removal deleted, verbatim and by theme, each with the lesson it carried, are its
-checklist: `softlock_gone-removed-tests.md` in the thread's folder (`20261019-softlock_gone/`,
-under `whiteboard/` or, once closed, `winboard/`). It also
-answers the question this entry replaces (*Lock NOW vs soft lock*, from
-[#106](https://github.com/mrflip/safebyok/pull/106)): whether `lock()` claws back a store already in
-flight.
+* **The device store throws when a lock erases the lease** (`lock()` refuses `storage_blocked` or
+  `storage_unavailable`, the vault locked in memory): the lease on disk survives, and the next
+  birth on this device takes it up. Decide whether a lease a lock failed to erase is marked, or
+  the next birth asks first.
+* **A sign-out with an unlock in flight in another tab**: harmless today, a lease being scoped by
+  user id; confirm with a test once the React dialogs (thread 10) settle.
 
 ### Must the passphrase be asked again once a vault has a passkey?
 
@@ -196,14 +202,15 @@ storing each whisper again, the old one's passphrase in hand. Decide whether saf
 move as a call, or documents it as the host's, alongside *Identity should not be tied to the
 backing database*.
 
-### A throwing `getProof` is always `unexpected_error`
+### A throwing `requestCleartext` is always `unexpected_error`
 
-The Coach (2026-10-19, sprint contract): "a throwing getProof is always unexpected_error: we need
-to allow more specificity." Today the answer is checked once, as the vault raises each ask (`src/ask.ts`): a
-throw from the host's `getProof` becomes `unexpected_error` (misuse), whatever it threw, so a
-dialog that fails for a reason the host could name -- a lost user gesture, a passkey the platform
-refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept
-as it came (as `outcomeOf` keeps one elsewhere), a fourth answer, or a short list of kinds.
+The Coach (2026-10-19, sprint contract, of `getProof`, which `requestCleartext` replaced): "a
+throwing getProof is always unexpected_error: we need to allow more specificity." Today a throw
+from the host's `requestCleartext` refuses every call waiting on the gating `unexpected_error`,
+carrying nothing of what it threw (it may quote the passphrase: #262), so a dialog that fails for
+a reason the host could name -- a lost user gesture, a passkey the platform refused -- cannot say
+so. Decide what a `requestCleartext` may refuse with: a short list of kinds it may throw as
+`VaultError`s, kept as they came, or a `gating.refuse(kind)` beside `decline()`.
 
 ### "Add "sensitive" and "host" flags to refusals"
 
@@ -214,13 +221,6 @@ throw is its refusal's `cause`; the strength checker's, which heard the passphra
 whole; its `load`'s, which heard nothing, rides as `cause`. Decide the two flags -- a refusal
 that heard secret material, one whose cause is the host's own code -- and audit each wrap
 against them.
-
-### Should `tryClose` be a promise?
-
-The Coach (2026-10-19, sprint contract): "should tryClose really be a promise." Every `try` form
-resolves its `Outcome`, but `tryClose()` answers one at once, because `close()` stays synchronous
-for React's effect cleanup (thread A4). Decide with phase C's close (C5): whether `tryClose`
-resolves, as its twins do, and whether a close waits for the calls it refuses.
 
 ### Redaction, batteries included
 
@@ -268,6 +268,47 @@ damaged, where the user may delete it or store over it (only on the user's own a
 the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
+
+### Capacity on the Vault object, adopted from storage
+
+The Coach (2026-10-22): `capacity` as an attribute of the Vault object an app reads, and the
+Vault object adopting storage's capacity when a write refuses `vault_full` (the refusal's
+`meta.capacity`), so the next check in this tab counts as storage does. Decide how an adopted
+capacity ages, since a hello's listing recounts it.
+
+### The stamp, not the scope, as a VaultDB request's parameter
+
+The Coach (2026-10-22): each VaultDB verb takes the scope and an expectation beside it; a verb
+could take the stamp (`{ ...scope, vault_tok, vault_epoch, gate_epoch }`) whole. And send the
+authenticated immutable fields with puts and reads, so a server can refuse early what the ctx
+would refuse late. Decide with the wire shapes (`safebyok-graphql`, the Postgres route), since
+both are contracts a host's server and browser share.
+
+### Whether `damaged_lease` calls `lock()`
+
+The Coach (2026-10-22): a lease that will not unwrap is dropped and erased as `lock()` drops and
+erases it, without calling `lock()`. Decide whether it calls `lock()` itself (ending a gating
+standing, settling `lockLanded`), taking care that the lock does not recurse into the call that
+met the damage.
+
+### "Whisper unchanged" in `putBox`
+
+The Coach (2026-10-22): a store that keeps the whisper reads and opens the box first
+(`putBox({ boxlabel, sidecar })`, a whisper left out). Decide whether an active sentinel, or a
+tighter entry point for a sidecar-only change, says so more plainly than an argument left out.
+
+### Who holds the lease's expiry
+
+The Coach (2026-10-22): only the passphrase proving, or a parent object, holding the lease's
+expiry, rather than the Vault object's timer. Thread 8 of the primitives sprint weighed it and
+kept the Vault object's; decide once the gating's chains settle.
+
+### A policy for asking every time
+
+The Coach (on #261: "figure out how to give that policy"): a host may want the user asked at
+every call. `leaseHours` keeps its floor above zero, and a `renewMinutes` as long as the lease
+refuses `bad_option`; today the host calls `lock()` once done. Decide how a host says "ask every
+time", and what a lease of no length means for the device store.
 
 ## Potential Optimizations
 
