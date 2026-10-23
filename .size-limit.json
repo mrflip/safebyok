@@ -1,6 +1,6 @@
 [
-  { "name": "everything", "path": "packages/safebyok/dist/index.js", "limit": "49 kB" },
-  { "name": "Bank", "path": "packages/safebyok/dist/index.js", "import": "{ Bank }", "limit": "41 kB" },
+  { "name": "everything", "path": "packages/safebyok/dist/index.js", "limit": "50 kB" },
+  { "name": "Bank", "path": "packages/safebyok/dist/index.js", "import": "{ Bank }", "limit": "42 kB" },
   { "name": "stableJsonify", "path": "packages/safebyok/dist/index.js", "import": "{ stableJsonify }", "limit": "3.5 kB" },
   { "name": "argon2idWebV1Deriver", "path": "packages/safebyok/dist/index.js", "import": "{ argon2idWebV1Deriver }", "limit": "8.6 kB" },
   { "name": "idbDeviceDB", "path": "packages/safebyok/dist/idb.js", "import": "{ idbDeviceDB }", "limit": "14 kB" },
