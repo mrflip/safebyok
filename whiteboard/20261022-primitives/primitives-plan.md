@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b (gating_followups) building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b (gating_followups) building; an opus review of the whole core line running beside it. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
