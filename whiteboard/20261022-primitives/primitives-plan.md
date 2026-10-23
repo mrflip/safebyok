@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 building; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -435,7 +435,7 @@ rework let the entry go on `stale_write`, added the rows and counts, erased befo
 `clearCachedVault`, and made the demo's account deletion `tryDel`. Left: toldjaso 21 and 22; the
 bank lets go whichever entry stands when a delete or erase ends (Open Matter).
 
-### 8. proving_gate
+### 8. proving_gate, filed ([#260](https://github.com/mrflip/safebyok/pull/260))
 
 > **proving_gate**: `Proof` becomes `Proving`, abstract, with `PassphraseProving` and
 > `PasskeyProving` each declaring its own `static seal(vault, header, cleartext)` (the header the
@@ -474,6 +474,13 @@ record. Ways in follow 6b's rule, "we sign all immutable fields" (the Coach): bi
 immutable visible fields into its ctx. Remove the `WayinStamp` type: `device_id` and `registered_at` are the wayin record's own
 stored fields (the Coach: "Wayin stamp will go away, right? aren't those own props of the wayin
 stored in the table?").
+
+*Review:* **fixed** ([#260](https://github.com/mrflip/safebyok/pull/260)). Built by a worker stopped after
+its first half, finished by a second. The review fixed a reused passkey answer sealing under a
+key anyone could rebuild (an all-zero answer now refused `bad_option`; security note added), and a
+lost first-gate race told `gate_moved` instead of `gate_made_elsewhere` (a regression). The
+key-handling checklist held. Left for thread 9: `StandingGating` on `unlock()` / `putWayin()` /
+`delWayin()` (audit 1 on every path), the seal order in `putWayin`, the demand's call name.
 
 ### 9. gating
 

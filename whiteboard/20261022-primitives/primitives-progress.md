@@ -80,8 +80,8 @@ rules* 3).
 | 6b | box_seal | filed, stacked on #254 | #256 |
 | 7 | bank | filed, stacked on #256 | #258 |
 | 7b | bank_provider | filed, stacked on #258 | #259 |
-| 8 | proving_gate | building | |
-| 9 | gating | planned | |
+| 8 | proving_gate | filed, stacked on #259 | #260 |
+| 9 | gating | building | |
 | 10 | react | planned | |
 | 11 | docs | planned | |
 | 12 | route_meta | filed, beside the line | #252 |
@@ -92,6 +92,20 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 8, proving_gate (#260)
+
+* `src/proving.ts`: `Proving` (abstract), `PassphraseProving` / `PasskeyProving` with `static seal(vault,
+  header, cleartext, { gating })`; a proving holds its wayinKey privately, its stamp non-enumerable;
+  `checkWayin`, `sealWayins(passkeyProving?)`, `resealWayinFor(newProving)`, `grantLease()` (demands on
+  the proving and the stored record's stamp before `putLease`), `wrappedWith` (a `Ciphered`).
+  `checkedPasskeyAnswer` refuses an all-zero answer; an answer is zeroed once used.
+* `src/gate.ts`: `Gate.make`, `Gate.of`, `Gate.isHeldBy`; `#putGate` private in vault.ts, demanding on
+  the gate before and after `putVaultProps`; `#gateWriteRefusal` makes the Vault gone on another life.
+* Wayin is record only; `src/proof.ts` gone; `vault.checkStrength` (beside `checkPassphrase`, kept for
+  React until thread 10). New kind `gating_landed`.
+* Placeholders for thread 9: `ProvingGating { landed }` (an ask's attempt, the Ask's `#over`) and
+  `StandingGating` (never lands) for `unlock()`, `putWayin()`, `delWayin()`.
 
 ### Thread 7b, bank_provider (#259)
 
