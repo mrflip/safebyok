@@ -509,6 +509,19 @@ and kept `#takeUp`'s AbortController for this thread to remove; the kept take-up
 judgment, which the Coach rules recorded, not fixed ("yes record don't fix"): fix it here only if the
 pantry consult's shape gives it for free.
 
+*Orchestrator, from thread 8 ([#260](https://github.com/mrflip/safebyok/pull/260)) and its review:* replace
+thread 8's placeholder gatings (`ProvingGating { landed }` for an ask's attempt, bound to the Ask's
+`#over`; `StandingGating`, which never lands, for `unlock()`, `putWayin()`, `delWayin()`), so audit
+risk 1 holds on every path: today a `lock()` landing during those three calls' `putLease` still
+attaches the lease in memory. `#putGate` is private (gating.ts must reach it); `seal` takes
+`{ gating }` after the cleartext (place it). Check the current passphrase before sealing a new
+passkey answer in `putWayin` (a typo now spends a second derivation and zeroes a fresh passkey's
+answer), unless the parallel seal junction is kept on purpose. `resealWayinFor` / `sealWayins`
+demand on the other proving once gatings are real. Provings demand through the public
+`vault.demandConsistentWith`, so their refusal logs `call: 'demandConsistentWith'`: give
+`ProvingInside` a `demand(thing, call)` naming `unlock`, `putWayin`, `delWayin`. Weigh again the
+Coach's TODO: only the passphrase proving (or a parent) holds the lease expiry.
+
 *Tests.* `ask.test.ts` and the gating halves of `vault-lease.test.ts` and `vault-wayins.test.ts`;
 one test per gatingkind's happy path, one injected failure per chain step, the open-on-typo, the
 second attempt, the stale-state settle, and "a write that lands and then a lock".
