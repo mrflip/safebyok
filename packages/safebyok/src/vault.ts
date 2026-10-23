@@ -20,7 +20,7 @@ import { Lease, type LeaseView } from './lease'
 import { registerLeaseReader } from './held-lease'
 import { type PassphraseProving, Proving, registerProvingInside } from './proving'
 import { Gate } from './gate'
-import { type GatingCall, type GatingInside, type GatingKind, RaisedGating } from './gating'
+import { type GatingCall, type GatingInside, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
 
 // == [Public types]: VaultState, VaultFreshness, VaultSnapshot, bear, letGo
 
@@ -872,12 +872,11 @@ export class Vault {
   #boxes: readonly (BoxSummary | DamagedBox)[] = []
   // The lease this Vault object holds, opened: the one place it keeps the vaultKey. Dropping it locks.
   #lease: Lease | null = null
-  // How many leases this Vault object has held, and which of them is the one in hand: a read of
-  // this device's store begun before the lease in hand was granted or taken up is older than it,
-  // and cannot say it was revoked. Counted, not timed: a read begun in the same millisecond as a
-  // grant is told apart.
+  // How many leases this Vault object has held, the last of them the one in hand: a read of this
+  // device's store begun before the lease in hand was granted or taken up is older than it, and
+  // cannot say it was revoked. Counted, not timed: a read begun in the same millisecond as a grant
+  // is told apart.
   #leasesHeld = 0
-  #leaseSerial = 0
   // Set once the bank lets the Vault object go, or it is deleted, or found deleted or made anew:
   // what every call refuses with from then on, 'vault_remade' for a vault made anew, else 'vault_gone'.
   #goneBy: (() => VaultError) | null = null
@@ -1052,7 +1051,7 @@ export class Vault {
     if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
-    const revoked = held !== null && found.leasesSeen >= this.#leaseSerial && ! standsBeside(found.leaseKept, held)
+    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! standsBeside(found.leaseKept, held)
     if (outdated || revoked) { this.#dropLease() }
     this.#replaceSnapshot()
     this.#tellListingNews(shown)
@@ -1431,7 +1430,6 @@ export class Vault {
     const lease = Lease.make(this, stored)
     this.#lease = lease
     this.#leasesHeld += 1
-    this.#leaseSerial = this.#leasesHeld
     this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
     return lease
@@ -1461,7 +1459,6 @@ export class Vault {
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
     this.#lease = lease
     this.#leasesHeld += 1
-    this.#leaseSerial = this.#leasesHeld
     this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
     return true
@@ -1485,7 +1482,6 @@ export class Vault {
     if (! this.#fitsTakeUp(lease, 0)) { return }
     this.#lease = lease
     this.#leasesHeld += 1
-    this.#leaseSerial = this.#leasesHeld
     this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
   }
@@ -1839,7 +1835,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, gateMadeElsewhereError, isGateMadeElsewhere, strippedOfStoredProps
+// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, isGateMadeElsewhere, strippedOfStoredProps
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
@@ -1855,8 +1851,6 @@ const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in c
 
 const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
-/** The refusal of a first unlock that lost the race to another device setting the vault's first passphrase. It carries nothing of that device's gate. */
-const gateMadeElsewhereError = () => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
 
 /** True when `err`, a first gate's write refused, says another device's first gate stands on the vault `vaultTok`: a stale write whose stored vault props are gated, of that vault. */
 const isGateMadeElsewhere = (err: VaultError, vaultTok: string): boolean => {

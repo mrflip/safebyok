@@ -1,6 +1,6 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
-import { type BadOutcome, type Outcome, bad, good } from './outcome'
+import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
 import { type GatedVaultProps, type PasskeyAnswer, type Stamped, type VaultProps, isGated } from './types'
 import type { Vault } from './vault'
@@ -148,6 +148,10 @@ export class RaisedGating implements ProvingGating {
   #settle: (outcome: Outcome<void>) => void = () => undefined
   #landLock: () => void = () => undefined
   #over = false
+  // Set once a del_vault attempt has sent its VaultDB.delVault: a lock, a decline or a let-go then
+  // marks the gating landed, and its chain settles it, as the deletion went or did not.
+  #deletionSent = false
+  #landedLate = false
   #attempting = false
 
   private constructor(gatingkind: GatingKind, call: GatingCall, vault: Vault, inside: GatingInside, onOver: () => void) {
@@ -172,7 +176,7 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** True once it settled, was declined, or a lock landed: its provings open nothing more. */
-  get landed(): boolean { return this.#over }
+  get landed(): boolean { return this.#over || this.#landedLate }
 
   /** Settle it with `outcome`, once: every waiter hears it. Later settles do nothing. */
   settle(outcome: Outcome<void>): void {
@@ -184,12 +188,24 @@ export class RaisedGating implements ProvingGating {
 
   /** A `lock()` landed, or the vault went gone, while it stood: every waiter refuses 'vault_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
   landLock(told?: VaultError): void {
-    // A deletion under way that a read finds landed -- its own write, heard before it answered --
-    // is settled by its chain, which knows whether the write was its own. Its dialog stays up
-    // till then: a host closing it on lockLanded would decline the gating first.
-    if (this.gatingkind === 'del_vault' && this.#attempting && told?.refusalkind === 'vault_gone') { return }
+    // A deletion whose write is sent is settled by its chain, which knows whether the write landed
+    // -- a read that heard it first, a lock or a let-go meanwhile alike. Its dialog stays up till
+    // then: a host closing it on lockLanded would decline the gating first.
+    if (this.#deletionSent) {
+      this.#landedLate = true
+      return
+    }
     this.settle(bad(told ?? lockLandedError()))
     this.#landLock()
+  }
+
+  /** Decline it: every waiter refuses 'vault_locked'. Once a deletion's write is sent, it only marks the gating landed, and the chain settles it. */
+  #decline(): void {
+    if (this.#deletionSent) {
+      this.#landedLate = true
+      return
+    }
+    this.settle(bad(declinedError(true)))
   }
 
   /** The pantry consult, then the host's request: a gating still open once the host's request resolves is declined. */
@@ -237,7 +253,7 @@ export class RaisedGating implements ProvingGating {
 
   /** The {@link Gating} the host is handed, frozen: its kind's attempt, `decline` and `lockLanded`. */
   #gatingOf(lockLanded: Promise<void>): Gating {
-    const common = { vault: this.#vault, lockLanded, decline: () => { this.settle(bad(declinedError(true))) } }
+    const common = { vault: this.#vault, lockLanded, decline: () => { this.#decline() } }
     // One attempt of the kind: its arguments checked, then its chain, each handed what the host handed in.
     const attemptOf = <ArgsT extends unknown[]>(check: (...args: ArgsT) => void, chain: (...args: ArgsT) => Promise<void>) => (
       async (...args: ArgsT): Promise<Outcome<Vault>> => await this.#attempt(() => { check(...args) }, async () => { await chain(...args) })
@@ -271,15 +287,14 @@ export class RaisedGating implements ProvingGating {
   async #initializeGate(passphrase: string, passkey: PasskeyAnswer | undefined): Promise<void> {
     const held = await this.#inside.freshen(this)
     if (isGated(held)) { throw gateMadeElsewhereError() }
-    await this.#vault.checkStrength(passphrase)
-    this.#inside.demand({ vault_tok: held.vault_tok, gate_epoch: held.gate_epoch }, this.call)
+    await this.#strengthUnder(passphrase, { vault_tok: held.vault_tok, gate_epoch: held.gate_epoch })
     const [passphraseProving, passkeyProving] = await Promise.all([
       PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, passphrase, { gating: this }),
       passkey === undefined ? undefined : PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this }),
     ])
     const wayins = await passphraseProving.sealWayins(passkeyProving)
     await this.#inside.putGate(Gate.make(this.#vault, { base: null, ...wayins }), this.call)
-    await passphraseProving.grantLease()
+    await this.#grantAfterChange(passphraseProving)
   }
 
   /** `unlock_vault` by the passphrase: proven over the gate's passphrase wayin, then the lease granted. */
@@ -307,8 +322,7 @@ export class RaisedGating implements ProvingGating {
     if (current === next) { throw samePassphraseError() }
     const held = this.#gatedOf(await this.#inside.freshen(this))
     const base = Gate.of(this.#vault, held)
-    await this.#vault.checkStrength(next)
-    this.#inside.demand(base, this.call)
+    await this.#strengthUnder(next, base)
     const currentProving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), current, { gating: this })
     await currentProving.checkWayin()
     const newProving = await PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, next, { gating: this })
@@ -348,9 +362,19 @@ export class RaisedGating implements ProvingGating {
     const held = this.#gatedOf(await this.#inside.freshen(this))
     const proving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
     await proving.checkWayin()
+    // Sent in this same step: from here a lock or a decline leaves the settling to this chain.
+    this.#deletionSent = true
     const vaultEpoch = await this.#inside.delVault(proving)
     this.settle(good(undefined))
     await this.#inside.afterDel(vaultEpoch)
+  }
+
+  /** Check `passphrase`'s strength, then demand `thing` and that this gating stands before acting on the verdict: a vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'. */
+  async #strengthUnder(passphrase: string, thing: Stamped): Promise<void> {
+    const verdict = await this.#vault.tryCheckStrength(passphrase)
+    this.#inside.demand(thing, this.call)
+    if (this.landed) { throw gatingOverError() }
+    valOf(verdict)
   }
 
   /** Grant the lease by `proving` once a change to the ways in has landed, as today's contract has it: a grant the device store refuses is said through the logger, never thrown as though the change had not landed.
@@ -368,7 +392,7 @@ export class RaisedGating implements ProvingGating {
 
   /** `held`, once gated: a gating other than `initialize_gate` is raised only on a vault with its gate, and a gate never goes. */
   #gatedOf(held: VaultProps): GatedVaultProps {
-    if (! isGated(held)) { throw new VaultError('absent_vault', 'This vault has no passphrase yet, so nothing can prove this change: unlock it first, which sets its passphrase.') }
+    if (! isGated(held)) { throw new VaultError('absent_vault', "This vault has no passphrase yet, so nothing can prove this change: unlock it first, which sets its passphrase.") }
     return held
   }
   // --
@@ -378,7 +402,7 @@ export class RaisedGating implements ProvingGating {
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it. */
 const checkText = (given: unknown): void => {
-  if (typeof given !== 'string') { throw new VaultError('bad_option', 'A passphrase is the text the user typed, as a string.') }
+  if (typeof given !== 'string') { throw new VaultError('bad_option', "A passphrase is the text the user typed, as a string.") }
 }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
@@ -401,18 +425,19 @@ const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
 
 /** The refusal of a call whose gating was declined: by the user, or for want of a `requestCleartext` to ask. */
 export const declinedError = (asked: boolean): VaultError => new VaultError('vault_locked', asked
-  ? 'The vault is locked, and the user declined to unlock it: nothing was read or written. Ask again when they want the vault.'
-  : 'The vault is locked, and there is no requestCleartext to ask the user (Bank.make was given none): nothing was read or written. Hand Bank.make a requestCleartext that shows a dialog.')
+  ? "The vault is locked, and the user declined to unlock it: nothing was read or written. Ask again when they want the vault."
+  : "The vault is locked, and there is no requestCleartext to ask the user (Bank.make was given none): nothing was read or written. Hand Bank.make a requestCleartext that shows a dialog.")
 
-const lockLandedError = () => new VaultError('vault_locked', 'The vault was locked while it was asking for a passphrase, so nothing was unlocked and the dialog is over. Ask again when the user wants the vault.')
+const lockLandedError = () => new VaultError('vault_locked', "The vault was locked while it was asking for a passphrase, so nothing was unlocked and the dialog is over. Ask again when the user wants the vault.")
 
-const gatingOverError = () => new VaultError('gating_landed', 'This dialog is over -- it was answered, declined, or a lock landed -- so this attempt was not tried, and nothing was changed. Ask again when the user wants the vault.')
+const gatingOverError = () => new VaultError('gating_landed', "This dialog is over -- it was answered, declined, or a lock landed -- so this attempt was not tried, and nothing was changed. Ask again when the user wants the vault.")
 
-const attemptInFlightError = () => new VaultError('attempt_in_flight', 'An attempt is already under way in this dialog, so this one was not tried: wait for it to finish, as disabling the submit button while it runs does.')
+const attemptInFlightError = () => new VaultError('attempt_in_flight', "An attempt is already under way in this dialog, so this one was not tried: wait for it to finish, as disabling the submit button while it runs does.")
 
-const samePassphraseError = () => new VaultError('same_passphrase', 'The new passphrase is the one the vault already has: choose a different one.')
+const samePassphraseError = () => new VaultError('same_passphrase', "The new passphrase is the one the vault already has: choose a different one.")
 
-const gateMadeElsewhereError = () => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
+/** The refusal of a first gate that lost the race to another device setting the vault's first passphrase. It carries nothing of that device's gate. */
+export const gateMadeElsewhereError = (): VaultError => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
 
 const absentPasskey = (then: string) => new VaultError('absent_wayin', `This vault has no passkey: it may have been removed on another device. ${then}`)
 // --

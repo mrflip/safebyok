@@ -329,6 +329,28 @@ describe("a lock or a decline landing during an attempt", () => {
     [async (vault: Vault) => { await vault.lock() }, 'lock()'],
     [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()'],
   ] as const) {
+    it(`leaves a deletion whose write was sent to settle by its chain when a ${blurb} lands: del() resolves, and storage holds the tombstone`, async () => {
+      const world = makeWorld()
+      const dialog = TH.heldDialog()
+      const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+      const deleting = vault.tryDel()
+      const gating = TH.asKind(await dialog.asked(), 'del_vault')
+      const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+      const attempting = gating.attempt('pw')
+      await writing.reached
+      await landing(vault, gating)
+      writing.release()
+      await TH.expectGood(attempting)
+      await TH.expectGood(deleting)
+      expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+      await TH.expectRefusal(vault.hello(), 'vault_gone')
+    })
+  }
+
+  for (const [landing, blurb] of [
+    [async (vault: Vault) => { await vault.lock() }, 'lock()'],
+    [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()'],
+  ] as const) {
     it(`refuses the attempt gating_landed for a ${blurb} landing while grantLease writes the lease, holding no lease in memory`, async () => {
       const world = makeRacingWorld()
       const dialog = TH.heldDialog()
@@ -346,6 +368,58 @@ describe("a lock or a decline landing during an attempt", () => {
       expect(heldLeaseOf(vault)).to.be.null
     })
   }
+})
+// --
+
+// == [Strength]: a demand after the strength check's wait
+
+/** A strength checker that answers, strong or `weak`, once `gate` passes: the test holds it. */
+const heldStrength = (weak = false) => {
+  const gate = TH.makeGate()
+  const strengthChecker: StrengthChecker = async () => {
+    await gate.pass()
+    return weak ? { strong: false, reason: 'Too easy to guess.' } : { strong: true }
+  }
+  return { gate, strengthChecker }
+}
+
+describe("the strength check's wait, in a chain", () => {
+  it("refuses an initialize_gate attempt gating_landed, never weak_passphrase, when a lock lands while the strength is checked, setting nothing", async () => {
+    const world = makeWorld()
+    const dialog = TH.heldDialog()
+    const held = heldStrength(true)
+    const vault = await world.open({ requestCleartext: dialog.requestCleartext, strengthChecker: held.strengthChecker })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
+    const attempting = gating.attempt('pw')
+    await held.gate.reached
+    await vault.lock()
+    held.gate.release()
+    await TH.expectBad(attempting, 'gating_landed')
+    await TH.expectBad(ensuring, 'vault_locked')
+    expect(vault.state).to.eq('novel')
+    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 0 })
+  })
+
+  it("refuses a change_passphrase attempt as the vault gone when it is deleted, and made anew, elsewhere while the strength is checked, writing nothing over the new one", async () => {
+    const world = makeWorld()
+    const dialog = TH.heldDialog()
+    const held = heldStrength()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext, strengthChecker: held.strengthChecker })
+    const putting = vault.tryPutWayin('passphrase')
+    const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
+    const attempting = gating.attempt('pw', 'pw two')
+    await held.gate.reached
+    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.del(elsewhere, 'pw')
+    const reborn = await world.open({ deviceDB: memoryDeviceDB() })
+    // The Vault object heard the deletion first, so it went gone before the new life was made.
+    await TH.expectBad(vault.tryRefresh(), 'vault_gone')
+    held.gate.release()
+    await TH.expectBad(attempting, 'vault_gone')
+    await TH.expectBad(putting, 'vault_gone')
+    expect(storedVaultPropsOf(world)).to.include({ vault_tok: reborn.vault_tok, gate_epoch: 0 })
+  })
 })
 // --
 
