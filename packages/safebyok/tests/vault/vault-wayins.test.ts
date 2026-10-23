@@ -3,7 +3,7 @@ import { type PasskeyAnswer, VaultProps, VaultScope } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
-import type { Gating } from '../../src/gating'
+import type { Gating, RequestCleartext } from '../../src/gating'
 import { memoryDeviceDB } from '../../src/device-db'
 import { Bank } from '../../src/bank'
 import { toB64 } from '../../src/crypto'
@@ -428,11 +428,19 @@ describe("the vault's passkey", () => {
     expect(storeDumpOf(world)).to.eq(before)
   })
 
-  it("putWayin with a passkey's answer on a novel vault sets the first passphrase and the passkey beside it, through initialize_gate", async () => {
+  it("refuses putWayin('passkey') on a novel vault absent_vault, asking nothing and writing nothing: the passkey goes beside the first passphrase through ensureUnlocked's initialize_gate", async () => {
     const world = makeWorld()
+    const requestCleartext = vi.fn<RequestCleartext>()
+    const novel = await world.open({ requestCleartext })
+    const writes = vi.spyOn(world.vaultDB, 'putVaultProps')
+    await TH.expectRefusal(novel.putWayin('passkey'), 'absent_vault')
+    expect(requestCleartext).not.toHaveBeenCalled()
+    expect(writes).not.toHaveBeenCalled()
+    TH.closeVault(novel)
     const vault = await world.open()
     const laptop = await TH.passkeyOf('laptop')
-    expect(await TH.putWayin(vault, 'pw', laptop)).to.deep.equal(vault.passkey)
+    TH.answering(vault, async (gating) => { await TH.expectGood(TH.asKind(gating, 'initialize_gate').attempt('pw', laptop)) })
+    await vault.ensureUnlocked()
     expect(vault.getSnapshot()).to.deep.include({ state: 'unlocked', gate_epoch: 1 })
     expect(vault.passkey?.credential_id).to.eq(laptop.credentialId)
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })

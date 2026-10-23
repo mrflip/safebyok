@@ -407,23 +407,36 @@ const requestCleartext: RequestCleartext = async (gating) => {
   (`attemptPassphrase(passphrase)` or `attemptPasskey(answer)`), `change_passphrase`
   (`attempt(current, next)`), `put_passkey` (`attempt(passphrase, passkey)`), `del_passkey` and
   `del_vault` (`attempt(passphrase)`).
-* **The attempt runs the whole change** and resolves an `Outcome`. `wrong_passphrase`,
-  `wrong_passkey`, `weak_passphrase` and `same_passphrase` leave the gating open: show them in
-  place and ask again. Anything else settles the gating -- success, or the refusal, which every
-  call waiting on it then hears -- so close the dialog. `gate_made_elsewhere` means another device
-  set the first passphrase while the user typed: the next call asks for the one chosen there. A
-  second submit while an attempt runs refuses `attempt_in_flight`; disable the button meanwhile.
+* **The attempt runs the whole change** and resolves an `Outcome`. The refusals a user can
+  correct (`CorrectableKindVals`) leave the gating open: show them in place and ask again.
+  They are `wrong_passphrase`, `wrong_passkey`, `weak_passphrase` and `same_passphrase`, and a
+  way in gone or stored damaged (`absent_wayin`, `damaged_wayin`) or a passkey this browser
+  cannot ask (`passkey_unavailable`), where the other way in, or Cancel, is the user's next
+  step. Nothing tries again by itself. Anything else settles the gating -- success, or the
+  refusal, which every call waiting on it then hears -- so close the dialog. `gate_made_elsewhere`
+  means another device set the first passphrase while the user typed: the next call asks for the
+  one chosen there. A first passphrase set when this device's store would not keep the unlock
+  refuses `ensureUnlocked()` `storage_blocked` or `storage_unavailable`, saying the passphrase was
+  set; through `putWayin`, the change resolves and the logger says so. A second submit while an
+  attempt runs refuses `attempt_in_flight`; disable the button meanwhile.
 * **Cancel** resolves your `requestCleartext`, or calls `gating.decline()`: a gating still open
   then is declined, and its calls refuse `vault_locked`. Declining never locks a vault that is
   unlocked, and is no lock: a decline that lands while an attempt's lease is being written to this
   device's store attaches nothing here, but leaves that proven lease in the store, and the next
   call takes it up without asking. To have the vault locked, call `lock()`. A `requestCleartext`
   that throws is `unexpected_error`, never logged.
-* **One gating at a time.** Every call that needs the vault while a gating stands waits on it:
-  `ensureUnlocked()` joins any but a deletion, and `putWayin`, `delWayin` and `del` join one of
-  their own kind and wait out any other. A `lock()` landing while it stands refuses every one of
-  them `vault_locked`, and the bank letting the vault go (`bank.closeVault`) refuses them
-  `vault_gone`; either way `gating.lockLanded` settles: close the dialog. An attempt under way
+* **One gating at a time.** Every call that needs the vault while a gating stands waits on it,
+  and joins it only when its settling answers the call. `ensureUnlocked()` -- and so every box
+  call -- joins an unlock (`unlock_vault`, `initialize_gate`) and hears its answer: a decline
+  refuses it too. A joined unlock that leaves the lease ending within the call's own
+  `renewMinutes` has the call ask again for itself. `ensureUnlocked()` waits out a change to the
+  ways in or a deletion, whatever it settles with, then asks for itself only if the vault is
+  still locked: declining "add a passkey" does not refuse a `getWhisper` waiting behind it, which
+  then raises its own unlock. `putWayin`, `delWayin` and `del` join one of their own kind and wait
+  out any other. A call raises at most one gating of its own. A `lock()` landing while a gating
+  stands refuses every call joined to it `vault_locked`, and the bank letting the vault go
+  (`bank.closeVault`) refuses them `vault_gone`; either way `gating.lockLanded` settles: close the
+  dialog. An attempt under way
   then attaches no lease, and one after refuses `gating_landed`. A deletion whose write is sent is
   past a lock's or a decline's reach: `del()` resolves when it lands, and refuses `vault_locked`
   when storage refuses it.
@@ -684,7 +697,8 @@ for a `passphrase` that does not open the vault, or is blank; `weak_passphrase` 
 `strengthChecker` finds weak, or a blank one; `bad_option` for a passkey's answer as the proof,
 or a new one over anything but a fresh salt; `damaged_wayin` when the passphrase is stored damaged;
 `absent_wayin` from `delWayin` on a vault with no passkey; and `stale_write` when another device
-changed the vault meanwhile.
+changed the vault meanwhile. `damaged_wayin` and `absent_wayin` met by the dialog's attempt leave
+the dialog open, as a wrong passphrase does.
 
 * **Every change asks for the passphrase**, even on an unlocked vault: the vault keeps no copy of
   its vaultKey it could wrap anew, and a walked-away unlocked screen should not be able to change
@@ -805,8 +819,11 @@ await vault.delWayin('passkey')                                // del_passkey: t
   answer, so a mistyped passphrase returns to the dialog with the answer unspent; a passkey made
   for an attempt that is then refused otherwise stays on its authenticator, a way into nothing:
   the user may delete it there. `delWayin('passkey')` on a vault with no passkey refuses
-  `absent_wayin`, and so does a passkey's attempt to unlock. A vault's first way in is a
-  passphrase, with a passkey beside it if the `initialize_gate` dialog offers one.
+  `absent_wayin` before any dialog; a passkey removed elsewhere while the dialog is up, and a
+  passkey's attempt to unlock a vault with none, refuse the attempt `absent_wayin`, the dialog
+  left open. A vault's first way in is a passphrase, with a passkey beside it if the
+  `initialize_gate` dialog offers one: `putWayin('passkey')` on a `novel` vault refuses
+  `absent_vault`, asking nothing.
 * **Where it works.** A passkey answers on the device that holds it: a platform passkey synced by
   iCloud Keychain or Google Password Manager on every device signed in to that account, a security
   key wherever it is plugged in. Browsers and authenticators without PRF refuse with kind
@@ -869,7 +886,7 @@ boundary, and `useVault` throws a birth's misuse there; a condition lands in the
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
-| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's draft, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options | Fix the call; the message names what it takes |
+| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's draft, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's draft naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
 | `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it below the floor, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_props_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
@@ -891,7 +908,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for the passphrase; if it works, the user may add the passkey again, which replaces it |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
-| `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`), or `bank.delDamagedVault` |
+| `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()`, `putWayin('passkey')` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`), or `bank.delDamagedVault` |
 | `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |

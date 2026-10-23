@@ -12,7 +12,7 @@ import { memoryStore } from '../src/string-store'
 import { browserOpts } from '../src/browser'
 import { type MakeBankOpts, type VaultDraft, parseMakeBankOpts, parseVaultDraft } from '../src/vault-opts'
 import type { Gating } from '../src/gating'
-import type { Vault } from '../src/vault'
+import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
 import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
 
@@ -213,6 +213,22 @@ describe("bank.ensureVault", () => {
       await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_label')
     }
     expect(births).not.toHaveBeenCalled()
+  })
+
+  it("refuses a draft naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to a draft naming its own", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const elsewhere = { ...U1, vaultDB: localVaultDB({ store: memoryStore() }) }
+    const birth = bank.ensureVault(U1)
+    await TH.expectRefusal(bank.ensureVault(elsewhere), 'bad_option')
+    const vault = await birth
+    await TH.expectRefusal(bank.ensureVault(elsewhere), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault({ ...U1, deviceDB: memoryDeviceDB() }), 'bad_option')
+    expect(await bank.ensureVault({ ...U1, vaultDB: world.vaultDB, deviceDB: world.deviceDB })).to.eq(vault)
+    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+    const moved = await bank.reopenVault(elsewhere)
+    expect(moved).to.not.eq(vault)
+    await TH.expectRefusal(bank.ensureVault(U1), 'bad_option')
   })
 
   it("hands two asks at once one Vault object, calling vaultDB.ensureVault once, and a third ask, once timely, the same", async () => {
@@ -544,6 +560,28 @@ describe("a vault deleted, and its next life", () => {
     const reborn = await bank.ensureVault(U1)
     expect(reborn.state).to.eq('novel')
     expect(reborn.vault_tok).to.not.eq(stale.vault_tok)
+  })
+
+  it("refuses a birth whose Vault object goes gone before the bank files it 'vault_gone': the entry refused, never handing out the gone Vault object, and the next birth a new, novel life", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+    const bank = bankIn(world)
+    await TH.del(maker, 'pw')
+    // The newborn left as its watch leaves it on finding the vault deleted in the microtasks
+    // before the bank files it -- gone, the bank told a microtask on -- which no read in this
+    // process is quick enough to race.
+    const bearing = Vault[bear].bind(Vault)
+    vi.spyOn(Vault, bear).mockImplementationOnce((parts, born, onGone) => {
+      const newborn = bearing(parts, born, onGone)
+      newborn[letGo]()
+      queueMicrotask(() => { onGone(new VaultError('vault_gone', 'This vault was deleted.')) })
+      return newborn
+    })
+    await TH.expectBad(bank.tryEnsureVault(U1), 'vault_gone')
+    expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null })
+    expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_gone')
+    const reborn = await bank.ensureVault(U1)
+    expect(reborn.state).to.eq('novel')
   })
 })
 // --

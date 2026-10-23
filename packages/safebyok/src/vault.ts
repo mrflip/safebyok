@@ -22,13 +22,16 @@ import { type PassphraseProving, Proving, registerProvingInside } from './provin
 import { Gate } from './gate'
 import { type GatingCall, type GatingInside, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
 
-// == [Public types]: VaultState, VaultFreshness, VaultSnapshot, bear, letGo
+// == [Public types]: VaultState, VaultFreshness, VaultSnapshot, bear, letGo, goneBy
 
 /** The name of the bank's one way to birth a Vault object, exported by no entry point. */
 export const bear = Symbol('Vault.bear')
 
 /** The name of the bank's one way to let a Vault object go, exported by no entry point. */
 export const letGo = Symbol('Vault.letGo')
+
+/** The name of the bank's one look at whether a Vault object went gone of itself, exported by no entry point. */
+export const goneBy = Symbol('Vault.goneBy')
 
 /** Where the vault stands, as a UI branches on it.
  *  * `novel`: stored, with no passphrase yet. The first gating, `initialize_gate`, sets it.
@@ -324,18 +327,24 @@ export class Vault {
    * first. Unlocked, under a lease of the ways in the vault holds that does not end within
    * `opts.renewMinutes` (0 when left out), it resolves at once, with no prompt and no write.
    * Otherwise it raises a gating, `unlock_vault` (`initialize_gate` while the vault is `novel`), or
-   * joins the one standing, unless that one deletes the vault: then it waits for it, and asks again.
-   * A gating it raises first consults this device's store, and takes up a lease another tab
-   * granted when it fits -- of the ways in held, ending past `renewMinutes` from now, and no later
-   * than `leaseHours` from now -- before the host is ever asked. Only then is the gating handed to
-   * `requestCleartext`, and the call waits for it to settle.
+   * joins the one standing when that one unlocks (`unlock_vault`, `initialize_gate`), hearing what
+   * it settles with: one dialog answers every call waiting on it. A gating of another kind -- a
+   * change to the ways in, a deletion -- it waits out, whatever that settles with, and asks again;
+   * so does a joined gating's success that leaves no lease standing past this call's
+   * `renewMinutes`. The call raises at most one gating of its own. A gating it raises first
+   * consults this device's store, and takes up a lease another tab granted when it fits -- of the
+   * ways in held, ending past `renewMinutes` from now, and no later than `leaseHours` from now --
+   * before the host is ever asked. Only then is the gating handed to `requestCleartext`, and the
+   * call waits for it to settle.
    *
    * A `renewMinutes` as long as the lease or longer refuses 'bad_option': every call would prompt.
    * Refuses 'vault_locked' when the user declines, when there is no `requestCleartext`, when a
    * `lock()` lands while the gating stands, or when the lease is gone by the time it settles;
    * 'vault_gone' when the vault is deleted meanwhile, or the bank lets it go ('vault_remade' for
-   * one made anew); and with what the gating's attempt refused, when it settled the gating. A wrong
-   * passphrase never reaches here: the dialog meets it, through the gating's attempt.
+   * one made anew); and with what the gating's attempt refused, when it settled the gating. A first
+   * passphrase set when this device's store would not keep the unlock refuses as the store did,
+   * 'storage_blocked' or 'storage_unavailable', saying the passphrase was set. A wrong passphrase
+   * never reaches here: the dialog meets it, through the gating's attempt.
    *
    * @example await vault.ensureUnlocked()   // unlocked, or refused 'vault_locked'
    * @example <button onClick={() => vault.tryEnsureUnlocked()}>Unlock</button>
@@ -489,8 +498,9 @@ export class Vault {
   }
 
   /** Put a way into the vault at `slotlabel`, through a gating the user answers, resolving the vault.
-   * On a `novel` vault it raises `initialize_gate`, whatever the slot: the first passphrase, and a
-   * passkey beside it if the dialog offers one. Otherwise `'passphrase'` raises
+   * On a `novel` vault `'passphrase'` raises `initialize_gate`: the first passphrase, and a passkey
+   * beside it if the dialog offers one; `'passkey'` refuses 'absent_vault', asking nothing, as a
+   * passkey is added under the passphrase. Otherwise `'passphrase'` raises
    * `change_passphrase`: the current passphrase and the next, which replaces it and removes the
    * passkey, if any (the user adds a passkey again under the new passphrase). `'passkey'` raises
    * `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's passkey,
@@ -503,7 +513,8 @@ export class Vault {
    * resolves, the change is in storage. The gate epoch moves, so every other device locks, and asks
    * again at its next look. This device is left unlocked, its lease starting again from now.
    *
-   * Refuses 'bad_option' for a slotlabel other than `'passphrase'` or `'passkey'`; 'vault_locked'
+   * Refuses 'bad_option' for a slotlabel other than `'passphrase'` or `'passkey'`; 'absent_vault'
+   * for `'passkey'` on a vault with no passphrase yet; 'vault_locked'
    * when the user declines or a `lock()` lands while the gating stands; and with what the gating's
    * attempt refused when it settled it: 'stale_write' or 'gate_moved' when the vault changed
    * first, here or elsewhere, 'damaged_wayin' when the passphrase is stored damaged. A wrong or
@@ -525,8 +536,9 @@ export class Vault {
       checkSlotlabel(slotlabel, 'putWayin')
       await this.#helloWithin(this.#staleMillis)
       const kindNow = (): GatingKind => {
-        if (! isGated(this.#vaultProps)) { return 'initialize_gate' }
-        return slotlabel === 'passphrase' ? 'change_passphrase' : 'put_passkey'
+        if (isGated(this.#vaultProps)) { return slotlabel === 'passphrase' ? 'change_passphrase' : 'put_passkey' }
+        if (slotlabel === 'passkey') { throw passkeyBeforePassphrase() }
+        return 'initialize_gate'
       }
       await this.#gatingFor(kindNow, 'putWayin')
       return good(this)
@@ -783,6 +795,9 @@ export class Vault {
 
   /** The bank lets this Vault object go: it is gone, every call refusing 'vault_gone', as `bank.closeVault` says. Not a lock: nothing stored is erased, and the lease stays for the next Vault object. */
   [letGo](): void { this.#letGo(null) }
+
+  /** What every call on this Vault object refuses with once it is gone, or null while it stands: the bank's look at a Vault object whose read found the vault deleted or made anew before its birth settled. */
+  get [goneBy](): VaultError | null { return this.#goneBy?.() ?? null }
   // --
 
   // == [Options and setup]: bear, the constructor, scope, parsed options, limits, vaultDB, onBadNews, requestCleartext, onGone, clockNow
@@ -1175,12 +1190,16 @@ export class Vault {
   readonly #gatingInside: GatingInside
 
   /** Have the vault unlocked: at once while a lease of the ways in held stands past `renewMillis` from now, else once the gating standing or raised now settles.
-   * See {@link Vault.ensureUnlocked}. Any gating whose chain ends in a lease is joined; a `del_vault`
-   * one is waited out, and the question asked again. `shouldAsk` runs only when the vault must ask,
-   * after the hello and before any gating is joined or raised: a call checks there what it can know
-   * without the key, so a call that cannot land never prompts. It resolves true once unlocked,
-   * demanding nothing after: the call's own operation demands on the lease first. It resolves
-   * false, asking nobody, when `shouldAsk` says not to ask.
+   * See {@link Vault.ensureUnlocked}. An unlocking gating standing (`unlock_vault`,
+   * `initialize_gate`) is joined: its refusal is this call's, as one dialog answers every call
+   * waiting on it, and its success is checked again, since it may have taken up a lease ending
+   * within this call's `renewMillis`. Any other kind is waited out, whatever it settles with, and
+   * the question asked again. The call raises at most one gating of its own, and hears what that
+   * settles with. `shouldAsk` runs only when the vault must ask, after the hello and before any
+   * gating is joined or raised: a call checks there what it can know without the key, so a call
+   * that cannot land never prompts. It resolves true once unlocked, demanding nothing after: the
+   * call's own operation demands on the lease first. It resolves false, asking nobody, when
+   * `shouldAsk` says not to ask.
    */
   async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
     await this.#helloWithin(this.#staleMillis)
@@ -1191,18 +1210,17 @@ export class Vault {
       // The threshold is the truth: a lease past its deadline goes now, should its timer run late.
       if (this.#lease?.endsBy(this.#clockNow()) === true) { this.#dropLease() }
       const standing = this.#gating
-      if (standing?.gatingkind === 'del_vault') {
+      if (standing !== null && ! UnlockingKinds.has(standing.gatingkind)) {
         await standing.settled
         this.#checkStanding()
         continue
       }
       if (shouldAsk?.() === false) { return false }
-      const joined = standing ?? this.#raiseGating(isGated(this.#vaultProps) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)
-      const settled = await joined.settled
+      const settled = await (standing ?? this.#raiseGating(isGated(this.#vaultProps) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
       this.#checkStanding()
       valOf(settled)
-      return true
+      if (standing === null) { return true }
     }
   }
 
@@ -1873,7 +1891,7 @@ const StaleWayinsMessage = "The vault changed in storage since this device read 
 
 // --
 
-// == [Vocabulary]: BirthRead, frozenVaultProps, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds
+// == [Vocabulary]: BirthRead, frozenVaultProps, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it.
  * `vaultProps` and `listed` are what `vaultDB.ensureVault` resolved; `leaseKept` what
@@ -1937,9 +1955,12 @@ type VaultCall = 'birth' | 'hello' | 'refresh' | 'del' | 'untrustedStorage' | 'e
  * storage to be looked at, or the app to be updated. Each has the next hello read afresh.
  */
 const UntrustedStorageKinds = ['identity_revoked', 'vault_behind', 'newer_format'] as const satisfies readonly RefusalKind[]
+
+/** The gatings whose settling answers `ensureUnlocked`'s question, which it joins: an unlock, and a first gate. Any other it waits out. */
+const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initialize_gate'])
 // --
 
-// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkSlotlabel, absentBox, noWhisper
+// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkSlotlabel, passkeyBeforePassphrase, absentBox, noWhisper
 
 /** What a call that takes options most likely had in place of its bag, and what to do: an event, as `call` was handed to `addEventListener` or `onClick` itself. */
 const eventHint = (call: 'hello' | 'ensureUnlocked', tried: 'tryHello' | 'tryEnsureUnlocked') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
@@ -1999,6 +2020,9 @@ const checkSlotlabel = (given: unknown, call: 'putWayin' | 'delWayin'): void => 
     throw new VaultError('bad_option', `${call} takes the slot of the way in, 'passphrase' or 'passkey': the user's passphrase or passkey is asked for through requestCleartext, never handed to the vault.`)
   }
 }
+
+/** The refusal of `putWayin('passkey')` on a novel vault: a passkey is added under the passphrase, which it has none of yet. */
+const passkeyBeforePassphrase = () => new VaultError('absent_vault', "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey.")
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const absentBox = () => new VaultError('absent_box', 'No box stands under that boxlabel in this vault: its snapshot lists the ones it holds.')

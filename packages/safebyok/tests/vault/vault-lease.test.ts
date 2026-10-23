@@ -5,7 +5,7 @@ import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
 import type { Gating, RequestCleartext } from '../../src/gating'
 import * as Safebyok from '../../src/index'
-import { VaultError } from '../../src/errors'
+import { type RefusalKind, VaultError } from '../../src/errors'
 import { bad } from '../../src/outcome'
 import { toB64 } from '../../src/crypto'
 import type { StrengthChecker } from '../../src/passphrase-strength'
@@ -677,15 +677,34 @@ describe("an unlock this device cannot keep a lease for", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
-  it("sets the first passphrase though the device store has no room for the lease: the first gate stands, the call refuses vault_locked, and the vault is locked here", async () => {
+  const UnkeptFirstUnlocks: readonly (readonly [RefusalKind, () => Error])[] = [
+    ['storage_blocked', () => new DOMException('The quota has been exceeded.', 'QuotaExceededError')],
+    ['storage_unavailable', () => new Error('device storage is unavailable')],
+  ]
+
+  for (const [refusalkind, trouble] of UnkeptFirstUnlocks) {
+    it(`sets the first passphrase though the device store refuses the lease: the first gate stands, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
+      const world = makeWorld()
+      const vault = await world.open()
+      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble())
+      const err = await TH.expectRefusal(TH.unlock(vault, 'pw one'), refusalkind)
+      expect(err.message).to.include('passphrase was set')
+      expect(err.message).to.not.include('pw one')
+      expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
+      expect(vault.getSnapshot().state).to.eq('locked')
+      await TH.unlock(vault, 'pw one')
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    })
+  }
+
+  it("sets the first passphrase through putWayin though the device store has no room for the lease: putWayin resolves, says so through the logger, and the vault is locked here", async () => {
     const world = makeWorld()
     const vault = await world.open()
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
-    await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'vault_locked')
+    await TH.putWayin(vault, 'pw one', 'pw one')
     expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(vault.getSnapshot().state).to.eq('locked')
-    await TH.unlock(vault, 'pw one')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 })
 
@@ -1609,7 +1628,7 @@ describe("the gating's attempt, by the Contract", () => {
     expect(await TH.expectGood(again)).to.eq(vault)
   })
 
-  it("refuses damaged_wayin for a passkey stored damaged, settling the gating: the call refuses it, and the next can unlock by the passphrase (Contract: Gating, attempt refuses: close the dialog)", async () => {
+  it("refuses damaged_wayin for a passkey stored damaged, leaving the gating open: the passphrase then unlocks, and the call resolves (Contract: Gating, attempt refuses: show in place)", async () => {
     const { world, vault: maker, laptop } = await vaultWithPasskey()
     await maker.lock()
     TH.closeVault(maker)
@@ -1620,22 +1639,21 @@ describe("the gating's attempt, by the Contract", () => {
     const ensuring = vault.tryEnsureUnlocked()
     const gating = await unlockAsked(dialog)
     await TH.expectBad(gating.attemptPasskey({ ...laptop, prfSaltB64: shortSalt }), 'damaged_wayin')
-    await TH.expectBad(ensuring, 'damaged_wayin')
-    const again = vault.tryEnsureUnlocked()
-    const unlocking = TH.asKind(await dialog.asked(1), 'unlock_vault')
-    await TH.expectGood(unlocking.attemptPassphrase('pw'))
+    await TH.expectGood(gating.attemptPassphrase('pw'))
     dialog.close()
-    await TH.expectGood(again)
+    await TH.expectGood(ensuring)
+    expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("refuses absent_wayin for a passkey's answer on a vault with no passkey, settling the gating: the call refuses it (Contract: Gating, attempt refuses: close the dialog)", async () => {
+  it("refuses absent_wayin for a passkey's answer on a vault with no passkey, leaving the gating open: the passphrase then unlocks, and the call resolves (Contract: Gating, attempt refuses: show in place)", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
     const gating = await unlockAsked(dialog)
     await TH.expectBad(gating.attemptPasskey(await TH.passkeyOf('laptop')), 'absent_wayin')
-    await TH.expectBad(ensuring, 'absent_wayin')
+    await TH.expectGood(gating.attemptPassphrase('pw'))
     dialog.close()
+    await TH.expectGood(ensuring)
   })
 
   it("refuses storage_unavailable when storage cannot be reached, settling the gating: the call refuses it, for the dialog to close (Contract: Gating, attempt refuses: close the dialog)", async () => {

@@ -9,8 +9,9 @@ import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './dev
 import { loadStrengthChecker } from './passphrase-strength'
 import { reportToPlatform } from './report-error'
 import { type MakeBankOpts, type ParsedBankOpts, type VaultDraft, type VaultParts, parseMakeBankOpts, parseVaultDraft } from './vault-opts'
-import { Vault, bear, letGo } from './vault'
+import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
+import type { VaultDB } from './vault-db'
 
 // == [Public types]: BankStatus, EntryStatus, VaultEntry, BankSnapshot, VaultChoice
 
@@ -52,8 +53,11 @@ export type VaultChoice = Pick<VaultDraft, 'userId' | 'vaultlabel'>
 
 /** One entry as the bank keeps it: its view, and the birth under way, if any. */
 type HeldEntry = {
-  view:  VaultEntry
-  birth: Promise<Vault> | null
+  view:     VaultEntry
+  birth:    Promise<Vault> | null
+  /** The stores it was born from: a draft naming others for its scope is refused. */
+  vaultDB:  VaultDB
+  deviceDB: DeviceDB
 }
 
 /** The app's vaults, one Vault object per scope, and what they share: the key deriver, the strength checker, the logger, the clock, the limits, and the stores each vault lives in unless told otherwise.
@@ -162,9 +166,13 @@ export class Bank {
    *
    * An ask while a birth of the same vault is under way gets the same Vault object. The bank holds
    * it until it is let go (`closeVault`, `reopenVault`, `closeVaults`, `clearCachedVault`), deleted,
-   * or found deleted or made anew: then the entry is `refused`, and the next ask births anew.
+   * or found deleted or made anew, during its birth or after: then the entry is `refused`, and the
+   * next ask births anew. One scope lives in one place: a draft for a vault the bank holds, or is
+   * birthing, names the stores it was born from (left out, the bank's own).
    *
-   * Refuses 'bad_label' or 'bad_option' for a draft amiss, before storage is touched. Refuses as
+   * Refuses 'bad_label' or 'bad_option' for a draft amiss, before storage is touched, and
+   * 'bad_option' for a draft naming another `vaultDB` or `deviceDB` than the vault held was born
+   * from. Refuses as
    * storage refuses: 'damaged_vault' for vault props it cannot use (`delDamagedVault` clears them),
    * 'newer_format', 'identity_revoked', 'storage_unavailable'. Refuses 'vault_behind' for a vault
    * below this device's record, as the class says. The entry keeps the refusal; bad news among them
@@ -348,25 +356,35 @@ export class Bank {
 
   // == [Birth]: ensureEntry, bearEntry, settleBirth, bear, bearFrom, revokeLease, heardGone, letGoOf, setView
 
-  /** The Vault object for `parts`' scope: the one held, the birth under way, or a birth begun now. */
+  /** The Vault object for `parts`' scope: the one held, the birth under way, or a birth begun now. A held one is handed out only to `parts` naming its stores: 'bad_option' otherwise. */
   #ensureEntry(parts: VaultParts): Promise<Vault> {
     const ckey = Ckeys.vaultProps(parts.scope)
     const held = this.#entries.get(ckey)
-    if (held?.birth !== null && held?.birth !== undefined) { return held.birth }
-    if (held?.view.status === 'timely' && held.view.vault !== null) { return Promise.resolve(held.view.vault) }
+    if (held?.birth !== null && held?.birth !== undefined) {
+      checkSameStores(held, parts)
+      return held.birth
+    }
+    if (held?.view.status === 'timely' && held.view.vault !== null) {
+      checkSameStores(held, parts)
+      return Promise.resolve(held.view.vault)
+    }
     return this.#bearEntry(ckey, parts)
   }
 
   /** Birth the Vault object for `parts`' scope into its entry, `starting` until it settles: `timely` holding it, or `refused`. */
   #bearEntry(ckey: string, parts: VaultParts): Promise<Vault> {
-    const entry: HeldEntry = { view: frozenEntry(parts.scope, 'starting', null, null), birth: null }
+    const entry: HeldEntry = { view: frozenEntry(parts.scope, 'starting', null, null), birth: null, vaultDB: parts.vaultDB, deviceDB: parts.deviceDB }
     this.#entries.set(ckey, entry)
     entry.birth = this.#settleBirth(ckey, entry, parts)
     this.#publish()
     return entry.birth
   }
 
-  /** Birth `entry`'s Vault object and settle the entry: `timely` holding it, `refused` with why, or, for an entry let go meanwhile, the Vault object let go too and the caller refused 'vault_gone'. */
+  /** Birth `entry`'s Vault object and settle the entry: `timely` holding it, `refused` with why, or, for an entry let go meanwhile, the Vault object let go too and the caller refused 'vault_gone'.
+   * A Vault object already gone of itself -- its watch found the vault deleted or made anew in the
+   * microtasks since it was born -- is never handed out: the entry is `refused` as it would have
+   * been a moment later, and the next ask births anew.
+   */
   async #settleBirth(ckey: string, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
     // Begun a microtask on, so the birth is held before anything is published -- the entry's
     // 'starting', or the bank's as the birth says hello: a listener asking for the vault as it
@@ -382,6 +400,11 @@ export class Bank {
     }
     entry.birth = null
     if (born.ok) {
+      const gone = born.val[goneBy]
+      if (gone !== null) {
+        this.#setView(entry, frozenEntry(parts.scope, 'refused', null, gone))
+        throw gone
+      }
       this.#setView(entry, frozenEntry(parts.scope, 'timely', born.val, null))
       return born.val
     }
@@ -484,10 +507,15 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: frozenEntry, draftOf, goneError, behindError
+// == [Helpers]: frozenEntry, checkSameStores, draftOf, goneError, behindError, otherStoresError
 
 /** An entry's view, frozen. */
 const frozenEntry = (scope: VaultScope, status: EntryStatus, vault: Vault | null, err: VaultError | null): VaultEntry => Object.freeze({ scope, status, vault, err })
+
+/** Refuse 'bad_option' unless `parts` names the stores `held` was born from: one scope lives in one place, and a vault read from one store and written to another is no vault at all. */
+const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
+  if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
+}
 
 /** The gateless vault props a birth hands `VaultDB.ensureVault`: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
 const draftOf = (scope: VaultScope, now: number): GatelessVaultProps => ({
@@ -495,6 +523,8 @@ const draftOf = (scope: VaultScope, now: number): GatelessVaultProps => ({
 })
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
+
+const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than this draft names (its vaultDB or deviceDB, or the bank's own where the draft leaves one out): one vault lives in one place. Ask for it with the stores it was opened with, or let it go first (bank.reopenVault) to open it from these.")
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --

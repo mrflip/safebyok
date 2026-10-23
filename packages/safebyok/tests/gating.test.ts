@@ -8,9 +8,10 @@ import type { KeyDeriver } from '../src/key-deriver'
 import { heldLeaseOf } from '../src/held-lease'
 import type { Vault } from '../src/vault'
 import * as TH from './test-helpers'
-import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultPropsOf } from './vault/world'
+import { MinuteMillis } from '../src/types'
+import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultPropsOf, SevenDaysMillis } from './vault/world'
 
-// == [Helpers]: World, lockedVaultIn, weakIsWeak
+// == [Helpers]: World, lockedVaultIn, weakIsWeak, deletingUnderThrowingDialog
 
 type World = ReturnType<typeof makeWorld>
 
@@ -25,6 +26,28 @@ const lockedVaultIn = async (world: World, overrides: Partial<TH.BornVaultOpts>)
 
 /** A strength checker that finds `weak` weak, and every other passphrase strong. */
 const weakIsWeak: StrengthChecker = (passphrase) => (passphrase === 'weak' ? { strong: false, reason: 'Too easy to guess.' } : { strong: true })
+
+/** A del() under way, its del_vault attempt's write held, over a requestCleartext the test makes throw: `refusing` has storage refuse the deletion. */
+const deletingUnderThrowingDialog = async (refusing: boolean) => {
+  const world = makeWorld()
+  const asked: { gating: Gating | null, fail: (err: Error) => void } = { gating: null, fail: () => undefined }
+  const requestCleartext: RequestCleartext = (gating) => new Promise<void>((_settle, fail) => {
+    asked.gating = gating
+    asked.fail = fail
+  })
+  const vault = await lockedVaultIn(world, { requestCleartext })
+  const deleting = vault.tryDel()
+  await TH.eventually(() => asked.gating !== null)
+  const gating = TH.asKind(asked.gating as unknown as Gating, 'del_vault')
+  if (refusing) { vi.spyOn(world.vaultDB, 'delVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached.")) }
+  const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+  const attempting = gating.attempt('pw')
+  await writing.reached
+  asked.fail(new Error('the dialog broke'))
+  await TH.wakeupAtNextTick()
+  writing.release()
+  return { world, attempting, deleting }
+}
 // --
 
 // == [Each kind]: a happy path per gatingkind
@@ -48,10 +71,10 @@ describe("a gating, kind by kind", () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await world.open({ requestCleartext: dialog.requestCleartext })
-    const putting = vault.tryPutWayin('passkey')
+    const ensuring = vault.tryEnsureUnlocked()
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     await TH.expectGood(gating.attempt('pw', await TH.passkeyOf('laptop')))
-    await TH.expectGood(putting)
+    await TH.expectGood(ensuring)
     expect(vault.passphrase).to.not.be.null
     expect(vault.passkey).to.not.be.null
     await vault.lock()
@@ -177,6 +200,21 @@ describe("an attempt the user can correct", () => {
       expect(dialog.requestCleartext).toHaveBeenCalledOnce()
     })
   }
+
+  it("refuses absent_wayin in del_passkey for a passkey removed on another device while the dialog was up, leaving the gating open: Cancel refuses delWayin vault_locked, nothing changed here", async () => {
+    const { world, vault: maker } = await vaultWithPasskey()
+    const dialog = TH.heldDialog()
+    const vault = await world.open({ requestCleartext: dialog.requestCleartext, deviceDB: memoryDeviceDB() })
+    const removing = vault.tryDelWayin('passkey')
+    const gating = TH.asKind(await dialog.asked(), 'del_passkey')
+    await TH.delWayin(maker, 'pw')
+    const writes = vi.spyOn(world.vaultDB, 'putVaultProps')
+    await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
+    await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
+    dialog.close()
+    await TH.expectBad(removing, 'vault_locked')
+    expect(writes).not.toHaveBeenCalled()
+  })
 
   it("refuses bad_option for a malformed argument, leaving the gating open", async () => {
     const dialog = TH.heldDialog()
@@ -410,6 +448,21 @@ describe("a lock or a decline landing during an attempt", () => {
     expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
+  it("leaves a deletion whose write was sent to settle by its chain when requestCleartext throws: del() resolves, and storage holds the tombstone", async () => {
+    const { world, attempting, deleting } = await deletingUnderThrowingDialog(false)
+    await TH.expectGood(attempting)
+    await TH.expectGood(deleting)
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+  })
+
+  it("refuses del() unexpected_error when requestCleartext throws while the deletion's write is sent and storage refuses it, as the throw would have", async () => {
+    const { world, attempting, deleting } = await deletingUnderThrowingDialog(true)
+    await TH.expectBad(attempting, 'gating_landed')
+    await TH.expectBad(deleting, 'unexpected_error')
+    expect(storedVaultPropsOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
+  })
+
+
   for (const [landing, blurb] of [
     [async (vault: Vault) => { await vault.lock() }, 'lock()'],
     [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()'],
@@ -517,7 +570,7 @@ describe("joining a gating, by kind", () => {
     expect(vault.passkey).to.not.be.null
   })
 
-  it("has ensureUnlocked() join a put_passkey gating standing, unlocked by its attempt", async () => {
+  it("has ensureUnlocked() wait out a put_passkey gating standing, unlocked by its attempt and asking nothing more", async () => {
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
     const putting = vault.tryPutWayin('passkey')
@@ -529,6 +582,53 @@ describe("joining a gating, by kind", () => {
     await TH.expectGood(ensuring)
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
     expect(vault.state).to.eq('unlocked')
+  })
+
+  it("has ensureUnlocked() wait out a put_passkey gating the user declines, then raise its own unlock_vault: the decline refuses putWayin alone", async () => {
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
+    const putting = vault.tryPutWayin('passkey')
+    const put = TH.asKind(await dialog.asked(), 'put_passkey')
+    const reading = vault.tryGetWhisper('anthropic')
+    await TH.wakeupAtNextTick()
+    put.decline()
+    await TH.expectBad(putting, 'vault_locked')
+    const unlock = TH.asKind(await dialog.asked(1), 'unlock_vault')
+    await TH.expectGood(unlock.attemptPassphrase('pw'))
+    expect(await TH.expectGood(reading)).to.eq('sk-fake')
+    expect(vault.passkey).to.be.null
+  })
+
+  it("has ensureUnlocked({ renewMinutes: 60 }) join an unlock_vault gating whose consult takes up a lease ending within the hour, then raise its own, asking the user once", async () => {
+    const world = makeWorld()
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    await TH.unlock(await world.open(), 'pw')
+    world.advance(SevenDaysMillis - (30 * MinuteMillis))
+    const consulting = TH.holdNextAnswer(world.deviceDB, 'getLease')
+    const first = vault.tryEnsureUnlocked()
+    await consulting.reached
+    const renewing = vault.tryEnsureUnlocked({ renewMinutes: 60 })
+    await TH.wakeupAtNextTick()
+    consulting.release()
+    await TH.expectGood(first)
+    expect(dialog.requestCleartext).not.toHaveBeenCalled()
+    const unlock = TH.asKind(await dialog.asked(), 'unlock_vault')
+    await TH.expectGood(unlock.attemptPassphrase('pw'))
+    await TH.expectGood(renewing)
+    expect(dialog.requestCleartext).toHaveBeenCalledOnce()
+    expect(vault.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+  })
+
+  it("has putWayin('passkey') on a novel vault refuse absent_vault while an initialize_gate stands, joining nothing: the first passphrase alone is no passkey", async () => {
+    const dialog = TH.heldDialog()
+    const vault = await makeWorld().open({ requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const first = TH.asKind(await dialog.asked(), 'initialize_gate')
+    await TH.expectBad(vault.tryPutWayin('passkey'), 'absent_vault')
+    await TH.expectGood(first.attempt('pw'))
+    await TH.expectGood(ensuring)
+    expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
   it("has del() wait out an unlock_vault gating standing, then raise its own del_vault", async () => {

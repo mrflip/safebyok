@@ -17,11 +17,15 @@ export const GatingKindVals = ['initialize_gate', 'unlock_vault', 'change_passph
 /** The kind of a {@link Gating}: `initialize_gate`, `unlock_vault`, `change_passphrase`, `put_passkey`, `del_passkey` or `del_vault`. */
 export type GatingKind = typeof GatingKindVals[number]
 
-/** The refusals of this device's own store, which a grant after a change to the ways in only warns of. */
+/** The refusals of this device's own store, which a grant after `putWayin`'s or `delWayin`'s change to the ways in only warns of. */
 const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable', 'storage_blocked'])
 
-/** The refusals an attempt meets that the user can correct: the dialog shows each in place, and the gating stays open for the next attempt. */
-export const CorrectableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+/** The refusals an attempt meets that the user can correct: the dialog shows each in place, and the gating stays open for the next attempt.
+ * Each attempt fails as a whole and changes nothing; nothing inside the package tries again. A way
+ * in that is gone or stored damaged ('absent_wayin', 'damaged_wayin'), or a passkey this browser
+ * cannot ask ('passkey_unavailable'), leaves the other way in to try, or Cancel.
+ */
+export const CorrectableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
 
 /** The vault call a gating was raised by, as the logger names it. */
 export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
@@ -81,10 +85,11 @@ export type DelVaultGating = GatingCommon & {
 
 /** One request for cleartext, handed to the host's {@link RequestCleartext}: a discriminated union on `gatingkind`, each kind carrying its one typed attempt beside `decline` and `lockLanded`.
  * Call the attempt on each submit. It runs the kind's whole chain and resolves the vault, or the
- * refusal. A refusal the user can correct ('wrong_passphrase', 'wrong_passkey',
- * 'weak_passphrase', 'same_passphrase') leaves the gating open: show it in place and ask again.
- * Any other outcome, success among them, settles the gating, and every call waiting on it hears
- * it: close the dialog. A second attempt while one runs refuses 'attempt_in_flight'; one after the
+ * refusal. A refusal the user can correct ({@link CorrectableKindVals}: 'wrong_passphrase',
+ * 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin',
+ * 'passkey_unavailable') leaves the gating open: show it in place and ask again. Any other
+ * outcome, success among them, settles the gating, and every call waiting on it hears it: close
+ * the dialog. A second attempt while one runs refuses 'attempt_in_flight'; one after the
  * gating settled, 'gating_landed'. A malformed argument refuses 'bad_option', leaving it open.
  *
  * @example
@@ -209,16 +214,16 @@ export class RaisedGating implements ProvingGating {
     this.#landLock()
   }
 
-  /** Decline it: every waiter refuses 'vault_locked'. Once a deletion's write is sent, it only marks the gating landed, and the chain settles it. */
-  #decline(): void {
+  /** Close it unanswered, every waiter refusing `refusal`: 'vault_locked' for a decline. Once a deletion's write is sent, it only marks the gating landed, and the chain settles it. */
+  #decline(refusal: VaultError = declinedError(true)): void {
     if (this.#deletionSent) {
-      this.#lateLanding ??= { refusal: declinedError(true), lock: false }
+      this.#lateLanding ??= { refusal, lock: false }
       return
     }
-    this.settle(bad(declinedError(true)))
+    this.settle(bad(refusal))
   }
 
-  /** The pantry consult, then the host's request: a gating still open once the host's request resolves is declined, as `decline()` declines it. */
+  /** The pantry consult, then the host's request: a gating still open once the host's request resolves is declined, as `decline()` declines it, and one open when it throws is closed with that throw's refusal. */
   async #run(renewMillis: number | null): Promise<void> {
     try {
       if (renewMillis !== null && await this.#inside.takeUp(this, renewMillis)) {
@@ -234,7 +239,8 @@ export class RaisedGating implements ProvingGating {
       await request(this.gating)
       this.#decline()
     } catch (err) {
-      this.settle(this.#inside.badOutcome(err))
+      // A deletion whose write is sent settles as storage decides, a throw as a decline does.
+      this.#decline(this.#inside.badOutcome(err).err)
     }
   }
 
@@ -379,7 +385,9 @@ export class RaisedGating implements ProvingGating {
     await this.#inside.afterDel(vaultEpoch)
   }
 
-  /** Check `passphrase`'s strength, then demand `thing` and that this gating stands before acting on the verdict: a vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'. */
+  /** Check `passphrase`'s strength, acting on the verdict only once `thing` and this gating are demanded to stand.
+   * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'.
+   */
   async #strengthUnder(passphrase: string, thing: Stamped): Promise<void> {
     const verdict = await this.#vault.tryCheckStrength(passphrase)
     this.#inside.demand(thing, this.call)
@@ -387,15 +395,18 @@ export class RaisedGating implements ProvingGating {
     valOf(verdict)
   }
 
-  /** Grant the lease by `proving` once a change to the ways in has landed, as today's contract has it: a grant the device store refuses is said through the logger, never thrown as though the change had not landed.
-   * A grant a lock or a decline stopped (`gating_landed`), or the vault moving on, still throws:
-   * the gating is over, and its waiters heard so already.
+  /** Grant the lease by `proving` once a change to the ways in has landed: for `putWayin` and `delWayin`, a grant the device store refuses is said through the logger, never thrown as though the change had not landed.
+   * Raised by `ensureUnlocked`, whose promise is an unlocked vault, the device store's refusal
+   * goes through, saying the passphrase was set. A grant a lock or a decline stopped
+   * (`gating_landed`), or the vault moving on, throws for every call: the gating is over, and its
+   * waiters heard so already.
    */
   async #grantAfterChange(proving: Proving): Promise<void> {
     try {
       await proving.grantLease()
     } catch (err) {
       if (! isVaultError(err) || ! DeviceStoreKinds.has(err.refusalkind)) { throw err }
+      if (this.call === 'ensureUnlocked') { throw unkeptUnlockError(err) }
       this.#vault.logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands locked here, and asks for the passphrase at its next open.", { call: this.call }, err)
     }
   }
@@ -408,7 +419,7 @@ export class RaisedGating implements ProvingGating {
   // --
 }
 
-// == [Refusals]: checkText, checkTexts, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, absentPasskey
+// == [Refusals]: checkText, checkTexts, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it. */
 const checkText = (given: unknown): void => {
@@ -448,6 +459,9 @@ const samePassphraseError = () => new VaultError('same_passphrase', "The new pas
 
 /** The refusal of a first gate that lost the race to another device setting the vault's first passphrase. It carries nothing of that device's gate. */
 export const gateMadeElsewhereError = (): VaultError => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
+
+/** The refusal of a first gate that landed when this device's store would not keep its unlock: `err`'s kind, saying the passphrase was set. */
+const unkeptUnlockError = (err: VaultError) => new VaultError(err.refusalkind, "The vault's passphrase was set, but this device's storage would not keep it unlocked, so it stands locked here: the next call asks for the passphrase just chosen. If this goes on, the browser may be refusing the site storage (private browsing, or storage full or blocked).", { cause: err })
 
 const absentPasskey = (then: string) => new VaultError('absent_wayin', `This vault has no passkey: it may have been removed on another device. ${then}`)
 // --
