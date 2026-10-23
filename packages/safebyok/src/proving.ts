@@ -155,6 +155,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    *
    * @example const wayin = await currentProving.resealWayinFor(newProving)
    */
+  async resealWayinFor(newProving: PassphraseProving): Promise<PassphraseWayin>
+  async resealWayinFor(newProving: PasskeyProving): Promise<PasskeyWayin>
   async resealWayinFor(newProving: Proving): Promise<PassphraseWayin | PasskeyWayin> {
     this.#demand()
     const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)

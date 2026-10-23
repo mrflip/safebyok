@@ -347,7 +347,7 @@ export class RaisedGating implements ProvingGating {
     await currentProving.checkWayin()
     const newProving = await PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, next, { gating: this })
     const wayin = await currentProving.resealWayinFor(newProving)
-    await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: wayin as typeof base.passphrase, passkey: null }), this.call)
+    await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: wayin, passkey: null }), this.call)
     await this.#grantAfterChange(newProving)
   }
 
@@ -362,7 +362,7 @@ export class RaisedGating implements ProvingGating {
     await passphraseProving.checkWayin()
     const passkeyProving = await PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this })
     const wayin = await passphraseProving.resealWayinFor(passkeyProving)
-    await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: wayin as NonNullable<typeof base.passkey> }), this.call)
+    await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: wayin }), this.call)
     await this.#grantAfterChange(passphraseProving)
   }
 

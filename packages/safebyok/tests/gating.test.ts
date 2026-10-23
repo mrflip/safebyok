@@ -553,7 +553,6 @@ describe("a lock or a decline landing during an attempt", () => {
     expect(storedVaultPropsOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
   })
 
-
   for (const [landing, blurb] of [
     [async (vault: Vault) => { await vault.lock() }, 'lock()'],
     [(_vault: Vault, gating: Gating) => { gating.decline(); return Promise.resolve() }, 'decline()'],

@@ -1343,19 +1343,24 @@ export class Vault {
    * Another `vault_tok` standing, or none, is the vault made anew or deleted elsewhere: the Vault
    * object goes for good, as a refresh finding it so does ('vault_remade', 'vault_gone'). A first
    * gate losing to another device's is 'gate_made_elsewhere', and the next hello reads the gate that
-   * stands. Any other stale write is 'stale_write', naming nothing stored.
+   * stands. Any other stale write is 'stale_write', naming nothing stored. A refusal naming no
+   * stored vault props passes as it came.
    */
-  #gateWriteRefusal(gate: Gate, err: VaultError): unknown {
+  #gateWriteRefusal(gate: Gate, err: VaultError): VaultError {
     const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
-    if (winner !== undefined && winner?.vault_tok !== gate.vault_tok) {
+    if (winner === undefined) { return err }
+    if (winner?.vault_tok !== gate.vault_tok) {
       const told = winner === null ? goneError() : remadeError()
       this.#letGo(told)
       return told
     }
-    if (gate.base_epoch > 0 || ! isGateMadeElsewhere(err, gate.vault_tok)) { return strippedOfStoredProps(err) }
-    // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
-    this.#readAt = FarPast
-    return gateMadeElsewhereError()
+    if (gate.base_epoch === 0 && isGated(winner)) {
+      // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
+      this.#readAt = FarPast
+      return gateMadeElsewhereError()
+    }
+    // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
+    return new VaultError('stale_write', "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.", err.cause === undefined ? {} : { cause: err.cause })
   }
 
   /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease.
@@ -1871,7 +1876,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError, isGateMadeElsewhere, strippedOfStoredProps
+// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
@@ -1886,22 +1891,6 @@ const behindError = () => new VaultError('vault_behind', "This device has alread
 const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in changed while this call was under way -- its passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
 const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
-
-/** True when `err`, a first gate's write refused, says another device's first gate stands on the vault `vaultTok`: a stale write whose stored vault props are gated, of that vault. */
-const isGateMadeElsewhere = (err: VaultError, vaultTok: string): boolean => {
-  const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
-  return winner !== undefined && winner !== null && isGated(winner) && winner.vault_tok === vaultTok
-}
-
-/** `err` with the vault props a stale write names stripped: a vault's refusal carries no stored vault props record. Any other refusal as it came. */
-const strippedOfStoredProps = (err: unknown): unknown => {
-  if (! isVaultError(err, 'stale_write') || err.meta?.vault_props_stored === undefined) { return err }
-  // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
-  return new VaultError(err.refusalkind, StaleWayinsMessage, err.cause === undefined ? {} : { cause: err.cause })
-}
-
-/** What a change to the ways in says when storage refuses it as stale. */
-const StaleWayinsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 
 // --
 
