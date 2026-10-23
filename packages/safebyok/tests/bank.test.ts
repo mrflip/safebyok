@@ -111,7 +111,7 @@ describe("bank.hello", () => {
   })
 
   it("loads once: a hello while the load runs shares it, and one after it succeeded loads nothing", async () => {
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     const strengthChecker = checkerLoading(() => gate.pass())
     const bank = bankIn(makeWorld(), { strengthChecker })
     const first = bank.hello()

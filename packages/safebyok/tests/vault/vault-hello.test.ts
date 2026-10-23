@@ -1019,7 +1019,7 @@ describe("onBadNews, by the Contract", () => {
 
 /** Holds this device's next read of its lease once the store has answered, until released. */
 const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
-  const gate = TH.makeGate()
+  const gate = TH.makeLatch()
   const read = world.deviceDB.getLease.bind(world.deviceDB)
   vi.spyOn(world.deviceDB, 'getLease').mockImplementationOnce(async (scope) => {
     const kept = await read(scope)
@@ -1031,7 +1031,7 @@ const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
 
 /** Holds this device's next write of its lease once the store has taken it, until released. */
 const holdLeaseAfterWrite = (world: ReturnType<typeof makeWorld>) => {
-  const gate = TH.makeGate()
+  const gate = TH.makeLatch()
   const write = world.deviceDB.putLease.bind(world.deviceDB)
   vi.spyOn(world.deviceDB, 'putLease').mockImplementationOnce(async (record) => {
     const written = await write(record)
@@ -1148,7 +1148,7 @@ const takeUpHeld = async () => {
 
 /** Hold this device's second raise of its record of the vault from here on, before it reaches the store, until released: a call's note of its own write, its read's raise passing first. */
 const holdSecondRaise = (world: ReturnType<typeof makeWorld>) => {
-  const noting = TH.makeGate()
+  const noting = TH.makeLatch()
   const raise = world.deviceDB.raiseDeviceRecord.bind(world.deviceDB)
   let raised = 0
   vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockImplementation(async (record) => {

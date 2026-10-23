@@ -84,21 +84,21 @@ export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: Vaul
 }
 
 /**
- * A gate for holding an async seam mid-flight, so a test can land one call in the middle of
+ * A latch for holding an async seam mid-flight, so a test can land one call in the middle of
  * another: `pass()` waits until `release()` is called, and `reached` resolves once something is
  * waiting at it. Released, it stays open: later passes go straight through.
  *
- * @returns The gate: `pass`, to await inside the seam; `reached`, to await in the test; `release`.
+ * @returns The latch: `pass`, to await inside the seam; `reached`, to await in the test; `release`.
  *
  * @example
- *   const gate = TH.makeGate()
- *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the gate
- *   await gate.reached
+ *   const latch = TH.makeLatch()
+ *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await latch.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
+ *   await latch.reached
  *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
- *   gate.release()
+ *   latch.release()
  */
-export const makeGate = () => {
+export const makeLatch = () => {
   const opened = deferred()
   const arrived = deferred()
   const pass = async () => {
@@ -175,28 +175,28 @@ const errandsAt = new WeakMap<object, (() => Promise<unknown>)[]>()
 const originalOf = new WeakMap<object, AsyncFn>()
 
 /**
- * Holds the next call to `target[verb]` at a gate (see {@link makeGate}) until the test releases
+ * Holds the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
  * it, so the test can land another call while that one is in flight. Later calls go straight
  * through.
  *
  * @param target - The object whose method to hold: an adapter, a deriver.
  * @param verb - The method, one returning a promise.
- * @returns The gate: await `reached`, then `release()`.
+ * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const gate = TH.holdNextCall(vaultDB, 'getVault')
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the gate
- *   await gate.reached
+ *   const latch = TH.holdNextCall(vaultDB, 'getVault')
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
+ *   await latch.reached
  *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
- *   gate.release()
+ *   latch.release()
  */
 export const holdNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
-  const gate = makeGate()
-  beforeNextCall(target, verb, gate.pass)
-  return gate
+  const latch = makeLatch()
+  beforeNextCall(target, verb, latch.pass)
+  return latch
 }
 
-/** Holds the answer of the next call to `target[verb]` at a gate (see {@link makeGate}) once the call itself has run, until the test releases it.
+/** Holds the answer of the next call to `target[verb]` at a latch (see {@link makeLatch}) once the call itself has run, until the test releases it.
  * The store has done the work, and the caller has not yet heard. Later calls go straight through.
  *
  * Use it, not {@link holdNextCall}, to land a call while a write is in flight to a store that
@@ -206,7 +206,7 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *
  * @param target - The object whose method's answer to hold: an adapter.
  * @param verb - The method, one returning a promise.
- * @returns The gate: await `reached`, then `release()`.
+ * @returns The latch: await `reached`, then `release()`.
  *
  * @example
  *   const written = TH.holdNextAnswer(deviceDB, 'putLease')
@@ -216,15 +216,15 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *   written.release()
  */
 export const holdNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
-  const gate = makeGate()
+  const latch = makeLatch()
   const original = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
   if (original === undefined) { throw new TypeError(`holdNextAnswer found no method ${verb} to hold.`) }
   vi.spyOn(target as unknown as Record<string, AsyncFn>, verb).mockImplementationOnce(async (...args: unknown[]) => {
     const answer = await original.apply(target, args)
-    await gate.pass()
+    await latch.pass()
     return answer
   })
-  return gate
+  return latch
 }
 
 /** Has `vault` read storage afresh, as it stands once this is called.
