@@ -90,3 +90,11 @@ and 11 are restated for the demand model.
     decipher on every partial put. The Coach: "yes. can you make sure this is noted as a "see if
     this is really needed" in the same place as you are noting the many "see if this is as bad as
     it sounds" loosenings?" (#254)
+21. **A VAULT OBJECT HELD THROUGH `bank.clearCachedVault` CAN WRITE A LEASE DURING THE ERASE.** The
+    bank erases the device record and the lease before letting the entry go, but a concurrent
+    unlock on a Vault object still held can `putLease` while the erase runs. The documented
+    `vault_behind` path holds no unlocked Vault object, so it does not arise there. (#259)
+22. **A REACT CHILD MOUNTING DURING A USER CHANGE ASKS THE OLD BANK.** A component that mounts in
+    the same commit as a `userId` or shaping-prop change renders with the old bank, and its
+    `useVault` effect, running after the provider's cleanup, starts a birth on that bank which no
+    one lets go. Needs an unusual tree. (#259 review)
