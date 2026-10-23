@@ -8,7 +8,9 @@ VOCABULARY.md.
 
 A name in the New column that also stands in the Old one was renamed again, by the rename pass of
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
-The last two rows are from the rename of 2026-10-21 (better_paths, streamline thread 1).
+The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 (better_paths,
+streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
+(`whiteboard/20261022-primitives/`).
 
 To be deleted at 1.0.0.
 
@@ -102,7 +104,7 @@ To be deleted at 1.0.0.
 | `readVaultProps`, `updateVaultProps`                   | `getVaultProps`, `putVaultProps`                        |
 | `readLease`, `writeLease`, `eraseLease`                | `getLease`, `putLease`, `delLease`                      |
 | `readMark`, `writeMark`, `eraseMark`, `eraseAll`       | `getMark`, `putMark`, `delMark`, `delAll`               |
-| `ensureOpen`, `ensureUnlocked`, `ensureSaltFits` and every `ensure` that only checks | `checkOpen`, `checkUnlocked`, `checkSaltFits`: a `check` |
+| `ensureOpen`, `ensureUnlocked`, `ensureSaltFits` and every `ensure` that only checks | `checkOpen`, `checkUnlocked`, `checkSaltFits`: a `check` (`ensureUnlocked` came back in the primitives sprint, for the call that makes the vault unlocked) |
 | `VaultError.kind`, `isVaultError(err, kind)`           | `VaultError.refusalkind`, `isVaultError(err, refusalkind)` |
 | Postgres `safebyok_lockboxes`, `safebyok_lockboxes_changed` | `safebyok_boxes`, `safebyok_boxes_changed`              |
 | Convex table `safebyok_lockboxes`; tally `lockbox_count`, `lockbox_bytes` | `safebyok_boxes`; tally `box_count`, `box_bytes`        |
@@ -112,3 +114,28 @@ To be deleted at 1.0.0.
 | files `lockbox.ts`, `retire-damaged-vault.ts`          | `box.ts`, `del-damaged-vault.ts`                        |
 | `vault_id`, `vaultId` (and `vaultIdMeets`, `Expectations.vaultIdMeets`; GraphQL, Convex and Postgres fields and columns of the same name) | `vault_tok`, `vaultTok`, `vaultTokMeets` |
 | `unlock_epoch`, `unlockEpoch` (stored, wire and column names alike) | `gate_epoch`, `gateEpoch`                               |
+| `Vault.make(opts)`, a vault's own options              | `Bank.make(opts)`, then `bank.ensureVault({ userId, vaultlabel })`: the bank holds the options, the draft names the vault |
+| handle (a `Vault` instance), `close()`, `tryClose()`, kind `vault_closed` | Vault object; `bank.closeVault(choice)`; kind `vault_gone` |
+| state `opening` (no read yet), state `absent` (never made) | none: a Vault object is born from a read, and a vault never made is born `novel` |
+| `Proof`, `PassphraseProof`, `Proof.parse`, a proof (what the user presents) | cleartext (what the user hands a gating's attempt), made into a `Proving` (`PassphraseProving`, `PasskeyProving`) |
+| `Ask`, `getProof` (a `Vault.make` option)              | `Gating`, `requestCleartext` (a `Bank.make` option)     |
+| `AskWhy` (`absent`, `locked`, `lease_ending`)          | `GatingKind` (`initialize_gate`, `unlock_vault`, ...), read as `gating.gatingkind` |
+| `ProofAnswer` (`unlocked`, `declined`, `carry_on`)     | none: the gating's attempt settles it, `decline()` declines, and `requestCleartext` resolving declines what is still open |
+| `carry_on`, `lease_ending`                             | none: `ensureUnlocked({ renewMinutes })` asks while the lease ends within that time |
+| `ask.attempt(proof, { wayinId? })`                     | the gating's typed attempt: `attempt`, `attemptPassphrase`, `attemptPasskey` |
+| `vault.unlock(proof)`, `tryUnlock`                     | `vault.ensureUnlocked()`, whose `unlock_vault` gating takes the cleartext |
+| `ensureLease`, `tryEnsureLease`                        | `ensureUnlocked`, `tryEnsureUnlocked`                   |
+| `vault.putWayin(proof, newProof, { wayinlabel })`, `vault.delWayin(proof, wayinId)` | `vault.putWayin(slotlabel)`, `vault.delWayin(slotlabel)`: each raises a gating |
+| `wayin_id`, `wayinlabel`, `wayinId`                    | `slotlabel` (`'passphrase'` or `'passkey'`): a vault holds one of each |
+| `getProof`'s throw, `unexpected_error` with its cause  | `requestCleartext`'s throw, `unexpected_error` carrying nothing of it |
+| device mark, `DeviceMark`, `safebyok-mark-v5`, `getMark`, `putMark`, `delMark`, the seen vault | device record, `DeviceRecord`, `safebyok-device-v1`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord` |
+| rolled back, kind `rolled_back` (a lower `gate_epoch` than the mark) | behind, kind `vault_behind` (a lower `vault_epoch` than the device record) |
+| kind `created_elsewhere`                               | kind `gate_made_elsewhere`                              |
+| kind `last_wayin`                                      | kind `passphrase_required`                              |
+| kind `too_many_wayins`                                 | none: a new passkey replaces the passkey                |
+| `vault.decryptWhisper(record)`, `tryDecryptWhisper`, `vault.openBox`, `box.tryOpen(vaultKey)`, `box.open` | `box.extractWhisper()`, `tryExtractWhisper`, under the vault's lease |
+| `Lease.grant`, `lease.tryOpen`, `lease.wrapBoxKey`, `lease.unwrapBoxKey`, `lease.record` | `proving.grantLease()`; a lease taken up as read; `lease.cipheredWith` / `decipherWith` / `sealProps`; no public record |
+| `Wayin.seal`, `Wayin.sealPassphrase`, `Wayin.sealPasskey`, `Wayin.tryOpenAmong`, `wayin.tryOpen` | `PassphraseProving.seal` / `PasskeyProving.seal`, then `proving.sealWayins`, `resealWayinFor`, `checkWayin` |
+| `tryDemandConsistentWith`                              | `consistentWith` (the query) beside `demandConsistentWith` (throws) |
+| `VaultDB.getVaultProps`, `ensureVaultProps`, `listBoxes`, `listBoxRecords` | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords` |
+| `TH.makeGate`                                          | `TH.makeLatch`: a gate is the vault's ways in       |
