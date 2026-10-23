@@ -664,7 +664,7 @@ describe("PassphraseModal", () => {
     })
 
     it("shows only the answer to the latest text, however late an earlier answer arrives", async () => {
-      const gate = TH.makeGate()
+      const gate = TH.makeLatch()
       const advice = async (typed: string) => {
         if (typed === 'slow') { await gate.pass() }
         return `said of ${typed}`
@@ -745,7 +745,7 @@ describe("PassphraseModal", () => {
     })
 
     it("lets a superseded call's failure pass unseen: only the latest call can fail the dialog", async () => {
-      const gate = TH.makeGate()
+      const gate = TH.makeLatch()
       const advice = async (typed: string) => {
         if (typed === 'slow') {
           await gate.pass()

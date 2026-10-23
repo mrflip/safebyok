@@ -581,7 +581,7 @@ describe("a lock or a decline landing during an attempt", () => {
 
 /** A strength checker that answers, strong or `weak`, once `gate` passes: the test holds it. */
 const heldStrength = (weak = false) => {
-  const gate = TH.makeGate()
+  const gate = TH.makeLatch()
   const strengthChecker: StrengthChecker = async () => {
     await gate.pass()
     return weak ? { strong: false, reason: 'Too easy to guess.' } : { strong: true }

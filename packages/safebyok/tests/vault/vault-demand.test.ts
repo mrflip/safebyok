@@ -234,7 +234,7 @@ describe("the refresh's judgment", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
     // A read starts as the change is about to write: storage serves it before the change lands,
     // and its answer is held until after.
-    const reading: { served?: ReturnType<typeof TH.makeGate>, done?: Promise<Vault> } = {}
+    const reading: { served?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
     TH.beforeNextCall(deaf, 'putVaultProps', async () => {
       reading.served = TH.holdNextAnswer(deaf, 'getVault')
       reading.done = vault.hello({ staleMinutes: 0 })
@@ -265,7 +265,7 @@ describe("the refresh's judgment", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     await vault.lock()
     // A read begins as the unlock is about to write its lease, and finds none; it is answered after.
-    const reading: { answered?: ReturnType<typeof TH.makeGate>, done?: Promise<Vault> } = {}
+    const reading: { answered?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
     TH.beforeNextCall(world.deviceDB, 'putLease', async () => {
       reading.answered = TH.holdNextAnswer(world.deviceDB, 'getLease')
       reading.done = vault.refresh()

@@ -13,7 +13,7 @@ export { testDeriver, vaultSliceOf, leasedSliceOf, SliceNow, anyStrengthChecker,
   wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, gatelessOf, ensureGated, propsOf, boxesOf, boxOf, OddLabels,
   summaryOf, noBoxYet, inThisVault, thisVault, deleting, deviceRecordOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { BornVaultOpts, LeasedSlice, VaultSlice } from './test-helpers/builders'
-export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,
+export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeLatch, beforeNextCall,
   holdNextCall, holdNextAnswer, readAfresh, tallyWatches } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'
 export { throughTurnstile, raceEveryWay } from './test-helpers/racing'

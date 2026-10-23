@@ -802,7 +802,7 @@ describe("a new passphrase's strength", () => {
 
   it("reads storage for a birth only once the checker's load has succeeded", async () => {
     const world = makeWorld()
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
     const strengthChecker = Object.assign(() => StrongVerdict, { load: gate.pass })
     const bank = Bank.make(bankOptsOf(world.optsWith({ strengthChecker })))
