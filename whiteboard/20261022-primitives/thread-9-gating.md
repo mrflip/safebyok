@@ -66,6 +66,15 @@ added. e2e typechecks (its Convex test needs a deployment, not run here).
   grant no longer drops it: it flaked `safebyok-convex`'s "locks over a ConvexClient while idle"
   under `pnpm justify`.
 
+* **Rework after review (2026-10-23)**: once a `del_vault` attempt has sent `VaultDB.delVault`, a
+  `lock()`, a decline or a let-go marks the gating landed and leaves its settling to the chain, so
+  `del()` resolves as the deletion went (risk 9); the strength check's verdict is acted on only
+  after a demand on the vault and the gating (risk 10, `#strengthUnder`); `initialize_gate`'s
+  grant goes through `#grantAfterChange` too, so a stored first gate never reads as refused (the
+  call then refuses `vault_locked`); one lease counter; `gateMadeElsewhereError` defined once, in
+  `gating.ts`; tests pointing back to `del()`'s and the gating helpers' examples; the README says a
+  decline is no lock.
+
 * **Deviations / refusals where today coped** (ground rule 17, for toldjaso):
   * `del()` needs the passphrase (ruled); on a `novel` vault it refuses `absent_vault`.
   * A `lock()` during `putWayin` / `delWayin` now stops them: no lease attached; the call refuses
