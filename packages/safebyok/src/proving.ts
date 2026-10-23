@@ -1,10 +1,11 @@
 import * as Z from 'zod/mini'
 import { type Ciphered, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
-import { VaultError } from './errors'
+import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './key-deriver-spec'
 import { type Lease, sealLeaseRecord } from './lease'
-import { type Outcome, hostThrewRefusal, outcomeOf, unexpectedError, valOf } from './outcome'
+import type { VaultLogger } from './logger'
+import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types'
 import { decorate } from './adorn'
@@ -18,8 +19,8 @@ import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } fr
  * vaultKey. What crosses a method's boundary is a Proving, a Wayin, a Lease or a wrapped key.
  */
 
-/** The slice of a {@link Vault} a proving reads: its scope and stamp, its key deriver, its lease length and clock, and its demand. */
-export type ProvingVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'stamp' | 'keyDeriver' | 'leaseMillis' | 'now' | 'demandConsistentWith'>
+/** The slice of a {@link Vault} a proving reads: its scope and stamp, its key deriver and logger, its lease length and clock, and its demand. */
+export type ProvingVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'stamp' | 'keyDeriver' | 'logger' | 'leaseMillis' | 'now' | 'demandConsistentWith'>
 
 /** A passphrase wayin's visible fields: its record but the wrap. */
 export type PassphraseWayinHeader = Omit<PassphraseWayinRecord, 'vault_key_wayin_wrapped'>
@@ -268,7 +269,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const { stamp } = vault
     const { keyDeriver } = vault
     const sealing = 'slotlabel' in header ? mintedPassphraseHeader(vault, keyDeriver) : checkedPassphraseHeader(header, keyDeriver, passphrase)
-    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, passphrase, fromB64(sealing.salt_b64)), unexpectedError)
+    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, passphrase, fromB64(sealing.salt_b64), vault.logger), unexpectedError)
     if (! derived.ok) { demandAfterFailedSeal(vault, stamp, opts.gating) }
     const proving = new PassphraseProving(vault, stamp, sealing, opts.gating, valOf(derived))
     proving.demandSelf()
@@ -468,10 +469,24 @@ const demandAfterFailedSeal = (vault: ProvingVault, stamp: Stamp, gating: Provin
 const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended while this passphrase or passkey was being worked through -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked or changed. Ask again when the user wants the vault.')
 // --
 
-// == [Key bytes]: notKeyBytes, isSharedMemory, isAllZero, passphraseKeyOf
+// == [Key bytes]: notKeyBytes, deriverThrewRefusal, isSharedMemory, isAllZero, passphraseKeyOf
 
 /** The refusal for a key deriver's result that is not 32 bytes of a view. */
 const notKeyBytes = () => new VaultError('bad_option', 'keyDeriver handed back something other than 32 key bytes: a passphraseKey is a 256-bit key.')
+
+/** The refusal in place of what a key deriver threw, carrying nothing of it -- no `cause`, text or property -- as the deriver heard the passphrase, and a throw may quote it.
+ * A condition-family VaultError keeps its kind, for the caller to show or retry, in safebyok's
+ * words. Anything else refuses 'unexpected_error', and `logger` hears that the deriver threw, and
+ * the refusalkind of a VaultError it threw, as {@link listedKindOf} tells it.
+ */
+const deriverThrewRefusal = (thrown: unknown, logger: VaultLogger): VaultError => {
+  const refusalkind = listedKindOf(thrown)
+  if (refusalkind !== null && RefusalFamilyForKind[refusalkind] === 'condition') {
+    return new VaultError(refusalkind, `The key deriver could not make a key of this passphrase, and refused it as '${refusalkind}'. What it said is left out of this report, as it heard the passphrase.`)
+  }
+  logger.error("The keyDeriver handed to Bank.make threw rather than deriving a key: the call that asked refuses 'unexpected_error'. What it threw is left out, as the deriver hears the passphrase.", { call: 'deriveKeyBytes', refusalkind })
+  return new VaultError('unexpected_error', "The keyDeriver handed to Bank.make threw rather than deriving a key, so this call was not answered. What it threw is left out of this report, as the deriver hears the passphrase; the log says the refusalkind of a VaultError it threw. Have it refuse only with a condition-family VaultError, and catch its own failures.")
+}
 
 /** True when a key deriver's bytes sit in shared memory, told even across realms and where `SharedArrayBuffer` is absent. */
 const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]'
@@ -487,17 +502,16 @@ const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => s
  * wrapped: WebCrypto would take 16 or 24 as a weaker key. It refuses 32 zero bytes alike: a key
  * anyone could rebuild, as a deriver handing back bytes kept from an earlier call, wiped since,
  * would make. Shared memory is refused untouched. What the deriver throws is refused as {@link
- * hostThrewRefusal} says.
+ * deriverThrewRefusal} says, through `logger`.
  *
- * @example const wayinKey = await passphraseKeyOf(vault.keyDeriver, typed, saltBytes)
+ * @example const wayinKey = await passphraseKeyOf(vault.keyDeriver, typed, saltBytes, vault.logger)
  */
-export const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array): Promise<CryptoKey> => {
+export const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array, logger: VaultLogger): Promise<CryptoKey> => {
   let handed: unknown
   try {
     handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
   } catch (err) {
-    // The deriver heard the passphrase: what it threw may quote it.
-    throw hostThrewRefusal(err)
+    throw deriverThrewRefusal(err, logger)
   }
   if (! ArrayBuffer.isView(handed)) { throw notKeyBytes() }
   if (isSharedMemory(handed)) {

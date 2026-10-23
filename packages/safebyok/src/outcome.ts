@@ -1,4 +1,4 @@
-import { RefusalFamilyForKind, VaultError, isVaultError } from './errors'
+import { VaultError, isVaultError } from './errors'
 import * as Refusals from './refusals'
 
 /** What a non-throwing safebyok call resolves to: a {@link GoodOutcome} holding its `val`, or a {@link BadOutcome} holding its refusal as `err`.
@@ -56,18 +56,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
  */
 export const unexpectedError = (thrown: unknown): VaultError => (
-  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a key deriver, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
-)
-
-/** The refusal in place of what the key deriver, which hears the passphrase, threw.
- * A condition-family VaultError passes as itself, for the caller to show or retry. Anything else,
- * a VaultError from another copy of safebyok among it, becomes 'unexpected_error' with the throw
- * as its `cause`. So no message of the deriver's is ever the refusal's own, nor told to
- * `onBadNews`. The `cause` still holds the throw whole, and may quote the passphrase: whoever logs
- * it logs that. A strength checker's throw, by contrast, carries nothing.
- */
-export const hostThrewRefusal = (thrown: unknown): VaultError => (
-  isVaultError(thrown) && RefusalFamilyForKind[thrown.refusalkind] === 'condition' ? thrown : unexpectedError(thrown)
+  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
 )
 
 /** True for a value shaped as an {@link Outcome}: an answer handed up still wrapped, since a stored record never is one.

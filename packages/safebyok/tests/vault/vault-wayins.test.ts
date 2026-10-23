@@ -1119,14 +1119,14 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses unexpected_error when the key deriver throws, what it threw the cause and never the message`, async () => {
+    it(`${callTitle} refuses unexpected_error when the key deriver throws, keeping nothing of what it threw`, async () => {
       const { world } = await vaultWithPasskey()
       const before = storedText(world)
       const thrown = new Error('could not derive from pw')
       const vault = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) } })
       const err = await TH.expectRefusal(change(vault), 'unexpected_error')
-      expect(err.cause).to.eq(thrown)
-      expect(err.message).to.not.include('could not derive')
+      expect(err.cause).to.be.undefined
+      expect(TH.thrownText(err)).to.not.include('could not derive')
       expect(storedText(world)).to.eq(before)
     })
 

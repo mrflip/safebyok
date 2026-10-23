@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -241,4 +241,16 @@ describe("isVaultError", () => {
       expect(isCondition(impostor)).to.be.false
     })
   }
+})
+
+describe("listedKindOf", () => {
+  it("is the kind of a VaultError on the list, and null for any other throw, as its examples show", () => {
+    expect(listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))).to.eq('storage_unavailable')
+    expect(listedKindOf(new Error('no luck with hunter2'))).to.be.null
+  })
+
+  it("is null for a VaultError whose kind is off the list: the thrower's own text", () => {
+    expect(listedKindOf(new VaultError('no luck with hunter2' as RefusalKind, 'A refusal made up.'))).to.be.null
+    expect(listedKindOf('hunter2')).to.be.null
+  })
 })

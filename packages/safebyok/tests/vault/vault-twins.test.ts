@@ -130,15 +130,19 @@ describe("each call's two forms (Contract: Shapes, Two forms of every call)", ()
 
 // == [Never rejects]: unexpected_error, what a host's function throws
 
-/** The test deriver, but throwing `thrown` at every derivation. */
-const throwingDeriver = (thrown: Error) => ({ ...TH.testDeriver, deriveKeyBytes: () => { throw thrown } })
+/** An unlocked vault whose vaultDB's getBox throws a TypeError, as a bug in it would: the vault, and what it throws. */
+const brokenStoreVault = async () => {
+  const world = makeWorld()
+  const vault = await world.openUnlocked('pw')
+  const thrown = new TypeError('the storage adapter is down')
+  vi.spyOn(world.vaultDB, 'getBox').mockRejectedValue(thrown)
+  return { vault, thrown }
+}
 
 describe("a throw that is no refusal (Contract: Shapes)", () => {
   it("resolves, from a try form, as 'unexpected_error', misuse, what was thrown its cause", async () => {
-    const world = makeWorld()
-    const thrown = new TypeError('the key deriver is down')
-    const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
-    const err = await TH.expectBad(TH.tryUnlock(vault, 'pw'), 'unexpected_error')
+    const { vault, thrown } = await brokenStoreVault()
+    const err = await TH.expectBad(vault.tryGetBox('ANTHROPIC_API_KEY'), 'unexpected_error')
     expect(err.family).to.eq('misuse')
     expect(err.cause).to.eq(thrown)
   })
@@ -151,10 +155,8 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
   })
 
   it("throws, from the throwing form, the same 'unexpected_error'", async () => {
-    const world = makeWorld()
-    const thrown = new TypeError('the key deriver is down')
-    const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
-    const err = await TH.expectRefusal(TH.unlock(vault, 'pw'), 'unexpected_error')
+    const { vault, thrown } = await brokenStoreVault()
+    const err = await TH.expectRefusal(vault.getBox('ANTHROPIC_API_KEY'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
   })
 

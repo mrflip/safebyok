@@ -74,7 +74,7 @@ const resealedPassphrase = async (vault: Vault, props: GatedVaultProps): Promise
 
 /** The passphraseKey the test deriver makes of `pw` over `saltB64`: the key a proving of `pw` over that salt holds. */
 const passphraseKeyOver = async (saltB64: string): Promise<CryptoKey> => (
-  await passphraseKeyOf(TH.testDeriver, 'pw', fromB64(saltB64))
+  await passphraseKeyOf(TH.testDeriver, 'pw', fromB64(saltB64), TH.spyLogger().logger)
 )
 
 /** The vaultKey's raw bytes, to compare two handles on it. */
@@ -354,12 +354,12 @@ describe("a proving's refusals of a way in", () => {
     await TH.expectRefusal(PasskeyProving.seal(vault, header, phone, { gating: StandingGating }), 'wrong_passkey')
   })
 
-  it("refuses unexpected_error when the key deriver throws, what it threw the cause", async () => {
+  it("refuses unexpected_error when the key deriver throws, keeping nothing of what it threw", async () => {
     const { vault, props, keyDeriver } = await lockedWorld()
     const thrown = new Error('the deriver fell over')
     vi.spyOn(keyDeriver, 'deriveKeyBytes').mockRejectedValue(thrown)
     const err = await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating }), 'unexpected_error')
-    expect(err.cause).to.eq(thrown)
+    expect(err.cause).to.be.undefined
   })
 
   it("passes a key deriver's own refusal through as it came", async () => {

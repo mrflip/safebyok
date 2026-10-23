@@ -83,7 +83,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const leaseCtx = textBytes(`["safebyok-lease-v1",${scopeText},${String(lease.gate_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
     const { passphrase } = GatedVaultProps.parse(vaultProps)
-    const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', fromB64(passphrase.salt_b64))
+    const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', fromB64(passphrase.salt_b64), TH.spyLogger().logger)
     const wayinCtx = wayinCtxOf(scope, vaultProps.vault_tok, headerOf(passphrase))
     const vaultKey = await unwrapKeyUnder(wayinKey, passphrase.vault_key_wayin_wrapped, wayinCtx, { extractable: false, usage: ['unwrapKey'] })
     const boxKey = await unwrapKeyUnder(vaultKey, box.box_key_wrapped, keyCtx, { extractable: false, usage: ['decrypt'] })

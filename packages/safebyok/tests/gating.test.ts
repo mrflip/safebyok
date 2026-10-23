@@ -319,6 +319,46 @@ describe("a step of an attempt's chain failing", () => {
     })
   }
 })
+
+describe("a host function that hears the passphrase throwing, quoting it", () => {
+  const Throwers: readonly (readonly [(keyDeriver: KeyDeriver) => Partial<TH.BornVaultOpts>, 'unlock' | 'change', string])[] = [
+    [(keyDeriver) => {
+      vi.spyOn(keyDeriver, 'deriveKeyBytes').mockRejectedValueOnce(new Error('could not derive pw-the-passphrase'))
+      return {}
+    }, 'unlock', 'the key deriver, proving the passphrase that stands'],
+    [(keyDeriver) => {
+      vi.spyOn(keyDeriver, 'deriveKeyBytes').mockImplementation(async (passphrase, salt) => {
+        if (passphrase === 'pw-the-passphrase') { throw new VaultError('bad_option', 'could not derive pw-the-passphrase') }
+        return await TH.testDeriver.deriveKeyBytes(passphrase, salt)
+      })
+      return {}
+    }, 'change', 'the key deriver, sealing a new passphrase, with a VaultError of its own'],
+    [() => ({ strengthChecker: () => { throw Object.assign(new Error('could not judge pw-the-passphrase'), { typed: 'pw-the-passphrase' }) } }), 'change', 'the strength checker'],
+  ]
+
+  for (const [inject, flavor, blurb] of Throwers) {
+    it(`refuses unexpected_error for ${blurb}, keeping nothing of the throw in the refusal, its cause, its properties or the log, nor telling it as bad news`, async () => {
+      const keyDeriver: KeyDeriver = { ...TH.testDeriver }
+      const world = makeWorld({ keyDeriver })
+      const dialog = TH.heldDialog()
+      const onBadNews = vi.fn()
+      const maker = await world.openUnlocked('pw')
+      await maker.lock()
+      TH.closeVault(maker)
+      const vault = await world.open({ requestCleartext: dialog.requestCleartext, onBadNews, ...inject(keyDeriver) })
+      const calling = flavor === 'unlock' ? vault.tryEnsureUnlocked() : vault.tryPutWayin('passphrase')
+      const gating = await dialog.asked()
+      const attempting = flavor === 'unlock' ? TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw-the-passphrase') : TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw-the-passphrase')
+      const refusals = [await TH.expectBad(attempting, 'unexpected_error'), await TH.expectBad(calling, 'unexpected_error')]
+      for (const err of refusals) {
+        expect(err.cause).to.be.undefined
+        expect(TH.thrownText(err)).to.not.include('pw-the-passphrase')
+      }
+      expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
+      expect(onBadNews).not.toHaveBeenCalled()
+    })
+  }
+})
 // --
 
 // == [Landing]: a lock or a decline landing mid-chain

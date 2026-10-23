@@ -9,9 +9,9 @@ type KeyDeriverBase = {
   salt_bytes:        number
   /** 32 key bytes from the passphrase and its salt: deterministic, and slow by design.
    * Refuse a salt of another length than `salt_bytes` as 'bad_option', as the supplied derivers do.
-   * A condition-family VaultError you throw reaches the caller as itself. Anything else becomes
-   * 'unexpected_error', your throw whole as its `cause`, where a host will log it: never put the
-   * passphrase in what you throw.
+   * Nothing you throw reaches the caller, as you hear the passphrase: a condition-family VaultError
+   * keeps its kind under safebyok's own words, and anything else becomes 'unexpected_error', the
+   * logger hearing only the kind of a VaultError you threw.
    */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
 }

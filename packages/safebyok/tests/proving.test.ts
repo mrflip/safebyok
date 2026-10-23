@@ -1,6 +1,7 @@
 import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
 import { GatedVaultProps, type PasskeyAnswer } from '../src/types'
 import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
@@ -279,7 +280,7 @@ describe("proving.grantLease", () => {
 
 describe("passphraseKeyOf", () => {
   it("makes the non-extractable passphraseKey, as its example shows", async () => {
-    const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16).fill(7))
+    const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16).fill(7), TH.spyLogger().logger)
     expect(wayinKey.extractable).to.be.false
     expect(wayinKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
   })
@@ -338,7 +339,7 @@ const keepingDeriver = () => {
 }
 
 /** The passphraseKey of 'pw' over {@link saltBytes}, by `keyDeriver`. */
-const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, 'pw', saltBytes)
+const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, 'pw', saltBytes, TH.spyLogger().logger)
 
 /** A key deriver handing back `handed` whatever it is asked. */
 const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as Uint8Array) })
@@ -346,7 +347,7 @@ const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriv
 describe("passphraseKeyOf, deriving", () => {
   it("is the key deriver's bytes over the passphrase and salt, derived once: the same two make the same key", async () => {
     const { keyDeriver, derivations } = countingDeriver()
-    const wayinKey = await passphraseKeyOf(keyDeriver, 'pw', saltBytes)
+    const wayinKey = await passphraseKeyOf(keyDeriver, 'pw', saltBytes, TH.spyLogger().logger)
     expect(derivations).toHaveBeenCalledOnce()
     expect(derivations.mock.calls[0]?.[0]).to.eq('pw')
     expect([...derivations.mock.calls[0]?.[1] ?? []]).to.deep.equal(bytesOf(7, 16))
@@ -355,28 +356,51 @@ describe("passphraseKeyOf, deriving", () => {
 
   it("makes another key of another passphrase, or another salt", async () => {
     const wayinKey = await keyBy(TH.testDeriver)
-    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, 'pW', saltBytes)
+    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, 'pW', saltBytes, TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherPassphrase)).rejects.toThrow()
-    const otherSalt = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16))
+    const otherSalt = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16), TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherSalt)).rejects.toThrow()
   })
 
-  it("refuses what a key deriver throws as unexpected_error, the throw its cause, quoting none of it", async () => {
-    const thrown = new Error('the deriver fell over on hunter2-hunter2')
-    const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, 'hunter2-hunter2', saltBytes), 'unexpected_error')
-    expect(err.cause).to.eq(thrown)
-    expect(err.message).to.not.include('hunter2')
-  })
-
-  it("lets a vault's proving refuse what its key deriver throws as unexpected_error, logging nothing", async () => {
-    const thrown = new Error('the deriver fell over on hunter2-hunter2')
+  it("lets a vault's proving refuse a key deriver's throw quoting the passphrase as unexpected_error, keeping nothing of it, the logger hearing only that it threw", async () => {
+    const thrown = Object.assign(new Error('the deriver fell over on pw-the-passphrase'), { typed: 'pw-the-passphrase' })
     const world = makeWorld({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) } })
     const vault = await world.open()
     const heard = world.logged.length
-    const err = await TH.expectRefusal(PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'hunter2-hunter2', { gating: StandingGating }), 'unexpected_error')
-    expect(err.cause).to.eq(thrown)
-    expect(world.logged).to.have.lengthOf(heard)
+    const err = await TH.expectRefusal(PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw-the-passphrase', { gating: StandingGating }), 'unexpected_error')
+    expect(err.cause).to.be.undefined
+    expect(TH.thrownText(err)).to.not.include('pw-the-passphrase')
+    expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
+    expect(world.logged.slice(heard).map((logged) => [logged.level, logged.story])).to.deep.equal([['error', { call: 'deriveKeyBytes', refusalkind: null }]])
   })
+})
+
+/** What a key deriver might throw, quoting the passphrase 'pw-the-passphrase', and the kind it is refused as. */
+const DeriverThrowCases = [
+  // a condition, for the caller to show or retry, its kind kept:
+  [new VaultError('storage_unavailable', 'The word list for pw-the-passphrase could not be loaded.'), 'storage_unavailable', null, "keeps the kind of a condition, in safebyok's words"],
+  [new VaultError('wrong_passphrase', "pw-the-passphrase can't be empty.", { meta: { typed: 'pw-the-passphrase' } as RefusalMeta }), 'wrong_passphrase', null, "keeps the kind of a condition, none of its meta"],
+  // anything else:
+  [new VaultError('bad_option', 'pw-the-passphrase is no passphrase I can judge.'), 'unexpected_error', 'bad_option', "refuses a VaultError of misuse as unexpected_error, logging its kind"],
+  [new VaultError('damaged_vault', 'pw-the-passphrase broke me.'), 'unexpected_error', 'damaged_vault', "refuses a VaultError of bad news as unexpected_error, never to be told to onBadNews"],
+  [new VaultError('pw-the-passphrase' as RefusalKind, 'A refusal made up.'), 'unexpected_error', null, "refuses a VaultError whose kind is off the list as unexpected_error, logging no kind: that is the host's own text"],
+  [new TypeError('could not judge pw-the-passphrase'), 'unexpected_error', null, "refuses a throw that is no VaultError as unexpected_error"],
+] as const
+
+describe("passphraseKeyOf, when its key deriver throws", () => {
+  for (const [thrown, kind, loggedKind, blurb] of DeriverThrowCases) {
+    it(`${blurb}, keeping nothing of the throw: no cause, text or property, and nothing in the log`, async () => {
+      const spy = TH.spyLogger()
+      const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, 'pw-the-passphrase', saltBytes, spy.logger), kind)
+      expect(err).to.not.eq(thrown)
+      expect(err.cause).to.be.undefined
+      expect(err.meta).to.be.undefined
+      expect(TH.thrownText(err)).to.not.include('pw-the-passphrase')
+      expect(TH.loggedText(spy.calls)).to.not.include('pw-the-passphrase')
+      const story = kind === 'unexpected_error' ? [['error', { call: 'deriveKeyBytes', refusalkind: loggedKind }]] : []
+      expect(spy.calls.map((logged) => [logged.level, logged.story])).to.deep.equal(story)
+    })
+  }
 })
 
 describe("a key deriver's bytes", () => {

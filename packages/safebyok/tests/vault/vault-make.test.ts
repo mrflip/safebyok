@@ -394,29 +394,31 @@ describe("the key deriver seam", () => {
     expect(fresh.getSnapshot().state).to.eq('locked')
   })
 
-  it("refuses unexpected_error for a deriver that throws, a VaultError of misuse or bad news included: what it threw the cause, never the refusal's message nor bad news, as it heard the passphrase", async () => {
+  it("refuses unexpected_error for a deriver that throws, a VaultError of misuse or bad news included, keeping nothing of what it threw, nor telling it as bad news, as it heard the passphrase", async () => {
     for (const thrown of [new Error('could not derive pw-the-passphrase'), new VaultError('bad_option', 'pw-the-passphrase is too short to derive from.'), new VaultError('damaged_vault', 'pw-the-passphrase broke the deriver.')]) {
       const world = makeWorld()
       const throwing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }
       const told: unknown[] = []
       const vault = await world.open({ keyDeriver: throwing, onBadNews: (news) => { told.push(news) } })
       const err = await TH.expectRefusal(TH.unlock(vault, 'pw-the-passphrase'), 'unexpected_error')
-      expect(err.cause).to.eq(thrown)
-      expect(err.message).to.not.include('pw-the-passphrase')
+      expect(err.cause).to.be.undefined
+      expect(TH.thrownText(err)).to.not.include('pw-the-passphrase')
+      expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
       expect(vault.getSnapshot().state).to.eq('novel')
       expect(told).to.have.lengthOf(0)
       expect(vault.getSnapshot().trouble).to.be.null
     }
   })
 
-  it("keeps a condition a deriver raises as it came, for the caller to show or retry", async () => {
+  it("keeps the kind of a condition a deriver raises, for the caller to show or retry, but none of its words", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
     const unreachable = new VaultError('storage_unavailable', "The key deriver's module could not be loaded: try again shortly.")
     const refusing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(unreachable) }
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: refusing })
     const err = await TH.expectRefusal(TH.unlock(fresh, 'pw'), 'storage_unavailable')
-    expect(err).to.eq(unreachable)
+    expect(err).to.not.eq(unreachable)
+    expect(err.message).to.not.include('module')
   })
 
   it("takes a key whose one nonzero byte is its last: only all zeros is refused", async () => {

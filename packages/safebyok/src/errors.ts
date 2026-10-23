@@ -270,6 +270,16 @@ export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is Va
   err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
 )
 
+/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link RefusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
+ * A kind off the list is the thrower's own text, and may quote what it heard.
+ *
+ * @example listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))  // 'storage_unavailable'
+ * @example listedKindOf(new Error('no luck with hunter2'))  // null
+ */
+export const listedKindOf = (thrown: unknown): RefusalKind | null => (
+  isVaultError(thrown) && (RefusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
+)
+
 /** True when `err` is a VaultError the app may show the user, or retry: a `condition` or `bad_news`.
  * Misuse, and anything that is not a VaultError, is false, and belongs with an error boundary.
  *

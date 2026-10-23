@@ -1779,7 +1779,20 @@ added or folded into through the subagent, and no other entry changes.
   `safebyok-react`'s `forBoundary` then strips the cause before React's `onCaughtError`. Bad news
   from a host function is never told to `onBadNews` or put in `snapshot.trouble`. A condition's
   message, if a host deriver or test wrote one quoting the passphrase, can reach the caller, and the
-  dialog shows it in place; it never reaches `onCaughtError`. On unlock, `wayin.tryOpen`
+  dialog shows it in place; it never reaches `onCaughtError`. Amended 2026-10-23 (thread 9c, core_cleanups, stacked on
+  [#262](https://github.com/mrflip/safebyok/pull/262)): **nothing of a key deriver's throw is kept anywhere, and the
+  three sentences above that say a deriver's condition passes as itself, or that its throw rides whole as the `cause`, no longer hold.**
+  `passphraseKeyOf` (`src/proving.ts`) refuses through `deriverThrewRefusal`, which builds a fresh `VaultError`: a
+  `condition`-family `VaultError` keeps only its `refusalkind`, under safebyok's own fixed message, with no `cause` and no
+  `meta`; anything else refuses `unexpected_error` under a fixed message with no `cause`. The host's logger hears only
+  `{ call: 'deriveKeyBytes', refusalkind }`, the `refusalkind` being the thrown `VaultError`'s only when it is one of
+  `RefusalKindVals` (`listedKindOf`, `src/errors.ts`; a kind off the list is the thrower's own text), else null; conditions are
+  not logged. This is the rule `requestCleartext` (thread 9b, same helper) and the strength checker's guard already follow; the
+  strength checker's `load()`, which hears no passphrase, keeps its `cause`. A deriver's own text is lost to the caller:
+  safebyok-fastkey's `bad_option` asking for `'wasm-unsafe-eval'` in the CSP reaches the host as `unexpected_error`, with the
+  kind `bad_option` in the log. Still open (a Coach's TODO, "Add sensitive and host flags to refusals"): a strength checker's
+  verdict `reason` becomes the `weak_passphrase` message as given, so a checker that quoted the passphrase in its `reason` would
+  put it there. Tests: `tests/proving.test.ts`, `tests/gating.test.ts`. On unlock, `wayin.tryOpen`
   (`src/wayin.ts`; amended 2026-10-19, slots: once `openWithPassphrase`, a walk over several passphrases) turns any `wrong_passphrase` from a way in into the vault's own
   `wrong_passphrase` (kind kept, message replaced), so a deriver's message, such as
   safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
