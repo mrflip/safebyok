@@ -57,11 +57,28 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` or a `flavor`.
 
-**`ensure` acquires or constructs, idempotently.** `ensureLease()`, `ensureVaultProps()`: have
-one, or make one, and hand it back, so a second call costs nothing. A function that only checks
-and refuses is not an `ensure`: it is a `check` (`checkBoxlabel(label)`,
-`checkStrength(passphrase)`), or a `parse` when it also hands back the cleaned value
-(*Validation*). Reviewers: an `ensure` that returns nothing is misnamed.
+**`ensure` acquires or constructs, idempotently.** `bank.ensureVault(draft)`,
+`vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
+nothing. A function that only checks and refuses is not an `ensure`: it is a `check`
+(`checkBoxlabel(label)`, `checkStrength(passphrase)`), a `demand` (below), or a `parse` when it
+also hands back the cleaned value (*Validation*). Reviewers: an `ensure` that returns nothing is
+misnamed.
+
+**Every public method is a try pair** (the Coach, 2026-10-22): `putBox()` resolves its value or
+throws its refusal, carrying its `refusalkind`; `tryPutBox()` resolves an `Outcome` and never
+throws. A method named `try` always resolves an `Outcome`; one whose result makes no sense as an
+outcome is renamed. The doc block lives on the throwing half, and the `try` half's one line points
+to it. The implementation lives on whichever half is easier to write, and `valOf` or one
+try/catch derives the other, never a second implementation; a method whose `Outcome` carries
+`meta` is implemented on the `try` side. A VaultDB adapter's verbs resolve `Outcome`s alone.
+
+**A check is a triplet, not a pair** (the Coach, 2026-10-22): "an ensureConsistent() and get
+consistent() triplet ... get foo(), demandFoo() and sometimes ensureFoo()". A synchronous yes/no
+query, named for the condition (`vault.consistentWith(thing)`); a synchronous `demandFoo` that
+throws when it does not hold (`vault.demandConsistentWith(thing)`); and, only where a caller needs
+it, an async `ensureFoo` that makes it so (`vault.ensureUnlocked()`, for the lease that
+`demandConsistentWith(thing, { leaseBound: true })` asks for). There is no `tryDemandFoo`: the
+query is the non-throwing form.
 
 **`put` resolves what is stored.** On success, `putFoo` resolves the foo as storage now holds it
 (the Coach, 2026-10-21): "putFoo should return the foo object as it is in the database (not what
@@ -242,13 +259,12 @@ A doc block before and after, its examples left out. Before, 41 lines opening:
 After:
 
 ```ts
-/** Read storage and settle the vault as `absent`, `locked` or `unlocked`, resolving the vault.
- * Never prompts. Optional: every call but `lock()` and `close()` awaits a first hello. Call it
- * again to refresh: within `opts.staleMinutes` of the last read it re-settles without reading.
- * Reads {@link VaultDB.getVaultProps}, {@link VaultDB.listBoxes} and {@link DeviceDB.getLease}.
+/** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
+ * Never prompts. Within `opts.staleMinutes` of the last read it re-settles without reading.
+ * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link DeviceDB.getLease}.
  *
  * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
- * with 'damaged_vault' ({@link delDamagedVault} clears them), 'newer_format' or 'rolled_back'.
+ * with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format' or 'vault_behind'.
  */
 ```
 
@@ -262,7 +278,7 @@ Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.
 module, `tests/foo/bar/`, of `bar-<theme>.test.ts` files whose themes are what a reader would look
 for (`bar-races`, `bar-refusals`), with the helpers two or more of them share in a `world.ts`
 beside them; no `bar.test.ts` stays outside the folder, and no `describe` title changes for the
-move. A module reached only through another's public verb (`vault-opts.ts` through `Vault.make`)
+move. A module reached only through another's public verb (`vault-opts.ts` through `Bank.make`)
 is tested beside that verb. Test and build artifacts never land in `src/`.
 
 * **Test helpers are reached through one module, `tests/test-helpers.ts`, star-imported as `TH`**:
