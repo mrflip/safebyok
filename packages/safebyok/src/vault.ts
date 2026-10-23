@@ -854,7 +854,7 @@ export class Vault {
       demand:     (thing, call) => { this.#demand(thing, { call }) },
       request:    this.#requestCleartext,
     }
-    this.#takePicture({ fresh: this.#vaultProps, listed: born.listed, leaseKept: null, readAt: born.readAt })
+    this.#takePicture({ fresh: this.#vaultProps, listed: born.listed, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
   }
@@ -872,9 +872,12 @@ export class Vault {
   #boxes: readonly (BoxSummary | DamagedBox)[] = []
   // The lease this Vault object holds, opened: the one place it keeps the vaultKey. Dropping it locks.
   #lease: Lease | null = null
-  // When the lease in hand was granted or taken up, by the vault's clock: a read of this device's
-  // store begun before then is older than it, and cannot say it was revoked.
-  #leaseSince = FarPast
+  // How many leases this Vault object has held, and which of them is the one in hand: a read of
+  // this device's store begun before the lease in hand was granted or taken up is older than it,
+  // and cannot say it was revoked. Counted, not timed: a read begun in the same millisecond as a
+  // grant is told apart.
+  #leasesHeld = 0
+  #leaseSerial = 0
   // Set once the bank lets the Vault object go, or it is deleted, or found deleted or made anew:
   // what every call refuses with from then on, 'vault_remade' for a vault made anew, else 'vault_gone'.
   #goneBy: (() => VaultError) | null = null
@@ -989,6 +992,7 @@ export class Vault {
    */
   async #takeStorage() {
     const readAt = this.#clockNow()
+    const leasesSeen = this.#leasesHeld
     const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.getDeviceRecord(this.#scope)))
     const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), this.#deviceDB.getLease(this.#scope)])
     const verdict = this.#judgeRead(read, record)
@@ -999,7 +1003,7 @@ export class Vault {
       await this.#heedRefusal(refusal)
       throw refusal
     }
-    this.#takePicture({ fresh: frozenVaultProps(verdict.vaultProps), listed: verdict.boxes, leaseKept: valOf(leaseKept), readAt })
+    this.#takePicture({ fresh: frozenVaultProps(verdict.vaultProps), listed: verdict.boxes, leaseKept: valOf(leaseKept), readAt, leasesSeen })
     await this.#raiseRecordAfter(verdict.vaultProps.vault_epoch, 'refresh')
   }
 
@@ -1034,7 +1038,7 @@ export class Vault {
    * taken, or found the lease the store held before it: a read older than the lease, which changes
    * nothing. None is taken up here. Bad news is told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultProps, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number }) {
+  #takePicture(found: { fresh: VaultProps, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
     const { fresh } = found
     const shown = this.#boxes
     const shownWayins = this.#wayinListOf(this.#shownProps)
@@ -1048,7 +1052,7 @@ export class Vault {
     if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
-    const revoked = held !== null && found.readAt >= this.#leaseSince && ! standsBeside(found.leaseKept, held)
+    const revoked = held !== null && found.leasesSeen >= this.#leaseSerial && ! standsBeside(found.leaseKept, held)
     if (outdated || revoked) { this.#dropLease() }
     this.#replaceSnapshot()
     this.#tellListingNews(shown)
@@ -1426,8 +1430,9 @@ export class Vault {
   #holdLease(stored: LeaseRecord): Lease {
     const lease = Lease.make(this, stored)
     this.#lease = lease
-    this.#leaseSince = this.#clockNow()
-    this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
+    this.#leasesHeld += 1
+    this.#leaseSerial = this.#leasesHeld
+    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
     return lease
   }
@@ -1455,8 +1460,9 @@ export class Vault {
     }
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
     this.#lease = lease
-    this.#leaseSince = this.#clockNow()
-    this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
+    this.#leasesHeld += 1
+    this.#leaseSerial = this.#leasesHeld
+    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
     return true
   }
@@ -1478,8 +1484,9 @@ export class Vault {
     }
     if (! this.#fitsTakeUp(lease, 0)) { return }
     this.#lease = lease
-    this.#leaseSince = this.#clockNow()
-    this.#armExpiry(lease.ask_passphrase_at, this.#leaseSince)
+    this.#leasesHeld += 1
+    this.#leaseSerial = this.#leasesHeld
+    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#replaceSnapshot()
   }
 
