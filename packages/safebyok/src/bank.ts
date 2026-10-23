@@ -225,7 +225,8 @@ export class Bank {
   /** Forget what this device keeps of the vault `draft` names -- its device record and its lease -- letting the vault go: the way out of 'vault_behind'.
    * Once storage was restored from an older copy on purpose, this has the device accept it: the
    * next {@link Bank.ensureVault} births the vault as storage holds it. Erases with
-   * {@link DeviceDB.delDeviceRecord} and {@link DeviceDB.delLease}. It weakens the check for a vault
+   * {@link DeviceDB.delDeviceRecord} and {@link DeviceDB.delLease}, and lets the vault go once both
+   * are erased, so the next birth reads neither. It weakens the check for a vault
    * served behind what this device has seen until the next birth, so call it only on the user's
    * or the host's say. Refuses 'storage_unavailable' or 'storage_blocked' when the device store
    * fails: call again to finish.
@@ -242,10 +243,12 @@ export class Bank {
   async tryClearCachedVault(draft: VaultDraft): Promise<Outcome<void>> {
     try {
       const parts = parseVaultDraft(draft, this.#parts)
-      this.#letGoOf(Ckeys.vaultProps(parts.scope))
       const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
       valOf(await deviceDB.delDeviceRecord(parts.scope))
       valOf(await deviceDB.delLease(parts.scope))
+      // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
+      // reads neither.
+      this.#letGoOf(Ckeys.vaultProps(parts.scope))
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -255,7 +258,8 @@ export class Bank {
    * for a vault that reads sound (delete that with `vault.del()`), 'stale_write' for one made anew
    * elsewhere meanwhile, 'storage_unavailable' and the rest. What the vault held is gone for good,
    * so ask the user first. Once it is deleted, the vault's entry is let go, and the next
-   * {@link Bank.ensureVault} births a new life, `novel`.
+   * {@link Bank.ensureVault} births a new life, `novel`. On 'stale_write' the entry is let go too,
+   * so the next ask births the vault that stands.
    *
    * @example
    *   if (isVaultError(entry.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
@@ -269,8 +273,16 @@ export class Bank {
   async tryDelDamagedVault(draft: VaultDraft): Promise<Outcome<void>> {
     try {
       const parts = parseVaultDraft(draft, this.#parts)
-      await delDamagedVaultIn(parts.scope, parts.vaultDB, parts.deviceDB)
-      this.#letGoOf(Ckeys.vaultProps(parts.scope))
+      const ckey = Ckeys.vaultProps(parts.scope)
+      try {
+        await delDamagedVaultIn(parts.scope, parts.vaultDB, parts.deviceDB)
+      } catch (err) {
+        // Made anew elsewhere meanwhile: the entry's refusal is out of date, so it goes, and the
+        // next ask births the vault that stands. The caller still hears why nothing was deleted.
+        if (isVaultError(err, 'stale_write')) { this.#letGoOf(ckey) }
+        throw err
+      }
+      this.#letGoOf(ckey)
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
   }

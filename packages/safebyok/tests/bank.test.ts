@@ -306,6 +306,26 @@ describe("a vault served behind this device's record", () => {
     expect(onBadNews).toHaveBeenCalledOnce()
   })
 
+  it("lets the entry go only once this device's record and lease are erased, so a listener asking again then takes up no lease", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const vault = await bank.ensureVault(U1)
+    await vault.unlock('pw')
+    expect(await world.getLease()).to.not.be.null
+    const asked: Promise<Vault>[] = []
+    bank.subscribe(() => { if (bank.entryOf(U1) === null && asked.length === 0) { asked.push(bank.ensureVault(U1)) } })
+    const gate = TH.holdNextCall(world.deviceDB, 'delLease')
+    const clearing = bank.clearCachedVault(U1)
+    await gate.reached
+    await TH.wakeupAtNextTick()
+    gate.release()
+    await clearing
+    expect(asked).to.have.lengthOf(1)
+    const reborn = await asked[0]
+    expect(reborn?.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+
   it("accepts the vault storage holds once support confirms the restore, as clearCachedVault's example shows", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
@@ -342,6 +362,24 @@ describe("bank.delDamagedVault", () => {
     expect(confirm).toHaveBeenCalledOnce()
     expect(await world.getLease()).to.be.null
     expect(bank.entryOf(U1)?.vault?.state).to.eq('novel')
+  })
+
+  it("lets the entry go and still refuses 'stale_write' when the vault was made anew elsewhere as it deleted: the next ensureVault births the vault that stands", async () => {
+    const world = await damagedVaultWorld()
+    const bank = bankIn(world)
+    await TH.expectRefusal(bank.ensureVault(U1), 'damaged_vault')
+    const elsewhere = bankIn(world, { deviceDB: memoryDeviceDB() })
+    const delDamagedVault = world.vaultDB.delDamagedVault.bind(world.vaultDB)
+    vi.spyOn(world.vaultDB, 'delDamagedVault').mockImplementationOnce(async (scope) => {
+      await TH.expectGood(delDamagedVault(scope))
+      await elsewhere.ensureVault(U1)
+      return TH.bad(new VaultError('stale_write', 'The vault was made anew elsewhere while it was being deleted.'))
+    })
+    await TH.expectRefusal(bank.delDamagedVault(U1), 'stale_write')
+    expect(bank.entryOf(U1)).to.be.null
+    const standing = await bank.ensureVault(U1)
+    expect(standing.vault_tok).to.eq(elsewhere.entryOf(U1)?.vault?.vault_tok)
+    expect(standing.state).to.eq('novel')
   })
 
   it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_label'", async () => {
