@@ -12,6 +12,13 @@ const UnlockButton = () => {
   return vault === null ? null : <button onClick={() => { void vault.tryEnsureLease() }}>Unlock ahead</button>
 }
 
+/** Keeps in `seen` the Vault object the provider hands down for `vaultlabel`, once there is one. */
+const VaultKeeper = ({ seen, vaultlabel }: { seen: Map<string, Vault>, vaultlabel: string }) => {
+  const vault = useVault(vaultlabel)?.vault ?? null
+  useLayoutEffect(() => { if (vault !== null) { seen.set(vaultlabel, vault) } }, [seen, vaultlabel, vault])
+  return null
+}
+
 describe("BankProvider", () => {
   // == [Opening and the dialog]: no vault without a user, a call summons the dialog, dismissing, misuse
 
@@ -224,6 +231,28 @@ describe("BankProvider", () => {
       fireEvent.click(screen.getByText('Unlock'))
       expect(await first).to.eq('sk-fake')
       expect(await second).to.eq('sk-fake')
+    })
+
+    it("shows another vault's ask over a dialog, the call it replaces refused vault_locked rather than left waiting", async () => {
+      const world = await lockedWorld()
+      const seen = new Map<string, Vault>()
+      render(
+        <BankProvider {...world.props} userId="u1">
+          <VaultKeeper seen={seen} vaultlabel="main" />
+          <VaultKeeper seen={seen} vaultlabel="work" />
+        </BankProvider>,
+      )
+      await waitFor(() => { expect(seen.size).to.eq(2) })
+      const [main, work] = [seen.get('main'), seen.get('work')]
+      if (main === undefined || work === undefined) { throw new Error('the provider opened no vault for main or work') }
+      const reading = main.tryGetWhisper('anthropic_api_key')
+      await screen.findByText('Unlock')
+      const storing = work.tryPutBox({ boxlabel: 'openai_api_key' }, 'sk-fake')
+      await TH.expectBad(reading, 'vault_locked')
+      await screen.findByText('Choose a vault passphrase')
+      expect(screen.getAllByPlaceholderText('vault passphrase')).to.have.lengthOf(1)
+      fireEvent.click(screen.getByText('Cancel'))
+      await TH.expectBad(storing, 'vault_locked')
     })
 
     it("has overlapping calls each refused vault_locked when the one dialog is cancelled", async () => {

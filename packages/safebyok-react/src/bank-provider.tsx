@@ -104,13 +104,16 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture
+// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture, unshownAnswerOf
 
 /** One showing of the passphrase dialog: which one, the ask it answers, and how it answers. */
 type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void }
 
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
+
+/** The answer to an ask the dialog does not show: carry on under a lease ending, declined otherwise. */
+const unshownAnswerOf = (ask: Ask): ProofAnswer => (ask.why === 'lease_ending' ? 'carry_on' : 'declined')
 
 /** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the passphrase dialog.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
@@ -184,7 +187,8 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * and the rest, or `vault.ensureLease()` on an Unlock button -- one at a time: unstyled markup
  * under the `modal-scrim` / `modal` class names, for the host's stylesheet to dress. The call
  * waits on the dialog, and goes on once it unlocks; dismissed, it refuses with kind
- * 'vault_locked'. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
+ * 'vault_locked'. Another vault's ask replaces the dialog showing, whose calls are refused
+ * likewise. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
  * or the provider unmounting lets the vault go, closing the dialog, its calls refused
  * 'vault_gone'. A user who starts over from the dialog (`allowStartOver`) has asked for a new
  * vault: once the old one is deleted, the provider asks the bank for the vault again, and the
@@ -251,14 +255,16 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
   }, [])
 
   // The provider's own getProof: its passphrase dialog, shown only while the user's gesture is in
-  // hand. A dialog showing is never asked over: a vault asks one at a time.
+  // hand, one at a time. A vault asks one at a time, but the bank's other vaults may ask over
+  // it: the newest is shown, and the ask it replaces answered as one unshown, never left waiting.
   const askByDialog = useCallback<GetProof>((ask) => new Promise<ProofAnswer>((answer) => {
-    if (! hasUserGesture()) { answer(ask.why === 'lease_ending' ? 'carry_on' : 'declined'); return }
+    if (! hasUserGesture()) { answer(unshownAnswerOf(ask)); return }
+    if (showingRef.current !== null) { endShowing(showingRef.current, unshownAnswerOf(showingRef.current.ask)) }
     showingRounds.current += 1
     const next = { round: showingRounds.current, ask, answer }
     showingRef.current = next
     setShowing(next)
-  }), [])
+  }), [endShowing])
 
   // The host's getProof as of the last commit, held as onBadNews is: the bank is handed one asker
   // that keeps its identity, so a getProof written inline makes no new bank.
