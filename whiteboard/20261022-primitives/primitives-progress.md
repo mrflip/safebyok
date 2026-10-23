@@ -79,8 +79,8 @@ rules* 3).
 | 6 | lease_box | filed, stacked on #253 | #254 |
 | 6b | box_seal | filed, stacked on #254 | #256 |
 | 7 | bank | filed, stacked on #256 | #258 |
-| 7b | bank_provider | built, in review | #259 |
-| 8 | proving_gate | planned | |
+| 7b | bank_provider | filed, stacked on #258 | #259 |
+| 8 | proving_gate | building | |
 | 9 | gating | planned | |
 | 10 | react | planned | |
 | 11 | docs | planned | |
@@ -92,6 +92,16 @@ rules* 3).
 
 See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads found*, for
 #243 and #244: the names, the shapes, the interim gateless handling thread 7 replaces.
+
+### Thread 7b, bank_provider (#259)
+
+* `BankProvider` (one bank per signed-in user, made in an effect, `bank.closeVaults()` on change
+  or unmount), `useBank(): Bank | null`, `useVault(vaultlabel)` (the bank's entry; asks only
+  while the bank holds none), `useVaultSnapshot(vaultlabel)`; `PassphraseModal`'s `onStartedOver`.
+  Thread 10's dialogs read the entry through `useVault` and reach the bank through `useBank`.
+* Core: the bank holds a birth before any publish and begins it a microtask on (a birth let go in
+  the same task reads nothing); `bank.delDamagedVault` / `tryDelDamagedVault` (lets the entry go on
+  success or `stale_write`); `clearCachedVault` erases, then lets the entry go.
 
 ### Thread 7, bank (#258)
 
