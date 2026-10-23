@@ -90,15 +90,17 @@ code, the stored records and these docs all use its words.
   one whisper, encrypted, with its `boxlabel` and its **sidecar**, your app's own data that
   rides beside it, visible in storage: authenticated, never encrypted. A **vault** is one user's set of boxes, named by your `applabel`,
   the signed-in user's id and a `vaultlabel`.
-* The vault is unlocked by a **proof** of one of its two **wayins**: its passphrase, which every
-  vault has, or its passkey's answer, if it has one. Each wayin holds the one **vaultKey** (the
-  vault's random master key) wrapped under a key made from that proof, so changing the
+* The vault is unlocked through one of its two **wayins**: its passphrase, which every
+  vault has, or its passkey's answer, if it has one. A **gating** asks the user for one, and
+  makes it a **proving**, a key-making proof that lives for that one request. Each wayin holds the
+  one **vaultKey** (the vault's random master key) wrapped under a key made from its passphrase
+  or passkey, so changing the
   passphrase, or adding or removing the passkey, rewrites no box. The vaultKey wraps a fresh
   **boxKey** for every stored whisper, and the boxKey encrypts the whisper. The wayins live in
   the **vault props**, the one record per vault that every device syncs. The backend holds those
   and the boxes, nothing else: every key and whisper in them is ciphertext; only their labels,
   ids, times and sidecars are not, and those are unencrypted, readable by anyone who can read your database.
-* A **lease** lets this device unlock again without a proof for a while: when a proof unlocks the
+* A **lease** lets this device unlock again without asking for a while: when a gating unlocks the
   vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
   `leaseHours` run out. It never leaves the device.
 * Every encryption is bound to its **ctx**: the app, user and vault, the field, and every other
@@ -124,9 +126,9 @@ code, the stored records and these docs all use its words.
   each vault (the highest `vault_epoch` it has seen there).
 
 ```text
-proof + wayin ──> wayinKey ──unwraps──> vaultKey ──unwraps──> boxKey ──deciphers──> whisper
-                                           ^
-                                   lease: leaseKey on this device unwraps it without a proof
+passphrase or passkey + wayin ──> wayinKey ──unwraps──> vaultKey ──unwraps──> boxKey ──deciphers──> whisper
+                                                          ^
+                                   lease: leaseKey on this device unwraps it without asking
 ```
 
 ## Where it runs
@@ -455,7 +457,7 @@ asked.
 
 ## Locking
 
-A proof that unlocks the vault grants this device a **lease**: the vault stays unlocked, across
+A gating that unlocks the vault grants this device a **lease**: the vault stays unlocked, across
 reloads, until the lease runs out (`leaseHours`, seven days by default, at most 588 hours: 24.5 days) or the host locks it. `Infinity` hours means never
 on this device, until a lock: `askPassphraseAt` is then the exported `FarFuture`, the latest
 instant the package accepts (in 2255). A finite number past 588 is refused, since no timer
@@ -490,7 +492,9 @@ sign-out. The key is dropped at once, and every call that needs it throws kind `
 `getBox()`, `getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing
 back, unless an unlock has put a key back in hand by the time storage answers. A gating's attempt under way
 attaches no lease: it refuses `gating_landed` at its next step, and a change to the ways in it
-already stored stays stored. A `putBox()` under way refuses with `vault_locked`, writing nothing,
+already stored stays stored. **A lock spares only the transactional part**: a VaultDB write once
+sent completes or refuses as storage decides, and every step before it refuses `vault_locked`. A
+`putBox()` under way refuses with `vault_locked`, writing nothing,
 when the lock comes while it waits on a gating, reads and opens the box (`VaultDB.getBox`,
 `box.extractWhisper()`), or seals it (`Box.seal`); a `delBox()` does when it comes while it waits
 on a gating. Only the write itself
@@ -695,7 +699,7 @@ snapshot's `passphrase` or `passkey` shows it. Each leaves the vault unlocked, i
 starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each
 refuses, changing nothing: `wrong_passphrase`
 for a `passphrase` that does not open the vault, or is blank; `weak_passphrase` for a new passphrase the
-`strengthChecker` finds weak, or a blank one; `bad_option` for a passkey's answer as the proof,
+`strengthChecker` finds weak, or a blank one; `bad_option` for a passkey's answer in place of the passphrase,
 or a new one over anything but a fresh salt; `damaged_wayin` when the passphrase is stored damaged;
 `absent_wayin` from `delWayin` on a vault with no passkey; and `stale_write` when another device
 changed the vault meanwhile. `damaged_wayin` and `absent_wayin` met by the dialog's attempt leave
@@ -852,8 +856,8 @@ news is told to `onBadNews` once, whichever form met it. `useWhisper()` comes
 in the throwing form alone, and `subscribe()` and `Bank.make` throw their misuse at once.
 
 ```ts
-const { ok, err } = await vault.tryUnlock(passphrase)
-if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
+const { ok, err } = await vault.tryPutBox({ boxlabel: 'anthropic_api_key' }, typedKey)
+if (! ok && err.refusalkind === 'vault_locked') { offerUnlock() }   // declined, or a lock landed
 
 const queryFn = () => vault.getWhisper('anthropic_api_key')   // throws its refusal, for TanStack Query
 ```
