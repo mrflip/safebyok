@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b built (#259), in review; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -420,6 +420,13 @@ Matter); `useVault(vaultlabel)` asks for a vault on demand, never re-ensuring a 
 own (Open Matter); `openError` / `retryOpen` go, in favour of the bank's entry. **Depends on:** 7.
 **Look-ahead:** thread 10's dialogs read the bank's entry. **Size:** M. Moves `VaultProvider`'s size
 line.
+
+*Orchestrator, as built ([#259](https://github.com/mrflip/safebyok/pull/259)):* `VaultProvider`, `useOpenError`,
+`openError`, `retryOpen` gone with no wrapper; `BankProvider` (one bank per signed-in user, made in
+an effect), `useBank(): Bank | null`, `useVault(vaultlabel)` (the bank's entry; asks only while the
+bank holds none), `useVaultSnapshot(vaultlabel)`; `PassphraseModal`'s `onStartedOver`. The
+listener recursion fixed in the core (the birth held before any publish, begun a microtask on).
+Pulled forward: `bank.delDamagedVault` / `tryDelDamagedVault` on the core Bank.
 
 ### 8. proving_gate
 
