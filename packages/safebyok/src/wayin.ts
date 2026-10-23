@@ -126,7 +126,6 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
 
   /** Its visible fields, each once: all JSON and a log line show of this wayin. */
   abstract toJSON(): WayinSummary
-
 }
 
 /** A passphrase wayin: the vaultKey wrapped under the passphraseKey made of the passphrase and this wayin's passphraseSalt.
@@ -153,7 +152,6 @@ export class PassphraseWayin extends Wayin<PassphraseWayinRecord> {
     const { keyDeriver, record } = this
     return record.key_deriver_label === keyDeriver.key_deriver_label && fromB64OrNull(record.salt_b64)?.length !== keyDeriver.salt_bytes
   }
-
 }
 
 /** A passkey wayin: the vaultKey wrapped under the passkeyKey made from the authenticator's PRF answer over this wayin's own salt.

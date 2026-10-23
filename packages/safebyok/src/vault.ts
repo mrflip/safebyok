@@ -1968,7 +1968,6 @@ const gateMovedError = () => new VaultError('gate_moved', "The vault's ways in c
 
 const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
 
-
 /** The refusal of a first unlock that lost the race to another device setting the vault's first passphrase. It carries nothing of that device's gate. */
 const gateMadeElsewhereError = () => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
 
@@ -1984,7 +1983,6 @@ const strippedOfStoredProps = (err: unknown): unknown => {
   // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
   return new VaultError(err.refusalkind, StaleWayinsMessage, err.cause === undefined ? {} : { cause: err.cause })
 }
-
 
 /** What a change to the ways in says when storage refuses it as stale. */
 const StaleWayinsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
@@ -2011,7 +2009,6 @@ const frozenVaultProps = (props: VaultProps): VaultProps => {
   if (! isGated(props)) { return Object.freeze({ ...props }) }
   return Object.freeze({ ...props, passphrase: frozenRecord(props.passphrase), passkey: props.passkey === null ? null : frozenRecord(props.passkey) })
 }
-
 
 /** The {@link Stamp} of `props` in `scope`, frozen. */
 const stampOf = (scope: VaultScope, props: VaultProps): Stamp => Object.freeze({
