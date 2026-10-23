@@ -130,9 +130,9 @@ export type VaultDraft = {
   userId:     string
   /** The vault's own label; an app that keeps one vault per user calls it `main`. */
   vaultlabel: string
-  /** Where this vault is stored, in place of the bank's `vaultDB`. */
+  /** Where this vault is stored, in place of the bank's `vaultDB`: the same object at every ask for the vault, as the bank compares stores by identity. */
   vaultDB?:   VaultDB | undefined
-  /** What this device keeps of this vault, in place of the bank's `deviceDB`. */
+  /** What this device keeps of this vault, in place of the bank's `deviceDB`: the same object at every ask, likewise. */
   deviceDB?:  DeviceDB | undefined
 }
 

@@ -168,15 +168,16 @@ export class Bank {
    * it until it is let go (`closeVault`, `reopenVault`, `closeVaults`, `clearCachedVault`), deleted,
    * or found deleted or made anew, during its birth or after: then the entry is `refused`, and the
    * next ask births anew. One scope lives in one place: a draft for a vault the bank holds, or is
-   * birthing, names the stores it was born from (left out, the bank's own).
+   * birthing, names the stores it was born from (left out, the bank's own): the same objects, as
+   * stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_label' or 'bad_option' for a draft amiss, before storage is touched, and
-   * 'bad_option' for a draft naming another `vaultDB` or `deviceDB` than the vault held was born
-   * from. Refuses as
-   * storage refuses: 'damaged_vault' for vault props it cannot use (`delDamagedVault` clears them),
-   * 'newer_format', 'identity_revoked', 'storage_unavailable'. Refuses 'vault_behind' for a vault
-   * below this device's record, as the class says. The entry keeps the refusal; bad news among them
-   * is told to `onBadNews`.
+   * 'bad_option' for a draft naming another `vaultDB` or `deviceDB` object than the vault held was
+   * born from, one made afresh over the same storage among them. Refuses as storage refuses:
+   * 'damaged_vault' for vault props it cannot use (`delDamagedVault` clears them), 'newer_format',
+   * 'identity_revoked', 'storage_unavailable'. Refuses 'vault_behind' for a vault below this
+   * device's record, as the class says. The entry keeps the refusal; bad news among them is told
+   * to `onBadNews`.
    *
    * @example const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
    * @example const vault = await bank.ensureVault({ userId, vaultlabel: 'work', vaultDB: workVaultDB })   // a vault stored elsewhere
@@ -512,7 +513,10 @@ export class Bank {
 /** An entry's view, frozen. */
 const frozenEntry = (scope: VaultScope, status: EntryStatus, vault: Vault | null, err: VaultError | null): VaultEntry => Object.freeze({ scope, status, vault, err })
 
-/** Refuse 'bad_option' unless `parts` names the stores `held` was born from: one scope lives in one place, and a vault read from one store and written to another is no vault at all. */
+/** Refuse 'bad_option' unless `parts` names the stores `held` was born from, the same objects: one scope lives in one place, and a vault read from one store and written to another is no vault at all.
+ * Stores are compared by identity, never by what they reach: a vaultDB made afresh for each call
+ * is another store, even over the same backend.
+ */
 const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
   if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
 }
@@ -524,7 +528,7 @@ const draftOf = (scope: VaultScope, now: number): GatelessVaultProps => ({
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 
-const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than this draft names (its vaultDB or deviceDB, or the bank's own where the draft leaves one out): one vault lives in one place. Ask for it with the stores it was opened with, or let it go first (bank.reopenVault) to open it from these.")
+const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than this draft names (its vaultDB or deviceDB, or the bank's own where the draft leaves one out): one vault lives in one place. Stores are compared as objects, so the draft must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --

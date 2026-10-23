@@ -231,6 +231,15 @@ describe("bank.ensureVault", () => {
     await TH.expectRefusal(bank.ensureVault(U1), 'bad_option')
   })
 
+  it("refuses a vaultDB made afresh over the same storage 'bad_option', saying stores are compared as objects", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    await bank.ensureVault(U1)
+    const err = await TH.expectRefusal(bank.ensureVault({ ...U1, vaultDB: localVaultDB({ store: world.dbStore }) }), 'bad_option')
+    expect(err.message).to.include('the same vaultDB object')
+    expect(err.message).to.include('make each store once')
+  })
+
   it("hands two asks at once one Vault object, calling vaultDB.ensureVault once, and a third ask, once timely, the same", async () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
