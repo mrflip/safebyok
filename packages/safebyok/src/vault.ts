@@ -776,8 +776,8 @@ export class Vault {
    * declines or a `lock()` lands while the gating stands, unless the attempt has sent its write: a
    * deletion that lands then resolves, as storage decides. Refuses with what the attempt refused
    * when it settled it: 'stale_write' when the vault changed in storage first, or as
-   * {@link Vault.demandConsistentWith} finds it moved on. A `novel` vault has no passphrase to
-   * prove it with, and refuses 'absent_vault'.
+   * {@link Vault.demandConsistentWith} finds it moved on. It awaits a hello first: a vault still
+   * `novel` then has no passphrase to prove it with, and refuses 'absent_vault'.
    *
    * @example await vault.del()   // storage holds a tombstone; bank.ensureVault(draft) births the next life, novel
    */
@@ -786,6 +786,9 @@ export class Vault {
   /** Delete the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.del}. */
   async tryDel(): Promise<Outcome<void>> {
     try {
+      this.#checkStanding()
+      // Judged on a picture within staleMinutes, as putWayin's and delWayin's are: a stale novel one may be gated by now.
+      await this.#helloWithin(this.#staleMillis)
       this.#checkStanding()
       this.#gatedProps()
       await this.#gatingFor(() => 'del_vault', 'del')
@@ -1353,10 +1356,19 @@ export class Vault {
     return gateMadeElsewhereError()
   }
 
-  /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease. */
+  /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease.
+   * A lease in hand of the gate before is dropped from memory, as a read taking a new gate drops
+   * it: the grant that follows holds the new one, and a grant that fails leaves the vault locked,
+   * as its snapshot then says.
+   */
   #takeOwnWrite(next: GatedVaultProps) {
     if (this.#goneBy !== null || isOlderPicture(this.#vaultProps, next)) { return }
     this.#vaultProps = next
+    const held = this.#lease
+    if (held !== null && ! fitsLease(next, held)) {
+      this.#dropLease()
+      return
+    }
     this.#replaceSnapshot()
   }
 

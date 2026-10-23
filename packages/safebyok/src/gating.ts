@@ -34,7 +34,7 @@ export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
 type GatingCommon = {
   /** The vault asking, its fields live while the dialog is up. */
   readonly vault:      Vault
-  /** Settles only when a `lock()` lands while the gating stands, or the vault goes gone: close the dialog. Every call waiting on it is then refused 'vault_locked'.
+  /** Settles only when a `lock()` lands while the gating stands, or the vault goes gone: close the dialog. Every call waiting on it is then refused: 'vault_locked' for a lock, 'vault_gone' or 'vault_remade' for a vault gone, and storage's own refusal for a lock storage's refusal made ('identity_revoked', 'vault_behind').
    * A deletion whose write is sent is past its reach: it settles only once storage refuses that write.
    */
   readonly lockLanded: Promise<void>
@@ -124,7 +124,7 @@ export type GatingInside = {
   freshen:     (gating: RaisedGating) => Promise<VaultProps>
   /** Store `gate` over its base, `vault.putGate`, within the attempt's hold. */
   putGate:     (gate: Gate, call: GatingCall) => Promise<Gate>
-  /** Delete the vault `proving` proved, expecting its `vault_tok` and `gate_epoch`, resolving the tombstone's `vault_epoch`. */
+  /** Delete the vault `proving` proved, once a demand on it holds, expecting the `vault_tok` and `gate_epoch` of the picture in hand, resolving the tombstone's `vault_epoch`. */
   delVault:    (proving: PassphraseProving) => Promise<number>
   /** Once the gating that deleted the vault settled: lock, let the Vault object go, and raise the device record to `vaultEpoch`. */
   afterDel:    (vaultEpoch: number) => Promise<void>

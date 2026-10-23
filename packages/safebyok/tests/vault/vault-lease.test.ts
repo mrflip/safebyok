@@ -627,6 +627,19 @@ describe("a change to the ways in, once it has landed", () => {
     await TH.unlock(vault, 'pw two')
   })
 
+  it("shows the vault locked here once a change's grant failed, never unlocked under the lease of the gate before: the next getWhisper asks, and does not refuse gate_moved", async () => {
+    const world = makeWorld()
+    // Deaf to storage's bell, so no refresh of its own write mends the picture first.
+    const vault = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+    await TH.putWayin(vault, 'pw one', await TH.passkeyOf('laptop'))
+    expect(vault.state).to.eq('locked')
+    expect(heldLeaseOf(vault)).to.be.null
+    TH.answering(vault, async (gating) => { await TH.expectGood(TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw one')) })
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
+  })
+
   it("resolves though this device could not keep its lease, says so through the logger, and asks at the next open", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
 import { toB64 } from '../../src/crypto'
+import { MinuteMillis, StaleMinutes } from '../../src/types'
 import * as TH from '../test-helpers'
 import { makeWorld, u1BoxCkey, storedRowOf, storedVaultPropsOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, vaultWithPasskey, spoilWayin } from './world'
 
@@ -118,6 +119,17 @@ describe("delBox and del()", () => {
     expect(stale.getSnapshot().state).to.eq('locked')
     await TH.del(stale, 'pw')
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultPropsCkey])
+  })
+
+  it("del() from a novel picture older than staleMinutes reads first: the vault gated elsewhere since is asked for and deleted, never refused absent_vault", async () => {
+    const world = makeWorld()
+    const stale = await world.open({ vaultDB: world.deafVaultDB() })
+    const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+    await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(stale.getSnapshot().state).to.eq('novel')
+    world.advance(StaleMinutes * MinuteMillis)
+    await TH.del(stale, 'pw')
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
   it("del() on a novel vault refuses absent_vault, asking nothing and writing nothing; once its first passphrase is set, del() lands, and a second refuses vault_gone; the next life's unlock and del() land", async () => {
