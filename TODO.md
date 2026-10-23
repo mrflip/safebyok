@@ -291,8 +291,9 @@ the operation, with no re-fetch; the refusal says what happened and to unlock ag
 
 ## The react lifecycle
 
-`VaultProvider` makes its vault in an effect and hands it down with `setVault` from that effect,
-under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/vault-provider.tsx`).
+`BankProvider` makes its bank in an effect and hands it down with `setHeld` from that effect,
+under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/bank-provider.tsx`);
+`useVault` asks for a vault in an effect of its own (thread 7b, 2026-10-22).
 Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the
 suppression to `setVault` and closed this section; the Coach (2026-10-19) reopened it: "Leave the
 todo, this is a big problem. Don't need a fix, do need the caveat." The caveat for hosts is in

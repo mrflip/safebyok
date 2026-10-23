@@ -158,7 +158,7 @@ describe("BankProvider", () => {
       await TH.expectBad(reading, 'vault_gone')
     })
 
-    it("refuses a read vault_locked when the user dismisses the dialog, as VaultProvider's third example shows (Contract: ensureLease, Does 3.5)", async () => {
+    it("refuses a read vault_locked when the user dismisses the dialog, as BankProvider's third example shows (Contract: ensureLease, Does 3.5)", async () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()

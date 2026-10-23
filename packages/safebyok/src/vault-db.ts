@@ -257,7 +257,7 @@ export abstract class VaultDB {
 
   /** The guarded logger this VaultDB was made with: one that throws breaks nothing.
    * It is no own field, so a VaultDB logged, spread or compared never shows or copies the host's
-   * logger. `Bank.make` and `VaultProvider` use it when given no logger of their own.
+   * logger. `Bank.make` and `BankProvider` use it when given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
 

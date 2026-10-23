@@ -263,7 +263,7 @@ await vault.putBox({ boxlabel: 'מפתח OpenAI: עבודה', sidecar: { note: '
   fields with the exported schemas first, and the vault's refusal is the backstop.
 * **A misspelt field is refused**, as `bad_option`: `boxLabel` would otherwise leave the default
   check quietly in place. `checkValidators(bag)` runs that check alone, for a binding or wrapper
-  that takes the bag apart (`VaultProvider` does).
+  that takes the bag apart (`BankProvider` does).
 * **Sizes follow the names.** Each `putBox()` weighs its box -- whisper, sidecar and names
   -- and refuses one heavier than the backend holds in a record (`box_too_large`), or a new
   one that would take the vault past what the backend holds of a vault (`vault_full`). The record
@@ -389,7 +389,7 @@ tests, such as `safebyok/testing`'s.
 Data calls never contain UI. A call that needs the vault unlocked -- `putBox`, `getBox`, `getWhisper`, `useWhisper`,
 `delBox` -- goes through `vault.ensureLease()`, which says `hello()`, and, when the vault is
 locked or `novel`, hands an `Ask` to your `getProof` and waits for its answer. `safebyok-react`'s
-`VaultProvider` is a `getProof` already: its passphrase dialog.
+`BankProvider` is a `getProof` already: its passphrase dialog.
 
 ```ts
 const getProof: GetProof = async (ask) => {
@@ -592,11 +592,11 @@ import { setDefaultLogger } from 'safebyok'
 setDefaultLogger(telemetry)  // everything safebyok would have said to the console goes here instead
 ```
 
-That covers every storage adapter, vault, `VaultProvider` and store given no logger of its own,
+That covers every storage adapter, vault, `BankProvider` and store given no logger of its own,
 whether it was made before the call or after. Name a logger a second time only to keep two apart,
 as a child logger would: give one to your storage adapter's factory (`idbVaultDB({ logger })`),
-and the adapter, every vault opened over it, and `VaultProvider` all use it, as one object; give
-one to `Bank.make` (or `VaultProvider`), and it is the bank's and its vaults' alone, the adapter
+and the adapter, every vault opened over it, and `BankProvider` all use it, as one object; give
+one to `Bank.make` (or `BankProvider`), and it is the bank's and its vaults' alone, the adapter
 keeping its own. Pass `logger: DefaultLogger` to have the bank use the default whatever its adapter was given.
 An adapter's logger is fixed when it is made: `vaultDB.logger` reads it, and nothing replaces it.
 
@@ -844,8 +844,9 @@ adapter. None of them quotes the record, its ciphertext or its sidecar.
 ### Misuse: fix the code
 
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
-or the dev overlay (in React, `VaultProvider` throws misuse from `Bank.make` or the vault's birth to the
-nearest error boundary, and hands a condition down as `useOpenError()`'s `openError`).
+or the dev overlay (in React, `BankProvider` throws misuse from `Bank.make` to the nearest error
+boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's entry, which
+`useVault` hands down).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
@@ -979,7 +980,8 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
-`safebyok-react`'s `useOpenError()` hands `delDamagedVault()` down beside `retryOpen`. A `VaultDB` that wraps
+A bank deletes one with its own stores, `bank.delDamagedVault({ userId, vaultlabel })`, which
+`safebyok-react`'s `useBank()` reaches. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
 deletion aims at the stored `vault_tok` alone, so vault props rewritten under that same
 `vault_tok` between its read and the deletion go too: it is the same vault, the one the user

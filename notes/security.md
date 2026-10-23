@@ -41,6 +41,28 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (thread 7b, bank_provider, [#259](https://github.com/mrflip/safebyok/pull/259), stacked on #258): **`safebyok-react` holds a Bank, not
+  a Vault object, and a vault deleted elsewhere is no longer asked for again by the app on its own.** `BankProvider`
+  (`packages/safebyok-react/src/bank-provider.tsx`) makes one `Bank.make` per signed-in user and lets every vault go
+  (`bank.closeVaults()`) on sign-out, a user change, a bank made anew (a shaping prop changed) and unmount; its
+  `onBadNews` and `getProof` handlers are still held through refs and gated per bank, so a vault of a bank let go tells
+  no bad news and asks for no proof (declined) and the next user's handler never hears the last user's vault.
+  `useVault(vaultlabel)` returns the bank's entry (starting, timely or refused) and asks the bank for it only while the
+  bank holds none. **A refused entry stays refused until the app asks again: `vault_gone` and `vault_remade` are no
+  longer re-ensured automatically**, so a deletion on another device never silently births a new, novel, gateless vault
+  on this one that nobody asked for (the only automatic ask left is the dialog's explicit "start over"; see the
+  entry on starting over, amended the same day). Misuse (a refusal whose family is 'misuse', `unexpected_error` included) is
+  thrown in render to the nearest error boundary; conditions and bad news land in the entry. `useBank()` hands a host
+  `bank.ensureVault`, `bank.delDamagedVault` and `bank.clearCachedVault`; the last erases the device record and weakens
+  the rollback check until the next birth (see the rollback entry), so it is for the user's or the host's say only.
+  In `packages/safebyok/src/bank.ts`: **a bank `subscribe` listener that calls `bank.ensureVault` synchronously no longer
+  recurses.** A birth is held in its entry before anything is published and begins a microtask later (`#settleBirth`);
+  a birth let go in the task that asked for it (React StrictMode's rehearsal) reads nothing from storage and its
+  caller is refused `vault_gone`. **`bank.delDamagedVault(draft)` / `tryDelDamagedVault`** is the standalone
+  `delDamagedVault` over the bank's own vaultDB and deviceDB (through the shared `delDamagedVaultIn(scope, vaultDB,
+  deviceDB)` in `del-damaged-vault.ts`), with the same refusals; the entry is let go only once the delete succeeds, and a
+  sound vault still refuses `bad_option` and keeps its Vault object.
+
 * 2026-10-22 (thread lease_box, branch `20261022-lease_box`, stacked on #253): **the Vault exposes its live `Lease`
   as `vault.lease` (null when locked).** A host holding it can decipher any box ciphertext of this vault bound to
   its visible fields while the vault is unlocked, which `getWhisper` already allows. The Lease keeps its record and
@@ -847,6 +869,9 @@ added or folded into through the subagent, and no other entry changes.
   passive cleanup before any passive effect, the effect cleanup that closes the old vault's gate
   always runs before the next user's handlers are installed, closing a sub-frame window in which the
   last user's news (with a boxlabel in `meta.box_listed`) or ask could reach the next user's handler.
+  Amended 2026-10-22 (bank_provider): `VaultProvider` is replaced by `BankProvider`, which is the default `getProof` (its
+  `PassphraseModal`, still shown only while the user's gesture is in hand) and gates its refs per bank, not per vault: a
+  vault of a bank let go tells no bad news and asks for no proof (declined).
 * 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
   first `hello()` a microtask, and throws `Vault.make`'s refusal from the effect.** (1) The provider
   hands `Vault.make` one stable teller that calls whichever handler the last committed render passed
@@ -867,6 +892,11 @@ added or folded into through the subagent, and no other entry changes.
   news), cleared once it opens; the snapshot's `trouble` is the latest bad news on any read, never a
   condition; a damaged record is both, the very same error object. `retryOpen()` and the re-hello
   after `delDamagedVault()` call `vault.tryHello({ staleMinutes: 0 })`, a fresh read of storage.
+  Amended 2026-10-22 (bank_provider): **`VaultProvider`, `useOpenError`, `openError` and `retryOpen` are gone.** `BankProvider`
+  makes the Bank in an effect and lets its vaults go in the cleanup; the first read runs in the bank (a birth begins a microtask
+  after it is asked for, `#settleBirth`, and one let go in that task reads nothing, so StrictMode's rehearsal still touches
+  storage once). `useVault` returns the bank's entry, holding the refusal (condition or bad news) where `openError` was;
+  misuse is thrown in render to the error boundary; asking again is `bank.ensureVault` through `useBank()`.
 * 2026-10-19 (branch 20261019-fields_and_make); 2026-10-19 (branch 20261019-proof_wayin, #201): **`Vault.make` takes a host function, `onBadNews(news)`,
   called with every `bad_news` refusal.** The family (`damaged_vault`, `rolled_back` (amended 2026-10-22 (bank): now `vault_behind`),
   `identity_revoked`, `newer_format`, `damaged_box`, `damaged_wayin`) is told synchronously, before
@@ -1097,7 +1127,7 @@ added or folded into through the subagent, and no other entry changes.
   `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
   The refusal names the unknown keys (the host's own field names, never a value) and, from a small
   table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
-  not know to `Vault.make`, so those reach the error boundary rather than being dropped.
+  not know to `Vault.make`, so those reach the error boundary rather than being dropped (amended 2026-10-22 (bank_provider): `BankProvider` forwards them to `Bank.make`, and the refusal is thrown to the error boundary).
   (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
   live, until the host closes it; the snapshot carries the refusal in a new snapshot field,
   `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
@@ -1199,7 +1229,7 @@ added or folded into through the subagent, and no other entry changes.
   comparison now guards a box built wrong, and stays so a later rotation needs no new
   contract). Deletions name no epoch. A box whose epoch is
   not the vault props' reads as `damaged_box`, its key never tried.
-* 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Amended 2026-10-22 (bank): **the device mark is replaced by the device record, and `rolled_back` by `vault_behind`; what follows describes the mark and no longer holds except where restated here.** Per scope, across the vault's lives, the DeviceDB holds `{ device_id, highest_vault_epoch }` (`packages/safebyok/src/device-db.ts`), written by `raiseDeviceRecord`: a store-side max in one transaction (IndexedDB: one readwrite transaction via idb-keyval `update`), so a tab that saw less never lowers it and the first `device_id` stored stays (the two-tabs write-back below no longer exists). It is raised at birth, after each refresh's take, after this device's own gate writes (first unlock, `putWayin`, `delWayin`) and after `del()` (to the tombstone's `vault_epoch`); `delDamagedVault` raises it to its tombstone's epoch instead of erasing it. The Coach's ruling (option A): one highest `vault_epoch` per scope, raised at each refresh too; `vault_epoch` is compared by <=, never bumped on reads. A birth (`bank.ensureVault`, `packages/safebyok/src/bank.ts`) whose fetched `vault_epoch` is below the record's highest births nothing; a refresh (`src/vault.ts`) refuses it as `vault_behind`, takes nothing, and locks (refusal policy 'lock', the lease erased as for `identity_revoked`). The refresh reads the record BEFORE `getVault`, and judges "older than the picture in hand" (same `vault_tok`, lower epoch: a late read of this tab's own write) BEFORE the behind check, so neither this tab's own write nor another tab's raise is a false `vault_behind`. The record spans lives, so a deletion's tombstone counter carries on in it, where the mark held one vault per scope. The only way out is `bank.clearCachedVault`, which erases the record and the lease and lets the Vault object go: a deliberate host action, never offered to the user as a prompt (the `delMark` recipe below is retired). Residual: a device whose record was cleared, or that never saw the newer copy, cannot tell; a failed raise after a read or own write is a logger warning, not a refusal, so detection is weaker until a later read raises it. Amended 2026-10-22 (bank): **the device record is validated at the boundary.**
+* 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Amended 2026-10-22 (bank): **the device mark is replaced by the device record, and `rolled_back` by `vault_behind`; what follows describes the mark and no longer holds except where restated here.** Per scope, across the vault's lives, the DeviceDB holds `{ device_id, highest_vault_epoch }` (`packages/safebyok/src/device-db.ts`), written by `raiseDeviceRecord`: a store-side max in one transaction (IndexedDB: one readwrite transaction via idb-keyval `update`), so a tab that saw less never lowers it and the first `device_id` stored stays (the two-tabs write-back below no longer exists). It is raised at birth, after each refresh's take, after this device's own gate writes (first unlock, `putWayin`, `delWayin`) and after `del()` (to the tombstone's `vault_epoch`); `delDamagedVault` raises it to its tombstone's epoch instead of erasing it. The Coach's ruling (option A): one highest `vault_epoch` per scope, raised at each refresh too; `vault_epoch` is compared by <=, never bumped on reads. A birth (`bank.ensureVault`, `packages/safebyok/src/bank.ts`) whose fetched `vault_epoch` is below the record's highest births nothing; a refresh (`src/vault.ts`) refuses it as `vault_behind`, takes nothing, and locks (refusal policy 'lock', the lease erased as for `identity_revoked`). The refresh reads the record BEFORE `getVault`, and judges "older than the picture in hand" (same `vault_tok`, lower epoch: a late read of this tab's own write) BEFORE the behind check, so neither this tab's own write nor another tab's raise is a false `vault_behind`. The record spans lives, so a deletion's tombstone counter carries on in it, where the mark held one vault per scope. The only way out is `bank.clearCachedVault`, which erases the record and the lease and lets the Vault object go: a deliberate host action, never offered to the user as a prompt (the `delMark` recipe below is retired; amended 2026-10-22 (bank_provider): `useBank()` hands it to React hosts as the way past `vault_behind`; it weakens this check until the next birth, so it is for the user's or host's say only, and `BankProvider` never calls it) Residual: a device whose record was cleared, or that never saw the newer copy, cannot tell; a failed raise after a read or own write is a logger warning, not a refusal, so detection is weaker until a later read raises it. Amended 2026-10-22 (bank): **the device record is validated at the boundary.**
   `deviceRecordFor(scope, answer)` (`packages/safebyok/src/device-db.ts`) checks every record a DeviceDB hands back
   (`getDeviceRecord` at birth and at each refresh, and `raiseDeviceRecord`'s answer at birth) against the
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
@@ -1868,6 +1898,11 @@ added or folded into through the subagent, and no other entry changes.
   damaged vault props therefore reaches the app's own UI, beside a `retryOpen` that cannot mend it; the
   React README tells hosts to branch on `openError.refusalkind`, and the error's message carries no
   secret material. Misuse still goes to the boundary.
+  Amended 2026-10-22 (bank_provider): `VaultProvider`, `openError` and `retryOpen` are gone. A condition or bad news (a
+  `damaged_vault` included) now lands in the `VaultEntry` that `useVault(vaultlabel)` returns, as its refusal, still the very
+  error object and still carrying no secret material; the entry stays refused until the app asks again through
+  `useBank()` (`bank.ensureVault`), and misuse (family 'misuse', `unexpected_error` included) is thrown in render to the
+  nearest error boundary. A damaged vault is mended by `bank.delDamagedVault`, not by asking again.
 * 2026-10-15: every validator in the core is `zod/mini` (`import * as Z from 'zod/mini'`; the
   core's lint refuses classic `zod` in `src/`). Same checks, limits and messages as before; mini
   shares classic's parsing core, and the test suite passes against zod 4.0.0, the peer range's
@@ -2262,6 +2297,10 @@ added or folded into through the subagent, and no other entry changes.
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
   `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
   has nothing to act on, and the hatch's own last step is erasing the lease.
+  Amended 2026-10-22 (bank_provider): **`bank.delDamagedVault(draft)` / `tryDelDamagedVault` run it over the bank's own
+  vaultDB and deviceDB** (the shared `delDamagedVaultIn(scope, vaultDB, deviceDB)`), with the same refusals; the bank's
+  entry is let go only once the delete succeeds, and a sound vault still refuses `bad_option` and keeps its Vault object.
+  React hosts reach it through `useBank()`; `VaultProvider`'s own `delDamagedVault` is gone.
 * 2026-10-16: **the checks tightened, and a forgotten bag made harmless.** Every default check,
   `AnyTextValidators` included, refuses text that is not well-formed Unicode (a lone surrogate); a host's own schema
   is untouched. A refusal by one of our checks now passes on that check's message, which quotes
@@ -2654,6 +2693,12 @@ added or folded into through the subagent, and no other entry changes.
   A host that deletes an account ends the provider's sign-in (null `userId`) in the same task that starts
   `vault.del()`, as the demo's SessionBar now does; with a real backend, a deleted account's `ensureVault` is refused
   `identity_revoked` anyway.
+  Amended 2026-10-22 (bank_provider): **that reasoning is reversed except for the dialog's own start over.** `BankProvider`
+  and `useVault` no longer ask the bank again after a deletion: a refused entry (`vault_gone`, `vault_remade`) stays refused
+  until the app asks, so a vault deleted elsewhere, a second device included, never births a new gateless vault here
+  unasked. `PassphraseModal` gained `onStartedOver`, called once the user's confirmed `vault.del()` has succeeded (even if the
+  dialog closed meanwhile), and `BankProvider` then asks the bank for the vault again, so an explicit start over still
+  lands on a new novel vault. That is the one automatic ask after a deletion, and it follows the user's confirmed act.
 * 2026-10-16: **`withUnlockedVault` answers a refusal only over the vault the action ran
   against**: an action whose `vault_locked` lands after its vault was closed (another user, a
   reopen) resolves null, so a passphrase is never asked over, nor an action rerun against, a
@@ -2766,7 +2811,7 @@ added or folded into through the subagent, and no other entry changes.
   and the vault it opens use that same object. If the logger or the vaultDB is malformed it warns
   nowhere and passes the raw prop on, so `Vault.make` refuses it to the error boundary. A host that
   wants one logger to hear both passes it to both; one that wants an adapter's messages apart
-  passes that adapter its own. Every logger call is guarded, so a throwing logger never breaks a
+  passes that adapter its own (amended 2026-10-22 (bank_provider): `BankProvider` does the same for `Bank.make`, through the same `settleLogger`). Every logger call is guarded, so a throwing logger never breaks a
   verb, and no host can opt a logger out of the guard. `parseLogger` keeps a module-private
   `WeakSet` (`guardedOnes`) of every logger it has guarded, and a module-private `WeakMap`
   (`guardedFor`) from each host logger to its guarded form: a logger in the set comes back as
@@ -2865,7 +2910,8 @@ added or folded into through the subagent, and no other entry changes.
   breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
   text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
   the device, keep nothing and send nothing. A host's own `passphraseAdvice` replaces this
-  default, and the test is then asked only at submit.
+  default, and the test is then asked only at submit. Amended 2026-10-22 (bank_provider): `VaultProvider` is `BankProvider`; the
+  dialog still asks the vault itself.
 * 2026-10-17 (thread 16, strength_principles): **the vault holds its strength test for its whole
   life.** Thread 10's ref wrapper is gone: the vault keeps the test it was opened with, unchanged.
   `VaultProvider` checks the test at render with `parseStrengthChecker` (not a function goes to
@@ -2874,14 +2920,17 @@ added or folded into through the subagent, and no other entry changes.
   in later through a ref. Amended 2026-10-21 (checker): `VaultProvider` no longer parses the checker
   at render; `Vault.make` refuses a bad one (to the error boundary), and the vault keeps the guarded
   checker for its life (amended 2026-10-21 (checker2): as `vault.checkPassphrase`). The dialog's advice asks
-  `vault.checkPassphrase` of the vault the ask came from.
+  `vault.checkPassphrase` of the vault the ask came from. Amended 2026-10-22 (bank_provider): `BankProvider` hands the
+  checker to `Bank.make`, which gives it to each vault it births; a new identity makes a new bank (warned of once), and
+  the old bank lets its vaults go.
 * 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the
   provider's own close cuts an action short.** An action, or its run again after an unlock, still
   under way when the provider closes the handle (unmount, sign-out, user switch, reopen) used to
   reject `vault_closed` to a fire-and-forget caller; it now resolves null, as a dialog the
   provider ends does. A `vault_closed` on a handle the provider still holds still rejects. Null
   from `withUnlockedVault` now also means that the vault went away under the action; the vault
-  was already closed and its key dropped.
+  was already closed and its key dropped. Amended 2026-10-22 (bank_provider): the provider's close is `bank.closeVaults()`
+  from `BankProvider` (sign-out, user change, a bank made anew, unmount).
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`putBox()`
   no longer deciphers the old box to compare whispers; `changed_at` is now `written_at`.**
   `putBox()` (`packages/safebyok/src/vault.ts`) used to open the box it replaced and compare the
@@ -2969,7 +3018,7 @@ added or folded into through the subagent, and no other entry changes.
   (`adviceFrom`, `packages/safebyok-react/src/vault-provider.tsx`) now treats a strength test that
   rejects as nothing to say (no advice shown) rather than ending the dialog at the error
   boundary (amended 2026-10-21 (checker2): `adviceFrom` is gone, and a check that throws goes on to
-  the app's error boundary again, see the 2026-10-19 (a_sec) react entry); the gate at Create is unchanged, since the vault runs the test again there.
+  the app's error boundary again, see the 2026-10-19 (a_sec) react entry); the gate at Create is unchanged, since the vault runs the test again there. Amended 2026-10-22 (bank_provider): `VaultProvider` is `BankProvider`.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **the vault-size allowance per box is 1 KiB, down from 2 KiB.** `BoxFieldsBytes`
   (`packages/safebyok/src/vault.ts`) is the allowance for the fields beside the whisper and sidecar.

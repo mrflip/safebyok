@@ -136,7 +136,7 @@ These are long enough to search instead, reading only the lines you need: in
 `packages/safebyok/`, `src/vault.ts`, `src/vault-db.ts`, `README.md`, `tests/vault-db.test.ts`,
 `tests/test-helpers.test.ts`, `tests/test-helpers/vault-db-conformance.ts`, and the `tests/vault/`
 folder taken together (a theme per file: grep it, read the one file);
-`safebyok-react/tests/vault-provider/` taken together (a theme per file) and `passphrase-modal.test.tsx`;
+`safebyok-react/tests/bank-provider/` taken together (a theme per file) and `passphrase-modal.test.tsx`;
 `safebyok-postgres/tests/postgres-vault-db.test.ts`. The README is searched by its headings; each
 code file here carries section banners: `grep -n '// == '` is its table of contents
 (`// == [Name]: key names` opens a section, `// --` closes it), then read the range.
