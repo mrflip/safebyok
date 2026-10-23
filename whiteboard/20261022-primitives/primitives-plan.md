@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 in its second review (#261, stacked on #260); threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -541,6 +541,20 @@ second attempt, the stale-state settle, and "a write that lands and then a lock"
 
 *Gloss.* `packages/safebyok-react/src/*` and its tests, `demos/`, `e2e/`. **Depends on:** 9.
 **Size:** M. Moves the React lines.
+*Orchestrator, from thread 9 ([#261](https://github.com/mrflip/safebyok/pull/261)):* `BankProvider`'s own
+dialog answers only `unlock_vault` and `initialize_gate` and declines the other four kinds, so the
+demo's ways-in buttons and Delete account are declined until this thread's per-kind dialogs
+(`change_passphrase`, `put_passkey`, `del_passkey`, `del_vault`) close that loosening.
+`PassphraseModal` and `PasskeyUnlockButton` take a `gating`; `allowStartOver` and `onStartedOver`
+are accepted and do nothing (start over waits on the Coach's row: `bank.startOver(draft)`).
+`attemptRefusalFlavor` has a new `in_flight` flavor the dialogs ignore (the review); it still
+shows `absent_wayin` and `damaged_wayin` in place and sends `same_passphrase` to `close`: settle
+both with the correctable-kinds row. Word the decline by gating kind (`declinedError` reads
+"declined to unlock" for every kind). The demo's Delete account skips `del()` on a novel vault
+(`absent_vault`). Test helpers: `TH.scriptedRequestCleartext`, `TH.answering`, `TH.heldDialog`,
+`TH.asKind`; React's `gatingOf`, `stubGating`, `gatedBy`. Once the dialogs exist, report how the
+joins across calls feel (the Coach's audit 5 worry; three rows in Open Matters). From #259 (the
+Coach took the Rec): demo tests for the dashboard's "Start a new vault" and "Accept this copy".
 
 ### 11. docs
 
@@ -578,6 +592,13 @@ step before it refuses `vault_locked` (the Coach: "that covers only the transact
 I'm sure is uncleaer in the contract"); a stale write never succeeds, refusing `stale_write`, not
 `vault_locked`. Write the get/demand/ensure triplet into STYLE.md
 beside the try pairs. `box_moved` is dropped from the kinds.
+*Orchestrator, 2026-10-23:* TODO entries from the Coach's rulings: `bank.hello` checks that the
+device store answers, not only loads the strength checker ("scheduling is up to you", #258); the
+demo shows how to trigger the bank when Auth.js gets an identity (#259). Contract lines from
+thread 9 (#261): `getBox`, `getWhisper` and `useWhisper` refuse `vault_locked` when a lock lands
+mid-read (the Coach's ruling on #254; the README and doc blocks already say so); a decline is no
+lock (README has it); `del()` needs the passphrase and refuses `absent_vault` on a novel vault;
+the new kinds `attempt_in_flight`, `passphrase_required`, `same_passphrase`.
 
 ### 12. route_meta
 
