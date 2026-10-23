@@ -858,7 +858,7 @@ export class Vault {
     registerProvingInside(this, {
       vaultProps: () => this.#vaultProps,
       deviceId:   () => this.#deviceId,
-      putLease:   async (record) => valOf(await this.#deviceDB.putLease(record)),
+      putLease:   (record) => this.#deviceDB.putLease(record),
       holdLease:  (stored) => this.#holdLease(stored),
       demand:     (thing, call) => { this.#demand(thing, { call }) },
     })

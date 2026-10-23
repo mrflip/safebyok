@@ -33,7 +33,7 @@ const landableGating = () => {
 describe("PassphraseProving.seal", () => {
   it("makes a proving over the current passphrase's header, as its first example shows, showing only its slotlabel", async () => {
     const { vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
     expect(proving.slotlabel).to.eq('passphrase')
     expect(proving.header).to.deep.eq(headerOf(props.passphrase))
     expect(JSON.stringify(proving)).to.eq('{"slotlabel":"passphrase"}')
@@ -43,7 +43,7 @@ describe("PassphraseProving.seal", () => {
 
   it("keeps its stamp readable for the demand, but shows none of it in a spread or a log line", async () => {
     const { vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
     expect(proving).to.include({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel, vault_tok: vault.vault_tok, gate_epoch: props.gate_epoch })
     expect(Object.keys(proving)).to.deep.eq(['slotlabel'])
     expect(Object.fromEntries(Object.entries(proving))).to.deep.eq({ slotlabel: 'passphrase' })
@@ -57,17 +57,17 @@ describe("PassphraseProving.seal", () => {
     await vault.lock()
     derivations.mockClear()
     const deriveKey = vi.spyOn(crypto.subtle, 'deriveKey')
-    await PassphraseProving.seal(vault, headerOf(propsOf(world).passphrase), 'pw')
+    await PassphraseProving.seal(vault, headerOf(propsOf(world).passphrase), 'pw', { gating: StandingGating })
     expect(derivations).toHaveBeenCalledOnce()
     expect(deriveKey).not.toHaveBeenCalled()
   })
 
   it("mints a fresh header for { slotlabel }, as its second example shows: the vault's deriver, a fresh salt, this device's id, and the time now", async () => {
     const { vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next')
+    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     expect(proving.header).to.include({ wayinkind: 'passphrase', key_deriver_label: TH.testDeriver.key_deriver_label, device_id: props.passphrase.device_id, registered_at: vault.now() })
     expect(proving.header.salt_b64).to.not.eq(props.passphrase.salt_b64)
-    const again = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next')
+    const again = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     expect(again.header.salt_b64).to.not.eq(proving.header.salt_b64)
   })
 
@@ -75,15 +75,15 @@ describe("PassphraseProving.seal", () => {
     const { vault, props } = await lockedWorld()
     const derive = vi.spyOn(vault.keyDeriver, 'deriveKeyBytes')
     const header = headerOf(props.passphrase)
-    await TH.expectRefusal(PassphraseProving.seal(vault, header, '  '), 'wrong_passphrase')
-    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, key_deriver_label: 'other' }, 'pw'), 'unknown_key_deriver')
-    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, salt_b64: 'c2hvcnQ' }, 'pw'), 'damaged_wayin')
+    await TH.expectRefusal(PassphraseProving.seal(vault, header, '  ', { gating: StandingGating }), 'wrong_passphrase')
+    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, key_deriver_label: 'other' }, 'pw', { gating: StandingGating }), 'unknown_key_deriver')
+    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, salt_b64: 'c2hvcnQ' }, 'pw', { gating: StandingGating }), 'damaged_wayin')
     expect(derive).not.toHaveBeenCalled()
   })
 
   it("refuses a passphrase that is not text as bad_option", async () => {
     const { vault, props } = await lockedWorld()
-    await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), 42 as unknown as string), 'bad_option')
+    await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), 42 as unknown as string, { gating: StandingGating }), 'bad_option')
   })
 
   it("demands on the proving after the derivation: a gate changed meanwhile refuses gate_moved", async () => {
@@ -91,7 +91,7 @@ describe("PassphraseProving.seal", () => {
     const vault = await world.openUnlocked('pw')
     const header = headerOf(propsOf(world).passphrase)
     const held = world.holdNextDerive()
-    const sealing = PassphraseProving.seal(vault, header, 'pw')
+    const sealing = PassphraseProving.seal(vault, header, 'pw', { gating: StandingGating })
     await held.reached
     const other = await world.open({ vaultDB: world.deafVaultDB() })
     await TH.unlock(other, 'pw')
@@ -106,7 +106,7 @@ describe("PasskeyProving.seal", () => {
   it("makes a proving over the current passkey's header, as its first example shows, and zeroes the answer's bytes", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const props = propsOf(world)
-    const proving = await PasskeyProving.seal(vault, headerOf(props.passkey!), laptop)
+    const proving = await PasskeyProving.seal(vault, headerOf(props.passkey!), laptop, { gating: StandingGating })
     expect(proving.slotlabel).to.eq('passkey')
     expect([...laptop.prfBytes].every((byte) => byte === 0)).to.be.true
   })
@@ -118,7 +118,7 @@ describe("PasskeyProving.seal", () => {
     await vault.lock()
     derivations.mockClear()
     const deriveKey = vi.spyOn(crypto.subtle, 'deriveKey')
-    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     expect(deriveKey).toHaveBeenCalledOnce()
     expect(deriveKey.mock.calls[0]?.[0]).to.include({ name: 'HKDF' })
     expect(derivations).not.toHaveBeenCalled()
@@ -127,7 +127,7 @@ describe("PasskeyProving.seal", () => {
   it("mints a fresh header of the answer's credential and salt, as its second example shows", async () => {
     const { vault, props } = await lockedWorld()
     const answer = await TH.passkeyOf('phone')
-    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer)
+    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer, { gating: StandingGating })
     expect(proving.header).to.include({ wayinkind: 'passkey', credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64, device_id: props.passphrase.device_id })
   })
 
@@ -135,18 +135,18 @@ describe("PasskeyProving.seal", () => {
     const { world, vault } = await vaultWithPasskey()
     const header = headerOf(propsOf(world).passkey!)
     const phone = await TH.passkeyOf('phone')
-    await TH.expectRefusal(PasskeyProving.seal(vault, header, phone), 'wrong_passkey')
+    await TH.expectRefusal(PasskeyProving.seal(vault, header, phone, { gating: StandingGating }), 'wrong_passkey')
     expect([...phone.prfBytes].every((byte) => byte === 0)).to.be.true
     const otherSalt = toB64(new Uint8Array(32).fill(9))
     const overOtherSalt = await TH.passkeyOf('laptop', otherSalt)
-    await TH.expectRefusal(PasskeyProving.seal(vault, header, overOtherSalt), 'wrong_passkey')
+    await TH.expectRefusal(PasskeyProving.seal(vault, header, overOtherSalt, { gating: StandingGating }), 'wrong_passkey')
     const shortSalt = await TH.passkeyOf('phone', 'c2hvcnQ')
-    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, shortSalt), 'bad_option')
+    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, shortSalt, { gating: StandingGating }), 'bad_option')
   })
 
   it("refuses what is no passkey's answer as bad_option, quoting none of it", async () => {
     const { vault } = await lockedWorld()
-    const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, { credentialId: 'abc' } as never), 'bad_option')
+    const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, { credentialId: 'abc' } as never, { gating: StandingGating }), 'bad_option')
     expect(err.message).to.not.include('abc')
   })
 })
@@ -156,9 +156,9 @@ describe("PasskeyProving.seal", () => {
 describe("proving.checkWayin", () => {
   it("resolves for the passphrase that opens the gate's wayin, as its example shows, and refuses wrong_passphrase for another", async () => {
     const { vault, props } = await lockedWorld()
-    const proven = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const proven = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
     await proven.checkWayin()
-    const mistyped = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope')
+    const mistyped = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope', { gating: StandingGating })
     await TH.expectRefusal(mistyped.checkWayin(), 'wrong_passphrase')
   })
 
@@ -166,7 +166,7 @@ describe("proving.checkWayin", () => {
     const { world, vault } = await vaultWithPasskey()
     const header = headerOf(propsOf(world).passkey!)
     const laptop = await TH.passkeyOf('laptop')
-    const proving = await PasskeyProving.seal(vault, header, { ...laptop, prfBytes: new Uint8Array(32).fill(5) })
+    const proving = await PasskeyProving.seal(vault, header, { ...laptop, prfBytes: new Uint8Array(32).fill(5) }, { gating: StandingGating })
     await TH.expectRefusal(proving.checkWayin(), 'wrong_passkey')
   })
 
@@ -182,8 +182,8 @@ describe("proving.checkWayin", () => {
 describe("proving.resealWayinFor", () => {
   it("wraps the vaultKey under the new proving, bound to its header, as its example shows: the new proving opens the wayin it makes", async () => {
     const { vault, props } = await lockedWorld()
-    const current = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
-    const next = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next')
+    const current = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
+    const next = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     const wayin = await current.resealWayinFor(next)
     expect(wayin.wayinkind).to.eq('passphrase')
     expect(headerOf(wayin.record as typeof props.passphrase)).to.deep.eq(next.header)
@@ -191,16 +191,16 @@ describe("proving.resealWayinFor", () => {
 
   it("refuses wrong_passphrase for a current proving that does not open its wayin", async () => {
     const { vault, props } = await lockedWorld()
-    const current = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope')
-    const next = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next')
+    const current = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope', { gating: StandingGating })
+    const next = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     await TH.expectRefusal(current.resealWayinFor(next), 'wrong_passphrase')
   })
 
   it("refuses gate_moved for a passphrase another device has since replaced", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const current = await PassphraseProving.seal(vault, headerOf(propsOf(world).passphrase), 'pw')
-    const next = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const current = await PassphraseProving.seal(vault, headerOf(propsOf(world).passphrase), 'pw', { gating: StandingGating })
+    const next = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     const other = await world.open({ vaultDB: world.deafVaultDB() })
     await TH.unlock(other, 'pw')
     await TH.putWayin(other, 'pw', 'replaced')
@@ -213,8 +213,8 @@ describe("passphraseProving.sealWayins", () => {
   it("wraps one fresh vaultKey under the passphrase's header and the passkey's, as its example shows: each opens its own", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    const passphrase = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
-    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const passphrase = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
+    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     const wayins = await passphrase.sealWayins(passkey)
     expect(wayins.passphrase.wayinkind).to.eq('passphrase')
     expect(wayins.passkey?.wayinkind).to.eq('passkey')
@@ -223,7 +223,7 @@ describe("passphraseProving.sealWayins", () => {
 
   it("makes no passkey wayin when given none", async () => {
     const vault = await makeWorld().open()
-    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
+    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
     const wayins = await proving.sealWayins()
     expect(wayins.passkey).to.be.null
   })
@@ -232,7 +232,7 @@ describe("passphraseProving.sealWayins", () => {
 describe("proving.grantLease", () => {
   it("grants, stores and holds a lease by the wayin it opens, as its example shows", async () => {
     const { world, vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
     const lease = await proving.grantLease()
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(heldLeaseOf(vault)).to.eq(lease)
@@ -242,7 +242,7 @@ describe("proving.grantLease", () => {
 
   it("refuses wrong_passphrase, storing nothing, for a proving that does not open its wayin", async () => {
     const { world, vault, props } = await lockedWorld()
-    const mistyped = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope')
+    const mistyped = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'nope', { gating: StandingGating })
     await TH.expectRefusal(mistyped.grantLease(), 'wrong_passphrase')
     expect(await world.getLease()).to.be.null
   })
@@ -288,7 +288,7 @@ describe("passphraseKeyOf", () => {
 describe("proving.wrappedWith", () => {
   it("wraps a key bound to a header, as its example shows", async () => {
     const vault: Vault = await makeWorld().open()
-    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
+    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
     const wrapped = await proving.wrappedWith(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['wrapKey']), proving.header)
     expect(wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
   })
@@ -373,7 +373,7 @@ describe("passphraseKeyOf, deriving", () => {
     const world = makeWorld({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) } })
     const vault = await world.open()
     const heard = world.logged.length
-    const err = await TH.expectRefusal(PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'hunter2-hunter2'), 'unexpected_error')
+    const err = await TH.expectRefusal(PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'hunter2-hunter2', { gating: StandingGating }), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
     expect(world.logged).to.have.lengthOf(heard)
   })
@@ -395,9 +395,9 @@ describe("a key deriver's bytes", () => {
     const vault = await world.openUnlocked('pw')
     await vault.lock()
     const header = headerOf(propsOf(world).passphrase)
-    const mistyped = await PassphraseProving.seal(vault, header, 'wrong')
+    const mistyped = await PassphraseProving.seal(vault, header, 'wrong', { gating: StandingGating })
     await TH.expectRefusal(mistyped.checkWayin(), 'wrong_passphrase')
-    const proven = await PassphraseProving.seal(vault, header, 'pw')
+    const proven = await PassphraseProving.seal(vault, header, 'pw', { gating: StandingGating })
     await proven.checkWayin()
     expect(handed.length).to.be.greaterThanOrEqual(3)
     for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.be.true }
@@ -446,7 +446,7 @@ describe("PassphraseProving.seal, the passphrase", () => {
   it("refuses anything but text as bad_option, a passkey's answer among it", async () => {
     const { vault, props } = await lockedWorld()
     for (const given of [42, null, undefined, await TH.passkeyOf('laptop')]) {
-      await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), given as unknown as string), 'bad_option')
+      await TH.expectRefusal(PassphraseProving.seal(vault, headerOf(props.passphrase), given as unknown as string, { gating: StandingGating }), 'bad_option')
     }
   })
 
@@ -458,14 +458,14 @@ describe("PassphraseProving.seal, the passphrase", () => {
     const header = headerOf(propsOf(world).passphrase)
     derivations.mockClear()
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
-      await TH.expectRefusal(PassphraseProving.seal(vault, header, blank), 'wrong_passphrase')
+      await TH.expectRefusal(PassphraseProving.seal(vault, header, blank, { gating: StandingGating }), 'wrong_passphrase')
     }
     expect(derivations).not.toHaveBeenCalled()
   })
 
   it("takes the passphrase as typed, spaces and all: a padded one does not open the wayin its bare words sealed", async () => {
     const { vault, props } = await lockedWorld()
-    const padded = await PassphraseProving.seal(vault, headerOf(props.passphrase), '  pw  ')
+    const padded = await PassphraseProving.seal(vault, headerOf(props.passphrase), '  pw  ', { gating: StandingGating })
     await TH.expectRefusal(padded.checkWayin(), 'wrong_passphrase')
   })
 })
@@ -474,7 +474,7 @@ describe("PasskeyProving.seal, the key", () => {
   it("is HKDF over the answer's bytes with the header's wayin ctx as its info, and over no other info", async () => {
     const { vault } = await lockedWorld()
     const { prfBytes } = await TH.passkeyOf('laptop')
-    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     const ctx = wayinCtxOf(vault, vault.vault_tok, proving.header)
     const wrapped = await proving.wrappedWith(await makeVaultKey(), proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
@@ -510,10 +510,10 @@ describe("checkedPasskeyAnswer", () => {
   it("refuses an answer already used, its bytes zeroed, as bad_option, as its third example shows", async () => {
     const { vault } = await lockedWorld()
     const usedAnswer = await TH.passkeyOf('laptop')
-    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer)
+    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating })
     const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(usedAnswer), 'bad_option')
     expect(err.message).to.include('used already')
-    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer), 'bad_option')
+    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating }), 'bad_option')
   })
 
   it("refuses a misshapen answer as bad_option, quoting none of it", async () => {
@@ -554,15 +554,15 @@ describe("checkFreshSalt", () => {
 describe("a proving's secret", () => {
   it("shows in no JSON: toJSON is the slotlabel alone, as the Proving's second example shows", async () => {
     const { vault, props } = await lockedWorld()
-    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2')
+    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2', { gating: StandingGating })
     expect(JSON.stringify(passphrase)).to.eq('{"slotlabel":"passphrase"}')
-    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     expect(JSON.stringify(passkey)).to.eq('{"slotlabel":"passkey"}')
   })
 
   it("is in no key, spread or log line: neither the passphrase nor the wayinKey made of it", async () => {
     const { vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2')
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'hunter2-hunter2', { gating: StandingGating })
     const spread = Object.fromEntries(Object.entries(proving))
     expect(JSON.stringify(spread)).to.not.include('hunter2')
     expect(Object.values(proving).some((val) => val instanceof CryptoKey)).to.be.false
@@ -572,7 +572,7 @@ describe("a proving's secret", () => {
 
   it("holds no passkey answer bytes in a key, a spread or a log line", async () => {
     const { vault } = await lockedWorld()
-    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     expect(Object.values(proving).some((val) => val instanceof Uint8Array || val instanceof CryptoKey)).to.be.false
     expect(inspect(proving, { depth: 4 })).to.not.include('Uint8Array')
     expect(inspect(proving, { depth: 4 })).to.not.include('CryptoKey')
@@ -580,15 +580,15 @@ describe("a proving's secret", () => {
 
   it("holds its vault, not enumerable, so a proving serializes in no circle", async () => {
     const { vault, props } = await lockedWorld()
-    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
+    const proving = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
     expect(proving.vault).to.eq(vault)
     expect(Object.keys(proving)).to.not.include('vault')
   })
 
   it("cannot be written over: a proving is frozen", async () => {
     const { vault, props } = await lockedWorld()
-    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw')
-    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'))
+    const passphrase = await PassphraseProving.seal(vault, headerOf(props.passphrase), 'pw', { gating: StandingGating })
+    const passkey = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
     expect(Object.isFrozen(passphrase)).to.be.true
     expect(Object.isFrozen(passkey)).to.be.true
     for (const field of ['slotlabel', 'vault_tok', 'vault', 'header', 'gating']) {

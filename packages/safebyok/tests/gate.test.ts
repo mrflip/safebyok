@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../src/gate'
-import { PassphraseProving } from '../src/proving'
+import { PassphraseProving, StandingGating } from '../src/proving'
 import { GatedVaultProps } from '../src/types'
 import * as TH from './test-helpers'
 import { makeWorld, storedVaultPropsOf } from './vault/world'
@@ -15,7 +15,7 @@ const gatedWorld = async () => {
 describe("Gate.make", () => {
   it("builds a novel vault's first gate at epoch 1 on no base, as its first example shows", async () => {
     const vault = await makeWorld().open()
-    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw')
+    const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
     const gate = Gate.make(vault, { base: null, ...await proving.sealWayins() })
     expect(gate).to.include({ gate_epoch: 1, base_epoch: 0, vault_tok: vault.vault_tok })
     expect(gate.passkey).to.be.null

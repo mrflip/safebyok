@@ -345,6 +345,57 @@ describe("a lock or a decline landing during an attempt", () => {
     expect(await world.getLease()).to.be.null
   })
 
+  for (const [flavor, blurb] of [['unlock', 'an unlock'], ['change', 'a change to the ways in']] as const) {
+    it(`refuses ${blurb}'s attempt gating_landed, never the device store's refusal nor success, when a lock lands while grantLease writes the lease and the device store then fails`, async () => {
+      const world = makeWorld()
+      const dialog = TH.heldDialog()
+      const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+      const calling = flavor === 'unlock' ? vault.tryEnsureUnlocked() : vault.tryPutWayin('passphrase')
+      const gating = await dialog.asked()
+      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+      const writing = TH.holdNextCall(world.deviceDB, 'putLease')
+      const attempting = flavor === 'unlock' ? TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw') : TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw two')
+      await writing.reached
+      await vault.lock()
+      writing.release()
+      await TH.expectBad(attempting, 'gating_landed')
+      await TH.expectBad(calling, 'vault_locked')
+      expect(vault.state).to.eq('locked')
+      expect(world.logged.filter((heard) => heard.level === 'warn')).to.have.lengthOf(0)
+    })
+  }
+
+  it("refuses an attempt gating_landed, never unexpected_error, when a lock lands while the key deriver works and the deriver then throws", async () => {
+    const keyDeriver: KeyDeriver = { ...TH.testDeriver }
+    const world = makeWorld({ keyDeriver })
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
+    vi.spyOn(keyDeriver, 'deriveKeyBytes').mockRejectedValueOnce(new Error('out of memory deriving pw'))
+    const deriving = TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
+    const attempting = gating.attemptPassphrase('pw')
+    await deriving.reached
+    await vault.lock()
+    deriving.release()
+    await TH.expectBad(attempting, 'gating_landed')
+    await TH.expectBad(ensuring, 'vault_locked')
+  })
+
+  it("resolves an attempt with what its gating settled with, never success, when a lock lands as the lease is held: vault_locked, and the vault locked", async () => {
+    const world = makeWorld()
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
+    // A listener that locks the moment the vault shows unlocked: inside holdLease, before the chain returns.
+    const unsubscribe = vault.subscribe(() => { if (vault.state === 'unlocked') { void vault.lock() } })
+    await TH.expectBad(gating.attemptPassphrase('pw'), 'vault_locked')
+    unsubscribe()
+    await TH.expectBad(ensuring, 'vault_locked')
+    expect(vault.state).to.eq('locked')
+  })
+
   it("leaves a deletion whose own write a read finds landed, before it answered, to settle by its chain: lockLanded stays unsettled, so a dialog closing on it declines nothing, and del() resolves", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
