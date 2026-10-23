@@ -382,6 +382,19 @@ describe("bank.delDamagedVault", () => {
     expect(standing.state).to.eq('novel')
   })
 
+  it("keeps the refused entry when storage refuses the delete 'storage_unavailable': a second call deletes, and the next ensureVault births a new life, novel", async () => {
+    const world = await damagedVaultWorld()
+    const bank = bankIn(world)
+    await TH.expectRefusal(bank.ensureVault(U1), 'damaged_vault')
+    vi.spyOn(world.vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
+    await TH.expectRefusal(bank.delDamagedVault(U1), 'storage_unavailable')
+    expect(bank.entryOf(U1)?.status).to.eq('refused')
+    await bank.delDamagedVault(U1)
+    expect(bank.entryOf(U1)).to.be.null
+    const reborn = await bank.ensureVault(U1)
+    expect(reborn.state).to.eq('novel')
+  })
+
   it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_label'", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
