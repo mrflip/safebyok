@@ -1,5 +1,6 @@
 import { VaultError } from './errors'
-import type { GatedVaultProps } from './types'
+import { stableJsonify } from './stable-jsonify'
+import { type GatedVaultProps, type VaultProps, isGated } from './types'
 import type { Vault } from './vault'
 import { type PasskeyWayin, type PassphraseWayin, Wayin, type WayinVault } from './wayin'
 
@@ -17,7 +18,7 @@ export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | 
 
 /** A vault's ways in, frozen, at one `gate_epoch`, built on the gate at `base_epoch`, one below it.
  * Its demand ({@link Vault.demandConsistentWith} handed the gate) asks that the gate in hand is
- * its base, or is itself, as once it is stored. A spread, JSON or a log line shows its stamp and
+ * its base, or is itself ({@link Gate.isHeldBy}), as once a read took it after it was stored. A spread, JSON or a log line shows its stamp and
  * its wayins' visible fields.
  *
  * @example const next = Gate.make(vault, { base: Gate.of(vault, vaultProps), passphrase: wayin, passkey: null })
@@ -76,6 +77,16 @@ export class Gate {
       passphrase: Wayin.make(vault, vaultProps.vault_tok, vaultProps.passphrase),
       passkey:    vaultProps.passkey === null ? null : Wayin.make(vault, vaultProps.vault_tok, vaultProps.passkey),
     })
+  }
+
+  /** True when `vaultProps` hold this gate: its epoch, and each of its wayins' records.
+   *
+   * @example Gate.of(vault, vaultProps).isHeldBy(vaultProps)   // true
+   */
+  isHeldBy(vaultProps: VaultProps): boolean {
+    if (! isGated(vaultProps)) { return false }
+    const { gate_epoch, passphrase, passkey } = vaultProps
+    return stableJsonify({ gate_epoch, passphrase, passkey }) === stableJsonify(this.storedFields)
   }
 
   /** The gate's fields as the stored vault props hold them, flat: its epoch and each wayin's record. */

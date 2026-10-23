@@ -1184,9 +1184,7 @@ export class Vault {
       && (thing.vaultlabel ?? this.#scope.vaultlabel) === this.#scope.vaultlabel
     if (! sameScope || thing.vault_tok !== held.vault_tok) { return remadeError() }
     if (thing instanceof Proving) { return this.#provingInconsistency(thing as Proving) }
-    if (thing instanceof Gate) {
-      return thing.base_epoch === held.gate_epoch || thing.gate_epoch === held.gate_epoch ? null : gateMovedError()
-    }
+    if (thing instanceof Gate) { return thing.base_epoch === held.gate_epoch || thing.isHeldBy(held) ? null : gateMovedError() }
     if ((thing.gate_epoch ?? held.gate_epoch) !== held.gate_epoch || (thing.vault_epoch ?? held.vault_epoch) > held.vault_epoch) { return gateMovedError() }
     return null
   }
@@ -1366,12 +1364,7 @@ export class Vault {
     const drafted = frozenVaultProps({ ...held, vault_epoch: held.vault_epoch + 1, ...gate.storedFields })
     const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
     this.#demandAfterWait(written, gate, { call })
-    if (! written.ok) {
-      if (gate.base_epoch > 0 || ! isGateMadeElsewhere(written.err, gate.vault_tok)) { throw strippedOfStoredProps(written.err) }
-      // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
-      this.#readAt = FarPast
-      throw gateMadeElsewhereError()
-    }
+    if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
     const next = frozenVaultProps(written.val) as GatedVaultProps
     const stored = Gate.of(this, next)
     this.#demand(stored, { call })
@@ -1379,6 +1372,25 @@ export class Vault {
     this.#takeOwnWrite(next)
     await this.#raiseRecordAfter(next.vault_epoch, call)
     return stored
+  }
+
+  /** What a refused write of `gate` refuses with, as storage's refusal `err` shows what stands.
+   * Another `vault_tok` standing, or none, is the vault made anew or deleted elsewhere: the Vault
+   * object goes for good, as a refresh finding it so does ('vault_remade', 'vault_gone'). A first
+   * gate losing to another device's is 'gate_made_elsewhere', and the next hello reads the gate that
+   * stands. Any other stale write is 'stale_write', naming nothing stored.
+   */
+  #gateWriteRefusal(gate: Gate, err: VaultError): unknown {
+    const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
+    if (winner !== undefined && winner?.vault_tok !== gate.vault_tok) {
+      const told = winner === null ? goneError() : remadeError()
+      this.#letGo(told)
+      return told
+    }
+    if (gate.base_epoch > 0 || ! isGateMadeElsewhere(err, gate.vault_tok)) { return strippedOfStoredProps(err) }
+    // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
+    this.#readAt = FarPast
+    return gateMadeElsewhereError()
   }
 
   /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease. */
