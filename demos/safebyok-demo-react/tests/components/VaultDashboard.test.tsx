@@ -60,6 +60,8 @@ describe("VaultDashboard, opening", () => {
 
   it("says a vault deleted elsewhere was deleted, storing no new one until the user asks for it", async () => {
     const world = TH.makeWorld()
+    // Given its passphrase on another device: deleting a vault is proven by it.
+    await world.seed({})
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/No boxes yet/)
     const elsewhere = await world.open()
