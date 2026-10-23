@@ -83,8 +83,8 @@ rules* 3).
 | 8 | proving_gate | filed, stacked on #259 | #260 |
 | 9 | gating | filed, stacked on #260 | #261 |
 | 9b | gating_followups | filed, stacked on #261 | #262 |
-| 9c | core_cleanups | building, on #262 | |
-| 11 | docs (core half) | building, on #262 | |
+| 9c | core_cleanups | in review, on #262 | #264 |
+| 11 | docs (core half) | filed, stacked on #262 | #263 |
 | 10 | react | planned | |
 | 12 | route_meta | filed, beside the line | #252 |
 

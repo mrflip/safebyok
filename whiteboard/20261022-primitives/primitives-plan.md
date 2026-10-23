@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); threads 9c (core_cleanups) and 11 (docs, core half) building beside each other on #262. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 filed (#258, stacked on #256); thread 7b filed (#259, stacked on #258); thread 8 filed (#260, stacked on #259); thread 9 filed (#261, stacked on #260); thread 9b filed (#262, stacked on #261); the whole-line core review done (`core-line-review.md`: the redesign works, with gaps, fixed in 9b); thread 11's core half filed (#263, stacked on #262); 9c (core_cleanups, #264, beside it on #262) in review. *The Coach (2026-10-23, 03:29 UTC):* pause at about 06:00 UTC, and put the core before React: after 9b come the line review's core fixes and thread 11's core docs; thread 10 (react) waits until after the pause; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -610,7 +610,7 @@ both with the correctable-kinds row. Word the decline by gating kind (`declinedE
 joins across calls feel (the Coach's audit 5 worry; three rows in Open Matters). From #259 (the
 Coach took the Rec): demo tests for the dashboard's "Start a new vault" and "Accept this copy".
 
-### 11. docs
+### 11. docs, core half filed ([#263](https://github.com/mrflip/safebyok/pull/263))
 
 *Orchestrator (2026-10-23):* run before 10, core and repo-wide docs only, per the Coach's core-first order; safebyok-react's docs go with thread 10.
 
@@ -660,6 +660,13 @@ thread 9 (#261): `getBox`, `getWhisper` and `useWhisper` refuse `vault_locked` w
 mid-read (the Coach's ruling on #254; the README and doc blocks already say so); a decline is no
 lock (README has it); `del()` needs the passphrase and refuses `absent_vault` on a novel vault;
 the new kinds `attempt_in_flight`, `passphrase_required`, `same_passphrase`.
+
+*Review (core half):* **fixed** (sonnet). Three doc drifts fixed (the `Intl` hint would format
+`FarFuture`; `hello()` is not always a fresh read; "proof" and a "relocks this device" line left in
+the core README). Left: two TODO paraphrases (*Lock timing*'s added test line; the badge "locks and
+signs out" where the Coach said "logs out"). The worker wrote a new *Contract, primitives* tab in
+the design doc beside the old *Contract* tab (Open Matters). Still to do: safebyok-react's docs
+(with thread 10), and the README lines 9c's PR lists under "For thread 11".
 
 ### 12. route_meta
 
