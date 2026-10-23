@@ -117,6 +117,19 @@ describe("vaultResolvers, in a host's schema", () => {
   })
 })
 
+describe("vaultResolvers, reading a box", () => {
+  it("answers a box read in the vault it names with the box, and crosses one naming another vault as vault_mismatch, its kind alone", async () => {
+    const db = await TH.emptyDatabase()
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
+    const read = await asked(TH.schemaOver(db), VaultOperations.safebyokGetBox, { scope: u1, boxlabel: 'openai', expected: { vault_tok: 'vault-tok-u1' } })
+    expect(read).to.deep.equal({ data: { safebyokGetBox: TH.boxOf('openai', 'r1') } })
+    const remade = await asked(TH.schemaOver(db), VaultOperations.safebyokGetBox, { scope: u1, boxlabel: 'openai', expected: { vault_tok: 'vault-tok-gone' } })
+    expect(remade.data).to.deep.equal({ safebyokGetBox: null })
+    expect(remade.errors?.map((err) => err.extensions)).to.deep.equal([{ kind: 'vault_mismatch' }])
+  })
+})
+
 describe("vaultResolvers, deleting a vault", () => {
   it("answers the tombstone it leaves, and takes an expectation that leaves out its null gate_epoch as the damaged path's, which names the vault_tok alone", async () => {
     const db = await TH.emptyDatabase()

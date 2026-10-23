@@ -72,7 +72,7 @@ export const hostThrewRefusal = (thrown: unknown): VaultError => (
 
 /** True for a value shaped as an {@link Outcome}: an answer handed up still wrapped, since a stored record never is one.
  *
- * @example isOutcomeShaped(await inner.getBox(scope, boxlabel))  // true: the caller forgot valOf
+ * @example isOutcomeShaped(await inner.getBox(scope, boxlabel, expected))  // true: the caller forgot valOf
  */
 export const isOutcomeShaped = (candidate: unknown): boolean => (
   typeof candidate === 'object' && candidate !== null && typeof (candidate as { ok?: unknown }).ok === 'boolean' && ('val' in candidate || 'err' in candidate)
@@ -82,8 +82,8 @@ export const isOutcomeShaped = (candidate: unknown): boolean => (
  *
  * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
  * @example
- *   protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
- *     return valOf(await this.inner.getBox(scope, boxlabel))
+ *   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+ *     return valOf(await this.inner.getBox(scope, boxlabel, expected))
  *   }
  */
 export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {

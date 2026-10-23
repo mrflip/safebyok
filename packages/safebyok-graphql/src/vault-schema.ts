@@ -153,6 +153,14 @@ input SafebyokVaultPropsExpectationInput {
 }
 
 """
+What a box read was meant for: it reads the box only while the vault has that vault_tok, and
+is refused as vault_mismatch otherwise, the vault deleted or made anew since the reader read it.
+"""
+input SafebyokBoxGetExpectationInput {
+  vault_tok:    String!
+}
+
+"""
 What a box write was written for and read: it lands only while the vault has that vault_tok,
 and the box that revision_tok, or, for a null revision_tok, while there is no box there.
 """
@@ -236,8 +244,8 @@ type SafebyokPutBoxAnswer {
 type Query {
   """The vault's props and every box, read in one step, or null when the vault has never been made."""
   safebyokGetVault(scope: SafebyokVaultScopeInput!): SafebyokVault
-  """One box, or null when there is none under that boxlabel."""
-  safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!): SafebyokBox
+  """One box, or null when there is none under that boxlabel, read only while the vault is the one expected."""
+  safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxGetExpectationInput!): SafebyokBox
   """How full the vault is, as its storage reckons it; nothing used for a vault never made."""
   safebyokGetCapacity(scope: SafebyokVaultScopeInput!): SafebyokCapacity!
 }

@@ -37,10 +37,10 @@ describe("VaultProvider", () => {
     // One hour, 3,600,000 ms, after the clock's time.
     expect(vault.getSnapshot().askPassphraseAt).to.eq(ClockMillis + 3_600_000)
     // 'sk-fake' is nine bytes of JSON, one over the limit given.
-    await TH.expectRefusal(vault.putBox('anthropic_api_key', 'sk-fake'), 'whisper_too_large')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake'), 'whisper_too_large')
     // One box fills the vault: a second is refused for room.
-    await vault.putBox('openai_api_key', 'sk')
-    await TH.expectRefusal(vault.putBox('mistral_api_key', 'sk'), 'vault_full')
+    await vault.putBox({ boxlabel: 'openai_api_key' }, 'sk')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'mistral_api_key' }, 'sk'), 'vault_full')
   })
 
   it("passes the validators through, reopening for a changed check but not for a bag rebuilt around the same ones", async () => {
@@ -55,7 +55,7 @@ describe("VaultProvider", () => {
     const { rerender } = render(tree(AnyTextValidators.boxlabel))
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.putBox('Anthropic API key', 'sk-fake')
+    await first.putBox({ boxlabel: 'Anthropic API key' }, 'sk-fake')
     rerender(tree(AnyTextValidators.boxlabel))
     expect(latest().vault).to.eq(first)
     // Another schema, a narrower one: a new check, so a new vault handle, which lists what is
@@ -199,7 +199,7 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
     expect(vault.getSnapshot().state).to.eq('absent')
     // The next call asks the user to choose a passphrase for the new vault.
-    const storing = vault.tryPutBox('anthropic_api_key', 'sk-new-fake')
+    const storing = vault.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-new-fake')
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     fireEvent.click(screen.getByText('Create vault'))

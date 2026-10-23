@@ -54,7 +54,7 @@ export const vaultPropsRefusalOf = (standing: unknown, expected: VaultPropsExpec
   vaultPropsMeets(standing, expected) ? null : Refusals.staleVaultProps(livePropsOf(standing))
 )
 
-/** True when the vault props standing are `expected`'s vault, at any epoch: what a box deletion, and a box write's vault half, compare.
+/** True when the vault props standing are `expected`'s vault, at any epoch: what a box read, a box deletion, and a box write's vault half, compare.
  * Vault props that show no `gate_epoch` fail.
  *
  * @example Expectations.vaultMeets(standing, { vault_tok: 'v1' })

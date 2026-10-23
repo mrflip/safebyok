@@ -87,7 +87,7 @@ describe("the README Yoga recipe", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     await vault.unlock('correct horse battery staple')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })

@@ -17,7 +17,8 @@ Three layers share the work, and each guarantee below belongs to one of them.
   it, and writes with an expectation of what it read. When storage refuses the write as stale, or
   as `vault_mismatch`, it catches up with storage once and refuses the store as `stale_write` (or
   `vault_locked`, when the catch-up relocks it), never trying again: what
-  the other device wrote or deleted stands, and the host hears that its write lost. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
+  the other device wrote or deleted stands, and the host hears that its write lost. A box read
+  that storage refuses as `vault_mismatch` (line 2.5) reaches the host as it came. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
@@ -199,6 +200,19 @@ finds them by its `ON CONFLICT`, which reads the row as it stands then, while it
 of the statement's start, filtered to those props' `vault_tok`: in that race the listing may lag
 the props by the boxes written meanwhile, and never names another vault.
 
+**2.5. A box is read only in the vault it lies in.** `getBox` names the vault its reader holds a
+key for, by its `vault_tok`, and hands back the box under the boxlabel, or null where none stands,
+only while the scope's standing vault props have that `vault_tok`. Where they do not -- none stand,
+a tombstone does (line 3.5), or another `vault_tok`'s, the vault deleted and made anew -- it refuses
+as `vault_mismatch`, reading nothing more and carrying nothing of the vault props that stand. So a
+box from another life of the scope never reaches a reader holding the key of this one, where it
+would fail to open and look damaged: the reader hears instead that its vault is gone. The vault
+props and the box are read in one atomic step, as a box write compares them (line 3.3): one
+statement (Postgres, the vault row joined to the box), one query (Convex, and over GraphQL the
+server's own step), one IndexedDB transaction, or one synchronous turn (`localVaultDB`). The
+adapter throws `Refusals.vaultMismatch()` from that step, and a key-value store reads both rows
+and asks `Expectations.vaultMeets`.
+
 ## 3. Versioned writes
 
 **3.1. Vault props are created once.** `ensureVault` stores the vault props only where the scope
@@ -304,7 +318,7 @@ not delete the vault. In the same atomic step it leaves a **tombstone** in the s
 place, and resolves it: the scope and a `vault_epoch` one past the vault's (format
 `safebyok-tombstone-v1`). The tombstone holds no `vault_tok`, so it meets no expectation: every
 write over it refuses as over no vault (`stale_write` for the vault props and the vault, `vault_mismatch`
-for a box), a second `delVault` of the vault already deleted included, and `getVault` reads it as
+for a box, as does a box read), a second `delVault` of the vault already deleted included, and `getVault` reads it as
 no vault. Only `ensureVault` (line 3.1) replaces it, with a new life that carries its counter on. A
 key-value adapter keeps it in the row the vault props were in, so a scope holds one or the other;
 a typed one in a table of its own, moved in the same step. `Expectations.tombstoneOf` and
@@ -386,7 +400,7 @@ the start of the write's statement, say, or its commit.
 `VaultError`: `stale_write` (by resolving `null` from a deletion of a box or a vault, the base
 class refusing with it; a box write throws `Refusals.staleBox(standing)`, and an update of the
 vault props `Refusals.staleVaultProps(standing)`), `vault_mismatch`
-(a box write, `Refusals.vaultMismatch()`), `vault_full`,
+(a box write or read, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
 class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large`, `damaged_vault`,

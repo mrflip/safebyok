@@ -244,7 +244,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
       await vault.unlock(TH.RealPassphrase)
-      await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+      await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
@@ -273,7 +273,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The laptop makes the vault and stores a whisper; the phone hears of both.
     await laptop.unlock(TH.RealPassphrase)
-    await laptop.putBox('anthropic_api_key', anthropicKey, { sidecar: { note: 'work account' } })
+    await laptop.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, anthropicKey)
     await vi.waitFor(() => {
       expect(phone.getSnapshot().state).to.eq('locked')
       expect(phone.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
@@ -282,12 +282,14 @@ describe("a vault over convexVaultDB, on two devices", () => {
     // The phone unlocks and reads what the laptop wrote; what the deployment holds is ciphertext.
     await phone.unlock(TH.RealPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
-    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })
+    const standing = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
+    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vaultProps.vault_tok } })
+    expect(stored.read).to.be.true
     expect(JSON.stringify(stored)).to.not.include(anthropicKey)
     expect(JSON.stringify(stored)).to.not.include(TH.RealPassphrase)
 
     // The phone stores a second; the laptop hears it and reads it.
-    await phone.putBox('openai_api_key', openaiKey)
+    await phone.putBox({ boxlabel: 'openai_api_key' }, openaiKey)
     await vi.waitFor(() => {
       expect(laptop.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key', 'openai_api_key'])
     })

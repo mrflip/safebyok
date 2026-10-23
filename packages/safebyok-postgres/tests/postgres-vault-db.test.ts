@@ -116,8 +116,8 @@ describe("postgresVaultDB, as the README has it", () => {
     })
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
-    await first.putBox('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
+    await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
+    await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
     const second = await opened()
@@ -137,7 +137,7 @@ describe("postgresVaultDB, who may reach a vault", () => {
     ['getVault',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getVault(u2)],
     ['ensureVault', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.ensureVault(TH.gatelessOf('u2'))],
     ['putVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putVaultProps(TH.vaultPropsOf('u2'), { vault_tok: 'vault-tok-u2', gate_epoch: 1 })],
-    ['getBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic')],
+    ['getBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic', { vault_tok: 'vault-tok-u2' })],
     ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'one'))],
     ['delBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_tok: 'vault-tok-u2', revision_tok: null })],
     ['delVault',         (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })],
@@ -214,10 +214,10 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
       return vault
     }
     const owner = await opened(TH.requestFor(db, 'u1'))
-    await owner.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await owner.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     owner.close()
     const reader = await opened(postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), userId: 'u1' }))
-    await TH.expectRefusal(reader.putBox('openai_api_key', 'sk-test-not-a-real-key'), 'not_permitted')
+    await TH.expectRefusal(reader.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
     expect(reader.getSnapshot().state).to.eq('unlocked')
     expect(await reader.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     reader.close()
@@ -318,7 +318,7 @@ describe("postgresVaultDB, what it stores", () => {
       registered_at:          Date.UTC(2026, 9, 14),
       written_at:             Date.UTC(2026, 9, 14),
     }])
-    const read = await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
+    const read = await TH.expectingGood(vaultDB).getBox(u1, 'anthropic', TH.inThisVault)
     expect(read?.sidecar).to.deep.equal(sidecar)
     const queried = await db.query("SELECT sidecar->>'alpha' AS alpha FROM safebyok_boxes")
     expect(queried.rows).to.deep.equal([{ alpha: 'café' }])
@@ -330,7 +330,7 @@ describe("postgresVaultDB, what it stores", () => {
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     const refusal = await TH.expectBad(vaultDB.putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { note: 'nul\0here' } })), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(Error)
-    expect(await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')).to.be.null
+    expect(await TH.expectingGood(vaultDB).getBox(u1, 'anthropic', TH.inThisVault)).to.be.null
   })
 
   it("lists boxes without asking for their ciphered fields", async () => {
@@ -352,7 +352,7 @@ describe("postgresVaultDB, what it stores", () => {
     await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u1'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
-    await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
+    await TH.expectingGood(vaultDB).getBox(u1, 'anthropic', TH.inThisVault)
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-two'))).to.deep.equal({ outcome: 'deleted' })
     await TH.expectingGood(vaultDB).delVault(u1, { vault_tok: 'vault-tok-u1', gate_epoch: 2 })
     expect(spy.sent).to.have.lengthOf(8)
@@ -550,7 +550,7 @@ describe("postgresVaultDB, its box limit", () => {
     const higher = await filledTo(db, 1000, [])
     await TH.expectingGood(higher).putBox(u1, noBoxYet, TH.boxOf('mistral', 'sk-fake-three'))
     expect(await boxlabelsIn(vaultDB)).to.have.members(['openai', 'anthropic', 'mistral'])
-    const racer = await TH.expectingGood(vaultDB).getBox(u1, 'mistral')
+    const racer = await TH.expectingGood(vaultDB).getBox(u1, 'mistral', TH.inThisVault)
     expect(racer?.boxlabel).to.eq('mistral')
     await TH.expectBad(vaultDB.putBox(u1, noBoxYet, TH.boxOf('gemini', 'sk-fake')), 'vault_full')
     await TH.expectingGood(vaultDB).delBox(u1, 'openai', TH.deleting('rev-sk-fake-openai'))
@@ -587,12 +587,12 @@ describe("postgresVaultDB, its box limit", () => {
     })
     const here = await opened()
     await here.unlock('correct horse battery staple')
-    await here.putBox('openai', 'sk-fake-one')
+    await here.putBox({ boxlabel: 'openai' }, 'sk-fake-one')
     const there = await opened()
     await there.unlock('correct horse battery staple')
-    await there.putBox('anthropic', 'sk-fake-two')
+    await there.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')
     expect(here.getSnapshot().boxes).to.have.lengthOf(1)
-    const refusal = await TH.expectRefusal(here.putBox('mistral', 'sk-fake-three'), 'vault_full')
+    const refusal = await TH.expectRefusal(here.putBox({ boxlabel: 'mistral' }, 'sk-fake-three'), 'vault_full')
     expect(refusal.message).to.include('its storage keeps')
     here.close()
     there.close()
@@ -607,8 +607,8 @@ describe("postgresVaultDB, its box limit", () => {
     await TH.expectRefusal(TH.settledVault(optsFor(4)), 'bad_option')
     const vault = await TH.settledVault(optsFor())
     await vault.unlock('correct horse battery staple')
-    for (const boxlabel of ['one', 'two', 'three']) { await vault.putBox(boxlabel, `sk-fake-${boxlabel}`) }
-    const refusal = await TH.expectRefusal(vault.putBox('four', 'sk-fake-four'), 'vault_full')
+    for (const boxlabel of ['one', 'two', 'three']) { await vault.putBox({ boxlabel }, `sk-fake-${boxlabel}`) }
+    const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'four' }, 'sk-fake-four'), 'vault_full')
     expect(refusal.message).to.include('limit of 3 boxes')
     vault.close()
   })

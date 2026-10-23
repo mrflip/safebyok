@@ -4,12 +4,15 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
+import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord, type Stamp } from '../../src/types'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/local-vault-db'
 import type { VaultDB } from '../../src/vault-db'
-import { valOf } from '../../src/outcome'
+import { good, valOf } from '../../src/outcome'
+import { VaultError } from '../../src/errors'
+import { Lease, sealLeaseRecord } from '../../src/lease'
+import { registerLeaseReader } from '../../src/held-lease'
 
 
 /**
@@ -61,6 +64,55 @@ export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a proof, a box, a way in and a lease read. */
 export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
+
+/** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp and lease are the test's to change. */
+export type LeasedSlice = VaultSlice & {
+  stamp:                Stamp | null
+  lease:                Lease | null
+  demandConsistentWith: Vault['demandConsistentWith']
+  tryLock:              Vault['tryLock']
+  /** How many times something called `tryLock`: what a damaged lease does. */
+  locks:                number
+}
+
+/** A stand-in for `userId`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
+ * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
+ * stamped with its scope and `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted
+ * at its clock's time. Its demand is the vault's in small: no stamp is `vault_gone`; another scope
+ * or `vault_tok`, `vault_remade`; another
+ * `gate_epoch`, `gate_moved`; lease-bound, no lease or one ended by its clock, `vault_locked`. Its
+ * `tryLock` drops the lease and counts the call.
+ *
+ * @example const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
+ * @example const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
+ */
+export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
+  const base = vaultSliceOf(userId, testDeriver, overrides)
+  const vaultTok = base.vault_tok ?? `vault-tok-${userId}`
+  const slice: LeasedSlice = {
+    ...base,
+    stamp: Object.freeze({ applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, vault_epoch: 1, gate_epoch: 1 }),
+    lease: null,
+    locks: 0,
+    demandConsistentWith: (thing, opts) => {
+      const { stamp, lease } = slice
+      if (stamp === null) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
+      const sameScope = (thing.applabel ?? stamp.applabel) === stamp.applabel && (thing.user_id ?? stamp.user_id) === stamp.user_id && (thing.vaultlabel ?? stamp.vaultlabel) === stamp.vaultlabel
+      if (! sameScope || thing.vault_tok !== stamp.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
+      if ((thing.gate_epoch ?? stamp.gate_epoch) !== stamp.gate_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
+      if (opts?.leaseBound === true && (lease === null || lease.endsBy(slice.now()))) { throw new VaultError('vault_locked', 'The vault this test holds is locked.') }
+    },
+    tryLock: () => {
+      slice.locks += 1
+      slice.lease = null
+      return Promise.resolve(good(undefined))
+    },
+  }
+  slice.lease = Lease.make(slice, await sealLeaseRecord(slice, { vault_tok: vaultTok, gate_epoch: 1 }, vaultKey))
+  // A box and a lease read the lease the slice holds as they read a Vault object's.
+  registerLeaseReader(slice, () => slice.lease)
+  return slice
+}
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
@@ -317,6 +369,13 @@ export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | Damage
  * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
 export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
+
+/** What a box read in {@link vaultPropsOf}('u1')'s vault expects: that vault.
+ * Frozen, since every test shares it.
+ *
+ * @example vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
+ */
+export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
 
 /**
  * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault, at its first gate.

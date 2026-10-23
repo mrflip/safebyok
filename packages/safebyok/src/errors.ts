@@ -13,10 +13,11 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`.
+ *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `no_whisper`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
- *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `rolled_back`,
- *   `identity_revoked`.
+ *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
+ *   `rolled_back`, `identity_revoked`.
  *
  * Each kind's one-line meaning sits beside it below. These need more:
  *
@@ -67,12 +68,17 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   zero quota or a full disk); or no IndexedDB (`NotSupportedError`). A private window with room
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
- * * `vault_mismatch`: from a `VaultDB.putBox` called directly, a box sealed for vault props
- *   that no longer stand (the vault deleted, remade under another `vault_tok`, or its vaultKey
- *   replaced). Nothing was written, and the device that sealed it is out of date.
+ * * `vault_mismatch`: from a `VaultDB.putBox` or `VaultDB.getBox` called directly, a box
+ *   written or read under vault props that no longer stand (the vault deleted, remade under
+ *   another `vault_tok`, or its vaultKey replaced). Nothing was written or read, and the device
+ *   that expected them is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
  *   storage sees it. A vault reports the same as `bad_record`, since it built the box.
+ * * `vault_gone`, `vault_remade`, `gate_moved`: a call found the vault moved on from what it held,
+ *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
+ *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The
+ *   picture is already the new one: unlock again, or read the vault (`hello()`) and call again.
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
@@ -104,12 +110,17 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
+  'vault_mismatch',      // a box read's or write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
   'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
+  'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
+  'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
+  'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
+  'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
+  'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
 ] as const
 export type RefusalKind = typeof RefusalKindVals[number]
 
@@ -158,6 +169,11 @@ export const RefusalFamilyForKind = {
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   storage_blocked:     'condition',
+  vault_gone:          'condition',
+  vault_remade:        'condition',
+  gate_moved:          'condition',
+  damaged_lease:       'bad_news',
+  no_whisper:          'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** What a refusal learned, each fact under its own name, filled only by the refusals that name it.

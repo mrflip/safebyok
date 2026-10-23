@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -26,7 +26,7 @@ const served = new Map<string, Served>([
   ['getVault',         (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
   ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
   ['putVaultProps',    (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
-  ['getBox',           (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
+  ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
@@ -86,7 +86,7 @@ class RouteVaultDB extends VaultDB {
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
   protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
   protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
-  protected doGetBox(scope: VaultScope, boxlabel: string) { return this.call('getBox', scope, boxlabel) }
+  protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
@@ -183,7 +183,7 @@ describe("the README route recipe", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     await vault.unlock('correct horse battery staple')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })
@@ -195,7 +195,7 @@ describe("the README route recipe", () => {
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger }
     const vault = await TH.settledVault(opts)
     await vault.unlock('correct horse battery staple')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     session.userId = null
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')

@@ -300,7 +300,7 @@ describe("VaultProvider", () => {
       await screen.findByPlaceholderText('vault passphrase')
       const elsewhere = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
       await elsewhere.unlock('pw')
-      await elsewhere.putBox('openai_api_key', 'sk-also-fake')
+      await elsewhere.putBox({ boxlabel: 'openai_api_key' }, 'sk-also-fake')
       elsewhere.close()
       await waitFor(() => { expect(vault.getSnapshot().boxes).to.have.lengthOf(2) })
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
@@ -331,7 +331,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const other = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
       await other.unlock('pw2')
-      await other.putBox('anthropic_api_key', 'sk-other-fake')
+      await other.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-other-fake')
       other.close()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }

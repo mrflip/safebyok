@@ -1,26 +1,21 @@
-/** `task`, made to run one at a time: no two runs overlap, and each caller's run begins after it called.
- * Called while a run is under way, it hands back one more run, started once that one ends and
- * shared by every call made meanwhile. A run's failure is heard only by the callers that share it.
+/** `task`, made to run one at a time, joined: a call made while a run is under way shares that run, and starts none of its own.
+ * Every caller sharing a run settles as it settles, its failure included. A call made once it has
+ * ended starts a fresh run. So a run that began before a caller asked can serve it: a caller that
+ * needs a run begun after some event of its own awaits that run, then asks again.
  *
- * @returns A function asking for a run of `task`, settling as the run it is given settles.
+ * @returns A function asking for a run of `task`, settling as the run it joins settles.
  *
  * @example
  *   const refresh = oneAtATime(readStorage)
- *   await Promise.all([refresh(), refresh(), refresh()])  // readStorage ran twice: once at the first call, once for the other two
+ *   await Promise.all([refresh(), refresh(), refresh()])  // readStorage ran once, and all three shared it
  */
 export const oneAtATime = (task: () => Promise<void>): (() => Promise<void>) => {
-  // The run under way, and the one queued to run after it, which every call made meanwhile shares.
+  // The run under way, which every call made meanwhile shares.
   let running: Promise<void> | null = null
-  let queued: Promise<void> | null = null
 
-  const run = (): Promise<void> => {
-    if (running === null) {
-      running = runAlone()
-      return running
-    }
-    queued ??= runAfter(running)
-    return queued
-  }
+  // `task` begun inside a promise of its own, so a task that throws before its first await
+  // rejects like any other failure: `running` is then cleared only after it was set.
+  const begin = async () => { await task() }
 
   const runAlone = async () => {
     try {
@@ -30,20 +25,8 @@ export const oneAtATime = (task: () => Promise<void>): (() => Promise<void>) => 
     }
   }
 
-  // `task` begun inside a promise of its own, so a task that throws before its first await
-  // rejects like any other failure: `running` is then cleared only after it was set.
-  const begin = async () => { await task() }
-
-  /** A run once `ahead` has ended, however it ended: its failure is its own callers' to hear. */
-  const runAfter = async (ahead: Promise<void>) => {
-    try {
-      await ahead
-    } catch {
-      // see above
-    }
-    queued = null
-    await run()
+  return () => {
+    running ??= runAlone()
+    return running
   }
-
-  return run
 }

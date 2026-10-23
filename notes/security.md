@@ -41,6 +41,94 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (thread lease_box, branch `20261022-lease_box`, stacked on #253): **the Vault exposes its live `Lease`
+  as `vault.lease` (null when locked).** A host holding it can decipher any box ciphertext of this vault bound to
+  its visible fields while the vault is unlocked, which `getWhisper` already allows. The Lease keeps its record and
+  leaseKey in private fields, so `{ ...lease }`, `JSON.stringify` and a logger show only scope, `vault_tok`,
+  `gate_epoch` and the deadline. Amended 2026-10-22 (lease_box rework): **the Lease's public `record` getter is
+  removed.** A review found it handed out `lease_key` (non-extractable, but usable to `unwrapKey`) and
+  `vault_key_lease_wrapped`, so a holder of the Vault object could, through the public `vault.lease`, unwrap the
+  vaultKey extractable and export it. A Lease now yields its record through no getter, field, spread or JSON; the
+  vault puts the record that `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered
+  (amended 2026-10-22 (lease_box review): no file in `src/` calls the module-internal `leaseRecordOf(lease)`, which
+  only tests use and no package entry point exports). A test walks every field and getter reachable from an unlocked Vault object (its lease and snapshot
+  included) and finds no CryptoKey and no wrapped key. `box.record` still hands out the box's wrapped boxKey and
+  ciphered whisper, which is what storage holds. Same-origin code in a browser with the IndexedDB device store can
+  read the stored lease record directly, as before (amended 2026-10-22 (lease_box review): so can a host's own
+  `DeviceDB`, which is pluggable: its `putLease` and `getLease` are handed every lease record, `lease_key` and the
+  wrapped vaultKey included, as their job requires). Amended 2026-10-22 (box_seal): **`vault.lease` is no longer
+  public; the headline and the holder sentences above no longer hold.** The getter is removed and the Lease is the Vault
+  object's own again: a host reaches no Lease, and so cannot decipher a box ciphertext through one; what an app reads
+  of it is `vault.askPassphraseAt` (the deadline, from the snapshot) and `vault.leaseMillis`. The package reads the
+  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseReader(vault, read)`, called once
+  in the Vault constructor with the first registration winning, and `heldLeaseOf(vault)`, used by `Box.seal`,
+  `box.extractWhisper()` and a damaged lease dropping itself; exported from no entry point. The walk test above now
+  finds no Lease either. Each copy of the package has its own registry, so a Vault object from one copy reads as locked
+  to a Box of another.
+
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **storage is the ground truth, and the vault argues with none
+  of it: every call demands, synchronously and at each of its steps, that the vault still stands at the stamp of what
+  it holds.** A write storage refuses as stale is refused as it came (`stale_write`), and the vault reads nothing
+  after it: the old catch-up refresh is gone. Every thing the vault hands out (a box, a lease, a listing's entry)
+  carries the stamp it was made under, `{ scope, vault_tok, vault_epoch, gate_epoch }`, and
+  `vault.demandConsistentWith(thing)` refuses it as `vault_gone` (deleted), `vault_remade` (deleted and made anew),
+  `gate_moved` (a way in changed) or, for a thing bound to the lease, `vault_locked`. A call makes the demand
+  before and after each wait it holds; none of it is a repair, and none of it reads storage. A demand failure is
+  logged by its kind and the call only, never the thing's fields (`packages/safebyok/src/vault.ts`, *Vault:
+  demand*). Amended 2026-10-22 (box_seal): a box's stamp is no part of its record and is not authenticated; it is
+  non-enumerable on the Box object and read for this demand only (see the box ctx entry).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **`lock()` acts before it returns, and the device's erase of
+  the lease is issued last.** In order, with nothing awaited between: the lease in memory is dropped and its expiry
+  disarmed, a lease take-up under way is stood down, the prompt up (if any) is landed on, and the snapshot swaps to
+  locked; only then is the pantry's erase (`DeviceDB.delLease`) issued, and its promise is what `lock()` awaits
+  (`#lockNow`; `del()` locks through it too). Because a device store applies one scope's calls in the order made, a
+  lease write already issued by an unlock under way is erased behind it. The grant demands the vault's stamp and its
+  prompt immediately before and after that write, and no longer erases its own lease. Amended 2026-10-22 (box_seal):
+  **a lock stops a `putBox()` or `delBox()` at each wait named here, and not the write.** A `putBox()` refuses
+  `vault_locked`, writing nothing, when a lock lands while it waits on `getProof`, `VaultDB.getBox` /
+  `box.extractWhisper()`, or `Box.seal`; a `delBox()` when it lands while it waits on `getProof`. Once
+  `VaultDB.putBox` / `VaultDB.delBox` is sent a lock does not stop it: it lands or refuses as storage decides, and a
+  stale `putBox()` still refuses `stale_write` and never lands. (Amended 2026-10-22 (box_seal): this once said "at every
+  step before its write"; `#ensureUnlocked`'s pre-prompt hello and lease take-up are not among the named waits.)
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **drops are memory-only; only a lock erases the pantry's
+  lease.** The expiry at the deadline, `close()`, a demand that finds the lease ended, and a read that finds the
+  lease revoked (the pantry holding none or a newer one, the ways in changed, the vault deleted or made anew) each
+  drop the lease from memory and erase nothing, because an unconditional erase on a judgment could take another
+  tab's fresh lease. A lease left in the pantry that names an old `gate_epoch` or `vault_tok` is never taken up
+  (take-up checks both) and is discarded by the next take-up. `lock()` (and `del()`, which locks as it does) erases,
+  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a read older than the vault props in hand is ignored, never
+  judged, and a Vault object holding newer props does not notice storage rolled back beneath it.** A read of the
+  same `vault_tok` at a lower `gate_epoch` or `vault_epoch` (one served before this tab's own write and answered
+  after it) changes nothing and refuses nothing; the test runs before the device mark's rollback check, so it is
+  never a false `rolled_back`. Consequence: the Vault object keeps proving against the newer props it holds, so a
+  removed way in stays removed on it, and its writes of the gate expect the newer epoch and refuse as stale. A Vault
+  object made anew still refuses the older copy as `rolled_back`. Box writes expect no epoch and land in
+  rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a pantry read older than the lease in hand cannot revoke
+  it.** A refresh judges the pantry (this device's store of the lease) only when its read began at or after the
+  moment the lease in hand was granted or taken up, by the vault's clock, or when the pantry holds a lease newer than
+  the one in hand; otherwise a refresh in flight across this tab's own unlock (common on a first unlock over a
+  store that rings on its own writes) would re-lock the tab at once. Narrow cost: a lock in another tab landing in
+  the same clock millisecond as this tab's grant may be seen only at the next read.
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **a cancel landing while an attempt writes its lease leaves
+  that lease in the pantry.** A prompt ended (Cancel) after the attempt's last demand before the write does not
+  erase what the write stores: this tab stays locked in memory, and the next `ensureLease()` takes the lease up
+  without a prompt. A lock landing then erases it behind the write (previous entries). This is the sprint's
+  narrowing, "cancel declines this prompt only".
+* 2026-10-22 (primitives sprint, thread 5 (demand)): **the lease take-up keeps its own abort guard until the
+  gating owns it.** `ensureLease()` and the first hello take a stored lease up under an abort signal that `lock()`,
+  a grant and `close()` stand down, so a lock landing while the pantry is read is never undone by the take-up, which
+  installs nothing and discards no lease once stood down. It is the one guard kept from the old machinery, because
+  no demand can see a lock from a take-up that holds no lease; a later thread moves the pantry consult inside the
+  prompt's gating. Amended 2026-10-22 (lease_box): **a take-up no longer unwraps the lease.** A lease read from the
+  device store is taken up on its `vault_tok`, `gate_epoch` and deadline alone, without trying its wrap. A wrap that
+  will not open is found at the lease's first cipher or decipher, refused `damaged_lease` (bad news), and the vault
+  then drops that lease as `lock()` does (memory, prompt, and an erase from the device store), only when it is the
+  lease the vault holds now; a newer lease stands. Before, the take-up opened the wrap and discarded a damaged lease
+  with a warning. `sealLeaseRecord(vault, standing, vaultKey)` (internal; replaces `Lease.grant`) makes the record;
+  the vault writes it and makes its Lease from what the device store answered. The wayin still unwraps a
+  non-extractable `sessionKey` beside the extractable transient key; the `sessionKey` is now unused.
 * 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a deleted vault leaves a tombstone, and `vault_epoch`
   is the record of a life.** The vault props carry `vault_epoch`, a counter the store, never the writer, moves up
   by one on every write of the gate (`putVaultProps`) and on `delVault`; no box write moves it. `delVault` leaves
@@ -307,7 +395,7 @@ added or folded into through the subagent, and no other entry changes.
   read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
   aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
   nothing up and writes no lease (or, outrun only during its write, erases the lease it wrote:
-  amended 2026-10-21, thread b_fixes); the unlock refuses `vault_locked`. A race test in
+  amended 2026-10-21, thread b_fixes; amended 2026-10-22 (primitives sprint, thread 5 (demand)): it no longer erases, see the `lockLanded` entry); the unlock refuses `vault_locked`. A race test in
   `packages/safebyok/tests/vault/vault-races.test.ts` fails without the fix. Known residue, failing
   safe: a make stood down by the deletion of *another* device's vault refuses although its own vault
   stands (the next read takes it up, the next unlock opens it). Cross-device invalidation in general
@@ -336,7 +424,8 @@ added or folded into through the subagent, and no other entry changes.
   `vault_key_lease_wrapped`; each gave its full stored record before. Amended 2026-10-21
   (trust_lines): `Box`, `Wayin` and `Lease` keep their stored record once, privately, behind a
   `record` getter; their own enumerable fields are the visible ones only, and `toJSON()` is those
-  fields. Ciphertext, wrapped keys, a passphrase wayin's salt and the leaseKey are on no own field
+  fields. Amended 2026-10-22 (lease_box rework): `Lease` has no `record` getter; its record is reached by no
+  path in `src/` (amended 2026-10-22 (lease_box review): only tests call the module-internal `leaseRecordOf(lease)`; see the 2026-10-22 `vault.lease` entry at the top). Ciphertext, wrapped keys, a passphrase wayin's salt and the leaseKey are on no own field
   and in no JSON or log output, nor is the vaultKey an opened `Lease` holds.
 * 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
   The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
@@ -362,6 +451,8 @@ added or folded into through the subagent, and no other entry changes.
   `leaseMillis` being overwritable on the handle hold for the lease, the vault not being frozen; its
   deadline rests on the host's clock as read after construction (see the clock entry, amended). The
   granted lease keeps the vaultKey's session handle in a private field (see the B2 `lease` entry).
+  Amended 2026-10-22 (lease_box): `Lease.grant` is gone, replaced by the internal `sealLeaseRecord(vault, standing,
+  vaultKey)`, which makes the record; a lease no longer keeps any vaultKey handle (see the 2026-10-14 leaseKey entry).
 * 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
   crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
   the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
@@ -371,7 +462,7 @@ added or folded into through the subagent, and no other entry changes.
   bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
   the lease or its record is that key; amended 2026-10-21 (trust_lines): a granted or opened lease
   keeps the pair's non-extractable session handle, the vaultKey, in an ES private field, and none of
-  the extractable transient), and writes nothing: the vault puts `lease.record` (once `lease.props`)
+  the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): not a getter; once `lease.props`; amended 2026-10-22 (lease_box review): `#grantLease` puts the record `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered, and no file in `src/` calls `leaseRecordOf`, which only `tests/lease.test.ts` uses)
   through `deviceDB.putLease`. leaseCtx is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
   applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
   'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
@@ -394,7 +485,9 @@ added or folded into through the subagent, and no other entry changes.
   (trust_lines): the vault keeps only its lease, and locking drops it; the opened vaultKey lives
   only in the opened lease's private field and never leaves it: a box wraps and unwraps its boxKeys
   through `lease.wrapBoxKey` and `lease.unwrapBoxKey`, which refuse a lease not opened, or ended, as
-  `vault_locked`). **`DeviceDB`'s verbs
+  `vault_locked`; amended 2026-10-22 (lease_box): `Lease.grant`, `lease.tryOpen`, `wrapBoxKey` and `unwrapBoxKey` are
+  gone, and the Lease holds no vaultKey between calls: each `lease.cipheredWith` and `lease.decipherWith` unwraps it
+  for that call alone, see the 2026-10-14 leaseKey entry). **`DeviceDB`'s verbs
   (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
   `Outcome` and never reject.** `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
   failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause`, the message
@@ -672,6 +765,13 @@ added or folded into through the subagent, and no other entry changes.
   erases that lease (and so the one it overwrote), while the key already held in memory stays until
   its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
   the lease it wrote, so a hello that read that lease in between takes nothing up.
+  Amended 2026-10-22 (primitives sprint, thread 5 (demand)): `#grantLease` no longer erases a lease it wrote,
+  whether the prompt ended or the vault props moved during the write. The write is erased by a `lock()` landing
+  then (its erase is issued after the write, and the device store applies one scope's calls in order); a cancel
+  alone leaves the lease in the pantry, and the next `ensureLease()` takes it up without a prompt. A lease left for
+  vault props that have moved on is never taken up (take-up checks `gate_epoch` and `vault_tok`). So the
+  "erases the lease it just wrote" statements in this entry and in the `a_sec2` and `b_fixes` statements
+  about the grant no longer hold.
 * 2026-10-19 (thread A6, getproof); 2026-10-20 (placement): **`Ask`: one per prompt, with one shared answer, and its
   `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
   `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
@@ -868,7 +968,12 @@ added or folded into through the subagent, and no other entry changes.
   carries no record; it did until this change.) Two refusals split off what was `stale_write`.
   `vault_mismatch` (condition) is a box write whose vault props (`vault_id`, `vault_key_epoch`; amended 2026-10-21 (trust_lines): `vault_id` alone) no
   longer stand; it carries no meta, since vault props (salts, wrapped vaultKey) never ride on a
-  refusal (the a_sec2 ruling). `invalid_box` (misuse) is a box the base class would not build,
+  refusal (the a_sec2 ruling). Amended 2026-10-22 (lease_box): **a box read names the vault it expects**:
+  `VaultDB.getBox(scope, boxlabel, { vault_tok })` compares the standing vault props' `vault_tok` in the same atomic
+  step as the read (every adapter: local, IndexedDB, Convex component query, Postgres single statement, GraphQL field
+  argument) and refuses `vault_mismatch` for none, a tombstone, or another life. The vault maps it to `vault_gone`
+  and marks its picture stale so the next hello reads storage, rather than opening a box of a vault made anew
+  elsewhere and calling it `damaged_box`. `invalid_box` (misuse) is a box the base class would not build,
   refused before storage sees it, which the vault relabels `bad_record`; neither message quotes the
   box. `putBox` also took `opts.signal`: an abort before storage answers resolved
   `storage_unavailable` with the signal's reason as `cause`, and a write already sent might still
@@ -933,7 +1038,8 @@ added or folded into through the subagent, and no other entry changes.
   (2) **`hello()` is memoised.** Amended 2026-10-19 (20261019-softlock_gone): a lock is no longer
   kept from being undone on its handle by a later `hello()`; with the counter gone, a lease that a
   lock failed to erase (the device store threw) is taken up by the next `hello()` that reads afresh
-  on the same handle, not only at the next page load. What the rest of this point says of the
+  on the same handle, not only at the next page load (amended 2026-10-22 (primitives sprint, thread 5 (demand)): only the first hello, or
+  `ensureLease()`, takes a lease up). What the rest of this point says of the
   counter, and of a lock staying locked on its handle, describes what stood until then.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
@@ -984,11 +1090,12 @@ added or folded into through the subagent, and no other entry changes.
   read's failure shows in the snapshot only as `syncing: false` (and the logger's warning).
   Amended 2026-10-19 (20261019-fields_and_make, PR #197; amending point 1): **a `lock()` landing
   while a `hello()` takes up this device's lease is no longer undone.** A take-up (`#fetchLease`)
-  reads the lease record, checks it fits, unwraps the vaultKey under the leaseKey, then installs the
+  reads the lease record, checks it fits, unwraps the vaultKey under the leaseKey (amended 2026-10-22 (lease_box): no unwrap at take-up; the wrap is first tried at the lease's first cipher or decipher, see the take-up abort-guard entry above), then installs the
   key and deadline; as the default five-minute `staleMinutes` makes a routine `hello()` re-run it, a
   `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
   and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
-  `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
+  `AbortController` (amended 2026-10-22 (primitives sprint, thread 5 (demand)): a lock, a grant and `close()` stand it down; the expiry and other
+  drops no longer do); whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
   expiry timer and relocks; and `#grantLease`, as an unlock or wayin change begins writing its
   lease, before the write, so a take-up that read an older lease cannot erase the fresh one by
   discarding the older) aborts it. An aborted take-up installs nothing and discards no lease
@@ -1005,7 +1112,8 @@ added or folded into through the subagent, and no other entry changes.
   a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
   `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
   before any further await: it drops the key, stands down any take-up, and (for a different
-  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes. Before,
+  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes (amended 2026-10-22 (primitives sprint, thread 5 (demand)):
+  a read that finds the lease revoked drops it from memory and erases nothing). Before,
   it decided "outlived" first and assigned the new props only after awaiting `delLease` and
   `listBoxes`, so a take-up or an unlock's lease grant that finished inside those waits still saw the
   old props through `#outrun`, installed a key fitted to them, and was never relocked. A revocation
@@ -1251,7 +1359,14 @@ added or folded into through the subagent, and no other entry changes.
   `unwrapKey` with it, asking for an extractable result, and so recover the vaultKey's bytes; the
   non-extractable flag keeps the leaseKey, not the vaultKey, from being carried off. This is the
   power a lease grants, until `ask_passphrase_at` (see the 2026-10-17 entry on the non-extractable
-  vaultKey).
+  vaultKey). Amended 2026-10-22 (lease_box): **a `Lease` holds no unwrapped vaultKey between calls.** Each
+  `lease.cipheredWith(bytes, visible)` and `lease.decipherWith(ciphered, visible)` unwraps the vaultKey from the
+  lease record under the non-extractable leaseKey, as a non-extractable handle limited to `wrapKey` (cipher) or
+  `unwrapKey` (decipher), in a local of that one call, and drops it. A seal makes a fresh boxKey, wraps it under the
+  vaultKey and ciphers the whisper under the boxKey, both bound to a ctx rebuilt from the lease's scope, `vault_tok`
+  and every visible field of the box (byte-identical to the ctx before this change). The serialized whisper bytes
+  are zeroed after ciphering (in a `finally`) and after parsing on open; the whisper's JSON string cannot be zeroed
+  and is not kept. The earlier "held by the opened lease" statements above no longer hold.
 * 2026-10-14: a stored record that fails validation or AEAD verification is refused with kind
   `corrupt_record` and left in place -- remote data is never auto-deleted. A device-local
   lease that fails is the one exception: it is dropped, and the user asks again. Amended 2026-10-21
@@ -1642,7 +1757,8 @@ added or folded into through the subagent, and no other entry changes.
   versioned expectation (same `vault_id`, same `revision_tok` or none; amended 2026-10-21 (trust_lines): it once also had the
   same `vault_key_epoch`, a field now removed). On a
   `stale_write` refusal it catches up with storage once and throws `stale_write` (nothing written;
-  the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
+  the adapter's refusal is the `cause`; amended 2026-10-22 (primitives sprint, thread 5 (demand)): it reads nothing after the refusal, and the catch-up
+  outcomes that follow in this sentence no longer occur); a catch-up that relocks the device (vault reborn, or its
   wayins changed) throws `vault_locked` with nothing written, and one that fails throws as it came
   (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
   box deleted elsewhere is now just a stale write. So no whisper is sealed over what another device
@@ -2213,7 +2329,16 @@ added or folded into through the subagent, and no other entry changes.
   from `safebyok-lockbox-v5` to `safebyok-box-v6`, and the purpose string that binds a wrapped boxKey
   moved from `lockbox_key_wrapped` to `box_key_wrapped`. Both are still distinct from every other format
   tag and purpose string. A box stored under the old names fails schema validation before any
-  decryption is tried, and is listed as damaged.
+  decryption is tried, and is listed as damaged. Amended 2026-10-22 (box_seal, branch `20261022-box_seal`, stacked on
+  #254): **the box ctx's rule is named, "we sign all immutable fields" (the Coach).** Both of a box's encryptions
+  (`box_key_wrapped` under the vaultKey, `whisper_ciphered` under the boxKey) are bound, as additional data, to every
+  field of a box that never changes once first stored (the vault's scope and `vault_tok`, the boxlabel,
+  `registered_at`, the format, codec and schema version) and to every other visible field of the revision
+  (`revision_tok`, sidecar, `written_at`). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`); only
+  the doc blocks in `box.ts` now state the rule, and a later thread (8) applies it to wayins. The box's stamp (scope,
+  `vault_tok`, `vault_epoch`, `gate_epoch`, as the vault stood when the box was read or sealed) is no part of the
+  record and is not authenticated; it is non-enumerable on the Box object and read only for the vault's consistency
+  demand.
 * 2026-10-16 (locks_and_expiry); 2026-10-19 (20261019-softlock_gone): **the lease has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
@@ -2323,7 +2448,9 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-21 (fault_kinds): a box that will not open under the lease in hand is `damaged_box` at
   once, with no re-read first, its message saying to read again with `hello({ staleMinutes: 0 })` in
   case the vault was made anew on another device; such a vault shows first as `damaged_box`, then
-  relocks on a fresh `hello()`. The catch-up after a `stale_write` write is unchanged. A
+  relocks on a fresh `hello()`. The catch-up after a `stale_write` write is unchanged (amended 2026-10-22 (primitives sprint, thread 5 (demand)): it
+  is gone; a write storage refuses as stale is refused as it came and reads nothing after it, and a call racing a
+  deleted or remade vault refuses `vault_gone` or `vault_remade`, see the entry on demands). A
   catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
   and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
   queued), so two reads never interleave their snapshot updates. None retries: `putBox()`, a change
@@ -2709,7 +2836,18 @@ added or folded into through the subagent, and no other entry changes.
   reads clean; the function returns only a boolean and the deciphered whisper is dropped unread.
   Not taken: unwrapping only the old boxKey, whose AES-GCM additional data binds the whole
   header, would vouch for the header without deciphering the whisper, but a record with only its
-  whisper ciphertext altered would then carry its sidecar forward.
+  whisper ciphertext altered would then carry its sidecar forward. Amended 2026-10-22 (lease_box): `vault.putBox({
+  boxlabel, sidecar? }, whisper?)`. **Leaving out the whisper** reads the stored box, opens it under the lease
+  (deciphering the whisper into memory for the length of the call), and seals it again under a fresh boxKey and
+  revision, written over the revision read (a store expectation; a write landing between is `stale_write`).
+  **Leaving out the sidecar alone** also reads and opens the box, so a sidecar or `registered_at` altered in storage
+  is never sealed into a fresh, authenticated revision; a box that will not open is written over as new, keeping
+  nothing. **A whole put** (both given) reads nothing and adopts the listing's revision and `registered_at` as its
+  base (the Coach's ruling): the listing is not authenticated, so a `registered_at` altered in storage can be sealed
+  into the new revision on that path. `recordOpens` and `box.tryOpen` are gone. Amended 2026-10-22 (box_seal): this
+  is the one path that seals an unopened `registered_at`, an exception to the rule that a box's ctx signs all
+  its immutable fields (see the box ctx entry): a `registered_at` altered in storage would make the old revision
+  refuse to open, yet is authenticated into the new one. Whether to close it is open with the Coach.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **a write's
   catch-up passes `identity_revoked`, `rolled_back` and `newer_format` through unchanged.** When
   storage refuses a write as stale, the vault refreshes once; if that refresh fails with one of
@@ -2808,7 +2946,9 @@ added or folded into through the subagent, and no other entry changes.
   page under a strict Content-Security-Policy, and never load third-party script into a page that
   holds an unlocked vault. Amended 2026-10-21: the same holds while a lease stands on the device, the vault open or not:
   anyone who can use this browser profile can open the vault with the lease's leaseKey, and
-  `unwrapKey` can hand back the vaultKey extractable (the 2026-10-14 leaseKey entry above).
+  `unwrapKey` can hand back the vaultKey extractable (the 2026-10-14 leaseKey entry above). Amended 2026-10-22
+  (lease_box): the vault holds no vaultKey handle while it waits; one exists only inside a lease's cipher or decipher
+  call, and injected code can still reach the same operations through `vault.lease` or the vault's own API (amended 2026-10-22 (box_seal): `vault.lease` is gone, the Lease being the Vault object's own and read by the package through a module-private registry (see the 2026-10-22 `vault.lease` entry at the top), so those operations are reachable through the vault's own API alone; the next two amendments describe the getter that stood) (amended 2026-10-22 (lease_box rework): `vault.lease` yields no record, leaseKey or wrapped vaultKey, so those operations are cipher and decipher only, not `unwrapKey`; amended 2026-10-22 (lease_box review): that holds of `vault.lease` alone, a host's own pluggable `DeviceDB`, like same-origin IndexedDB, is handed every lease record, `lease_key` and the wrapped vaultKey included).
 * 2026-10-17 (thread sweep_small, [#143](https://github.com/mrflip/safebyok/pull/143)): **the Postgres README no longer ships a hard-cap trigger
   recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
   `safebyok_boxes` that refused a box past a hard limit, taking a transaction-scoped

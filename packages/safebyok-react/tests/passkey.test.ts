@@ -169,7 +169,7 @@ describe("a passkey unlock, end to end", () => {
   it("createPasskey's answer puts the vault's passkey, and askPasskey's opens the vault on another device, as their examples show", async () => {
     install()
     const { vault, open } = await vaultInMemory()
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const answer = await createPasskey(passkeyOpts)
     if (answer !== null) { await vault.putWayin('pw', answer) }
     expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credentialId)

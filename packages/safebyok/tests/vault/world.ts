@@ -121,7 +121,7 @@ export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'pass
 export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  await vault.putBox('anthropic', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   vault.close()
   world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
@@ -140,7 +140,7 @@ export const vaultWithPasskey = async () => {
   const world = makeWorld()
   const vault = await world.open()
   await vault.unlock('pw')
-  await vault.putBox('anthropic', 'sk-fake')
+  await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
   await addLaptopPasskey(vault)
   return { world, vault, laptop }
@@ -148,8 +148,8 @@ export const vaultWithPasskey = async () => {
 
 /**
  * A world whose slow waits can be held mid-flight, to land a lock inside an unlock: each
- * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, device-record
- * write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
+ * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, the answer of
+ * a lease write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
  * own copy of testDeriver, so a spy on it stays here.
  */
 export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
@@ -157,7 +157,8 @@ export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const world = makeWorld({ keyDeriver, ...defaults })
   const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVault')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
-  const holdNextLease = () => TH.holdNextCall(world.deviceDB, 'putLease')
+  // Held once the store has the lease: the device store applies one scope's calls in the order made.
+  const holdNextLease = () => TH.holdNextAnswer(world.deviceDB, 'putLease')
   const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'getBox')
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }

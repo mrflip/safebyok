@@ -11,7 +11,7 @@ import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
 import { type Outcome, isOutcomeShaped, outcomeOf, unexpectedError } from './outcome'
 
-// == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, ListedVault, VaultRecords
+// == [Expectations and records]: VaultPropsExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, ListedVault, VaultRecords
 
 /** What an update of the vault props was proven against: the vault, and the `gate_epoch` the writer read.
  * The update lands only while the standing vault props still have both. A `gate_epoch` of 0 is
@@ -24,6 +24,19 @@ export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
 const VaultPropsExpectation = Z.object({
   vault_tok:        GatedVaultProps.shape.vault_tok,
   gate_epoch:       Z.int().check(Z.nonnegative()),
+})
+
+/** The vault a box read means to read in: it finds the box only while the standing vault props have this `vault_tok`.
+ * Otherwise it refuses `vault_mismatch`, reading nothing more: none stand, a tombstone stands, or
+ * the vault was deleted and made anew under another `vault_tok`. So a box from another life of the
+ * scope is never handed to a reader holding the key of this one.
+ *
+ * @example { vault_tok: vaultProps.vault_tok }
+ */
+export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
+
+const BoxGetExpectation = Z.object({
+  vault_tok:    GatedVaultProps.shape.vault_tok,
 })
 
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
@@ -354,12 +367,22 @@ export abstract class VaultDB {
 
   // == [Box verbs]: getBox, putBox
 
-  /** The box under `boxlabel`, validated, or null when there is none. */
-  getBox(scope: VaultScope, boxlabel: string): Promise<Outcome<BoxRecord | null>> {
+  /** The box under `boxlabel`, validated, or null when there is none, read only while the standing vault props have `expected`'s `vault_tok`.
+   * The vault props and the box are read in one atomic step. Refuses `vault_mismatch`, reading
+   * nothing more, when the standing vault props are another vault's, or none stand (the vault
+   * deleted, or deleted and made anew): what the reader holds a key for is gone. A box that fails
+   * its checks refuses as `damaged_box`.
+   *
+   * @example
+   *   const { ok, val, err } = await vaultDB.getBox(scope, 'anthropic', { vault_tok: vaultProps.vault_tok })
+   *   if (! ok && err.refusalkind === 'vault_mismatch') { await reopen() }   // the vault was remade
+   */
+  getBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<Outcome<BoxRecord | null>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const label = heldBoxlabel(this, boxlabel)
-      const raw = await adapterAnswer('doGetBox', () => this.doGetBox(asked, label))
+      const expectation = checkOutgoing(BoxGetExpectation, expected, 'box read expectation', 'read')
+      const raw = await adapterAnswer('doGetBox', () => this.doGetBox(asked, label, expectation))
       if (raw === null || raw === undefined) { return null }
       return checkStoredBox(raw, label)
     })
@@ -617,8 +640,13 @@ export abstract class VaultDB {
    * `gate_epoch` back or leave it where it stands.
    */
   protected abstract doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown>
-  /** The stored box record under `boxlabel`, exactly as saved, or null when there is none. */
-  protected abstract doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown>
+  /** The stored box record under `boxlabel`, exactly as saved, or null for none, if, and only if, the standing vault props have `expected.vault_tok`.
+   * Compare the vault props in the same atomic step as the read of the box. Otherwise read
+   * nothing more, and throw `Refusals.vaultMismatch()` from that step: none stand, a tombstone
+   * stands, or another vault's. A key-value backend reads both rows and asks
+   * `Expectations.vaultMeets(standingVaultProps, expected)`.
+   */
+  protected abstract doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown>
   /** Store `box` under its boxlabel if, and only if, the standing vault props and box are those `expected` names.
    * That is vault props with `expected.vault_tok`, and the box at `expected.revision_tok`, or no box
    * for null, all compared in the same atomic step as the write. Once written, resolve the record as
@@ -759,7 +787,7 @@ const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
-const byCodeUnit = (one: string, two: string): number => {
+export const byCodeUnit = (one: string, two: string): number => {
   if (one === two) { return 0 }
   return one < two ? -1 : 1
 }
@@ -901,10 +929,11 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
   return parsed.data
 }
 
-/** A record or expectation a write verb was handed, once it is one this package builds: 'bad_record' otherwise.
- * The refusal leads with what was spared: nothing `written`, or for a delete, nothing `removed`.
+/** A record or expectation a verb was handed, once it is one this package builds: 'bad_record' otherwise.
+ * The refusal leads with what was spared: nothing `written`, for a delete nothing `removed`, or for
+ * a box read nothing `read`.
  */
-const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
+const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' | 'read' = 'written'): RecordT => checked(recordSchema, candidate, () => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
 ))
 

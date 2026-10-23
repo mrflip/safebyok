@@ -58,7 +58,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
     try {
       await vault.unlock(Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
-        await vault.putBox(boxlabel, whisper)
+        await vault.putBox({ boxlabel }, whisper)
       }
     } finally {
       vault.close()

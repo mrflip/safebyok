@@ -2,9 +2,9 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
-import type { ListedBox, PutBoxAnswer, PutVaultPropsAnswer } from './component/validators'
+import type { GetBoxAnswer, ListedBox, PutBoxAnswer, PutVaultPropsAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -122,8 +122,13 @@ class ConvexVaultDB extends VaultDB {
     throw Refusals.staleVaultProps(answer.vault_props_stored)
   }
 
-  protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return refusing(() => this.client.query(this.api.getBox, { scope, boxlabel }))
+  // The component answers a read whose vault props are not the ones expected from the query that
+  // read the box: the vault props and the box are one snapshot.
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+    const answer: unknown = await refusing(() => this.client.query(this.api.getBox, { scope, boxlabel, expected }))
+    if (! isGetBoxAnswer(answer)) { throw new VaultError('corrupt_record', ReadOutOfDateMessage) }
+    if (answer.read) { return answer.box_stored }
+    throw Refusals.vaultMismatch()
   }
 
   // The component answers why a write did not land, from the transaction that refused it; what
@@ -184,6 +189,17 @@ const storedBoxesOf = (rows: readonly Infer<typeof ListedBox>[]): StoredBox[] =>
 
 /** What a write answered in a shape this client does not know says: whose version to fix. */
 const OutOfDateMessage = "The vault's Convex functions answered a write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
+
+/** What a box read answered in a shape this client does not know says: whose version to fix. */
+const ReadOutOfDateMessage = "The vault's Convex functions answered a box read in a shape this version of safebyok-convex does not know, so nothing was read: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
+
+/** True when `answer` is a box read's answer as this version's component makes it: `read`, carrying the box or null, or a `vault_mismatch`. */
+const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof GetBoxAnswer> => {
+  if (typeof answer !== 'object' || answer === null) { return false }
+  const { read, refusalkind } = answer as { read?: unknown, refusalkind?: unknown }
+  if (read === true) { return 'box_stored' in answer }
+  return read === false && refusalkind === 'vault_mismatch'
+}
 
 /** True when `answer` is a box write's answer as this version's component makes it.
  * That is `landed`, and for a refusal its kind, each with the field that kind carries. What those

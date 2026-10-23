@@ -44,7 +44,7 @@ describe("localVaultDB", () => {
     }
     const vaultDB = localVaultDB({ store })
     expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
-    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
     expect(store.ckeys()).to.have.members(earlier)
   })
@@ -61,7 +61,7 @@ describe("localVaultDB", () => {
     const vaultDB = localVaultDB({ store })
     const summaries = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
     expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
-    const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai')
+    const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai', TH.inThisVault)
     expect(prev).to.deep.equal(emptied)
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: 'rev-two' }, emptied)
     expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
@@ -135,8 +135,9 @@ describe("localVaultDB", () => {
   it("hands a row that is not JSON up as its text, which reads back as damaged_box, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
+    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
     store.write(u1BoxCkey('anthropic'), 'SUPERSECRET{')
-    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
     expect(refusal.message).to.match(/did not read back in a shape this package knows/)
     expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
   })
@@ -156,8 +157,9 @@ describe("localVaultDB", () => {
     store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u2')))
     const elsewhere = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(elsewhere.message).to.match(/different app, user or vault/)
+    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
     store.write(u1BoxCkey('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
-    const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box'), 'damaged_box')
+    const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box', TH.inThisVault), 'damaged_box')
     expect(moved.message).to.match(/different boxlabel/)
   })
 })

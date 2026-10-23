@@ -199,10 +199,13 @@ describe("VaultProvider", () => {
       await expectShown('open error: storage_unavailable')
       const elsewhere = await TH.settledVault({ ...world.props, userId: 'u1', deviceDB: memoryDeviceDB() })
       await elsewhere.unlock('correct horse battery staple')
+      // A ring of a write after the vault was made: one rung during the make may be answered by a read begun before its last write.
+      await TH.wakeupAtNextTick()
+      await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake')
       await expectShown('locked')
     })
 
-    it("hands down a rolled_back that a later read met as openError, the vault sent back to opening, rather than sit at opening with none", async () => {
+    it("leaves the vault as it stands when a later read meets an older copy than the one in hand: the older is ignored, and no openError", async () => {
       const world = await madeWorld()
       const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
       const older = world.store.read(vaultPropsCkey) ?? ''
@@ -213,11 +216,14 @@ describe("VaultProvider", () => {
       const { Grab, latest } = grabber()
       render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
       await expectShown('locked')
-      // Storage hands back the older copy; the vault's watch reads it, refuses it, and opens again.
+      // Storage hands back the older copy; the vault's read ignores it, holding the newer.
       world.store.write(vaultPropsCkey, older)
-      await expectShown('open error: rolled_back')
-      expect(latest().openError).to.eq(latest().vault?.trouble)
-      expect(latest().vault?.state).to.eq('opening')
+      const shown = latest().vault
+      expect(shown).to.not.be.null
+      await act(async () => { if (shown !== null) { await TH.readAfresh(shown) } })
+      expect(latest().vault?.state).to.not.eq('opening')
+      expect(latest().openError).to.be.null
+      expect(latest().vault?.gate_epoch).to.eq(2)
     })
 
     it("a retry that fails again hands down the fresh error", async () => {

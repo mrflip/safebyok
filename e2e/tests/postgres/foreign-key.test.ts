@@ -43,6 +43,6 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('ROLLBACK')
     await TH.expectGood(write)
 
-    expect(await TH.expectingGood(device).getBox(u1, 'anthropic')).to.not.be.null
+    expect(await TH.expectingGood(device).getBox(u1, 'anthropic', TH.inThisVault)).to.not.be.null
   })
 })

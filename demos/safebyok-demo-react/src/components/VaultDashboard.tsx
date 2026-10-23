@@ -73,10 +73,13 @@ export const VaultDashboard = () => {
   // The handle comes at once, and says it is opening until its hello has read storage.
   if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
 
-  // A read the user dismissed the passphrase dialog for is refused vault_locked: nothing to show.
+  // A read the user dismissed the passphrase dialog for is refused vault_locked, and a box gone
+  // meanwhile absent_box: nothing to show.
   const view = async (boxlabel: string) => {
     const read = await vault.tryGetWhisper(boxlabel)
-    if (read.ok) { setShown((prev) => ({ ...prev, [boxlabel]: read.val })) }
+    if (! read.ok) { return }
+    const whisper = read.val
+    setShown((prev) => ({ ...prev, [boxlabel]: whisper }))
   }
 
   const hide = (boxlabel: string) => {
@@ -117,7 +120,7 @@ export const VaultDashboard = () => {
       // null, and the store's refusal lands in the gripe below. A blank note leaves the
       // sidecar out, so the box keeps the one it has.
       const note = form.noteText.trim()
-      await vault.putBox(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
+      await vault.putBox({ boxlabel: form.boxlabelText.trim(), sidecar: note === '' ? undefined : { note } }, parseWhisperText(form.whisperText)!)
       setForm(null)
     } catch (err) {
       if (! isVaultError(err, 'vault_locked')) { setGripe(err instanceof Error ? err.message : 'Could not store that.') }

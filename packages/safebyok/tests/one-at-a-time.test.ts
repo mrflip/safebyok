@@ -60,7 +60,7 @@ describe("oneAtATime", () => {
     expect(first.settled).to.eq('resolved')
   })
 
-  it("serves every call made during a run with one more run, shared, begun once that run ends", async () => {
+  it("serves every call made during a run with that same run, starting none of its own", async () => {
     const held = heldTask()
     const run = oneAtATime(held.task)
     const first = watched(run())
@@ -68,64 +68,42 @@ describe("oneAtATime", () => {
     expect(held.tally.began).to.eq(1)
     await held.end()
     expect(first.settled).to.eq('resolved')
-    expect(later.map((seen) => seen.settled)).to.deep.equal(['pending', 'pending', 'pending'])
-    expect(held.tally.began).to.eq(2)
-    await held.end()
     expect(later.map((seen) => seen.settled)).to.deep.equal(['resolved', 'resolved', 'resolved'])
-    expect(held.tally.began).to.eq(2)
+    expect(held.tally.began).to.eq(1)
     expect(held.tally.most).to.eq(1)
   })
 
-  it("runs the task twice for three calls at once, as its example says", async () => {
+  it("runs the task once for three calls at once, as its example says", async () => {
     let runs = 0
     const run = oneAtATime(async () => {
       runs += 1
       await TH.wakeupAtNextTick()
     })
     await Promise.all([run(), run(), run()])
-    expect(runs).to.eq(2)
+    expect(runs).to.eq(1)
   })
 
-  it("queues a call made during the queued run behind it, never beside it", async () => {
+  it("starts a fresh run for a call made once the run it would have joined has ended, never beside one", async () => {
     const held = heldTask()
     const run = oneAtATime(held.task)
-    void run()
-    const second = watched(run())
+    const first = watched(run())
     await held.end()
-    const third = watched(run())
+    const second = watched(run())
+    expect(first.settled).to.eq('resolved')
     expect(held.tally.began).to.eq(2)
     await held.end()
     expect(second.settled).to.eq('resolved')
-    expect(third.settled).to.eq('pending')
-    await held.end()
-    expect(third.settled).to.eq('resolved')
-    expect(held.tally.began).to.eq(3)
     expect(held.tally.most).to.eq(1)
   })
 
-  it("tells a run's failure only to the calls that shared it, and still runs the one queued behind it", async () => {
+  it("tells a run's failure to every call that shared it", async () => {
     const held = heldTask()
     const run = oneAtATime(held.task)
-    const first = watched(run())
-    const second = watched(run())
+    const shared = [run(), run()].map((promise) => watched(promise))
     await held.end('reject')
-    expect(first.settled).to.eq('rejected')
-    expect((first.err as Error).message).to.eq('run 1 failed')
-    expect(second.settled).to.eq('pending')
-    await held.end()
-    expect(second.settled).to.eq('resolved')
-  })
-
-  it("tells the queued run's failure to every call that shared it", async () => {
-    const held = heldTask()
-    const run = oneAtATime(held.task)
-    const first = watched(run())
-    const later = [run(), run()].map((promise) => watched(promise))
-    await held.end()
-    await held.end('reject')
-    expect(first.settled).to.eq('resolved')
-    expect(later.map((seen) => seen.settled)).to.deep.equal(['rejected', 'rejected'])
-    expect(later.map((seen) => (seen.err as Error).message)).to.deep.equal(['run 2 failed', 'run 2 failed'])
+    expect(shared.map((seen) => seen.settled)).to.deep.equal(['rejected', 'rejected'])
+    expect(shared.map((seen) => (seen.err as Error).message)).to.deep.equal(['run 1 failed', 'run 1 failed'])
+    expect(held.tally.began).to.eq(1)
   })
 
   it("starts afresh once every run has ended, and goes on after a failure", async () => {

@@ -22,7 +22,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getVault',         (caller) => caller.query(api.safebyok.getVault, { scope: u1 })],
   ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }) })],
   ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf('u1', { gate_epoch: 2 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })],
-  ['getBox',           (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
+  ['getBox',           (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })],
   ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_tok: 'vault-tok-u1', revision_tok: 'rev-a1' } })],
   ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { scope: u1 })],
   ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a2') })],
@@ -43,7 +43,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     const listed = await asU1.query(api.safebyok.getVault, { scope: u1 })
     expect(listed?.vaultProps).to.deep.equal(TH.gatelessOf('u1'))
-    expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await asU1.query(api.safebyok.watchVault, { scope: u1 })).to.deep.equal({
       vault_tok: 'vault-tok-u1', gate_epoch: 0, boxes: [['anthropic_api_key', 'rev-a1']],
     })
@@ -100,7 +100,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
     const left = await asU1.query(api.safebyok.getVault, { scope: u1 })
     expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u1'))
     expect(left?.boxes).to.have.lengthOf(1)
-    expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
 
   it("shows a user only their own vault: their listing holds none of another's boxes", async () => {

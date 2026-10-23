@@ -5,7 +5,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, PutVaultPropsAnswer, Tombstone, VaultProps, VaultScope, VaultSignature,
+  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, Tombstone, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
@@ -75,13 +75,19 @@ export const putVaultProps = mutation({
 
 // ----------------------------------------------------------------------------- the boxes
 
-/** One box, exactly as stored, or null when there is none under `boxlabel`. */
+/** Read the box under `boxlabel` as `VaultDB`'s `doGetBox` does, resolving a {@link GetBoxAnswer} where that throws.
+ * The vault props and the box are read from one query's snapshot.
+ */
 export const getBox = query({
-  args:    { scope: VaultScope, boxlabel: v.string() },
-  returns: v.nullable(BoxRecord),
-  handler: async (ctx, { scope, boxlabel }) => {
+  args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxGetExpectation },
+  returns: GetBoxAnswer,
+  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof GetBoxAnswer>> => {
+    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    if (vaultProps?.vault_tok !== expected.vault_tok) {
+      return { read: false, refusalkind: 'vault_mismatch' }
+    }
     const row = await findBoxRow(ctx.db, scope, boxlabel)
-    return row && boxOfRow(row)
+    return { read: true, box_stored: row && boxOfRow(row) }
   },
 })
 

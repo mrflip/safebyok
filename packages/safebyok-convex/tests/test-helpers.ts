@@ -131,7 +131,7 @@ export const realRecords = async (userId = 'u1') => {
   const vault = await openOver(store, userId)
   await vault.unlock(RealPassphrase)
   for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
-    await vault.putBox(boxlabel, whisper, { sidecar })
+    await vault.putBox({ boxlabel, sidecar }, whisper)
   }
   vault.close()
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))

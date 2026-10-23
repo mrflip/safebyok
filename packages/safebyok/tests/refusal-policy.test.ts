@@ -72,7 +72,7 @@ describe("RefusalPolicy.heed", () => {
       await TH.wakeupAtNextTick()
       heard.push(given.refusalkind)
     })
-    expect(await TH.expectRefusal(heeded.getBox(scope, 'anthropic_api_key'), 'identity_revoked')).to.eq(refusal)
+    expect(await TH.expectRefusal(heeded.getBox(scope, 'anthropic_api_key', TH.inThisVault), 'identity_revoked')).to.eq(refusal)
     expect(heard).to.deep.equal(['identity_revoked'])
   })
 

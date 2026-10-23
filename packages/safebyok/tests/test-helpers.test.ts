@@ -6,17 +6,17 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type StringStore } from '../src/index'
-import { Ciphered, fromB64, toB64 } from '../src/crypto'
+import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
-import { BoxRecord } from '../src/box'
+import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
 import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
-import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
+import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
 
@@ -203,7 +203,7 @@ describe("beforeNextCall", () => {
       await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'theirs'))
     })
     await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'mine')), 'stale_write')
-    const kept = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')
+    const kept = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
     expect(kept?.revision_tok).to.eq('rev-theirs')
   })
 })
@@ -324,6 +324,48 @@ describe("holdNextCall", () => {
     expect(settled).to.be.false
     gate.release()
     await unlocking
+  })
+})
+
+describe("holdNextAnswer", () => {
+  it("holds the next call's answer once the call has run, until released; a later call goes straight through", async () => {
+    const heard: string[] = []
+    const target = { fetchRow: (ckey: string) => { heard.push(ckey); return Promise.resolve(ckey) } }
+    const gate = TH.holdNextAnswer(target, 'fetchRow')
+    let answered = false
+    const held = (async () => { const row = await target.fetchRow('held'); answered = true; return row })()
+    await gate.reached
+    expect(heard).to.deep.equal(['held'])
+    expect(await target.fetchRow('later')).to.eq('later')
+    expect(answered).to.be.false
+    gate.release()
+    expect(await held).to.eq('held')
+  })
+
+  it("lands a lock's erase after a lease the store has already taken, as its @example has it", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    const written = TH.holdNextAnswer(opts.deviceDB, 'putLease')
+    const unlocking = vault.tryUnlock('pw')
+    await written.reached
+    await vault.lock()
+    written.release()
+    await unlocking
+    const kept = await opts.deviceDB.getLease(TH.scopeOf('u1'))
+    expect(await TH.expectGood(kept)).to.be.null
+  })
+})
+
+describe("readAfresh", () => {
+  it("waits out a read under way and reads again, so a change made while it ran shows, as its @example has it", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    await vault.unlock('pw')
+    const reads = vi.spyOn(opts.vaultDB, 'getVault')
+    const underWay = vault.refresh()
+    await TH.readAfresh(vault)
+    await underWay
+    expect(reads).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -578,7 +620,7 @@ describe("testDeriver", () => {
   it("opens a vault, deterministic in passphrase and salt", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
     await vault.unlock('correct horse battery staple')
-    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     await vault.lock()
     await vault.unlock('correct horse battery staple')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
@@ -619,6 +661,27 @@ describe("the fixtures", () => {
     expect(slice.vault_tok).to.be.null
   })
 
+  it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, stamped with its scope and vault token, as its examples show", async () => {
+    const vaultKey = await makeVaultKey()
+    const vault = await TH.leasedSliceOf('u1', vaultKey)
+    expect(vault.stamp).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.lease).to.include({ vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+    const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
+    expect(await box.extractWhisper()).to.eq('sk-fake')
+  })
+
+  it("leasedSliceOf's demand refuses as the vault's does, and its tryLock drops the lease and counts", async () => {
+    const vault = await TH.leasedSliceOf('u1', await makeVaultKey(), { vault_tok: 'vault-tok-other' })
+    expect(vault.stamp?.vault_tok).to.eq('vault-tok-other')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-u1' }) }, 'vault_remade')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other', gate_epoch: 2 }) }, 'gate_moved')
+    await TH.expectGood(vault.tryLock())
+    expect(vault.locks).to.eq(1)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }, { leaseBound: true }) }, 'vault_locked')
+    vault.stamp = null
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }) }, 'vault_gone')
+  })
+
   it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
     const { checkPassphrase } = TH.vaultSliceOf('u1')
     expect(await checkPassphrase('pw')).to.deep.equal({ strong: true })
@@ -638,6 +701,16 @@ describe("the fixtures", () => {
     expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
     expect(Object.isFrozen(TH.noBoxYet)).to.be.true
     expect(Object.isFrozen(TH.thisVault)).to.be.true
+  })
+
+  it("inThisVault: the expectation a box read in u1's vault meets, and no other vault's, as its example shows", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u2'))
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u2'), 'anthropic', TH.inThisVault), 'vault_mismatch')
+    expect(Object.isFrozen(TH.inThisVault)).to.be.true
   })
 
   it("deleting: the expectation a deletion of u1's box meets, naming the revision boxOf gave it, as its example shows", async () => {
@@ -864,8 +937,8 @@ describe("expectBad", () => {
 describe("expectingGood", () => {
   it("answers each verb with its good outcome's val, as its example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)).to.be.null
     expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 
@@ -960,7 +1033,7 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
     ensureVaultRecords: (draft) => permitted(draft, () => shared.ensureVaultRecords(draft)),
     putVaultProps:    (vaultProps, expected) => permitted(vaultProps, () => shared.putVaultProps(vaultProps, expected)),
-    getBox:           (scope, boxlabel) => permitted(scope, () => shared.getBox(scope, boxlabel)),
+    getBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.getBox(scope, boxlabel, expected)),
     putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
     getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),
     delBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.delBox(scope, boxlabel, expected)),
@@ -998,7 +1071,7 @@ describe("perUser", () => {
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u2'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
-    expect(await TH.expectingGood(servingOnly('u2', store)).getBox(TH.scopeOf('u2'), 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'two'))
+    expect(await TH.expectingGood(servingOnly('u2', store)).getBox(TH.scopeOf('u2'), 'anthropic', { vault_tok: 'vault-tok-u2' })).to.deep.equal(TH.boxOf('anthropic', 'two'))
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
   })
 
@@ -1206,7 +1279,11 @@ class RoundTripVaultDB extends VaultDB {
     throw missed.refusal ?? new Error('a write that did not land, with no refusal from its check')
   }
 
-  protected doGetBox(scope: VaultScope, boxlabel: string) { return this.backend.atomically((rows) => rows.get(Ckeys.box(scope, boxlabel)) ?? null) }
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) {
+    const read = await this.backend.atomically((rows) => (vaultIs(rows, scope, expected) ? { box: rows.get(Ckeys.box(scope, boxlabel)) ?? null } : null))
+    if (read === null) { throw Refusals.vaultMismatch() }
+    return read.box
+  }
 
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) {
     const ckey = Ckeys.box(scope, box.boxlabel)

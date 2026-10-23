@@ -33,7 +33,7 @@ export const Probe = () => {
   if (vault === null || snapshot === null) { return <span data-testid="state">no vault</span> }
 
   const put = () => {
-    void vault.tryPutBox('anthropic_api_key', 'sk-fake').then((stored) => { setOutcome(stored.ok ? 'stored' : saidOf(stored.err)) })
+    void vault.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake').then((stored) => { setOutcome(stored.ok ? 'stored' : saidOf(stored.err)) })
   }
   const grab = () => {
     void vault.tryGetWhisper('anthropic_api_key').then((read) => { setOutcome(read.ok ? `read:${JSON.stringify(read.val)}` : saidOf(read.err)) })
@@ -105,7 +105,7 @@ export const madeWorld = async () => {
   const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
   const made = await TH.settledVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
-  await made.putBox('anthropic_api_key', 'sk-fake')
+  await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   made.close()
   const spoil = () => {
     const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
@@ -173,7 +173,7 @@ export const lockedWorld = async () => {
   const world = makeWorld()
   const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
   await maker.unlock('pw')
-  await maker.putBox('anthropic_api_key', 'sk-fake')
+  await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   maker.close()
   const grab = grabber()
   const tree = (userId: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (

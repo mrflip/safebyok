@@ -22,7 +22,7 @@ describe("delDamagedVault", () => {
     const fresh = await world.open()
     expect(fresh.getSnapshot().state).to.eq('absent')
     await fresh.unlock('another pw')
-    await fresh.putBox('anthropic', 'sk-new-fake')
+    await fresh.putBox({ boxlabel: 'anthropic' }, 'sk-new-fake')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
   })
 
@@ -39,7 +39,7 @@ describe("delDamagedVault", () => {
   it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
     const world = await damagedVaultWorld()
     const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
-    await theirs.putBox('anthropic', 'theirs')
+    await theirs.putBox({ boxlabel: 'anthropic' }, 'theirs')
     await delDamagedVault(world.optsWith())
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
     expect(await TH.expectingGood(world.deviceDB).getLease(TH.scopeOf('u2'))).to.not.be.null
@@ -49,7 +49,7 @@ describe("delDamagedVault", () => {
   it("refuses a vault that stands sound, removing nothing from storage or the device: that one is del()'s", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const before = world.dbStore.ckeys().map((ckey) => [ckey, world.dbStore.read(ckey)])
     const lease = await world.getLease()
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'bad_option')

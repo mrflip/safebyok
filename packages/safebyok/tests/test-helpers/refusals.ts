@@ -64,7 +64,7 @@ export type ExpectingGood<DbT> = {
  * @param db - The store whose answers the test reads.
  * @returns `db`, its verbs answering with their `val`s.
  *
- * @example expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic')).to.be.null
+ * @example expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', TH.inThisVault)).to.be.null
  */
 export const expectingGood = <DbT extends object>(db: DbT): ExpectingGood<DbT> => new Proxy(db, {
   get: (target, prop) => {

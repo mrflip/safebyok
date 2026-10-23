@@ -125,8 +125,8 @@ export const Sidecar: Z.ZodMiniType<Record<string, WhisperJson>> = whisperBag
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /** The visible fields of a sound box, readable while locked: what a vault's snapshot holds beside {@link DamagedBox}es.
- * They are a `Box`'s own fields, as `{ ...box }` holds them, `vault_tok` among them, and `damaged`
- * false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
+ * They are a `Box`'s own fields, as `{ ...box }` holds them, and `vault_tok`, of the box's stamp,
+ * and `damaged` false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
  * `getWhisper()` opens the box and so proves it unaltered.
  *
  * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_tok }).damaged // false
@@ -332,6 +332,23 @@ export type Tombstone = Z.infer<typeof Tombstone>
  */
 export const VaultProps = Z.union([GatedVaultProps, GatelessVaultProps])
 export type VaultProps = Z.infer<typeof VaultProps>
+
+/** What a vault's picture of storage stands at: its scope, the `vault_tok` of the life it holds, its `vault_epoch` and its `gate_epoch`, frozen.
+ * A Vault's `stamp` is the one it holds now; a thing it hands out carries the one it was made
+ * under, and `demandConsistentWith` compares the two.
+ *
+ * @example { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', vault_epoch: 3, gate_epoch: 2 }
+ */
+export type Stamp = Readonly<VaultScope & Pick<GatedVaultProps, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>>
+
+/** A thing `demandConsistentWith` can judge: the `vault_tok` it was made under, and as much of the rest of a {@link Stamp} as it carries.
+ * A box carries its `vault_tok` alone, a lease its scope and `gate_epoch` besides, a stamp all of
+ * them. Each field present is compared; one absent is not.
+ *
+ * @example vault.demandConsistentWith(box)          // { vault_tok, ... }: the vault half
+ * @example vault.demandConsistentWith(vault.stamp)  // every field
+ */
+export type Stamped = Readonly<Pick<Stamp, 'vault_tok'> & Partial<Stamp>>
 
 /** True for vault props whose gate is made: {@link GatedVaultProps}, as opposed to gateless ones.
  *

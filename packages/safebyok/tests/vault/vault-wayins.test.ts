@@ -35,7 +35,7 @@ describe("putWayin, with a new passphrase", () => {
   it("replaces the passphrase, resolving the new one as stored, the vault unlocked, and keeps every box readable, as its first example shows (Contract: putWayin, Returns)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const put = await vault.putWayin('old passphrase', 'new passphrase')
     expect(put).to.deep.equal(vault.passphrase)
     expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'], vault_tok: vault.vault_tok })
@@ -51,7 +51,7 @@ describe("putWayin, with a new passphrase", () => {
   it("rewrites no box: each stands byte for byte as it was (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
-    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const before = storedRowOf(world, 'anthropic')
     await vault.putWayin('old passphrase', 'new passphrase')
     expect(storedRowOf(world, 'anthropic')).to.deep.equal(before)
@@ -111,7 +111,11 @@ describe("putWayin, with a new passphrase", () => {
     await here.putWayin('old passphrase', 'new passphrase')
     expect(storedVaultPropsOf(world)['gate_epoch']).to.eq(2)
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
-    expect(await TH.expectGood(thereDeviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }))).to.be.null
+    // Dropped from memory, erasing nothing; the lease left is outdated, and never taken up.
+    const theirLease = () => TH.expectGood(thereDeviceDB.getLease(TH.scopeOf('u1')))
+    expect(await theirLease()).to.not.be.null
+    await TH.expectRefusal(there.ensureLease(), 'vault_locked')
+    expect(await theirLease()).to.be.null
   })
 
   it("takes only the standing passphrase as proof: a passkey's answer is refused as bad_option, changing nothing (Contract: putWayin, Guarantees)", async () => {
@@ -669,7 +673,7 @@ describe("a new passphrase's strength", () => {
     expect(vault.state).to.eq('opening')
   })
 
-  it("runs the checker's load at hello, never at make, beside the read of storage, and again only at a hello that reads afresh", async () => {
+  it("runs the checker's load at the first hello, never at make, beside the read of storage, and never again once it succeeds", async () => {
     const world = makeWorld()
     const load = vi.fn(() => Promise.resolve())
     const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load }) }))
@@ -679,7 +683,7 @@ describe("a new passphrase's strength", () => {
     await vault.hello()
     expect(load).toHaveBeenCalledTimes(1)
     await vault.hello({ staleMinutes: 0 })
-    expect(load).toHaveBeenCalledTimes(2)
+    expect(load).toHaveBeenCalledTimes(1)
   })
 
   it("starts the load and the read of storage together, and settles the hello only once both have", async () => {
@@ -1027,13 +1031,20 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses rolled_back when the vault props it reads are older than this device has seen`, async () => {
+    it(`${callTitle} changes nothing when storage holds vault props older than the ones in hand: it proves against those in hand, and is refused`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const older = storedText(world) ?? ''
       await vault.putWayin('pw', 'pw newer')
       await vault.putWayin('pw newer', 'pw')
       world.dbStore.write(u1VaultPropsCkey, older)
-      await TH.expectRefusal(change(vault), 'rolled_back')
+      let refused: unknown = null
+      try {
+        await change(vault)
+      } catch (err) {
+        refused = err
+      }
+      // The older copy is ignored: the write expecting the newer is stale, or the newer has no passkey to remove.
+      expect(refused).to.have.property('refusalkind').that.is.oneOf(['stale_write', 'absent_wayin'])
       expect(storedText(world)).to.eq(older)
     })
 

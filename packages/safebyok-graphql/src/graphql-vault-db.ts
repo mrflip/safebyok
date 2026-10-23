@@ -1,5 +1,5 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, TombstoneFields, recordOf, selectionOf } from './fields'
 
@@ -85,8 +85,8 @@ const GetVaultDoc = `query SafebyokGetVault(${Scope}) {
 const EnsureVaultDoc = `mutation SafebyokEnsureVault($draft: SafebyokVaultPropsInput!) {
   safebyokEnsureVault(draft: $draft) { ${VaultSelection} }
 }`
-const GetBoxDoc = `query SafebyokGetBox(${Scope}, $boxlabel: String!) {
-  safebyokGetBox(scope: $scope, boxlabel: $boxlabel) { ${selectionOf(BoxFields)} }
+const GetBoxDoc = `query SafebyokGetBox(${Scope}, $boxlabel: String!, $expected: SafebyokBoxGetExpectationInput!) {
+  safebyokGetBox(scope: $scope, boxlabel: $boxlabel, expected: $expected) { ${selectionOf(BoxFields)} }
 }`
 const GetCapacityDoc = `query SafebyokGetCapacity(${Scope}) {
   safebyokGetCapacity(scope: $scope) { boxes { used max } bytes { used max } }
@@ -172,8 +172,11 @@ class UrqlVaultDB extends VaultDB {
     throw refusalOfAnswer(answer, 'vault_props_stored')
   }
 
-  protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    const { safebyokGetBox } = await this.asked(GetBoxDoc, { scope: scopeOut(scope), boxlabel })
+  // A read whose vault props are not the ones expected refuses on the server, in the step that
+  // reads the box, and crosses as its kind.
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+    const { vault_tok } = expected
+    const { safebyokGetBox } = await this.asked(GetBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_tok } })
     return recordOf(safebyokGetBox, BoxFields)
   }
 

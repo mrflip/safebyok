@@ -6,11 +6,11 @@ import * as Z from 'zod/mini'
 import type { GenericValidator, Infer } from 'convex/values'
 import * as Records from 'safebyok'
 import type {
-  VaultPropsExpectation as CoreVaultPropsExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxExpectation as CoreBoxExpectation,
+  VaultPropsExpectation as CoreVaultPropsExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxGetExpectation as CoreBoxGetExpectation, BoxExpectation as CoreBoxExpectation,
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import {
-  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, VaultProps, VaultScope,
+  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -116,6 +116,7 @@ describe("the Convex validators, field for field with the core's Zod records", (
     // a listing must meet.
     expectTypeOf<Omit<Infer<typeof ListedBox>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
     expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
+    expectTypeOf<Infer<typeof BoxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
     expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
     expectTypeOf<Infer<typeof VaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
     expectTypeOf<Infer<typeof BoxDelExpectation>>().toEqualTypeOf<CoreBoxDelExpectation>()
