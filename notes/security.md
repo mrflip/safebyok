@@ -2481,6 +2481,24 @@ added or folded into through the subagent, and no other entry changes.
   vaultDB and deviceDB** (the shared `delDamagedVaultIn(scope, vaultDB, deviceDB)`), with the same refusals; the bank's
   entry is let go only once the delete succeeds, and a sound vault still refuses `bad_option` and keeps its Vault object.
   React hosts reach it through `useBank()`; `VaultProvider`'s own `delDamagedVault` is gone.
+  Amended 2026-10-24 (primitives sprint, thread 13, branch `20261024-bank_clears`; the Coach's ruling on the review of
+  [#262](https://github.com/mrflip/safebyok/pull/262), which proposed refusing both calls a draft naming other stores than the
+  held entry was born from, as `bank.ensureVault` does with `bad_option`; declined): **`bank.delDamagedVault(draft)` may be
+  issued for a vault the bank does not report, and `bank.clearCachedVault(draft)` for a vault that is not there.** Nothing
+  on the device gates `bank.delDamagedVault`, and it asks for no unlock or passphrase: storage decides, by the checks only it
+  can make (`VaultDB.delDamagedVault` deletes props that fail their checks and still name their `vault_tok`, expecting that
+  `vault_tok` with `gate_epoch` null; a sound vault, a novel one included, refuses `bad_option`; props too damaged to name a
+  `vault_tok` refuse `damaged_vault`; an unknown format `newer_format`; a vault replaced meanwhile `stale_write`). A backend
+  whose server validates what it reads (safebyok-graphql) refuses it as `damaged_vault` and keeps the record. The bank's
+  entry for the scope is let go on success and on `stale_write`; any other refusal keeps it. `bank.clearCachedVault` touches
+  only this device's store (`DeviceDB.delDeviceRecord`, then `DeviceDB.delLease`), calls no `VaultDB` verb, needs no unlock or
+  passphrase, and refuses nothing for a vault the bank holds no entry for or storage does not hold. It rests on the device
+  store being no stronger a boundary than the browser's own site data, which anyone at the device can clear; its effect
+  (weakening the `vault_behind` check until the next birth, dropping the lease so the next open asks for the passphrase) is
+  no more than that. It lets go the bank's entry once both erasures succeed; a device-store refusal keeps it. **For review**:
+  a draft naming other stores acts on those stores and, for either call, lets go the held entry whichever stores it was born
+  from. Letting a Vault object go erases nothing (the next ask births anew from storage, the ground truth), so no stores
+  check is added. No code changed; the doc blocks, READMEs and tests say it. See also the bank entry (`useBank()`) above.
 * 2026-10-16: **the checks tightened, and a forgotten bag made harmless.** Every default check,
   `AnyTextValidators` included, refuses text that is not well-formed Unicode (a lone surrogate); a host's own schema
   is untouched. A refusal by one of our checks now passes on that check's message, which quotes
