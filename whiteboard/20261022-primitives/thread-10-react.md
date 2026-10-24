@@ -62,6 +62,17 @@ Branch `20261024-react`, PR [#265](https://github.com/mrflip/safebyok/pull/265),
     with a gesture in hand, so in practice declined.
   - In the demo the scrim covers the page, so the waits arise only from calls the app makes by
     itself (timers, effects, KnockKnock's `useWhisper` mid-flight), not from a second click.
+* **Rework, the Coach's ruling (2026-10-24)** on "'Cleartext' replaces 'proof'" (#263): "Make
+  this display to the human as "Vault unlocker". TODO: an i18n friendly way to send in phrases
+  displayed". Code and VOCABULARY keep `cleartext`; VOCABULARY's entry says how it is shown; the
+  TODO is a side quest in TODO.md. Strings changed, where a user may see the passphrase and
+  passkey named together: the demo's WaysIn heading ("Ways in" -> "Vault unlockers"); core
+  refusals `gate_moved` (vault.ts, proving.ts), `stale_write` (vault.ts, refusals.ts
+  `StaleVaultPropsMessage`), `damaged_wayin` (wayin.ts, the bad news in vault.ts),
+  `gating_landed` while sealing (proving.ts), `damaged_vault` (vault-db.ts), the device store's
+  `getLease` remedy (device-db.ts), and the declined `put_passkey`'s "Its vault unlockers are
+  unchanged." safebyok-react's own words name the passphrase or the passkey alone, each right as
+  it stands, so none changed. Developer-only text (a logger warning, `bad_option`) is unchanged.
 * **For the Coach** (the PR's open questions, each with its Rec):
   - Cancel, then asked again (above): accept; a toldjaso line.
   - A cancelled change refuses `vault_locked`: keep; maybe `gating_declined` after the sprint.
