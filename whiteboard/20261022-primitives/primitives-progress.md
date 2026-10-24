@@ -64,6 +64,9 @@ keeps it. Newer than the plan and the spec wherever they disagree.
   once desired"); no cross-tab coordination additions this sprint ("note your concern and carry
   on").
 
+* **Ruled, 2026-10-24:** `bank.ensureVault` after a deletion elsewhere births a new, novel vault
+  (the Coach took the Rec: keep for now).
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
@@ -78,14 +81,14 @@ rules* 3).
 | 5 | demand | merged | #253 |
 | 6 | lease_box | merged | #254 |
 | 6b | box_seal | merged | #256 |
-| 7 | bank | filed, stacked on #256 | #258 |
-| 7b | bank_provider | filed, stacked on #258 | #259 |
-| 8 | proving_gate | filed, stacked on #259 | #260 |
-| 9 | gating | filed, stacked on #260 | #261 |
-| 9b | gating_followups | filed, stacked on #261 | #262 |
-| 9c | core_cleanups | filed, stacked on #262 | #264 |
-| 11 | docs (core half) | filed, stacked on #264 | #263 |
-| 10 | react | after the pause | |
+| 7 | bank | merged | #258 |
+| 7b | bank_provider | merged | #259 |
+| 8 | proving_gate | merged | #260 |
+| 9 | gating | merged | #261 |
+| 9b | gating_followups | merged | #262 |
+| 9c | core_cleanups | merged | #264 |
+| 11 | docs (core half) | merged | #263 |
+| 10 | react | building, from main | |
 | 12 | route_meta | filed, beside the line | #252 |
 
 ## What the threads found

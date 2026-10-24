@@ -2,7 +2,10 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** **paused, 2026-10-23 04:45 UTC** (the Coach's request; `human/20261023-sprint_primitives_paused.md`). Merged by the Coach: #243, #244, #246, #251, #256 (with #253 and #254). The line waiting: #258 → #259 → #260 → #261 → #262 → #264 → #263, all filed and green; #252 beside it on main. Next: thread 10 (react), the Coach's rulings, the wrap-up.
+* **Status:** **resumed, 2026-10-24** (the Coach: "restart the primitives sprint"). Merged by the Coach,
+  2026-10-24: the whole core line, #258 → #259 → #260 → #261 → #262 → #264 → #263. Building: thread 10
+  (react), cut from `origin/main`. Waiting: #252 beside it on main. Then the Coach's rulings and the wrap-up.
+  Paused 2026-10-23 04:45 UTC (`human/20261023-sprint_primitives_paused.md`).
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -602,6 +605,9 @@ hand commit.
 > in place and the dialog asks again.
 
 *Gloss.* `packages/safebyok-react/src/*` and its tests, `demos/`, `e2e/`. **Depends on:** 9b.
+*Orchestrator, 2026-10-24:* the core line is merged, so thread 10 is cut from `origin/main`. It also
+carries the react half of thread 11: safebyok-react's README (its *React reports it to you* line is
+stale) and its doc blocks, true to the gatings.
 **Size:** M. Moves the React lines.
 *Orchestrator, from thread 9 ([#261](https://github.com/mrflip/safebyok/pull/261)):* `BankProvider`'s own
 dialog answers only `unlock_vault` and `initialize_gate` and declines the other four kinds, so the
