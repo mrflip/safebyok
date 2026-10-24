@@ -1,7 +1,7 @@
 # Thread 12: route_meta (2026-10-22)
 
-Branch `20261022-route_meta`, PR [#252](https://github.com/mrflip/safebyok/pull/252), stacked on [#251](https://github.com/mrflip/safebyok/pull/251) (thread 4), beside the line's threads 5 to 11; it joins the line at wrap-up.
-Justify: green (core 2803, indexeddb 159, postgres 308, convex 306, graphql 312, react 287, demo 216, e2e 102; `pnpm size:budget` within every budget).
+Branch `20261022-route_meta`, PR [#252](https://github.com/mrflip/safebyok/pull/252), stacked on [#265](https://github.com/mrflip/safebyok/pull/265), in the line main → #265 → #252 → #250 (restacked 2026-10-24).
+Justify: green at the restacked tip (core 3139, indexeddb 164, postgres 318, fastkey 49, react 300, convex 316, graphql 323, demo 227, e2e 107; `pnpm size:budget` within every budget, none moved).
 
 * **Built**: the Postgres route recipe answers every call in one shape
   (`packages/safebyok-postgres/README.md`, *The route recipe*; run by `tests/route-recipe.test.ts`, which is the README's code with only the test's wiring changed).
@@ -23,4 +23,8 @@ Justify: green (core 2803, indexeddb 159, postgres 308, convex 306, graphql 312,
   * The core's server-side VaultDB refusals carry only `box_stored`, `vault_props_stored` and `capacity`; `box_listed` and `wayin_listed` come from the `Vault` on the browser. So the real route's `refusal.meta` is `{}` today: the allowlist is a guard against an adapter's or future refusal, and its tests drive `answerOf` with crafted refusals.
   * `notes/security.md` has two other entries (2026-10-21 store_rulings amendment near line 639; the `stale_write`/`box_stored` entry near line 863) that still say the recipe sends `meta` whole. The subagent amended only the Postgres entry, as the header allows one entry; the Coach's audit should add the pointer.
   * The residual is unchanged: a stale update's `vault_props_stored` carries both wayins (salts, wrapped vaultKeys) in a response body, to the vault's own signed-in user only. A host that logs response bodies would log them.
+* **Restack (2026-10-24)**: rebased from #251 onto [#265](https://github.com/mrflip/safebyok/pull/265) (`20261024-react`, 146 commits of core reshaping since the cut). Three conflicts, all side by side:
+  * `notes/security.md`: the route_meta amendment and #265's line's 2026-10-22 (bank) amendment of the same Postgres entry, both kept, route_meta's first; no other entry touched.
+  * `packages/safebyok-postgres/README.md` and `tests/route-recipe.test.ts`: the `safebyok` type imports take both sides (today's `BoxGetExpectation`, this thread's `DamagedBox` and `WayinSummary`); the client half's lead-in says `Bank.make`, today's name, where this thread had `Vault.make`.
+  * Every stored-field and refusal-meta name the recipe uses (`box_listed`, `wayin_listed`, `box_stored`, `vault_props_stored`, `capacity`, the wayin and `DamagedBox` fields) is still today's; no behaviour needed a choice.
 * **For the Coach**: see the PR's open questions.
