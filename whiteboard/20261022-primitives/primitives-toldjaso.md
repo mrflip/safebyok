@@ -98,3 +98,8 @@ and 11 are restated for the demand model.
     the same commit as a `userId` or shaping-prop change renders with the old bank, and its
     `useVault` effect, running after the provider's cleanup, starts a birth on that bank which no
     one lets go. Needs an unusual tree. (#259 review)
+23. **CANCEL, THEN ASKED AGAIN.** A call waiting behind a change's dialog (`change_passphrase`,
+    `put_passkey`, `del_passkey`) raises its own unlock once that dialog is cancelled. With the
+    Cancel button, a user activation, "Unlock your vault" pops up at once; with Escape, which gives
+    none, the browser's transient activation (about 5 s) may lapse and the waiting call is declined
+    silently. Thread 10's file, *How the joins feel in the UI*, has the rest. (#265)

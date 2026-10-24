@@ -621,8 +621,14 @@ both with the correctable-kinds row. Word the decline by gating kind (`declinedE
 "declined to unlock" for every kind). The demo's Delete account skips `del()` on a novel vault
 (`absent_vault`). Test helpers: `TH.scriptedRequestCleartext`, `TH.answering`, `TH.heldDialog`,
 `TH.asKind`; React's `gatingOf`, `stubGating`, `gatedBy`. Once the dialogs exist, report how the
-joins across calls feel (the Coach's audit 5 worry; three rows in Open Matters). From #259 (the
-Coach took the Rec): demo tests for the dashboard's "Start a new vault" and "Accept this copy".
+joins across calls feel (the Coach's audit 5 worry; three rows in Open Matters). ~~From #259 (the
+Coach took the Rec): demo tests for the dashboard's "Start a new vault" and "Accept this copy".~~
+*Orchestrator:* already on main (4608ac1b, #259). Thread 10 pulled forward `vault.checkPassphrase`'s
+retirement (`checkStrength` / `tryCheckStrength`) and `declinedError(gatingkind, asked)`.
+*Orchestrator, 2026-10-24, the Coach on the row "'Cleartext' replaces 'proof'" (#263), verbatim:*
+"Make this display to the human as "Vault unlocker". TODO: an i18n friendly way to send in phrases
+displayed". The code keeps `cleartext`; wherever a dialog or message names what the user gives
+(passphrase or passkey) it says "Vault unlocker". Queued for thread 10's rework after its review.
 
 ### 11. docs, core half filed ([#263](https://github.com/mrflip/safebyok/pull/263))
 
