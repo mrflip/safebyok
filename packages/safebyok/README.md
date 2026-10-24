@@ -775,7 +775,7 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
   Its whole contract is that verdict, for every passphrase: it never throws. `Bank.make` refuses
   anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
-  keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
+  keeps it held to its contract, and asks it as `vault.checkStrength(typed)`. A checker that
   answers anything but a verdict is refused `bad_option`, and one that throws `unexpected_error`,
   carrying nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to
   choose one.
@@ -783,8 +783,8 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
 * **Call it from the field as well, through the vault.** The field the user types into can ask
-  `vault.checkPassphrase(typed)` on each keystroke, and show the reason before the user
-  submits: the same check, held to the same contract, so the field and Create decide alike (a
+  `vault.tryCheckStrength(typed)` on each keystroke, and show a `weak_passphrase` refusal's
+  message, the checker's reason, before the user submits: the same check, held to the same contract, so the field and Create decide alike (a
   blank passphrase is weak without the checker hearing it). `safebyok-react`'s dialog does so by
   default. It hears the passphrase in plain text, so it must run on the device and keep nothing:
   never send it to a server, log it, or let an error tracker capture it.

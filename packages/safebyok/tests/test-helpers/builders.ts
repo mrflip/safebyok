@@ -1,7 +1,7 @@
 import { type Ciphered, toB64 } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
-import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
+import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
 import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceRecord, type LeaseRecord, type Stamp } from '../../src/types'
@@ -40,21 +40,17 @@ export const testDeriver: KeyDeriver = {
 /**
  * The slice of a vault a box, a way in or a lease reads, for a test that makes one with
  * no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it, holding the vault props
- * `vault-tok-<userId>`, deriving with `keyDeriver`, admitting any passphrase
- * ({@link anyStrengthChecker}, held to its contract as a vault holds it), granting leases of
- * seven days, and reading {@link SliceNow} on its clock -- each as `overrides` does not say
- * otherwise.
+ * `vault-tok-<userId>`, deriving with `keyDeriver`, granting leases of seven days, and reading
+ * {@link SliceNow} on its clock -- each as `overrides` does not say otherwise.
  *
  * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'vault-tok-u1', TH.passkeyWayinOf('laptop'))
  * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
  */
 export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
-  const scope = scopeOf(userId)
   return {
-    ...scope,
+    ...scopeOf(userId),
     vault_tok:       `vault-tok-${userId}`,
     keyDeriver,
-    checkPassphrase: guardStrengthChecker(anyStrengthChecker, scope),
     leaseMillis:     7 * 24 * 60 * 60_000,
     now:             () => SliceNow,
     ...overrides,
@@ -65,7 +61,7 @@ export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDerive
 export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a box, a way in and a lease read. */
-export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
+export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'leaseMillis' | 'now'>
 
 /** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */
 export type LeasedSlice = VaultSlice & {

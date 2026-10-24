@@ -11,7 +11,7 @@ import { oneAtATime } from './one-at-a-time'
 import { byCodeUnit, jsonBytes, type BoxExpectation, type ListedVault } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
-import type { GuardedStrengthChecker, PassphraseVerdict } from './passphrase-strength'
+import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type BadNewsHandler, type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
@@ -137,7 +137,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *  * A call refuses with what storage refuses, as it came.
  *  * Once the Vault object is gone -- the bank let it go, or the vault was deleted, or deleted and
  *    made anew, here or elsewhere -- every call but `subscribe()`, `getSnapshot()` and
- *    `checkPassphrase()` refuses 'vault_gone', or 'vault_remade' for a vault made anew. The bank
+ *    `checkStrength()` refuses 'vault_gone', or 'vault_remade' for a vault made anew. The bank
  *    hands out a new Vault object when asked again.
  *  * A throw that is no refusal (a bug, in safebyok or in a function handed to it) is refused
  *    'unexpected_error', what was thrown its cause, and is not logged. What a function that hears
@@ -168,12 +168,12 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * that branches on `refusalkind`. `ensureUnlocked()`, `putBox()` and the rest resolve to that `val` or
  * throw that `err`: the form for code that reports failure by throwing, as a TanStack `queryFn`
  * does. A refusal a member's doc names comes as `err` from its `try` form. Bad news is told to
- * `onBadNews` once, whichever form met it. `subscribe()`, `checkPassphrase()` and `useWhisper()`
- * come in the throwing form alone.
+ * `onBadNews` once, whichever form met it. `subscribe()` and `useWhisper()` come in the throwing
+ * form alone.
  *
- * `subscribe`, `getSnapshot` and `checkPassphrase` are bound to their vault, so `subscribe` and
- * `getSnapshot` can go to `useSyncExternalStore` as they are. Every other call is a method: call it
- * on the vault, or wrap it to hand it on, as an event handler does: `() => vault.tryHello()`.
+ * `subscribe` and `getSnapshot` are bound to their vault, so they can go to
+ * `useSyncExternalStore` as they are. Every other call is a method: call it on the vault, or wrap
+ * it to hand it on, as an event handler does: `() => vault.tryHello()`.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
  * @example if (vault.state === 'locked') { askForProof(vault.passkey) }
@@ -460,44 +460,34 @@ export class Vault {
   }
   // --
 
-  // == [Vault: ways in]: checkPassphrase, putWayin, delWayin
+  // == [Vault: ways in]: checkStrength, putWayin, delWayin
 
-  /** How strong `typed` is as a new passphrase for this vault, by the `strengthChecker` it was made with.
-   * The `initialize_gate` and `change_passphrase` gatings refuse a weak one by this verdict, so a field asking it as
-   * the user types decides alike. The `reason` of a weak one is written for the user. A blank
-   * passphrase is weak before the checker hears it. Reads nothing, and awaits no hello.
+  /** Refuse a new passphrase too easy to guess, by the `strengthChecker` the vault was made with: 'weak_passphrase', the checker's reason its message, written for the user.
+   * The `initialize_gate` and `change_passphrase` gatings refuse a weak one by this check, so a
+   * field asking it as the user types decides alike: show a 'weak_passphrase' message beside the
+   * field. A blank passphrase is weak before the checker hears it. Reads nothing, and awaits no
+   * hello.
    *
    * A checker that breaks its contract is refused here, and by every call that asks it:
    * 'bad_option' for an answer that is no verdict, and 'unexpected_error' for a throw. That refusal
-   * carries nothing of what the checker threw, as the checker heard the passphrase.
-   *
-   * @example
-   *   const verdict = await vault.checkPassphrase(typed)
-   *   setHint(verdict.strong ? '' : verdict.reason)
-   * @example await vault.checkPassphrase('   ')   // { strong: false, reason: "A new passphrase can't be empty or only spaces: ..." }
-   * @example await vault.checkPassphrase(42)   // throws 'bad_option'
-   */
-  checkPassphrase = async (typed: string): Promise<PassphraseVerdict> => {
-    if (typeof typed !== 'string') {
-      throw new VaultError('bad_option', "checkPassphrase takes the passphrase as the text the user typed, as a string.")
-    }
-    return this.#strengthChecker(typed)
-  }
-
-  /** Refuse a new passphrase too easy to guess, by the `strengthChecker` the vault was made with: 'weak_passphrase', the checker's reason its message.
-   * It is {@link Vault.checkPassphrase}'s verdict as a refusal: a blank passphrase is weak before
-   * the checker hears it, and a checker that breaks its contract refuses as there. What a chain
-   * asks of a new passphrase before it becomes a way in. Reads nothing, and awaits no hello.
+   * carries nothing of what the checker threw, as the checker heard the passphrase. A passphrase
+   * that is not text is 'bad_option' too.
    *
    * @example await vault.checkStrength(chosen)   // throws 'weak_passphrase' with the checker's reason
    * @example await vault.checkStrength('correct horse battery staple')   // resolves
+   * @example
+   *   const { ok, err } = await vault.tryCheckStrength(typed)
+   *   setHint(ok || err.refusalkind !== 'weak_passphrase' ? '' : err.message)
    */
   async checkStrength(passphrase: string): Promise<void> { valOf(await this.tryCheckStrength(passphrase)) }
 
   /** Refuse a new passphrase too easy to guess, as an {@link Outcome}: the non-throwing form of {@link Vault.checkStrength}. */
   async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
     try {
-      const verdict = await this.checkPassphrase(passphrase)
+      if (typeof passphrase !== 'string') {
+        throw new VaultError('bad_option', "checkStrength takes the passphrase as the text the user typed, as a string.")
+      }
+      const verdict = await this.#strengthChecker(passphrase)
       if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
