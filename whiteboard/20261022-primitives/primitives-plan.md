@@ -2,10 +2,10 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** **wrap-up, 2026-10-24.** Merged by the Coach: the whole core line, #258 → #264 → #263.
-  Thread 10 (react) filed as #265 at 28f1c45b, on main, reviewed twice. Restacking #252 onto it (the
-  line main → #265 → #252 → #250), then the final opus review. The rows the Coach marked TOP in
-  Open Matters wait on the Coach; each ruling that needs work becomes a thread on top of the line.
+* **Status:** **paused for the Coach's rulings, 2026-10-24** (`human/20261024-sprint_primitives_paused.md`).
+  Every thread is filed, and the line is restacked, pushed and green at its top: main → #265 → #252 →
+  #268 → #269 → #270 → #266 → #267 → #250 (this PR, a draft, on top). Open Matters holds the rest;
+  a ruling that needs work becomes a thread on top of the line, then the wrap-up closes the sprint.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds

@@ -75,6 +75,9 @@ keeps it. Newer than the plan and the spec wherever they disagree.
 * *Orchestrator:* the final opus review (`final-review.md`): the demand model holds, no side door,
   the cryptography unchanged; its findings are Open Matters rows, none ruled yet.
 
+* *Orchestrator, 2026-10-24:* thread 15's new toldjaso entry, numbered 16 on its branch (#268's PR
+  and thread file say 16), is **24** in the merged list; 16 stays the Postgres ensure/delete race.
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
@@ -96,13 +99,13 @@ rules* 3).
 | 9b | gating_followups | merged | #262 |
 | 9c | core_cleanups | merged | #264 |
 | 11 | docs (core half) | merged | #263 |
-| 10 | react | filed, on main | #265 |
-| 12 | route_meta | restacked onto #265 | #252 |
-| 13 | bank_clears | building, on #252 | |
-| 14 | contract_tab | building, from main | |
-| 15 | refresh_rulings | building, on #252 | |
-| 16 | first_gate_kind | queued | |
-| 17 | confirm_passphrase | queued | |
+| 10 | react | filed, the line's bottom | #265 |
+| 12 | route_meta | filed, in the line | #252 |
+| 13 | bank_clears | filed, in the line | #266 |
+| 14 | contract_tab | filed, in the line | #267 |
+| 15 | refresh_rulings | filed, in the line | #268 |
+| 16 | first_gate_kind | filed, in the line | #269 |
+| 17 | confirm_passphrase | filed, in the line | #270 |
 
 ## What the threads found
 
