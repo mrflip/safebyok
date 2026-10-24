@@ -861,7 +861,7 @@ export class Vault {
       deviceId:   () => this.#deviceId,
       putLease:   (record) => this.#deviceDB.putLease(record),
       holdLease:  (stored) => this.#holdLease(stored),
-      demand:     (thing, call) => { this.#demand(thing, { call }) },
+      demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
     })
     this.#gatingInside = {
       freshen:    async (gating) => await this.#freshen(gating),
@@ -870,7 +870,7 @@ export class Vault {
       afterDel:   async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
       takeUp:     async (gating, renewMillis) => await this.#takeUpFromPantry(gating, renewMillis),
       badOutcome: (thrown) => this.#badOutcome(thrown),
-      demand:     (thing, call) => { this.#demand(thing, { call }) },
+      demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
       request:    this.#requestCleartext,
     }
     this.#takePicture({ fresh: this.#vaultProps, listed: born.listed, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
@@ -1114,9 +1114,12 @@ export class Vault {
     if (this.#goneBy !== null) { throw this.#goneBy() }
   }
 
-  /** Refuse unless `thing` is consistent with the picture in hand, as {@link Vault.demandConsistentWith} says: the one demand, before and after each wait. */
-  #demand(thing: Stamped, opts: { leaseBound?: boolean, call: VaultCall }) {
-    const refusal = this.#inconsistencyWith(thing) ?? (opts.leaseBound === true ? this.#leaseRefusal() : null)
+  /** Refuse unless `thing` is consistent with the picture in hand, as {@link Vault.demandConsistentWith} says: the one demand, before and after each wait.
+   * With `opts.firstGate`, `thing` was made for the vault's first gate, which is not yet written: a
+   * gate in the picture is another device's first, and refuses 'gate_made_elsewhere', not 'gate_moved'.
+   */
+  #demand(thing: Stamped, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
+    const refusal = this.#inconsistencyWith(thing, { firstGate: opts.firstGate === true }) ?? (opts.leaseBound === true ? this.#leaseRefusal() : null)
     if (refusal === null) { return }
     // The thing's fields never reach the logger: a lease's are its scope and epoch, but the rule is one.
     this.#logger.log(`A call found the vault moved on from what it held, and refused it: ${refusal.refusalkind}.`, { call: opts.call, refusalkind: refusal.refusalkind })
@@ -1128,32 +1131,36 @@ export class Vault {
    * it is what moved the picture. A lease-bound demand asks for the lease only of an answer that
    * came: a lease that refused its own use (`damaged_lease`) has dropped itself.
    */
-  #demandAfterWait(settled: Outcome<unknown>, thing: Stamped, opts: { leaseBound?: boolean, call: VaultCall }) {
+  #demandAfterWait(settled: Outcome<unknown>, thing: Stamped, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
     if (! settled.ok && UntrustedStorageKinds.some((kind) => isVaultError(settled.err, kind))) { throw settled.err }
-    this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, call: opts.call })
+    this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, firstGate: opts.firstGate === true, call: opts.call })
   }
 
-  /** Why `thing` is not consistent with the picture in hand, the vault half (gone, made anew, ways in moved), or null when it is. */
-  #inconsistencyWith(thing: Stamped): VaultError | null {
+  /** Why `thing` is not consistent with the picture in hand, the vault half (gone, made anew, ways in moved), or null when it is.
+   * Ways in moved past a thing made for the first gate, before that gate is written
+   * (`opts.firstGate`), are another device's first gate: 'gate_made_elsewhere'.
+   */
+  #inconsistencyWith(thing: Stamped, opts?: { firstGate: boolean }): VaultError | null {
     if (this.#goneBy !== null) { return this.#goneBy() }
     const held = this.#vaultProps
     const sameScope = (thing.applabel ?? this.#scope.applabel) === this.#scope.applabel
       && (thing.user_id ?? this.#scope.user_id) === this.#scope.user_id
       && (thing.vaultlabel ?? this.#scope.vaultlabel) === this.#scope.vaultlabel
     if (! sameScope || thing.vault_tok !== held.vault_tok) { return remadeError() }
-    if (thing instanceof Proving) { return this.#provingInconsistency(thing as Proving) }
-    if (thing instanceof Gate) { return thing.base_epoch === held.gate_epoch || thing.isHeldBy(held) ? null : gateMovedError() }
-    if ((thing.gate_epoch ?? held.gate_epoch) !== held.gate_epoch || (thing.vault_epoch ?? held.vault_epoch) > held.vault_epoch) { return gateMovedError() }
+    const moved = opts?.firstGate === true ? gateMadeElsewhereError : gateMovedError
+    if (thing instanceof Proving) { return this.#provingInconsistency(thing as Proving, moved) }
+    if (thing instanceof Gate) { return thing.base_epoch === held.gate_epoch || thing.isHeldBy(held) ? null : moved() }
+    if ((thing.gate_epoch ?? held.gate_epoch) !== held.gate_epoch || (thing.vault_epoch ?? held.vault_epoch) > held.vault_epoch) { return moved() }
     return null
   }
 
-  /** Why `proving` is not consistent with the gate in hand: its header is in no wayin of the gate, which moved since it was sealed ('gate_moved'), or its gating landed ('gating_landed').
+  /** Why `proving` is not consistent with the gate in hand: its header is in no wayin of the gate, which moved since it was sealed (`moved`, 'gate_moved' or 'gate_made_elsewhere'), or its gating landed ('gating_landed').
    * A fresh header is in no gate until the one carrying it is stored: until then the gate it was
    * sealed under must stand.
    */
-  #provingInconsistency(proving: Proving): VaultError | null {
+  #provingInconsistency(proving: Proving, moved: () => VaultError): VaultError | null {
     const held = this.#vaultProps
-    if (! proving.isCarriedBy(held) && proving.gate_epoch !== held.gate_epoch) { return gateMovedError() }
+    if (! proving.isCarriedBy(held) && proving.gate_epoch !== held.gate_epoch) { return moved() }
     if (proving.gating.landed) { return gatingLandedError() }
     return null
   }
@@ -1318,14 +1325,15 @@ export class Vault {
    * the gate that stands; any other stale write refuses 'stale_write', naming nothing stored.
    */
   async #putGate(gate: Gate, call: GatingCall): Promise<Gate> {
-    this.#demand(gate, { call })
+    const firstGate = gate.base_epoch === 0
+    this.#demand(gate, { call, firstGate })
     const held = this.#vaultProps
     // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
     const drafted = frozenVaultProps({ ...held, vault_epoch: held.vault_epoch + 1, ...gate.storedFields })
     const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
-    // A refused first gate demands the vault half only: a read meanwhile may have taken up the
-    // other device's first gate, which is 'gate_made_elsewhere', not a gate moved.
-    this.#demandAfterWait(written, gate.base_epoch === 0 && ! written.ok ? { vault_tok: gate.vault_tok } : gate, { call })
+    // A read meanwhile may have taken up the other device's first gate, which refused this one:
+    // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
+    this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
     if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
     const next = frozenVaultProps(written.val) as GatedVaultProps
     const stored = Gate.of(this, next)

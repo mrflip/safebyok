@@ -132,8 +132,8 @@ export type GatingInside = {
   takeUp:      (gating: RaisedGating, renewMillis: number) => Promise<boolean>
   /** The refusal `thrown` makes, bad news told, as a public call's outcome. */
   badOutcome:  (thrown: unknown) => BadOutcome
-  /** The vault's demand on `thing`, a refusal logged as `call`'s. */
-  demand:      (thing: Stamped, call: GatingCall) => void
+  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
+  demand:      (thing: Stamped, call: GatingCall, opts?: { firstGate: boolean }) => void
   /** The host's request for cleartext, guarded, or null for none. */
   request:     ((gating: Gating) => Promise<void>) | null
 }
@@ -301,7 +301,8 @@ export class RaisedGating implements ProvingGating {
   // written between them; each opens with a read of storage through the refresh join.
 
   /** `initialize_gate`: the first gate, its passphrase wayin and its passkey's when given around a fresh vaultKey, stored at epoch 1, and the lease granted by the passphrase.
-   * A gate found standing at the start, made elsewhere while the user typed, is 'gate_made_elsewhere'.
+   * A gate found standing at the start, made elsewhere while the user typed, is 'gate_made_elsewhere';
+   * so is one a refresh takes up before this one is written, as each demand up to the write names it.
    * The strength check runs before any derivation, so a weak passphrase zeroes no passkey's answer.
    */
   async #initializeGate(passphrase: string, passkey: PasskeyAnswer | undefined): Promise<void> {
@@ -390,11 +391,12 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** Check `passphrase`'s strength, acting on the verdict only once `thing` and this gating are demanded to stand.
-   * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'.
+   * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'; a
+   * gate made elsewhere meanwhile, for a `thing` made on a vault with none, is 'gate_made_elsewhere'.
    */
   async #strengthUnder(passphrase: string, thing: Stamped): Promise<void> {
     const verdict = await this.#vault.tryCheckStrength(passphrase)
-    this.#inside.demand(thing, this.call)
+    this.#inside.demand(thing, this.call, { firstGate: thing.gate_epoch === 0 })
     if (this.landed) { throw gatingOverError() }
     valOf(verdict)
   }

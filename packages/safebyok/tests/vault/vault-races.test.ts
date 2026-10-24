@@ -321,6 +321,111 @@ describe("a first unlock that loses the race to create the vault", () => {
   })
 })
 
+/**
+ * Device B, open on a novel vault over a store that rings, and device A beside it on the same
+ * storage with its own device store. `gateElsewhere` has A set the vault's first gate with
+ * 'pw one', then waits until B's refresh, rung by A's write, takes that gate into B's picture: a
+ * test lands it while B's first unlock is held in one window of its chain.
+ */
+const ringingRaceToPwOne = async (overrides?: Partial<TH.BornVaultOpts>) => {
+  const world = makeRacingWorld()
+  const there = await world.open(overrides)
+  const here = await world.open({ deviceDB: memoryDeviceDB() })
+  const gateElsewhere = async () => {
+    await TH.unlock(here, 'pw one')
+    await TH.eventually(() => there.getSnapshot().gate_epoch === 1)
+  }
+  return { world, there, gateElsewhere }
+}
+
+/** What stands once B's first unlock lost midway: A's gate, which B's picture holds, B locked under it with no lease, and A's passphrase unlocking B. */
+const expectLostToPwOne = async (world: ReturnType<typeof makeRacingWorld>, there: Vault) => {
+  expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
+  expect(there.getSnapshot()).to.deep.include({ state: 'locked', gate_epoch: 1 })
+  expect(await world.getLease()).to.be.null
+  await TH.unlock(there, 'pw one')
+  expect(there.state).to.eq('unlocked')
+}
+
+describe("a first unlock that loses the race midway, a refresh taking the other device's gate in", () => {
+  it("refuses as gate_made_elsewhere, never weak_passphrase, when the other device's gate lands while the strength check runs", async () => {
+    const latch = TH.makeLatch()
+    const strengthChecker = async () => {
+      await latch.pass()
+      return { strong: false as const, reason: "Too short to stand." }
+    }
+    const { world, there, gateElsewhere } = await ringingRaceToPwOne({ strengthChecker })
+    const unlocking = TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
+    await latch.reached
+    await gateElsewhere()
+    latch.release()
+    const err = await unlocking
+    expect(err.message).to.include('Enter the passphrase chosen there')
+    await expectLostToPwOne(world, there)
+  })
+
+  it("refuses as gate_made_elsewhere when the other device's gate lands while the passphrase is derived", async () => {
+    const { world, there, gateElsewhere } = await ringingRaceToPwOne()
+    const deriving = world.holdNextDerive()
+    const unlocking = TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
+    await deriving.reached
+    await gateElsewhere()
+    deriving.release()
+    await unlocking
+    await expectLostToPwOne(world, there)
+  })
+
+  it("refuses as gate_made_elsewhere when the other device's gate lands while a derivation that then fails runs: the race, not the deriver, is what it names", async () => {
+    const latch = TH.makeLatch()
+    const keyDeriver = { ...TH.testDeriver, deriveKeyBytes: async () => {
+      await latch.pass()
+      throw new Error("The deriver ran out of memory.")
+    } }
+    const { world, there, gateElsewhere } = await ringingRaceToPwOne({ keyDeriver })
+    const unlocking = TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
+    await latch.reached
+    await gateElsewhere()
+    latch.release()
+    await unlocking
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
+    expect(there.getSnapshot()).to.deep.include({ state: 'locked', gate_epoch: 1 })
+  })
+
+  it("refuses as gate_made_elsewhere when the other device's gate lands while the first wayins are sealed", async () => {
+    const { world, there, gateElsewhere } = await ringingRaceToPwOne()
+    // The first fresh key the chain makes is its vaultKey, in sealWayins, after both seals' demands.
+    TH.beforeNextCall(crypto.subtle, 'generateKey', gateElsewhere)
+    await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
+    await expectLostToPwOne(world, there)
+  })
+
+  it("refuses as gate_made_elsewhere when the other device's gate lands while the first wayins are sealed beside a passkey's", async () => {
+    const { world, there, gateElsewhere } = await ringingRaceToPwOne()
+    const passkey = await TH.passkeyOf('laptop')
+    TH.beforeNextCall(crypto.subtle, 'generateKey', gateElsewhere)
+    TH.answering(there, async (gating) => { await TH.expectBad(TH.asKind(gating, 'initialize_gate').attempt('pw two', passkey), 'gate_made_elsewhere') })
+    await TH.expectRefusal(there.ensureUnlocked(), 'gate_made_elsewhere')
+    expect(storedVaultPropsOf(world)).to.deep.include({ passkey: null })
+    await expectLostToPwOne(world, there)
+  })
+
+  it("refuses as gate_moved, not gate_made_elsewhere, once its own first gate is stored and the other device then changes the passphrase before the lease is granted", async () => {
+    const world = makeRacingWorld()
+    const there = await world.open()
+    const here = await world.open({ deviceDB: memoryDeviceDB() })
+    // The first key the chain unwraps is the vaultKey, in grantLease, after its gate is stored.
+    TH.beforeNextCall(crypto.subtle, 'unwrapKey', async () => {
+      await TH.unlock(here, 'pw two')
+      await TH.putWayin(here, 'pw two', 'pw three')
+      await TH.eventually(() => there.getSnapshot().gate_epoch === 2)
+    })
+    await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_moved')
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 2 })
+    expect(await world.getLease()).to.be.null
+    await TH.unlock(there, 'pw three')
+  })
+})
+
 describe("a vault that moves elsewhere while an unlock is under way", () => {
   it("deleted and made anew: the unlock takes up nothing, throws 'vault_remade', and can't seal into the new vault", async () => {
     const world = makeRacingWorld()
