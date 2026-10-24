@@ -1,7 +1,7 @@
 # Thread 13: bank_clears (2026-10-24)
 
-Branch `20261024-bank_clears`, PR #PR, stacked on [#252](https://github.com/mrflip/safebyok/pull/252)
-in the line main → #265 → #252 → #this → #250. Justify: green (core 3147 passed, 37 skipped);
+Branch `20261024-bank_clears`, PR [#266](https://github.com/mrflip/safebyok/pull/266), stacked on [#252](https://github.com/mrflip/safebyok/pull/252)
+in the line main → #265 → #252 → #266 → #250. Justify: green (core 3147 passed, 37 skipped);
 `pnpm size:budget` moves nothing.
 
 Two of the Coach's rulings (2026-10-24), made into docs, tests and TODOs. **No behaviour
@@ -48,7 +48,15 @@ changed**: at the base, both calls already did what the Coach ruled; the empty c
 * **Deviations**: the React README line (one sentence) and the core README's `absent_vault` row
   are outside the gloss; both are about which entry these calls let go, or when they apply.
 
-* **For thread 14 (Contract)**: no Contract line is made untrue by a behaviour change, since none
-  changed. See *Contract lines* below for lines that already disagree with the ruling.
+* **For thread 14 (Contract)**: no Contract line is made untrue, since no behaviour changed. Two
+  sections say less than the ruling (read from the *Contract* tab's export, 2026-10-24):
+  * *bank.clearCachedVault(draft)*: add that it touches this device's store alone (no unlock, no
+    passphrase, no VaultDB verb); that a vault not held, or not stored, is no refusal; that it
+    erases in the draft's `deviceDB`; and that it lets go the entry for the scope once both
+    erasures land, a refusal keeping it. Its **Refuses** leaves out `bad_label` / `bad_option`
+    for a draft amiss.
+  * *bank.delDamagedVault(draft)*: add that storage decides, so it may be asked for a vault the
+    bank does not report; that it acts on the draft's stores, none checked against the held
+    entry's; and that any refusal but `stale_write` keeps the entry.
 
 * **For the Coach**: nothing blocking.
