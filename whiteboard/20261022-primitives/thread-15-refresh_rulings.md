@@ -1,6 +1,6 @@
 # Thread 15: refresh_rulings (2026-10-24)
 
-Branch `20261024-refresh_rulings`, PR #PR, stacked on [#252](https://github.com/mrflip/safebyok/pull/252), in the line main → #265 → #252 → #PR → #250.
+Branch `20261024-refresh_rulings`, PR [#268](https://github.com/mrflip/safebyok/pull/268), stacked on [#252](https://github.com/mrflip/safebyok/pull/252), in the line main → #265 → #252 → #268 → #250.
 Justify: green (core 3142, indexeddb 164, postgres 318, fastkey 49, react 300, convex 316, graphql 323, demo 227, e2e 107); `pnpm size:budget` within every budget.
 
 * **Built**: the Coach's rulings on the core-line review's U3 and U6, both in the vault's refresh
@@ -74,3 +74,9 @@ restored boxes, its gate writes refusing `stale_write`, while every other tab lo
   the Vault object that holds the newer copy".
 * *Tradeoffs and limitations*, "A coherent picture": "a read older than the picture in hand is
   ignored" is now true only above the device record.
+
+## Open questions (also in the PR)
+
+* **Lagging replica false alarm (U6):** Rec: accept; a copy below what the device has seen is
+  indistinguishable from a rollback, and a retry is ruled out (ground rule 10).
+* **Lock-then-unlock elsewhere (U3):** Rec: accept (toldjaso 16).
