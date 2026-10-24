@@ -1,6 +1,6 @@
 # Thread 14: contract_tab (2026-10-24)
 
-Branch `20261024-contract_tab`, PR #TBD, base `main`. Justify: not run (no code; this file and an
+Branch `20261024-contract_tab`, PR [#267](https://github.com/mrflip/safebyok/pull/267), base `main`. Justify: not run (no code; this file and an
 empty changeset only). The work is in the design doc,
 [Every path through store()](https://claude.ai/code/artifact/8ac26722-33ee-4082-a76f-f4c9b6722b70).
 
