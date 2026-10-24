@@ -321,11 +321,10 @@ describe("a first unlock that loses the race to create the vault", () => {
   })
 })
 
-/**
- * Device B, open on a novel vault over a store that rings, and device A beside it on the same
- * storage with its own device store. `gateElsewhere` has A set the vault's first gate with
- * 'pw one', then waits until B's refresh, rung by A's write, takes that gate into B's picture: a
- * test lands it while B's first unlock is held in one window of its chain.
+/** Device B, open on a novel vault over a store that rings, and device A beside it on the same storage with its own device store.
+ * `gateElsewhere` has A set the vault's first gate with 'pw one', then waits until B's refresh,
+ * rung by A's write, takes that gate into B's picture: a test lands it while B's first unlock is
+ * held in one window of its chain.
  */
 const ringingRaceToPwOne = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeRacingWorld()
