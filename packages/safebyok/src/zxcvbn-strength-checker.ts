@@ -43,7 +43,7 @@ const PlainSaying = 'That would be easy to guess'
 /** What to do, after whatever was said: more words, never a digit, a capital or a symbol. */
 const Remedy = ': add a few more words, less common ones.'
 
-// zxcvbn and its dictionaries load at the vault's hello, or the first passphrase checked, never at
+// zxcvbn and its dictionaries load at the bank's hello, or the first passphrase checked, never at
 // import: a bundler splits them into a chunk of their own, so importing browserOpts() costs a page
 // nothing until a vault opens. Ranking the dictionaries takes some milliseconds more, once. The
 // estimator keeps nothing of any passphrase between calls. A load that fails is forgotten, so the
@@ -106,19 +106,19 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
  * nothing, and sends nothing anywhere.
  *
  * zxcvbn and its dictionary, about 216 kB brotlied, are a chunk of their own in a bundled app. Its
- * `load` fetches them, as `hello()` does, or else its first call. After that, a call takes a few
+ * `load` fetches them, as `bank.hello()` does, or else its first call. After that, a call takes a few
  * milliseconds, so a field may call it on every keystroke. A load that fails throws, failing the
- * hello, and the next load tries again.
+ * bank's hello, and the next load tries again.
  *
  * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. The vault
  *   always passes it.
  *
  * @example
- *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })  // brings it in
+ *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })  // brings it in
  * @example await zxcvbnStrengthChecker('correct horse battery staple')  // { strong: true }
  * @example await zxcvbnStrengthChecker('password1234')                  // { strong: false, reason: 'That is very like a commonly used password: add a few more words, less common ones.' }
  * @example await zxcvbnStrengthChecker('hunter2')                       // { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }
- * @example await zxcvbnStrengthChecker.load()   // fetches zxcvbn and its dictionary, as the vault's hello() does; throws if they will not load
+ * @example await zxcvbnStrengthChecker.load()   // fetches zxcvbn and its dictionary, as bank.hello() does; throws if they will not load
  * @example await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: 'u1', vaultlabel: 'pinecone' })  // { strong: false, reason: 'That holds something about you or this site, ...' }
  */
 export const zxcvbnStrengthChecker = Object.assign(checkWithZxcvbn, {

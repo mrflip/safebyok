@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useOpenError, useVault, useVaultSnapshot } from 'safebyok-react'
+import { useBank, useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
@@ -28,50 +28,73 @@ const noteOf = (sidecar: Sidecar): string => {
 }
 
 export const VaultDashboard = () => {
-  const vault = useVault()
-  const { openError, retryOpen, delDamagedVault } = useOpenError()
-  const snapshot = useVaultSnapshot()
+  const bank = useBank()
+  const entry = useVault('main')
+  const snapshot = useVaultSnapshot('main')
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
   const [psst, setPsst] = useState<{ boxlabel: string, whisper: Whisper } | null>(null)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // A condition that stopped the vault opening -- storage unreachable, signed out of the
-  // backend -- is shown here, in place, with a way to try again. (Misuse would have gone to an
-  // error boundary instead.)
-  // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
-  // and start over, which asks first, as it takes every box in the vault with it.
-  if (openError?.refusalkind === 'damaged_vault') {
-    const startOver = async () => {
-      if (! globalThis.confirm("Remove this vault and start over? Every box in it is lost for good.")) { return }
-      setGripe(null)
-      try {
-        await delDamagedVault()
-      } catch (err) {
-        setGripe(err instanceof Error ? err.message : 'Could not remove the vault.')
+  // Why the bank has no vault to hand down -- storage unreachable, signed out of the backend -- is
+  // shown here, in place, with a way to ask again. (Misuse would have gone to an error boundary.)
+  // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
+  const refusal = entry?.err ?? null
+  if (entry !== null && refusal !== null && bank !== null) {
+    const choice = { userId: entry.scope.user_id, vaultlabel: entry.scope.vaultlabel }
+    const askAgain = () => { void bank.tryEnsureVault(choice) }
+    // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
+    // and start over, which asks first, as it takes every box in the vault with it.
+    if (refusal.refusalkind === 'damaged_vault') {
+      const startOver = async () => {
+        if (! globalThis.confirm("Remove this vault and start over? Every box in it is lost for good.")) { return }
+        setGripe(null)
+        const deleted = await bank.tryDelDamagedVault(choice)
+        if (! deleted.ok) { setGripe(deleted.err.message); return }
+        askAgain()
       }
+      return (
+        <>
+          <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{refusal.message} <button onClick={() => { void startOver() }}>Remove and start over</button></p>
+          {gripe !== null && <p className="gripe">{gripe}</p>}
+        </>
+      )
+    }
+    // A browser that will not let the app keep anything here holds to that until the user changes
+    // it, so it gets no Retry button either: only what to change.
+    if (refusal.refusalkind === 'storage_blocked') {
+      return <p className="gripe">{"This browser won't let the app keep your vault on this device. "}{refusal.message}</p>
+    }
+    // Storage serving an older copy than this device has seen holds until it serves the newer one
+    // again, or the user, sure the restore was meant, has this device accept the older copy.
+    if (refusal.refusalkind === 'vault_behind') {
+      const accept = async () => {
+        if (! globalThis.confirm("Accept the older copy of this vault that storage holds now? Only do this if it was restored from a backup on purpose.")) { return }
+        setGripe(null)
+        const cleared = await bank.tryClearCachedVault(choice)
+        if (! cleared.ok) { setGripe(cleared.err.message); return }
+        askAgain()
+      }
+      return (
+        <>
+          <p className="gripe">{refusal.message} <button onClick={askAgain}>Retry</button> <button onClick={() => { void accept() }}>Accept this copy</button></p>
+          {gripe !== null && <p className="gripe">{gripe}</p>}
+        </>
+      )
+    }
+    // A vault deleted -- here, or on another device -- stays gone until the user asks for a new one.
+    if (refusal.refusalkind === 'vault_gone' || refusal.refusalkind === 'vault_remade') {
+      return <p className="quiet">{"This vault was deleted. "}<button onClick={askAgain}>Start a new vault</button></p>
     }
     return (
-      <>
-        <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{openError.message} <button onClick={() => { void startOver() }}>Remove and start over</button></p>
-        {gripe !== null && <p className="gripe">{gripe}</p>}
-      </>
-    )
-  }
-  // A browser that will not let the app keep anything here holds to that until the user changes
-  // it, so it gets no Retry button either: only what to change.
-  if (openError?.refusalkind === 'storage_blocked') {
-    return <p className="gripe">{"This browser won't let the app keep your vault on this device. "}{openError.message}</p>
-  }
-  if (openError !== null) {
-    return (
       <p className="gripe">
-        {"Can't reach your vault. "}{openError.message} <button onClick={retryOpen}>Retry</button>
+        {"Can't reach your vault. "}{refusal.message} <button onClick={askAgain}>Retry</button>
       </p>
     )
   }
-  // The handle comes at once, and says it is opening until its hello has read storage.
-  if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
+  const vault = entry?.vault ?? null
+  // No Vault object until its birth has read storage: until then, the vault is opening.
+  if (vault === null || snapshot === null) { return <p className="quiet">Opening vault…</p> }
 
   // A read the user dismissed the passphrase dialog for is refused vault_locked, and a box gone
   // meanwhile absent_box: nothing to show.
@@ -97,8 +120,9 @@ export const VaultDashboard = () => {
       await vault.delBox(boxlabel)
     } catch (err) {
       // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
-      // the user deleted to start over from the passphrase dialog -- is what was asked for.
-      if (isVaultError(err, 'vault_locked')) { return }
+      // the user deleted to start over from the passphrase dialog, its Vault object gone with it
+      // -- is what was asked for.
+      if (isVaultError(err, 'vault_locked') || isVaultError(err, 'vault_gone')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
     hide(boxlabel)
@@ -240,6 +264,6 @@ const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassph
     )
   }
   if (state === 'locked') { return <span className="chip locked">🔒 locked</span> }
-  if (state === 'absent') { return <span className="chip">no vault yet</span> }
+  if (state === 'novel') { return <span className="chip">no vault yet</span> }
   return <span className="chip">…</span>
 }

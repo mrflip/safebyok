@@ -1,5 +1,5 @@
 import { browserOpts } from 'safebyok/browser'
-import { VaultProvider } from 'safebyok-react'
+import { BankProvider } from 'safebyok-react'
 import { KnockKnock } from './components/KnockKnock'
 import { SessionBar } from './components/SessionBar'
 import { TroubleBoundary } from './components/TroubleBoundary'
@@ -49,16 +49,15 @@ export const App = () => {
   const userId = session?.userId ?? null
   return (
     <TroubleBoundary key={userId ?? 'signed-out'}>
-      <VaultProvider
+      <BankProvider
         {...browserOpts({ dbName: Applabel })}
         applabel={Applabel}
-        vaultlabel="main"
         userId={userId}
         vaultDB={vaultDB}
         allowStartOver
       >
         <Page />
-      </VaultProvider>
+      </BankProvider>
     </TroubleBoundary>
   )
 }

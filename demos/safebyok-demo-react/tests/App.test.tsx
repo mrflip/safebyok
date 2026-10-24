@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserOpts } from 'safebyok/browser'
 import { App } from '../src/App'
+import { Applabel, vaultDB } from '../src/lib/stores'
 
 // The App derives through the browser's defaults: 64 MiB of Argon2id for every passphrase typed,
 // near a second each here and over five on a loaded CI machine under coverage, where one click
@@ -46,7 +47,26 @@ describe("App", () => {
     expect(screen.queryByText('The Knock-Knock Machine')).to.be.null
   })
 
-  it("clicks through the passphrase dialog: set, lock, mistype, dismiss, enter, and start over", async () => {
+  it("keeps the account and its vault, and says why, when Delete account meets a vault with no passphrase yet: deleting a vault is proven by its passphrase", async () => {
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: 'leaver' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByText(/No boxes yet/)
+    const shown = await screen.findByText(/^\(user_/)
+    const scope = { applabel: Applabel, user_id: shown.textContent.slice(1, -1), vaultlabel: 'main' }
+    const born = await vaultDB.getVault(scope)
+    expect(born.ok && born.val !== null).to.be.true
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(await screen.findByText(/has no passphrase yet/)).to.not.be.null
+    expect(screen.queryByPlaceholderText('username')).to.be.null
+    const kept = await vaultDB.getVault(scope)
+    expect(kept.ok && kept.val !== null).to.be.true
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await screen.findByPlaceholderText('username')
+  })
+
+  it("clicks through the passphrase dialog: set, lock, mistype, dismiss, and enter", async () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: 'clicker' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -84,17 +104,6 @@ describe("App", () => {
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await screen.findByText('sk-ant-test-not-a-real-key')
-
-    // Forgot it: start over from the dialog, the vault emptied of every box.
-    fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
-    await screen.findByText('🔒 locked')
-    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'remove' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Forgot it? Start a new vault' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
-    // The delete lands as a lock: the dialog closes, the removal it asked for with it, and the
-    // emptied vault lists no boxes. The next store asks for a new vault's passphrase.
-    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-    expect(await screen.findByText(/No boxes yet/)).to.not.be.null
   })
+
 })

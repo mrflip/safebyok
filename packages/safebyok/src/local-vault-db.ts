@@ -35,7 +35,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
  *   not a StringStore, or a `logger` that is not a VaultLogger.
- * @returns The VaultDB, to hand `Vault.make`.
+ * @returns The VaultDB, to hand `Bank.make`.
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })

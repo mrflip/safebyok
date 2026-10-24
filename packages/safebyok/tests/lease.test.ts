@@ -299,7 +299,7 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
   ] as const) {
     it(`refuse '${refusalkind}' once the vault has moved on from the lease's stamp, ciphering nothing`, async () => {
       const { lease, vault } = await leasedVault()
-      vault.stamp = vault.stamp === null ? null : { ...vault.stamp, ...moved }
+      vault.stamp = { ...vault.stamp, ...moved }
       await TH.expectRefusal(lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf()), refusalkind)
     })
   }
@@ -321,7 +321,7 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
     const deciphering = TH.holdNextCall(crypto.subtle, 'decrypt')
     const opening = lease.decipherWith({ ...ciphered, whisper_ciphered: other.whisper_ciphered }, visibleOf())
     await deciphering.reached
-    vault.stamp = vault.stamp === null ? null : { ...vault.stamp, vault_tok: 'vault-tok-new' }
+    vault.stamp = { ...vault.stamp, vault_tok: 'vault-tok-new' }
     deciphering.release()
     await TH.expectRefusal(opening, 'vault_remade')
   })

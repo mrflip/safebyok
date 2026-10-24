@@ -292,17 +292,17 @@ describe("idbVaultDB", () => {
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(1)
   })
 
-  it("serves Vault.make and hello(): a vault made, stored in and reopened over it", async () => {
+  it("serves Bank.make and ensureVault(): a vault born, stored in and born again over it", async () => {
     const dbName = TH.freshDbName()
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
     const vault = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
-    await vault.unlock('correct horse')
+    await TH.unlock(vault, 'correct horse')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-not-a-real-key')
-    vault.close()
+    TH.closeVault(vault)
     const reopened = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
-    await reopened.unlock('correct horse')
+    await TH.unlock(reopened, 'correct horse')
     expect(await reopened.getWhisper('anthropic')).to.eq('sk-not-a-real-key')
-    reopened.close()
+    TH.closeVault(reopened)
   })
 })
 
@@ -421,12 +421,12 @@ describe("idbVaultDB's subscribe", () => {
     }
   })
 
-  it("closes the bell's channel when its vault closes", async () => {
+  it("closes the bell's channel when its vault is let go", async () => {
     const dbName = TH.freshDbName()
     const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB(), vaultDB: idbVaultDB({ dbName }) })
     const closing = vi.spyOn(BroadcastChannel.prototype, 'close')
     try {
-      vault.close()
+      TH.closeVault(vault)
       expect(closing).toHaveBeenCalledTimes(1)
     } finally {
       closing.mockRestore()

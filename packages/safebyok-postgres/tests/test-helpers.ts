@@ -58,8 +58,9 @@ export const tablelessClient = (db: PGlite): PostgresClient => ({
 
 /**
  * The roles {@link roleClient} sends as, made once in this file's database. Each may keep its
- * vault props and read every box; `safebyok_reader` lacks the privilege to write a box, and
- * `safebyok_viewer` holds it, but no row-level security policy lets it insert or change one.
+ * vault props and its tombstone (a vault's birth writes both) and read every box;
+ * `safebyok_reader` lacks the privilege to write a box, and `safebyok_viewer` holds it, but no
+ * row-level security policy lets it insert or change one.
  */
 export type GuestRole = 'safebyok_reader' | 'safebyok_viewer'
 
@@ -69,11 +70,14 @@ const GuestRolesSql = `DO $$ BEGIN
   EXCEPTION WHEN duplicate_object THEN NULL;
   END $$;
   GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_vaults TO safebyok_reader, safebyok_viewer;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_vault_tombstones TO safebyok_reader, safebyok_viewer;
   GRANT SELECT ON safebyok_boxes TO safebyok_reader;
   GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_boxes TO safebyok_viewer;
   DROP POLICY IF EXISTS guests ON safebyok_vaults;
+  DROP POLICY IF EXISTS guests ON safebyok_vault_tombstones;
   DROP POLICY IF EXISTS guests ON safebyok_boxes;
   CREATE POLICY guests ON safebyok_vaults TO safebyok_reader, safebyok_viewer USING (true) WITH CHECK (true);
+  CREATE POLICY guests ON safebyok_vault_tombstones TO safebyok_reader, safebyok_viewer USING (true) WITH CHECK (true);
   CREATE POLICY guests ON safebyok_boxes FOR SELECT TO safebyok_reader, safebyok_viewer USING (true);`
 
 /**

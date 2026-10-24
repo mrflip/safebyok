@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Validators from '../src/validators'
 import { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from '../src/validators'
+import { Bank } from '../src/bank'
 import { VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
@@ -223,10 +224,24 @@ describe("AnyTextValidators", () => {
     expect(AnyTextValidators.boxlabel.safeParse('key \u{D83D}').success).to.be.false
   })
 
-  it("composes with a default, as its second example shows", () => {
+  it("lets a bank take any text for its vaults' names, as its first example shows", async () => {
+    const { userId: _userId, vaultlabel: _vaultlabel, ...opts } = TH.memoryVaultOpts()
+    const bank = Bank.make({ ...opts, validators: AnyTextValidators })
+    const vault = await bank.ensureVault({ userId: 'Alice Smith', vaultlabel: 'Work: מפתח API' })
+    expect(vault).to.include({ user_id: 'Alice Smith', vaultlabel: 'Work: מפתח API' })
+    bank.closeVaults()
+  })
+
+  it("composes with a default in a bank's validators, as its second example shows", async () => {
     const validators = { ...AnyTextValidators, userId: UserId }
     expect(validators.boxlabel.safeParse('Anthropic API key').success).to.be.true
     expect(validators.userId.safeParse('').success).to.be.false
+    const { userId: _userId, vaultlabel: _vaultlabel, ...opts } = TH.memoryVaultOpts()
+    const bank = Bank.make({ ...opts, validators })
+    await TH.expectRefusal(bank.ensureVault({ userId: 'Alice Smith', vaultlabel: 'Work keys' }), 'bad_label')
+    const vault = await bank.ensureVault({ userId: 'alice', vaultlabel: 'Work keys' })
+    expect(vault.vaultlabel).to.eq('Work keys')
+    bank.closeVaults()
   })
 })
 
@@ -237,7 +252,7 @@ describe("DefaultValidators", () => {
     expect(DefaultValidators.userId).to.eq(UserId)
   })
 
-  it("is frozen: a host replaces a check in Vault.make's validators, never here", () => {
+  it("is frozen: a host replaces a check in Bank.make's validators, never here", () => {
     expect(Object.isFrozen(DefaultValidators)).to.be.true
   })
 

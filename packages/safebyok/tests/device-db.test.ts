@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deviceOutcomeOf, deviceTroubleAsConditions, memoryDeviceDB, type DeviceDB } from '../src/device-db'
+import { deviceOutcomeOf, deviceRecordFor, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
 import { VaultError } from '../src/errors'
-import type { LeaseRecord, VaultScope } from '../src/types'
+import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types'
 import * as TH from './test-helpers'
 
 TH.describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
@@ -15,19 +15,19 @@ describe("memoryDeviceDB", () => {
     expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
 
-  it("treats a mangled mark as no mark, and clears it", async () => {
+  it("treats a mangled device record as none, and clears it", async () => {
     const deviceDB = TH.expectingGood(memoryDeviceDB())
-    await deviceDB.putMark(TH.markOf('u1', { seen: { device_id: '' } }))
-    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
-    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null  // stays gone
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))
+    expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
 
   it("answers a null lease as a good Outcome, as its first example shows", async () => {
     expect(await memoryDeviceDB().getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
   })
 
-  it("answers a null mark as a good Outcome, as its second example shows", async () => {
-    expect(await memoryDeviceDB().getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+  it("answers a null device record as a good Outcome, as its second example shows", async () => {
+    expect(await memoryDeviceDB().getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
   })
 
   it("refuses a scope whose name holds the ckey delimiter as a bad Outcome of 'bad_label', never a rejection", async () => {
@@ -35,17 +35,77 @@ describe("memoryDeviceDB", () => {
   })
 })
 
+describe("raisedDeviceRecord", () => {
+  const record: DeviceRecord = TH.deviceRecordOf('u1')
+
+  it("stores the record as it came where none stands, as its first example shows", () => {
+    expect(raisedDeviceRecord(undefined, record)).to.eq(record)
+  })
+
+  it("keeps the higher highest_vault_epoch where a record stands, as its second example shows", () => {
+    expect(raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch).to.eq(5)
+  })
+
+  it("raises a standing record to a higher epoch, keeping its own device_id", () => {
+    const standing = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 })
+    expect(raisedDeviceRecord(standing, TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 4 })))
+      .to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 4 }))
+  })
+
+  const GivesWayCases = [
+    // what may stand under the ckey that is no device record of this scope:
+    [null,                                                       'a null left by a store'],
+    [{ format: 'safebyok-device-v0', highest_vault_epoch: 9 },  'a row that fails its check'],
+    [TH.deviceRecordOf('u2', { highest_vault_epoch: 9 }),        "another scope's record, filed where it should not be"],
+  ] as const
+
+  for (const [stored, blurb] of GivesWayCases) {
+    it(`gives way to the record handed to it over ${blurb}`, () => {
+      expect(raisedDeviceRecord(stored, record)).to.eq(record)
+    })
+  }
+})
+
+describe("deviceRecordFor", () => {
+  const scope = TH.scopeOf('u1')
+  const record: DeviceRecord = TH.deviceRecordOf('u1')
+
+  it("hands back a record of the scope as it came, and none as none, as its first example shows", () => {
+    expect(deviceRecordFor(scope, record)).to.deep.equal(record)
+    expect(deviceRecordFor(scope, null)).to.be.null
+  })
+
+  it("reads a record naming another user as none, as its second example shows", () => {
+    expect(deviceRecordFor(scope, { ...record, user_id: 'someone-else' })).to.be.null
+  })
+
+  const NoneCases = [
+    [{ ...record, device_id: undefined },          'one with no device_id'],
+    [{ ...record, device_id: '' },                 'one with an empty device_id'],
+    [{ ...record, highest_vault_epoch: -1 },       'one with a negative epoch'],
+    [{ ...record, format: 'safebyok-device-v0' },  'one of another format'],
+    [{ ...record, vaultlabel: 'work' },            "another vault's"],
+    ['a string, not a record',                     'what is no record at all'],
+  ] as const
+
+  for (const [answer, blurb] of NoneCases) {
+    it(`reads ${blurb} as none`, () => {
+      expect(deviceRecordFor(scope, answer)).to.be.null
+    })
+  }
+})
+
 describe("deviceOutcomeOf", () => {
   it("answers what the body returns as a good Outcome, a record or null, as its first example shows", async () => {
-    expect(await deviceOutcomeOf('getMark', () => TH.markOf('u1'))).to.deep.equal({ ok: true, val: TH.markOf('u1') })
-    expect(await deviceOutcomeOf('getMark', () => Promise.resolve(null))).to.deep.equal({ ok: true, val: null })
+    expect(await deviceOutcomeOf('getDeviceRecord', () => TH.deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: TH.deviceRecordOf('u1') })
+    expect(await deviceOutcomeOf('getDeviceRecord', () => Promise.resolve(null))).to.deep.equal({ ok: true, val: null })
   })
 
   it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting, as its second example shows", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
-    const err = await TH.expectBad(deviceOutcomeOf('putMark', () => Promise.reject(blocked)), 'storage_blocked')
+    const err = await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => Promise.reject(blocked)), 'storage_blocked')
     expect(err.cause).to.eq(blocked)
-    expect(err.message).to.match(/writing its mark of this vault/)
+    expect(err.message).to.match(/erasing its record of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
   })
 
@@ -67,15 +127,15 @@ describe("deviceOutcomeOf", () => {
 
   it("passes a VaultError through as it came", async () => {
     const refusal = new VaultError('bad_label', 'no such label')
-    expect(await TH.expectBad(deviceOutcomeOf('delMark', () => { throw refusal }), 'bad_label')).to.eq(refusal)
+    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_label')).to.eq(refusal)
   })
 })
 
 describe("deviceTroubleAsConditions", () => {
   it("passes a good Outcome through as it came", async () => {
     const deviceDB = memoryDeviceDB()
-    await deviceDB.putMark(TH.markOf('u1'))
-    expect(await deviceTroubleAsConditions(deviceDB).getMark(TH.scopeOf('u1'))).to.deep.equal({ ok: true, val: TH.markOf('u1') })
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
+    expect(await deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal({ ok: true, val: TH.deviceRecordOf('u1') })
   })
 
   it("passes a store's own refusal through as it came", async () => {
@@ -116,11 +176,27 @@ describe("deviceTroubleAsConditions", () => {
     await TH.expectBad(deviceTroubleAsConditions(deviceDB).delAll(), 'storage_unavailable')
   })
 
+  it("says a failing store reading its device record as 'storage_unavailable', as its first example shows", async () => {
+    const deviceDB = memoryDeviceDB()
+    vi.spyOn(deviceDB, 'getDeviceRecord').mockRejectedValueOnce(new Error('the disk said no'))
+    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1')), 'storage_unavailable')
+    expect(err.message).to.match(/failed reading its record of this vault/)
+  })
+
+  it("says site data blocked as 'storage_blocked', the store's error its cause, as its second example shows", async () => {
+    const deviceDB = memoryDeviceDB()
+    const blocked = new DOMException('The operation is insecure.', 'SecurityError')
+    vi.spyOn(deviceDB, 'getDeviceRecord').mockImplementationOnce(() => { throw blocked })
+    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
+    expect(err.cause).to.eq(blocked)
+    expect(err.message).to.match(/will not help until that changes/)
+  })
+
   it("names no scope in what it says", async () => {
     const deviceDB = memoryDeviceDB()
     const scope: VaultScope = { applabel: 'acme', user_id: 'distinctive_user', vaultlabel: 'main' }
-    vi.spyOn(deviceDB, 'getMark').mockRejectedValueOnce(new Error('no'))
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getMark(scope), 'storage_unavailable')
+    vi.spyOn(deviceDB, 'getDeviceRecord').mockRejectedValueOnce(new Error('no'))
+    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(scope), 'storage_unavailable')
     expect(err.message).not.to.include('distinctive_user')
   })
 })

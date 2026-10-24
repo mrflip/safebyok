@@ -25,33 +25,32 @@ the floor is stated in the core's *Where it runs*.
 ## Use
 
 ```ts
-import { Vault } from 'safebyok'
+import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const vault = Vault.make({
+const bank = Bank.make({
   applabel:   'acme',
-  userId:     session.userId,
-  vaultlabel: 'main',
   vaultDB:    idbVaultDB({ dbName: 'acme' }),
   ...browserOpts({ dbName: 'acme' }),   // the key deriver, and the device store beside the vault
 })
+const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
 ```
 
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's
   rows in `<dbName>:vault_db`, and, through `browserOpts`, the lease in
   `<dbName>:device_db`. Anything but non-empty text refuses with kind `bad_option`.
 * **`logger`**, when given, hears what the store has to say (a listener that threw, say); left
-  out, the store uses the one `Vault.make` is given, else the console.
+  out, the store uses the one `Bank.make` is given, else the console.
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
   at once settle on one; deleting a vault takes its every box with it, or none of them.
 * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel, so a vault open in two tabs
   stays current in both. The bell says only that something changed; the vault reads again. Its
-  channel is closed when the last vault listening to it closes.
+  channel is closed when the last vault listening to it is let go.
 * **No limits of its own.** IndexedDB sets none per record or per vault, so `maxRecordBytes`,
-  `maxVaultBytes` and `maxBoxes` are `Infinity`: a vault holds what `Vault.make`'s
+  `maxVaultBytes` and `maxBoxes` are `Infinity`: a vault holds what `Bank.make`'s
   `maxBoxes` allows (100 by default), the origin's storage quota bounds the whole database,
   and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
   Its `getCapacity` counts a vault's boxes, and weighs each row as its JSON in UTF-8 bytes,

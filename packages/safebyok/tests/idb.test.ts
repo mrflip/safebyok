@@ -53,10 +53,10 @@ describe("idbDeviceDB over storage the browser withholds", () => {
     failWritesOverQuota()
     const refused = await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
     expect(refused.cause).to.have.property('name', 'QuotaExceededError')
-    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
     const scope = TH.scopeOf('u1')
     expect(await TH.expectGood(deviceDB.getLease(scope))).to.be.null
-    expect(await TH.expectGood(deviceDB.getMark(scope))).to.be.null
+    expect(await TH.expectGood(deviceDB.getDeviceRecord(scope))).to.be.null
   })
 
   it("answers every verb as storage_blocked when the browser refuses each open through its request's onerror, its SecurityError the cause", async () => {
@@ -67,9 +67,9 @@ describe("idbDeviceDB over storage the browser withholds", () => {
     expect(refused.cause).to.be.instanceOf(DOMException).and.to.have.property('name', 'SecurityError')
     await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
     await TH.expectBad(deviceDB.delLease(scope), 'storage_blocked')
-    await TH.expectBad(deviceDB.getMark(scope), 'storage_blocked')
-    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
-    await TH.expectBad(deviceDB.delMark(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.getDeviceRecord(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.delDeviceRecord(scope), 'storage_blocked')
     await TH.expectBad(deviceDB.delAll(), 'storage_blocked')
   })
 })
@@ -100,6 +100,37 @@ describe("idbDeviceDB, reading a lease it cannot read", () => {
     expect(written).to.deep.equal({ ok: true, val: lease })
     const kept = await TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
     expect(kept).to.deep.equal(lease)
+  })
+})
+
+describe("idbDeviceDB, as its examples have it", () => {
+  it("answers a fresh device's lease as a good Outcome of null, in the default database, as its first example shows", async () => {
+    const deviceDB = idbDeviceDB()
+    expect(await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+  })
+
+  it("answers a fresh device's record as a good Outcome of null, as its second example shows", async () => {
+    const deviceDB = idbDeviceDB()
+    expect(await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+  })
+})
+
+describe("idbDeviceDB, two tabs raising at once", () => {
+  it("keeps the higher epoch when two tabs over one database raise the device record at once, in either order", async () => {
+    for (const [first, second] of [[7, 6], [6, 7]] as const) {
+      const dbName = TH.freshDbName()
+      const thisTab = idbDeviceDB({ dbName })
+      const otherTab = idbDeviceDB({ dbName })
+      const thisRecord = TH.deviceRecordOf('u1', { highest_vault_epoch: first })
+      const otherRecord = TH.deviceRecordOf('u1', { highest_vault_epoch: second })
+      const [thisRaised, otherRaised] = await Promise.all([TH.expectGood(thisTab.raiseDeviceRecord(thisRecord)), TH.expectGood(otherTab.raiseDeviceRecord(otherRecord))])
+      // Each resolves what it stored: the one that landed second saw the first's raise.
+      expect(Math.max(thisRaised.highest_vault_epoch, otherRaised.highest_vault_epoch)).to.eq(7)
+      const highest = TH.deviceRecordOf('u1', { highest_vault_epoch: 7 })
+      const scope = TH.scopeOf('u1')
+      expect(await TH.expectGood(thisTab.getDeviceRecord(scope))).to.deep.equal(highest)
+      expect(await TH.expectGood(otherTab.getDeviceRecord(scope))).to.deep.equal(highest)
+    }
   })
 })
 
@@ -147,7 +178,7 @@ describe("idbDeviceDB", () => {
       const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
       vi.stubGlobal('indexedDB', factory)
       try {
-        const err = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+        const err = await TH.expectBad(deviceDB.getDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
         expect(err.cause).to.have.property('name', 'NotSupportedError')
       } finally {
         vi.unstubAllGlobals()
@@ -170,7 +201,7 @@ describe("idbDeviceDB", () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      const { cause } = await TH.expectBad(deviceDB.getDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
       expect(cause).to.be.instanceOf(DOMException)
       expect(cause).to.have.property('name', 'NotSupportedError')
     } finally {
@@ -183,7 +214,7 @@ describe("idbDeviceDB", () => {
     vi.stubGlobal('indexedDB', undefined)
     vi.stubGlobal('DOMException', undefined)
     try {
-      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      const { cause } = await TH.expectBad(deviceDB.getDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
       expect(cause).to.be.instanceOf(Error)
       expect(cause).to.have.property('name', 'NotSupportedError')
       expect(cause).to.have.property('message').that.includes('no IndexedDB')
@@ -226,36 +257,47 @@ describe("idbDeviceDB", () => {
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
   })
 
-  it("discards a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
+  it("discards a device's lease from before the rename, filed under unlock^, keeping its device record: the user proves once more", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    await deviceDB.putMark(TH.markOf('u1'))
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     // Even a record that would read today is swept unread: its ckey is not one this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
     expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['mark^acme^u1^main'])
-    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.deep.equal(TH.markOf('u1'))
+    expect(rows.map((row) => row.ckey)).to.deep.equal(['device^acme^u1^main'])
+    expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal(TH.deviceRecordOf('u1'))
   })
 
-  it("keeps every device mark through a sweep: a mark's ckey is one this version files", async () => {
+  it("keeps every device record through a sweep: a device record's ckey is one this version files", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    await deviceDB.putMark(TH.markOf('u1'))
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.mark(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.deviceRecord(TH.scopeOf('u1'))])
   })
 
-  it("reads a mark that does not pass its check as none, and drops it", async () => {
+  it("sweeps a device mark an earlier version filed under mark^ at the first read, keeping the device record", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, gate_epoch: 'one' } }, shelf)
+    await set('mark^acme^u1^main', { format: 'safebyok-mark-v1', applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
+    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.getLease(TH.scopeOf('u1'))
+    const rows = await inspectIdbDeviceDB({ dbName }).rows()
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.deviceRecord(TH.scopeOf('u1'))])
+  })
+
+  it("reads a device record that does not pass its check as none, and drops it", async () => {
+    const dbName = TH.freshDbName()
+    const shelf = createStore(`${dbName}:device_db`, 'records')
+    await set(Ckeys.deviceRecord(TH.scopeOf('u1')), { ...TH.deviceRecordOf('u1'), highest_vault_epoch: 'one' }, shelf)
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 

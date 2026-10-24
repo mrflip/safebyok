@@ -1,18 +1,30 @@
 // @vitest-environment jsdom
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStore } from 'safebyok'
+import { VaultError, memoryStore, type RequestCleartext } from 'safebyok'
+import { BankProvider } from 'safebyok-react'
 import { SessionBar } from '../../src/components/SessionBar'
 import { createAuth } from '../../src/lib/auth'
 import * as TH from '../test-helpers'
 
-/** The bar over a fresh fake auth, in a vault for `u1`. */
-const renderBar = () => {
+/** The bar over a fresh fake auth, in a vault for `u1`: behind the provider's own dialog, or `requestCleartext` when given. */
+const renderBar = (requestCleartext?: RequestCleartext) => {
   const world = TH.makeWorld()
   const dbStore = memoryStore()
   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore() })
-  world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
+  const ui = <><SessionBar auth={auth} /><TH.VaultProbe /></>
+  if (requestCleartext === undefined) {
+    world.renderInVault(ui)
+  } else {
+    const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB: world.vaultDB, deviceDB: world.deviceDB })
+    render(<BankProvider {...bankOpts} requestCleartext={requestCleartext} userId="u1">{ui}</BankProvider>)
+  }
   return { world, auth, dbStore }
+}
+
+/** A host's requestCleartext that answers a deletion with `passphrase`, as a dialog for it would, and declines every other gating. */
+const deletingWith = (passphrase: string): RequestCleartext => async (gating) => {
+  if (gating.gatingkind === 'del_vault') { await gating.attempt(passphrase) }
 }
 
 const signInAs = (userlabelText: string) => {
@@ -64,6 +76,7 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     fireEvent.click(await screen.findByRole('button', { name: 'unlock' }))
+    await TH.answerPassphraseDialog()
     await TH.expectProbeState('unlocked')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
@@ -71,19 +84,50 @@ describe("SessionBar", () => {
     expect(screen.getByTestId('state').textContent).to.eq('locked')
   })
 
-  it("deletes the account and its vault, once the user confirms", async () => {
-    const { world, auth, dbStore } = renderBar()
+  it("deletes the account and its vault, once the user confirms and a dialog of the host's own answers the deletion with the passphrase: the vault stays gone, nothing asking for it again", async () => {
+    const { world, auth, dbStore } = renderBar(deletingWith(TH.Passphrase))
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     signInAs('margo')
     await screen.findByText('margo')
     await TH.expectProbeState('locked')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    const deleted = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    expect(deleted).to.not.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     expect(dbStore.read('account:acme:margo')).to.be.null
+    // This provider's userId is not the auth's: it stays on u1, and still asks for nothing anew.
+    await TH.expectProbeState('none')
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+  })
+
+  it("keeps the account and says why when the vault cannot be deleted", async () => {
+    const { world, auth } = renderBar(deletingWith(TH.Passphrase))
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('locked')
+    vi.spyOn(world.vaultDB, 'delVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(await screen.findByText('The vault storage could not be reached: try again shortly.')).to.not.be.null
+    expect(auth.getSnapshot()?.userlabel).to.eq('margo')
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+  })
+
+  it("keeps the account and its vault, and says so, when the provider's own dialog declines the deletion, as it does for now", async () => {
+    const { world, auth } = renderBar()
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('locked')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(await screen.findByText(/declined/)).to.not.be.null
+    expect(auth.getSnapshot()?.userlabel).to.eq('margo')
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {

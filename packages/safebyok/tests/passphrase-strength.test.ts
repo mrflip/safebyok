@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, type StrengthChecker, type PassphraseVerdict } from '../src/passphrase-strength'
+import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, loadStrengthChecker, type StrengthChecker, type PassphraseVerdict } from '../src/passphrase-strength'
+import { zxcvbnStrengthChecker } from '../src/zxcvbn-strength-checker'
 import type { VaultScope } from '../src/types'
 import { VaultError } from '../src/errors'
 import * as TH from './test-helpers'
@@ -88,7 +89,7 @@ describe("guardStrengthChecker", () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
       const err = await TH.expectRefusal(guardStrengthChecker(broken, scope)('acme acme acme'), 'unexpected_error')
       expect(err).to.not.eq(thrown)
-      expect(err.message).to.match(/strengthChecker handed to Vault.make threw/)
+      expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
       expect(TH.thrownText(err)).to.not.include('acme acme acme')
@@ -98,7 +99,7 @@ describe("guardStrengthChecker", () => {
   for (const field of ['strong', 'reason'] as const) {
     it(`refuses a verdict whose ${field} is a getter that throws as unexpected_error, carrying nothing of the throw`, async () => {
       const err = await TH.expectRefusal(guardStrengthChecker(lazyCheckerThrowingOn(field), scope)('acme acme acme'), 'unexpected_error')
-      expect(err.message).to.match(/strengthChecker handed to Vault.make threw/)
+      expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
       expect(TH.thrownText(err)).to.not.include('acme acme acme')
@@ -134,6 +135,20 @@ describe("guardStrengthChecker's load", () => {
   it("refuses a load that throws rather than rejecting, likewise", async () => {
     const checker = Object.assign(() => StrongVerdict, { load: () => { throw new Error('no word list') } })
     await TH.expectRefusal(guardStrengthChecker(checker, scope).load(), 'unexpected_error')
+  })
+})
+
+describe("loadStrengthChecker", () => {
+  it("fetches zxcvbn for zxcvbnStrengthChecker and resolves, as its example shows", async () => {
+    await loadStrengthChecker(zxcvbnStrengthChecker)
+    expect(await zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
+  })
+
+  it("refuses a load that fails as 'unexpected_error', naming bank.hello(), what it threw the cause, as its example shows", async () => {
+    const chunkLost = new TypeError('Failed to fetch dynamically imported module')
+    const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })), 'unexpected_error')
+    expect(err.message).to.match(/bank\.hello\(\)/)
+    expect(err.cause).to.eq(chunkLost)
   })
 })
 

@@ -165,14 +165,14 @@ export class Box {
 
   /** The box a stored record makes, of `vault`, made under `stamp`; the record kept, frozen, as `record`.
    * Touches no storage and no key. Throws 'bad_record' for a record this package does not write,
-   * and 'absent_vault' when no `stamp` is given and the vault holds no vault props.
+   * and 'bad_option' for a `stamp` that is none.
    *
    * @param stamp - The stamp of the vault the record was read or written under. Default: the vault's own now.
    *
    * @example const box = Box.make(vault, record)   // record: what a VaultDB's getBox resolved
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' })   // throws 'bad_record': no box record
    */
-  static make(vault: BoxVault, record: BoxRecord, stamp: Stamp | null = vault.stamp): Box {
+  static make(vault: BoxVault, record: BoxRecord, stamp: Stamp = vault.stamp): Box {
     const checked = checkedBoxRecord(record)
     return new this(vault, checkedStamp(stamp), checked, null)
   }
@@ -189,7 +189,7 @@ export class Box {
    *
    * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_label' for a boxlabel below the
    * floor, and 'bad_option' for a sidecar JSON cannot carry or a malformed base. Refuses
-   * 'vault_locked' when the vault holds no lease, 'absent_vault' when it holds no vault props, and
+   * 'vault_locked' when the vault holds no lease, and
    * otherwise as `lease.cipheredWith` does.
    *
    * @example const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...')
@@ -209,7 +209,6 @@ export class Box {
         const lease = heldLeaseOf(vault)
         if (lease === null) { throw lockedError() }
         const { stamp } = vault
-        if (stamp === null) { throw absentVault() }
         const now = vault.now()
         const record = await lease.sealProps({
           format:                 BoxFormat,
@@ -300,7 +299,7 @@ export const heldListing = (listed: ListedSummary | DamagedBox, vaultTok: string
 }
 // --
 
-// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkedBase, checkedStamp, lockedError, absentVault
+// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkedBase, checkedStamp, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
@@ -366,9 +365,8 @@ const StampShape = Z.object({
   gate_epoch:  Z.int().check(Z.nonnegative()),
 })
 
-/** `stamp`, once it is a {@link Stamp}: 'absent_vault' for none, a vault not made yet, and 'bad_option' for one malformed. */
+/** `stamp`, once it is a {@link Stamp}: 'bad_option' for anything else. */
 const checkedStamp = (stamp: unknown): Stamp => {
-  if (stamp === null) { throw absentVault() }
   const checked = StampShape.safeParse(stamp)
   if (! checked.success) {
     throw new VaultError('bad_option', "Box.make's stamp is the stamp of the vault the record was read or written under, as vault.stamp holds it: its scope, vault_tok, vault_epoch and gate_epoch.")
@@ -378,7 +376,4 @@ const checkedStamp = (stamp: unknown): Stamp => {
 
 /** The refusal of a seal or an extract with no lease in hand. */
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so the box was neither sealed nor opened: unlock it first, or go through the vault (getWhisper, putBox), which asks for a proof.')
-
-/** The refusal of a box of a vault that holds no vault props. */
-const absentVault = () => new VaultError('absent_vault', 'This vault has not been created yet, so no box lies in it: the first unlock() creates it.')
 // --

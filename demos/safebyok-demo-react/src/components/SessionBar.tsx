@@ -12,7 +12,7 @@ import { keepStorage } from '../lib/persist-storage'
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const vault = useVault()
+  const vault = useVault('main')?.vault ?? null
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -51,7 +51,13 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
 
   const deleteAccount = async () => {
     if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
-    await vault?.del()
+    setGripe(null)
+    // The vault deleted stays gone: nothing asks for it again, so no new one is stored under the
+    // account as it goes. A vault that could not be deleted keeps the account, and says why.
+    if (vault !== null) {
+      const deleted = await vault.tryDel()
+      if (! deleted.ok) { setGripe(deleted.err.message); return }
+    }
     await auth.deleteAccount()
   }
 
@@ -60,6 +66,7 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
       <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.userId})</code></span>
       <button onClick={() => { void signOut() }}>Sign out</button>
       <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
+      {gripe !== null && <span className="gripe">{gripe}</span>}
     </div>
   )
 }

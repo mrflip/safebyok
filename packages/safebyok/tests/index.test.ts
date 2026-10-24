@@ -8,11 +8,11 @@ describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
-      'Vault', 'Ask', 'AskWhyVals', 'ProofAnswerVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxRecord', 'BoxSummary', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'GatedVaultProps', 'GatelessVaultProps', 'Tombstone', 'TombstoneFormat', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
+      'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
+      'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxRecord', 'BoxSummary', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'GatedVaultProps', 'GatelessVaultProps', 'Tombstone', 'TombstoneFormat', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
-      'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf',
+      'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'raisedDeviceRecord',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -25,7 +25,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isMark'])
+    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'deviceRecord', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isDeviceRecord'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
@@ -58,14 +58,14 @@ const bundleOf = async (imports: string): Promise<string> => {
   return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
 }
 
-// The supplied spec's label ships with Vault.make, which refuses a deriver wearing it without its
+// The supplied spec's label ships with Bank.make, which refuses a deriver wearing it without its
 // parameters; Argon2id's implementation shows by the variants it names, Argon2d among them.
 const Argon2Implementation = /argon2d/iu
 
 describe("the main entry's tree-shaking", () => {
-  it("leaves Argon2id out of an app that imports Vault.make alone", async () => {
-    const shipped = await bundleOf('Vault')
-    expect(shipped).to.include('Vault.make')
+  it("leaves Argon2id out of an app that imports Bank alone", async () => {
+    const shipped = await bundleOf('Bank')
+    expect(shipped).to.include('Bank.make')
     expect(shipped).to.include('argon2id_web_v1')
     expect(shipped).to.not.match(Argon2Implementation)
   }, 30_000)

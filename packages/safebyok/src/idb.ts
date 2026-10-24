@@ -1,7 +1,7 @@
-import { createStore, del, delMany, entries, get, keys, set, clear, type UseStore } from 'idb-keyval'
-import { DeviceMark, LeaseRecord } from './types'
+import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
+import { DeviceRecord, LeaseRecord } from './types'
 import * as Ckeys from './ckeys'
-import { type DeviceDB, deviceOutcomeOf } from './device-db'
+import { type DeviceDB, deviceOutcomeOf, raisedDeviceRecord } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
@@ -58,20 +58,20 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  *   const deviceDB = idbDeviceDB()
  *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
- *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+ *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
   const shelf = () => shelfStore(dbName)
   const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
 
-  // A row under any ckey but a lease's or a mark's is one an earlier version filed (`unlock^…`
-  // before the lease, `["unlock","acme","u1","main"]` before the joined ckeys), which nothing else
+  // A row under any ckey but a lease's or a device record's is one an earlier version filed (`unlock^…`
+  // before the lease, `mark^…` before the device record, `["unlock","acme","u1","main"]` before the joined ckeys), which nothing else
   // would ever reach, expire or erase. It is deleted unread, so an old record never outlives the
   // lock that should revoke it.
   const sweepStrays = async () => {
     const ckeys = await keys(shelf())
-    const strays = ckeys.filter((ckey) => ! Ckeys.isLease(ckey) && ! Ckeys.isMark(ckey))
+    const strays = ckeys.filter((ckey) => ! Ckeys.isLease(ckey) && ! Ckeys.isDeviceRecord(ckey))
     if (strays.length === 0) { return }
     await delMany(strays, shelf())
     ring()
@@ -108,29 +108,35 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       await sweepStrays()
     }),
 
-    getMark: (scope) => deviceOutcomeOf('getMark', async () => {
-      const raw: unknown = await get(Ckeys.mark(scope), shelf())
+    getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', async () => {
+      const raw: unknown = await get(Ckeys.deviceRecord(scope), shelf())
       if (raw === undefined || raw === null) { return null }
-      const checked = DeviceMark.safeParse(raw)
+      const checked = DeviceRecord.safeParse(raw)
       if (! checked.success) {
-        await del(Ckeys.mark(scope), shelf())
+        await del(Ckeys.deviceRecord(scope), shelf())
         ring()
         return null
       }
       return checked.data
     }),
 
-    putMark: (mark) => deviceOutcomeOf('putMark', async () => {
-      await set(Ckeys.mark(mark), mark, shelf())
+    // Read and written in one transaction, so two tabs raising at once never lower each other's.
+    raiseDeviceRecord: (record) => deviceOutcomeOf('raiseDeviceRecord', async () => {
+      let raised = record
+      await update<unknown>(Ckeys.deviceRecord(record), (stored) => {
+        raised = raisedDeviceRecord(stored, record)
+        return raised
+      }, shelf())
+      ring()
+      return raised
+    }),
+
+    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', async () => {
+      await del(Ckeys.deviceRecord(scope), shelf())
       ring()
     }),
 
-    delMark: (scope) => deviceOutcomeOf('delMark', async () => {
-      await del(Ckeys.mark(scope), shelf())
-      ring()
-    }),
-
-    // The shelf holds leases and device marks and nothing else, so erasing them all
+    // The shelf holds leases and device records and nothing else, so erasing them all
     // is clearing it: any row an earlier version filed under another ckey goes too.
     delAll: () => deviceOutcomeOf('delAll', async () => {
       await clear(shelf())
@@ -184,7 +190,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
-    /** Remove every row on the shelf: every lease and device mark in this database. */
+    /** Remove every row on the shelf: every lease and device record in this database. */
     wipe: async (): Promise<void> => {
       await clear(shelfStore(dbName))
       ChangeBell.ring(bellnameOf(dbName))

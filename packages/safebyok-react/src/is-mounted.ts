@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef } from 'react'
  * @example
  *   const isMounted = useIsMounted()
  *   const submit = async () => {
- *     await vault.unlock(passphrase)
+ *     await gating.attemptPassphrase(passphrase)
  *     if (! isMounted()) { return }
  *     onDone(true)
  *   }

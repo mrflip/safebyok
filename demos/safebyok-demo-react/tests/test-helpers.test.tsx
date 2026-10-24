@@ -6,9 +6,9 @@ import { tellKnockKnockJoke } from '../src/lib/anthropic'
 import * as TH from './test-helpers'
 
 describe("makeWorld", () => {
-  it("renders a component inside a vault for u1, absent until something is stored", async () => {
+  it("renders a component inside a vault for u1, novel until its passphrase is set", async () => {
     TH.makeWorld().renderInVault(<TH.VaultProbe />)
-    await TH.expectProbeState('absent')
+    await TH.expectProbeState('novel')
   })
 
   it("puts the vault behind the vaultDB it is handed", async () => {
@@ -32,7 +32,7 @@ describe("makeWorld", () => {
     expect(screen.getByTestId('boxes').textContent).to.eq('anthropic_api_key')
   })
 
-  it("closes the vault it seeds through, even when a store is refused", async () => {
+  it("lets go of the vault it seeds through, even when a store is refused", async () => {
     const world = TH.makeWorld()
     const tally = TH.tallyWatches(world.vaultDB)
     await TH.expectRefusal(world.seed({ '': 'sk-ant-test-not-a-real-key' }), 'bad_label')
@@ -44,7 +44,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.open()
-    await vault.unlock(TH.Passphrase)
+    await TH.unlock(vault, TH.Passphrase)
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
@@ -64,12 +64,12 @@ describe("makeWorld's vaults opened from outside the page", () => {
 
   it("are handed out open, to a test that opens them", async () => {
     opened = await TH.makeWorld().open()
-    expect(opened.getSnapshot().state).to.eq('absent')
+    expect(opened.getSnapshot().state).to.eq('novel')
   })
 
-  it("are closed once that test has ended", async () => {
+  it("are let go once that test has ended", async () => {
     if (opened === null) { throw new Error('the test before this one opens a vault') }
-    await TH.expectRefusal(opened.unlock(TH.Passphrase), 'vault_closed')
+    await TH.expectRefusal(TH.unlock(opened, TH.Passphrase), 'vault_gone')
   })
 })
 
@@ -116,12 +116,13 @@ describe("fakeAnthropic", () => {
 })
 
 describe("VaultProbe", () => {
-  it("unlocks the vault with the tests' passphrase, through its unlock button", async () => {
+  it("unlocks the vault through its unlock button, the provider's dialog answered with the tests' passphrase", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     world.renderInVault(<TH.VaultProbe />)
     await TH.expectProbeState('locked')
     fireEvent.click(screen.getByRole('button', { name: 'unlock' }))
+    await TH.answerPassphraseDialog()
     await TH.expectProbeState('unlocked')
     expect(screen.getByTestId('vault').textContent).to.eq('open')
   })

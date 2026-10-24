@@ -22,7 +22,7 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
  * It needs WebAssembly, which React Native's Hermes lacks, and a page whose
  * Content-Security-Policy allows `'wasm-unsafe-eval'`; where either is missing, `deriveKeyBytes`
  * refuses with kind 'bad_option'. It refuses an empty passphrase too (kind 'wrong_passphrase'), as
- * `unlock()` does before it ever reaches a deriver. Each derivation holds the thread it runs on
+ * an unlock does before it ever reaches a deriver. Each derivation holds the thread it runs on
  * until it is done.
  *
  * @param spec - The whole Argon2id parameter set, and the label vaults made under it record.
@@ -47,7 +47,7 @@ export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver =>
  * any `browserOpts()` spread, so it wins.
  *
  * @example
- *   const vault = Vault.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', vaultDB })
  * @example
  *   const keyBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', passphraseSalt)
  *   keyBytes.length  // 32

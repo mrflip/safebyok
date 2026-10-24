@@ -44,7 +44,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a browser that withholds storage won't keep the vault, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.deviceDB, 'getMark').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
+    vi.spyOn(world.deviceDB, 'getDeviceRecord').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/won't let the app keep your vault/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
@@ -52,10 +52,47 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
+    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
+  })
+
+  it("says a vault deleted elsewhere was deleted, storing no new one until the user asks for it", async () => {
+    const world = TH.makeWorld()
+    // Given its passphrase on another device: deleting a vault is proven by it.
+    await world.seed({})
+    world.renderInVault(<VaultDashboard />)
+    await screen.findByText(/No boxes yet/)
+    const elsewhere = await world.open()
+    await TH.del(elsewhere, TH.Passphrase)
+    const startNew = await screen.findByRole('button', { name: 'Start a new vault' })
+    expect(screen.getByText(/This vault was deleted/)).to.not.be.null
+    await TH.wakeupAtNextTick()
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    fireEvent.click(startNew)
+    expect(await screen.findByText(/No boxes yet/)).to.not.be.null
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+  })
+
+  it("offers to accept an older copy storage serves, accepting it only once the user confirms", async () => {
+    const world = TH.makeWorld()
+    // This device has seen a later epoch of the vault than storage serves: a restore from an older copy.
+    await world.open()
+    const scope = TH.scopeOf('u1')
+    const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
+    if (record === null) { throw new Error('the birth kept no device record') }
+    await TH.expectGood(world.deviceDB.raiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
+    const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
+    world.renderInVault(<VaultDashboard />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept this copy' }))
+    expect(confirming).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await TH.wakeupAtNextTick()
+    expect(screen.queryByRole('button', { name: 'Accept this copy' })).to.not.be.null
+    confirming.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Accept this copy' }))
+    expect(await screen.findByText(/No boxes yet/)).to.not.be.null
   })
 })
 

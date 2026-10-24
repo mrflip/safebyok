@@ -155,19 +155,19 @@ describe("graphqlVaultDB, as the README has it", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const opened = () => vaultIn(schema)
     const first = await opened()
-    await first.unlock('correct horse battery staple')
+    await TH.unlock(first, 'correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
     await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
-    first.close()
+    TH.closeVault(first)
 
     const second = await opened()
-    await second.unlock('correct horse battery staple')
+    await TH.unlock(second, 'correct horse battery staple')
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
-    second.close()
+    TH.closeVault(second)
   })
 
   it("never lets the Client's cache answer: a read after another device's write sees it", async () => {
@@ -192,18 +192,18 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const opened = () => vaultIn(schema)
     const laptop = await TH.passkeyOf('laptop')
     const first = await opened()
-    await first.unlock('correct horse battery staple')
+    await TH.unlock(first, 'correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    expect(await first.putWayin('correct horse battery staple', laptop)).to.deep.equal(first.passkey)
-    first.close()
+    expect(await TH.putWayin(first, 'correct horse battery staple', laptop)).to.deep.equal(first.passkey)
+    TH.closeVault(first)
 
     const second = await opened()
     expect(second.getSnapshot().passkey).to.deep.include({
       wayinkind: 'passkey', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
-    await second.unlock(laptop)
+    await TH.unlock(second, await TH.passkeyOf('laptop'))
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    second.close()
+    TH.closeVault(second)
   })
 })
 

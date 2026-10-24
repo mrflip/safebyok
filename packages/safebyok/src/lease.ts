@@ -47,7 +47,7 @@ const leaseCtxOf = (lease: LeaseBinding): Uint8Array => (
   cipherCtx(LeaseFormat, lease.applabel, lease.user_id, lease.vaultlabel, lease.vault_tok, lease.gate_epoch, lease.ask_passphrase_at, 'vault_key_lease_wrapped')
 )
 
-/** Reads a lease's record from inside this module: set once, by the class's static block. */
+/** Reads a lease's record from inside this module, for {@link leaseRecordOf}: set once, by the class's static block. */
 let recordOf: (lease: Lease) => LeaseRecord
 
 /** This device's lease on one vault: the vaultKey wrapped under a leaseKey that never leaves this browser profile, and the instant it ends.
@@ -126,7 +126,7 @@ export class Lease {
   }
 
   /** True when this lease has ended by `instant`: its `ask_passphrase_at` is at or before it.
-   * `endsBy(now + renewMillis)` is how `ensureLease({ renewMinutes })` asks ahead of the end.
+   * `endsBy(now + renewMillis)` is how `ensureUnlocked({ renewMinutes })` asks ahead of the end.
    *
    * @example lease.endsBy(vault.now())                       // true once it has ended
    * @example lease.endsBy(vault.now() + 60 * MinuteMillis)   // true when it ends within the hour
@@ -257,9 +257,10 @@ export class Lease {
   }
 }
 
-/** The record `lease` stands for, frozen, its leaseKey and wrapped vaultKey among it: for this package's own code and tests alone.
- * A Lease shows no getter, field or JSON of it, so whatever holds one cannot unwrap the vaultKey
- * extractable. The package's entry points export none of this.
+/** The record `lease` stands for, frozen, its leaseKey and wrapped vaultKey among it: for tests alone, which have no other way to it.
+ * Nothing in `src/` calls it, and nothing should: a Lease shows no getter, field or JSON of its
+ * record, so whatever holds one cannot unwrap the vaultKey extractable, and the package's entry
+ * points export none of this.
  */
 export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
 

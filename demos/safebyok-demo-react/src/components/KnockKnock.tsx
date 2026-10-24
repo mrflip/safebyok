@@ -21,15 +21,15 @@ const apiKeyOf = (whisper: unknown): string => {
 }
 
 export const KnockKnock = () => {
-  const vault = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')?.vault ?? null
+  const snapshot = useVaultSnapshot('main')
   const [whosThere, setWhosThere] = useState('')
   const [joke, setJoke] = useState<string | null>(null)
   const [telling, setTelling] = useState(false)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // The handle comes at once, its boxes listed only once its hello has read storage.
-  if (vault === null || snapshot === null || snapshot.state === 'opening') { return null }
+  // No Vault object until its birth has read storage, and with it the boxes it lists.
+  if (vault === null || snapshot === null) { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
   const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
@@ -87,7 +87,7 @@ export const SavedFlashMillis = 2000
  * same key saved again included.
  */
 const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox: boolean, damaged: boolean, replaceable: boolean, savedAt?: number | undefined }) => {
-  const vault = useVault()
+  const vault = useVault('main')?.vault ?? null
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)

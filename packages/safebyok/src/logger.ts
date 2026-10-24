@@ -4,7 +4,7 @@ import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
  * Pass one to the storage adapter's factory as `logger`, and the vault opened over it uses it too.
- * Pass Vault.make one of its own to keep them apart. With none anywhere, it is the {@link
+ * Pass Bank.make one of its own to keep them apart. With none anywhere, it is the {@link
  * DefaultLogger}.
  *
  * Each call has a plain-language `message`, a `story` of facts to filter on (`call` names the
@@ -21,9 +21,9 @@ import { consoleLogger } from './console-logger'
  *     warn:  (message, story, err) => { telemetry.warn(message, story, err) },
  *     error: (message, story, err) => { telemetry.error(message, story, err) },
  *   }
- *   const vault = Vault.make({ ...opts, logger })
- * @example Vault.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
- * @example Vault.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
+ *   const bank = Bank.make({ ...opts, logger })
+ * @example Bank.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
+ * @example Bank.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
  */
 export type VaultLogger = {
   /** Something worth knowing, with nothing to act on. */
@@ -39,7 +39,7 @@ export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
 export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 
 const loggerCall = Z.custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
-/** What a VaultLogger must carry. Checked only: what Vault.make keeps calls the host's own, `this` and all. */
+/** What a VaultLogger must carry. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
 const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerCall })
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
@@ -56,7 +56,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
  * It keeps identity. A logger it made safe comes back as itself, and the same host logger always
  * comes back as the same safe one.
  *
- * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })
+ * @example parseLogger(props.logger).warn('BankProvider made its bank anew for a logger rebuilt in render', { call: 'BankProvider' })
  * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
  * @example parseLogger(undefined) === DefaultLogger  // true: the one default logger
  * @example parseLogger(telemetry) === parseLogger(parseLogger(telemetry))  // true: guarded once
@@ -107,16 +107,16 @@ const forwarding = (): VaultLogger => {
 
 /** The logger every storage adapter, vault, provider and store uses when it was given none of its own.
  * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
- * else to the console, each line tagged 'safebyok:'. Pass it to Vault.make or VaultProvider to
+ * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to
  * have the vault use the default whatever its storage adapter was given.
  *
- * @example Vault.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
+ * @example Bank.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
 export const DefaultLogger: VaultLogger = forwarding()
 
 /** Send what safebyok would say to the console to `logger` instead, from everything made before this call or after.
- * Call it once, as the app starts. A logger handed to an adapter's factory, to Vault.make or to
- * VaultProvider still wins there. It is guarded as {@link parseLogger} guards one, and refused
+ * Call it once, as the app starts. A logger handed to an adapter's factory, to Bank.make or to
+ * BankProvider still wins there. It is guarded as {@link parseLogger} guards one, and refused
  * alike.
  *
  * @param logger - The app's own logger. Null or undefined puts the console back.

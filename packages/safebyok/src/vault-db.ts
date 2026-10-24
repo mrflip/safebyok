@@ -199,7 +199,7 @@ export abstract class VaultDB {
   // == [Backend limits]: maxRecordBytes, maxVaultBytes, maxBoxes, maxNameBytes
 
   /** The most bytes this backend holds in one record, or `Infinity` for no per-record limit.
-   * `Vault.make` refuses a `maxWhisperBytes` over half of it. {@link VaultDB.putBox} refuses as
+   * `Bank.make` refuses a `maxWhisperBytes` over half of it. {@link VaultDB.putBox} refuses as
    * `box_too_large` a box whose JSON, with its scope, weighs more in UTF-8 bytes. A large sidecar or
    * long names can make a box so even within `maxWhisperBytes`.
    */
@@ -209,7 +209,7 @@ export abstract class VaultDB {
    * Declare what the backend can still list and delete whole. A backend that reads a vault in one
    * transaction under a read budget declares the share of it its heaviest verb leaves.
    *
-   * `Vault.make` refuses ('bad_option') a `maxBoxes` whose boxes might not fit, each counted at
+   * `Bank.make` refuses ('bad_option') a `maxBoxes` whose boxes might not fit, each counted at
    * twice `maxWhisperBytes` plus 1 KiB. The vault's `putBox()` refuses as `vault_full` a new box
    * that might take the vault past it. It counts each box at twice `maxWhisperBytes`, plus its
    * scope and boxlabel as UTF-8 JSON, plus a little for fixed-size fields. That is a conservative
@@ -224,7 +224,7 @@ export abstract class VaultDB {
 
   /** The most boxes this backend holds in one vault, a whole number, or `Infinity` for no such limit.
    * A backend whose limit crosses a wire or is stored, where `Infinity` cannot go, sets a large
-   * whole number instead. `Vault.make` refuses ('bad_option') a `maxBoxes` above it, and given none
+   * whole number instead. `Bank.make` refuses ('bad_option') a `maxBoxes` above it, and given none
    * takes the smaller of this and `MaxBoxes`.
    *
    * A backend with a finite limit refuses a new box in a full vault as `vault_full`, writing
@@ -257,7 +257,7 @@ export abstract class VaultDB {
 
   /** The guarded logger this VaultDB was made with: one that throws breaks nothing.
    * It is no own field, so a VaultDB logged, spread or compared never shows or copies the host's
-   * logger. `Vault.make` and `VaultProvider` use it when given no logger of their own.
+   * logger. `Bank.make` and `BankProvider` use it when given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
 

@@ -113,8 +113,14 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
 * **Your database's own rules.** A statement your database refuses for want of a privilege, or
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
-  write them, say. A policy that hides rows refuses nothing: Postgres filters them, so the vault
-  reads as absent and a write over a hidden row as `stale_write`. So when users who should reach
+  write them, say. Opening a vault writes, even one that stands: its birth is `ensureVault`, one
+  statement that deletes the scope's tombstone and inserts the vault props or meets the ones
+  standing (`ON CONFLICT ... DO UPDATE`), and lists their boxes. So the role needs `SELECT`,
+  `INSERT` and `UPDATE` on `safebyok_vaults`, `SELECT` and `DELETE` on
+  `safebyok_vault_tombstones`, and `SELECT` on `safebyok_boxes`, to open a vault at all: a
+  read-only role is refused `not_permitted` at the birth. A policy that hides rows
+  refuses nothing: Postgres filters them, so the vault reads as absent and a write over a hidden
+  row as `stale_write`. So when users who should reach
   their vaults see `not_permitted`, check the grants of the role your server connects as: a
   `GRANT` lost in a migration, or a table made by another role, reads exactly so.
 * **Trouble** refuses with kind `storage_unavailable`, your driver's own error as its `cause`.
@@ -191,7 +197,7 @@ vault, its listing included, is one request. An update of the vault props answer
 stored, and a deletion of the vault the tombstone it left: both go to the browser as the route's
 `result`.
 
-The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
+The client half, a VaultDB over `fetch`, to hand `Bank.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
@@ -257,7 +263,7 @@ const storedVaultOf = (sent: unknown): StoredVault => {
 * **A limit of the server's own, if you give one.** Pass `maxBoxes` and this VaultDB holds
   every vault to that many boxes, whatever the browser asks: a new box past it refuses
   with kind `vault_full`, and a box replacing one already there never does. Declare the same
-  number as the browser VaultDB's `maxBoxes`, so that `Vault.make` refuses a larger one up
+  number as the browser VaultDB's `maxBoxes`, so that `Bank.make` refuses a larger one up
   front. A limit costs the statement that inserts a new box one count of its vault; with
   none (`Infinity`, the default), nothing is counted, and how large a vault grows is yours to
   bound, by your own quotas. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds

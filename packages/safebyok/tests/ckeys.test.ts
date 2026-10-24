@@ -19,8 +19,8 @@ describe("Ckeys, the ckey of each row", () => {
     expect(Ckeys.lease(u1)).to.eq('lease^acme^u1^main')
   })
 
-  it("files a device mark under its kind and scope, joined on ^", () => {
-    expect(Ckeys.mark(u1)).to.eq('mark^acme^u1^main')
+  it("files a device record under its kind and scope, joined on ^", () => {
+    expect(Ckeys.deviceRecord(u1)).to.eq('device^acme^u1^main')
   })
 
   it("begins every box ckey of a scope with its box prefix: the first four parts and a trailing ^", () => {
@@ -71,9 +71,9 @@ describe("Ckeys, refusing a name that holds its delimiter", () => {
     })
   }
 
-  it("refuses a scope holding ^ in every ckey it makes: vault props, lease, mark and prefix", () => {
+  it("refuses a scope holding ^ in every ckey it makes: vault props, lease, device record and prefix", () => {
     const scope = { ...u1, user_id: 'u1^x' }
-    for (const make of [Ckeys.vaultProps, Ckeys.lease, Ckeys.mark, Ckeys.boxPrefix]) {
+    for (const make of [Ckeys.vaultProps, Ckeys.lease, Ckeys.deviceRecord, Ckeys.boxPrefix]) {
       TH.expectSyncRefusal(() => make(scope), 'bad_label')
     }
   })
@@ -182,15 +182,19 @@ describe("Ckeys.isLease", () => {
   })
 })
 
-describe("Ckeys.isMark", () => {
-  it("knows a mark's ckey, for any scope", () => {
-    expect(Ckeys.isMark(Ckeys.mark(u1))).to.be.true
+describe("Ckeys.isDeviceRecord", () => {
+  it("knows a device record's ckey, for any scope, as its first example shows", () => {
+    expect(Ckeys.isDeviceRecord(Ckeys.deviceRecord(u1))).to.be.true
+  })
+
+  it("refuses an earlier version's device mark", () => {
+    expect(Ckeys.isDeviceRecord('mark^acme^u1^main')).to.be.false
   })
 
   it("refuses a lease's ckey, as its second example shows, another kind's, and anything that is not text", () => {
-    expect(Ckeys.isMark(Ckeys.lease(u1))).to.be.false
-    expect(Ckeys.isMark('marked^acme^u1^main')).to.be.false
-    expect(Ckeys.isMark(['mark', 'acme', 'u1', 'main'])).to.be.false
+    expect(Ckeys.isDeviceRecord(Ckeys.lease(u1))).to.be.false
+    expect(Ckeys.isDeviceRecord('devices^acme^u1^main')).to.be.false
+    expect(Ckeys.isDeviceRecord(['device', 'acme', 'u1', 'main'])).to.be.false
   })
 })
 
@@ -199,7 +203,7 @@ describe("Ckeys, between kinds", () => {
     const isBox = Ckeys.isBoxIn(u1)
     expect(isBox(Ckeys.vaultProps(u1))).to.be.false
     expect(isBox(Ckeys.lease(u1))).to.be.false
-    expect(isBox(Ckeys.mark(u1))).to.be.false
-    expect(new Set([Ckeys.vaultProps(u1), Ckeys.lease(u1), Ckeys.mark(u1), Ckeys.box(u1, 'main')]).size).to.eq(4)
+    expect(isBox(Ckeys.deviceRecord(u1))).to.be.false
+    expect(new Set([Ckeys.vaultProps(u1), Ckeys.lease(u1), Ckeys.deviceRecord(u1), Ckeys.box(u1, 'main')]).size).to.eq(4)
   })
 })

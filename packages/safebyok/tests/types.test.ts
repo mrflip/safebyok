@@ -2,7 +2,7 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { BoxRecord } from '../src/box'
-import { DeviceMark, Tombstone, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
+import { DeviceRecord, Tombstone, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -299,25 +299,25 @@ describe("EpochMillis", () => {
   })
 })
 
-const MarkCases = [
+const DeviceRecordCases = [
   // regular usage:
-  [TH.markOf('u1'),                                               true,   'a whole mark'],
-  [TH.markOf('u1', { seen: { gate_epoch: 40 } }),                 true,   'a mark of a vault seen at a later epoch'],
+  [TH.deviceRecordOf('u1'),                                                 true,   'a whole device record'],
+  [TH.deviceRecordOf('u1', { highest_vault_epoch: 40 }),                    true,   'a record of a vault seen at a later epoch'],
+  [TH.deviceRecordOf('u1', { highest_vault_epoch: 0 }),                     true,   'a record of a vault seen only at epoch zero'],
   // refused, as a damaged or foreign record:
-  [TH.markOf('u1', { format: 'safebyok-mark-v6' as never }),      false,  'a format this version does not know'],
-  [TH.markOf('u1', { format: 'safebyok-mark-v4' as never }),      false,  'a mark from before the vaultKey epoch went, which reads as none'],
-  [{ ...TH.markOf('u1', { format: 'safebyok-mark-v3' as never }), lock_generation: 0 }, false, 'a mark from before the lock generation went, which reads as none'],
-  [TH.markOf('u1', { format: 'safebyok-mark-v2' as never }),      false,  'a mark from before a mark could see no vault, which reads as none'],
-  [TH.omitting(TH.markOf('u1'), 'seen'),                          false,  'a mark missing what it has seen'],
-  [{ ...TH.markOf('u1'), seen: null },                            false,  'a mark that has seen no vault: the device keeps none'],
-  [TH.markOf('u1', { seen: { device_id: '' } }),                  false,  'an empty device_id'],
-  [TH.markOf('u1', { seen: { vault_tok: '' } }),                  false,  'an empty vault_tok'],
-  [TH.markOf('u1', { seen: { gate_epoch: 0 } }),                  false,  'an epoch starts at one'],
+  [TH.deviceRecordOf('u1', { format: 'safebyok-device-v2' as never }),      false,  'a format this version does not know'],
+  [{ format: 'safebyok-mark-v5', ...TH.scopeOf('u1'), seen: { device_id: 'device-one', vault_tok: 'vault-tok-u1', gate_epoch: 1 } }, false, 'a device mark from before the device record, which reads as none'],
+  [TH.omitting(TH.deviceRecordOf('u1'), 'device_id'),                       false,  'a record missing its device_id'],
+  [TH.deviceRecordOf('u1', { device_id: '' }),                              false,  'an empty device_id'],
+  [TH.omitting(TH.deviceRecordOf('u1'), 'highest_vault_epoch'),             false,  'a record missing the epoch it has seen'],
+  [TH.deviceRecordOf('u1', { highest_vault_epoch: -1 }),                    false,  'an epoch below zero'],
+  [TH.deviceRecordOf('u1', { highest_vault_epoch: 1.5 }),                   false,  'an epoch that is no whole number'],
+  [TH.omitting(TH.deviceRecordOf('u1'), 'user_id'),                         false,  'a record that names no user'],
 ] as const
 
-describe("DeviceMark", () => {
-  for (const [candidate, expected, blurb] of MarkCases) {
-    it(blurb, () => { expect(DeviceMark.safeParse(candidate).success).to.eq(expected) })
+describe("DeviceRecord", () => {
+  for (const [candidate, expected, blurb] of DeviceRecordCases) {
+    it(blurb, () => { expect(DeviceRecord.safeParse(candidate).success).to.eq(expected) })
   }
 })
 
@@ -333,7 +333,7 @@ const StoredRecords = [
   [GatedVaultProps.shape.format, VaultProps],
   [BoxRecord.shape.format, BoxRecord],
   [LeaseRecord.shape.format, LeaseRecord],
-  [DeviceMark.shape.format, DeviceMark],
+  [DeviceRecord.shape.format, DeviceRecord],
   [Tombstone.shape.format, Tombstone],
 ] as const
 

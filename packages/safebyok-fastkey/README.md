@@ -22,11 +22,12 @@ pnpm add safebyok safebyok-fastkey
 Pass the deriver as `keyDeriver`, after any `browserOpts()` spread, so it wins:
 
 ```ts
-import { Vault } from 'safebyok'
+import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const vault = Vault.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', vaultDB })
+const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
 ```
 
 A vault records only its deriver's label, and this deriver derives exactly what the core's does

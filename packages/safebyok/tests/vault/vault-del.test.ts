@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
-import { type MakeVaultOpts } from '../../src/vault-opts'
 import { toB64 } from '../../src/crypto'
+import { MinuteMillis, StaleMinutes } from '../../src/types'
 import * as TH from '../test-helpers'
-import { makeWorld, u1BoxCkey, storedRowOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, vaultWithPasskey, spoilWayin } from './world'
+import { makeWorld, u1BoxCkey, storedRowOf, storedVaultPropsOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, vaultWithPasskey, spoilWayin } from './world'
 
 /** A stored box row, as text, with its whisper's ciphertext bent a little. */
 const withTweakedCiphertext = (row: Record<string, unknown>): string => {
@@ -21,6 +21,19 @@ const SpoiledBoxes = [
 ] as const
 
 describe("delBox and del()", () => {
+  it("deletes as del()'s example shows: storage holds a tombstone, and bank.ensureVault births the next life, novel", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    TH.answering(vault, async (gating) => {
+      if (gating.gatingkind === 'del_vault') { await gating.attempt('pw') }
+    })
+    await vault.del()
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    expect(next.state).to.eq('novel')
+    expect(next.vault_tok).to.not.eq(vault.vault_tok)
+  })
+
   for (const [spoil, blurb] of SpoiledBoxes) {
     it(`delBox removes a box ${blurb}, and leaves the vault's other boxes as they were`, async () => {
       const world = makeWorld()
@@ -58,47 +71,86 @@ describe("delBox and del()", () => {
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
   })
 
-  it("del() removes every trace of this vault, and only this vault", async () => {
+  it("del() removes every trace of this vault but its tombstone, and only this vault: the Vault object is gone after", async () => {
     const world = makeWorld()
     const mine = await world.openUnlocked('my pw')
     await mine.putBox({ boxlabel: 'anthropic' }, 'mine')
     const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
     await theirs.putBox({ boxlabel: 'anthropic' }, 'theirs')
 
-    await mine.del()
-    expect(mine.getSnapshot().state).to.eq('absent')
-    expect(world.dbStore.ckeys().filter((ckey) => ckey.includes(':u1:'))).to.have.lengthOf(0)
+    await TH.del(mine, 'my pw')
+    await TH.expectRefusal(mine.hello(), 'vault_gone')
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultPropsCkey])
+    expect(storedVaultPropsOf(world)['format']).to.eq('safebyok-tombstone-v1')
+    expect(await world.getLease()).to.be.null
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
   })
 
-  it("del() works on a locked vault: owning the account is enough to delete it", async () => {
+  it("del() works on a locked vault, proven by its passphrase, and the bank's next life is novel", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.lock()
-    await vault.del()
-    expect(vault.getSnapshot().state).to.eq('absent')
+    await TH.del(vault, 'pw')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
+    const reborn = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    expect(reborn.getSnapshot()).to.deep.include({ state: 'novel', passphrase: null, gate_epoch: 0 })
+    expect(reborn.getSnapshot().boxes).to.have.lengthOf(0)
   })
 
-  it("del() on a handle that has seen no vault looks first, and deletes the one made elsewhere since: 'delete my vault' never reports success over one standing", async () => {
+  it("del() raises this device's record of the vault to the tombstone's epoch, never erasing it", async () => {
     const world = makeWorld()
-    const handle = await world.open({ vaultDB: world.deafVaultDB() })
-    expect(handle.getSnapshot().state).to.eq('absent')
+    const vault = await world.openUnlocked('pw')
+    await TH.del(vault, 'pw')
+    const tombstoneEpoch = storedVaultPropsOf(world)['vault_epoch']
+    const deviceRecord = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    expect(deviceRecord?.highest_vault_epoch).to.eq(tombstoneEpoch)
+  })
+
+  it("del() from a novel picture of a vault gated elsewhere since refuses absent_vault, deleting nothing: 'delete my vault' never reports success over one standing", async () => {
+    const world = makeWorld()
+    const stale = await world.open({ vaultDB: world.deafVaultDB() })
+    expect(stale.getSnapshot().state).to.eq('novel')
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    await handle.del()
-    expect(handle.getSnapshot().state).to.eq('absent')
+    await TH.expectRefusal(TH.del(stale, 'pw'), 'absent_vault')
+    expect(storedVaultPropsOf(world)['format']).to.not.eq('safebyok-tombstone-v1')
+    await stale.hello({ staleMinutes: 0 })
+    expect(stale.getSnapshot().state).to.eq('locked')
+    await TH.del(stale, 'pw')
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultPropsCkey])
   })
 
-  it("del() on a vault already gone is quiet: a second del() finds nothing to refuse", async () => {
+  it("del() from a novel picture older than staleMinutes reads first: the vault gated elsewhere since is asked for and deleted, never refused absent_vault", async () => {
+    const world = makeWorld()
+    const stale = await world.open({ vaultDB: world.deafVaultDB() })
+    const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+    await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(stale.getSnapshot().state).to.eq('novel')
+    world.advance(StaleMinutes * MinuteMillis)
+    await TH.del(stale, 'pw')
+    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+  })
+
+  it("del() on a novel vault refuses absent_vault, asking nothing and writing nothing; once its first passphrase is set, del() lands, and a second refuses vault_gone; the next life's unlock and del() land", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    await vault.del()
-    await vault.unlock('pw')
-    await vault.del()
-    await vault.del()
-    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(vault.getSnapshot().state).to.eq('novel')
+    const stored = world.dbStore.read(u1VaultPropsCkey)
+    const requestCleartext = vi.fn()
+    const asked = await world.open({ requestCleartext })
+    await TH.expectRefusal(asked.del(), 'absent_vault')
+    expect(requestCleartext).not.toHaveBeenCalled()
+    await TH.expectRefusal(TH.del(vault, 'pw'), 'absent_vault')
+    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(stored)
+    await TH.unlock(vault, 'pw')
+    await TH.del(vault, 'pw')
+    expect(storedVaultPropsOf(world)['format']).to.eq('safebyok-tombstone-v1')
+    await TH.expectRefusal(TH.del(vault, 'pw'), 'vault_gone')
+    const reborn = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    await TH.unlock(reborn, 'pw')
+    await TH.del(reborn, 'pw')
+    await TH.expectRefusal(TH.unlock(reborn, 'pw'), 'vault_gone')
   })
 })
 
@@ -117,7 +169,7 @@ const DamagedListings = [
 ] as const
 
 /** A world holding `anthropic`, spoiled by `spoil`, beside a sound `openai` with a sidecar; and the vault that stored them, unlocked. */
-const worldWithDamagedBox = async (spoil: (row: Record<string, unknown>) => string, overrides?: Partial<MakeVaultOpts>) => {
+const worldWithDamagedBox = async (spoil: (row: Record<string, unknown>) => string, overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw', overrides)
   await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'personal account' } }, 'sk-ant-fake')
@@ -284,15 +336,15 @@ describe("a way in stored damaged", () => {
 
   it("shuts out no other: the vault's sound passphrase still opens it", async () => {
     const { fresh } = await vaultWithDamagedPasskey()
-    await fresh.unlock('pw')
+    await TH.unlock(fresh, 'pw')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("a passkey stored damaged refuses its answer as damaged_wayin, and the passphrase still opens", async () => {
     const { fresh, spoiledLaptop } = await vaultWithDamagedPasskey()
-    const err = await TH.expectRefusal(fresh.unlock(spoiledLaptop), 'damaged_wayin')
+    const err = await TH.expectRefusal(TH.unlock(fresh, spoiledLaptop), 'damaged_wayin')
     expect(err.message).to.include('Unlock with the passphrase')
-    await fresh.unlock('pw')
+    await TH.unlock(fresh, 'pw')
     expect(fresh.getSnapshot().state).to.eq('unlocked')
   })
 
@@ -300,17 +352,17 @@ describe("a way in stored damaged", () => {
     const { world, laptop } = await vaultWithPasskey()
     spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    const err = await TH.expectRefusal(fresh.unlock('pw'), 'damaged_wayin')
+    const err = await TH.expectRefusal(TH.unlock(fresh, 'pw'), 'damaged_wayin')
     expect(TH.thrownText(err)).to.not.include('c2FsdA')
-    await fresh.unlock(laptop)
+    await TH.unlock(fresh, laptop)
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("a passkey stored damaged is removed by the passphrase, leaving the vault no passkey", async () => {
     const { fresh, spoiledLaptop } = await vaultWithDamagedPasskey()
-    await TH.expectRefusal(fresh.unlock(spoiledLaptop), 'damaged_wayin')
+    await TH.expectRefusal(TH.unlock(fresh, spoiledLaptop), 'damaged_wayin')
     expect(fresh.getSnapshot().state).to.eq('locked')
-    await fresh.delWayin('pw')
+    await TH.delWayin(fresh, 'pw')
     expect(fresh.getSnapshot().passkey).to.be.null
   })
 
@@ -319,7 +371,7 @@ describe("a way in stored damaged", () => {
     const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { passkey: { registered_at: number } }
     world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, passkey: { ...vaultProps.passkey, registered_at: vaultProps.passkey.registered_at - 1 } }))
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    const err = await TH.expectRefusal(fresh.unlock(laptop), 'wrong_passkey')
+    const err = await TH.expectRefusal(TH.unlock(fresh, laptop), 'wrong_passkey')
     expect(err.message).to.include('may be damaged')
   })
 })

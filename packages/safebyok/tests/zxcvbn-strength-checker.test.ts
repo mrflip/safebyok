@@ -168,26 +168,28 @@ describe("zxcvbnStrengthChecker's loading", () => {
     expect(await fresh.zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
   })
 
-  it("fails a vault's hello as unexpected_error when zxcvbn fails to load, though it read storage, and opens at the next hello", async () => {
+  it("fails a bank's hello as unexpected_error when zxcvbn fails to load, births no vault, and births one at the next ask", async () => {
     const { fresh } = await freshModule(true)
-    const [{ Vault: FreshVault }, { localVaultDB }, { memoryStore }, { memoryDeviceDB }] = await Promise.all([
-      import('../src/vault'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
+    const [{ Bank: FreshBank }, { localVaultDB }, { memoryStore }, { memoryDeviceDB }] = await Promise.all([
+      import('../src/bank'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
     ])
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const vault = FreshVault.make(TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() }))
+    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() })
+    const bank = FreshBank.make(bankOpts)
     try {
       // The fresh copy's VaultError is a class of its own: told by kind.
-      const refused = await vault.tryHello()
-      if (refused.ok) { throw new Error('the hello was not refused') }
+      const refused = await bank.tryEnsureVault({ userId, vaultlabel })
+      if (refused.ok) { throw new Error('the birth was not refused') }
       expect(refused.err.refusalkind).to.eq('unexpected_error')
       expect(refused.err.cause).to.be.instanceOf(Error)
-      expect(vault.getSnapshot().state).to.eq('absent')
-      await vault.hello()
-      expect(vault.getSnapshot().state).to.eq('absent')
-      await vault.unlock('correct horse battery staple')
+      expect(bank.getSnapshot().status).to.eq('refused')
+      expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
+      const vault = await bank.ensureVault({ userId, vaultlabel })
+      expect(vault.getSnapshot().state).to.eq('novel')
+      await TH.unlock(vault, 'correct horse battery staple')
       expect(vault.getSnapshot().state).to.eq('unlocked')
     } finally {
-      vault.close()
+      bank.closeVaults()
     }
   })
 })

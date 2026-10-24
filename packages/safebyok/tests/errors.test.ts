@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -115,23 +115,23 @@ const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
   ["bad_label",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_whisper",         "misuse",    'storing what JSON cannot carry is a bug'],
-  ["bad_option",          "misuse",    'an Vault.make option out of range is a bug'],
+  ["bad_option",          "misuse",    'a Bank.make option out of range is a bug'],
   ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
   ["invalid_box",         "misuse",    'handing a VaultDB a box this package does not build, or one for another vaultKey, is a bug'],
   ["corrupt_record",      "misuse",    "a storage adapter's wrong answer is the developer's bug to fix, never the user's"],
-  ["vault_closed",        "misuse",    'using a handle after close() is a bug'],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
+  ["passphrase_required", "misuse",    "asking to remove a vault's passphrase is a bug: it can only be replaced"],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
   ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
-  ["created_elsewhere",   "condition", 'a vault made on another device meanwhile asks for the passphrase chosen there'],
+  ["gate_made_elsewhere", "condition", 'a first passphrase set on another device meanwhile asks for the passphrase chosen there'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
   ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
-  ["absent_vault",        "condition", 'a vault never made is made by the first unlock'],
+  ["absent_vault",        "condition", 'a novel vault, asked for what only a gated one has, is set up by its first unlock'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
   ["whisper_too_large",   "condition", "an oversized whisper is the user's value, not the code"],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
@@ -142,7 +142,7 @@ const FamilyCases = [
   ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
-  ["rolled_back",         "bad_news",  'storage handing back an older copy of the vault is a fact a user can be told'],
+  ["vault_behind",        "bad_news",  'storage handing back an older copy of the vault than this device has seen is a fact a user can be told'],
   ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
@@ -150,8 +150,11 @@ const FamilyCases = [
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
   ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
+  ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
   ["no_whisper",          "condition", 'a store keeping a whisper where none stands is told to the caller, who hands one in'],
+  ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
+  ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
 ] as const
 
 describe("each kind's family", () => {
@@ -170,7 +173,7 @@ const ConditionCases = [
   [new VaultError('damaged_box', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
   [new VaultError('not_permitted', 'You may not change this vault.'),                true,  'a refusal of the signed-in user'],
   [new VaultError('bad_label', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
-  [new VaultError('vault_closed', 'This vault handle was closed.'),                  false, 'a closed handle, misuse too'],
+  [new VaultError('unexpected_error', 'Something threw that is no refusal.'),       false, 'an unexpected error, misuse too'],
   [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],
   [{ refusalkind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
   [null,                                                                                   false, 'a thrown null'],
@@ -238,4 +241,16 @@ describe("isVaultError", () => {
       expect(isCondition(impostor)).to.be.false
     })
   }
+})
+
+describe("listedKindOf", () => {
+  it("is the kind of a VaultError on the list, and null for any other throw, as its examples show", () => {
+    expect(listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))).to.eq('storage_unavailable')
+    expect(listedKindOf(new Error('no luck with hunter2'))).to.be.null
+  })
+
+  it("is null for a VaultError whose kind is off the list: the thrower's own text", () => {
+    expect(listedKindOf(new VaultError('no luck with hunter2' as RefusalKind, 'A refusal made up.'))).to.be.null
+    expect(listedKindOf('hunter2')).to.be.null
+  })
 })

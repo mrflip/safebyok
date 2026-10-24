@@ -3,7 +3,7 @@ import * as Z from 'zod/mini'
 /** `safebyok/validators`: the checks safebyok runs on every name, so a form or a server can check a name as the vault will.
  * The main entry exports each too. Every name passes {@link NameFloor}, whatever the host chose.
  * Above it are the {@link DefaultValidators}, which a host replaces field by field with
- * Vault.make's `validators`.
+ * Bank.make's `validators`.
  */
 
 /** The most a name holds under any validators, in bytes of UTF-8: the floor's ceiling. */
@@ -86,7 +86,7 @@ export const UserIdPattern = /^[A-Za-z0-9_.:@+|-]+$/
 /** The default check for a scope's `user_id`: 1 to {@link MaxUserIdChars} ASCII letters, digits and `-_.:@+|`.
  * That holds every stable id a provider issues: a UUID, Auth0's `provider|id`, Clerk's `user_...`,
  * Apple's dotted `sub`, a DID. Pass the provider's stable, opaque id, never an email or handle: a
- * vault is found by its user_id, and one that changes orphans the vault. `Vault.make` refuses one
+ * vault is found by its user_id, and one that changes orphans the vault. `Bank.make` refuses one
  * that fails as 'bad_label'.
  *
  * @example UserId.parse('auth0|5f7c8ec7c33c6c004bbafe82')
@@ -103,7 +103,7 @@ export const UserId = Z.string().check(
 /** A schema a host hands the vault in place of one of ours: any Zod 4 schema, classic or mini, whose output is text. It must check synchronously. */
 export type NameValidator = Z.core.$ZodType<string>
 
-/** Vault.make's `validators`: the checks a vault runs on each name where it enters.
+/** Bank.make's `validators`: the checks a vault runs on each name where it enters.
  * A field given **replaces** ours; one left out keeps {@link DefaultValidators}. Build the bag once, at module level, not anew on each call or render.
  *
  * Each only checks: the vault keeps the name as it was handed, never what the schema makes of it.
@@ -112,7 +112,7 @@ export type NameValidator = Z.core.$ZodType<string>
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), putBox (the boxlabel) | `bad_label` |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Bank.make and bank.ensureVault (the scope), putBox (the boxlabel) | `bad_label` |
  * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_record` (a bug) when sent; damaged on read; `stale_write` |
  * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxBoxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `box_too_large`, `vault_full`, `bad_label` |
@@ -133,7 +133,7 @@ export type NameValidator = Z.core.$ZodType<string>
  *     boxlabel: z.string().min(1).max(200),
  *     userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/),
  *   }
- *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
+ *   const bank = Bank.make({ applabel: 'acme', vaultDB, validators, ...browserOpts() })
  */
 export type VaultValidators = {
   /** The check for the app's label: {@link Label} by default. */
@@ -159,8 +159,8 @@ export const DefaultValidators = Object.freeze({
 
 /** Checks that admit, in every field, whatever passes {@link NameFloor}: for a host keeping names in any script, whole or as a start. Frozen.
  *
- * @example Vault.make({ ...opts, validators: AnyTextValidators })
- * @example Vault.make({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
+ * @example Bank.make({ ...opts, validators: AnyTextValidators })
+ * @example Bank.make({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
  * @example AnyTextValidators.boxlabel.safeParse('Work: מפתח API').success  // true
  * @example AnyTextValidators.boxlabel.safeParse('key \uD83D').success      // false: half of an emoji
  */

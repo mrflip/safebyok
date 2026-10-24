@@ -115,19 +115,19 @@ describe("postgresVaultDB, as the README has it", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     const first = await opened()
-    await first.unlock('correct horse battery staple')
+    await TH.unlock(first, 'correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
     await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
-    first.close()
+    TH.closeVault(first)
 
     const second = await opened()
-    await second.unlock('correct horse battery staple')
+    await TH.unlock(second, 'correct horse battery staple')
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
-    second.close()
+    TH.closeVault(second)
   })
 })
 
@@ -210,17 +210,17 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
       const vault = await TH.settledVault({
         applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
       })
-      await vault.unlock('correct horse battery staple')
+      await TH.unlock(vault, 'correct horse battery staple')
       return vault
     }
     const owner = await opened(TH.requestFor(db, 'u1'))
     await owner.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    owner.close()
+    TH.closeVault(owner)
     const reader = await opened(postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), userId: 'u1' }))
     await TH.expectRefusal(reader.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
     expect(reader.getSnapshot().state).to.eq('unlocked')
     expect(await reader.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    reader.close()
+    TH.closeVault(reader)
   })
 })
 // --
@@ -586,16 +586,16 @@ describe("postgresVaultDB, its box limit", () => {
       vaultDB: postgresVaultDB({ client: db, userId: 'u1', maxBoxes: 2 }),
     })
     const here = await opened()
-    await here.unlock('correct horse battery staple')
+    await TH.unlock(here, 'correct horse battery staple')
     await here.putBox({ boxlabel: 'openai' }, 'sk-fake-one')
     const there = await opened()
-    await there.unlock('correct horse battery staple')
+    await TH.unlock(there, 'correct horse battery staple')
     await there.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')
     expect(here.getSnapshot().boxes).to.have.lengthOf(1)
     const refusal = await TH.expectRefusal(here.putBox({ boxlabel: 'mistral' }, 'sk-fake-three'), 'vault_full')
     expect(refusal.message).to.include('its storage keeps')
-    here.close()
-    there.close()
+    TH.closeVault(here)
+    TH.closeVault(there)
   })
 
   it("opens a vault with the smaller of MaxBoxes and its own, and refuses one asking for more", async () => {
@@ -606,11 +606,11 @@ describe("postgresVaultDB, its box limit", () => {
     })
     await TH.expectRefusal(TH.settledVault(optsFor(4)), 'bad_option')
     const vault = await TH.settledVault(optsFor())
-    await vault.unlock('correct horse battery staple')
+    await TH.unlock(vault, 'correct horse battery staple')
     for (const boxlabel of ['one', 'two', 'three']) { await vault.putBox({ boxlabel }, `sk-fake-${boxlabel}`) }
     const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'four' }, 'sk-fake-four'), 'vault_full')
     expect(refusal.message).to.include('limit of 3 boxes')
-    vault.close()
+    TH.closeVault(vault)
   })
 })
 // --

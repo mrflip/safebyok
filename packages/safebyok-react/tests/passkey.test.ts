@@ -36,7 +36,7 @@ const vaultInMemory = async () => {
   const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
   const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
   const vault = await open()
-  await vault.unlock('pw')
+  await TH.unlock(vault, 'pw')
   return { vault, open }
 }
 
@@ -171,13 +171,13 @@ describe("a passkey unlock, end to end", () => {
     const { vault, open } = await vaultInMemory()
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const answer = await createPasskey(passkeyOpts)
-    if (answer !== null) { await vault.putWayin('pw', answer) }
+    if (answer !== null) { await TH.putWayin(vault, 'pw', answer) }
     expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credentialId)
 
     const elsewhere = await open()
     expect(elsewhere.getSnapshot().state).to.eq('locked')
     const passkey = await askPasskey(elsewhere.getSnapshot().passkey)
-    if (passkey !== null) { await elsewhere.unlock(passkey) }
+    if (passkey !== null) { await TH.unlock(elsewhere, passkey) }
     expect(await elsewhere.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
@@ -187,16 +187,16 @@ describe("a passkey unlock, end to end", () => {
     fake.refuseNext('NotAllowedError')
     const answer = await createPasskey(passkeyOpts)
     expect(answer).to.be.null
-    if (answer !== null) { await vault.putWayin('pw', answer) }
+    if (answer !== null) { await TH.putWayin(vault, 'pw', answer) }
     expect(vault.getSnapshot().passkey).to.be.null
   })
 
   it("a passkey added again takes the first's place: askPasskey asks only the new one", async () => {
     const fake = install()
     const { vault, open } = await vaultInMemory()
-    await vault.putWayin('pw', await madePasskey())
+    await TH.putWayin(vault, 'pw', await madePasskey())
     const [first = ''] = fake.credentialIds()
-    await vault.putWayin('pw', await madePasskey())
+    await TH.putWayin(vault, 'pw', await madePasskey())
     const elsewhere = await open()
     const { passkey } = elsewhere.getSnapshot()
     expect(passkey?.credential_id).to.not.eq(first)

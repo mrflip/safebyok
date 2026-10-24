@@ -5,19 +5,20 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
  *
  * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
- *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`, `vault_closed`,
- *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`. Let it reach an error boundary
+ *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`,
+ *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`, `passphrase_required`. Let it reach an error boundary
  *   or the dev overlay.
  *   Never show it to the user, and never retry it.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
- *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
+ *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `no_whisper`.
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
+ *   `same_passphrase`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
- *   `rolled_back`, `identity_revoked`.
+ *   `vault_behind`, `identity_revoked`.
  *
  * Each kind's one-line meaning sits beside it below. These need more:
  *
@@ -46,19 +47,21 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  * * `wrong_passphrase`, `wrong_passkey`: the proof did not open its wayin. That is all the vault
  *   can tell even when the stored vault was altered, since decryption fails alike; the message
  *   says so. A blank passphrase offered as proof is `wrong_passphrase` too.
- * * `created_elsewhere`: a first unlock found the vault just made on another device, under another
- *   passphrase. Nothing was created here, and the vault shows `locked` as the other device made it.
- *   The user enters the passphrase chosen there. A passphrase that opens it unlocks with no refusal.
- * * `weak_passphrase`: a new passphrase (the one a vault is created with, or one `putWayin()`
- *   sets) that the `strengthChecker` finds too easy to guess, or a blank one. Its message is the
- *   checker's reason, fit to show beside the field. `unlock()` of a standing vault never raises it.
+ * * `gate_made_elsewhere`: an `initialize_gate` attempt found the vault's first passphrase just
+ *   set on another device. Nothing was set here; the next `hello()` shows the vault `locked` as the other device
+ *   made it, and the user enters the passphrase chosen there.
+ * * `weak_passphrase`: a new passphrase (the one an `initialize_gate` attempt sets, or a
+ *   `change_passphrase` attempt's next) that the `strengthChecker` finds too easy to guess, or a
+ *   blank one. Its message is the checker's reason, fit to show beside the field. An unlock of a
+ *   standing vault never raises it.
  * * `insecure_context`: a page served over plain http (anywhere but localhost), where the browser
  *   withholds WebCrypto. The host serves it over https.
  * * `newer_format`: a stored vault in a form this version does not know, perhaps written by a newer
  *   safebyok. The user updates the app, never starts over, and nothing deletes it.
- * * `rolled_back`: storage handed back older vault props than this device has seen (a backup
- *   restored over it, or tampering). The vault takes nothing from them, writes nothing over them,
- *   and locks. Only a device whose own storage still holds the mark of the newer props can tell.
+ * * `vault_behind`: storage handed back a vault at a lower `vault_epoch` than this device has seen
+ *   (a backup restored over it, or tampering). The vault takes nothing from it, writes nothing over
+ *   it, and locks; at birth, no vault is born. Only a device whose own store still holds its record
+ *   of the higher epoch can tell. `bank.clearCachedVault` accepts what storage holds.
  * * `storage_unavailable`: a storage failure a retry may mend. A backend out of reach, an aborted
  *   transaction, a closed connection, or a browser error naming no lasting cause
  *   (`InvalidStateError`, `UnknownError`).
@@ -79,13 +82,21 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
  *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The
  *   picture is already the new one: unlock again, or read the vault (`hello()`) and call again.
+ * * `gating_landed`: a gating's attempt under way, or made, was for a gating that has since
+ *   ended -- a `lock()` landed, or it was settled or declined -- so it unlocked nothing. Ask again.
+ * * `attempt_in_flight`: a second attempt at a gating while its first runs: nothing was tried.
+ *   Disable the dialog's submit while an attempt runs.
+ * * `same_passphrase`: a `change_passphrase` attempt whose next passphrase is the current one.
+ *   The dialog shows it in place, and the gating stays open.
+ * * `passphrase_required`: `delWayin('passphrase')`, refused at once: a vault keeps its
+ *   passphrase, which `putWayin('passphrase')` replaces.
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
 export const RefusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
-  'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
+  'gate_made_elsewhere', // a first unlock found the vault's first passphrase just set on another device
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
@@ -97,10 +108,9 @@ export const RefusalKindVals = [
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
-  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
+  'bad_option',          // an option or argument out of its range: Bank.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
   'bad_record',          // a record or expectation the host handed in that is not one this package builds
   'invalid_box',         // a box handed to a VaultDB's putBox that is not one this package builds, or not for its expectation
-  'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a storage adapter answered in a shape its protocol does not allow: a bug in the adapter
   'damaged_vault',       // the vault's props, read from storage, failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
@@ -111,7 +121,7 @@ export const RefusalKindVals = [
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
   'vault_mismatch',      // a box read's or write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
-  'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
+  'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
@@ -119,8 +129,12 @@ export const RefusalKindVals = [
   'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
   'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
+  'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
+  'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
+  'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
+  'same_passphrase',     // a new passphrase that is the one the vault already has
 ] as const
 export type RefusalKind = typeof RefusalKindVals[number]
 
@@ -138,7 +152,7 @@ export type RefusalFamily = typeof RefusalFamilyVals[number]
 export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
-  created_elsewhere:   'condition',
+  gate_made_elsewhere: 'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
   passkey_unavailable: 'condition',
@@ -153,7 +167,6 @@ export const RefusalFamilyForKind = {
   bad_option:          'misuse',
   bad_record:          'misuse',
   invalid_box:         'misuse',
-  vault_closed:        'misuse',
   corrupt_record:      'misuse',
   damaged_vault:       'bad_news',
   damaged_wayin:       'bad_news',
@@ -164,7 +177,7 @@ export const RefusalFamilyForKind = {
   unexpected_error:    'misuse',
   stale_write:         'condition',
   vault_mismatch:      'condition',
-  rolled_back:         'bad_news',
+  vault_behind:        'bad_news',
   not_permitted:       'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
@@ -172,8 +185,12 @@ export const RefusalFamilyForKind = {
   vault_gone:          'condition',
   vault_remade:        'condition',
   gate_moved:          'condition',
+  gating_landed:       'condition',
   damaged_lease:       'bad_news',
   no_whisper:          'condition',
+  attempt_in_flight:   'condition',
+  passphrase_required: 'misuse',
+  same_passphrase:     'condition',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** What a refusal learned, each fact under its own name, filled only by the refusals that name it.
@@ -251,6 +268,16 @@ export class VaultError extends Error {
  */
 export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
   err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+)
+
+/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link RefusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
+ * A kind off the list is the thrower's own text, and may quote what it heard.
+ *
+ * @example listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))  // 'storage_unavailable'
+ * @example listedKindOf(new Error('no luck with hunter2'))  // null
+ */
+export const listedKindOf = (thrown: unknown): RefusalKind | null => (
+  isVaultError(thrown) && (RefusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
 )
 
 /** True when `err` is a VaultError the app may show the user, or retry: a `condition` or `bad_news`.

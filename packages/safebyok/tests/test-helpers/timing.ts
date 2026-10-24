@@ -93,9 +93,9 @@ export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: Vaul
  * @example
  *   const gate = TH.makeGate()
  *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
- *   const unlocking = vault.unlock('pw')   // now waiting at the gate
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the gate
  *   await gate.reached
- *   await vault.lock()                     // lands mid-unlock
+ *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
  *   gate.release()
  */
 export const makeGate = () => {
@@ -185,9 +185,9 @@ const originalOf = new WeakMap<object, AsyncFn>()
  *
  * @example
  *   const gate = TH.holdNextCall(vaultDB, 'getVault')
- *   const unlocking = vault.unlock('pw')   // now waiting at the gate
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the gate
  *   await gate.reached
- *   await vault.lock()                     // lands mid-unlock
+ *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
  *   gate.release()
  */
 export const holdNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
@@ -210,7 +210,7 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *
  * @example
  *   const written = TH.holdNextAnswer(deviceDB, 'putLease')
- *   const unlocking = vault.unlock('pw')   // the lease is in the store; the unlock has not heard
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the store; the unlock has not heard
  *   await written.reached
  *   await vault.lock()                     // its erase lands after the write
  *   written.release()
@@ -244,7 +244,7 @@ export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Pr
 
 /**
  * A count of the storage watches `vaultDB` opens and closes from here on, kept by spying on its
- * `subscribe`: for a test that a close or a lock leaves no watch running that
+ * `subscribe`: for a test that letting a vault go leaves no watch running that
  * nobody could end. Each watch still reaches the adapter's own `subscribe`.
  *
  * A watch counts as closed the first time it is closed: closing it again changes nothing, so a
@@ -255,9 +255,8 @@ export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Pr
  *
  * @example
  *   const tally = TH.tallyWatches(vaultDB)
- *   const vault = Vault.make(opts)
- *   await TH.expectRefusal(vault.hello(), 'not_permitted')
- *   vault.close()
+ *   const vault = await TH.settledVault({ ...opts, vaultDB })
+ *   TH.closeVault(vault)
  *   expect(tally.opened - tally.closed).to.eq(0)
  */
 export const tallyWatches = (vaultDB: Pick<VaultDB, 'subscribe'>) => {

@@ -70,7 +70,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * @example
  *   import { api } from '../convex/_generated/api'
  *   const vaultDB = convexVaultDB({ client: convex, api: api.safebyok })
- *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
+ *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
  */
 export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
   const { client, api } = (opts as Partial<ConvexVaultDBOpts> | null | undefined) ?? {}
