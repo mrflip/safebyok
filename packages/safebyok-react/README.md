@@ -6,9 +6,10 @@ otherwise write itself.
 * `BankProvider` -- makes the app's bank (`Bank.make`) from its props, for the signed-in user
   (the `userId` prop from your auth); lets every vault in it go as the user signs out or changes
   (`bank.closeVaults()`). It is the vaults' `requestCleartext`, unless you pass one of your own:
-  whenever a call on a vault needs it unlocked and finds it not -- `vault.getWhisper(...)`,
-  `vault.putBox(...)`, or `vault.ensureUnlocked()` on an Unlock button -- it shows the passphrase
-  dialog, one at a time, and the call waits on it (*Asking for the passphrase*, below).
+  whenever a call on a vault needs the user -- `vault.getWhisper(...)`, `vault.putBox(...)` or
+  `vault.ensureUnlocked()` on a vault locked, `vault.putWayin(...)`, `vault.delWayin('passkey')`,
+  `vault.del()` -- it shows the dialog for that gating's kind, one at a time, and the call waits on
+  it (*Asking for the passphrase*, below).
 * `useVault(vaultlabel)` -- the bank's entry for the user's vault under that label, asking the
   bank for it (`bank.ensureVault`) when it holds none: `starting`, `timely` with its Vault object,
   or `refused` with why; `null` while nobody is signed in, and until the ask lands. Its Vault
@@ -17,21 +18,27 @@ otherwise write itself.
   `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while there is no Vault object.
 * `useBank()` -- the bank itself, to ask for a vault again (`bank.ensureVault`), or to take the
   ways past a refusal: `bank.delDamagedVault`, `bank.clearCachedVault` (*When opening fails*, below).
-* `PassphraseModal` -- the shipped `requestCleartext`'s dialog, handed one `unlock_vault` or `initialize_gate` gating and answering it: unstyled markup under `modal-scrim` / `modal` class
-  names for the host's stylesheet to dress. It says how long an unlock lasts on the device -- "Locks
-  again on this device in 7 days", "in 15 minutes", "Stays unlocked ... until you lock it"
-  ("Locks on this device ..." while it creates the vault) -- read from the vault itself (its
-  `leaseMillis`, the `leaseHours` it was opened with). A wrong
-  passphrase shows in the dialog in place; a lock that won or storage out of reach closes it,
-  answering `declined`; anything else (misuse, a bug) shows a calm "Something went wrong" with a Close
-  button, and goes to React's error reporting, never to your page (*When an unlock fails*,
-  below). For a vault with a passkey, "Use a passkey" comes first, ahead of the passphrase
-  field, and takes the focus. It is a modal `dialog` named by its heading; Escape cancels it and
-  goes no further; its error line is a live region a screen reader announces. It follows the
-  vault as it changes, and starts afresh when handed another. `allowStartOver` offers nothing for
-  now (*Starting over*, below).
-  Its passphrase field is made for password managers, with a Show / Hide button and room for your
-  advice beside it (*The passphrase field*, below).
+* `GatingModal` -- the shipped `requestCleartext`'s dialog, handed one gating and answering it,
+  one form per `gatingkind`: the passphrase dialog, `PassphraseModal`, for an unlock or a first
+  passphrase; the current passphrase and the next for `change_passphrase`, a new passphrase typed
+  twice, at a change as at the first (a submit whose two differ is refused in place, before
+  anything is attempted, so that a typo never becomes the vault's passphrase); the passphrase, then a
+  passkey the browser makes, for `put_passkey`; the passphrase for `del_passkey` and `del_vault`.
+  Unstyled markup under `modal-scrim` / `modal` class names for the host's stylesheet to dress.
+  It says how long an unlock lasts on the device -- "Locks again on this device in 7 days", "in 15
+  minutes", "Stays unlocked ... until you lock it" ("Locks on this device ..." while it creates the
+  vault) -- read from the vault itself (its `leaseMillis`, the `leaseHours` it was opened with). A
+  refusal the user can correct -- a wrong passphrase, a weak or unchanged new one, a way in that
+  cannot answer -- shows in the dialog in place, and the dialog asks again; a lock that won or
+  storage out of reach closes it, answering `declined`; anything else (misuse, a bug) shows a calm
+  "Something went wrong" with a Close button, and goes to React's error reporting, never to your
+  page (*When an unlock fails*, below). For a vault with a passkey, "Use a passkey" comes first in
+  the passphrase dialog, ahead of the field, and takes the focus. It is a modal `dialog` named by
+  its heading; Escape cancels it and goes no further; its error line is a live region a screen
+  reader announces. It follows the vault as it changes, and starts afresh when handed another
+  gating. `allowStartOver` offers nothing for now (*Starting over*, below). Its passphrase fields
+  are made for password managers, with a Show / Hide button and room for your advice beside a new
+  one (*The passphrase field*, below).
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
   Show / Hide button; password managers and autofill are turned away (*Entering a whisper*,
   below).
@@ -179,7 +186,7 @@ show.
 deleted and made anew (`vault_remade`) by a later read, here or on another device, its Vault
 object is gone, and its entry is `refused` with that kind. Nothing asks for it again on its own: a
 new vault, `novel`, is stored only once the app asks the bank (`bank.ensureVault`), as on the
-user's "Start a new vault". The dialog's own "Start over" is such an ask (*Starting over*, below).
+user's "Start a new vault".
 
 **A vault behind this device.** Should a later read find storage handing back an older copy of the
 vault than this device has seen, the vault takes nothing from it, and locks: the entry stays
@@ -254,31 +261,47 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 * **Unlock ahead of time** with `vault.ensureUnlocked()` on a button: `onClick={() => { void
   vault.tryEnsureUnlocked() }}`; `vault.ensureUnlocked({ renewMinutes: 60 })` asks now if the
   lease ends within the hour.
-* **Changes to the ways in, and deleting the vault**, raise gatings of their own kinds
-  (`change_passphrase`, `put_passkey`, `del_passkey`, `del_vault`), which the provider's dialog
-  does not answer yet: it declines them, and the call refuses `vault_locked`. Pass a
-  `requestCleartext` of your own to answer them.
+* **Changes to the ways in, and deleting the vault**, raise gatings of their own kinds:
+  `vault.putWayin('passphrase')` raises `change_passphrase` (`initialize_gate` on a vault with no
+  passphrase yet), `vault.putWayin('passkey')` raises `put_passkey`, `vault.delWayin('passkey')`
+  raises `del_passkey`, and `vault.del()` raises `del_vault`. The provider's dialog asks for each,
+  proven by the passphrase; cancelled, the call refuses `vault_locked`, its message saying what
+  stands ("The passphrase is unchanged.", "Nothing was deleted."), and nothing was changed.
+  `vault.putWayin('passkey')` on a vault with no passphrase yet refuses `absent_vault`, asking
+  nothing: a passkey is added under the passphrase.
+* **A call behind another kind's dialog waits.** One gating stands per vault. A call that needs
+  the vault unlocked while a change's or a deletion's dialog is up waits for that dialog to close,
+  and does not show in it. A change made leaves the vault unlocked, so the waiting call goes on
+  unasked; a change cancelled lets the call ask for the passphrase in a dialog of its own, as
+  soon as the first has closed (shown only while the user's gesture is in hand, as ever). A
+  deletion made leaves the Vault object gone, and the waiting call refuses `vault_gone`. Calls
+  asking for one kind join its dialog: two unlocks, or two passphrase changes, share one.
 * **Your own dialog**: pass `requestCleartext={(gating) => ...}`, which the vault hands a gating
   -- its `gatingkind`, the `vault`, the kind's attempt, `decline()` and `lockLanded` -- and which
-  resolves once the dialog closes. It may render `PassphraseModal` itself for an unlock:
-  `<PassphraseModal gating={gating} onDone={close} />`. `requestCleartext={null}` asks no one:
-  each such call is refused `vault_locked`.
+  resolves once the dialog closes. It may render `GatingModal` itself for every kind,
+  `<GatingModal gating={gating} onDone={close} />`, or `PassphraseModal` for an unlock or a
+  first passphrase. `requestCleartext={null}` asks no one: each such call is refused
+  `vault_locked`.
 
 ## When an unlock fails
 
 **The user sees what they can mend.** A wrong passphrase, a passkey that does not answer, a way in
-stored damaged: each shows in the dialog in the vault's own calm words, to try again or cancel.
-A first passphrase that lost the race to one set on another device (`gate_made_elsewhere`) shows
-as advice, not as a typo: the dialog has the vault say hello, so it shows `locked`, and becomes an
-unlock of the vault that stands, for the passphrase chosen there.
-Storage out of reach, a lock that won, a vault gone, or a refusal the dialog cannot mend closes it, answering
-`declined`, so the call that asked is refused `vault_locked`. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
-reason the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`,
-which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
-own names. The user hears the same reason before pressing Create, as advice (below). A field of
-your own can ask the vault's checker, held to the same contract, as the user types:
-`const verdict = await vault.checkPassphrase(typed)`, then show `verdict.reason` while
-`verdict.strong` is false.
+gone or stored damaged, a new passphrase too easy to guess (`weak_passphrase`) or the one the vault
+already has (`same_passphrase`): each shows in the dialog in the vault's own calm words, and the
+gating stays open for the user to try again or cancel. These are the core's
+`CorrectableKindVals`; nothing tries again for the user. A weak passphrase's message is the reason
+the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`, which asks
+for 12 characters and turns away common passwords, keyboard patterns and the vault's own names.
+The user hears the same reason before pressing Create, as advice (below). A field of your own can
+ask the vault's checker, held to the same contract, as the user types:
+`const { ok, err } = await vault.tryCheckStrength(typed)`, then show `err.message` while `err` is
+a `weak_passphrase`.
+
+**The rest closes the dialog.** Storage out of reach, a lock that won, a vault gone, or a refusal
+the dialog cannot mend closes it, answering `declined`; the call that asked hears that refusal.
+A first passphrase that lost the race to one set on another device (`gate_made_elsewhere`)
+closes it too: the call that asked refuses `gate_made_elsewhere`, and the next call asks to
+unlock with the passphrase chosen there.
 
 **Anything else never takes your page down.** Misuse -- an `rpId` that
 does not fit the page, a vault made with a key deriver this build lacks (as in a tab left open
@@ -294,13 +317,13 @@ focus to the passphrase field. Your error boundary never sees it.
 own, so React hands the error to the root's `onCaughtError`: by default the console, with the
 component stack, in development and production alike. It arrives with nothing the user typed: a
 `VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver
-throws, a `VaultError` of its own included, is the vault's `unexpected_error` with that throw as the
-cause, as it heard the passphrase; a `strengthChecker` that threw, or answered no verdict, is the
+throws, a `VaultError` of its own included, is the vault's `unexpected_error`, carrying nothing of
+the throw, as it heard the passphrase; a `strengthChecker` that threw, or answered no verdict, is the
 vault's own refusal of it (`unexpected_error` quoting none of it, or `bad_option`); and anything
 else -- a `passphraseAdvice` that threw, say -- arrives as a fixed `unexpected_error` quoting none
-of it. (A
-condition a key deriver raises is met as the same condition from storage is -- shown in the
-dialog, or closing it -- and never reported.) Hook your error tracker there:
+of it. (A key deriver's `VaultError` of the condition family keeps its kind, in safebyok's own
+words, and is met as any condition is -- shown in the dialog, or closing it -- and never
+reported.) Hook your error tracker there:
 
 ```tsx
 createRoot(rootElement, {
@@ -314,9 +337,10 @@ opening fails*, above), where it fires on every load, before any user has typed 
 ## Starting over
 
 A forgotten passphrase cannot be recovered: the vault and its whispers are gone with it. Deleting
-a vault is now proven by its passphrase (`vault.del()` raises a `del_vault` gating), so the
-dialog's "Forgot it? Start a new vault" is not offered for now: `allowStartOver` and
-`onStartedOver` are taken and do nothing. A vault with a passkey still unlocks with it.
+a vault is proven by its passphrase (`vault.del()` raises a `del_vault` gating), so a user who has
+forgotten it cannot delete it from the dialog: "Forgot it? Start a new vault" is not offered for
+now, and `allowStartOver` and `onStartedOver` are taken and do nothing. A vault with a passkey
+still unlocks with it.
 
 ## The passphrase field
 
@@ -340,8 +364,19 @@ It has a Show / Hide button (`aria-pressed`), flipping the field between `passwo
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
 
-**Advice while choosing.** By default the dialog says `vault.checkPassphrase`'s reason as the
-user chooses a weak passphrase, and nothing once the checker admits it, so they hear why before
+**Typed twice when new.** A new passphrase -- the vault's first, or the next at a change -- is
+typed again in a confirmation field below it, also `autocomplete="new-password"`, so that a
+manager that generates one fills both. A typo would otherwise become the vault's passphrase
+(at a change, the passkey goes with the old one), and once this device's unlock ends, nobody
+could open the vault. A submit whose two differ is refused in place, before any key is derived or
+anything is stored: "The new passphrase and its confirmation don't match: type the same one in
+both." The confirmation field is then marked `aria-invalid` and described by that message
+(`aria-describedby`), until the user types again. The two are compared only at the submit; the
+confirmation field is uncontrolled too, and the advice never hears it. The unlock form, and the
+current passphrase at a change, ask once.
+
+**Advice while choosing.** By default the dialog says the reason `vault.tryCheckStrength` gives
+as the user chooses a weak passphrase (a first one, or the next at a change), and nothing once the checker admits it, so they hear why before
 pressing Create. Pass `passphraseAdvice`, a function of what has
 been typed, to say something of your own instead (the checker then goes unasked until Create); what
 it answers shows beside the field as the user chooses a passphrase: tied to the field by
@@ -485,7 +520,10 @@ if (passkey !== null) { const { ok } = await gating.attemptPasskey(passkey) }
   its field (`autoFocus` to make it the first choice); `onDone` hears `'unlocked'`, or
   `'declined'` for a refusal that closes the dialog; `onGripe` hears null as each press
   begins (what it said before no longer stands), each message to show in place, and the button's
-  word when it takes itself away.
+  word when it takes itself away. `GatingModal`'s form for `put_passkey` asks for the passphrase,
+  then makes the passkey at each submit, filed under `passphraseUsername` for a relying party
+  named for the `applabel`, at the page's own domain. It keeps no answer across attempts: after a
+  typo, the next submit makes another passkey, and the first stays on the authenticator, unused.
 * **A passkey unlocks; only the passphrase changes things.** `vault.putWayin('passphrase')`,
   `vault.putWayin('passkey')` and `vault.delWayin('passkey')` each raise a gating whose attempt
   takes the standing passphrase as proof, never a passkey's answer. A user who forgot the passphrase can still unlock

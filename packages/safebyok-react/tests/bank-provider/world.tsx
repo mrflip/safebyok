@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, vi } from 'vitest'
 import { Ckeys, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
-import * as TH from 'safebyok/testing'
+import * as TH from '../test-helpers'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { BankProvider, useBank, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
 
@@ -143,7 +143,8 @@ export const expectOutcome = (outcome: string) => waitFor(() => { expect(screen.
 /** Puts a box through the Probe into a vault not yet made, choosing `passphrase` for it. */
 export const putThroughNewVault = async (passphrase: string) => {
   fireEvent.click(screen.getByText('put'))
-  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  await screen.findByPlaceholderText('vault passphrase')
+  TH.typeNewPassphrase(passphrase)
   fireEvent.click(screen.getByText('Create vault'))
   await expectOutcome('stored')
 }

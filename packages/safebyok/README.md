@@ -482,7 +482,11 @@ under the longer setting, whose deadline lies past the new number of hours from 
 taken up, the vault is born locked, and the user types their passphrase again. Raising it
 lengthens no lease already granted. A device keeps one lease per vault, shared by its tabs, so
 open a vault with one setting on a device: two tabs opening it with different ones are not
-supported, and the lower one wins (`notes/wontfix.md`). A device clock
+supported, and the lower one wins (`notes/wontfix.md`). A tab already unlocked keeps its own lease
+when another tab unlocks or renews, and at its own deadline its next call takes up the other's
+without asking; a `lock()` in another tab, or a change to the ways in, drops it at its next read
+(`vault.hello`). A lock and an unlock in another tab that both land before that read leave it
+standing: the device holds a lease under the same ways in again. A device clock
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
@@ -775,7 +779,7 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
   Its whole contract is that verdict, for every passphrase: it never throws. `Bank.make` refuses
   anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
-  keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
+  keeps it held to its contract, and asks it as `vault.checkStrength(typed)`. A checker that
   answers anything but a verdict is refused `bad_option`, and one that throws `unexpected_error`,
   carrying nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to
   choose one.
@@ -783,8 +787,8 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
 * **Call it from the field as well, through the vault.** The field the user types into can ask
-  `vault.checkPassphrase(typed)` on each keystroke, and show the reason before the user
-  submits: the same check, held to the same contract, so the field and Create decide alike (a
+  `vault.tryCheckStrength(typed)` on each keystroke, and show a `weak_passphrase` refusal's
+  message, the checker's reason, before the user submits: the same check, held to the same contract, so the field and Create decide alike (a
   blank passphrase is weak without the checker hearing it). `safebyok-react`'s dialog does so by
   default. It hears the passphrase in plain text, so it must run on the device and keep nothing:
   never send it to a server, log it, or let an error tracker capture it.
@@ -924,7 +928,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `vault_gone`          | the Vault object is gone: the vault was deleted, here or on another device, or the bank let the Vault object go (`closeVault`, `closeVaults`, `reopenVault`, `clearCachedVault`). A call under way found so at one of its own steps, and did nothing more; every later call on it refuses so. A box read also refuses so when storage no longer holds the vault this device read | Ask the bank for the vault again (`bank.ensureVault`): it hands out a new Vault object, novel where the vault was deleted |
 | `vault_remade`        | the vault was deleted and made anew on another device: what the call held belongs to the vault that was deleted. The Vault object is gone, and every later call on it refuses so | Ask the bank for the vault again (`bank.ensureVault`), and unlock the one that stands now, with the passphrase chosen there |
-| `gate_moved`          | the vault's ways in changed while a call was under way -- its passphrase or passkey was changed, here or on another device -- so what the call held, proven under the old ones, opens nothing now | Unlock again: the vault asks for the passphrase as it stands now |
+| `gate_moved`          | a vault unlocker changed while a call was under way -- the passphrase or passkey was changed, here or on another device -- so what the call held, proven under the old ones, opens nothing now | Unlock again: the vault asks for the passphrase as it stands now |
 | `gating_landed`       | a gating's attempt under way, or made, was for a gating that ended meanwhile -- a `lock()` landed, or it was settled or declined -- so it attached no lease | Nothing: the user asks again when they want the vault |
 | `attempt_in_flight`   | a gating's attempt was made while another of its attempts was under way, so it was not tried | Disable the dialog's submit while an attempt runs |
 | `same_passphrase`     | a `change_passphrase` attempt whose next passphrase is the current one; the gating stays open | Show it in place, and ask for a different one |
@@ -1061,10 +1065,10 @@ id there, and the highest `vault_epoch` it has seen the vault at, raised at ever
 write of its own, and never lowered, whichever tab writes it. A vault storage serves below that
 epoch is refused with `vault_behind`: a birth births nothing, and a Vault object already born
 takes nothing from it, writes nothing, and locks, as for a user signed out (*When the user signs
-out*). A Vault object that itself holds the newer copy reads an older one of the same life as a
-read served late, and ignores it, keeping the newer; another tab, or the next birth, refuses it.
-Storage handing back an older copy could otherwise bring back a way in that was removed, or, once a vaultKey can be
-replaced, a vaultKey too. A device that never saw the newer copy, or whose site data was cleared,
+out*). That holds for a Vault object that itself holds the newer copy too: it refuses the older,
+keeping the newer in hand, as another tab and the next birth do. Storage handing back an older
+copy could otherwise bring back a way in that was removed, or, once a vaultKey can be replaced, a
+vaultKey too. A device that never saw the newer copy, or whose site data was cleared,
 cannot tell, and takes the older copy as it stands; nor does a box restored alone move the
 counter (*A deleted vault's tombstone*, above).
 

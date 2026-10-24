@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
+import { MinuteMillis } from '../../src/types'
 import type { Vault } from '../../src/vault'
 import { heldLeaseOf } from '../../src/held-lease'
 import type { Gating } from '../../src/gating'
@@ -258,6 +259,48 @@ describe("the refresh's judgment", () => {
     expect(thisTab.state).to.eq('unlocked')
     await thisTab.refresh()
     expect(thisTab.state).to.eq('locked')
+  })
+
+  it("keeps its own lease when another tab's renewal writes one ending later: it never shows 'locked' for it, and takes the renewed one up, unasked, once its own ends", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), leaseHours: 1 })
+    const own = thisTab.askPassphraseAt
+    if (own === null) { throw new Error("The unlock left this tab no lease") }
+    world.advance(30 * MinuteMillis)
+    const otherTab = await world.open({ leaseHours: 1 })
+    expect(otherTab.state).to.eq('unlocked')
+    TH.answering(otherTab, async (gating) => { if (gating.gatingkind === 'unlock_vault') { await gating.attemptPassphrase('pw') } })
+    await otherTab.ensureUnlocked({ renewMinutes: 45 })
+    const renewed = await world.getLease()
+    expect(renewed?.ask_passphrase_at).to.be.above(own)
+    await thisTab.refresh()
+    expect(thisTab.state).to.eq('unlocked')
+    expect(thisTab.askPassphraseAt).to.eq(own)
+    world.advance(own - world.clock.now())
+    await thisTab.ensureUnlocked()
+    expect(thisTab.askPassphraseAt).to.eq(renewed?.ask_passphrase_at)
+  })
+
+  it("keeps its own lease when another tab's lock and unlock both land before it reads: the store holds a lease under the same gate", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const otherTab = await world.open()
+    await otherTab.lock()
+    world.advance(MinuteMillis)
+    await TH.unlock(otherTab, 'pw')
+    await thisTab.refresh()
+    expect(thisTab.state).to.eq('unlocked')
+  })
+
+  it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault props read still show the old", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const kept = await world.getLease()
+    if (kept === null) { throw new Error("The unlock left no lease in this device's store") }
+    vi.spyOn(world.deviceDB, 'getLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
+    await vault.refresh()
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.deep.eq(kept)
   })
 
   it("keeps a lease granted after a read began, though that read found none in this device's store", async () => {

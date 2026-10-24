@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank, isVaultError, type Vault, memoryDeviceDB, type Gating, type Outcome, type RequestCleartext, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
-import * as TH from 'safebyok/testing'
+import * as TH from '../test-helpers'
 import { BankProvider, useVault } from '../../src/bank-provider'
 import { Probe, makeWorld, shownState, expectShown, expectOutcome, putThroughNewVault, CatchingBoundary, lockedWorld, watched, hushConsole } from './world'
 
@@ -41,10 +41,10 @@ describe("BankProvider", () => {
     await expectShown('novel')
 
     fireEvent.click(screen.getByText('put'))
-    const passphraseInput = await screen.findByPlaceholderText('vault passphrase')
+    await screen.findByPlaceholderText('vault passphrase')
     expect(screen.getByText('Choose a vault passphrase')).to.not.be.null
 
-    fireEvent.change(passphraseInput, { target: { value: 'correct horse battery staple' } })
+    TH.typeNewPassphrase('correct horse battery staple')
     fireEvent.click(screen.getByText('Create vault'))
 
     await expectOutcome('stored')
@@ -471,6 +471,74 @@ describe("BankProvider", () => {
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await waitFor(() => { expect(vault.getSnapshot().state).to.eq('unlocked') })
+    })
+  })
+  // --
+
+  // == [Every kind's dialog]: a change to the ways in, a deletion, and a call that waits behind one
+
+  describe("its requestCleartext, a dialog for every kind of gating", () => {
+    it("asks a passphrase change through its own dialog: the current and the next, the vault unlocked under the next", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      const changing = vault.tryPutWayin('passphrase')
+      await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
+      fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: 'pw' } })
+      TH.typeNewPassphrase('pw two', { fieldlabel: 'new passphrase' })
+      fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
+      await TH.expectGood(changing)
+      await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+      expect(vault.state).to.eq('unlocked')
+      await vault.lock()
+      await TH.unlock(await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1', vaultlabel: 'main' }), 'pw two')
+    })
+
+    it("asks a deletion through its own dialog, and the vault is deleted", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      const deleting = vault.tryDel()
+      await screen.findByRole('dialog', { name: 'Delete your vault' })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete vault' }))
+      await TH.expectGood(deleting)
+      await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+      expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    })
+
+    it("has a read wait behind a change's dialog, and go on unasked once the change leaves the vault unlocked", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      const changing = vault.tryPutWayin('passphrase')
+      await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
+      const reading = watched(vault.getWhisper('anthropic_api_key'))
+      await TH.wakeupAtNextTick()
+      expect(reading.outcome).to.eq('pending')
+      expect(screen.getAllByRole('dialog')).to.have.lengthOf(1)
+      fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: 'pw' } })
+      TH.typeNewPassphrase('pw two', { fieldlabel: 'new passphrase' })
+      fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
+      await TH.expectGood(changing)
+      expect(await reading.settled).to.eq('sk-fake')
+      expect(screen.queryByRole('dialog')).to.be.null
+    })
+
+    it("has a read wait behind a change's dialog the user cancels, then ask for the passphrase in a dialog of its own", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      const changing = vault.tryPutWayin('passphrase')
+      await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
+      const reading = vault.getWhisper('anthropic_api_key')
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      const err = await TH.expectBad(changing, 'vault_locked')
+      expect(err.message).to.match(/passphrase is unchanged/)
+      await screen.findByRole('dialog', { name: 'Unlock your vault' })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      fireEvent.click(screen.getByText('Unlock'))
+      expect(await reading).to.eq('sk-fake')
     })
   })
   // --
