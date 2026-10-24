@@ -6,7 +6,7 @@ import type { DialogAnswer, PassphraseAdvice } from '../src/modal'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
-// == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, renderUnlocking, others
+// == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, confirmField, renderUnlocking, others
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
 const vaultInState = (state: 'novel' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
@@ -43,6 +43,9 @@ const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters 
 
 /** Advice that breaks, quoting what it was handed: as a host's might. */
 const quotingAdvice = (typed: string) => { throw new Error(`could not judge ${typed}`) }
+
+/** The field that confirms the passphrase being chosen. */
+const confirmField = () => screen.getByPlaceholderText<HTMLInputElement>('confirm vault passphrase')
 
 /** The polite region beside the field, which says the advice. */
 const adviceRegion = () => screen.getByRole('status')
@@ -161,7 +164,7 @@ describe("PassphraseModal", () => {
     it("closes, answering declined: the gating it answered is over, and the next call asks for the passphrase chosen there", async () => {
       const heard: DialogAnswer[] = []
       render(<PassphraseModal gating={createdElsewhere()} onDone={(answer) => { heard.push(answer) }} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      TH.typeNewPassphrase('pw one')
       fireEvent.click(screen.getByText('Create vault'))
       await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
       expect(screen.queryByText(/didn't unlock|did not open/)).to.be.null
@@ -177,7 +180,7 @@ describe("PassphraseModal", () => {
       TH.beforeNextCall(deafDB, 'putVaultProps', () => TH.unlock(there, 'pw one'))
       const heard: DialogAnswer[] = []
       render(<PassphraseModal gating={gating} onDone={(answer) => { heard.push(answer) }} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw two' } })
+      TH.typeNewPassphrase('pw two')
       fireEvent.click(screen.getByText('Create vault'))
       await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
       const { err } = await ensuring
@@ -365,7 +368,7 @@ describe("PassphraseModal", () => {
       const misuse = new VaultError('bad_option', 'pw-the-passphrase is not a passphrase I take.')
       const { vault, gating } = await TH.gatedBy(TH.memoryVaultOpts({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(misuse) } }))
       const { reported } = TH.renderReporting(<PassphraseModal gating={gating} onDone={noop} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
+      TH.typeNewPassphrase('pw-the-passphrase')
       fireEvent.click(screen.getByText('Create vault'))
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.have.lengthOf(1)
@@ -381,7 +384,7 @@ describe("PassphraseModal", () => {
       const { vault, gating } = await TH.gatedBy(TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(misuse) }))
       // The host's advice says nothing, so the broken checker is met only at Create.
       const { reported } = TH.renderReporting(<PassphraseModal gating={gating} passphraseAdvice={() => null} onDone={noop} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
+      TH.typeNewPassphrase('pw-the-passphrase')
       fireEvent.click(screen.getByText('Create vault'))
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.have.lengthOf(1)
@@ -524,7 +527,7 @@ describe("PassphraseModal", () => {
       // A read begun after the other device's writes: one rung by them may have begun before the last.
       await act(async () => { await TH.readAfresh(vault) })
       expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw here' } })
+      TH.typeNewPassphrase('pw here')
       fireEvent.click(screen.getByText('Create vault'))
       await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
       const { err } = await ensuring
@@ -695,7 +698,7 @@ describe("PassphraseModal", () => {
       const given: unknown[] = []
       const gating = TH.stubGating({ state: 'novel', attempt: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
       render(<PassphraseModal gating={gating} passphraseAdvice={() => 'Too short.'} onDone={noop} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      TH.typeNewPassphrase('pw')
       await screen.findByText('Too short.')
       fireEvent.click(screen.getByText('Create vault'))
       await waitFor(() => { expect(given).to.deep.equal(['pw']) })
@@ -776,6 +779,94 @@ describe("PassphraseModal", () => {
       await act(async () => { await TH.wakeupAtNextTick() })
       expect(adviceRegion().textContent).to.eq('')
       expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
+    })
+  })
+  // --
+
+  // == [Confirming a new passphrase]: a mismatch refused in place, a match, the strength check, the markup
+
+  describe("confirming the passphrase being chosen", () => {
+    const Mismatch = "The new passphrase and its confirmation don't match: type the same one in both."
+
+    it("refuses a mismatch in place, attempting nothing, in words that quote nothing typed, tied to the confirmation", async () => {
+      const given: unknown[] = []
+      const heard: DialogAnswer[] = []
+      const gating = TH.stubGating({ state: 'novel', attempt: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
+      render(<PassphraseModal gating={gating} passphraseAdvice={() => null} onDone={(answer) => { heard.push(answer) }} />)
+      TH.typeNewPassphrase('pw chosen', { confirming: 'pw chosne' })
+      fireEvent.click(screen.getByText('Create vault'))
+      const alert = screen.getByRole('alert')
+      expect(alert.textContent).to.eq(Mismatch)
+      expect(confirmField().getAttribute('aria-invalid')).to.eq('true')
+      expect(confirmField().getAttribute('aria-describedby')).to.eq(alert.id)
+      await act(async () => { await TH.wakeupAtNextTick() })
+      expect(given).to.deep.equal([])
+      expect(heard).to.deep.equal([])
+      expect(document.body.outerHTML).to.not.include('pw chosen').and.not.include('pw chosne')
+    })
+
+    it("lets the mismatch go as the user types again, and creates the vault with the passphrase once the two match", async () => {
+      const given: unknown[] = []
+      const heard: DialogAnswer[] = []
+      const gating = TH.stubGating({ state: 'novel', attempt: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
+      render(<PassphraseModal gating={gating} passphraseAdvice={() => null} onDone={(answer) => { heard.push(answer) }} />)
+      TH.typeNewPassphrase('pw chosen', { confirming: 'pw chosne' })
+      fireEvent.click(screen.getByText('Create vault'))
+      expect(screen.getByRole('alert').textContent).to.eq(Mismatch)
+      fireEvent.change(confirmField(), { target: { value: 'pw chosen' } })
+      expect(screen.getByRole('alert').textContent).to.eq('')
+      expect(confirmField().hasAttribute('aria-invalid')).to.be.false
+      expect(confirmField().hasAttribute('aria-describedby')).to.be.false
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+      expect(given).to.deep.equal(['pw chosen'])
+    })
+
+    it("derives no key for a mismatch: a real vault stays novel, its key deriver unasked, until the two match", async () => {
+      const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+      const { vault, gating, ensuring } = await TH.gatedBy(TH.memoryVaultOpts({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }))
+      const heard: DialogAnswer[] = []
+      render(<PassphraseModal gating={gating} passphraseAdvice={() => null} onDone={(answer) => { heard.push(answer) }} />)
+      TH.typeNewPassphrase('pw-the-passphrase', { confirming: 'pw-the-passphrsae' })
+      fireEvent.click(screen.getByText('Create vault'))
+      await act(async () => { await TH.wakeupAtNextTick() })
+      expect(deriveKeyBytes.mock.calls).to.have.lengthOf(0)
+      expect(vault.state).to.eq('novel')
+      fireEvent.change(confirmField(), { target: { value: 'pw-the-passphrase' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+      await TH.expectGood(ensuring)
+      expect(vault.state).to.eq('unlocked')
+      TH.closeVault(vault)
+    })
+
+    it("asks the strength check of the passphrase being chosen, never of its confirmation, and still shows a weak one refused at Create", async () => {
+      const tryCheckStrength = vi.fn((typed: string) => Promise.resolve(typed.length < 6 ? TH.bad(new VaultError('weak_passphrase', 'Longer, please.')) : TH.good(undefined)))
+      const gating = TH.stubGating({ state: 'novel', tryCheckStrength, attempt: () => Promise.reject(new VaultError('weak_passphrase', 'Longer, please.')) })
+      render(<PassphraseModal gating={gating} onDone={noop} />)
+      TH.typeNewPassphrase('pw')
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('Longer, please.') })
+      expect(tryCheckStrength.mock.calls).to.deep.equal([['pw']])
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('Longer, please.') })
+    })
+
+    it("is a second new-password field in the same form, with no advice of its own, keeping what is typed out of the page's markup", () => {
+      render(<PassphraseModal gating={TH.gatingOf(vaultInState('novel'))} passphraseAdvice={() => null} onDone={noop} />)
+      const field = confirmField()
+      expect(field.type).to.eq('password')
+      expect(field.getAttribute('autocomplete')).to.eq('new-password')
+      expect(field.getAttribute('aria-label')).to.eq('confirm vault passphrase')
+      expect(field.form).to.eq(screen.getByPlaceholderText<HTMLInputElement>('vault passphrase').form)
+      expect(field.hasAttribute('aria-describedby')).to.be.false
+      fireEvent.change(field, { target: { value: 'pw kept from the page' } })
+      expect(field.hasAttribute('value')).to.be.false
+      expect(document.body.outerHTML).to.not.include('pw kept from the page')
+    })
+
+    it("offers no confirmation while unlocking", () => {
+      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked'))} onDone={noop} />)
+      expect(screen.queryByPlaceholderText('confirm vault passphrase')).to.be.null
     })
   })
   // --

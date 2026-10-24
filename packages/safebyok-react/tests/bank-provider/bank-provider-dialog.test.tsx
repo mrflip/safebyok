@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank, isVaultError, type Vault, memoryDeviceDB, type Gating, type Outcome, type RequestCleartext, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
-import * as TH from 'safebyok/testing'
+import * as TH from '../test-helpers'
 import { BankProvider, useVault } from '../../src/bank-provider'
 import { Probe, makeWorld, shownState, expectShown, expectOutcome, putThroughNewVault, CatchingBoundary, lockedWorld, watched, hushConsole } from './world'
 
@@ -41,10 +41,10 @@ describe("BankProvider", () => {
     await expectShown('novel')
 
     fireEvent.click(screen.getByText('put'))
-    const passphraseInput = await screen.findByPlaceholderText('vault passphrase')
+    await screen.findByPlaceholderText('vault passphrase')
     expect(screen.getByText('Choose a vault passphrase')).to.not.be.null
 
-    fireEvent.change(passphraseInput, { target: { value: 'correct horse battery staple' } })
+    TH.typeNewPassphrase('correct horse battery staple')
     fireEvent.click(screen.getByText('Create vault'))
 
     await expectOutcome('stored')
@@ -485,7 +485,7 @@ describe("BankProvider", () => {
       const changing = vault.tryPutWayin('passphrase')
       await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
       fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: 'pw' } })
-      fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: 'pw two' } })
+      TH.typeNewPassphrase('pw two', { fieldlabel: 'new passphrase' })
       fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
       await TH.expectGood(changing)
       await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
@@ -518,7 +518,7 @@ describe("BankProvider", () => {
       expect(reading.outcome).to.eq('pending')
       expect(screen.getAllByRole('dialog')).to.have.lengthOf(1)
       fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: 'pw' } })
-      fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: 'pw two' } })
+      TH.typeNewPassphrase('pw two', { fieldlabel: 'new passphrase' })
       fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
       await TH.expectGood(changing)
       expect(await reading.settled).to.eq('sk-fake')

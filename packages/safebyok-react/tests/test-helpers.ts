@@ -192,6 +192,19 @@ export const submitPassphrase = (passphrase: string) => {
   fireEvent.click(screen.getByText('Unlock'))
 }
 
+/**
+ * Types a new passphrase into the dialog twice: into the field whose placeholder is `fieldlabel`,
+ * and into its confirmation, 'confirm ' and that label. A `confirming` other than `passphrase`
+ * types a mismatch.
+ *
+ * @example TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase', confirming: 'a new passprase' })
+ */
+export const typeNewPassphrase = (passphrase: string, opts: { fieldlabel?: string, confirming?: string } = {}) => {
+  const { fieldlabel = 'vault passphrase', confirming = passphrase } = opts
+  fireEvent.change(screen.getByPlaceholderText(fieldlabel), { target: { value: passphrase } })
+  fireEvent.change(screen.getByPlaceholderText(`confirm ${fieldlabel}`), { target: { value: confirming } })
+}
+
 /** Stands in for a settler until the promise hands over its own. */
 const unsettled = () => { /* replaced before use */ }
 

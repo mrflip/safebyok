@@ -77,6 +77,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     const choosing = await screen.findByRole('dialog', { name: 'Choose a vault passphrase' })
     fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
+    fireEvent.change(within(choosing).getByPlaceholderText('confirm vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(within(choosing).getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/🔓 unlocked until/)
     // The save goes on once the vault unlocks: its box is listed before the lock below, which

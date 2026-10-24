@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type RequestCleartext, type StrengthChecker, type Vault } from 'safebyok'
 import { GatingModal } from '../src/gating-modal'
 import type { DialogAnswer } from '../src/modal'
@@ -72,13 +72,13 @@ describe("GatingModal, by kind", () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts({ requestCleartext }))
     const ensuring = vault.ensureUnlocked()
     await screen.findByRole('dialog', { name: 'Choose a vault passphrase' })
-    typeInto('vault passphrase', Passphrase)
+    TH.typeNewPassphrase(Passphrase)
     submit()
     await ensuring
     const changing = vault.putWayin('passphrase')
     await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
     typeInto('current passphrase', Passphrase)
-    typeInto('new passphrase', 'a new passphrase')
+    TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     submit()
     await changing
     const deleting = vault.del()
@@ -98,7 +98,7 @@ describe("GatingModal, change_passphrase", () => {
     render(<GatingModal gating={gating} onDone={onDone} />)
     expect(screen.getByRole('dialog', { name: 'Change your vault passphrase' })).to.not.be.null
     typeInto('current passphrase', Passphrase)
-    typeInto('new passphrase', 'a new passphrase')
+    TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
     await TH.expectGood(raising)
@@ -114,7 +114,7 @@ describe("GatingModal, change_passphrase", () => {
     const before = vault.passphrase
     render(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('current passphrase', 'not it')
-    typeInto('new passphrase', 'a new passphrase')
+    TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     submit()
     expect(await theGripe()).to.match(/didn't unlock the vault/)
     expect(heard).to.deep.equal([])
@@ -127,11 +127,11 @@ describe("GatingModal, change_passphrase", () => {
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('current passphrase', Passphrase)
-    typeInto('new passphrase', Passphrase)
+    TH.typeNewPassphrase(Passphrase, { fieldlabel: 'new passphrase' })
     submit()
     expect(await theGripe()).to.match(/already has: choose a different one/)
     expect(heard).to.deep.equal([])
-    typeInto('new passphrase', 'a new passphrase')
+    TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     expect(screen.getByRole('alert').textContent).to.eq('')
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
@@ -141,11 +141,53 @@ describe("GatingModal, change_passphrase", () => {
     const vault = await vaultOf({ strengthChecker: weakIsWeak })
     const { gating } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     render(<GatingModal gating={gating} onDone={() => undefined} />)
-    typeInto('new passphrase', 'weak')
+    TH.typeNewPassphrase('weak', { fieldlabel: 'new passphrase' })
     await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('Too easy to guess.') })
     typeInto('current passphrase', Passphrase)
     submit()
     expect(await theGripe()).to.eq('Too easy to guess.')
+  })
+
+  it("refuses a next passphrase its confirmation does not match, in place, deriving no key and changing nothing, the passkey kept; once they match, it changes, as TH.typeNewPassphrase's example shows", async () => {
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const vault = await vaultOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }, true)
+    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+    const { heard, onDone } = answersOf()
+    const before = vault.passphrase
+    const derivedBefore = deriveKeyBytes.mock.calls.length
+    render(<GatingModal gating={gating} onDone={onDone} />)
+    typeInto('current passphrase', Passphrase)
+    TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase', confirming: 'a new passprase' })
+    submit()
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).to.eq("The new passphrase and its confirmation don't match: type the same one in both.")
+    const confirmField = screen.getByPlaceholderText('confirm new passphrase')
+    expect(confirmField.getAttribute('aria-invalid')).to.eq('true')
+    expect(confirmField.getAttribute('aria-describedby')).to.eq(alert.id)
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(deriveKeyBytes.mock.calls).to.have.lengthOf(derivedBefore)
+    expect(heard).to.deep.equal([])
+    expect(vault.passphrase).to.eq(before)
+    expect(vault.getSnapshot().passkey).to.not.be.null
+    expect(document.body.outerHTML).to.not.include('a new passprase')
+    typeInto('confirm new passphrase', 'a new passphrase')
+    expect(screen.getByRole('alert').textContent).to.eq('')
+    submit()
+    await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+    await TH.expectGood(raising)
+    await vault.lock()
+    await TH.unlock(vault, 'a new passphrase')
+  })
+
+  it("asks the strength check of the next passphrase, never of its confirmation", async () => {
+    const strengthChecker = vi.fn(weakIsWeak)
+    const vault = await vaultOf({ strengthChecker })
+    const { gating } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+    render(<GatingModal gating={gating} onDone={() => undefined} />)
+    const askedBefore = strengthChecker.mock.calls.length
+    TH.typeNewPassphrase('weak', { fieldlabel: 'new passphrase', confirming: 'confirmed only' })
+    await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('Too easy to guess.') })
+    expect(strengthChecker.mock.calls.slice(askedBefore).map(([typed]) => typed)).to.deep.equal(['weak'])
   })
 
   it("says the passkey goes with the old passphrase, only for a vault that has one", async () => {
@@ -159,13 +201,13 @@ describe("GatingModal, change_passphrase", () => {
     expect(screen.getAllByText(/Your passkey goes with the old passphrase/)).to.have.lengthOf(1)
   })
 
-  it("is a change-password form a password manager knows: the username, the current passphrase and the new, in one form", async () => {
+  it("is a change-password form a password manager knows: the username, the current passphrase, and the new one twice, in one form", async () => {
     const vault = await vaultOf()
     const { gating } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     render(<GatingModal gating={gating} passphraseUsername="ada (main vault)" onDone={() => undefined} />)
     const form = screen.getByRole('dialog').querySelector('form')
     const autocompletes = [...(form?.querySelectorAll('input') ?? [])].map((input) => input.getAttribute('autocomplete'))
-    expect(autocompletes).to.deep.equal(['username', 'current-password', 'new-password'])
+    expect(autocompletes).to.deep.equal(['username', 'current-password', 'new-password', 'new-password'])
     expect(form?.querySelector<HTMLInputElement>('input[autocomplete="username"]')?.value).to.eq('ada (main vault)')
   })
 
@@ -344,7 +386,7 @@ describe("GatingModal, whatever the kind", () => {
     const { heard, onDone } = answersOf()
     const { reported } = TH.renderReporting(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('current passphrase', Passphrase)
-    typeInto('new passphrase', 'pw-the-new-one')
+    TH.typeNewPassphrase('pw-the-new-one', { fieldlabel: 'new passphrase' })
     submit()
     const notice = await screen.findByRole('alertdialog', { name: 'Something went wrong' })
     expect(notice.textContent).to.match(/could not change your passphrase/)

@@ -1,0 +1,5 @@
+---
+"safebyok-react": minor
+---
+
+**A new passphrase is typed twice.** The passphrase dialog, choosing a vault's first passphrase (`initialize_gate`), and `GatingModal`'s `change_passphrase` dialog, for the next one, add a confirmation field below the new passphrase (`confirm vault passphrase`, `confirm new passphrase`; `autocomplete="new-password"`, uncontrolled, as the passphrase fields are). A submit whose two differ is refused in place, before any key is derived or anything is stored: the dialog says "The new passphrase and its confirmation don't match: type the same one in both.", marks the confirmation `aria-invalid` and ties the message to it, and stays open. A typo there would otherwise have become the vault's passphrase, and at a change dropped the passkey too. The unlock form, and the current passphrase at a change, ask once. A host's tests that fill these dialogs type the new passphrase into the confirmation field too; `passphraseAdvice` hears the new passphrase only, never its confirmation.

@@ -2,16 +2,17 @@ import { useRef, useSyncExternalStore } from 'react'
 import type { ChangePassphraseGating, DelPasskeyGating, DelVaultGating, Gating, PutPasskeyGating, Vault } from 'safebyok'
 import { useRoundFor } from './boundary'
 import { Messages } from './messages'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, unlockedFor, useAdvice, useAttempts, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
 import { createPasskey } from './passkey'
 import { PassphraseModal } from './passphrase-modal'
 
 /**
  * The dialog for any gating, by its `gatingkind`: what `BankProvider`'s own `requestCleartext`
  * shows, one at a time. A first passphrase or an unlock is `PassphraseModal`'s; a passphrase
- * change asks for the current passphrase and the next; adding or replacing the passkey asks for
- * the passphrase, then has the browser make a passkey (`createPasskey`); removing the passkey,
- * and deleting the vault, ask for the passphrase. A host writing its own `requestCleartext` may
+ * change asks for the current passphrase and the next, the next twice: a submit whose two differ
+ * is refused in place, saying so, before anything is attempted; adding or replacing the passkey
+ * asks for the passphrase, then has the browser make a passkey (`createPasskey`); removing the
+ * passkey, and deleting the vault, ask for the passphrase. A host writing its own `requestCleartext` may
  * render it for every gating: hand it the gating, and resolve once `onDone` is told.
  *
  * Every kind behaves as `PassphraseModal` does: unstyled markup under the `modal-scrim` / `modal`
@@ -80,7 +81,7 @@ const useFiling = (vault: Vault, passphraseUsername: string | undefined) => {
 
 // == [change_passphrase]: ChangePassphraseModal, ChangePassphraseForm
 
-/** The `change_passphrase` dialog: the current passphrase and the next, the advice heard for the next. */
+/** The `change_passphrase` dialog: the current passphrase and the next, confirmed, the advice heard for the next. */
 const ChangePassphraseModal = (props: KindModalProps<ChangePassphraseGating>) => (
   <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
     {(done) => <ChangePassphraseForm {...props} done={done} />}
@@ -94,9 +95,13 @@ const ChangePassphraseForm = ({ gating, done, passphraseUsername, passphraseAdvi
   const advice = useAdvice(passphraseAdvice, vault, true, fail)
   const currentRef = useRef<HTMLInputElement>(null)
   const nextRef = useRef<HTMLInputElement>(null)
+  const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const submit = () => {
     const current = currentRef.current?.value ?? ''
     const next = nextRef.current?.value ?? ''
+    // A next passphrase mistyped would replace the current one, and the passkey with it: refused
+    // here, before any key is derived.
+    if (differs(next)) { return }
     void attempt(() => gating.attempt(current, next), 'unlocked')
   }
   return (
@@ -105,6 +110,7 @@ const ChangePassphraseForm = ({ gating, done, passphraseUsername, passphraseAdvi
       blurb={snapshot.passkey === null ? Messages.changeBlurb : `${Messages.changeBlurb} ${Messages.changeDropsPasskey}`}
       submitWord={Messages.changeButton}
       gripe={gripe}
+      gripeId={gripeId}
       footnote={unlockedFor(vault.leaseMillis, false)}
       done={done}
       onSubmit={submit}
@@ -119,6 +125,7 @@ const ChangePassphraseForm = ({ gating, done, passphraseUsername, passphraseAdvi
         advice={advice.said}
         onChange={(typed) => { setGripe(null); void advice.hear(typed) }}
       />
+      <ConfirmField ref={confirmRef} gripeId={gripeId} fieldlabel={Messages.confirmNewField} gripe={gripe} onChange={() => { setGripe(null) }} />
     </ModalForm>
   )
 }

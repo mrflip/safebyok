@@ -98,11 +98,12 @@ const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: Dial
 // == [Form]: Gripe, useAttempts, ModalForm, holdsFocus, unlockedFor
 
 /**
- * What the dialog says to the user, and whether it is about the passkey: a word about a typed
- * passphrase goes once the user types again; one about the passkey stays until the next submit,
- * or the next press of the passkey.
+ * What the dialog says to the user, whether it is about the passkey, and whether it says a new
+ * passphrase and its confirmation differ (`mismatched`, which marks the confirmation field
+ * invalid): a word about a typed passphrase goes once the user types again; one about the passkey
+ * stays until the next submit, or the next press of the passkey.
  */
-export type Gripe = { text: string, fromPasskey: boolean }
+export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
 
 /**
  * A form's state around its attempts, for the dialog that `done` answers and `source` names:
@@ -154,6 +155,8 @@ type ModalFormProps = {
   submitWord: string
   /** What to say in the live region, or null for nothing. */
   gripe:      Gripe | null
+  /** The live region's id, for a field it describes: a confirmation's, from {@link useConfirmation}. */
+  gripeId?:   string | undefined
   /** A quiet line under the live region: how long an unlock lasts. */
   footnote?:  string | undefined
   formRef?:   Ref<HTMLFormElement> | undefined
@@ -171,7 +174,7 @@ type ModalFormProps = {
  * from the start, so that each word put in it is announced; then the submit and Cancel buttons.
  * Unstyled markup under the `modal-scrim` / `modal` / `quiet` / `gripe` class names.
  */
-export const ModalForm = ({ title, blurb, submitWord, gripe, footnote, formRef, done, onSubmit, children }: ModalFormProps) => {
+export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, formRef, done, onSubmit, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
   return (
@@ -181,7 +184,7 @@ export const ModalForm = ({ title, blurb, submitWord, gripe, footnote, formRef, 
         <h3 id={titleId}>{title}</h3>
         <p className="quiet" id={blurbId}>{blurb}</p>
         {children}
-        <div role="alert">{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
+        <div role="alert" id={gripeId}>{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
         {footnote !== undefined && <p className="quiet">{footnote}</p>}
         <div className="row">
           <button type="submit">{submitWord}</button>
@@ -242,7 +245,7 @@ export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 }
 // --
 
-// == [Passphrase field]: UsernameField, PassphraseField, PassphraseAdvice, useAdvice, adviceFailed, vaultAdvice
+// == [Passphrase field]: UsernameField, PassphraseField, useConfirmation, ConfirmField, PassphraseAdvice, useAdvice, adviceFailed, vaultAdvice
 
 /**
  * The hidden field a password manager files a form's passphrase under, `username`: never shown,
@@ -258,19 +261,22 @@ export const UsernameField = ({ username }: { username: string }) => (
  * `current-password` for one the vault has; uncontrolled, so that React writes nothing typed
  * into the page; never capitalized, corrected or spell-checked; with its Show / Hide button, and,
  * when there is advice to give (`advice` is not undefined), the polite region that says it.
- * `fieldlabel` is its label and placeholder.
+ * `fieldlabel` is its label and placeholder. Handed `invalidBy`, the id of the word that says
+ * what is wrong with what was typed, it is marked invalid and described by that word too.
  */
-export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advice, onChange }: {
+export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advice, invalidBy, onChange }: {
   ref:        Ref<HTMLInputElement>
   credential: 'new-password' | 'current-password'
   fieldlabel: string
   takesFocus: boolean
   advice?:    string | null | undefined
+  invalidBy?: string | undefined
   onChange:   (typed: string) => void
 }) => {
   const reveal = useRevealToggle(Messages.showPassphrase, Messages.hidePassphrase)
   const fieldId = useId()
   const adviceId = useId()
+  const describedBy = [advice === undefined ? undefined : adviceId, invalidBy].filter((id) => id !== undefined).join(' ')
   return (
     <>
       <span className="passphrase-field">
@@ -286,7 +292,8 @@ export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advic
           // eslint-disable-next-line jsx-a11y/no-autofocus -- moving focus to the dialog's first field on open is the WAI-ARIA dialog pattern; the rule aims at page-load autofocus
           autoFocus={takesFocus}
           aria-label={fieldlabel}
-          aria-describedby={advice === undefined ? undefined : adviceId}
+          aria-describedby={describedBy === '' ? undefined : describedBy}
+          aria-invalid={invalidBy === undefined ? undefined : true}
           placeholder={fieldlabel}
           onChange={(evt) => { onChange(evt.target.value) }}
         />
@@ -297,6 +304,50 @@ export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advic
     </>
   )
 }
+
+/** The gripe for a new passphrase and a confirmation that differ. */
+const MismatchGripe: Gripe = { text: Messages.passphrasesDiffer, fromPasskey: false, mismatched: true }
+
+/**
+ * The confirmation of a new passphrase, for a form whose gripes `setGripe` sets: `ref`, for its
+ * {@link ConfirmField}; `gripeId`, for the form's live region and the field, which it describes
+ * while it says the two differ; and `differs(chosen)`, asked at a submit before anything is
+ * attempted, which says whether the confirmation field holds other than `chosen`, and if so has
+ * the gripe say so.
+ * Nothing typed is kept: the field is uncontrolled, and read only at the submit.
+ */
+export const useConfirmation = (setGripe: (gripe: Gripe) => void) => {
+  const ref = useRef<HTMLInputElement>(null)
+  const gripeId = useId()
+  const differs = (chosen: string): boolean => {
+    if ((ref.current?.value ?? '') === chosen) { return false }
+    setGripe(MismatchGripe)
+    return true
+  }
+  return { ref, gripeId, differs }
+}
+
+/**
+ * The field that confirms a new passphrase, `fieldlabel` its label and placeholder: a
+ * `new-password` field, as the new passphrase's is, with no advice of its own; marked invalid, and
+ * described by the form's live region (`gripeId`), while `gripe` says the two differ.
+ */
+export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
+  ref:        Ref<HTMLInputElement>
+  gripeId:    string
+  fieldlabel: string
+  gripe:      Gripe | null
+  onChange:   (typed: string) => void
+}) => (
+  <PassphraseField
+    ref={ref}
+    credential="new-password"
+    fieldlabel={fieldlabel}
+    takesFocus={false}
+    invalidBy={gripe?.mismatched === true ? gripeId : undefined}
+    onChange={onChange}
+  />
+)
 
 /**
  * What a host says of a passphrase as the user chooses it: a sentence to show beside the field, or

@@ -20,7 +20,9 @@ otherwise write itself.
   ways past a refusal: `bank.delDamagedVault`, `bank.clearCachedVault` (*When opening fails*, below).
 * `GatingModal` -- the shipped `requestCleartext`'s dialog, handed one gating and answering it,
   one form per `gatingkind`: the passphrase dialog, `PassphraseModal`, for an unlock or a first
-  passphrase; the current passphrase and the next for `change_passphrase`; the passphrase, then a
+  passphrase; the current passphrase and the next for `change_passphrase`, a new passphrase typed
+  twice, at a change as at the first (a submit whose two differ is refused in place, before
+  anything is attempted, so that a typo never becomes the vault's passphrase); the passphrase, then a
   passkey the browser makes, for `put_passkey`; the passphrase for `del_passkey` and `del_vault`.
   Unstyled markup under `modal-scrim` / `modal` class names for the host's stylesheet to dress.
   It says how long an unlock lasts on the device -- "Locks again on this device in 7 days", "in 15
@@ -361,6 +363,17 @@ in with.
 It has a Show / Hide button (`aria-pressed`), flipping the field between `password` and `text`,
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
+
+**Typed twice when new.** A new passphrase -- the vault's first, or the next at a change -- is
+typed again in a confirmation field below it, also `autocomplete="new-password"`, so that a
+manager that generates one fills both. A typo would otherwise become the vault's passphrase
+(at a change, the passkey goes with the old one), and once this device's unlock ends, nobody
+could open the vault. A submit whose two differ is refused in place, before any key is derived or
+anything is stored: "The new passphrase and its confirmation don't match: type the same one in
+both." The confirmation field is then marked `aria-invalid` and described by that message
+(`aria-describedby`), until the user types again. The two are compared only at the submit; the
+confirmation field is uncontrolled too, and the advice never hears it. The unlock form, and the
+current passphrase at a change, ask once.
 
 **Advice while choosing.** By default the dialog says the reason `vault.tryCheckStrength` gives
 as the user chooses a weak passphrase (a first one, or the next at a change), and nothing once the checker admits it, so they hear why before

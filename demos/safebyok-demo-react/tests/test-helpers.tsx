@@ -72,7 +72,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
 
 /**
  * Answers the passphrase dialog once it shows: types `passphrase` and submits, whether the dialog
- * is choosing a new vault's passphrase or unlocking one.
+ * is choosing a new vault's passphrase (typed again in its confirmation) or unlocking one.
  *
  * @param passphrase - What to type. Default: {@link Passphrase}.
  *
@@ -83,6 +83,8 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
 export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   const field = await screen.findByPlaceholderText('vault passphrase')
   fireEvent.change(field, { target: { value: passphrase } })
+  const confirmation = screen.queryByPlaceholderText('confirm vault passphrase')
+  if (confirmation !== null) { fireEvent.change(confirmation, { target: { value: passphrase } }) }
   const form = field.closest('form')
   if (form === null) { throw new Error('the passphrase dialog has no form to submit') }
   fireEvent.submit(form)

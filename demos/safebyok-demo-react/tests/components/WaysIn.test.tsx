@@ -44,6 +44,7 @@ describe("WaysIn", () => {
     const dialog = await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
     fireEvent.change(within(dialog).getByPlaceholderText('current passphrase'), { target: { value: TH.Passphrase } })
     fireEvent.change(within(dialog).getByPlaceholderText('new passphrase'), { target: { value: 'a new passphrase entirely' } })
+    fireEvent.change(within(dialog).getByPlaceholderText('confirm new passphrase'), { target: { value: 'a new passphrase entirely' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Change passphrase' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
     expect(document.querySelector('.gripe')).to.be.null

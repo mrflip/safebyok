@@ -2,7 +2,7 @@ import { useRef, useSyncExternalStore } from 'react'
 import type { InitializeGateGating, UnlockVaultGating } from 'safebyok'
 import { useRoundFor } from './boundary'
 import { Messages } from './messages'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
 
 /**
@@ -14,8 +14,10 @@ import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
  * host's stylesheet to dress, with a dialog's semantics: the scrim is the `dialog`, named by its
  * heading, and Escape anywhere in it cancels, answering `declined`. Each submit is one attempt
  * of the gating. Its behaviors are the contract: an `initialize_gate` gating reads as "choose a
- * passphrase" (it sets the vault's first); a wrong passphrase stays in the dialog with a calm message;
- * an attempt that is ok answers `unlocked`; and a lock that lands while it is up -- its gating's
+ * passphrase" (it sets the vault's first), and asks for it twice, the second time to confirm it:
+ * a submit whose two differ is refused in place, saying so, before anything is attempted, so that
+ * a typo never becomes the vault's passphrase; a wrong passphrase stays in the dialog with a calm
+ * message; an attempt that is ok answers `unlocked`; and a lock that lands while it is up -- its gating's
  * `lockLanded` -- closes it, answering `declined`, as does an attempt the lock won. Whichever the
  * case, it says plainly that a forgotten passphrase cannot be recovered, and how long an unlock
  * lasts on this device. For a vault with a passkey, in a browser offering WebAuthn, "Use a
@@ -51,19 +53,21 @@ import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
  * `allowStartOver` and `onStartedOver` are taken and offer nothing, for now.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
- * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing
- * (a manager offers to generate one, and to save it) and `current-password` while unlocking (it
- * offers the one it saved), and beside it a hidden `autocomplete="username"` field naming what the
- * manager files it under, `passphraseUsername`. That defaults to the user and the vault, as
- * 'u1 (main vault)'; never make it the user's sign-in name alone, or a manager may take the
- * passphrase for their sign-in password and offer to overwrite it. The field is uncontrolled, so
- * React never writes what is typed into the page; a Show / Hide button reveals it, and it is
- * never capitalized, corrected or spell-checked.
+ * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing,
+ * on the confirmation field too (a manager offers to generate one, fills both, and saves it), and
+ * `current-password` while unlocking (it offers the one it saved), and beside it a hidden
+ * `autocomplete="username"` field naming what the manager files it under, `passphraseUsername`.
+ * That defaults to the user and the vault, as 'u1 (main vault)'; never make it the user's sign-in
+ * name alone, or a manager may take the passphrase for their sign-in password and offer to
+ * overwrite it. The fields are uncontrolled, so React never writes what is typed into the page,
+ * and a passphrase and its confirmation are compared only at a submit; each field has a Show /
+ * Hide button, and is never capitalized, corrected or spell-checked.
  *
- * While the user chooses a passphrase, `passphraseAdvice` hears what they have typed after each
- * change, and what it answers shows beside the field, tied to it by `aria-describedby` and
- * announced politely: 'Longer is stronger: try a few unrelated words'. It answers null for
- * nothing to say, and may answer through a promise; only the answer to the latest text shows.
+ * While the user chooses a passphrase, `passphraseAdvice` hears what they have typed in the
+ * passphrase field (never the confirmation) after each change, and what it answers shows beside
+ * the field, tied to it by `aria-describedby` and announced politely: 'Longer is stronger: try a
+ * few unrelated words'. It answers null for nothing to say, and may answer through a promise; only
+ * the answer to the latest text shows.
  * Left out, the dialog asks `vault.tryCheckStrength`, and shows the reason of a 'weak_passphrase',
  * so the advice and Create decide alike. It is advice: what the vault itself refuses at creation
  * shows as any refusal does. It is never asked while unlocking.
@@ -112,6 +116,7 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
+  const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   // The gating's kind, fixed when it was raised: a first passphrase, or an unlock.
   const creating = gating.gatingkind === 'initialize_gate'
   // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
@@ -120,7 +125,10 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
 
   const submit = () => {
     const typed = fieldRef.current?.value ?? ''
-    void attempt(() => (gating.gatingkind === 'initialize_gate' ? gating.attempt(typed) : gating.attemptPassphrase(typed)), 'unlocked')
+    if (gating.gatingkind === 'unlock_vault') { void attempt(() => gating.attemptPassphrase(typed), 'unlocked'); return }
+    // A first passphrase mistyped would be the vault's: refused here, before any key is derived.
+    if (differs(typed)) { return }
+    void attempt(() => gating.attempt(typed), 'unlocked')
   }
 
   /** Each change to the field: a complaint about what was typed before goes (a passkey's word stays till the next submit), and, while choosing, the host's advice is asked anew. */
@@ -141,6 +149,7 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
       blurb={creating ? Messages.chooseBlurb : Messages.unlockBlurb}
       submitWord={creating ? Messages.createButton : Messages.unlockButton}
       gripe={gripe}
+      gripeId={gripeId}
       footnote={unlockedFor(vault.leaseMillis, creating)}
       formRef={formRef}
       done={done}
@@ -157,6 +166,7 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
         advice={creating ? advice.said : undefined}
         onChange={hearPassphrase}
       />
+      {creating && <ConfirmField ref={confirmRef} gripeId={gripeId} fieldlabel={Messages.confirmField} gripe={gripe} onChange={() => { setGripe(null) }} />}
     </ModalForm>
   )
 }

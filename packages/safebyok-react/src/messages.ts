@@ -20,6 +20,9 @@ export const Messages = {
   chooseBlurb:       'This passphrase encrypts your secrets on your device. Nobody can recover it for you -- not even us.',
   unlockBlurb:       'Your secrets are encrypted with this passphrase; enter it to continue. A forgotten passphrase cannot be recovered -- you would start a new vault and re-enter your secrets.',
   passphraseField:   'vault passphrase',
+  confirmField:      'confirm vault passphrase',
+  /** Said at a submit whose new passphrase and its confirmation differ: nothing is attempted. */
+  passphrasesDiffer: "The new passphrase and its confirmation don't match: type the same one in both.",
   /** What a password manager files a vault's passphrase under, unless the host names it. */
   passphraseUsername: (userId: string, vaultlabel: string) => `${userId} (${vaultlabel} vault)`,
   showPassphrase:    'Show',
@@ -39,6 +42,7 @@ export const Messages = {
   changeDropsPasskey: 'Your passkey goes with the old passphrase: add it again once the new one is set.',
   currentField:       'current passphrase',
   newField:           'new passphrase',
+  confirmNewField:    'confirm new passphrase',
   changeButton:       'Change passphrase',
   putPasskeyTitle:    'Add a passkey',
   putPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',

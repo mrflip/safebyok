@@ -31,7 +31,7 @@ localStorage.
   passphrase and its passkey, if it has one, shown even while locked, and buttons to change them.
   Each calls one vault method, and the provider's dialog for that change asks for your passphrase
   as proof: "Change passphrase" (`vault.putWayin('passphrase')`: the current passphrase and the
-  next, which removes the fingerprint: add it again under the new passphrase); "Add fingerprint",
+  next, typed twice, which removes the fingerprint: add it again under the new passphrase); "Add fingerprint",
   or "Replace fingerprint" once there is one (`vault.putWayin('passkey')`: your passphrase, then
   the browser makes the passkey, which takes the place of any the vault had, the passphrase
   dialog then offering "Use a passkey"); and "Remove fingerprint" (`vault.delWayin('passkey')`).
