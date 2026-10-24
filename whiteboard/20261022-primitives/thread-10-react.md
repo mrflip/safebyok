@@ -1,6 +1,6 @@
 # Thread 10: react (2026-10-24)
 
-Branch `20261024-react`, PR #TBD, cut from `origin/main` (30d5f9df). Justify: green at the tip
+Branch `20261024-react`, PR [#265](https://github.com/mrflip/safebyok/pull/265), cut from `origin/main` (30d5f9df). Justify: green at the tip
 (core 3139 + 37 skipped, react 300, demo 227 + 17 skipped, every other package as main).
 
 * **Built**:
@@ -62,4 +62,11 @@ Branch `20261024-react`, PR #TBD, cut from `origin/main` (30d5f9df). Justify: gr
     with a gesture in hand, so in practice declined.
   - In the demo the scrim covers the page, so the waits arise only from calls the app makes by
     itself (timers, effects, KnockKnock's `useWhisper` mid-flight), not from a second click.
-* **For the Coach**: the Open Matters in the PR.
+* **For the Coach** (the PR's open questions, each with its Rec):
+  - Cancel, then asked again (above): accept; a toldjaso line.
+  - A cancelled change refuses `vault_locked`: keep; maybe `gating_declined` after the sprint.
+  - No `passkeyRp` / `rpId` prop on the provider: keep; add when a host needs a custom `rp.id`.
+  - A typo while adding a passkey leaves an unused one on the authenticator: keep.
+  - Delete account on a novel vault leaves its empty record in storage: keep for the demo.
+  - `putWayin('passkey')` on a novel vault refuses `absent_vault`: kept.
+  - Start over: still a TODO.
