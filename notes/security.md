@@ -41,6 +41,26 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **the put_passkey dialog makes the passkey before the passphrase is checked.**
+  `GatingModal`'s `PutPasskeyForm` (`packages/safebyok-react/src/gating-modal.tsx`) calls `createPasskey()` at each submit, straight
+  from the submit's user gesture as WebAuthn requires, then hands the passphrase and the new passkey's PRF answer to the
+  `put_passkey` gating's attempt; the core checks the passphrase (`checkWayin`) before it seals the passkey proving. After a wrong
+  passphrase the core leaves the PRF answer unspent, but the dialog keeps none across attempts (a secret answer is not held in React
+  state between submits), so a typo leaves an unused credential on the authenticator (useless to the vault) and the next submit makes
+  another. One submit runs at a time (a ref guard), so one press never makes two passkeys. The relying party is named for the vault's
+  `applabel` at the page's own domain; the user entry is `passphraseUsername` (default "u1 (main vault)"), never the host's sign-in name.
+* 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **every gating kind is asked through the provider's own dialog.**
+  `change_passphrase`, `put_passkey`, `del_passkey` and `del_vault` join `unlock_vault` and `initialize_gate` in `GatingModal`, each proven
+  by the standing passphrase and shown only while the user's gesture is in hand (`navigator.userActivation`), as before. A refusal the core
+  leaves the gating open for (`CorrectableKindVals`) shows in place and nothing retries. Misuse, or a non-`VaultError`, reaches React's
+  `onCaughtError` through `forBoundary`, which drops any `cause` (it may quote what the user typed); the report's source is named `GatingModal`.
+* 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **a declined gating's refusal is worded by kind.**
+  `declinedError(gatingkind, asked)` (`packages/safebyok/src/gating.ts`) is still kind `vault_locked`; its message names what was asked and
+  what stands, and quotes nothing the user typed.
+* 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **`vault.checkPassphrase` is retired from the core's public surface.**
+  A field that asks strength as the user types calls `vault.tryCheckStrength(typed)`, whose `weak_passphrase` carries the checker's reason as
+  its message. The vault still holds the checker to its contract: blank passphrases are weak unheard, a non-verdict is `bad_option`, and a
+  throw is `unexpected_error` carrying nothing of it.
 * 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **a lease of an old gate is never shown as unlocked.**
   After this tab's own change to the ways in (a new `gate_epoch`), a lease in memory that no longer fits the new gate is
   dropped from memory, never erased from the device store, as the write is taken into the picture, so a change whose grant
@@ -199,6 +219,14 @@ added or folded into through the subagent, and no other entry changes.
   raises a prompt or reports a read as success (guarantees audit risk 10). A refresh that finds the vault deleted
   (`getVault` null) or another `vault_tok` makes the Vault object gone for good by the same drop (below, in the
   demand entry).
+  Amended 2026-10-24 (refresh_rulings): **a refresh no longer revokes on a deadline.** It drops the lease in hand (memory only, nothing erased)
+  only when this device's store holds no lease (a `lock()` in another tab), or one under another `vault_tok` or `gate_epoch`, or the vault props
+  read show other ways in. It no longer compares deadlines (`ask_passphrase_at`), so another tab's unlock or renewal does not drop this tab's
+  lease: this tab keeps its own until its own deadline, then its next call takes up the other tab's lease from the device store without
+  asking. A read begun before the lease in hand was taken still changes nothing (the `leasesHeld` count; see the entry "a pantry read older
+  than the lease in hand cannot revoke it", whose newer-lease clause this supersedes). Loosening, accepted: a `lock()` and an unlock both done in
+  another tab before this tab's next read leave this tab unlocked, as the store again holds a lease under the same ways in. The comparison reads
+  only the stored record's `vault_tok` and `gate_epoch`; no key material is compared or logged.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **a read older than the vault props in hand is ignored, never
   judged, and a Vault object holding newer props does not notice storage rolled back beneath it.** A read of the
   same `vault_tok` at a lower `gate_epoch` or `vault_epoch` (one served before this tab's own write and answered
@@ -208,6 +236,16 @@ added or folded into through the subagent, and no other entry changes.
   removed way in stays removed on it, and its writes of the gate expect the newer epoch and refuse as stale. A Vault
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
+  Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
+  The refresh (`#judgeRead` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
+  epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
+  `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
+  other tabs and a fresh birth already did. The false alarm the old order guarded against (a read served before this device's own write,
+  answered after) stays prevented: the device record is read before the fetch is issued, so a raise by this device's own write is never held
+  against a read served before it. Residual: a lagging read replica serving a copy below the device record now locks a tab holding the newer
+  copy (a false alarm; the next `hello` after the replica catches up reads afresh, and the user unlocks again). The host's path is unchanged:
+  `bank.clearCachedVault` accepts a restore made on purpose. Two checks swapped; no new mechanism.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **a pantry read older than the lease in hand cannot revoke
   it.** A refresh judges the pantry (this device's store of the lease) only when its read began at or after the
   moment the lease in hand was granted or taken up, by the vault's clock, or when the pantry holds a lease newer than
@@ -348,7 +386,10 @@ added or folded into through the subagent, and no other entry changes.
   `Vault.make` wraps the host's checker once, bound to the vault's own scope. Amended 2026-10-21
   (checker2): the guarded check is the method `vault.checkPassphrase(typed)` (before, the getter
   `vault.strengthChecker`, type `GuardedStrengthChecker`, both gone); it validates its argument (a
-  non-string is refused `bad_option`) and resolves `{ strong: true }` or `{ strong: false, reason }`.
+  non-string is refused `bad_option`) and resolves `{ strong: true }` or `{ strong: false, reason }`
+  (amended 2026-10-24 (thread 10): `vault.checkPassphrase` is retired; the guarded check is `vault.checkStrength(typed)`
+  and its non-throwing form `vault.tryCheckStrength(typed)`, and a weak passphrase is refused `weak_passphrase` with the
+  checker's reason as the refusal's message, no longer a `{ strong, reason }` result).
   `PassphraseProof.checkStrongEnough()` and `safebyok-react`'s dialog advice both ask it. The guard
   finds a blank passphrase (empty, or only spaces) weak before the host's checker hears it; hands the
   checker a frozen copy of the scope, frozen once at `Vault.make`; and throws a verdict that breaks
@@ -439,7 +480,8 @@ added or folded into through the subagent, and no other entry changes.
   blank new passphrase (empty, or only whitespace) is refused `weak_passphrase` before the host's
   strength checker or any derivation (amended 2026-10-21 (wayin_rules): by `PassphraseProof.checkStrongEnough()`, which
   puts the passphrase to the vault's `strengthChecker`, a public getter on `Vault` (amended 2026-10-21
-  (checker2): now the method `vault.checkPassphrase(typed)`; the getter is gone), with a frozen copy
+  (checker2): now the method `vault.checkPassphrase(typed)`; the getter is gone; amended 2026-10-24 (thread 10): that method is
+  retired for `vault.checkStrength(typed)` / `vault.tryCheckStrength(typed)`), with a frozen copy
   of the vault's scope; the vault no longer reads `proof.passphrase`). (3) The strength
   checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
   to answer a verdict (amended 2026-10-21 (checker): the host's checker is called only through
@@ -1376,6 +1418,8 @@ added or folded into through the subagent, and no other entry changes.
   a wayin whose `vault_key_epoch` is not the vault props' is passed over as damaged
   (`damaged_wayin`), so a wayin spliced in from older vault props never hands over its vaultKey
   as the current one.
+  Amended 2026-10-24 (refresh_rulings): the order this entry gives, "older than the picture in hand" judged BEFORE the behind check, is reversed;
+  the refresh now tests `vault_behind` first (see the entry "a read older than the vault props in hand is ignored", amended the same day).
 * 2026-10-16: **`device_id`.** Every wayin carries the `device_id` of the device that
   added it, and its `registered_at`, both in its header and so bound into its wrap (and, for a
   passkey, its HKDF `info`), and kept when the wayin is sealed anew. The id is a random UUID
@@ -2202,7 +2246,27 @@ added or folded into through the subagent, and no other entry changes.
   core's VaultDB validates them. A driver's error rides as `cause` and may quote key columns, or
   (a malformed record refused by a NOT NULL) the whole failing row, its ciphertext included; the
   README's route recipe sends the browser only a refusal's kind and message (amended 2026-10-21
-  (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb).
+  (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb;
+  amended 2026-10-22 (route_meta, branch 20261022-route_meta): no longer whole, and it sent more than that: a
+  refusal that listed a record (`box_listed`, `wayin_listed`) carried a wrapped vaultKey, ciphertext or a
+  passphrase wayin's salt (`salt_b64`, `vault_key_wayin_wrapped`, ciphered box fields) to the browser and into any
+  log of browser traffic, which is offline-guessing material. Every answer is now `{ result, meta }` or
+  `{ refusal: { kind, message, meta }, meta }`. The main `meta` holds a write's not-quite-error facts
+  (`box_stored`, `vault_props_stored`, `capacity`) as whole records, as a read would send them, which the browser
+  needs to recompose its picture and its VaultDB validates. The refusal's own `meta` holds error information
+  only and is rebuilt by an allowlist (`answerOf`, `boxShown`, `wayinShown`): a damaged box listing is only
+  `boxlabel`, `damaged`, `revision_tok`; a wayin listing is only `wayinkind`, `device_id`, `registered_at`,
+  `vault_tok` and, for a passkey, `credential_id` and `prf_salt_b64` (what a locked vault's snapshot already
+  shows). A new field crosses only by being added to the allowlist; a denylist of `*_wrapped`/`*_ciphered`
+  names was rejected as it fails open. The refusal's `cause` never crosses. The browser's `checkedAnswer`
+  believes an answer only whole: a main-meta field in the refusal's `meta`, an unknown `meta` field, a result
+  beside a refusal, or an unknown kind is refused as `storage_unavailable`. Residual: the main `meta`'s winner
+  records remain in the response body of a stale write (a stale update's `vault_props_stored` carries both
+  wayins with salts and wrapped vaultKeys), to the signed-in owner of that vault only, since the VaultDB refuses
+  any other user's scope; a host that logs response bodies would log them. The GraphQL wire keeps its shape
+  (see the 2026-10-22 wire_meta entry) and is unchanged. Coach's ruling 2026-10-22; code in
+  `packages/safebyok-postgres/README.md`, "The route recipe", run by
+  `packages/safebyok-postgres/tests/route-recipe.test.ts`).
   Amended 2026-10-22 (bank): **a vault's birth writes, so the server's database role needs `SELECT`, `INSERT` and
   `UPDATE` on `safebyok_vaults` and `SELECT` and `DELETE` on `safebyok_vault_tombstones` to open a vault at all**; a
   read-only role is refused `not_permitted` at birth (`packages/safebyok-postgres/README.md` says so).
@@ -2310,7 +2374,7 @@ added or folded into through the subagent, and no other entry changes.
   came. Amended 2026-10-21 (checker2): no longer. A host's own `passphraseAdvice` that throws is
   always reported as a fixed `unexpected_error` quoting nothing of it, so a host `VaultError` quoting
   the passphrase is not reported as it came. With no `passphraseAdvice` the dialog asks
-  `vault.checkPassphrase`, and what that throws, and what `ask.attempt` throws, goes on through
+  `vault.tryCheckStrength` (amended 2026-10-24 (thread 10): was `vault.checkPassphrase`, now retired), and what that throws, and what `ask.attempt` throws, goes on through
   `forBoundary` (which strips any `cause`) to the app's error boundary above the dialog's own; the
   vault's own check's thrown error goes on as itself, since it quotes nothing. Amended 2026-10-21
   (checker2): as the boundary takes the dialog away on such a throw, the dialog answers `declined`
@@ -2322,7 +2386,7 @@ added or folded into through the subagent, and no other entry changes.
   carrying nothing, or `bad_option`), and the dialog shows its calm "Something went wrong" notice
   and reports the refusal to React as it does any other misuse (through `forBoundary`, as above).
   The report names
-  its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
+  its component (`PassphraseModal` or `PasskeyUnlockButton`; amended 2026-10-24 (thread 10): `GatingModal` for a gating's dialog, see the entry of that date) and, for a `VaultError` whose cause was
   stripped, says in its message that the cause was left out. `meta` is passed through as is. The
   dialog's fallback notice once misuse trips it ("Something went wrong") now shares
   the dialog's one answer: a lock landing closes it answering `declined`, and a vault unlocked under
@@ -2417,6 +2481,24 @@ added or folded into through the subagent, and no other entry changes.
   vaultDB and deviceDB** (the shared `delDamagedVaultIn(scope, vaultDB, deviceDB)`), with the same refusals; the bank's
   entry is let go only once the delete succeeds, and a sound vault still refuses `bad_option` and keeps its Vault object.
   React hosts reach it through `useBank()`; `VaultProvider`'s own `delDamagedVault` is gone.
+  Amended 2026-10-24 (primitives sprint, thread 13, branch `20261024-bank_clears`; the Coach's ruling on the review of
+  [#262](https://github.com/mrflip/safebyok/pull/262), which proposed refusing both calls a draft naming other stores than the
+  held entry was born from, as `bank.ensureVault` does with `bad_option`; declined): **`bank.delDamagedVault(draft)` may be
+  issued for a vault the bank does not report, and `bank.clearCachedVault(draft)` for a vault that is not there.** Nothing
+  on the device gates `bank.delDamagedVault`, and it asks for no unlock or passphrase: storage decides, by the checks only it
+  can make (`VaultDB.delDamagedVault` deletes props that fail their checks and still name their `vault_tok`, expecting that
+  `vault_tok` with `gate_epoch` null; a sound vault, a novel one included, refuses `bad_option`; props too damaged to name a
+  `vault_tok` refuse `damaged_vault`; an unknown format `newer_format`; a vault replaced meanwhile `stale_write`). A backend
+  whose server validates what it reads (safebyok-graphql) refuses it as `damaged_vault` and keeps the record. The bank's
+  entry for the scope is let go on success and on `stale_write`; any other refusal keeps it. `bank.clearCachedVault` touches
+  only this device's store (`DeviceDB.delDeviceRecord`, then `DeviceDB.delLease`), calls no `VaultDB` verb, needs no unlock or
+  passphrase, and refuses nothing for a vault the bank holds no entry for or storage does not hold. It rests on the device
+  store being no stronger a boundary than the browser's own site data, which anyone at the device can clear; its effect
+  (weakening the `vault_behind` check until the next birth, dropping the lease so the next open asks for the passphrase) is
+  no more than that. It lets go the bank's entry once both erasures succeed; a device-store refusal keeps it. **For review**:
+  a draft naming other stores acts on those stores and, for either call, lets go the held entry whichever stores it was born
+  from. Letting a Vault object go erases nothing (the next ask births anew from storage, the ground truth), so no stores
+  check is added. No code changed; the doc blocks, READMEs and tests say it. See also the bank entry (`useBank()`) above.
 * 2026-10-16: **the checks tightened, and a forgotten bag made harmless.** Every default check,
   `AnyTextValidators` included, refuses text that is not well-formed Unicode (a lone surrogate); a host's own schema
   is untouched. A refusal by one of our checks now passes on that check's message, which quotes
@@ -2997,7 +3079,8 @@ added or folded into through the subagent, and no other entry changes.
   words) and defaults one left out to `DefaultStrengthChecker` (weak for every passphrase, logs
   nothing); `Vault.make` then wraps it with `guardStrengthChecker` and keeps the guarded one for the
   vault's life (amended 2026-10-21 (checker2): behind the method `vault.checkPassphrase`, not a
-  `vault.strengthChecker` getter; see the checker entry). The length-only
+  `vault.strengthChecker` getter; see the checker entry; amended 2026-10-24 (thread 10): behind `vault.checkStrength` /
+  `vault.tryCheckStrength`, `checkPassphrase` being retired). The length-only
   `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
 * 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
   demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnStrengthChecker`
@@ -3025,7 +3108,7 @@ added or folded into through the subagent, and no other entry changes.
   host's `strengthChecker` is called with each partial passphrase as the user types while
   creating a vault, never while unlocking (amended 2026-10-21 (checker): through the vault's guarded
   `strengthChecker`, so a blank partial passphrase never reaches the host's checker; amended 2026-10-21
-  (checker2): through `vault.checkPassphrase`, and the provider no longer supplies an `adviceFrom`,
+  (checker2): through `vault.checkPassphrase` (amended 2026-10-24 (thread 10): now `vault.tryCheckStrength`), and the provider no longer supplies an `adviceFrom`,
   the dialog asking the vault itself). A host test that does anything off the device (a
   breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
   text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
@@ -3039,8 +3122,9 @@ added or folded into through the subagent, and no other entry changes.
   warned of once. The test that gates a passphrase is the one validated at open; none is swapped
   in later through a ref. Amended 2026-10-21 (checker): `VaultProvider` no longer parses the checker
   at render; `Vault.make` refuses a bad one (to the error boundary), and the vault keeps the guarded
-  checker for its life (amended 2026-10-21 (checker2): as `vault.checkPassphrase`). The dialog's advice asks
-  `vault.checkPassphrase` of the vault the ask came from. Amended 2026-10-22 (bank_provider): `BankProvider` hands the
+  checker for its life (amended 2026-10-21 (checker2): as `vault.checkPassphrase`; amended 2026-10-24 (thread 10): as `vault.checkStrength` /
+  `vault.tryCheckStrength`). The dialog's advice asks
+  `vault.tryCheckStrength` (amended 2026-10-24 (thread 10): was `vault.checkPassphrase`) of the vault the ask came from. Amended 2026-10-22 (bank_provider): `BankProvider` hands the
   checker to `Bank.make`, which gives it to each vault it births; a new identity makes a new bank (warned of once), and
   the old bank lets its vaults go.
 * 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the

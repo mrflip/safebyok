@@ -969,7 +969,7 @@ const checkWrittenVaultProps = (raw: unknown, written: VaultProps, scope: VaultS
 }
 
 /** Vault props read from storage that fail their checks, as `said` says how: 'damaged_vault', quoting none of them. */
-const damagedVaultProps = (said: string, opts?: ErrorOptions) => new VaultError('damaged_vault', `This vault's stored props ${said}, so no passphrase or passkey can be tried against them, and the vault can't be opened. They were left as they are: restore them from a backup, or, if the user chooses to start over, delDamagedVault() clears them.`, opts)
+const damagedVaultProps = (said: string, opts?: ErrorOptions) => new VaultError('damaged_vault', `This vault's stored props ${said}, so no vault unlocker (passphrase or passkey) can be tried against them, and the vault can't be opened. They were left as they are: restore them from a backup, or, if the user chooses to start over, delDamagedVault() clears them.`, opts)
 
 const unnamedVaultProps = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to remove, and nothing was removed. Its backend's own tools can clear it.", opts)
 

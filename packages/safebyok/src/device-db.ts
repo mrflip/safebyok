@@ -186,7 +186,7 @@ const guarded = <ValT>(verb: DeviceVerb, call: () => Promise<Outcome<ValT>>): Pr
 
 /** What failed, for each device-store verb, and what it leaves undone; and what the user may do instead of trying again, if anything. */
 const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }> = {
-  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
+  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a vault unlocker (the passphrase or passkey)" },
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
   delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
   getDeviceRecord:   { failed: "reading its record of this vault (the newest copy of the vault it has seen), so the vault could not check storage against it" },
