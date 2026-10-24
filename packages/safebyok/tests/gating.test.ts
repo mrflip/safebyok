@@ -361,6 +361,48 @@ describe("a host function that hears the passphrase throwing, quoting it", () =>
 })
 // --
 
+// == [Declining]: a declined gating's refusal, worded by kind
+
+/** Each kind of gating, the call that raises it on a vault made as `made` says, and what its decline's message says stands. */
+const DeclineCases = [
+  ['initialize_gate',   'novel',   (vault: Vault) => vault.tryEnsureUnlocked(),         /first passphrase.*still has no passphrase/],
+  ['unlock_vault',      'locked',  (vault: Vault) => vault.tryEnsureUnlocked(),         /unlock it.*stays locked/],
+  ['change_passphrase', 'locked',  (vault: Vault) => vault.tryPutWayin('passphrase'),   /change the vault's passphrase.*passphrase is unchanged/],
+  ['put_passkey',       'locked',  (vault: Vault) => vault.tryPutWayin('passkey'),      /put a passkey.*ways in are unchanged/],
+  ['del_passkey',       'passkey', (vault: Vault) => vault.tryDelWayin('passkey'),      /remove the vault's passkey.*passkey stays/],
+  ['del_vault',         'locked',  async (vault: Vault) => await vault.tryDel(),       /delete the vault.*Nothing was deleted/],
+] as const
+
+/** `u1`'s vault in a fresh world, made as `made` says -- novel, locked, or locked with a passkey -- and born under `overrides`. */
+const vaultMade = async (made: 'novel' | 'locked' | 'passkey', overrides: Partial<TH.BornVaultOpts>) => {
+  const world = makeWorld()
+  if (made === 'novel') { return await world.open(overrides) }
+  const maker = await world.openUnlocked('pw')
+  if (made === 'passkey') { await TH.putWayin(maker, 'pw', await TH.passkeyOf('laptop')) }
+  await maker.lock()
+  TH.closeVault(maker)
+  return await world.open(overrides)
+}
+
+describe("a declined gating's refusal", () => {
+  for (const [gatingkind, made, raise, says] of DeclineCases) {
+    it(`words a declined ${gatingkind} for what it asked, as vault_locked`, async () => {
+      const vault = await vaultMade(made, {})
+      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      expect(err.message).to.match(says)
+      expect(err.message).to.match(/declined/)
+    })
+
+    it(`words a ${gatingkind} with no requestCleartext to ask for what it needed, as vault_locked`, async () => {
+      const vault = await vaultMade(made, { requestCleartext: null })
+      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      expect(err.message).to.match(says)
+      expect(err.message).to.match(/no requestCleartext/)
+    })
+  }
+})
+// --
+
 // == [Landing]: a lock or a decline landing mid-chain
 
 describe("a lock or a decline landing during an attempt", () => {
