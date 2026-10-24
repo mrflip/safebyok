@@ -22,6 +22,11 @@ quietly route around it, and do not treat a convention you find inconvenient as 
 
 Link each PR, branch or commit on first mention (`[#12](https://github.com/mrflip/safebyok/pull/12)`).
 
+Name the operation. `read` and `write` mean a generic storage read or mutation, and are the right
+words only when any of them is meant. Otherwise say which call: `ensureVault`, `vault.refresh`,
+`putBox`, `lock()`. This holds in chat, plans, doc blocks and names alike: "a read in flight"
+hides which read, and whose.
+
 ## Philosophy and Values
 
 The top three values while writing code are **empathy, safety and readability**. Empathy here
