@@ -17,6 +17,10 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'd
  * through `VaultDB.delDamagedVault`, then the DeviceDB's `delLease`, and raises this device's
  * record of the scope to the tombstone's `vault_epoch` with `raiseDeviceRecord`.
  *
+ * Storage decides, by the checks it alone can make: `VaultDB.delDamagedVault` deletes only vault
+ * props that fail their checks and still name their `vault_tok`. So no bank need have opened the
+ * vault, or refused it, first, and nothing here asks for an unlock or a passphrase.
+ *
  * Once it resolves, storage holds no vault in the scope and this device holds no lease of it. With
  * no vault stored it only clears the lease, so a call cut short can be made again.
  *

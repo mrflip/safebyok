@@ -104,7 +104,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   static make(vault: WayinVault, vaultTok: string, record: unknown): PassphraseWayin | PasskeyWayin {
     const checked = WayinRecord.safeParse(record)
     if (! checked.success) {
-      throw new VaultError('damaged_wayin', "A way into this vault is stored in a form this package never writes, so it can't be tried. The other way in, if the vault has one, still can.", { cause: checked.error })
+      throw new VaultError('damaged_wayin', "One of this vault's unlockers is stored in a form this package never writes, so it can't be tried. The other vault unlocker, if the vault has one, still can.", { cause: checked.error })
     }
     return checked.data.wayinkind === 'passphrase' ? new PassphraseWayin(vault, vaultTok, checked.data) : new PasskeyWayin(vault, vaultTok, checked.data)
   }

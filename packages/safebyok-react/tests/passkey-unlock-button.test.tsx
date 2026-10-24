@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type UnlockVaultGating } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
-import { PassphraseModal, type DialogAnswer } from '../src/passphrase-modal'
+import type { DialogAnswer } from '../src/modal'
+import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
 /** A locked vault in memory with one passkey, made through the fake authenticator, that authenticator, and the `unlock_vault` gating the vault raised, held open. */

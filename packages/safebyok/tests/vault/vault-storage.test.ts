@@ -766,25 +766,25 @@ describe("vault props behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
-  it("ignores an older copy at unlock, the newer in hand standing, so a removed way in stays removed on this device", async () => {
+  it("refuses an older copy at unlock as vault_behind, the newer in hand standing, so a removed way in stays removed on this device", async () => {
     const { world, vault, older } = await rolledBackWorld()
     await vault.lock()
     const deaf = await world.open({ vaultDB: world.deafVaultDB() })
     world.dbStore.write(u1VaultPropsCkey, older)
-    await TH.expectRefusal(TH.unlock(deaf, await TH.passkeyOf('laptop')), 'absent_wayin')
+    await TH.expectRefusal(TH.unlock(deaf, await TH.passkeyOf('laptop')), 'vault_behind')
     expect(deaf.getSnapshot().state).to.eq('locked')
     expect(deaf.getSnapshot().gate_epoch).to.eq(3)
     expect(deaf.getSnapshot().passkey).to.be.null
     expect(await world.getLease()).to.be.null
   })
 
-  it("ignores an older copy met by a background refresh, taking nothing from it: the newer in hand stands, and a birth made anew refuses it", async () => {
+  it("refuses an older copy met by a background refresh as vault_behind, taking nothing from it: the newer in hand stands, the vault locks, and a birth made anew refuses it too", async () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultPropsCkey, older)
-    await vault.refresh()
+    await TH.expectRefusal(vault.refresh(), 'vault_behind')
     expect(vault.getSnapshot().gate_epoch).to.eq(3)
     expect(vault.getSnapshot().passkey).to.be.null
-    expect(world.logged).to.have.lengthOf(0)
+    expect(vault.getSnapshot().state).to.eq('locked')
     await TH.expectRefusal(world.open(), 'vault_behind')
   })
 
@@ -838,12 +838,12 @@ describe("vault props behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(2)
   })
 
-  it("restored under a del(), refuses that del() as stale, deleting nothing, locking nothing, and lowering no record", async () => {
+  it("restored under a del(), refuses that del() as vault_behind, deleting nothing, locking, and lowering no record", async () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.wakeupAtNextTick()
-    await TH.expectRefusal(TH.del(vault, 'pw'), 'stale_write')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    await TH.expectRefusal(TH.del(vault, 'pw'), 'vault_behind')
+    expect(vault.getSnapshot().state).to.eq('locked')
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
     expect(await recordEpochIn(world)).to.eq(3)
   })
