@@ -27,7 +27,7 @@ localStorage.
   direct manipulation of the vault: add, view, edit, remove and *use* boxes. Whisper-touching
   actions summon the passphrase dialog only when the vault is actually locked; an unlock grants
   the device a lease of seven days. Signing out locks the vault.
-* **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's one
+* **Vault unlockers** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's one
   passphrase and its passkey, if it has one, shown even while locked, and buttons to change them.
   Each calls one vault method, and the provider's dialog for that change asks for your passphrase
   as proof: "Change passphrase" (`vault.putWayin('passphrase')`: the current passphrase and the

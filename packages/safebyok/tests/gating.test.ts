@@ -368,7 +368,7 @@ const DeclineCases = [
   ['initialize_gate',   'novel',   (vault: Vault) => vault.tryEnsureUnlocked(),         /first passphrase.*still has no passphrase/],
   ['unlock_vault',      'locked',  (vault: Vault) => vault.tryEnsureUnlocked(),         /unlock it.*stays locked/],
   ['change_passphrase', 'locked',  (vault: Vault) => vault.tryPutWayin('passphrase'),   /change the vault's passphrase.*passphrase is unchanged/],
-  ['put_passkey',       'locked',  (vault: Vault) => vault.tryPutWayin('passkey'),      /put a passkey.*ways in are unchanged/],
+  ['put_passkey',       'locked',  (vault: Vault) => vault.tryPutWayin('passkey'),      /put a passkey.*vault unlockers are unchanged/],
   ['del_passkey',       'passkey', (vault: Vault) => vault.tryDelWayin('passkey'),      /remove the vault's passkey.*passkey stays/],
   ['del_vault',         'locked',  async (vault: Vault) => await vault.tryDel(),       /delete the vault.*Nothing was deleted/],
 ] as const

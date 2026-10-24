@@ -31,8 +31,9 @@ const renderWaysIn = async (prepare?: (world: ReturnType<typeof TH.makeWorld>) =
 }
 
 describe("WaysIn", () => {
-  it("shows the vault's ways in while it is locked: its passphrase, and no passkey", async () => {
+  it("shows the vault's ways in while it is locked, as its 'Vault unlockers': its passphrase, and no passkey", async () => {
     await renderWaysIn()
+    expect(screen.getByRole('heading', { name: 'Vault unlockers' })).to.not.be.null
     expect(screen.getByText('passphrase')).to.not.be.null
     expect(screen.getByText('no passkey')).to.not.be.null
   })
