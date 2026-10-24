@@ -9,7 +9,7 @@ empty changeset only). The work is in the design doc,
     after the new one (order `Na`). *Contract, primitives* is now *Contract*, at the old one's
     place (order `N`), its title and lead saying so.
   * **The Contract restated as a design tool** on purpose and relationships, true to main
-    (30d5f9df) with #265 and #252. Per section:
+    (30d5f9df) with #265, #252 and #266, and #268 for three lines. Per section:
     * *At a glance* (new): a lead, a drawn diagram of the cast (app, bank, Vault object, gating,
       requestCleartext, box, proving, lease, gate, the two stores) and what calls what, and a
       17-row table: each call, what it is for, which gating it raises, which store verbs it reaches.
@@ -36,6 +36,36 @@ empty changeset only). The work is in the design doc,
       but never in JSON or a spread (307); `box.extractWhisper()` as its own subsection.
     * *Lease*, *VaultDB*: a **For** line each. *Refusals*: the `vault_mismatch` row by call shape
       (393), the `stale_write` row's `meta`. *Shapes*, *A lock landing mid-call*, *Tradeoffs*: unchanged.
+  * **The line-by-line check against the code** (origin/20261022-route_meta 89b65977 and #266,
+    3360de5b), by a fresh-eyes subagent with each claim confirmed in the code, then applied by id
+    with guards (doc rev 17 to 32). The lines it found the code makes untrue, now fixed:
+    * *A lock landing mid-call*: a stale write refuses `vault_locked` in one case, a `del()` that a
+      lock or decline met after its write was sent (gating.ts:199-211).
+    * `stale_write`'s `meta` (*Shapes*, the *Refusals* row, *Tradeoffs*): only a box write over a
+      moved revision carries `meta.box_stored`; a gate write, `del()` and a box write into a vault
+      gone carry none (vault.ts:1357, 1736; refusals.ts:44).
+    * A gate write that finds the vault deleted or made anew refuses `vault_gone` / `vault_remade`
+      and the Vault object goes (vault.ts:1346-1350): added to `putWayin` (Does 6, Refuses), the
+      gatings' *Close the dialog*, and *States* (gone), with `bank.delDamagedVault` there too.
+    * *Every call*'s gone exemptions: the fields, `now()`, and `consistentWith` (answers false).
+    * The device store refusing a grant only warns after `putWayin`/`delWayin`; after an
+      `initialize_gate` that `ensureUnlocked` raised it refuses the call (gating.ts:413).
+    * *VaultDB*: `subscribe` returns the unsubscribe and may throw; `vault_mismatch` covers none and
+      a tombstone; `delBox` refuses `stale_write` itself (vault-db.ts:459-476).
+    * *At a glance*: `VaultDB.subscribe` at birth and close, `raiseDeviceRecord` after a gate
+      write, and a line on the hello each call says first and the `delLease` a storage-caused lock
+      or `damaged_lease` makes.
+    * `putBox`: by where the call meets a vault deleted elsewhere (its first read `vault_gone`; the
+      write, whole put or not, `stale_write`; after the write landed `vault_gone`/`vault_remade`).
+    * `ensureVault`: an entry let go during its birth leaves the snapshot. `unlock_vault` changes
+      nothing in the VaultDB (it grants a lease, like every kind but `del_vault`). `Box.make`
+      takes an optional `stamp`. `delDamagedVault` with no vault stored erases only the lease.
+    * Internals cut: `putGate` (private) from the gatings; the order of steps after `del()`'s write.
+  * **Three lines follow #268** (refresh_rulings, in review, so they may change): `hello` Does 2
+    (a hello drops the lease when the store holds none or one under other ways in, or the ways in
+    changed; another tab's renewal leaves it standing); `hello`'s ignored-read guarantee (unless
+    below the device record: `vault_behind`); *Tradeoffs*, "A coherent picture" (likewise). On
+    main today a newer lease in the store also drops the one in hand (vault.ts:1936-1944).
 * **Decisions taken**:
   * Kept the labels **Does / Guarantees / Returns / Refuses** and added **For** above them, as the
     tests cite labels. The numbered Does lists of `hello`, `ensureUnlocked` and `putWayin` are
