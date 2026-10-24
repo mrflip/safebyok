@@ -16,7 +16,7 @@ import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
 import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
 
-// == [Helpers]: U1, bankOptsOf, bankIn, recordOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
+// == [Helpers]: U1, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
 
 type World = ReturnType<typeof makeWorld>
 
@@ -34,6 +34,9 @@ const bankIn = (world: World, overrides?: Partial<TH.BornVaultOpts>): Bank => Ba
 
 /** This device's record of u1's vault in `world`'s device store, or null for none. */
 const recordOf = (world: World) => TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+
+/** What `vaultDB.getVault` answers for u1's vault in `world`: null for none stored. */
+const gotVaultOf = (world: World) => TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
 
 /** The highest `vault_epoch` this device's record of u1's vault in `world` has seen, or null for no record. */
 const highestEpochOf = async (world: World) => {
@@ -367,6 +370,60 @@ describe("a vault served behind this device's record", () => {
     expect(await highestEpochOf(world)).to.eq(1)
   })
 })
+
+describe("bank.clearCachedVault", () => {
+  it("is a quiet success for a vault the bank holds no entry for and storage holds none: no unlock, no passphrase asked, no vaultDB verb called", async () => {
+    const world = makeWorld()
+    const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
+    const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
+    const bank = bankIn(world, { requestCleartext })
+    expect(await bank.tryClearCachedVault(U1)).to.deep.equal({ ok: true, val: undefined })
+    await bank.clearCachedVault(U1)
+    expect(bank.entryOf(U1)).to.be.null
+    expect(await recordOf(world)).to.be.null
+    for (const called of [...vaultDBCalls, requestCleartext]) { expect(called).not.toHaveBeenCalled() }
+  })
+
+  it("erases the record and the lease an earlier session left, for a vault this bank never opened, opening nothing", async () => {
+    const world = makeWorld()
+    TH.closeVault(await world.openUnlocked('pw'))
+    expect(await world.getLease()).to.not.be.null
+    expect(await recordOf(world)).to.not.be.null
+    const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
+    const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
+    const bank = bankIn(world, { requestCleartext })
+    await bank.clearCachedVault(U1)
+    expect(await recordOf(world)).to.be.null
+    expect(await world.getLease()).to.be.null
+    expect(bank.entryOf(U1)).to.be.null
+    for (const called of [...vaultDBCalls, requestCleartext]) { expect(called).not.toHaveBeenCalled() }
+  })
+
+  it("erases in the deviceDB the draft names and lets go the entry the bank holds for the scope, whichever stores that was born from: no stores are checked", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    await bank.ensureVault(U1)
+    const otherDeviceDB = memoryDeviceDB()
+    await TH.expectGood(otherDeviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')))
+    await bank.clearCachedVault({ ...U1, deviceDB: otherDeviceDB })
+    expect(bank.entryOf(U1)).to.be.null
+    const otherRecord = await TH.expectGood(otherDeviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    expect(otherRecord).to.be.null
+    expect(await recordOf(world)).to.not.be.null
+  })
+
+  it("keeps the entry when the device store refuses 'storage_unavailable' as it erases: a second call erases both and lets it go", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const vault = await bank.ensureVault(U1)
+    vi.spyOn(world.deviceDB, 'delLease').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The device store could not be reached: try again shortly.')))
+    await TH.expectRefusal(bank.clearCachedVault(U1), 'storage_unavailable')
+    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+    expect(await recordOf(world)).to.be.null
+    await bank.clearCachedVault(U1)
+    expect(bank.entryOf(U1)).to.be.null
+  })
+})
 // --
 
 // == [damaged_vault at birth]: delDamagedVault's way out
@@ -429,6 +486,48 @@ describe("bank.delDamagedVault", () => {
     expect(stored).to.not.be.null
     expect(bank.entryOf(U1)?.vault).to.eq(vault)
     await TH.expectRefusal(bank.delDamagedVault({ userId: 'u1', vaultlabel: 'Not A Label' }), 'bad_label')
+  })
+
+  it("deletes a damaged vault the bank holds no entry for, never asked of it: storage's own checks decide, and the next ensureVault births a new life, novel", async () => {
+    const world = await damagedVaultWorld()
+    const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
+    const bank = bankIn(world, { requestCleartext })
+    expect(bank.entryOf(U1)).to.be.null
+    await bank.delDamagedVault(U1)
+    expect(bank.entryOf(U1)).to.be.null
+    expect(await gotVaultOf(world)).to.be.null
+    expect(await world.getLease()).to.be.null
+    expect(requestCleartext).not.toHaveBeenCalled()
+    const reborn = await bank.ensureVault(U1)
+    expect(reborn.state).to.eq('novel')
+  })
+
+  it("refuses a sound vault the bank holds no entry for 'bad_option', as storage decides: nothing deleted, this device's lease kept", async () => {
+    const world = makeWorld()
+    TH.closeVault(await world.openUnlocked('pw'))
+    const bank = bankIn(world)
+    await TH.expectRefusal(bank.delDamagedVault(U1), 'bad_option')
+    expect(await gotVaultOf(world)).to.not.be.null
+    expect(await world.getLease()).to.not.be.null
+    expect(bank.entryOf(U1)).to.be.null
+  })
+
+  it("is a quiet success with no vault stored and no entry held, as storage finds nothing to delete", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    await bank.delDamagedVault(U1)
+    expect(bank.entryOf(U1)).to.be.null
+    expect(await gotVaultOf(world)).to.be.null
+  })
+
+  it("lets go the entry the bank holds for the scope once a draft naming another vaultDB deletes there, whichever stores the entry was born from: no stores are checked", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    await bank.ensureVault(U1)
+    const otherVaultDB = localVaultDB({ store: memoryStore() })
+    await bank.delDamagedVault({ ...U1, vaultDB: otherVaultDB })
+    expect(bank.entryOf(U1)).to.be.null
+    expect(await gotVaultOf(world)).to.not.be.null
   })
 })
 // --

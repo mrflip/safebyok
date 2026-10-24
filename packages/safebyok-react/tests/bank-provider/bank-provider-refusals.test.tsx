@@ -197,7 +197,7 @@ describe("BankProvider", () => {
       await expectShown('novel')
     })
 
-    it("leaves the vault as it stands when a later read meets an older copy than the one in hand: the older is ignored, and nothing refused", async () => {
+    it("keeps a vault holding the newer copy in hand when a later read meets an older one, as for a vault found behind: locked, its trouble vault_behind, the entry still timely", async () => {
       const world = await madeWorld()
       const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
       const older = world.store.read(vaultPropsCkey) ?? ''
@@ -208,15 +208,16 @@ describe("BankProvider", () => {
       const { Grab, latest } = grabber()
       render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
-      // Storage hands back the older copy; the vault's read ignores it, holding the newer.
+      // Storage hands back the older copy; the vault's read refuses it, keeping the newer in hand.
       world.store.write(vaultPropsCkey, older)
       const shown = latest().vault
       expect(shown).to.not.be.null
-      await act(async () => { if (shown !== null) { await TH.readAfresh(shown) } })
+      await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_behind') } })
+      await expectShown('locked')
       expect(latest().vault).to.eq(shown)
-      expect(latest().vault?.state).to.eq('unlocked')
-      expect(latest().err).to.be.null
-      expect(latest().vault?.gate_epoch).to.eq(2)
+      expect(latest().entry?.status).to.eq('timely')
+      expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
+      expect(shown?.gate_epoch).to.eq(2)
     })
 
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {

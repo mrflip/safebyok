@@ -57,6 +57,61 @@ and 11 are restated for the demand model.
 14. **A LATE READ OF THIS TAB'S OWN GATE WRITE IS IGNORED, NOT JUDGED**: data cannot tell it from
     a restored backup, so *behind* is judged against the device record's highest `vault_epoch`
     only. The Coach: "this is why we might have to synchronize gated operations". (the spec,
-    *Vault and bank*)
+    *Vault and bank*) *Amended by thread 15 (U6, 2026-10-24):* the refresh now tests *behind*
+    before it ignores an older read, so a Vault object holding the newer copy refuses a restored
+    one 'vault_behind' and locks, as every other tab does. A late read of its own write is still
+    ignored, since the device record is read before the fetch. **A LAGGING READ REPLICA** that
+    serves a copy below the record now refuses 'vault_behind' and locks a tab that holds the
+    newer copy, where it was ignored: a false alarm, cured by the next hello once the replica
+    catches up.
 15. **A whisper-omitted `putBox` costs a read first**, since the listing carries no ciphertext;
     ergonomics reconsidered after the sprint. (the Coach, 2026-10-22)
+16. **A POSTGRES VAULT DELETED AND ENSURED IN THE SAME INSTANT CAN RESTART ITS COUNTER.** Under
+    READ COMMITTED, an `ensureVault` statement that began before a `delVault` committed reads no
+    tombstone and finds the old row gone, so it starts a new life at `vault_epoch` 0 and the
+    fresh tombstone stays beside it. It fails safe: a device that saw a higher epoch refuses the
+    new life as `vault_behind` until the host calls `bank.clearCachedVault`. Convex, IndexedDB and
+    the local store are unaffected. The cure, if it shows: keep the tombstone as a state of the
+    vault row, so one `INSERT ... ON CONFLICT DO UPDATE` decides. (#251 review; the Coach: "don't
+    let rollback protection drive any large revisions")
+17. **A CHANGE-BELL RING DURING A `vault.refresh()` IN FLIGHT JOINS IT, AND ITS CHANGE IS LOST** until
+    the next ring or hello: a write that landed after that refresh's `getVault` began is not shown
+    (say, a vault made on another device while this tab shows "Choose a passphrase"). No demand
+    catches it, since nothing disagrees: the picture is only old. The Coach: "no, note the concern,
+    don't fix: I think it points to the weakness in cross-tab coordination, but the read-re-read
+    business is what landed us here." (#253)
+18. **THE TAKE-UP KEPT UNTIL THREAD 9 ERASES ON A STALE JUDGMENT.** `#ensureUnlocked` judges a stored
+    lease against a picture up to `staleMinutes` old and erases what it cannot open, so a tab whose
+    picture predates another tab's change to the ways in can erase that tab's valid lease, which
+    re-prompts at its next read. A re-prompt, never a lease kept wrongly. The Coach: "yes record
+    don't fix". (#253 review)
+19. **NO CROSS-TAB COORDINATION THIS SPRINT.** The mutexes are per tab. Races between tabs (audit
+    risks 5 and 9's cross-tab halves, toldjaso 17's lost ring) are settled by the VaultDB's
+    expected tokens and the next read, never by a lock across tabs. A Web Locks layer for the
+    gating line and the dialog is a later option. The Coach: "don't do cross-tab coordination
+    additions this sprint, note your concern and carry on".
+20. **SEE IF THIS IS REALLY NEEDED: a partial `putBox` opens the box it reads.** Even when only the
+    sidecar is left out, `putBox` calls `getBox` and deciphers the stored box rather than re-wrapping
+    it blind, so nothing tampered in storage is re-sealed under this device's key. It costs a
+    decipher on every partial put. The Coach: "yes. can you make sure this is noted as a "see if
+    this is really needed" in the same place as you are noting the many "see if this is as bad as
+    it sounds" loosenings?" (#254)
+21. **A VAULT OBJECT HELD THROUGH `bank.clearCachedVault` CAN WRITE A LEASE DURING THE ERASE.** The
+    bank erases the device record and the lease before letting the entry go, but a concurrent
+    unlock on a Vault object still held can `putLease` while the erase runs. The documented
+    `vault_behind` path holds no unlocked Vault object, so it does not arise there. (#259)
+22. **A REACT CHILD MOUNTING DURING A USER CHANGE ASKS THE OLD BANK.** A component that mounts in
+    the same commit as a `userId` or shaping-prop change renders with the old bank, and its
+    `useVault` effect, running after the provider's cleanup, starts a birth on that bank which no
+    one lets go. Needs an unusual tree. (#259 review)
+23. **CANCEL, THEN ASKED AGAIN.** A call waiting behind a change's dialog (`change_passphrase`,
+    `put_passkey`, `del_passkey`) raises its own unlock once that dialog is cancelled. With the
+    Cancel button, a user activation, "Unlock your vault" pops up at once; with Escape, which gives
+    none, the browser's transient activation (about 5 s) may lapse and the waiting call is declined
+    silently. Thread 10's file, *How the joins feel in the UI*, has the rest. (#265)
+24. **A LOCK AND AN UNLOCK IN ANOTHER TAB, BOTH LANDING BEFORE THIS TAB'S NEXT READ, LEAVE THIS
+    TAB UNLOCKED.** A refresh drops the lease in hand only when the device store holds none, or
+    one under other ways in; it no longer compares deadlines, so another tab's unlock or renewal
+    leaves this tab's lease standing until its own deadline (no flash of 'locked'). The store
+    then holds a lease under the same ways in, which this tab cannot tell from a renewal. (the
+    Coach on U3, 2026-10-24: "yay"; thread 15)

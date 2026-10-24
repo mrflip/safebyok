@@ -482,7 +482,7 @@ describe("a hello that fails", () => {
     vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new DOMException('The operation is insecure.', 'SecurityError'))
     const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.message).to.match(/reading the lease it keeps/)
-    expect(err.message).to.match(/will not help until that changes: unlock with a passphrase or passkey instead\./)
+    expect(err.message).to.match(/will not help until that changes: unlock with a vault unlocker \(the passphrase or passkey\) instead\./)
     expect(err.message).to.not.match(/try again/i)
   })
 
@@ -490,7 +490,7 @@ describe("a hello that fails", () => {
     const deviceDB = memoryDeviceDB()
     vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
     const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(err.message).to.match(/try again, or unlock with a passphrase or passkey\./)
+    expect(err.message).to.match(/try again, or unlock with a vault unlocker \(the passphrase or passkey\)\./)
   })
 
   it("tells a blocked store by its error's name, so one from another frame, no instance of this one's Error, is told alike", async () => {
@@ -868,12 +868,14 @@ describe("vault.hello, by the Contract", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("ignores an older copy in the Vault object that saw the newer, as a late read of its own write: it refuses nothing, takes nothing, and stays unlocked", async () => {
-    const { world, here, restoreOlder } = await behindWorld()
+  it("refuses vault_behind in the Vault object that saw the newer copy too, as another tab does: it takes nothing, keeps the newer in hand, and locks", async () => {
+    const { world, here, older, restoreOlder } = await behindWorld()
     restoreOlder()
-    expect(await here.refresh()).to.eq(here)
-    expect(here.getSnapshot()).to.deep.include({ state: 'unlocked', gate_epoch: 3, passkey: null, trouble: null })
-    expect(world.logged).to.have.lengthOf(0)
+    const err = await TH.expectRefusal(here.refresh(), 'vault_behind')
+    expect(here.getSnapshot()).to.deep.include({ state: 'locked', gate_epoch: 3, passkey: null, trouble: err, freshness: 'refused' })
+    expect(await world.getLease()).to.be.null
+    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
+    expect(await recordEpochIn(world)).to.eq(3)
   })
 
   it("is refused vault_behind at a new birth too, and accepted once bank.clearCachedVault() has this device forget the vault, as its example shows", async () => {

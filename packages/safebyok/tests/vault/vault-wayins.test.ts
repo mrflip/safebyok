@@ -745,30 +745,32 @@ describe("a new passphrase's strength", () => {
     }
   })
 
-  it("asks the host's checker as vault.checkPassphrase, told the vault's scope, as its first example shows: a blank passphrase weak unheard", async () => {
+  it("asks the host's checker as vault.checkStrength, told the vault's scope: a weak one weak_passphrase, its reason the message", async () => {
     const world = makeWorld()
     const checker = refusing('acme acme acme')
     const vault = await world.open({ strengthChecker: checker })
-    expect(await vault.checkPassphrase('acme acme acme')).to.deep.equal({ strong: false, reason: 'That one is on every list of guesses: try another.' })
-    expect(await vault.checkPassphrase('pw')).to.deep.equal({ strong: true })
+    const err = await TH.expectRefusal(vault.checkStrength('acme acme acme'), 'weak_passphrase')
+    expect(err.message).to.eq('That one is on every list of guesses: try another.')
+    await vault.checkStrength('pw')
     expect(checker.mock.calls).to.deep.equal([['acme acme acme', TH.scopeOf('u1')], ['pw', TH.scopeOf('u1')]])
   })
 
-  it("finds a blank passphrase weak before the checker hears it, as checkPassphrase's second example shows", async () => {
+  it("finds a blank passphrase weak before the checker hears it", async () => {
     const world = makeWorld()
     const checker = refusing('acme acme acme')
     const vault = await world.open({ strengthChecker: checker })
-    expect(await vault.checkPassphrase(' '.repeat(3))).to.have.property('reason').that.includes("can't be empty")
+    const err = await TH.expectRefusal(vault.checkStrength(' '.repeat(3)), 'weak_passphrase')
+    expect(err.message).to.include("can't be empty")
     expect(checker).not.toHaveBeenCalled()
   })
 
-  it("refuses checkPassphrase anything but text as 'bad_option', as its third example shows, never a TypeError", async () => {
+  it("refuses checkStrength anything but text as 'bad_option', never a TypeError", async () => {
     const world = makeWorld()
     const checker = refusing('acme acme acme')
     const vault = await world.open({ strengthChecker: checker })
     for (const misfit of [42, undefined, null, { passphrase: 'pw' }]) {
-      const err = await TH.expectRefusal(vault.checkPassphrase(misfit as unknown as string), 'bad_option')
-      expect(err.message).to.match(/checkPassphrase takes the passphrase/)
+      const err = await TH.expectRefusal(vault.checkStrength(misfit as unknown as string), 'bad_option')
+      expect(err.message).to.match(/checkStrength takes the passphrase/)
     }
     expect(checker).not.toHaveBeenCalled()
   })
@@ -779,7 +781,7 @@ describe("a new passphrase's strength", () => {
     const vault = await world.open({ strengthChecker: Object.assign(() => StrongVerdict, { load }) })
     const getVault = vi.spyOn(world.vaultDB, 'getVault')
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
-    expect(await vault.checkPassphrase('pw')).to.deep.equal({ strong: true })
+    await vault.checkStrength('pw')
     expect(getVault).not.toHaveBeenCalled()
     expect(ensureVault).not.toHaveBeenCalled()
     expect(load).toHaveBeenCalledTimes(1)
@@ -859,7 +861,7 @@ describe("a new passphrase's strength", () => {
     const before = storeDumpOf(world)
     const err = await TH.expectBad(TH.tryUnlock(misfit, 'pw'), 'bad_option')
     expect(err.message).to.match(/strengthChecker handed to Bank\.make answered something other than a verdict/)
-    await TH.expectRefusal(misfit.checkPassphrase('pw'), 'bad_option')
+    await TH.expectRefusal(misfit.checkStrength('pw'), 'bad_option')
     expect(storeDumpOf(world)).to.eq(before)
     expect(told).to.have.lengthOf(0)
   })
@@ -1146,7 +1148,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} changes nothing when storage holds vault props older than the ones in hand: it proves against those in hand, and is refused`, async () => {
+    it(`${callTitle} changes nothing when storage holds vault props older than the ones in hand, and is refused`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const older = storedText(world) ?? ''
       await TH.putWayin(vault, 'pw', 'pw newer')
@@ -1158,8 +1160,8 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       } catch (err) {
         refused = err
       }
-      // The older copy is ignored: the write expecting the newer is stale, or the newer has no passkey to remove.
-      expect(refused).to.have.property('refusalkind').that.is.oneOf(['stale_write', 'absent_wayin'])
+      // The older copy is refused as behind what this device has seen, or the newer in hand has no passkey to remove.
+      expect(refused).to.have.property('refusalkind').that.is.oneOf(['vault_behind', 'absent_wayin'])
       expect(storedText(world)).to.eq(older)
     })
 
@@ -1278,13 +1280,14 @@ describe("vault.checkStrength", () => {
     await vault.checkStrength('correct horse battery staple')
   })
 
-  it("refuses a blank passphrase as weak_passphrase, and one that is not text as bad_option; tryCheckStrength resolves each as its Outcome", async () => {
+  it("refuses a blank passphrase as weak_passphrase, and one that is not text as bad_option; tryCheckStrength resolves each as its Outcome, its weak one's message the hint, as its third example shows", async () => {
     const vault = await makeWorld().open()
     const blank = ' '.repeat(3)
     await TH.expectRefusal(vault.checkStrength(blank), 'weak_passphrase')
     await TH.expectRefusal(vault.checkStrength(42 as unknown as string), 'bad_option')
     const weak = await vault.tryCheckStrength(blank)
     expect(weak.err?.refusalkind).to.eq('weak_passphrase')
+    expect(weak.err?.message).to.include("can't be empty")
     const strong = await vault.tryCheckStrength('fine passphrase')
     expect(strong.ok).to.be.true
   })
