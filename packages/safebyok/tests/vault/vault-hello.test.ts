@@ -482,7 +482,7 @@ describe("a hello that fails", () => {
     vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new DOMException('The operation is insecure.', 'SecurityError'))
     const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.message).to.match(/reading the lease it keeps/)
-    expect(err.message).to.match(/will not help until that changes: unlock with a passphrase or passkey instead\./)
+    expect(err.message).to.match(/will not help until that changes: unlock with a vault unlocker \(the passphrase or passkey\) instead\./)
     expect(err.message).to.not.match(/try again/i)
   })
 
@@ -490,7 +490,7 @@ describe("a hello that fails", () => {
     const deviceDB = memoryDeviceDB()
     vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
     const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(err.message).to.match(/try again, or unlock with a passphrase or passkey\./)
+    expect(err.message).to.match(/try again, or unlock with a vault unlocker \(the passphrase or passkey\)\./)
   })
 
   it("tells a blocked store by its error's name, so one from another frame, no instance of this one's Error, is told alike", async () => {

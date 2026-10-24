@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Bank, type Gating, type RequestCleartext, checkValidators, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
-import { PassphraseModal, type PassphraseAdvice, type PassphraseGating } from './passphrase-modal'
+import { GatingModal } from './gating-modal'
+import type { PassphraseAdvice } from './modal'
 
 // == [Hooks]: useBank, useVault, useEntry, useVaultSnapshot
 
@@ -104,23 +105,20 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture, isPassphraseGating
+// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture
 
-/** One showing of the passphrase dialog: which one, the gating it answers, and how it closes. */
-type Showing = { round: number, gating: PassphraseGating, close: () => void }
+/** One showing of the dialog: which one, the gating it answers, and how it closes. */
+type Showing = { round: number, gating: Gating, close: () => void }
 
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** True for a gating the passphrase dialog answers: a first passphrase, or an unlock. The other kinds are a host's own dialog's. */
-const isPassphraseGating = (gating: Gating): gating is PassphraseGating => gating.gatingkind === 'initialize_gate' || gating.gatingkind === 'unlock_vault'
-
-/** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the passphrase dialog.
+/** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the provider's dialogs.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
- * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own passphrase
- * dialog. The dialog's three: whether it offers a forgetful user to start over (it offers nothing), what a password
- * manager files the passphrase under, and the advice it shows as the user chooses one
- * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
+ * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own
+ * dialogs. Their three: whether they offer a forgetful user to start over (they offer nothing,
+ * for now), what a password manager files the passphrase under, and the advice shown as the user
+ * chooses one (`GatingModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
  * the `keyDeriver`, `deviceDB` and `strengthChecker` Bank.make asks for. `BankProvider` says
  * which props make the bank anew as they change, and which do not.
  */
@@ -128,24 +126,23 @@ export type BankProviderProps = MakeBankOpts & {
   /** The signed-in user from the host's auth, or null when nobody is: then the hooks hand down no vault, and ask for none. */
   userId:              string | null
   /** What asks the user for a passphrase or passkey when a call needs one (Bank.make's `requestCleartext`).
-   * Left out, the provider's own: its passphrase dialog, `PassphraseModal`, for an `unlock_vault`
-   * or `initialize_gate` gating, one at a time, shown only while the user's gesture is in hand
-   * (`navigator.userActivation`) -- a call a timer makes is declined unasked -- and closing as a
-   * lock lands. A change to the ways in or a deletion is declined unasked: hand a
-   * `requestCleartext` of your own to answer those. Null: none, every gating declined, so a call
-   * needing the vault locked refuses 'vault_locked'. Written inline, it makes no new bank.
+   * Left out, the provider's own: `GatingModal`, the dialog for each gating's kind -- an unlock, a
+   * first passphrase, a change to the ways in, a deletion -- one at a time, shown only while the
+   * user's gesture is in hand (`navigator.userActivation`): a call a timer makes is declined
+   * unasked. It closes as a lock lands. Null: none, every gating declined, so a call needing the
+   * vault refuses 'vault_locked'. Written inline, it makes no new bank.
    */
   requestCleartext?:   RequestCleartext | null | undefined
-  /** `PassphraseModal`'s `allowStartOver`: taken, and offers nothing, as deleting a vault needs its passphrase. */
+  /** `GatingModal`'s `allowStartOver`: taken, and offers nothing, for now. */
   allowStartOver?:     boolean | undefined
-  /** What a password manager files a vault's passphrase under: `PassphraseModal`'s `passphraseUsername`.
+  /** What a password manager files a vault's passphrase under, and a new passkey is listed by: `GatingModal`'s `passphraseUsername`.
    * Default: the user and the vault, as 'u1 (main vault)'. Never the user's sign-in name alone, or
    * a manager may take the passphrase for their sign-in password.
    */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s `passphraseAdvice`.
-   * Default: the dialog's, `vault.checkPassphrase`'s reason for a passphrase it finds weak, so the
-   * user hears why before pressing Create. Like the strength checker, it hears the passphrase in
+  /** What to say beside the field as the user chooses a passphrase: `GatingModal`'s `passphraseAdvice`.
+   * Default: the dialog's, the reason `vault.tryCheckStrength` gives for a passphrase it finds
+   * weak, so the user hears why before pressing Create. Like the strength checker, it hears the passphrase in
    * plain text: keep it on the device.
    */
   passphraseAdvice?:   PassphraseAdvice | undefined
@@ -184,15 +181,19 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  *
  * The provider and its bank say things through one logger: the `logger` given here, else the one
  * the `vaultDB` was made with (the default logger when it was given none). Unless given a
- * `requestCleartext` of the host's own, it renders the passphrase dialog, `PassphraseModal`, whenever a
- * call on one of the bank's vaults needs it unlocked and finds it not -- `vault.getWhisper(...)`
- * and the rest, or `vault.ensureUnlocked()` on an Unlock button -- one at a time: unstyled markup
- * under the `modal-scrim` / `modal` class names, for the host's stylesheet to dress. The call
- * waits on the dialog, and goes on once it unlocks; dismissed, it refuses with kind
- * 'vault_locked'. Another vault's gating replaces the dialog showing, whose calls are refused
- * likewise. A lock closes the dialog, its calls refused likewise; a sign-out, another user,
- * or the provider unmounting lets the vault go, closing the dialog, its calls refused
- * 'vault_gone'. `allowStartOver` offers nothing: deleting a vault needs its passphrase.
+ * `requestCleartext` of the host's own, it renders `GatingModal`, the dialog for each gating's
+ * kind, one at a time: unstyled markup under the `modal-scrim` / `modal` class names, for the
+ * host's stylesheet to dress. A call that needs the vault unlocked and finds it not --
+ * `vault.getWhisper(...)` and the rest, or `vault.ensureUnlocked()` on an Unlock button -- asks
+ * through the passphrase dialog, waits on it, and goes on once it unlocks; dismissed, it refuses
+ * with kind 'vault_locked'. `vault.putWayin(...)`, `vault.delWayin('passkey')` and `vault.del()`
+ * ask through the dialog for their change, and refuse 'vault_locked' when it is cancelled. A
+ * call needing an unlock while a change's dialog is up waits for it to close: a change made
+ * leaves the vault unlocked, and the call goes on unasked; a change cancelled lets the call ask
+ * for the passphrase in a dialog of its own. Another vault's gating replaces the dialog showing,
+ * whose calls are refused 'vault_locked'. A lock closes the dialog, its calls refused likewise;
+ * a sign-out, another user, or the provider unmounting lets the vault go, closing the dialog, its
+ * calls refused 'vault_gone'. `allowStartOver` offers nothing, for now.
  *
  * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
  * birth refused as misuse or with a value that is no VaultError at all, which `useVault` throws
@@ -254,11 +255,11 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     ending.close()
   }, [])
 
-  // The provider's own requestCleartext: its passphrase dialog, shown only while the user's gesture
-  // is in hand, one at a time. A vault raises one gating at a time, but the bank's other vaults may
+  // The provider's own requestCleartext: the dialog for the gating's kind, shown only while the
+  // user's gesture is in hand, one at a time. A vault raises one gating at a time, but the bank's other vaults may
   // raise over it: the newest is shown, and the one it replaces declined, never left waiting.
   const askByDialog = useCallback<RequestCleartext>((gating) => new Promise<void>((close) => {
-    if (! isPassphraseGating(gating) || ! hasUserGesture()) { close(); return }
+    if (! hasUserGesture()) { close(); return }
     if (showingRef.current !== null) { endShowing(showingRef.current) }
     showingRounds.current += 1
     const next = { round: showingRounds.current, gating, close: () => { close() } }
@@ -330,7 +331,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     <BankContext.Provider value={held}>
       {children}
       {showing !== null && (
-        <PassphraseModal
+        <GatingModal
           key={showing.round}
           gating={showing.gating}
           allowStartOver={allowStartOver}

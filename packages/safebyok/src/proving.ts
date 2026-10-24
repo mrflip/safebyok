@@ -459,7 +459,7 @@ const stampOfRecord = (record: LeaseRecord) => ({
 })
 
 /** The refusal of a proving whose slot the gate no longer fills. */
-const gateMovedPast = () => new VaultError('gate_moved', "The vault's ways in changed while this call was under way -- its passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
+const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
 /** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `stamp`, as it stood when the seal began, and `gating` not landed ('gating_landed'). */
 const demandAfterFailedSeal = (vault: ProvingVault, stamp: Stamp, gating: ProvingGating) => {
@@ -468,7 +468,7 @@ const demandAfterFailedSeal = (vault: ProvingVault, stamp: Stamp, gating: Provin
 }
 
 /** The refusal of a seal whose gating landed while it derived. */
-const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended while this passphrase or passkey was being worked through -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked or changed. Ask again when the user wants the vault.')
+const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended while this vault unlocker was being worked through -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked or changed. Ask again when the user wants the vault.')
 // --
 
 // == [Key bytes]: notKeyBytes, deriverThrewRefusal, isSharedMemory, isAllZero, passphraseKeyOf

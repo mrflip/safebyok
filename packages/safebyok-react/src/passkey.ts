@@ -5,9 +5,9 @@ import { Messages } from './messages'
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
  * new passkey and asks it for its first answer, `askPasskey` asks the vault's passkey for its
- * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`putWayin`, `unlock`), or
- * null when the user dismissed the prompt. Nothing here imports React: any framework's host may use
- * them.
+ * answer again. Both hand back a {@link PasskeyAnswer} for a gating's attempt (`put_passkey`'s,
+ * `unlock_vault`'s), or null when the user dismissed the prompt. Nothing here imports React: any
+ * framework's host may use them.
  *
  * These passkeys are not logins. Each is a fresh credential of its own, made under a random user
  * handle so it never replaces a passkey the host's sign-in uses; its challenge is random and no
@@ -48,8 +48,9 @@ export type AskPasskeyOpts = {
 }
 
 /**
- * A new passkey, and its first answer over a fresh salt: what `vault.putWayin` takes, beside the
- * vault's passphrase, to put the vault's passkey. The browser asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
+ * A new passkey, and its first answer over a fresh salt: what a `put_passkey` gating's attempt
+ * takes, beside the vault's passphrase, to put the vault's passkey (and an `initialize_gate`'s,
+ * beside the first). The browser asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
  * that answer only when asked again, to touch it once more.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out). Refuses with kind
