@@ -388,6 +388,7 @@ describe("bank.clearCachedVault", () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
     expect(await world.getLease()).to.not.be.null
+    expect(await recordOf(world)).to.not.be.null
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
     const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
     const bank = bankIn(world, { requestCleartext })
