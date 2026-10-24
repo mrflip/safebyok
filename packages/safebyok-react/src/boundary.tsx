@@ -24,7 +24,7 @@ export type BoundaryProps = {
  *
  * @example
  *   <Boundary fallback={<p>Something went wrong.</p>}>
- *     <UnlockForm vault={vault} onDone={onDone} />
+ *     <UnlockForm gating={gating} onDone={onDone} />
  *   </Boundary>
  * @example <Boundary fallback={null} onCaught={() => { onGripe(trouble) }}><PasskeyPress {...props} /></Boundary>
  */
@@ -39,18 +39,18 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
 }
 
 /**
- * A number that changes whenever `handle` does: the key for a component that serves one vault
- * handle, so that handed another it starts afresh -- its boundary caught nothing, its form holds
- * nothing typed for the last vault.
+ * A number that changes whenever `thing` does: the key for a component that serves one gating,
+ * so that handed another it starts afresh -- its boundary caught nothing, its form holds nothing
+ * typed for the last.
  *
- * @example <Boundary key={useRoundFor(vault)} fallback={null}><PasskeyPress vault={vault} /></Boundary>
+ * @example <Boundary key={useRoundFor(gating)} fallback={null}><PasskeyPress gating={gating} /></Boundary>
  */
-export const useRoundFor = (handle: object): number => {
-  const [served, setServed] = useState({ handle, round: 0 })
-  if (served.handle === handle) { return served.round }
+export const useRoundFor = (thing: object): number => {
+  const [served, setServed] = useState({ thing, round: 0 })
+  if (served.thing === thing) { return served.round }
   // React's "adjusting state while rendering": it renders again at once, before committing this.
   const round = served.round + 1
-  setServed({ handle, round })
+  setServed({ thing, round })
   return round
 }
 
