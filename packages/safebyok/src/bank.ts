@@ -278,8 +278,7 @@ export class Bank {
    *
    * Storage decides, by the checks it alone can make: it deletes only vault props that fail their
    * checks and still name their `vault_tok`. So it may be asked for a vault the bank holds no
-   * entry for, or holds as it was born: nothing on this device need agree first, and no unlock
-   * or passphrase is asked. With no vault stored it erases only this device's lease, and
+   * entry for: nothing on this device need agree first, and no unlock or passphrase is asked. With no vault stored it erases only this device's lease, and
    * resolves. The entry let go is the one the bank holds for the draft's scope once storage
    * answers, whichever stores it was born from: on success, and the next {@link Bank.ensureVault}
    * births a new life, `novel`; and on 'stale_write', so the next ask births the vault that
