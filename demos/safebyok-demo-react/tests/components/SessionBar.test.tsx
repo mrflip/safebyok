@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, memoryStore, type RequestCleartext } from 'safebyok'
 import { BankProvider } from 'safebyok-react'
@@ -117,7 +117,7 @@ describe("SessionBar", () => {
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
-  it("keeps the account and its vault, and says so, when the provider's own dialog declines the deletion, as it does for now", async () => {
+  it("deletes the account and its vault through the provider's own dialog, proven by the passphrase", async () => {
     const { world, auth } = renderBar()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     signInAs('margo')
@@ -125,8 +125,40 @@ describe("SessionBar", () => {
     await TH.expectProbeState('locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-    expect(await screen.findByText(/declined/)).to.not.be.null
+    await screen.findByRole('dialog', { name: 'Delete your vault' })
+    await TH.answerPassphraseDialog()
+    await screen.findByPlaceholderText('username')
+    expect(auth.getSnapshot()).to.be.null
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+  })
+
+  it("keeps the account and its vault, saying nothing, when the user cancels the deletion's dialog", async () => {
+    const { world, auth } = renderBar()
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('locked')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByRole('dialog', { name: 'Delete your vault' })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    await TH.wakeupAtNextTick()
+    expect(document.querySelector('.gripe')).to.be.null
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+  })
+
+  it("deletes an account whose vault has no passphrase yet without asking: there is nothing in it, and nothing to prove its deletion", async () => {
+    const { world, auth } = renderBar()
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('novel')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByPlaceholderText('username')
+    expect(screen.queryByRole('dialog')).to.be.null
+    expect(auth.getSnapshot()).to.be.null
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 

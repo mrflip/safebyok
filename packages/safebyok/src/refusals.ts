@@ -78,7 +78,7 @@ export const staleVaultProps = (vaultPropsStored: unknown): VaultError => (
 )
 
 /** What an update of the vault props' `stale_write` says. */
-export const StaleVaultPropsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_props_stored: read the vault again before retrying."
+export const StaleVaultPropsMessage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_props_stored: read the vault again before retrying."
 
 /** A `vault_mismatch` refusal of a box read or write, for vault props that are not the ones it expects. Throw it from `doGetBox` or `doPutBox`.
  * None stand, or they have another `vault_tok`. It carries nothing of the props that stand, as they
