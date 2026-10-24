@@ -1,14 +1,15 @@
-import { isVaultError } from 'safebyok'
+import { CorrectableKindVals, isVaultError } from 'safebyok'
 
 /** What a dialog does with a refusal a gating's attempt met.
- * * `in_place`: show its message beside the field and ask again (a wrong passphrase or passkey, a
- *   weak new passphrase, and the ways in that cannot answer: a way in absent or damaged, a passkey
- *   the browser cannot ask).
- * * `gate_made_elsewhere`: the vault's first passphrase was just set on another device. Show it as
- *   advice, empty the field, have the vault say hello so it shows `locked`, and ask for the
+ * * `in_place`: show its message beside the field and ask again. These are the core's
+ *   correctable kinds (`CorrectableKindVals`), each of which leaves the gating open: a wrong
+ *   passphrase or passkey, a weak new passphrase or the same one again, and a way in that cannot
+ *   answer (absent or damaged, or a passkey the browser cannot ask), which leaves the other to try.
+ * * `gate_made_elsewhere`: the vault's first passphrase was just set on another device. The gating
+ *   it answered is over: close the dialog, answering `declined`, and the next call asks for the
  *   passphrase chosen there.
  * * `close`: close the dialog, answering `declined` (a lock that won, storage out of reach, a vault
- *   gone, and any other refusal).
+ *   gone, and any other refusal): the gating is over.
  * * `trouble`: misuse or a failure that is no VaultError at all, which goes to the dialog's error
  *   boundary, to be reported, and whose Close answers `declined` too.
  * * `in_flight`: a second attempt while one runs ('attempt_in_flight'), which was not tried. Do
@@ -16,8 +17,8 @@ import { isVaultError } from 'safebyok'
  */
 export type AttemptRefusalFlavor = 'in_place' | 'gate_made_elsewhere' | 'close' | 'trouble' | 'in_flight'
 
-/** The refusals a dialog shows in place, asking again. */
-const InPlaceKinds: ReadonlySet<string> = new Set(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'])
+/** The refusals a dialog shows in place, asking again: those the core leaves the gating open for. */
+const InPlaceKinds: ReadonlySet<string> = new Set(CorrectableKindVals)
 
 /** What a dialog does with `err`, a refusal a gating's attempt met: see {@link AttemptRefusalFlavor}. */
 export const attemptRefusalFlavor = (err: unknown): AttemptRefusalFlavor => {

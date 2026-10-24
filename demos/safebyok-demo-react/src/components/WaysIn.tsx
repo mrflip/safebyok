@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { isVaultError } from 'safebyok'
 import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
 
 /**
  * The vault's two ways in -- its one passphrase, and its passkey if it has one, shown even while
- * locked -- and the buttons that change them. Each raises its gating, which the app's
- * `requestCleartext` answers with the passphrase: `vault.putWayin('passphrase')`, which removes
- * the passkey with the old passphrase; `vault.putWayin('passkey')`, which replaces the passkey the
- * vault had; and `vault.delWayin('passkey')`, which removes it. `BankProvider`'s own dialog answers
- * only unlocks for now, so here each change is declined until the dialogs for them land. With a
- * passkey, the passphrase dialog offers "Use a passkey".
+ * locked, under the heading "Vault unlockers", as the user is shown them -- and the buttons that
+ * change them. Each raises its gating, which the provider's own
+ * dialog answers, proven by the passphrase: `vault.putWayin('passphrase')` asks for the current
+ * passphrase and the next, and removes the passkey with the old one; `vault.putWayin('passkey')`
+ * asks for the passphrase, then has the browser make a passkey, which replaces the one the vault
+ * had; and `vault.delWayin('passkey')` asks for the passphrase to remove it. A change the user
+ * cancels refuses 'vault_locked', and changes nothing: nothing to say. With a passkey, the
+ * passphrase dialog offers "Use a passkey".
  */
 export const WaysIn = () => {
   const vault = useVault('main')?.vault ?? null
@@ -20,19 +23,20 @@ export const WaysIn = () => {
   const { passphrase, passkey } = snapshot
   if (passphrase === null) { return null }
 
-  /** Runs `change`; a refusal shows as the gripe. */
+  /** Runs `change`; a refusal shows as the gripe, but for a dialog the user cancelled. */
   const press = async (change: () => Promise<unknown>) => {
     setGripe(null)
     try {
       await change()
     } catch (err) {
+      if (isVaultError(err, 'vault_locked')) { return }
       setGripe(err instanceof Error ? err.message : 'Could not make that change.')
     }
   }
 
   return (
     <section className="ways-in">
-      <h2>Ways in</h2>
+      <h2>Vault unlockers</h2>
       <ul>
         <li>passphrase <span className="quiet">set {new Date(passphrase.registered_at).toLocaleString()}</span></li>
         <li>

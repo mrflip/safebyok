@@ -48,8 +48,8 @@ export type ProvingInside = {
   putLease:   (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
   /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
   holdLease:  (stored: LeaseRecord) => Lease
-  /** The vault's demand on `thing`, a refusal logged as `call`'s. */
-  demand:     (thing: Stamped, call: ProvingCall) => void
+  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
+  demand:     (thing: Stamped, call: ProvingCall, opts?: { firstGate: boolean }) => void
 }
 
 /** Each registered vault's inside: a weak map, so a vault let go is let go here too. */
@@ -204,9 +204,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The refusal of a wayin this proving does not open. */
   protected abstract wrongProof(): VaultError
 
-  /** The demand on this proving, through its vault, a refusal logged as its gating's call. */
-  #demand() {
-    insideOf(this.vault).demand(this, this.#call())
+  /** The demand on this proving, through its vault, a refusal logged as its gating's call.
+   * While it is `sealing`, before any gate is written to carry it, a proving made on a vault with no
+   * gate is for the first: a gate standing then was made elsewhere ('gate_made_elsewhere').
+   */
+  #demand(opts?: { sealing: boolean }) {
+    insideOf(this.vault).demand(this, this.#call(), { firstGate: opts?.sealing === true && this.gate_epoch === 0 })
   }
 
   /** The vault call its gating was raised by, as a refusal logs it. */
@@ -214,9 +217,9 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.gating.call ?? 'demandConsistentWith'
   }
 
-  /** The demand on this proving, for a method of a subclass. */
-  protected demandSelf() {
-    this.#demand()
+  /** The demand on this proving, for a method of a subclass: `sealing` from `seal` and `sealWayins`, before a gate carries it. */
+  protected demandSelf(opts?: { sealing: boolean }) {
+    this.#demand(opts)
   }
 
   /** The wrap of the gate's wayin at this proving's slotlabel, as the vault holds it now; a gate with none there has moved past it. */
@@ -274,7 +277,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, passphrase, fromB64(sealing.salt_b64), vault.logger), unexpectedError)
     if (! derived.ok) { demandAfterFailedSeal(vault, stamp, opts.gating) }
     const proving = new PassphraseProving(vault, stamp, sealing, opts.gating, valOf(derived))
-    proving.demandSelf()
+    proving.demandSelf({ sealing: true })
     return proving
   }
 
@@ -287,8 +290,8 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const vaultKey = await makeVaultKey()
     const passphraseWrap = await this.wrappedWith(vaultKey, this.header)
     const passkeyWrap = passkeyProving === undefined ? null : await passkeyProving.wrappedWith(vaultKey, passkeyProving.header)
-    this.demandSelf()
-    if (passkeyProving !== undefined) { insideOf(this.vault).demand(passkeyProving, this.gating.call ?? 'demandConsistentWith') }
+    this.demandSelf({ sealing: true })
+    if (passkeyProving !== undefined) { insideOf(this.vault).demand(passkeyProving, this.gating.call ?? 'demandConsistentWith', { firstGate: passkeyProving.gate_epoch === 0 }) }
     return {
       passphrase: Wayin.make(this.vault, this.vault_tok, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }),
       passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vault, this.vault_tok, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }),
@@ -341,7 +344,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
       const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(vault, stamp.vault_tok, sealing)), unexpectedError)
       if (! derived.ok) { demandAfterFailedSeal(vault, stamp, opts.gating) }
       const proving = new PasskeyProving(vault, stamp, sealing, opts.gating, valOf(derived))
-      proving.demandSelf()
+      proving.demandSelf({ sealing: true })
       return proving
     } finally {
       prfBytes.fill(0)
@@ -459,16 +462,18 @@ const stampOfRecord = (record: LeaseRecord) => ({
 })
 
 /** The refusal of a proving whose slot the gate no longer fills. */
-const gateMovedPast = () => new VaultError('gate_moved', "The vault's ways in changed while this call was under way -- its passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
+const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
-/** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `stamp`, as it stood when the seal began, and `gating` not landed ('gating_landed'). */
+/** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `stamp`, as it stood when the seal began, and `gating` not landed ('gating_landed').
+ * A seal begun on a vault with no gate was for the first: a gate standing now was made elsewhere ('gate_made_elsewhere').
+ */
 const demandAfterFailedSeal = (vault: ProvingVault, stamp: Stamp, gating: ProvingGating) => {
-  insideOf(vault).demand(stamp, gating.call ?? 'demandConsistentWith')
+  insideOf(vault).demand(stamp, gating.call ?? 'demandConsistentWith', { firstGate: stamp.gate_epoch === 0 })
   if (gating.landed) { throw sealLandedError() }
 }
 
 /** The refusal of a seal whose gating landed while it derived. */
-const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended while this passphrase or passkey was being worked through -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked or changed. Ask again when the user wants the vault.')
+const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended while this vault unlocker was being worked through -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked or changed. Ask again when the user wants the vault.')
 // --
 
 // == [Key bytes]: notKeyBytes, deriverThrewRefusal, isSharedMemory, isAllZero, passphraseKeyOf

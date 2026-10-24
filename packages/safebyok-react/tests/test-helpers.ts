@@ -8,8 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Outcome, type PasskeyAnswer, type PasskeyWayinSummary, type Vault, type VaultState } from 'safebyok'
-import { heldDialog, scopeOf, settledVault, type BornVaultOpts } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSummary, type Vault, type VaultState } from 'safebyok'
+import { answering, asKind, heldDialog, scopeOf, settledVault, type BornVaultOpts } from 'safebyok/testing'
 import type { PassphraseGating } from '../src/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -35,15 +35,15 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 
 /** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
 export type StubVaultOpts = {
-  state?:           VaultState
-  passkey?:         PasskeyWayinSummary | null
-  leaseMillis?:     number
-  checkPassphrase?: Vault['checkPassphrase']
-  tryHello?:        Vault['tryHello']
+  state?:            VaultState
+  passkey?:          PasskeyWayinSummary | null
+  leaseMillis?:      number
+  tryCheckStrength?: Vault['tryCheckStrength']
+  tryHello?:         Vault['tryHello']
 }
 
-/** A stub vault's `checkPassphrase` unless the test hands it another: every passphrase is strong. */
-const admitsEvery: Vault['checkPassphrase'] = () => Promise.resolve({ strong: true })
+/** A stub vault's `tryCheckStrength` unless the test hands it another: every passphrase is strong. */
+const admitsEvery: Vault['tryCheckStrength'] = () => Promise.resolve({ ok: true, val: undefined })
 
 /** The lease, in milliseconds, of a vault opened with the default leaseHours. */
 export const DefaultLeaseMillis = LeaseHours * 3_600_000
@@ -52,7 +52,7 @@ export const DefaultLeaseMillis = LeaseHours * 3_600_000
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven
- * days), a subscribe that never calls back, and a `checkPassphrase` admitting every passphrase and
+ * days), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
  * a `tryHello` settling at once unless the test hands it others. What it does when the user
  * answers is its gating's: see {@link gatingOf}.
  *
@@ -62,12 +62,12 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
   const snapshot = { state: opts.state ?? 'locked', passkey: opts.passkey ?? null, ...scopeOf('u1') }
   const stub = {
     ...scopeOf('u1'),
-    getSnapshot:     () => snapshot,
-    subscribe:       () => unsubscribeFromNothing,
-    leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,
-    checkPassphrase: opts.checkPassphrase ?? admitsEvery,
+    getSnapshot:      () => snapshot,
+    subscribe:        () => unsubscribeFromNothing,
+    leaseMillis:      opts.leaseMillis ?? DefaultLeaseMillis,
+    tryCheckStrength: opts.tryCheckStrength ?? admitsEvery,
     // Settles at once, reading nothing.
-    tryHello:        opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
+    tryHello:         opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
   } as unknown as Vault
   return stub
 }
@@ -161,6 +161,29 @@ export const gatedBy = async (opts: BornVaultOpts) => {
   if (raised.gatingkind !== 'unlock_vault' && raised.gatingkind !== 'initialize_gate') { throw new Error(`The vault raised a ${raised.gatingkind} gating, which no passphrase dialog answers.`) }
   const gating: PassphraseGating = raised
   return { vault, gating, ensuring, close: dialog.close }
+}
+
+/**
+ * The gating of kind `gatingkind` that `raise` has `vault` raise, held open as a host's dialog
+ * holds it until the test closes it: `gating`, narrowed to its kind; `raising`, the outcome of the
+ * call that raised it; and `close`, which resolves the request, declining the gating if still
+ * open. `vault` answers through `TH.scriptedRequestCleartext`, as `settledVault` makes it by
+ * default. Throws when the vault raises another kind.
+ *
+ * @example
+ *   const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+ *   render(<GatingModal gating={gating} onDone={noop} />)
+ */
+export const heldGatingOf = async <KindT extends GatingKind, OutcomeT>(vault: Vault, raise: (vault: Vault) => Promise<OutcomeT>, gatingkind: KindT) => {
+  const handed = held<Gating>()
+  const closing = held()
+  answering(vault, async (gating) => {
+    handed.resolve(gating)
+    await closing.promise
+  })
+  const raising = raise(vault)
+  const gating = asKind(await handed.promise, gatingkind)
+  return { gating, raising, close: () => { closing.resolve(undefined) } }
 }
 
 /** Types the passphrase in the dialog and presses Unlock. */

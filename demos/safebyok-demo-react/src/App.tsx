@@ -42,8 +42,9 @@ const Page = () => {
   )
 }
 
-// A user who forgets the passphrase may start a new vault from the dialog (allowStartOver), as a
-// real app would let them once it has said a forgotten passphrase cannot be recovered.
+// A user who forgets the passphrase is to be offered a new vault from the dialog (allowStartOver),
+// as a real app would once it has said a forgotten passphrase cannot be recovered. The provider
+// takes it, and offers nothing yet.
 export const App = () => {
   const session = useSession(auth)
   const userId = session?.userId ?? null

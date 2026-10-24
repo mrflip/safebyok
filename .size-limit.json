@@ -12,6 +12,6 @@
   { "name": "argon2idWasmDeriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmDeriver }", "limit": "19 kB" },
   { "name": "zxcvbnStrengthChecker", "path": "packages/safebyok/dist/browser.js", "import": "{ zxcvbnStrengthChecker }", "limit": "220 kB" },
   { "name": "idbVaultDB", "path": "packages/safebyok-indexeddb/dist/index.js", "import": "{ idbVaultDB }", "ignore": ["safebyok", "zod"], "limit": "2.7 kB" },
-  { "name": "BankProvider", "path": "packages/safebyok-react/dist/index.js", "import": "{ BankProvider }", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "8.1 kB" },
-  { "name": "reactEverything", "path": "packages/safebyok-react/dist/index.js", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "8.7 kB" }
+  { "name": "BankProvider", "path": "packages/safebyok-react/dist/index.js", "import": "{ BankProvider }", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "9.3 kB" },
+  { "name": "reactEverything", "path": "packages/safebyok-react/dist/index.js", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "9.7 kB" }
 ]
