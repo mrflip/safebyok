@@ -2855,9 +2855,23 @@ added or folded into through the subagent, and no other entry changes.
   needs and pushes it as the App, so CI runs again (a GITHUB_TOKEN push would not). It runs on
   `pull_request_target`, so it is main's copy of the file, with the `releasing` environment's
   secrets, whatever the pull request holds; what keeps that safe is that it never runs anything the
-  pull request wrote: no install, no package script, only main's `scripts/dependabot.ts` reading the
+  pull request wrote: no package script, only main's `scripts/dependabot.ts` reading the
   branch's `package.json` files out of git as data, and writing names and ranges into the changeset
-  only after replacing everything but plain text. It writes only when every commit on the branch is
+  only after replacing everything but plain text. Amended 2026-10-21 (dependabot_changeset_install):
+  this once said "no install", but `scripts/runtime-deps.ts` imports `safe-stable-stringify` (a
+  runtime dependency of the root), so the step died with `ERR_MODULE_NOT_FOUND` on every Dependabot
+  pull request touching a public package's `package.json`. The workflow now runs `pnpm install
+  --frozen-lockfile --ignore-scripts` right after the checkout. That checkout is main (the default
+  ref of `pull_request_target`), so the lockfile and `package.json` are main's, never the pull
+  request's; `--ignore-scripts` runs no lifecycle script of any dependency; and the install precedes
+  the `create-github-app-token` step, the only step that references the App key's secret, so
+  install-time code (none runs) would not see it. The pull request's own files are still read out of
+  git as data only; `release.yml`'s publish job installs with `--ignore-scripts` on the same
+  reasoning. Left standing: the install fetches main's pinned dependencies from the registry
+  (`minimumReleaseAge` and the lockfile's integrity hashes apply), and the script now loads one
+  third-party module in a job that later holds the App's token for `contents: write`; that module is
+  one we ship as a runtime dependency, reviewed as such (see the 2026-10-14 `safe-stable-stringify`
+  entry). It writes only when every commit on the branch is
   Dependabot's, by its author email, and its own commit then ends that. The App's token is cut to
   `contents: write`. Unproven until the first Dependabot runtime-dependency pull request after
   merge: whether the environment's secret reaches a run Dependabot started (if not, the key is
