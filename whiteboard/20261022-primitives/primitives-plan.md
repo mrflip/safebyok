@@ -719,6 +719,17 @@ headline overclaimed (the main meta's winner records cross whole, as ruled; only
 meta is stripped). Left, minor: a non-JSON body's SyntaxError quotes its first characters (the
 server's own body, as before); the README recipe and its test are hand-kept copies (Open Matter).
 
+### 13 to 17, from the Coach's rulings at the wrap-up (2026-10-24)
+
+*Orchestrator:* each ruling's text is verbatim in the sprint doc's *Resolved* tab and in the
+thread's handoff. 13 `bank_clears` (no stores check; a clear of an absent vault is quiet; the
+logger and `vault.probe` TODOs), on #252. 14 `contract_tab` (the design doc's Contract tabs, true to
+the code, on purpose and relationships), from main. 15 `refresh_rulings` (U3: drop a lease at a
+refresh only when the store holds none or the gate moved; U6: `vault_behind` first, only if a pure
+reordering), on #252. 16 `first_gate_kind` (final review 8: `gate_made_elsewhere` for a first gate
+lost mid-chain, tested with a ringing store) and 17 `confirm_passphrase` (final review 26: a confirm
+field for a new passphrase), queued behind the cap of three.
+
 ## Wrap-up
 
 `wrapup.md`'s restack, then one `opus`, `high` reviewer over the whole line, briefed with

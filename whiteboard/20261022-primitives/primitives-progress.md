@@ -100,6 +100,9 @@ rules* 3).
 | 12 | route_meta | restacked onto #265 | #252 |
 | 13 | bank_clears | building, on #252 | |
 | 14 | contract_tab | building, from main | |
+| 15 | refresh_rulings | building, on #252 | |
+| 16 | first_gate_kind | queued | |
+| 17 | confirm_passphrase | queued | |
 
 ## What the threads found
 
