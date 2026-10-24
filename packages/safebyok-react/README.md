@@ -270,7 +270,7 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 * **A call behind another kind's dialog waits.** One gating stands per vault. A call that needs
   the vault unlocked while a change's or a deletion's dialog is up waits for that dialog to close,
   and does not show in it. A change made leaves the vault unlocked, so the waiting call goes on
-  unasked; a change cancelled, and the call asks for the passphrase in a dialog of its own, as
+  unasked; a change cancelled lets the call ask for the passphrase in a dialog of its own, as
   soon as the first has closed (shown only while the user's gesture is in hand, as ever). A
   deletion made leaves the Vault object gone, and the waiting call refuses `vault_gone`. Calls
   asking for one kind join its dialog: two unlocks, or two passphrase changes, share one.
