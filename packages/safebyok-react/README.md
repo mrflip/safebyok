@@ -211,7 +211,8 @@ over: `bank.delDamagedVault({ userId, vaultlabel: 'main' })` does that with the 
 asks for the vault again: a new one, `novel`, for the user to choose a passphrase for. The user's
 boxes in it are lost for good, so ask first. It refuses with storage's refusal (say,
 `storage_unavailable`) if deleting it fails, the entry left as it was; `stale_write` means the
-vault was made anew meanwhile, and `bad_option` that it reads sound now: ask for it again.
+vault was made anew meanwhile, and lets the entry go too, so `useVault` asks for the one that
+stands; `bad_option` means it reads sound now: ask for it again.
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
 the vault as storage refusing it, kind `identity_revoked`, and a vault already born locks itself

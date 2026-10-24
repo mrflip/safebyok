@@ -917,7 +917,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for the passphrase; if it works, the user may add the passkey again, which replaces it |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
-| `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()`, `putWayin('passkey')` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`), or `bank.delDamagedVault` |
+| `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()`, `putWayin('passkey')` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`) |
 | `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
@@ -1028,7 +1028,11 @@ tell, it refuses rather than deletes. So is any backend that checks a record bef
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
 A bank deletes one with its own stores, `bank.delDamagedVault({ userId, vaultlabel })`, which
-`safebyok-react`'s `useBank()` reaches. A `VaultDB` that wraps
+`safebyok-react`'s `useBank()` reaches. Storage decides, by the checks only it can make, so the
+bank need not hold the vault, or have refused it, first, and nothing asks for an unlock. Once
+storage deletes the vault, and on `stale_write` too, the bank lets go its entry for the scope,
+whichever stores that was born from, so the next `bank.ensureVault` births what stands; any other
+refusal leaves the entry as it was. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
 deletion aims at the stored `vault_tok` alone, so vault props rewritten under that same
 `vault_tok` between its read and the deletion go too: it is the same vault, the one the user
@@ -1090,6 +1094,13 @@ if (! ok) {
   vault = await bank.ensureVault(choice)
 }
 ```
+
+It touches this device's store alone, as clearing the browser's site data would: nothing in
+storage, no unlock, no passphrase. So a vault the bank holds no entry for, or that storage does not
+hold, is no refusal: whatever this device keeps of it is erased. The bank lets go its entry for the
+scope, whichever stores that was born from, once the record and the lease are both erased; a device
+store that fails refuses (`storage_unavailable`, `storage_blocked`) and leaves the entry as it was,
+and a second call finishes.
 
 Whatever the older copy holds stands then, so tell the user what that means: ways in removed
 since, and passphrases since changed, open the vault again, and a passphrase added or changed

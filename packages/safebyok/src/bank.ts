@@ -55,7 +55,7 @@ export type VaultChoice = Pick<VaultDraft, 'userId' | 'vaultlabel'>
 type HeldEntry = {
   view:     VaultEntry
   birth:    Promise<Vault> | null
-  /** The stores it was born from: a draft naming others for its scope is refused. */
+  /** The stores it was born from: `ensureVault` refuses a draft naming others for its scope, where `clearCachedVault` and `delDamagedVault` act on the draft's. */
   vaultDB:  VaultDB
   deviceDB: DeviceDB
 }
@@ -237,8 +237,16 @@ export class Bank {
    * {@link DeviceDB.delDeviceRecord} and {@link DeviceDB.delLease}, and lets the vault go once both
    * are erased, so the next birth reads neither. It weakens the check for a vault
    * served behind what this device has seen until the next birth, so call it only on the user's
-   * or the host's say. Refuses 'storage_unavailable' or 'storage_blocked' when the device store
-   * fails: call again to finish.
+   * or the host's say.
+   *
+   * It touches this device's store alone, as clearing the browser's site data would: no
+   * VaultDB verb, no unlock, no passphrase. A vault the bank holds no entry for, or that storage
+   * does not hold, is no refusal: what this device keeps of it, if anything, is erased all the
+   * same. The store erased is the draft's `deviceDB`, or the bank's own where it names none. The
+   * entry let go is the one the bank holds for the draft's scope once both are erased, whichever
+   * stores it was born from, and only then: a draft amiss refuses 'bad_label' or 'bad_option',
+   * and a device store that fails 'storage_unavailable' or 'storage_blocked', each keeping the
+   * entry. Call again to finish.
    *
    * @example
    *   if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
@@ -263,12 +271,19 @@ export class Bank {
   }
 
   /** Delete the vault `draft` names, whose birth was refused 'damaged_vault' -- its vault props, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
-   * It is the `delDamagedVault` function with the bank's own stores, and refuses as it does: 'bad_option'
-   * for a vault that reads sound (delete that with `vault.del()`), 'stale_write' for one made anew
-   * elsewhere meanwhile, 'storage_unavailable' and the rest. What the vault held is gone for good,
-   * so ask the user first. Once it is deleted, the vault's entry is let go, and the next
-   * {@link Bank.ensureVault} births a new life, `novel`. On 'stale_write' the entry is let go too,
-   * so the next ask births the vault that stands.
+   * It is the `delDamagedVault` function with the draft's stores (the bank's own, where it names
+   * none), and refuses as it does: 'bad_option' for a vault that reads sound (delete that with
+   * `vault.del()`), 'stale_write' for one made anew elsewhere meanwhile, 'storage_unavailable' and
+   * the rest. What the vault held is gone for good, so ask the user first.
+   *
+   * Storage decides, by the checks it alone can make: it deletes only vault props that fail their
+   * checks and still name their `vault_tok`. So it may be asked for a vault the bank holds no
+   * entry for, or holds as it was born: nothing on this device need agree first, and no unlock
+   * or passphrase is asked. With no vault stored it erases only this device's lease, and
+   * resolves. The entry let go is the one the bank holds for the draft's scope once storage
+   * answers, whichever stores it was born from: on success, and the next {@link Bank.ensureVault}
+   * births a new life, `novel`; and on 'stale_write', so the next ask births the vault that
+   * stands. Any other refusal keeps the entry.
    *
    * @example
    *   if (isVaultError(entry.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
