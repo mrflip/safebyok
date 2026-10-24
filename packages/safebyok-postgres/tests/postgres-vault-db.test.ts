@@ -734,7 +734,7 @@ const UnlistenCases: PostgresListen[] = [() => throwsClosed, () => rejectsClosed
 
 describe("postgresVaultDB, subscribe", () => {
   it("calls onChange once as its listen begins, so its subscriber reads what landed meanwhile", async () => {
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     const listen: PostgresListen = async () => {
       await gate.pass()
       return unlistened
@@ -820,7 +820,7 @@ describe("postgresVaultDB, subscribe", () => {
   })
 
   it("ends a listen that settles only after its unsubscribe, as it arrives, and hears nothing meanwhile", async () => {
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     const calls = { unlistens: 0, notify: (_payload: string) => { /* replaced when listening */ } }
     const listen: PostgresListen = async (_channel, onNotify) => {
       calls.notify = onNotify

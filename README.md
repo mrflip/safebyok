@@ -39,9 +39,11 @@ Holds vault​s and box​es scoped by applabel, userId, vaultlabel and boxlabel
 ### Browser
 
 * a vault​ object
-  - Vault.make({ applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver, ... })​: Vault, non-async
-  - vault.hello() (initial bookkeeping that doesn't bother the user)
-  - lock​, unlock​, putWayin​, delWayin​, getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
+  - Bank.make({ applabel, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async
+  - bank.ensureVault({ userId, vaultlabel }): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
+  - vault.hello() (reads storage once its picture has aged; never asks the user)
+  - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
+  - a gating, handed to the app's requestCleartext, is the one place the user is asked for the passphrase or passkey
 * a pantry​ holding keys
 * a DeviceDB​ safely holding and managing access to the boxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)

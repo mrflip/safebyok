@@ -154,11 +154,11 @@ describe("liveWatch", () => {
 })
 // --
 
-// == [Gates and call hooks]: makeGate, beforeNextCall, holdNextCall, settledVault, tallyWatches
+// == [Gates and call hooks]: makeLatch, beforeNextCall, holdNextCall, settledVault, tallyWatches
 
-describe("makeGate", () => {
+describe("makeLatch", () => {
   it("holds a pass until released, and says when something reached it", async () => {
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     const heard: string[] = []
     const passing = (async () => {
       await gate.pass()
@@ -174,7 +174,7 @@ describe("makeGate", () => {
   })
 
   it("stays open once released: a later pass goes straight through", async () => {
-    const gate = TH.makeGate()
+    const gate = TH.makeLatch()
     gate.release()
     let passes = 0
     await gate.pass()

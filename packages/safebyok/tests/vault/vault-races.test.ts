@@ -430,7 +430,7 @@ describe("a read that began before this device's own change to the ways in lande
     const world = makeWorld()
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
-    let listing: ReturnType<typeof TH.makeGate> | undefined
+    let listing: ReturnType<typeof TH.makeLatch> | undefined
     let reading: Promise<Vault> | undefined
     // The read starts as the change is about to write, and is held at its listing, the vault props
     // it read the older copy, while the change lands.

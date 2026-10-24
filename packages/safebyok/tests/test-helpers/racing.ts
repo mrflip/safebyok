@@ -1,6 +1,6 @@
 import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
-import { makeGate, type AsyncVerbOf, microtasks, ticks } from './timing'
+import { makeLatch, type AsyncVerbOf, microtasks, ticks } from './timing'
 
 
 // ------------------------------------------------------------------------- racing devices
@@ -19,7 +19,7 @@ export type Turnstile = {
 
 /** A turnstile, and the race's hold on it: stop the nth pass from now, or stop none. */
 export const makeTurnstile = () => {
-  let armed: { untilHeld: number, gate: ReturnType<typeof makeGate> } | null = null
+  let armed: { untilHeld: number, gate: ReturnType<typeof makeLatch> } | null = null
   const pass = async () => {
     if (armed === null) { return }
     armed.untilHeld -= 1
@@ -29,7 +29,7 @@ export const makeTurnstile = () => {
     await gate.pass()
   }
   const holdAt = (nth: number) => {
-    const gate = makeGate()
+    const gate = makeLatch()
     armed = { untilHeld: nth, gate }
     return gate
   }
@@ -262,7 +262,7 @@ const holding = (firstIdx: 0 | 1, nth: number): Schedule => async (starts, keepe
 
 /** Each move held before its nth round trip in turn, so all are midway at once, then all let go together. */
 const crowding = (nth: number): Schedule => async (starts, keeper) => {
-  const gates: ReturnType<typeof makeGate>[] = []
+  const gates: ReturnType<typeof makeLatch>[] = []
   const moves: Promise<RaceOutcome>[] = []
   for (const start of starts) {
     const gate = keeper.holdAt(nth)
@@ -280,7 +280,7 @@ const crowding = (nth: number): Schedule => async (starts, keeper) => {
 }
 
 /** True once a move waits at `gate`, or false once `move` ends without coming to it. */
-const reachedBeforeEnd = (gate: ReturnType<typeof makeGate>, move: Promise<unknown>): Promise<boolean> => Promise.race([trueOnce(gate.reached), falseOnce(move)])
+const reachedBeforeEnd = (gate: ReturnType<typeof makeLatch>, move: Promise<unknown>): Promise<boolean> => Promise.race([trueOnce(gate.reached), falseOnce(move)])
 
 const trueOnce = async (promise: Promise<unknown>) => {
   await promise

@@ -249,7 +249,10 @@ export class Vault {
 
   /** When this device's lease ends and the vault locks of itself, in epoch milliseconds, while unlocked; null otherwise: for an autolock, or a "locks in 10 minutes" line. See {@link VaultSnapshot}.
    * It reads the snapshot, so a component subscribed to it sees the deadline move as a renewal
-   * moves it. A vault that stays unlocked until `lock()` reads {@link FarFuture}.
+   * moves it. A vault that stays unlocked until `lock()` reads {@link FarFuture}. To show it, format
+   * it in the user's locale with `Intl`: `Intl.DateTimeFormat` for the deadline itself ("Tue, Oct 27,
+   * 3:00 PM"), and `Intl.RelativeTimeFormat` for the time left ("in 2 days"); show "until locked"
+   * instead for any deadline at or past `FarFuture - MinuteMillis`.
    *
    * @example const minutesLeft = vault.askPassphraseAt === null ? null : Math.ceil((vault.askPassphraseAt - vault.now()) / MinuteMillis)
    */

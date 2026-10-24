@@ -270,7 +270,7 @@ describe("BankProvider", () => {
 
     it("stands an attempt down when the user cancels during it: a newer dialog stays asking, and the vault stays locked (Contract: Gating, attempt refuses: gating_landed)", async () => {
       const world = await lockedWorld()
-      const gate = TH.makeGate()
+      const gate = TH.makeLatch()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish: the
       // dialog is handed each gating through one whose attempt keeps what it starts.
@@ -330,7 +330,7 @@ describe("BankProvider", () => {
 
     it("leaves the vault locked when a lock lands under the attempt, and closes the dialog (Contract: Gating, attempt refuses: vault_locked)", async () => {
       const world = await lockedWorld()
-      const gate = TH.makeGate()
+      const gate = TH.makeLatch()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
@@ -352,7 +352,7 @@ describe("BankProvider", () => {
       await TH.unlock(other, 'pw2')
       await other.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-other-fake')
       TH.closeVault(other)
-      const gate = TH.makeGate()
+      const gate = TH.makeLatch()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       const { rerender } = render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
