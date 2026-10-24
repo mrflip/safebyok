@@ -67,6 +67,14 @@ keeps it. Newer than the plan and the spec wherever they disagree.
 * **Ruled, 2026-10-24:** `bank.ensureVault` after a deletion elsewhere births a new, novel vault
   (the Coach took the Rec: keep for now).
 
+* **Ruled, 2026-10-24** (verbatim in *Resolved* and `final-review.md`'s rows): 9c's dropped deriver
+  `cause` stays ("It's fine"), with a TODO for a redacting or wrapped logger; `clearCachedVault` on a
+  vault that isn't there is no refusal and needs no unlock, and `delDamagedVault` may be issued for a
+  vault the bank doesn't report (thread 13); the old Contract tab is "(old) Design of Contract" and
+  the Contract is a design tool on purpose and relationships, not internals (thread 14).
+* *Orchestrator:* the final opus review (`final-review.md`): the demand model holds, no side door,
+  the cryptography unchanged; its findings are Open Matters rows, none ruled yet.
+
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
@@ -89,7 +97,9 @@ rules* 3).
 | 9c | core_cleanups | merged | #264 |
 | 11 | docs (core half) | merged | #263 |
 | 10 | react | filed, on main | #265 |
-| 12 | route_meta | restacking onto #265 | #252 |
+| 12 | route_meta | restacked onto #265 | #252 |
+| 13 | bank_clears | building, on #252 | |
+| 14 | contract_tab | building, from main | |
 
 ## What the threads found
 
