@@ -55,12 +55,13 @@ export const useRoundFor = (handle: object): number => {
 }
 
 /** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
-export type BoundarySource = 'PassphraseModal' | 'PasskeyUnlockButton'
+export type BoundarySource = 'PassphraseModal' | 'GatingModal' | 'PasskeyUnlockButton'
 
 /** Where to look, by the component, for an error that was not the vault's own. */
 const LookFor: Record<BoundarySource, string> = {
   PassphraseModal:     "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
-  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey and vault.unlock yourself to see it.",
+  GatingModal:         "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice, and, for a passkey, the browser's passkey prompt (call createPasskey yourself to see it).",
+  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey yourself to see it.",
 }
 
 /**

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WaysIn } from '../../src/components/WaysIn'
 import * as TH from '../test-helpers'
@@ -30,12 +30,6 @@ const renderWaysIn = async (prepare?: (world: ReturnType<typeof TH.makeWorld>) =
   return { world }
 }
 
-/** Waits until WaysIn shows its gripe, and hands back what it says. */
-const gripeShown = async () => {
-  await waitFor(() => { expect(document.querySelector('.gripe')).to.not.be.null })
-  return document.querySelector('.gripe')?.textContent ?? ''
-}
-
 describe("WaysIn", () => {
   it("shows the vault's ways in while it is locked: its passphrase, and no passkey", async () => {
     await renderWaysIn()
@@ -43,22 +37,41 @@ describe("WaysIn", () => {
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
-  it("raises putWayin('passphrase') at Change passphrase, which the provider's dialog declines for now: it says so, and the passphrase stands", async () => {
+  it("raises putWayin('passphrase') at Change passphrase, which the provider's dialog answers with the current passphrase and the next: the next unlocks the vault", async () => {
     const { world } = await renderWaysIn()
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
-    expect(await gripeShown()).to.match(/declined/)
-    expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+    const dialog = await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
+    fireEvent.change(within(dialog).getByPlaceholderText('current passphrase'), { target: { value: TH.Passphrase } })
+    fireEvent.change(within(dialog).getByPlaceholderText('new passphrase'), { target: { value: 'a new passphrase entirely' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change passphrase' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    expect(document.querySelector('.gripe')).to.be.null
     const vault = await world.open()
-    await TH.unlock(vault, TH.Passphrase)
+    await TH.unlock(vault, 'a new passphrase entirely')
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("raises putWayin('passkey') at Add fingerprint, which the provider's dialog declines for now, asking no authenticator: it says so, and the vault keeps no passkey", async () => {
+  it("says nothing when the user cancels a change: the passphrase stands", async () => {
+    const { world } = await renderWaysIn()
+    fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
+    await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    await TH.wakeupAtNextTick()
+    expect(document.querySelector('.gripe')).to.be.null
+    const vault = await world.open()
+    await TH.unlock(vault, TH.Passphrase)
+  })
+
+  it("raises putWayin('passkey') at Add fingerprint, whose dialog takes the passphrase and then asks the authenticator: dismissed, the dialog stays and the vault keeps no passkey", async () => {
     const create = installDismissedAuthenticator()
     await renderWaysIn()
     fireEvent.click(screen.getByRole('button', { name: 'Add fingerprint' }))
-    expect(await gripeShown()).to.match(/declined/)
-    expect(create).not.toHaveBeenCalled()
+    await screen.findByRole('dialog', { name: 'Add a passkey' })
+    fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: TH.Passphrase } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add passkey' }))
+    await waitFor(() => { expect(create).toHaveBeenCalledOnce() })
+    expect(screen.getByRole('dialog', { name: 'Add a passkey' })).to.not.be.null
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
@@ -70,7 +83,7 @@ describe("WaysIn", () => {
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
-  it("offers to replace or remove the vault's passkey, and raises delWayin('passkey') at Remove fingerprint, which the provider's dialog declines for now: the passkey stays", async () => {
+  it("offers to replace or remove the vault's passkey, and raises delWayin('passkey') at Remove fingerprint, whose dialog takes the passphrase: the passkey goes", async () => {
     installDismissedAuthenticator()
     await renderWaysIn(async (world) => {
       const vault = await world.openUnlocked()
@@ -78,8 +91,9 @@ describe("WaysIn", () => {
     })
     expect(screen.getByRole('button', { name: 'Replace fingerprint' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Remove fingerprint' }))
-    expect(await gripeShown()).to.match(/declined/)
-    expect(screen.queryByText('no passkey')).to.be.null
-    expect(screen.getByRole('button', { name: 'Remove fingerprint' })).to.not.be.null
+    await screen.findByRole('dialog', { name: 'Remove your passkey' })
+    await TH.answerPassphraseDialog()
+    expect(await screen.findByText('no passkey')).to.not.be.null
+    expect(screen.queryByRole('button', { name: 'Remove fingerprint' })).to.be.null
   })
 })

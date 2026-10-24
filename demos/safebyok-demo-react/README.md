@@ -28,12 +28,16 @@ localStorage.
   actions summon the passphrase dialog only when the vault is actually locked; an unlock grants
   the device a lease of seven days. Signing out locks the vault.
 * **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's one
-  passphrase and its passkey, if it has one, shown even while locked, and buttons to change them,
-  each taking your passphrase as proof: "Change passphrase" (`vault.putWayin()` with the new
-  passphrase, which removes the fingerprint: add it again under the new passphrase); "Add fingerprint", or "Replace fingerprint" once there is one: `createPasskey()`
-  makes the passkey, and `vault.putWayin()` with its answer checks your passphrase and puts it in
-  the place of any the vault had, the passphrase dialog then offering "Use a passkey"; and "Remove
-  fingerprint" (`vault.delWayin()`). A passkey needs a browser and authenticator with the WebAuthn PRF extension.
+  passphrase and its passkey, if it has one, shown even while locked, and buttons to change them.
+  Each calls one vault method, and the provider's dialog for that change asks for your passphrase
+  as proof: "Change passphrase" (`vault.putWayin('passphrase')`: the current passphrase and the
+  next, which removes the fingerprint: add it again under the new passphrase); "Add fingerprint",
+  or "Replace fingerprint" once there is one (`vault.putWayin('passkey')`: your passphrase, then
+  the browser makes the passkey, which takes the place of any the vault had, the passphrase
+  dialog then offering "Use a passkey"); and "Remove fingerprint" (`vault.delWayin('passkey')`).
+  A passkey needs a browser and authenticator with the WebAuthn PRF extension. *Delete account*,
+  in the sign-in strip, deletes the vault through its own dialog (`vault.del()`), proven by the
+  passphrase likewise.
 * **Inspection panels** ([src/components/inspection/](src/components/inspection/)) -- the raw
   rows of the pretend-backend store and the device-local store, rendered straight from storage by
   machinery that never talks to the vault. The backend's panel has an outage switch
@@ -49,7 +53,7 @@ localStorage.
 | Layer | Where |
 |---|---|
 | the library | the `safebyok` workspace package (`packages/safebyok/src/`) |
-| React plumbing | the `safebyok-react` workspace package (provider, hooks, passphrase dialog) |
+| React plumbing | the `safebyok-react` workspace package (provider, hooks, the dialog for each change) |
 | app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in; a real app brings its own auth and passes `userId` to the provider), [src/lib/stores.ts](src/lib/stores.ts) (this browser's IndexedDB standing in for a backend) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |
 

@@ -47,7 +47,7 @@ describe("App", () => {
     expect(screen.queryByText('The Knock-Knock Machine')).to.be.null
   })
 
-  it("keeps the account and its vault, and says why, when Delete account meets a vault with no passphrase yet: deleting a vault is proven by its passphrase", async () => {
+  it("deletes an account whose vault has no passphrase yet, asking nothing: the vault holds no boxes, and its empty record stays in storage", async () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: 'leaver' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -58,12 +58,10 @@ describe("App", () => {
     expect(born.ok && born.val !== null).to.be.true
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-    expect(await screen.findByText(/has no passphrase yet/)).to.not.be.null
-    expect(screen.queryByPlaceholderText('username')).to.be.null
+    await screen.findByPlaceholderText('username')
+    expect(screen.queryByRole('dialog')).to.be.null
     const kept = await vaultDB.getVault(scope)
     expect(kept.ok && kept.val !== null).to.be.true
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await screen.findByPlaceholderText('username')
   })
 
   it("clicks through the passphrase dialog: set, lock, mistype, dismiss, and enter", async () => {
