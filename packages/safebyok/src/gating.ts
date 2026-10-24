@@ -453,7 +453,7 @@ const DeclinedWords: Record<GatingKind, { asked: string, stands: string }> = {
   initialize_gate:   { asked: "choose the vault's first passphrase", stands: "The vault still has no passphrase, and nothing was read or written." },
   unlock_vault:      { asked: "unlock it",                           stands: "The vault stays locked, and nothing was read or written." },
   change_passphrase: { asked: "change the vault's passphrase",       stands: "The passphrase is unchanged." },
-  put_passkey:       { asked: "put a passkey on the vault",          stands: "Its vault unlockers are unchanged." },
+  put_passkey:       { asked: "put a passkey on the vault",          stands: "No vault unlocker was changed." },
   del_passkey:       { asked: "remove the vault's passkey",          stands: "The passkey stays." },
   del_vault:         { asked: "delete the vault",                    stands: "Nothing was deleted." },
 }
