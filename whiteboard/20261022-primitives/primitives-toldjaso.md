@@ -57,6 +57,18 @@ and 11 are restated for the demand model.
 14. **A LATE READ OF THIS TAB'S OWN GATE WRITE IS IGNORED, NOT JUDGED**: data cannot tell it from
     a restored backup, so *behind* is judged against the device record's highest `vault_epoch`
     only. The Coach: "this is why we might have to synchronize gated operations". (the spec,
-    *Vault and bank*)
+    *Vault and bank*) *Amended by thread 15 (U6, 2026-10-24):* the refresh now tests *behind*
+    before it ignores an older read, so a Vault object holding the newer copy refuses a restored
+    one 'vault_behind' and locks, as every other tab does. A late read of its own write is still
+    ignored, since the device record is read before the fetch. **A LAGGING READ REPLICA** that
+    serves a copy below the record now refuses 'vault_behind' and locks a tab that holds the
+    newer copy, where it was ignored: a false alarm, cured by the next hello once the replica
+    catches up.
 15. **A whisper-omitted `putBox` costs a read first**, since the listing carries no ciphertext;
     ergonomics reconsidered after the sprint. (the Coach, 2026-10-22)
+16. **A LOCK AND AN UNLOCK IN ANOTHER TAB, BOTH LANDING BEFORE THIS TAB'S NEXT READ, LEAVE THIS
+    TAB UNLOCKED.** A refresh drops the lease in hand only when the device store holds none, or
+    one under other ways in; it no longer compares deadlines, so another tab's unlock or renewal
+    leaves this tab's lease standing until its own deadline (no flash of 'locked'). The store
+    then holds a lease under the same ways in, which this tab cannot tell from a renewal. (the
+    Coach on U3, 2026-10-24: "yay"; thread 15)

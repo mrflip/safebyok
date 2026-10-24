@@ -23,7 +23,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
  * quote it. `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to
  * replace it, or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
- * `vault.checkPassphrase(typed)`.
+ * `vault.tryCheckStrength(typed)`.
  *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
@@ -77,7 +77,7 @@ const passphraseVerdict = Z.union([
   Z.object({ strong: Z.literal(false), reason: reasonText }),
 ])
 
-/** `hostChecker` held to its contract and told `scope`: `vault.checkPassphrase`, and the only caller of the host's checker.
+/** `hostChecker` held to its contract and told `scope`: what `vault.checkStrength` asks, and the only caller of the host's checker.
  * So the vault and a dialog checking as the user types decide alike. A blank passphrase is weak
  * before the host's checker hears it. It refuses 'bad_option' for an answer that is no verdict.
  * It refuses 'unexpected_error' for a throw, carrying nothing of it, as the checker heard the

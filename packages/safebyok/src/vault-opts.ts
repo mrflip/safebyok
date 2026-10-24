@@ -109,7 +109,7 @@ export type MakeBankOpts = {
    * `zxcvbnStrengthChecker`.
    *
    * Its `load`, if any, runs at `bank.hello()`, and one that fails fails that hello: no vault is
-   * born until it succeeds. Each vault asks it as `vault.checkPassphrase(typed)`.
+   * born until it succeeds. Each vault asks it as `vault.checkStrength(typed)`.
    * A checker that answers anything but a verdict refuses the call that asked it 'bad_option'; one
    * that throws, 'unexpected_error', carrying nothing of what it threw.
    */

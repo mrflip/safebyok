@@ -697,9 +697,8 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the scope, vault token, key deriver, passphrase check, lease length and clock a box, way in or lease reads, as its first example shows", () => {
-    const { checkPassphrase, now, ...rest } = TH.vaultSliceOf('u1')
-    expect(checkPassphrase).to.be.a('function')
+  it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
+    const { now, ...rest } = TH.vaultSliceOf('u1')
     expect(now()).to.eq(TH.SliceNow)
     expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
@@ -743,12 +742,6 @@ describe("the fixtures", () => {
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }, { leaseBound: true }) }, 'vault_locked')
     vault.gone = true
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }) }, 'vault_gone')
-  })
-
-  it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
-    const { checkPassphrase } = TH.vaultSliceOf('u1')
-    expect(await checkPassphrase('pw')).to.deep.equal({ strong: true })
-    expect(await checkPassphrase(' ')).to.have.property('strong', false)
   })
 
   it("vaultPropsOf: a shape-valid VaultProps, with any field overridden", () => {

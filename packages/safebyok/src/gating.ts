@@ -215,7 +215,7 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** Close it unanswered, every waiter refusing `refusal`: 'vault_locked' for a decline. Once a deletion's write is sent, it only marks the gating landed, and the chain settles it. */
-  #decline(refusal: VaultError = declinedError(true)): void {
+  #decline(refusal: VaultError = declinedError(this.gatingkind, true)): void {
     if (this.#deletionSent) {
       this.#lateLanding ??= { refusal, lock: false }
       return
@@ -233,7 +233,7 @@ export class RaisedGating implements ProvingGating {
       if (this.#over) { return }
       const { request } = this.#inside
       if (request === null) {
-        this.settle(bad(declinedError(false)))
+        this.settle(bad(declinedError(this.gatingkind, false)))
         return
       }
       await request(this.gating)
@@ -448,10 +448,23 @@ const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
   if (passkey !== undefined) { checkFreshSalt(checkedPasskeyAnswer(passkey)) }
 }
 
-/** The refusal of a call whose gating was declined: by the user, or for want of a `requestCleartext` to ask. */
-export const declinedError = (asked: boolean): VaultError => new VaultError('vault_locked', asked
-  ? "The vault is locked, and the user declined to unlock it: nothing was read or written. Ask again when they want the vault."
-  : "The vault is locked, and there is no requestCleartext to ask the user (Bank.make was given none): nothing was read or written. Hand Bank.make a requestCleartext that shows a dialog.")
+/** What the user was asked to do, by gating kind, and what stands once they decline: the two halves of a declined call's message. */
+const DeclinedWords: Record<GatingKind, { asked: string, stands: string }> = {
+  initialize_gate:   { asked: "choose the vault's first passphrase", stands: "The vault still has no passphrase, and nothing was read or written." },
+  unlock_vault:      { asked: "unlock it",                           stands: "The vault stays locked, and nothing was read or written." },
+  change_passphrase: { asked: "change the vault's passphrase",       stands: "The passphrase is unchanged." },
+  put_passkey:       { asked: "put a passkey on the vault",          stands: "No vault unlocker was changed." },
+  del_passkey:       { asked: "remove the vault's passkey",          stands: "The passkey stays." },
+  del_vault:         { asked: "delete the vault",                    stands: "Nothing was deleted." },
+}
+
+/** The refusal of a call whose `gatingkind` gating was declined, worded for what it asked: by the user, or for want of a `requestCleartext` to ask. */
+const declinedError = (gatingkind: GatingKind, asked: boolean): VaultError => {
+  const words = DeclinedWords[gatingkind]
+  return new VaultError('vault_locked', asked
+    ? `The user was asked to ${words.asked}, and declined. ${words.stands} Ask again when they want to.`
+    : `The user had to be asked to ${words.asked}, but there is no requestCleartext to ask them (Bank.make was given none). ${words.stands} Hand Bank.make a requestCleartext that shows a dialog.`)
+}
 
 const lockLandedError = () => new VaultError('vault_locked', "The vault was locked while it was asking for a passphrase, so nothing was unlocked and the dialog is over. Ask again when the user wants the vault.")
 

@@ -24,7 +24,7 @@ export type BoundaryProps = {
  *
  * @example
  *   <Boundary fallback={<p>Something went wrong.</p>}>
- *     <UnlockForm vault={vault} onDone={onDone} />
+ *     <UnlockForm gating={gating} onDone={onDone} />
  *   </Boundary>
  * @example <Boundary fallback={null} onCaught={() => { onGripe(trouble) }}><PasskeyPress {...props} /></Boundary>
  */
@@ -39,28 +39,29 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
 }
 
 /**
- * A number that changes whenever `handle` does: the key for a component that serves one vault
- * handle, so that handed another it starts afresh -- its boundary caught nothing, its form holds
- * nothing typed for the last vault.
+ * A number that changes whenever `thing` does: the key for a component that serves one gating,
+ * so that handed another it starts afresh -- its boundary caught nothing, its form holds nothing
+ * typed for the last.
  *
- * @example <Boundary key={useRoundFor(vault)} fallback={null}><PasskeyPress vault={vault} /></Boundary>
+ * @example <Boundary key={useRoundFor(gating)} fallback={null}><PasskeyPress gating={gating} /></Boundary>
  */
-export const useRoundFor = (handle: object): number => {
-  const [served, setServed] = useState({ handle, round: 0 })
-  if (served.handle === handle) { return served.round }
+export const useRoundFor = (thing: object): number => {
+  const [served, setServed] = useState({ thing, round: 0 })
+  if (served.thing === thing) { return served.round }
   // React's "adjusting state while rendering": it renders again at once, before committing this.
   const round = served.round + 1
-  setServed({ handle, round })
+  setServed({ thing, round })
   return round
 }
 
 /** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
-export type BoundarySource = 'PassphraseModal' | 'PasskeyUnlockButton'
+export type BoundarySource = 'PassphraseModal' | 'GatingModal' | 'PasskeyUnlockButton'
 
 /** Where to look, by the component, for an error that was not the vault's own. */
 const LookFor: Record<BoundarySource, string> = {
   PassphraseModal:     "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
-  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey and vault.unlock yourself to see it.",
+  GatingModal:         "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice, and, for a passkey, the browser's passkey prompt (call createPasskey yourself to see it).",
+  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey yourself to see it.",
 }
 
 /**

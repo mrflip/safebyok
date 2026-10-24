@@ -54,6 +54,13 @@ In order. A later item that depends on an earlier one says so.
 
 Straightforward, likely to be done, not needed yet. Each is a thread cut from `main`.
 
+* **The dialogs' phrases, sent in by the host.** The Coach, 2026-10-24 (on
+  [#265](https://github.com/mrflip/safebyok/pull/265), ruling that what the user types to open the
+  vault shows as "Vault unlocker"): "TODO: an i18n friendly way to send in phrases displayed".
+  Every word safebyok-react shows is in `src/messages.ts`, English only, each varying sentence a
+  frame around its part; give a host a way to hand in its own (a locale's bag of phrases through
+  `BankProvider` and the dialogs, say), so a translation, or a house term in place of "Vault
+  unlocker", needs no fork.
 * **One test container for every backend.** The Coach (2026-10-16): a big container serving
   Convex (its local backend), Postgres, and each backend added later, used by CI as a service
   container and by a contributor locally. It is what the race battery

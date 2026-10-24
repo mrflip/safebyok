@@ -120,8 +120,7 @@ export const VaultDashboard = () => {
       await vault.delBox(boxlabel)
     } catch (err) {
       // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
-      // the user deleted to start over from the passphrase dialog, its Vault object gone with it
-      // -- is what was asked for.
+      // the user deleted, its Vault object gone with it -- is what was asked for.
       if (isVaultError(err, 'vault_locked') || isVaultError(err, 'vault_gone')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }

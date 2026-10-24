@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext } from 'safebyok'
-import { PassphraseModal, type DialogAnswer, type PassphraseAdvice } from '../src/passphrase-modal'
+import type { DialogAnswer, PassphraseAdvice } from '../src/modal'
+import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
 // == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, renderUnlocking, others
@@ -722,14 +723,14 @@ describe("PassphraseModal", () => {
       expect(TH.thrownText(reported[0])).to.not.include('pw-the-passphrase')
     })
 
-    it("asks vault.checkPassphrase when the host gives no advice, saying its reason for a weak passphrase", async () => {
-      const checkPassphrase = vi.fn((typed: string) => Promise.resolve(typed.length < 6 ? { strong: false as const, reason: 'Longer, please.' } : { strong: true as const }))
-      render(<PassphraseModal gating={TH.gatingOf(TH.stubVault({ state: 'novel', checkPassphrase }))} onDone={noop} />)
+    it("asks vault.tryCheckStrength when the host gives no advice, saying a weak passphrase's reason", async () => {
+      const tryCheckStrength = vi.fn((typed: string) => Promise.resolve(typed.length < 6 ? TH.bad(new VaultError('weak_passphrase', 'Longer, please.')) : TH.good(undefined)))
+      render(<PassphraseModal gating={TH.gatingOf(TH.stubVault({ state: 'novel', tryCheckStrength }))} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('Longer, please.') })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw longer' } })
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('') })
-      expect(checkPassphrase.mock.calls).to.deep.equal([['pw'], ['pw longer']])
+      expect(tryCheckStrength.mock.calls).to.deep.equal([['pw'], ['pw longer']])
     })
 
     it("meets a broken strength checker, met by its own advice as the user types, with the trouble notice, reporting the vault's refusal", async () => {
