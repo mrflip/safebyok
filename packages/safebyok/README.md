@@ -1066,8 +1066,9 @@ write of its own, and never lowered, whichever tab writes it. A vault storage se
 epoch is refused with `vault_behind`: a birth births nothing, and a Vault object already born
 takes nothing from it, writes nothing, and locks, as for a user signed out (*When the user signs
 out*). That holds for a Vault object that itself holds the newer copy too: it refuses the older,
-keeping the newer in hand, as another tab and the next birth do. Storage handing back an older copy could otherwise bring back a way in that was removed, or, once a vaultKey can be
-replaced, a vaultKey too. A device that never saw the newer copy, or whose site data was cleared,
+keeping the newer in hand, as another tab and the next birth do. Storage handing back an older
+copy could otherwise bring back a way in that was removed, or, once a vaultKey can be replaced, a
+vaultKey too. A device that never saw the newer copy, or whose site data was cleared,
 cannot tell, and takes the older copy as it stands; nor does a box restored alone move the
 counter (*A deleted vault's tombstone*, above).
 
