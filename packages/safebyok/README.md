@@ -482,7 +482,11 @@ under the longer setting, whose deadline lies past the new number of hours from 
 taken up, the vault is born locked, and the user types their passphrase again. Raising it
 lengthens no lease already granted. A device keeps one lease per vault, shared by its tabs, so
 open a vault with one setting on a device: two tabs opening it with different ones are not
-supported, and the lower one wins (`notes/wontfix.md`). A device clock
+supported, and the lower one wins (`notes/wontfix.md`). A tab already unlocked keeps its own lease
+when another tab unlocks or renews, and at its own deadline its next call takes up the other's
+without asking; a `lock()` in another tab, or a change to the ways in, drops it at its next read
+(`vault.hello`). A lock and an unlock in another tab that both land before that read leave it
+standing: the device holds a lease under the same ways in again. A device clock
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
@@ -1061,9 +1065,8 @@ id there, and the highest `vault_epoch` it has seen the vault at, raised at ever
 write of its own, and never lowered, whichever tab writes it. A vault storage serves below that
 epoch is refused with `vault_behind`: a birth births nothing, and a Vault object already born
 takes nothing from it, writes nothing, and locks, as for a user signed out (*When the user signs
-out*). A Vault object that itself holds the newer copy reads an older one of the same life as a
-read served late, and ignores it, keeping the newer; another tab, or the next birth, refuses it.
-Storage handing back an older copy could otherwise bring back a way in that was removed, or, once a vaultKey can be
+out*). That holds for a Vault object that itself holds the newer copy too: it refuses the older,
+keeping the newer in hand, as another tab and the next birth do. Storage handing back an older copy could otherwise bring back a way in that was removed, or, once a vaultKey can be
 replaced, a vaultKey too. A device that never saw the newer copy, or whose site data was cleared,
 cannot tell, and takes the older copy as it stands; nor does a box restored alone move the
 counter (*A deleted vault's tombstone*, above).

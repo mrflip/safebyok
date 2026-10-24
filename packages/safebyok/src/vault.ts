@@ -147,10 +147,11 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *
  * This device keeps a record of the highest `vault_epoch` it has seen in the scope (its device
  * record, in the deviceDB), raised at each read and at each write of its own, never lowered. A
- * read of vault props older than the ones a Vault object holds is ignored: it takes nothing from
- * them, refuses nothing, and keeps the newer. Any other read below the device record refuses
- * 'vault_behind', taking nothing from it and writing nothing: an older vault could bring back a
- * way in that was removed. It locks the vault, as 'identity_revoked' from storage does. A host
+ * read below the device record refuses 'vault_behind', taking nothing from it and writing nothing,
+ * though the Vault object holds the newer copy: an older vault could bring back a way in that was
+ * removed. It locks the vault, as 'identity_revoked' from storage does. Any other read of vault
+ * props older than the ones a Vault object holds (one served before a write of this device's own)
+ * is ignored: it takes nothing from them, refuses nothing, and keeps the newer. A host
  * that restored storage from an older copy on purpose accepts it on this device with
  * `bank.clearCachedVault`, which erases the record, and asks the bank for the vault again.
  *
@@ -276,8 +277,9 @@ export class Vault {
    *
    * A hello takes no lease up: the vault's birth took up this device's, and another tab's unlock
    * shows here at the next {@link Vault.ensureUnlocked}. It drops the lease in hand, erasing nothing,
-   * once this device's store no longer holds it (another tab locked), or the vault's ways in
-   * changed. A read served before a write of this device's own, and answered after it, is ignored:
+   * once this device's store no longer holds it (another tab locked), or holds one under other ways
+   * in, or the vault's ways in changed; another tab's unlock or renewal leaves it standing until it
+   * ends. A read served before a write of this device's own, and answered after it, is ignored:
    * nothing is taken from it, and nothing refused. It raises this device's record of the vault to
    * what it read.
    *
@@ -1026,9 +1028,10 @@ export class Vault {
   /** Judge one read of storage against the picture in hand and `record`, this device's record as read before it, synchronously: the read to take, `ignore`, or `behind`.
    * A Vault object let go meanwhile takes nothing. The vault deleted, or made anew under another
    * `vault_tok`, makes this Vault object gone for good, refusing 'vault_gone' or 'vault_remade'. A
-   * read older than the picture (the same vault at a lower epoch: one served before this device's
-   * own write) is ignored, and judged so before any other check. A read below the record's highest
-   * `vault_epoch` is `behind`: the caller refuses it 'vault_behind', taking nothing.
+   * read below the record's highest `vault_epoch` is `behind`, though the picture in hand is the
+   * newer copy: the caller refuses it 'vault_behind', taking nothing. A read older than the picture
+   * but not below the record (the same vault at a lower epoch: one served before this device's own
+   * write, whose raise of the record came after the record was read) is ignored.
    */
   #judgeRead(read: ListedVault | null, record: DeviceRecord | null): ListedVault | 'ignore' | 'behind' {
     if (this.#goneBy !== null) { return 'ignore' }
@@ -1042,17 +1045,17 @@ export class Vault {
       this.#letGo(remade)
       throw remade
     }
-    if (isOlderPicture(this.#vaultProps, read.vaultProps)) { return 'ignore' }
     if (record !== null && read.vaultProps.vault_epoch < record.highest_vault_epoch) { return 'behind' }
+    if (isOlderPicture(this.#vaultProps, read.vaultProps)) { return 'ignore' }
     return read
   }
 
   /** Replace the picture with what one read found, synchronously: vault props and listing together, never a vault beside another's boxes.
    * The lease in hand is dropped, in memory only, when it no longer fits the vault props' ways in.
-   * It is dropped too when this device's store holds no lease (a lock in another tab), or one
-   * granted after it (another tab's unlock), unless the read began before the lease in hand was
-   * taken, or found the lease the store held before it: a read older than the lease, which changes
-   * nothing. None is taken up here. Bad news is told once the snapshot shows it.
+   * It is dropped too when this device's store holds no lease (a lock in another tab), or one under
+   * another gate, unless the read began before the lease in hand was taken: a read older than the
+   * lease, which changes nothing. A lease another tab's unlock or renewal wrote under the same gate
+   * leaves it standing. None is taken up here. Bad news is told once the snapshot shows it.
    */
   #takePicture(found: { fresh: VaultProps, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
     const { fresh } = found
@@ -1927,20 +1930,15 @@ const isOlderPicture = (inHand: VaultProps, fresh: VaultProps): boolean => (
 /** True when `lease` was granted under the vault and ways in `standing` holds. */
 const fitsLease = (standing: VaultProps, lease: Lease): boolean => lease.vault_tok === standing.vault_tok && lease.gate_epoch === standing.gate_epoch
 
-/** True when `kept`, what this device's store held as its lease when a read looked, leaves `held`, the lease in hand, standing.
- * It does when it is `held` (the same vault, ways in and deadline), or a lease older than it: one
- * of the same vault under earlier ways in, or one ending sooner. That is the lease this device's
- * store held before `held` was granted, read before the grant landed. None, or a newer one
- * (another tab's unlock), does not.
+/** True when `kept`, what this device's store held as its lease when a read looked, leaves `held`, the lease in hand, standing: a lease of the same vault and ways in.
+ * Its deadline is not compared: another tab's unlock or renewal writes a lease ending later, and
+ * this tab keeps its own until it ends. None (a lock in another tab), or one under another gate,
+ * does not.
  */
 const standsBeside = (kept: unknown, held: Lease): boolean => {
   if (typeof kept !== 'object' || kept === null) { return false }
   const record: Partial<Record<keyof LeaseView, unknown>> = kept
-  if (typeof record.ask_passphrase_at !== 'number' || typeof record.gate_epoch !== 'number') { return false }
-  const sameVault = record.vault_tok === held.vault_tok
-  const isHeld = sameVault && record.gate_epoch === held.gate_epoch && record.ask_passphrase_at === held.ask_passphrase_at
-  const isOlder = (sameVault && record.gate_epoch < held.gate_epoch) || record.ask_passphrase_at < held.ask_passphrase_at
-  return isHeld || isOlder
+  return record.vault_tok === held.vault_tok && record.gate_epoch === held.gate_epoch
 }
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */

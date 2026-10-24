@@ -1148,7 +1148,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} changes nothing when storage holds vault props older than the ones in hand: it proves against those in hand, and is refused`, async () => {
+    it(`${callTitle} changes nothing when storage holds vault props older than the ones in hand, and is refused`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const older = storedText(world) ?? ''
       await TH.putWayin(vault, 'pw', 'pw newer')
@@ -1160,8 +1160,8 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       } catch (err) {
         refused = err
       }
-      // The older copy is ignored: the write expecting the newer is stale, or the newer has no passkey to remove.
-      expect(refused).to.have.property('refusalkind').that.is.oneOf(['stale_write', 'absent_wayin'])
+      // The older copy is refused as behind what this device has seen, or the newer in hand has no passkey to remove.
+      expect(refused).to.have.property('refusalkind').that.is.oneOf(['vault_behind', 'absent_wayin'])
       expect(storedText(world)).to.eq(older)
     })
 

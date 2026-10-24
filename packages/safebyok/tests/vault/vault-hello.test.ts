@@ -868,12 +868,14 @@ describe("vault.hello, by the Contract", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("ignores an older copy in the Vault object that saw the newer, as a late read of its own write: it refuses nothing, takes nothing, and stays unlocked", async () => {
-    const { world, here, restoreOlder } = await behindWorld()
+  it("refuses vault_behind in the Vault object that saw the newer copy too, as another tab does: it takes nothing, keeps the newer in hand, and locks", async () => {
+    const { world, here, older, restoreOlder } = await behindWorld()
     restoreOlder()
-    expect(await here.refresh()).to.eq(here)
-    expect(here.getSnapshot()).to.deep.include({ state: 'unlocked', gate_epoch: 3, passkey: null, trouble: null })
-    expect(world.logged).to.have.lengthOf(0)
+    const err = await TH.expectRefusal(here.refresh(), 'vault_behind')
+    expect(here.getSnapshot()).to.deep.include({ state: 'locked', gate_epoch: 3, passkey: null, trouble: err, freshness: 'refused' })
+    expect(await world.getLease()).to.be.null
+    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
+    expect(await recordEpochIn(world)).to.eq(3)
   })
 
   it("is refused vault_behind at a new birth too, and accepted once bank.clearCachedVault() has this device forget the vault, as its example shows", async () => {

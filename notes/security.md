@@ -219,6 +219,14 @@ added or folded into through the subagent, and no other entry changes.
   raises a prompt or reports a read as success (guarantees audit risk 10). A refresh that finds the vault deleted
   (`getVault` null) or another `vault_tok` makes the Vault object gone for good by the same drop (below, in the
   demand entry).
+  Amended 2026-10-24 (refresh_rulings): **a refresh no longer revokes on a deadline.** It drops the lease in hand (memory only, nothing erased)
+  only when this device's store holds no lease (a `lock()` in another tab), or one under another `vault_tok` or `gate_epoch`, or the vault props
+  read show other ways in. It no longer compares deadlines (`ask_passphrase_at`), so another tab's unlock or renewal does not drop this tab's
+  lease: this tab keeps its own until its own deadline, then its next call takes up the other tab's lease from the device store without
+  asking. A read begun before the lease in hand was taken still changes nothing (the `leasesHeld` count; see the entry "a pantry read older
+  than the lease in hand cannot revoke it", whose newer-lease clause this supersedes). Loosening, accepted: a `lock()` and an unlock both done in
+  another tab before this tab's next read leave this tab unlocked, as the store again holds a lease under the same ways in. The comparison reads
+  only the stored record's `vault_tok` and `gate_epoch`; no key material is compared or logged.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **a read older than the vault props in hand is ignored, never
   judged, and a Vault object holding newer props does not notice storage rolled back beneath it.** A read of the
   same `vault_tok` at a lower `gate_epoch` or `vault_epoch` (one served before this tab's own write and answered
@@ -228,6 +236,16 @@ added or folded into through the subagent, and no other entry changes.
   removed way in stays removed on it, and its writes of the gate expect the newer epoch and refuse as stale. A Vault
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
+  Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
+  The refresh (`#judgeRead` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
+  epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
+  `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
+  other tabs and a fresh birth already did. The false alarm the old order guarded against (a read served before this device's own write,
+  answered after) stays prevented: the device record is read before the fetch is issued, so a raise by this device's own write is never held
+  against a read served before it. Residual: a lagging read replica serving a copy below the device record now locks a tab holding the newer
+  copy (a false alarm; the next `hello` after the replica catches up reads afresh, and the user unlocks again). The host's path is unchanged:
+  `bank.clearCachedVault` accepts a restore made on purpose. Two checks swapped; no new mechanism.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **a pantry read older than the lease in hand cannot revoke
   it.** A refresh judges the pantry (this device's store of the lease) only when its read began at or after the
   moment the lease in hand was granted or taken up, by the vault's clock, or when the pantry holds a lease newer than
@@ -1400,6 +1418,8 @@ added or folded into through the subagent, and no other entry changes.
   a wayin whose `vault_key_epoch` is not the vault props' is passed over as damaged
   (`damaged_wayin`), so a wayin spliced in from older vault props never hands over its vaultKey
   as the current one.
+  Amended 2026-10-24 (refresh_rulings): the order this entry gives, "older than the picture in hand" judged BEFORE the behind check, is reversed;
+  the refresh now tests `vault_behind` first (see the entry "a read older than the vault props in hand is ignored", amended the same day).
 * 2026-10-16: **`device_id`.** Every wayin carries the `device_id` of the device that
   added it, and its `registered_at`, both in its header and so bound into its wrap (and, for a
   passkey, its HKDF `info`), and kept when the wayin is sealed anew. The id is a random UUID
