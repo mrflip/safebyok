@@ -2,10 +2,10 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** **resumed, 2026-10-24** (the Coach: "restart the primitives sprint"). Merged by the Coach,
-  2026-10-24: the whole core line, #258 → #259 → #260 → #261 → #262 → #264 → #263. Building: thread 10
-  (react), cut from `origin/main`. Waiting: #252 beside it on main. Then the Coach's rulings and the wrap-up.
-  Paused 2026-10-23 04:45 UTC (`human/20261023-sprint_primitives_paused.md`).
+* **Status:** **wrap-up, 2026-10-24.** Merged by the Coach: the whole core line, #258 → #264 → #263.
+  Thread 10 (react) filed as #265 at 28f1c45b, on main, reviewed twice. Restacking #252 onto it (the
+  line main → #265 → #252 → #250), then the final opus review. The rows the Coach marked TOP in
+  Open Matters wait on the Coach; each ruling that needs work becomes a thread on top of the line.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -598,7 +598,7 @@ checker's `reason` shown as given (docs only); a deriver condition's message giv
 follow-up). Undoing the deriver change, should the Coach keep "Leave it, we will audit these", is one
 hand commit.
 
-### 10. react
+### 10. react, [#265](https://github.com/mrflip/safebyok/pull/265)
 
 > **react**: the dialogs dispatch on `gatingkind`, one per kind; `passphrase-modal`,
 > `passkey-unlock-button`, `attempt-refusals`, `messages` follow; a correctable refusal is shown
@@ -629,6 +629,13 @@ retirement (`checkStrength` / `tryCheckStrength`) and `declinedError(gatingkind,
 "Make this display to the human as "Vault unlocker". TODO: an i18n friendly way to send in phrases
 displayed". The code keeps `cleartext`; wherever a dialog or message names what the user gives
 (passphrase or passkey) it says "Vault unlocker". Queued for thread 10's rework after its review.
+
+*Review:* **fixed**, twice (sonnet). First: one README sentence; no secret through a side door,
+nothing retries, the ledger matches. Left, as Open Matters: a decline with no dialog shown still
+says the user declined; the demo's Delete account after a slow `confirm()`; Cancel live during an
+attempt; the passkey's user name. Second, over the "Vault unlocker" rework: the declined
+`put_passkey` message's "Its" had no noun (now "No vault unlocker was changed."). Left:
+`wrong_passkey` says "way in" to a user (Open Matters).
 
 ### 11. docs, core half filed ([#263](https://github.com/mrflip/safebyok/pull/263))
 

@@ -88,8 +88,8 @@ rules* 3).
 | 9b | gating_followups | merged | #262 |
 | 9c | core_cleanups | merged | #264 |
 | 11 | docs (core half) | merged | #263 |
-| 10 | react | building, from main | |
-| 12 | route_meta | filed, beside the line | #252 |
+| 10 | react | filed, on main | #265 |
+| 12 | route_meta | restacking onto #265 | #252 |
 
 ## What the threads found
 
