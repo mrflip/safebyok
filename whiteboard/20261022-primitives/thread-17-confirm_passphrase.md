@@ -1,7 +1,7 @@
 # Thread 17: confirm_passphrase (2026-10-24)
 
-Branch `20261024-confirm_passphrase`, PR #TBD, stacked on #252, in the line main → #265 → #252 →
-#this → #250. Justify: green (react 308, was 300; demo 227 + 17 skipped; core 3139 + 37 skipped).
+Branch `20261024-confirm_passphrase`, PR [#270](https://github.com/mrflip/safebyok/pull/270),
+stacked on #252, in the line main → #265 → #252 → #270 → #250. Justify: green (react 308, was 300; demo 227 + 17 skipped; core 3139 + 37 skipped).
 
 From the Coach's "y" on the final review's finding 26: a typo in a new passphrase becomes the
 vault's, and at a change it drops the passkey too, so the vault is lost once the lease ends.
@@ -52,5 +52,8 @@ vault's, and at a change it drops the passkey too, so the vault is lost once the
     form" (was "... the current passphrase and the new, in one form").
   * A host's own tests that fill `PassphraseModal` for a first passphrase, or the change dialog,
     must now fill the confirmation too. The changeset says so.
-* **For the Coach**: the mismatch wording, the two field labels, and whether focus should move
-  to the confirmation on a mismatch (it does not; the alert is announced).
+* **For the Coach** (also the PR's open questions):
+  * **Mismatch wording and labels**: "The new passphrase and its confirmation don't match: type
+    the same one in both."; "confirm vault passphrase", "confirm new passphrase". Rec: keep them.
+  * **Focus on a mismatch**: it stays where it is, and the alert is announced. Rec: leave it.
+    Moving focus to the confirmation guesses which field has the typo.
