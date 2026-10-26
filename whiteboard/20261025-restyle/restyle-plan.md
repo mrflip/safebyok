@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 9 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#280](https://github.com/mrflip/safebyok/pull/280)); thread 10 built ([#281](https://github.com/mrflip/safebyok/pull/281)), in review.
+* **Status:** threads 1 to 10 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#281](https://github.com/mrflip/safebyok/pull/281)); thread 11 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -407,6 +407,18 @@ on the damaged ones; `BoxSparse`/`BoxDamaged` merging the box summary types (*Pr
 `__typename` dropped before a strict parse. **Depends on:** thread 9. **Look-ahead:** thread 12's
 snapshot takes `boxes` and `damagedBoxes` as slices. **Size:** large.
 
+*Review:* medium, `fixed`. Checked and holding: a server's sound boxes are re-judged and stripped
+to `BoxSparse`, its damaged entries strictly parsed, a foreign-scope record still refused, nothing
+ciphered reaches the snapshot; Convex keeps `mustBe` on the record's own `user_id`; every old
+listing check found its new home. Fixed: `delDamagedVault` skipped the `ReadAnswer` check (a
+non-object answer threw a TypeError; now `corrupt_record`, deleting nothing); VOCABULARY's
+*damaged* entry; ~45 grammar slips the props→record sweep left; column alignment; two exported
+renames missing from the changeset. Left: "vault props" strays outside the diff (thread 11); the
+demo's key slot offers to replace a `newer_format` box, and the dashboard lists damaged rows first
+(thread 12); `StoredBox.box`'s union type makes adapters cast (an Open Matter); `ReadAnswer`
+accepts an answer with no `vault` key (left before 1.0); the GraphQL changeset's persisted
+operations (thread 11). Filed as [#281](https://github.com/mrflip/safebyok/pull/281).
+
 ### 11. The Vault object (Preplan Phase 6) -- `vault_object`
 
 > 6. **The Vault object.** `implements` its shapes, as the Box and Lease objects do theirs; own
@@ -430,7 +442,13 @@ box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`
 `VaultStampButFormat` and `LeaseStampPicked` (lease.ts) into vault-record.ts beside the other
 shapes; rename the old-sense "stamp" (what a thing was made
 under: scope, `vault_tok`, epochs) in Box's getters, `vault.stamp`, provings' `stamp` parameter,
-`StampedShape`, `checkedStamp`; VOCABULARY calls that set "made under". **Depends on:** thread
+`StampedShape`, `checkedStamp`; VOCABULARY calls that set "made under". From #281's review: finish the "vault
+props" sweep (package.json descriptions of safebyok-convex, -indexeddb, -postgres;
+`vault-tables.sql`/`.ts`; `idb-vault-db.ts`; `scopepath.ts`; `del-damaged-vault.ts`; `vault.ts`;
+test titles in `expectations.test.ts`, `bank.test.ts`, `vault-hello.test.ts`, React's
+`bank-provider-refusals.test.tsx`; the local `propsOf` in `proving.test.ts`, `wayin.test.ts`); add
+to #281's changeset (`.changeset/20261026-reads.md`) that GraphQL persisted operations
+(`VaultOperations.safebyokPutVaultRecord`) change with the schema. **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
 
 ### 12. The snapshot (Preplan Phase 7) -- `snapshot`
@@ -441,7 +459,11 @@ under: scope, `vault_tok`, epochs) in Box's getters, `vault.stamp`, provings' `s
 >    `askPasskey` takes `snapshot.gate`. README sections on the snapshot.
 
 *Gloss:* *Preplan*, *The snapshot a React host renders*; the demo app (`demos/`) follows, as it
-reads the snapshot. **Depends on:** thread 11. **Look-ahead:** thread 13's bank listing mirrors
+reads the snapshot. *Orchestrator, from #281's review:* the demo's key slot (`ApiKeySlot`) offers to
+replace or remove a `newer_format` box: show "update the app" there, as the dashboard does; the
+dashboard lists every damaged row before every sound row: restore boxlabel order. Thread 10 left
+`#boxes`/`#damagedBoxes` as frozen arrays replaced only when a box changes, so those slices hold
+identity already. **Depends on:** thread 11. **Look-ahead:** thread 13's bank listing mirrors
 `snapshot.boxes`'s sorted frozen form. **Size:** medium to large.
 
 ### 13. The bank's listing (Preplan Phase 8; what is left of Phase 9) -- `bank_listing`
