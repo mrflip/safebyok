@@ -155,7 +155,7 @@ const { passkey: _noPasskey, ...gateWithoutPasskey } = TH.gateOf('u1')
 const vaultRecordWithoutPasskey = { ...TH.vaultRecordOf('u1'), gate: gateWithoutPasskey }
 /** A vault record as this format held it before its gate was nested: the two ways in flat beside its fields. */
 const flatVaultRecord = { ...vaultRecordWithoutWayins, ...TH.gateOf('u1') }
-/** The three fields the vault record held their one passphrase in, before they held ways in. */
+/** The three fields the vault record held its one passphrase in, before it held ways in. */
 const OldWayinFields = {
   key_deriver_label:            'test_digest_v0',
   // base64 of the literal text 'salt': a fake salt, public material anyway

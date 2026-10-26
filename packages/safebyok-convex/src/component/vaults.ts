@@ -168,7 +168,7 @@ export const delBox = mutation({
 
 /** Remove the vault record, every box and the tally in one transaction, only while the vault record has `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone, which it resolves.
  * The tombstone takes the vault's place in the scope, its `vault_epoch` the vault's plus one.
- * Null when the vault record do not meet the expectation, or none stand.
+ * Null when the vault record does not meet the expectation, or none stands.
  */
 export const delVault = mutation({
   args:    { ...VaultScope.fields, expected: VaultDelExpectation },

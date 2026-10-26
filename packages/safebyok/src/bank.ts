@@ -320,7 +320,7 @@ export class Bank {
    * the rest. What the vault held is gone for good, so ask the user first.
    *
    * Storage decides, by the checks it alone can make: it deletes only a vault record that fails its
-   * checks and still name their `vault_tok`. So it may be asked for a vault the bank holds no
+   * checks and still names its `vault_tok`. So it may be asked for a vault the bank holds no
    * entry for: nothing on this device need agree first, and no unlock or passphrase is asked. With
    * no vault stored it erases only this device's lease, and resolves. The entry let go is the one
    * the bank holds for the scope once storage answers, whichever stores it was born from: on

@@ -127,7 +127,7 @@ export type VaultSnapshot = Readonly<{
 }>
 // --
 
-/** The ways in of a vault record's gate, as the vault holds it: the passphrase's, and the passkey's or null. */
+/** The ways in of a vault record's gate, as the vault holds them: the passphrase's, and the passkey's or null. */
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
 /** One user's vault of boxes, one life of it in storage, for as long as the bank holds it: every read and write of a whisper goes through here.
@@ -926,7 +926,7 @@ export class Vault {
   }
   // The ways in of each gate the vault has held, made once per gate. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
-  // and the vault record it are bound to, never change under it.
+  // and the vault record they are bound to, never change under it.
   readonly #modelled = new WeakMap<GateRecord, HeldWayins>()
   #wayinsOf(standing: VaultRecord & { gate: GateRecord }): HeldWayins {
     const { gate } = standing
@@ -1014,7 +1014,7 @@ export class Vault {
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
   }
 
-  /** Fetch the vault record, listing and this device's lease, judge it against the picture in hand, and raise this device's record to what was taken.
+  /** Fetch the vault record, listing and this device's lease, judge them against the picture in hand, and raise this device's record to what was taken.
    * The device record is read first, so a raise this device's own write made is never held against a
    * read served before that write landed. The judgment is synchronous ({@link Vault.#judgeRead}).
    */

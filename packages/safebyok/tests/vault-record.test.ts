@@ -155,7 +155,7 @@ describe("the vault record's shapes", () => {
 // == [isGated]
 
 describe("isGated", () => {
-  it("is true for a gated vault record and false for a novel one, as its example tells it apart", () => {
+  it("is true for a gated vault record and false for a novel one, as its example tells them apart", () => {
     expect(isGated(TH.vaultRecordOf('u1'))).to.be.true
     expect(isGated(TH.gatelessOf('u1'))).to.be.false
   })

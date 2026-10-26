@@ -947,7 +947,7 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `damaged_vault`       | the vault's record, read from storage, failed its checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVault` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
+| `damaged_vault`       | the vault's record, read from storage, failed its checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVault` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its record from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passphrase, or the passkey. The other is still tried | A damaged passkey: unlock with the passphrase, and add the passkey again. A damaged passphrase: unlock with the passkey, if there is one, to read what the vault holds; it cannot be changed, so the vault is then removed and made again |
 | `damaged_box`     | a box failed its checks as read from storage (a `VaultDB`'s `getBox` refuses it so too), or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, moved there from elsewhere, or written by a vault deleted and made anew on another device since this one read it. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing | Nothing was changed. Read the vault again, `hello({ staleMinutes: 0 })`: a vault made anew elsewhere relocks this device. A box still damaged: offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `damaged_lease`       | this device's lease would not open under its leaseKey: damaged where the device keeps it. It was erased, and the vault locked, at the first call that used it | Unlock again: that grants a new lease. Reading the vault (`hello()`) does not mend it |
@@ -1010,7 +1010,7 @@ if (! ok) {
 It refuses a vault that is sound, with `bad_option` and nothing removed: a vault that opens is
 deleted through its Vault object's `del()`. With no vault stored it erases only the device's
 lease, so a call cut short can be made again. It needs the stored record's `vault_tok`
-to aim the deletion, so vault record too damaged to show one are refused as `damaged_vault`
+to aim the deletion, so a vault record too damaged to show one is refused as `damaged_vault`
 still, with nothing removed: the backend's own tools can clear it (`localVaultDB`'s vault record
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
 safebyok, which opens it; so one in a `format` this version does not know is refused with a kind of its

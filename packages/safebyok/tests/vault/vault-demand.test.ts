@@ -292,7 +292,7 @@ describe("the refresh's judgment", () => {
     expect(thisTab.state).to.eq('unlocked')
   })
 
-  it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault record read still show the old", async () => {
+  it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault record read still shows the old", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const kept = await world.getLease()

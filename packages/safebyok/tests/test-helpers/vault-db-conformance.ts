@@ -173,7 +173,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     }
   }
 
-  /** A fresh adapter whose `u1` scope holds vault record, as every box write needs. */
+  /** A fresh adapter whose `u1` scope holds a vault record, as every box write needs. */
   const withVaultRecord = async () => {
     const vaultDB = await makeVaultDB()
     await ensureGated(vaultDB, vaultRecordOf('u1'))
@@ -1221,7 +1221,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
     },
     rivalVaultRecordUpdates: {
       line:  '3.2',
-      title: `lands one of two updates of one vault record made at once ${fromTwo}, and refuses the other as stale_write, however it interleave`,
+      title: `lands one of two updates of one vault record made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
       check: async () => {
         const rivals = [vaultRecordOf('u1', { gate_epoch: 2, gate: gateOf('u1', { passphrase: wayinOf('one') }) }), vaultRecordOf('u1', { gate_epoch: 2, gate: gateOf('u1', { passphrase: wayinOf('two') }) })]
@@ -1760,7 +1760,7 @@ const storeEach = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]) =>
   for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, boxlabel)) }
 }
 
-/** Everything `u1`'s vault holds, as its verbs read it: the vault record, the listing, and each of `boxlabels` read in the vault that record name.
+/** Everything `u1`'s vault holds, as its verbs read it: the vault record, the listing, and each of `boxlabels` read in the vault that record names.
  * Where no vault record stands, each read is the refusal it meets, by its kind: `vault_mismatch`.
  */
 const standingVault = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]) => {

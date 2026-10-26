@@ -129,8 +129,8 @@ const GetVaultSql = `SELECT ${Columns.selected(VaultRowColumns)}, ${VaultBoxesJs
 // `vault_epoch`, no lower than the draft's (which is 0): a new life with the counter carried on.
 // Another device doing the same waits on the tombstone's row, finds it gone, and meets the new
 // vault by its `ON CONFLICT`. The listing reads the statement's snapshot, filtered to the
-// vault_tok the insert returns: vault record another device created after that snapshot are returned
-// as they stand, with the boxes the snapshot holds of them, and never another vault's.
+// vault_tok the insert returns: a vault record another device created after that snapshot is returned
+// as it stands, with the boxes the snapshot holds of it, and never another vault's.
 const EnsureVaultSql = `WITH carried AS (
     DELETE FROM safebyok_vault_tombstones WHERE ${ScopeIs} RETURNING vault_epoch
   ), ensured AS (
@@ -142,8 +142,8 @@ const EnsureVaultSql = `WITH carried AS (
   SELECT ensured.*, ${VaultBoxesJsonSql('ensured')} FROM ensured`
 
 // The vault record written must name the vault it replaces, as a vault_tok never changes, and move
-// their gate_epoch forward, as every update does (line 3.2): a modified client cannot write vault
-// props back over those it read. The vault row is read FOR UPDATE first, which locks it and reads
+// its gate_epoch forward, as every update does (line 3.2): a modified client cannot write a vault
+// record back over the one it read. The vault row is read FOR UPDATE first, which locks it and reads
 // it as it stands once locked, another writer's commit since the statement began included: what a
 // miss reports is the winner. The UPDATE then writes only over that row, its vault_epoch the
 // standing one plus one whatever the client sent. One row back, either way: `landed`, `stands`
@@ -271,7 +271,7 @@ const ReplaceBoxSql = `WITH vault AS (
     SELECT *, false FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
   ) AS box ON true`
 
-// Lands while the vault record of that vault_tok stand, whether or not there was a box to delete,
+// Lands while the vault record of that vault_tok stands, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
 // for none (the column is NOT NULL, so null is only ever no box). A box written meanwhile
 // is one the DELETE waited on and then removed as it stands, its revision the one returned. No row
@@ -284,7 +284,7 @@ const DelBoxSql = `WITH deleted AS (
   SELECT (SELECT revision_tok FROM deleted) AS deleted_tok FROM safebyok_vaults WHERE ${ScopeIs} AND vault_tok = $5::text`
 
 // The vault record is deleted only at the vault_tok in $4 and, unless $5 is null, the gate_epoch in
-// $5, and the tombstone takes their place in the same statement, its counter the vault's plus one.
+// $5, and the tombstone takes its place in the same statement, its counter the vault's plus one.
 // The boxes go with the vault record, by the foreign key's cascade. No row back when nothing was
 // deleted, a tombstone standing alone included.
 const DelVaultSql = `WITH deleted AS (

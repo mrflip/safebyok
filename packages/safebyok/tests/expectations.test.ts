@@ -53,7 +53,7 @@ describe("Expectations.vaultMeets", () => {
     expect(Expectations.vaultMeets(null, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
 
-  it("fails vault record too damaged to show an epoch, though it show the vault_tok", () => {
+  it("fails a vault record too damaged to show an epoch, though it shows the vault_tok", () => {
     expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
     expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1', gate_epoch: '1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
@@ -85,7 +85,7 @@ describe("Expectations, over a tombstone", () => {
 })
 
 describe("Expectations.vaultRecordPutOf", () => {
-  it("stores the vault record with the counter the standing ones show plus one, whatever the writer sent, as its example shows", () => {
+  it("stores the vault record with the counter the standing one shows plus one, whatever the writer sent, as its example shows", () => {
     const next = TH.vaultRecordOf('u1', { gate_epoch: 2, vault_epoch: 99 })
     expect(Expectations.vaultRecordPutOf(next, TH.vaultRecordOf('u1', { vault_epoch: 4 }))).to.deep.equal({ ...next, vault_epoch: 5 })
   })

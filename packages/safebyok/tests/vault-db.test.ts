@@ -215,7 +215,7 @@ TH.describeVaultDB('the smallest honest adapter', (vaultDBOpts) => new MapVaultD
   },
 })
 
-/** A MapVaultDB whose `u1` scope holds vault record, as a listing needs to read a vault. */
+/** A MapVaultDB whose `u1` scope holds a vault record, as a listing needs to read a vault. */
 const withVaultRecord = () => {
   const vaultDB = new MapVaultDB()
   vaultDB.rows.set(Scopepath.vault(TH.scopeOf('u1')), TH.vaultRecordOf('u1'))
@@ -1156,12 +1156,12 @@ class StalePropsVaultDB extends MapVaultDB {
 
 /** What a stale update's adapter may say stands, and the refusal and meta that then reach the caller. */
 const StandingPropsCases = [
-  [TH.vaultRecordOf('u1', { gate_epoch: 2 }),                       'stale_write',   { vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 2 }) }, 'the winning vault record: stale_write, carrying them whole'],
-  [TH.gatelessOf('u1'),                                            'stale_write',   { vault_stored: TH.gatelessOf('u1') },                     'gateless vault record: stale_write, carrying them'],
+  [TH.vaultRecordOf('u1', { gate_epoch: 2 }),                       'stale_write',   { vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 2 }) }, 'the winning vault record: stale_write, carrying it whole'],
+  [TH.gatelessOf('u1'),                                            'stale_write',   { vault_stored: TH.gatelessOf('u1') },                     'gateless vault record: stale_write, carrying it'],
   [null,                                                           'stale_write',   { vault_stored: null },                                    'none: stale_write, carrying null'],
-  [{ ...TH.vaultRecordOf('u1'), gate_epoch: 'two' },                'damaged_vault', undefined,                                                       'damaged vault record: damaged_vault, as a read of them'],
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },      'newer_format',  undefined,                                                       'vault record of a later format: newer_format, as a read of them'],
-  [TH.vaultRecordOf('u2'),                                          'damaged_vault', undefined,                                                       "another scope's vault record: damaged_vault, as a read of them"],
+  [{ ...TH.vaultRecordOf('u1'), gate_epoch: 'two' },                'damaged_vault', undefined,                                                       'damaged vault record: damaged_vault, as a read of it'],
+  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },      'newer_format',  undefined,                                                       'vault record of a later format: newer_format, as a read of it'],
+  [TH.vaultRecordOf('u2'),                                          'damaged_vault', undefined,                                                       "another scope's vault record: damaged_vault, as a read of it"],
   [{ ...TH.vaultRecordOf('u1'), user_id: 'u 1' },                   'damaged_vault', undefined,                                                       "vault record whose user_id fails its check: damaged_vault, never the check's bad_scope"],
 ] as const
 

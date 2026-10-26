@@ -1141,7 +1141,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses newer_format when the vault record it reads are of a form a newer safebyok writes`, async () => {
+    it(`${callTitle} refuses newer_format when the vault record it reads is of a form a newer safebyok writes`, async () => {
       const { world, vault } = await vaultWithPasskey()
       world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v9' }))
       const before = storedText(world)

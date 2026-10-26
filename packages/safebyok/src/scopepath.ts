@@ -46,7 +46,7 @@ export const bank = (scope: BankScope): BankScopepath => {
   return ['bank', applabel, user_id].join(ScopepathDelimiter)
 }
 
-/** The scopepath of the vault record of the vault `scope` names: any record carrying its fields, vault record and leases among it.
+/** The scopepath of the vault record of the vault `scope` names: any record carrying its fields, vault record and leases among them.
  *
  * @example Scopepath.vault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // 'vault^acme^u1^main'
  * @example Scopepath.vault({ applabel: 'acme', user_id: 'u1^x', vaultlabel: 'main' })  // throws 'bad_scope': "user_id: A user_id is ASCII letters, ..."
