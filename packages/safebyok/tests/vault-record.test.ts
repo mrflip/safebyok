@@ -27,8 +27,10 @@ const VaultRecordCases = [
   // refused, as a damaged or foreign record:
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },     false,  'a format this version does not know'],
   [flatOf(TH.vaultRecordOf('u1')),                                 false,  'a record from before its gate was nested, the wayins flat beside its fields'],
+  [{ ...omit(TH.gatelessOf('u1'), ['gate']), passphrase: null, passkey: null }, false, 'a novel record from before its gate was nested, its two slots null, never read as a novel vault'],
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1 }, false, 'v5 vault props, which carried a vaultKey epoch'],
   [{ ...recordWithoutGate, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
+  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v3' },     false,  'vault props from before the prior vaultKey went'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: 0 },                   false,  'a gate at gate_epoch 0'],
   [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                      false,  'no gate at a later gate_epoch: a gate that lost its ways in'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: 1.5 },                 false,  'an epoch that is no whole number'],
@@ -85,6 +87,7 @@ const GateCases = [
   [{ passkey: TH.passkeyWayinOf('laptop', { prf_salt_b64: '' as never }) },         false,  'a passkey with an empty salt'],
   [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' as never }) },             false,  'an empty salt'],
   [{ passphrase: TH.wayinOf('passphrase', { device_id: '' }) },            false,  'an empty device_id'],
+  [{ passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, 'a passphrase missing its ciphertext'],
   [{ passkey: TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 }) }, false, 'a registered_at in epoch seconds'],
   [{ gate_epoch: 1 },                                                      false,  'a gate holding its epoch, which rides beside it in the vault record'],
 ] as const
