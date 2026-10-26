@@ -148,7 +148,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
   it("leaves the vault as it was after another user's every attempt", async () => {
     const CVX = await seeded()
     const asU2 = CVX.withIdentity({ subject: 'u2' })
-    for (const [, call] of EveryCall) { await TH.convexRefusalOf(call(asU2)) }
+    for (const [_fnName, call] of EveryCall) { await TH.convexRefusalOf(call(asU2)) }
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     const left = await asU1.query(api.safebyok.getVault, { ...u1 })
     expect(left?.vault).to.deep.equal(TH.gatelessOf('u1'))
