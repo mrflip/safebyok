@@ -169,3 +169,30 @@ Who reads this: threads 8, 11 and 13.
   one is signed in.
 * **For thread 8**: `draftOf` in bank.ts still spreads the parsed scope into the record (Phase 9).
   `sealBoxlabel` in box.ts stays (no bag reaches `Box.seal`).
+
+## From thread 8 (vault_record, #279)
+
+Who reads this: threads 9 to 13.
+
+* **`src/vault-record.ts`** holds `VaultRecord`, `GateRecord`, the wayin records, `VaultSparse`,
+  `VaultStamp`, `VaultTombstone`, `GateSparse`, `PassphraseWayinSparse`/`PasskeyWayinSparse`,
+  `VaultFormat`, `TombstoneFormat` and `isGated`. `BoxStamp` is in box.ts; `LeaseStamp` and
+  `LeaseSparse` in lease.ts. `deviceRecordOf` (new export) builds every device record from a
+  parsed scope; `draftOf` likewise. **Phase 9 is done.**
+* **`VaultRecord` carries a `.refine`** (`gate_epoch` 0 ⇔ `gate` null), and Zod 4.6.7 refuses to
+  `pick`/`omit` a refined object: **slice from `VaultSparse`**, not the record.
+* **Every ctx is unchanged**; the format stays `safebyok-vault-v6` (the Coach's no-format-bumps
+  ruling); an old flat record reads as damaged. Snapshots render each record as output and as
+  `io: 'input'`.
+* `vault.stamp` returns the full `VaultSparse` (thread 11: rename or drop it, beside `VaultStamp`).
+* `Lease implements Omit<LeaseSparse, 'format'>`: its tests keep the format private (thread 11).
+* `demandConsistentWith`'s parameter `Partial<VaultSparse>` would refuse a thing carrying its own
+  `format`: thread 11 makes it `Partial<Omit<VaultSparse, 'format'>>`.
+* **Still named "props"** (thread 10 renames): `StoredVault`/`ListedVault`'s `vaultProps`,
+  `putVaultProps`, `vault_props_stored`, `staleVaultProps`, `Expectations.vaultProps*`, the Convex
+  and GraphQL `vaultProps` argument; and ~33 lines of "vault props" prose in VAULTDB.md, READMEs,
+  test titles.
+* Postgres keeps its two wayin jsonb columns and nests them on read. Convex hosts clear the
+  component's tables before deploying (changeset, README).
+* VOCABULARY's "vault props" retirement is on this branch's text; at the restack, apply it to
+  #272's VOCABULARY.

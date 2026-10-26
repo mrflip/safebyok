@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 7 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#278](https://github.com/mrflip/safebyok/pull/278)); thread 8 under way.
+* **Status:** threads 1 to 7 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#278](https://github.com/mrflip/safebyok/pull/278)); thread 8 built ([#279](https://github.com/mrflip/safebyok/pull/279)), in review.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -370,7 +370,11 @@ the box's own fields in thread 11 are what its stamp binds. **Size:** medium; re
 >    README *Damaged boxes*; GraphQL's schema as above, both kinds of box typed.
 
 *Gloss:* *Preplan*, *Reads*: `VaultReadResponse` `{ vault, boxes: BoxSparse[], damagedBoxes:
-BoxDamaged[] }`, `splitStoredBoxes(rows: StoredBox[])` exported for adapters, every adapter
+BoxDamaged[] }`, `splitStoredBoxes(rows: StoredBox[])` exported for adapters (*Orchestrator, from
+thread 8:* rename the remaining "props" verbs and wire names, `putVaultProps`, `vault_props_stored`,
+`staleVaultProps`, `Expectations.vaultProps*`, the Convex and GraphQL `vaultProps` argument, and
+sweep "vault props" from VAULTDB.md, READMEs and test titles; slice from `VaultSparse`, since
+`VaultRecord`'s refine refuses `pick`), every adapter
 answering that shape, the base class checking a server's sound boxes again and parsing its word
 on the damaged ones; `BoxSparse`/`BoxDamaged` merging the box summary types (*Preplan*, *Box*);
 `damagedBoxes` on today's snapshot beside `boxes` (thread 12 reshapes the rest). GraphQL's
@@ -389,7 +393,11 @@ VaultStamp`, `getSnapshot`/`subscribe` as prototype getters returning private ar
 `Bank`), the five collaborator slices written out as `VaultStamp` / `ConsistencyWith<...>` with
 `keyDeriver`, `logger`, `leaseMillis` and `now` handed in at make; `class Box implements
 Boxscope, BoxSparse` and `class Lease implements LeaseSparse`, own frozen fields, the Box's two
-epochs its own fields. Tests that spied on a Vault spy on a collaborator. **Depends on:** thread
+epochs its own fields. Tests that spied on a Vault spy on a collaborator. *Orchestrator, from thread 8:* `vault.stamp`
+returns a `VaultSparse` (rename or drop it); `Lease implements Omit<LeaseSparse, 'format'>`
+(keep the format private, or say why not); `demandConsistentWith`'s parameter becomes
+`Partial<Omit<VaultSparse, 'format'>>`; thread 6's `vault.ask_passphrase_at` getter goes with the
+others. **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
 
 ### 12. The snapshot (Preplan Phase 7) -- `snapshot`
@@ -412,7 +420,7 @@ reads the snapshot. **Depends on:** thread 11. **Look-ahead:** thread 13's bank 
 `(Lifecycled<BankScope, 'made' | 'starting' | 'ready'> | Refused<BankScope>) & { vaults: readonly
 BankVault[] }`, `VaultEntry` → `BankVault`, `BankStatus`/`EntryStatus` → `lifecycle` unions;
 `vaultOf(scope)` from a map keyed by scopepath; `VaultParts` with the scope's names as own fields,
-frozen; Phase 9's lines not taken by thread 8. **Depends on:** thread 12. **Size:** medium.
+frozen. Phase 9 was finished by thread 8. **Depends on:** thread 12. **Size:** medium.
 
 ## Not in this sprint
 
