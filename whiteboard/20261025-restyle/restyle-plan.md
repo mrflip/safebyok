@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 7 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#278](https://github.com/mrflip/safebyok/pull/278)); thread 8 built ([#279](https://github.com/mrflip/safebyok/pull/279)), in review.
+* **Status:** threads 1 to 8 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#279](https://github.com/mrflip/safebyok/pull/279)); thread 9 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -345,6 +345,19 @@ the `vault_tok` validator (`StampShape` in box.ts and the expectations in vault-
 `VaultRecord`; thread 11's Vault object `implements VaultStamp`. **Size:** large; if the adapters
 run long, they are a thread of their own (8b), the core's change first.
 
+*Review:* medium, `fixed`. Checked and holding: every ctx's bytes unchanged (`ctx-bytes.test.ts`
+pins them); `gate_epoch` 0 ⇔ `gate` null on every write path; the sparse shapes keep wrapped keys
+and salts from a host (the old `stale_write` `meta.vault_props_stored` carries a whole record, by
+design, replaced before a host sees it); Postgres's columns and SQL check unchanged, a mismatched
+row reads as damaged; Convex's two `mustBe`s unchanged, and clearing the tables before a deploy is
+necessary (told in the README's *Upgrading* and the changeset); no check removed; an old flat v6
+record, gated or novel, reads as damaged. Fixed: a loose `== null` in `delWayin`; blank lines; two
+test cases lost in the move, plus a flat novel v6 record. Left: a demand on an empty `vault_tok`
+now refuses `bad_option` (changeset clause, thread 9); `raisedDeviceRecord` can now throw
+`bad_record` inside a host's transaction (thread 9 documents it); hand-written
+`VaultRecord & { gate: ... }` and `Stamped` types, `stampOf` listing fields by hand, `MadeUnder`,
+`LeaseSparse` beside `LeaseStamp` (thread 11). Filed as [#279](https://github.com/mrflip/safebyok/pull/279).
+
 ### 9. Each ctx binds its stamps (Preplan Phase 4, the ctx) -- `cipher_ctx`
 
 > 4. (continued) `cipherCtx(stamp, purpose, header)` at wayin.ts:39, lease.ts:47 and lease.ts:256.
@@ -397,7 +410,10 @@ epochs its own fields. Tests that spied on a Vault spy on a collaborator. *Orche
 returns a `VaultSparse` (rename or drop it); `Lease implements Omit<LeaseSparse, 'format'>`
 (keep the format private, or say why not); `demandConsistentWith`'s parameter becomes
 `Partial<Omit<VaultSparse, 'format'>>`; thread 6's `vault.ask_passphrase_at` getter goes with the
-others. **Depends on:** thread
+others. From #279's review: name what is written out at many sites (`GatedVaultRecord`, an
+exported `VaultDraft`, the `Stamped` parameter) if that reads better; derive `stampOf` by leaving
+out `gate` (`const { gate: _gate, ...sparse } = record`), not by listing fields; `MadeUnder` in
+box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`. **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
 
 ### 12. The snapshot (Preplan Phase 7) -- `snapshot`
