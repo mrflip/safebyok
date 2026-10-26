@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 built ([#273](https://github.com/mrflip/safebyok/pull/273)), in review.
+* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 filed ([#273](https://github.com/mrflip/safebyok/pull/273)); thread 3 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -129,6 +129,14 @@ of a wrapped schema still refuses with the call's kind, or doesn't, and says so 
 block). Thread 5 builds `Scopepath` on the scopepath tuples made here. **Size:** large. Moves
 every core line up (`Bank`, `everything` and the entries importing a check).
 
+*Review:* medium, `fixed`. Fixed VAULTDB.md's *Who does what* (it still named the name floor and
+the host's validators). Left, each with its disposition: `SayableName` admits key-shaped unknown
+fields (thread 3 narrows it: an Open Matter); an empty `user_id` gets two sentences (thread 3
+aborts on the min); classic Zod sets the global locale (thread 3's changeset); `heldName` and
+`maxNameBytes` near vestigial (left); `ScopepathDelimiter` duplicates `Ckeys.Delimiter` (thread 5);
+Postgres and GraphQL READMEs' 640-byte lead and Convex's stale `component/validators.ts` doc block
+(thread 3). PR body and draft state wait on the Coach (denied to the worker).
+
 ### 3. Every schema in classic Zod (Preplan Phase 1, second half) -- `zod_classic`
 
 > (Phase 1, continued:) Every validator is made inside a `Validator` call [...]. The few helpers
@@ -145,7 +153,12 @@ every core line up (`Bank`, `everything` and the entries importing a check).
 newer `format`), as suggested. `zod/mini` leaves `src/`, and the eslint rule that held it goes
 the other way (classic only). Keep each schema's shape as today: thread 8 restructures the vault
 record, so don't polish `vaultProps` beyond the conversion. *Orchestrator, from thread 2:* the kit and its limits are in the progress document, *From thread
-2*; `bankApplabel` and `sealBoxlabel` are interim, for thread 7. **Depends on:** thread 2.
+2*; `bankApplabel` and `sealBoxlabel` are interim, for thread 7. From #273's review (YOLO, each an
+Open Matter): narrow `SayableName` before the strict records land, so an unknown key is repeated
+only when shaped as one of our field names (lowercase underbar or camelCase, short), or never;
+`abort: true` on `user_id`'s `min(1)`; the changeset says classic Zod sets the global locale;
+reword Convex's `component/validators.ts` doc block and the Postgres and GraphQL READMEs' name
+lines. **Depends on:** thread 2.
 **Look-ahead:** threads 4 and 8 brand and slice these. **Size:** large, mostly mechanical; it
 may run long: if it does, split by package or concern and report. Moves the core lines (down,
 once mini is gone).
