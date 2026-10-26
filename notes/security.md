@@ -41,6 +41,31 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
+  strict; a refusal repeats only keys shaped like our field names; classic Zod loads and sets its global locale.**
+  (1) Every stored-record schema (vault props gated and gateless, the passphrase and passkey wayin records, the tombstone, the box record, the
+  lease record, the device record, `Ciphered`) is a strict object: a field this version does not write is refused on the way in (a `VaultDB` verb
+  `bad_record`, a box `invalid_box`, before the adapter sees it) and reads back as damage (`damaged_vault`, `damaged_box`), where an unknown field
+  was silently stripped. A lease or device record in this device's store holding an unknown field is discarded and read as absent, as any lease
+  or device record failing its check already was; for the device record that drops its `highest_vault_epoch` rollback watermark. This leans on
+  the rule that any change to a stored shape bumps `format`.
+  (2) A refusal repeats a key only when it is shaped as one of the package's own field names: snake_case words (`salt_b64`) or camelCase
+  (`maxWhisperBytes`, `vaultDB`), each word letters ending in at most three digits, 32 characters at most (`packages/safebyok/src/checks/validator.ts`:
+  `isSayable`, `SnakeFieldname`, `CamelFieldname`, `sayable`); any other key in a failing path or an unknown-field list is said as "(a name not
+  repeated here)". This replaced `/^[A-Za-z_]\w{0,63}$/`, which would have repeated a key like `ghp_` plus 36 characters. It is a shape heuristic: a
+  key of lowercase letters only, 32 characters or fewer, is still repeated. `Bank.make`'s unknown-option refusal now names an unknown key through
+  the same `sayable` (it named every unknown key raw), and the per-call option checks (`hello`, `ensureUnlocked`, `demandConsistentWith`, `putBox`
+  props, `Box.seal` props) no longer use Zod's `Unrecognized key: "..."` text, which quoted each unknown key raw.
+  (3) A refusal of a record read back from storage, or of an adapter's answer, now carries as its `cause` the record check's own `bad_record`
+  `VaultError` (its message names each failing field with Zod's English sentence; `meta.fieldnames` lists the fields; no value is quoted), where
+  it carried Zod's `ZodError`, whose issues held unknown keys raw. Outgoing `bad_record` refusals from a `VaultDB` verb carry that cause too.
+  (4) `zod/mini` is gone from every package's `src/`; the core and `safebyok-indexeddb` import classic `zod` (`^4.6.7`). Importing safebyok now loads
+  classic Zod, which sets Zod's global locale (`z.config`) to English on load; a host's own `z.config` still wins for its own schemas, and the
+  `Validator` refusals pass Zod's English locale per parse, so a host's error map (which could quote input) is never used in a safebyok refusal
+  message. Validators whose call sites still use `safeParse` throw their own hand-written messages, never Zod's text.
+  (5) The `Validator` factory's wrapper of each schema is now `schema.clone()` (a distinct Zod schema over the same definition) with its own
+  `parse` overridden, where it was `Object.create(schema)`, because Zod binds methods such as its JSON Schema processors to the original instance.
+  `safeParse` stays Zod's own.
 * 2026-10-26 (restyle sprint, thread 2, branch `20261026-validator`, [#273](https://github.com/mrflip/safebyok/pull/273)): **a `Validator` factory
   refuses without quoting its input, and classic Zod 4.6.7 is a peer.**
   A failed `parse` of a `Validator` (`packages/safebyok/src/checks/validator.ts`) throws a `VaultError` of the call's kind. Its
@@ -48,13 +73,14 @@ added or folded into through the subagent, and no other entry changes.
   the paths. It never quotes an input value: Zod 4.6.7's own messages name a type, a limit or the allowed values, and an issue
   carries `input` only under `reportInput`, which is never passed. Each parse passes Zod's English locale as a per-parse error
   map, so a host's global `z.config({ customError })`, which could quote the input, never shapes our messages. A path step or
-  unknown key is repeated only when it is shaped like one of our field names (`/^[A-Za-z_]\w{0,63}$/`); any other key could be the
+  unknown key is repeated only when it is shaped like one of our field names (`/^[A-Za-z_]\w{0,63}$/`; amended 2026-10-26 (zod_classic):
+  now `isSayable`, see the entry of that date); any other key could be the
   caller's data (a record's key, a pasted secret) and is said as "(a name not repeated here)". The refusal carries no `cause`,
   since the `ZodError` holds the input. `safeParse` and `parseAsync` stay Zod's own and are not refusals, so a host calling them
   gets Zod's errors as Zod makes them. Classic Zod `^4.6.7` is now a peer of `safebyok` and `safebyok-indexeddb` (the Coach's
   ruling in the 2026-10-25 restyle session; it replaces the `^4.0.0` peer of 2026-10-14), and the core bundles classic beside
   `zod/mini` for one thread (about 15 kB brotlied more on `Bank`), where the 2026-10-15 entry has the core's lint refuse classic
-  in `src/`. The kit leaves out the `zod` namespace object, which would carry every Zod locale.
+  in `src/` (amended 2026-10-26 (zod_classic): `zod/mini` is gone from every package's `src/`, and the lint refuses it there). The kit leaves out the `zod` namespace object, which would carry every Zod locale.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **the put_passkey dialog makes the passkey before the passphrase is checked.**
   `GatingModal`'s `PutPasskeyForm` (`packages/safebyok-react/src/gating-modal.tsx`) calls `createPasskey()` at each submit, straight
   from the submit's user gesture as WebAuthn requires, then hands the passphrase and the new passkey's PRF answer to the
@@ -1271,7 +1297,8 @@ added or folded into through the subagent, and no other entry changes.
   (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
   over the option names. Before, unknown keys were ignored, so a host still passing the retired
   `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
-  The refusal names the unknown keys (the host's own field names, never a value) and, from a small
+  The refusal names the unknown keys (the host's own field names, never a value; amended 2026-10-26 (zod_classic): `Bank.make`'s refusal
+  names a key only through `sayable`, and says any other as "(a name not repeated here)") and, from a small
   table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
   not know to `Vault.make`, so those reach the error boundary rather than being dropped (amended 2026-10-22 (bank_provider): `BankProvider` forwards them to `Bank.make`, and the refusal is thrown to the error boundary).
   (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
@@ -1600,7 +1627,8 @@ added or folded into through the subagent, and no other entry changes.
   (fault_kinds, PR [#240](https://github.com/mrflip/safebyok/pull/240)): a record read from storage
   that fails its checks is refused `damaged_box` (a box, one naming another boxlabel included) or
   `damaged_vault` (vault props, one naming another scope included), at the `VaultDB` layer as at the
-  vault's, still left in place; Zod's error is the refusal's `cause`, and `corrupt_record` now means
+  vault's, still left in place; Zod's error is the refusal's `cause` (amended 2026-10-26 (zod_classic): the record check's `bad_record` `VaultError`, see
+  the entry of that date), and `corrupt_record` now means
   only an adapter answering in the wrong shape (a write echo, a stale or full refusal missing its
   meta, a deletion report, capacity), its family moved from condition to misuse. A lease read from
   this device's own store still fails as `corrupt_record` internally, never surfaced (the vault asks
@@ -2069,7 +2097,7 @@ added or folded into through the subagent, and no other entry changes.
   `useBank()` (`bank.ensureVault`), and misuse (family 'misuse', `unexpected_error` included) is thrown in render to the
   nearest error boundary. A damaged vault is mended by `bank.delDamagedVault`, not by asking again.
 * 2026-10-15: every validator in the core is `zod/mini` (`import * as Z from 'zod/mini'`; the
-  core's lint refuses classic `zod` in `src/`). Same checks, limits and messages as before; mini
+  core's lint refuses classic `zod` in `src/`; amended 2026-10-26 (zod_classic): `zod/mini` is gone from every package's `src/`, and the core imports classic `zod`). Same checks, limits and messages as before; mini
   shares classic's parsing core, and the test suite passes against zod 4.0.0, the peer range's
   floor, as against the current 4.6. Mini loads no locale, so a zod issue's default message is
   generic, but no zod message reaches a caller of the vault or its VaultDB: every refusal there
@@ -2079,13 +2107,15 @@ added or folded into through the subagent, and no other entry changes.
   off). The build keeps each module its own file in `dist/` (`unbundle`), so a host's bundle
   carries only the modules its imports reach. Amended 2026-10-21 (fault_kinds): a `damaged_box` or
   `damaged_vault` refusal for a stored record that failed its schema now carries Zod's error as its
-  `cause`, so a Zod message does reach a caller there. `reportInput` stays off: an issue's path can
+  `cause`, so a Zod message does reach a caller there (amended 2026-10-26 (zod_classic): the `cause` is the record check's `bad_record` `VaultError`,
+  not a `ZodError`; its issues held unknown keys raw). `reportInput` stays off: an issue's path can
   name a stored sidecar's keys, never its values. A test checks that each damaged refusal's message,
   stack, `cause` and JSON hold no ciphertext and no sidecar text.
 * 2026-10-15: every `VaultDB` write verb validates its record and its expectation against the
   schemas its reads use, before the adapter's half sees them, so the core never writes a record
   its own read would refuse (an over-long sidecar once did, and the vault could not be opened again);
-  Zod strips a field it does not know, so none reaches storage. `putVaultProps` refuses vault props
+  Zod strips a field it does not know, so none reaches storage (amended 2026-10-26 (zod_classic): every stored-record schema is strict; an unknown field is
+  refused, not stripped). `putVaultProps` refuses vault props
   whose `vault_id` differs from the expected one. Listing still validates only what a listing
   shows: a box whose ciphered fields are damaged lists, and is refused at `getBox()`, so one
   damaged box never makes the vault fail to open; such a box cannot be stored over or deleted
@@ -3277,7 +3307,9 @@ added or folded into through the subagent, and no other entry changes.
   quotes the options. Amended 2026-10-21 (checker): every options-bag check (`optionsCheck`: `hello`,
   `ensureLease`, `putBox`, `Box.seal`, the validators, a VaultDB call's opts) and `Vault.make`'s options
   schema now report Zod's own English message, `zod/mini`'s `en` locale passed per parse and never by
-  `Z.config`, so the host's Zod is untouched. Zod's English names the type of a refused value, never
+  `Z.config`, so the host's Zod is untouched (amended 2026-10-26 (zod_classic): classic Zod's English locale, still passed per parse, but importing
+  safebyok now sets Zod's global locale; the per-call option checks no longer use Zod's `Unrecognized key: "..."` text, which quoted each
+  unknown key raw). Zod's English names the type of a refused value, never
   the value; it does quote the options bag's field names (the host's code), where `optionsCheck`
   formerly quoted nothing. No secret material reaches these bags.
 * 2026-10-17 (PR [#6](https://github.com/mrflip/safebyok/pull/6)): **the non-extractable vaultKey
