@@ -63,8 +63,8 @@ const HoldingCaret = [
 
 describe("Ckeys, refusing a name that holds its delimiter", () => {
   for (const [scope, boxlabel, part] of HoldingCaret) {
-    it(`refuses a ${part} holding ^ as bad_label, naming the part and quoting none of it`, () => {
-      const refusal = TH.expectSyncRefusal(() => Ckeys.box(scope, boxlabel), 'bad_label')
+    it(`refuses a ${part} holding ^ as bad_scope, naming the part and quoting none of it`, () => {
+      const refusal = TH.expectSyncRefusal(() => Ckeys.box(scope, boxlabel), 'bad_scope')
       expect(TH.thrownText(refusal)).to.include(part)
       expect(TH.thrownText(refusal)).to.not.include('anthro^pic')
       expect(TH.thrownText(refusal)).to.not.include('u1^x')
@@ -74,12 +74,12 @@ describe("Ckeys, refusing a name that holds its delimiter", () => {
   it("refuses a scope holding ^ in every ckey it makes: vault props, lease, device record and prefix", () => {
     const scope = { ...u1, user_id: 'u1^x' }
     for (const make of [Ckeys.vaultProps, Ckeys.lease, Ckeys.deviceRecord, Ckeys.boxPrefix]) {
-      TH.expectSyncRefusal(() => make(scope), 'bad_label')
+      TH.expectSyncRefusal(() => make(scope), 'bad_scope')
     }
   })
 
   it("refuses as its last example shows", () => {
-    TH.expectSyncRefusal(() => Ckeys.box({ ...u1, user_id: 'a^b' }, 'x'), 'bad_label')
+    TH.expectSyncRefusal(() => Ckeys.box({ ...u1, user_id: 'a^b' }, 'x'), 'bad_scope')
   })
 })
 

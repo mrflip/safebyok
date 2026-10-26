@@ -238,7 +238,7 @@ describe("AnyTextValidators", () => {
     expect(validators.userId.safeParse('').success).to.be.false
     const { userId: _userId, vaultlabel: _vaultlabel, ...opts } = TH.memoryVaultOpts()
     const bank = Bank.make({ ...opts, validators })
-    await TH.expectRefusal(bank.ensureVault({ userId: 'Alice Smith', vaultlabel: 'Work keys' }), 'bad_label')
+    await TH.expectRefusal(bank.ensureVault({ userId: 'Alice Smith', vaultlabel: 'Work keys' }), 'bad_scope')
     const vault = await bank.ensureVault({ userId: 'alice', vaultlabel: 'Work keys' })
     expect(vault.vaultlabel).to.eq('Work keys')
     bank.closeVaults()

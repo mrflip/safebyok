@@ -205,7 +205,7 @@ describe("bank.ensureVault", () => {
     expect(vault.getSnapshot()).to.deep.include({ state: 'locked', vault_tok: maker.vault_tok, gate_epoch: 1 })
   })
 
-  it("refuses a draft amiss before storage is touched: 'bad_option' for no bag or a field it does not take, 'bad_label' for a name", async () => {
+  it("refuses a draft amiss before storage is touched: 'bad_option' for no bag or a field it does not take, 'bad_scope' for a name", async () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world)
@@ -213,7 +213,7 @@ describe("bank.ensureVault", () => {
       await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_option')
     }
     for (const draft of [{ ...U1, userId: '' }, { ...U1, vaultlabel: 'not-a-label' }, { vaultlabel: 'main' }]) {
-      await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_label')
+      await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_scope')
     }
     expect(births).not.toHaveBeenCalled()
   })
@@ -477,7 +477,7 @@ describe("bank.delDamagedVault", () => {
     expect(reborn.state).to.eq('novel')
   })
 
-  it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_label'", async () => {
+  it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_scope'", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(U1)
@@ -485,7 +485,7 @@ describe("bank.delDamagedVault", () => {
     const stored = await TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
     expect(stored).to.not.be.null
     expect(bank.entryOf(U1)?.vault).to.eq(vault)
-    await TH.expectRefusal(bank.delDamagedVault({ userId: 'u1', vaultlabel: 'Not A Label' }), 'bad_label')
+    await TH.expectRefusal(bank.delDamagedVault({ userId: 'u1', vaultlabel: 'Not A Label' }), 'bad_scope')
   })
 
   it("deletes a damaged vault the bank holds no entry for, never asked of it: storage's own checks decide, and the next ensureVault births a new life, novel", async () => {
@@ -942,12 +942,12 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     TH.expectSyncRefusal(() => bank.subscribe('listen' as unknown as () => void), 'bad_option')
   })
 
-  it("reads an entry's status, or undefined for a vault not asked for, as entryOf's example shows; a bad name refuses 'bad_label'", async () => {
+  it("reads an entry's status, or undefined for a vault not asked for, as entryOf's example shows; a bad name refuses 'bad_scope'", async () => {
     const bank = bankIn(makeWorld())
     expect(bank.entryOf({ userId: 'u1', vaultlabel: 'main' })?.status).to.be.undefined
     await bank.ensureVault(U1)
     expect(bank.entryOf({ userId: 'u1', vaultlabel: 'main' })?.status).to.eq('timely')
-    TH.expectSyncRefusal(() => bank.entryOf({ userId: 'u1', vaultlabel: 'not-a-label' }), 'bad_label')
+    TH.expectSyncRefusal(() => bank.entryOf({ userId: 'u1', vaultlabel: 'not-a-label' }), 'bad_scope')
   })
 
   it("births a vault through the browser's defaults, as the class's first example shows", async () => {
@@ -979,9 +979,9 @@ describe("parseVaultDraft", () => {
     expect(scope).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
-  it("refuses a name that fails its check as bad_label, and a misspelt field as bad_option", () => {
+  it("refuses a name that fails its check as bad_scope, and a misspelt field as bad_option", () => {
     const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
-    TH.expectSyncRefusal(() => parseVaultDraft({ userId: 'u^1', vaultlabel: 'main' }, bank), 'bad_label')
+    TH.expectSyncRefusal(() => parseVaultDraft({ userId: 'u^1', vaultlabel: 'main' }, bank), 'bad_scope')
     TH.expectSyncRefusal(() => parseVaultDraft({ userId: 'u1', vaultlabel: 'main', vaultlable: 'x' } as VaultDraft, bank), 'bad_option')
   })
 })

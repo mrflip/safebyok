@@ -26,7 +26,7 @@ describe("BankProvider", () => {
       )
       await expectShown('boundary')
       expect(caught).to.have.length(1)
-      expect(isVaultError(caught[0], 'bad_label')).to.be.true
+      expect(isVaultError(caught[0], 'bad_scope')).to.be.true
     })
 
     it("throws a validators bag with a misspelt field to the error boundary, rather than keep the default check unseen", async () => {

@@ -115,7 +115,7 @@ export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<un
  * @param refusalkind - The refusal's expected `refusalkind`.
  * @returns The refusal, for a closer look at its message.
  *
- * @example TH.expectSyncRefusal(() => Ckeys.box({ ...scope, user_id: 'a^b' }, 'x'), 'bad_label')
+ * @example TH.expectSyncRefusal(() => Ckeys.box({ ...scope, user_id: 'a^b' }, 'x'), 'bad_scope')
  */
 export const expectSyncRefusal = (attempt: () => unknown, refusalkind: RefusalKind): VaultError => {
   let refusal: unknown = NotRefused

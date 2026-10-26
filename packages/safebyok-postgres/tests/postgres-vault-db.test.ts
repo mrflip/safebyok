@@ -643,10 +643,10 @@ describe("postgresVaultDB, getVaultRecords", () => {
     expect(summary).to.not.have.property('format')
   })
 
-  it("refuses a malformed scope with bad_label, before the database is asked", async () => {
+  it("refuses a malformed scope with bad_scope, before the database is asked", async () => {
     const db = await TH.emptyDatabase()
     const spy = TH.spyClient(db)
-    await TH.expectBad(postgresVaultDB({ client: spy.client, userId: 'u1' }).getVaultRecords({ ...u1, vaultlabel: 42 } as never), 'bad_label')
+    await TH.expectBad(postgresVaultDB({ client: spy.client, userId: 'u1' }).getVaultRecords({ ...u1, vaultlabel: 42 } as never), 'bad_scope')
     expect(spy.sent).to.have.lengthOf(0)
   })
 
@@ -655,7 +655,7 @@ describe("postgresVaultDB, getVaultRecords", () => {
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
     for (const vaultlabel of ['main^x', 'tab\there', 'n'.repeat(641)]) {
-      const refusal = await TH.expectBad(vaultDB.getVaultRecords({ ...u1, vaultlabel }), 'bad_label')
+      const refusal = await TH.expectBad(vaultDB.getVaultRecords({ ...u1, vaultlabel }), 'bad_scope')
       // Each refusal names the name and the rule it broke, as every verb's does, quoting none of it.
       expect(refusal.message).to.include('vaultlabel')
       expect(refusal.message).to.not.include(vaultlabel)
@@ -667,7 +667,7 @@ describe("postgresVaultDB, getVaultRecords", () => {
   it("declares 640 bytes the most it holds in one name, refusing a longer one at every verb", async () => {
     const vaultDB = TH.requestFor(await TH.emptyDatabase(), 'u1')
     expect(vaultDB.maxNameBytes).to.eq(640)
-    await TH.expectBad(vaultDB.getVault({ ...u1, vaultlabel: 'n'.repeat(641) }), 'bad_label')
+    await TH.expectBad(vaultDB.getVault({ ...u1, vaultlabel: 'n'.repeat(641) }), 'bad_scope')
   })
 
   it("refuses driver trouble with storage_unavailable, the driver's error as its cause", async () => {

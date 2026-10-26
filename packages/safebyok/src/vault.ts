@@ -132,7 +132,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * raises a gating, handed to the host's `requestCleartext`, one at a time. Nothing prompts on open.
  *
  * Every call holds to these, unless its own doc says otherwise:
- *  * A malformed argument or option is refused 'bad_option' ('bad_label' for a name) before
+ *  * A malformed argument or option is refused 'bad_option' ('bad_scope' for a name) before
  *    anything is read, asked for or written. Its message names the field, never the value.
  *  * A call refuses with what storage refuses, as it came.
  *  * Once the Vault object is gone -- the bank let it go, or the vault was deleted, or deleted and
@@ -617,7 +617,7 @@ export class Vault {
    * its sidecar nor its `registered_at`, when the whisper is given; a store keeping its whisper
    * refuses 'damaged_box'. One listed damaged with no revision refuses 'damaged_box', writing
    * nothing: {@link Vault.delBox} it first. A boxlabel the vault's check refuses is refused
-   * 'bad_label', even where a box stands under it: the check gates writes alone.
+   * 'bad_scope', even where a box stands under it: the check gates writes alone.
    *
    * @param props - The box: its `boxlabel`, and its `sidecar`, your app's own JSON object beside the
    *   whisper, shown in the snapshot while locked, and never interpreted by the vault. Anything but a
@@ -662,7 +662,7 @@ export class Vault {
    * this Vault object is gone with it: ask the bank for the vault again (`bank.ensureVault`).
    * Deleted or made anew while storage is read, it refuses
    * 'vault_gone' or 'vault_remade', as when the bank lets the vault go; a lock landing then refuses
-   * 'vault_locked', handing back no box. The boxlabel is held to the floor alone, 'bad_label'
+   * 'vault_locked', handing back no box. The boxlabel is held to the floor alone, 'bad_scope'
    * below it: the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
    *
    * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
@@ -711,7 +711,7 @@ export class Vault {
 
   /** Remove the box `boxlabel`, whatever revision of it stands, resolving what was removed: a damaged one too, as deleting is its remedy.
    * Once it resolves, storage holds no box under `boxlabel`. It asks for a proof, and refuses
-   * 'absent_box' at once for a box the snapshot does not list, or 'bad_label', as {@link Vault.getBox}
+   * 'absent_box' at once for a box the snapshot does not list, or 'bad_scope', as {@link Vault.getBox}
    * does; 'absent_box' too when another device or tab deleted it first. Writes with
    * `VaultDB.delBox`, which keeps no record of what it removed.
    *

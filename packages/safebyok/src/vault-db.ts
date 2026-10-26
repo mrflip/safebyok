@@ -178,7 +178,7 @@ export type VaultDBOpts = {
  *
  *  * It resolves an {@link Outcome} and never rejects. {@link VaultDB.subscribe} alone throws.
  *  * Each name handed to it, the scope's three and a boxlabel, is held to the floor (`NameFloor`)
- *    and to {@link VaultDB.maxNameBytes} before your `do*` method sees it: 'bad_label' otherwise.
+ *    and to {@link VaultDB.maxNameBytes} before your `do*` method sees it: 'bad_scope' otherwise.
  *    A name inside a record below the floor refuses as that record does.
  *  * A host's own `validators` are never checked here: a server serving several clients takes any
  *    name above the floor.
@@ -801,7 +801,7 @@ const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
 /** What a backend declares about the names it holds. */
 type NameFacts = Pick<VaultDB, 'maxNameBytes'>
 
-/** `scope`, once each name passes the floor and fits the backend: 'bad_label' otherwise, quoting none of it. */
+/** `scope`, once each name passes the floor and fits the backend: 'bad_scope' otherwise, quoting none of it. */
 const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
   const asked = Names.checkScope(FloorRules, scope)
   heldName(facts, 'applabel', asked.applabel)
@@ -810,14 +810,14 @@ const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
   return asked
 }
 
-/** `boxlabel`, once it passes the floor and fits the backend: 'bad_label' otherwise. */
+/** `boxlabel`, once it passes the floor and fits the backend: 'bad_scope' otherwise. */
 const heldBoxlabel = (facts: NameFacts, boxlabel: unknown): string => heldName(facts, 'boxlabel', Names.checkFloor('boxlabel', boxlabel))
 
-/** `part`, a name, once it fits the backend's `maxNameBytes`: 'bad_label' otherwise, naming `said` and the limit. */
+/** `part`, a name, once it fits the backend's `maxNameBytes`: 'bad_scope' otherwise, naming `said` and the limit. */
 const heldName = (facts: NameFacts, said: string, part: string): string => {
   const partBytes = new TextEncoder().encode(part).length
   if (partBytes > facts.maxNameBytes) {
-    throw new VaultError('bad_label', `That ${said} is ${String(partBytes)} bytes of UTF-8, over the ${String(facts.maxNameBytes)} this storage holds in one name: choose a shorter ${said}.`)
+    throw new VaultError('bad_scope', `That ${said} is ${String(partBytes)} bytes of UTF-8, over the ${String(facts.maxNameBytes)} this storage holds in one name: choose a shorter ${said}.`)
   }
   return part
 }

@@ -323,7 +323,7 @@ describe("Box.seal", () => {
     [{ props: { sidcar: { note: Secret } } },                         'bad_option',   'a misspelt prop'],
     [{ props: { base: { revision: Secret } } },                       'bad_option',   'a base that shows no revision_tok'],
     [{ props: { base: { revision_tok: 'r1', registered_at: 'then' } } }, 'bad_option', 'a base whose registered_at is no time'],
-    [{ props: { boxlabel: '' } },                                     'bad_label',    'an empty boxlabel'],
+    [{ props: { boxlabel: '' } },                                     'bad_scope',    'an empty boxlabel'],
   ] as const
 
   for (const [given, refusalkind, blurb] of SealRefusals) {
@@ -357,7 +357,7 @@ describe("Box.seal", () => {
     const vault = await vaultOf()
     const box = await TH.expectGood(Box.trySeal(vault, { boxlabel: 'anthropic_api_key' }, Secret))
     expect(box).to.be.instanceOf(Box)
-    await TH.expectBad(Box.trySeal(vault, { boxlabel: '' }, Secret), 'bad_label')
+    await TH.expectBad(Box.trySeal(vault, { boxlabel: '' }, Secret), 'bad_scope')
   })
 
   it("refuses as 'vault_locked' a seal by another copy of safebyok into a vault this copy holds: that copy reads no lease of it", async () => {

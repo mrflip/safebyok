@@ -11,7 +11,7 @@ import type { VaultScope } from './types'
  *
  * No two rows share a ckey, and every ckey splits back into its names. A ckey is part of what is
  * stored: rows filed under these are where every other device's copy of the package looks.
- * Each maker refuses 'bad_label' for a name holding `^`, which `NameFloor` refuses anyway.
+ * Each maker refuses 'bad_scope' for a name holding `^`, which `NameFloor` refuses anyway.
  */
 
 /** The character every ckey joins its parts on, which no name may hold: `^`. */
@@ -89,10 +89,10 @@ const BoxParts = 5
 /** A scope's three names, each beside what a refusal calls it. */
 const scopeParts = (scope: VaultScope): Part[] => [['applabel', scope.applabel], ['user_id', scope.user_id], ['vaultlabel', scope.vaultlabel]]
 
-/** `part`, once it is free of `^`; refuses 'bad_label' otherwise, naming the part and quoting none of it. */
+/** `part`, once it is free of `^`; refuses 'bad_scope' otherwise, naming the part and quoting none of it. */
 const partOf = ([said, part]: Part): string => {
   if (part.includes(Delimiter)) {
-    throw new VaultError('bad_label', `That ${said} holds '${Delimiter}', which no name may hold: storage joins names on it.`)
+    throw new VaultError('bad_scope', `That ${said} holds '${Delimiter}', which no name may hold: storage joins names on it.`)
   }
   return part
 }

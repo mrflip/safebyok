@@ -137,7 +137,7 @@ within it. Every name a verb is handed passes, before the adapter sees it:
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
 A name handed to a verb on its own or in a scope, and a name the floor admits but over
-`maxNameBytes` wherever it is, is refused as `bad_label`, naming which name and which rule, and
+`maxNameBytes` wherever it is, is refused as `bad_scope`, naming which name and which rule, and
 quoting none of it. A name below the floor inside a record -- the vault props' scope, a box's
 boxlabel -- makes that record one this package does not build, refused whole as `bad_record`
 (a box, as `invalid_box`), naming the record and quoting none of it.
@@ -404,7 +404,7 @@ vault props `Refusals.staleVaultProps(standing)`), `vault_mismatch`
 (a box write or read, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large`, `damaged_vault`,
+class refuses `bad_scope`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large`, `damaged_vault`,
 `damaged_box` and `corrupt_record` itself, before the adapter is asked or after it answers.
 
 A record that fails its checks is named for who is at fault. One the caller hands in is
@@ -495,7 +495,7 @@ boxes might not fit in it.
 **7.3. The most it holds in one name.** `maxNameBytes`, a whole number above zero, or `Infinity`
 for a backend that holds any name the floor admits: the bytes of UTF-8 its keys and indexes hold
 of one name. Postgres, whose box key is a btree entry of four names together, declares 640.
-The base class refuses a longer name (`bad_label`) before the adapter sees it, in every verb.
+The base class refuses a longer name (`bad_scope`) before the adapter sees it, in every verb.
 
 A backend that does not hold to the limits it declares, or a vault opened with limits that
 disagree with its backend's, is outside this contract: not a bug we will fix, and not one whose

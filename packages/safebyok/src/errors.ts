@@ -4,7 +4,7 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
  *
- * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
+ * * **Misuse**: a programming error, the host developer's to fix. `bad_scope`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`,
  *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`, `passphrase_required`. Let it reach an error boundary
  *   or the dev overlay.
@@ -27,8 +27,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   Either way the user deletes a box, or the host raises `maxBoxes` where the backend allows.
  * * `whisper_too_large`: the whisper with its sidecar over `maxWhisperBytes`. `box_too_large`: the
  *   whisper and sidecar together over what storage holds in one record.
- * * `bad_label`: a label the app passed that fails the vault's check. Check a label the user types
- *   first, with `Label` or the host's own `validators.boxlabel`.
+ * * `bad_scope`: a name the app passed (an applabel, a user_id, a vaultlabel or a boxlabel) that
+ *   fails its check. Check a name the user types first, with the same check (`Label` or `UserId` by default).
  * * `identity_revoked`: storage no longer serves the user this vault was opened for (signed out,
  *   or another user signed in). The vault locks as it refuses. The user signs in again, and the
  *   host opens the vault for whoever that is.
@@ -103,7 +103,7 @@ export const RefusalKindVals = [
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
-  'bad_label',           // a label, or the userId, that fails the vault's check for it
+  'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
@@ -159,7 +159,7 @@ export const RefusalFamilyForKind = {
   absent_box:          'condition',
   absent_vault:        'condition',
   absent_wayin:        'condition',
-  bad_label:           'misuse',
+  bad_scope:           'misuse',
   bad_whisper:         'misuse',
   whisper_too_large:   'condition',
   box_too_large:       'condition',

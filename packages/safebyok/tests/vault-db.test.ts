@@ -402,7 +402,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 
   it("refuses to subscribe to a scope below the floor", () => {
     const vaultDB = new MapVaultDB()
-    expect(() => vaultDB.subscribe({ ...TH.scopeOf('u1'), applabel: '' }, unheard)).to.throw(VaultError, /applabel/).with.property('refusalkind', 'bad_label')
+    expect(() => vaultDB.subscribe({ ...TH.scopeOf('u1'), applabel: '' }, unheard)).to.throw(VaultError, /applabel/).with.property('refusalkind', 'bad_scope')
   })
 
   it("refuses an onChange that is not a function, so no later write meets it", () => {
@@ -587,7 +587,7 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
       protected override doGetVault(): Promise<StoredVault> { return Promise.reject(new Error('connection reset')) }
     }
     await TH.expectBad(new DownVaultDB().delDamagedVault(TH.scopeOf('u1')), 'storage_unavailable')
-    await TH.expectBad(new MapVaultDB().delDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_label')
+    await TH.expectBad(new MapVaultDB().delDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_scope')
   })
 })
 // --
@@ -884,9 +884,9 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
     expect(JSON.stringify(capacity)).to.not.include('null')  // as Infinity would cross
   })
 
-  it("refuses a scope below the floor as bad_label, before its adapter is asked", async () => {
+  it("refuses a scope below the floor as bad_scope, before its adapter is asked", async () => {
     const vaultDB = new CapacityAnsweringVaultDB(() => Promise.reject(new Error('never asked')))
-    await TH.expectBad(vaultDB.getCapacity({ ...TH.scopeOf('u1'), vaultlabel: 'a^b' }), 'bad_label')
+    await TH.expectBad(vaultDB.getCapacity({ ...TH.scopeOf('u1'), vaultlabel: 'a^b' }), 'bad_scope')
   })
 
   for (const [answer, blurb] of [[null, 'null'], ...UnsoundCapacityCases.slice(1)] as const) {
@@ -1177,11 +1177,11 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   ] as const
 
   for (const [candidate, blurb] of BelowTheFloor) {
-    it(`refuses ${blurb} as bad_label as a boxlabel and in a scope, as bad_record in vault props and invalid_box in a box, before its adapter's half sees it`, async () => {
+    it(`refuses ${blurb} as bad_scope as a boxlabel and in a scope, as bad_record in vault props and invalid_box in a box, before its adapter's half sees it`, async () => {
       const vaultDB = new MapVaultDB()
-      await TH.expectBad(vaultDB.getVault({ ...TH.scopeOf('u1'), vaultlabel: candidate }), 'bad_label')
-      await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), candidate, TH.inThisVault), 'bad_label')
-      await TH.expectBad(vaultDB.putBox({ ...TH.scopeOf('u1'), applabel: candidate }, TH.noBoxYet, TH.boxOf('anthropic', 'one')), 'bad_label')
+      await TH.expectBad(vaultDB.getVault({ ...TH.scopeOf('u1'), vaultlabel: candidate }), 'bad_scope')
+      await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), candidate, TH.inThisVault), 'bad_scope')
+      await TH.expectBad(vaultDB.putBox({ ...TH.scopeOf('u1'), applabel: candidate }, TH.noBoxYet, TH.boxOf('anthropic', 'one')), 'bad_scope')
       await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf(candidate, 'one')), 'invalid_box')
       await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), vaultlabel: candidate }), 'bad_record')
       expect(vaultDB.rows.size).to.eq(0)
@@ -1228,25 +1228,25 @@ const NarrowRefusals = [
 
 describe("the abstract VaultDB, holding names to what its adapter declares", () => {
   for (const [candidate, said, blurb] of NarrowRefusals) {
-    it(`refuses ${blurb} as bad_label, in every verb and every place a candidate goes, naming the rule and quoting nothing`, async () => {
+    it(`refuses ${blurb} as bad_scope, in every verb and every place a candidate goes, naming the rule and quoting nothing`, async () => {
       const vaultDB = new NarrowNamesVaultDB()
       vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'))
       const before = [...vaultDB.rows]
       const scopes = [{ ...TH.scopeOf('u1'), applabel: candidate }, { ...TH.scopeOf('u1'), user_id: candidate }, { ...TH.scopeOf('u1'), vaultlabel: candidate }]
       for (const scope of scopes) {
-        const refusal = await TH.expectBad(vaultDB.getVault(scope), 'bad_label')
+        const refusal = await TH.expectBad(vaultDB.getVault(scope), 'bad_scope')
         expect(refusal.message).to.include(said)
         expect(refusal.message).to.not.include(candidate)
-        await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), ...scope }), 'bad_label')
-        await TH.expectBad(vaultDB.getVault(scope), 'bad_label')
-        await TH.expectBad(vaultDB.delVault(scope, TH.thisVault), 'bad_label')
-        await TH.expectBad(vaultDB.delDamagedVault(scope), 'bad_label')
-        expect(() => vaultDB.subscribe(scope, unheard)).to.throw(VaultError).with.property('refusalkind', 'bad_label')
+        await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), ...scope }), 'bad_scope')
+        await TH.expectBad(vaultDB.getVault(scope), 'bad_scope')
+        await TH.expectBad(vaultDB.delVault(scope, TH.thisVault), 'bad_scope')
+        await TH.expectBad(vaultDB.delDamagedVault(scope), 'bad_scope')
+        expect(() => vaultDB.subscribe(scope, unheard)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
       }
-      const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf(candidate, 'one')), 'bad_label')
+      const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf(candidate, 'one')), 'bad_scope')
       expect(refusal.message).to.include('boxlabel')
-      await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), candidate, TH.inThisVault), 'bad_label')
-      await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), candidate, TH.deleting(null)), 'bad_label')
+      await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), candidate, TH.inThisVault), 'bad_scope')
+      await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), candidate, TH.deleting(null)), 'bad_scope')
       expect([...vaultDB.rows]).to.deep.equal(before)
     })
   }
@@ -1526,11 +1526,11 @@ describe("VaultDB.getVaultRecords", () => {
     expect(records?.boxes).to.deep.equal([])
   })
 
-  it("refuses as getVault does: a scope below the floor as bad_label, the adapter's failure as storage_unavailable", async () => {
+  it("refuses as getVault does: a scope below the floor as bad_scope, the adapter's failure as storage_unavailable", async () => {
     class DownVaultDB extends MapVaultDB {
       protected override doGetVault(): Promise<StoredVault> { return Promise.reject(new Error('connection reset')) }
     }
-    await TH.expectBad(new MapVaultDB().getVaultRecords({ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' }), 'bad_label')
+    await TH.expectBad(new MapVaultDB().getVaultRecords({ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' }), 'bad_scope')
     await TH.expectBad(new DownVaultDB().getVaultRecords(TH.scopeOf('u1')), 'storage_unavailable')
   })
 })

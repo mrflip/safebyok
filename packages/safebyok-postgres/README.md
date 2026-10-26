@@ -101,7 +101,7 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   unlisten that failed, a subscriber that threw. Left out, it is the console's.
 * **Names of up to 640 bytes** of UTF-8 each (`maxNameBytes`): a box's primary key is its
   four names together, and Postgres holds a btree entry of at most 2704 bytes. A longer name is
-  refused with kind `bad_label` before a statement runs. No character is reserved: each name is
+  refused with kind `bad_scope` before a statement runs. No character is reserved: each name is
   a column of its own.
 * **What the server checks** is who may reach which vault, that each write is atomic, and that
   each record has its shape and each name is above the floor (`VAULTDB.md`, *Names*) and within

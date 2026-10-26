@@ -241,7 +241,7 @@ await vault.putBox({ boxlabel: 'מפתח OpenAI: עבודה', sidecar: { note: '
   composed form (NFC), and with no control character: `NameFloor`. A name holds no `^` either,
   the character the key-value stores join a row's names on, so every store holds the same names:
   a vault whose names suit Postgres today suits IndexedDB tomorrow. Below the floor is
-  `bad_label`, and a stored record below it reads back as damaged. Your storage
+  `bad_scope`, and a stored record below it reads back as damaged. Your storage
   may hold less: Postgres holds a name of at most 640 bytes (`VAULTDB.md`, *Names*).
 * **A check only checks.** What passes is kept exactly as you passed it, never what the schema
   makes of it: a name is bound into the ciphertext and names its rows, so a schema that trims or
@@ -257,7 +257,7 @@ await vault.putBox({ boxlabel: 'מפתח OpenAI: עבודה', sidecar: { note: '
 * **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
   does, and widen only once every client you serve runs the wider check: an older one refuses at
   its door the names a newer one stores.
-* **The refusal is the vault's own**: kind `bad_label`, naming the
+* **The refusal is the vault's own**: kind `bad_scope`, naming the
   field, never quoting the name or your schema's issues. Where one of our checks refused, it says
   what was wrong (too long, a control character, not well-formed); your schema's, it names only.
   A schema must check synchronously; one that is async or throws is refused as `bad_option`,
@@ -893,10 +893,10 @@ boundary, and `useVault` throws a birth's misuse there; a condition lands in the
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
+| `bad_scope`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
 | `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's draft, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's draft naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
-| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it below the floor, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_props_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
 | `unknown_key_deriver` | the vault names a key deriver this bank was not made with        | Update safebyok, or open the vault with the deriver that made it |
@@ -961,7 +961,7 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 | `vault_behind`        | this device has already seen the vault at a higher `vault_epoch` than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked, or was not born: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device with `bank.clearCachedVault` (see *A vault behind this device*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 
-`Bank.make` itself throws `bad_option`, `bad_label` or `insecure_context`, at once.
+`Bank.make` itself throws `bad_option`, `bad_scope` or `insecure_context`, at once.
 `bank.ensureVault`, as it reads the vault from storage, can refuse with `storage_unavailable`,
 `not_permitted`, `identity_revoked`, `newer_format`, `vault_behind` or `damaged_vault` (a damaged
 box never stops it), and no Vault object is born: the refusal reaches its caller, the bad news
@@ -1120,7 +1120,7 @@ null otherwise; nothing else of it is trusted. (One stored under a name your `va
 is not damaged: it lists and reads as any other.) The rest of the vault opens and works
 as ever. `getBox()`, `getWhisper()` and `useWhisper()` refuse a damaged box with `damaged_box`; `delBox()` removes
 it by the name it is listed under, and `putBox()` writes a fresh box over one that names its
-revision -- except under a name your boxlabel check refuses, which `putBox()` refuses with `bad_label`, writing nothing. A
+revision -- except under a name your boxlabel check refuses, which `putBox()` refuses with `bad_scope`, writing nothing. A
 damaged box's boxlabel is the name it is stored under, above the floor but perhaps one your
 boxlabel check refuses: show it as text, never as markup. A row stored under a name below the
 floor, which no call could reach, is not listed. Show it as removable:

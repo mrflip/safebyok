@@ -295,7 +295,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await ensureGated(vaultDB, vaultPropsOf(composed))
       expect(await propsOf(vaultDB, scopeOf(composed))).to.deep.equal(vaultPropsOf(composed))
       await expectBad(vaultDB.ensureVault(gatelessOf(decomposed)), 'bad_record')
-      await expectBad(vaultDB.getVault(scopeOf(decomposed)), 'bad_label')
+      await expectBad(vaultDB.getVault(scopeOf(decomposed)), 'bad_scope')
     })
 
     it("keeps apart vaults and boxes whose labels differ only by a colon, a quote, a backslash, a comma or a bracket, or are in any script", async () => {
@@ -932,26 +932,26 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(outcome).to.deep.equal({ ok: true, val: { vaultProps: vaultPropsOf('u1'), boxes: [] } })
     })
 
-    it("refuses a scope or boxlabel below the floor every name is held to as bad_label, and a box holding one as invalid_box, before storage sees it", async () => {
+    it("refuses a scope or boxlabel below the floor every name is held to as bad_scope, and a box holding one as invalid_box, before storage sees it", async () => {
       const vaultDB = await withVaultProps()
-      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
-      await expectBad(vaultDB.getBox(scopeOf('u1'), 'tab\there', inThisVault), 'bad_label')
+      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_scope')
+      await expectBad(vaultDB.getBox(scopeOf('u1'), 'tab\there', inThisVault), 'bad_scope')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('cafe\u{301}', 'one')), 'invalid_box')
-      await expectBad(vaultDB.delBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', deleting(null)), 'bad_label')
+      await expectBad(vaultDB.delBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', deleting(null)), 'bad_scope')
       const overlong = 'u'.repeat(NameFloorBytes + 1)
-      await expectBad(vaultDB.getVault(scopeOf(overlong)), 'bad_label')
+      await expectBad(vaultDB.getVault(scopeOf(overlong)), 'bad_scope')
       expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(0)
     })
 
-    it("refuses a name holding ^, which key-value stores join names on, in every place a name goes, whatever the store, writing nothing: as bad_label, in vault props as bad_record, and in a box as invalid_box", async () => {
+    it("refuses a name holding ^, which key-value stores join names on, in every place a name goes, whatever the store, writing nothing: as bad_scope, in vault props as bad_record, and in a box as invalid_box", async () => {
       const vaultDB = await withVaultProps()
       const holding = 'a^b'
       await expectBad(vaultDB.ensureVault(gatelessOf(holding)), 'bad_record')
-      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
-      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
+      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), applabel: holding }), 'bad_scope')
+      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_scope')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf(holding, 'one')), 'invalid_box')
-      await expectBad(vaultDB.getBox(scopeOf('u1'), holding, inThisVault), 'bad_label')
-      await expectBad(vaultDB.delBox(scopeOf('u1'), holding, deleting(null)), 'bad_label')
+      await expectBad(vaultDB.getBox(scopeOf('u1'), holding, inThisVault), 'bad_scope')
+      await expectBad(vaultDB.delBox(scopeOf('u1'), holding, deleting(null)), 'bad_scope')
       expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(0)
     })
 
@@ -1072,14 +1072,14 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(box?.revision_tok).to.eq('rev-one')
     })
 
-    it("refuses a name one byte longer than it holds as bad_label, in every place a name goes, writing nothing", async () => {
+    it("refuses a name one byte longer than it holds as bad_scope, in every place a name goes, writing nothing", async () => {
       const vaultDB = await withVaultProps()
       if (vaultDB.maxNameBytes >= NameFloorBytes) { return }
       const overlong = 'n'.repeat(vaultDB.maxNameBytes + 1)
-      await expectBad(vaultDB.ensureVault(gatelessOf(overlong)), 'bad_label')
-      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), applabel: overlong }), 'bad_label')
-      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_label')
-      await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf(overlong, 'one')), 'bad_label')
+      await expectBad(vaultDB.ensureVault(gatelessOf(overlong)), 'bad_scope')
+      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), applabel: overlong }), 'bad_scope')
+      await expectBad(vaultDB.getVault({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_scope')
+      await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf(overlong, 'one')), 'bad_scope')
       expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(0)
     })
   })

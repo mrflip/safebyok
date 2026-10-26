@@ -1485,7 +1485,7 @@ describe("every data call, through ensureUnlocked", () => {
     const requestCleartext = typingPw()
     const { vault } = await lockedVaultWith({ requestCleartext })
     await TH.expectRefusal(vault.putBox({ boxlabel: 'openai' }, null as unknown as string), 'bad_whisper')
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'no such label!' }, 'sk-fake'), 'bad_label')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'no such label!' }, 'sk-fake'), 'bad_scope')
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
@@ -1495,7 +1495,7 @@ describe("every data call, through ensureUnlocked", () => {
     [(vault: Vault, boxlabel: string) => vault.useWhisper(boxlabel, (whisper) => whisper), 'useWhisper', 'refuses absent_box'],
     [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox', 'refuses absent_box'],
   ] as const) {
-    it(`refuses bad_label below the floor, and ${unlisted} for a box the listing in hand does not show, before asking for anything: ${blurb} (Contract: ensureUnlocked, a call that cannot land never prompts)`, async () => {
+    it(`refuses bad_scope below the floor, and ${unlisted} for a box the listing in hand does not show, before asking for anything: ${blurb} (Contract: ensureUnlocked, a call that cannot land never prompts)`, async () => {
       const requestCleartext = typingPw()
       const { vault } = await lockedVaultWith({ requestCleartext })
       const expectUnlisted = async (boxlabel: string) => {
@@ -1507,7 +1507,7 @@ describe("every data call, through ensureUnlocked", () => {
       }
       // Below the floor every name is held to; refused by the vault's own check, which gates only
       // writes, and not listed; passing both, and not listed.
-      await TH.expectRefusal(call(vault, 'tab\there'), 'bad_label')
+      await TH.expectRefusal(call(vault, 'tab\there'), 'bad_scope')
       await expectUnlisted('no such label!')
       await expectUnlisted('openai')
       expect(requestCleartext).not.toHaveBeenCalled()

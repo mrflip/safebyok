@@ -30,8 +30,8 @@ describe("memoryDeviceDB", () => {
     expect(await memoryDeviceDB().getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
   })
 
-  it("refuses a scope whose name holds the ckey delimiter as a bad Outcome of 'bad_label', never a rejection", async () => {
-    await TH.expectBad(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_label')
+  it("refuses a scope whose name holds the ckey delimiter as a bad Outcome of 'bad_scope', never a rejection", async () => {
+    await TH.expectBad(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
   })
 })
 
@@ -126,8 +126,8 @@ describe("deviceOutcomeOf", () => {
   }
 
   it("passes a VaultError through as it came", async () => {
-    const refusal = new VaultError('bad_label', 'no such label')
-    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_label')).to.eq(refusal)
+    const refusal = new VaultError('bad_scope', 'no such label')
+    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_scope')).to.eq(refusal)
   })
 })
 

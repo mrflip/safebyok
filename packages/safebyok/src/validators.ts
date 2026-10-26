@@ -33,7 +33,7 @@ const utf8Within = (limit: number, said: string) => Z.refine<string>((text) => n
 
 /** The floor beneath every name, whatever the validators: well-formed NFC text, 1 to {@link NameFloorBytes} bytes, with no control character and no `^`.
  * A host's own check narrows what passes; nothing widens it. The vault refuses a name below the
- * floor as 'bad_label', and a stored record holding one reads back as damaged.
+ * floor as 'bad_scope', and a stored record holding one reads back as damaged.
  *
  * @example NameFloor.safeParse('Work: מפתח API').success  // true: any script
  * @example NameFloor.safeParse('key \uD83D').success      // false: half of an emoji
@@ -87,7 +87,7 @@ export const UserIdPattern = /^[A-Za-z0-9_.:@+|-]+$/
  * That holds every stable id a provider issues: a UUID, Auth0's `provider|id`, Clerk's `user_...`,
  * Apple's dotted `sub`, a DID. Pass the provider's stable, opaque id, never an email or handle: a
  * vault is found by its user_id, and one that changes orphans the vault. `Bank.make` refuses one
- * that fails as 'bad_label'.
+ * that fails as 'bad_scope'.
  *
  * @example UserId.parse('auth0|5f7c8ec7c33c6c004bbafe82')
  * @example UserId.safeParse('').success               // false: an empty id names no one
@@ -108,14 +108,14 @@ export type NameValidator = Z.core.$ZodType<string>
  *
  * Each only checks: the vault keeps the name as it was handed, never what the schema makes of it.
  * So a schema that trims or lowercases still decides only pass or fail. A refusal is the vault's
- * own 'bad_label', and never quotes the schema's issues, which may quote the name.
+ * own 'bad_scope', and never quotes the schema's issues, which may quote the name.
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Bank.make and bank.ensureVault (the scope), putBox (the boxlabel) | `bad_label` |
- * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Bank.make and bank.ensureVault (the scope), putBox (the boxlabel) | `bad_scope` |
+ * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_scope` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_record` (a bug) when sent; damaged on read; `stale_write` |
- * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxBoxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `box_too_large`, `vault_full`, `bad_label` |
+ * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxBoxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `box_too_large`, `vault_full`, `bad_scope` |
  *
  * So a check of yours is an alarm, not a promise about what storage holds. A box stored under a
  * name it refuses, by another client or before you narrowed it, lists, reads and deletes as any

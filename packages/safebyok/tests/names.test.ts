@@ -67,14 +67,14 @@ describe("Names.check, against a host's check", () => {
 
   it("passes what the field's check passes: ours, or the host's", () => {
     expect(Names.check(rules, 'applabel', 'acme')).to.eq('acme')
-    TH.expectSyncRefusal(() => Names.check(rules, 'applabel', 'Acme Corp'), 'bad_label')
+    TH.expectSyncRefusal(() => Names.check(rules, 'applabel', 'Acme Corp'), 'bad_scope')
     expect(Names.check(rules, 'boxlabel', 'Acme Corp: מפתח API')).to.eq('Acme Corp: מפתח API')
   })
 
   it("refuses anything that is not text, whatever the check would make of it", () => {
     const coercing = Names.rulesOf({ boxlabel: ZClassic.coerce.string() })
-    TH.expectSyncRefusal(() => Names.check(coercing, 'boxlabel', 42), 'bad_label')
-    TH.expectSyncRefusal(() => Names.check(coercing, 'boxlabel', null), 'bad_label')
+    TH.expectSyncRefusal(() => Names.check(coercing, 'boxlabel', 42), 'bad_scope')
+    TH.expectSyncRefusal(() => Names.check(coercing, 'boxlabel', null), 'bad_scope')
   })
 
   it("refuses an async check as misuse, rather than answering for it", () => {
@@ -102,9 +102,9 @@ describe("Names.check", () => {
     expect(Names.check(lowering, 'userId', 'User_2FJ8')).to.eq('User_2FJ8')
   })
 
-  it("refuses a name as bad_label, naming the field and never the candidate", () => {
+  it("refuses a name as bad_scope, naming the field and never the candidate", () => {
     const rules = Names.rulesOf()
-    const labelErr = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'Not A Label sk-fake'), 'bad_label')
+    const labelErr = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'Not A Label sk-fake'), 'bad_scope')
     expect(labelErr.message).to.include('boxlabel')
     expect(labelErr.message).to.not.include('sk-fake')
   })
@@ -117,7 +117,7 @@ describe("Names.check", () => {
       ['userId',   'sk-fake user',             'ASCII letters, digits'],
     ] as const
     for (const [field, candidate, said] of cases) {
-      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_label')
+      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_scope')
       expect(err.message).to.include(`vault's ${field} check`)
       expect(err.message).to.include(said)
       expect(err.message).to.not.include('sk-fake')
@@ -134,20 +134,20 @@ describe("Names.check", () => {
       ['vaultlabel', 'sk-fake\u{DD11}',        'well-formed Unicode'],
     ] as const
     for (const [field, candidate, said] of cases) {
-      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_label')
+      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_scope')
       expect(err.message).to.include(`That ${field} is not text any vault can hold`)
       expect(err.message).to.include(said)
       expect(err.message).to.not.include('sk-fak')
     }
     const anyText = Names.rulesOf(AnyTextValidators)
-    expect(TH.expectSyncRefusal(() => Names.check(anyText, 'boxlabel', 'key \u{D83D}'), 'bad_label').message).to.include('lone surrogate')
+    expect(TH.expectSyncRefusal(() => Names.check(anyText, 'boxlabel', 'key \u{D83D}'), 'bad_scope').message).to.include('lone surrogate')
   })
 
   it("holds a name to the floor beneath a host's own check, however much that check admits", () => {
     const rules = Names.rulesOf({ boxlabel: ZClassic.string(), userId: Z.string() })
-    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'key \u{D83D}'), 'bad_label')
-    TH.expectSyncRefusal(() => Names.check(rules, 'userId', 'tab\there'), 'bad_label')
-    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'n'.repeat(NameFloorBytes + 1)), 'bad_label')
+    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'key \u{D83D}'), 'bad_scope')
+    TH.expectSyncRefusal(() => Names.check(rules, 'userId', 'tab\there'), 'bad_scope')
+    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'n'.repeat(NameFloorBytes + 1)), 'bad_scope')
     expect(Names.check(rules, 'boxlabel', 'Any Text: מפתח')).to.eq('Any Text: מפתח')
   })
 
@@ -160,24 +160,24 @@ describe("Names.check", () => {
     const rules = Names.rulesOf({ boxlabel: counting })
     Names.check(rules, 'boxlabel', 'anthropic')
     expect(asked).to.eq(1)
-    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'tab\there'), 'bad_label')
+    TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'tab\there'), 'bad_scope')
     expect(asked).to.eq(1)
   })
 
   it("names a host check that refuses, and that the check is the host's, saying nothing of why", () => {
     const rules = Names.rulesOf({ boxlabel: ZClassic.string().max(5, 'too long for our forms') })
-    const err = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'sk-fake-long'), 'bad_label')
+    const err = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'sk-fake-long'), 'bad_scope')
     expect(err.message).to.include("boxlabel check passed in Bank.make's validators")
     expect(err.message).to.not.include('too long for our forms')
   })
 
   it("refuses a candidate that is not text, saying so", () => {
-    expect(TH.expectSyncRefusal(() => Names.check(Names.rulesOf(), 'boxlabel', undefined), 'bad_label').message).to.include('not text')
+    expect(TH.expectSyncRefusal(() => Names.check(Names.rulesOf(), 'boxlabel', undefined), 'bad_scope').message).to.include('not text')
   })
 
   it("never quotes a host check's own issues, which may quote the candidate", () => {
     const quoting = Names.rulesOf({ userId: ZClassic.string().refine(() => false, { error: (issue) => `refused ${String(issue.input)}` }) })
-    const err = TH.expectSyncRefusal(() => Names.check(quoting, 'userId', 'alice@example.com'), 'bad_label')
+    const err = TH.expectSyncRefusal(() => Names.check(quoting, 'userId', 'alice@example.com'), 'bad_scope')
     expect(TH.thrownText(err)).to.not.include('alice')
   })
 })
@@ -197,13 +197,13 @@ describe("Names.checkScope", () => {
     expect(Object.isFrozen(scope)).to.be.false
   })
 
-  it("refuses, as bad_label, a scope with a name its check refuses, or one that is not text", () => {
+  it("refuses, as bad_scope, a scope with a name its check refuses, or one that is not text", () => {
     const rules = Names.rulesOf()
-    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, { ...TH.scopeOf('u1'), applabel: 'Acme' }), 'bad_label').message).to.include('applabel')
-    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, TH.scopeOf('')), 'bad_label').message).to.include('userId')
-    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, TH.scopeOf('alice smith')), 'bad_label').message).to.include('userId')
-    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, { ...TH.scopeOf('u1'), vaultlabel: 42 }), 'bad_label').message).to.include('vault scope')
-    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, null), 'bad_label').message).to.include('vault scope')
+    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, { ...TH.scopeOf('u1'), applabel: 'Acme' }), 'bad_scope').message).to.include('applabel')
+    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, TH.scopeOf('')), 'bad_scope').message).to.include('userId')
+    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, TH.scopeOf('alice smith')), 'bad_scope').message).to.include('userId')
+    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, { ...TH.scopeOf('u1'), vaultlabel: 42 }), 'bad_scope').message).to.include('vault scope')
+    expect(TH.expectSyncRefusal(() => Names.checkScope(rules, null), 'bad_scope').message).to.include('vault scope')
   })
 })
 
@@ -213,10 +213,10 @@ describe("Names.checkFloor", () => {
     expect(Names.checkFloor('vaultlabel', 'n'.repeat(1000))).to.have.lengthOf(1000)
   })
 
-  it("refuses a name below the floor as bad_label, quoting none of it", () => {
-    expect(TH.expectSyncRefusal(() => Names.checkFloor('boxlabel', 'sk-fake\u{7}'), 'bad_label').message).to.not.include('sk-fake')
-    expect(TH.expectSyncRefusal(() => Names.checkFloor('applabel', 42), 'bad_label').message).to.include('not text')
-    TH.expectSyncRefusal(() => Names.checkFloor('vaultlabel', 'two\nlines'), 'bad_label')
+  it("refuses a name below the floor as bad_scope, quoting none of it", () => {
+    expect(TH.expectSyncRefusal(() => Names.checkFloor('boxlabel', 'sk-fake\u{7}'), 'bad_scope').message).to.not.include('sk-fake')
+    expect(TH.expectSyncRefusal(() => Names.checkFloor('applabel', 42), 'bad_scope').message).to.include('not text')
+    TH.expectSyncRefusal(() => Names.checkFloor('vaultlabel', 'two\nlines'), 'bad_scope')
   })
 })
 

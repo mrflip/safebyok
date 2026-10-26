@@ -128,7 +128,7 @@ describe("delDamagedVault", () => {
     const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
     await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userID: longUserId } as unknown as MakeBankOpts['validators'] })), 'bad_option')
     const narrowUserId = ZClassic.string().max(1)
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userId: narrowUserId } })), 'bad_label')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userId: narrowUserId } })), 'bad_scope')
     expect(verb).not.toHaveBeenCalled()
     await delDamagedVault(world.optsWith({ validators: { userId: longUserId } }))
     expect(verb.mock.calls[0]).to.deep.equal([TH.scopeOf('u1')])
@@ -137,8 +137,8 @@ describe("delDamagedVault", () => {
 
   it("takes the options Bank.make took beside the vault's names, and refuses misuse before touching storage", async () => {
     const world = await damagedVaultWorld()
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_label')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: '' })), 'bad_label')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_scope')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: '' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')

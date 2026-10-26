@@ -118,7 +118,7 @@ describe("putBox and getWhisper", () => {
   it("refuses a malformed boxlabel before touching storage", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'not a label' }, 'whatever'), 'bad_label')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'not a label' }, 'whatever'), 'bad_scope')
   })
 
   it("refuses a get or a use of an absent box without quoting the boxlabel, which may be any text a host admits; getBox of one resolves null", async () => {
@@ -951,36 +951,36 @@ describe("the host's validators", () => {
     await vault.putBox({ boxlabel: String.raw`["box","acme"] \ x` }, 'sk-fake-two')
     expect(await vault.getWhisper('Work: מפתח API')).to.eq('sk-fake')
     expect(boxlabelsOf(vault)).to.have.lengthOf(2)
-    await TH.expectRefusal(vault.putBox({ boxlabel: '' }, 'sk-fake'), 'bad_label')
-    await TH.expectRefusal(world.open({ validators: AnyTextValidators, userId: '' }), 'bad_label')
+    await TH.expectRefusal(vault.putBox({ boxlabel: '' }, 'sk-fake'), 'bad_scope')
+    await TH.expectRefusal(world.open({ validators: AnyTextValidators, userId: '' }), 'bad_scope')
   })
 
   it("never widen the floor: a host's z.string() still meets a refusal of half a character, a control character or a decomposed letter", async () => {
     const world = makeWorld({ validators: { boxlabel: ZClassic.string(), userId: ZClassic.string() } })
     const vault = await world.openUnlocked('pw')
     for (const boxlabel of ['key \u{D83D}', 'tab\there', 'cafe\u{301}', 'n'.repeat(NameFloorBytes + 1)]) {
-      await TH.expectRefusal(vault.putBox({ boxlabel }, 'sk-fake'), 'bad_label')
+      await TH.expectRefusal(vault.putBox({ boxlabel }, 'sk-fake'), 'bad_scope')
     }
-    await TH.expectRefusal(world.open({ userId: 'u1\u{D800}' }), 'bad_label')
+    await TH.expectRefusal(world.open({ userId: 'u1\u{D800}' }), 'bad_scope')
     expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 
   it("never let a name hold ^, which storage joins names on: refused at ensureVault and at putBox(), whatever the validators", async () => {
     const world = makeWorld({ validators: AnyTextValidators })
-    const err = await TH.expectRefusal(world.open({ userId: 'alice^admin' }), 'bad_label')
+    const err = await TH.expectRefusal(world.open({ userId: 'alice^admin' }), 'bad_scope')
     expect(err.message).to.include('userId')
     expect(err.message).to.include('no ^')
     expect(TH.thrownText(err)).to.not.include('alice')
-    await TH.expectRefusal(world.open({ vaultlabel: 'main^x' }), 'bad_label')
+    await TH.expectRefusal(world.open({ vaultlabel: 'main^x' }), 'bad_scope')
     const vault = await world.openUnlocked('pw')
-    const stored = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthro^pic' }, 'sk-fake'), 'bad_label')
+    const stored = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthro^pic' }, 'sk-fake'), 'bad_scope')
     expect(stored.message).to.include('boxlabel')
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
   it("refuse a user_id of 101 characters at ensureVault, under the default check", async () => {
     const world = makeWorld()
-    const err = await TH.expectRefusal(world.open({ userId: 'u'.repeat(MaxUserIdChars + 1) }), 'bad_label')
+    const err = await TH.expectRefusal(world.open({ userId: 'u'.repeat(MaxUserIdChars + 1) }), 'bad_scope')
     expect(err.message).to.include('at most 100 characters')
     expect(await world.stateOnOpen({ userId: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
   })
@@ -989,7 +989,7 @@ describe("the host's validators", () => {
     const clerkUserId = ZClassic.string().regex(/^user_[A-Za-z0-9]{27}$/)
     const world = makeWorld({ validators: { userId: clerkUserId } })
     expect(await world.stateOnOpen({ userId: `user_${'A'.repeat(27)}` })).to.eq('novel')
-    const err = await TH.expectRefusal(world.open({ userId: 'alice@example.com' }), 'bad_label')
+    const err = await TH.expectRefusal(world.open({ userId: 'alice@example.com' }), 'bad_scope')
     expect(err.message).to.include('userId')
     expect(TH.thrownText(err)).to.not.include('alice')
   })
@@ -997,9 +997,9 @@ describe("the host's validators", () => {
   it("keep ours for every field a host leaves out", async () => {
     const world = makeWorld({ validators: { vaultlabel: AnyScript.vaultlabel } })
     const vault = await world.openUnlocked('pw', { vaultlabel: 'Main vault' })
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'Not A Label' }, 'sk-fake'), 'bad_label')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'Not A Label' }, 'sk-fake'), 'bad_scope')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    await TH.expectRefusal(world.open({ applabel: 'Acme' }), 'bad_label')
+    await TH.expectRefusal(world.open({ applabel: 'Acme' }), 'bad_scope')
   })
 
   it("refuse a note check, as there is no note: a host checks its sidecar itself", async () => {
@@ -1029,7 +1029,7 @@ describe("the host's validators", () => {
     const quoting = ZClassic.string().refine(() => false, { error: (issue) => `no such label ${String(issue.input)}` })
     const world = makeWorld({ validators: { boxlabel: quoting } })
     const vault = await world.openUnlocked('pw')
-    const err = await TH.expectRefusal(vault.putBox({ boxlabel: 'secret_project_x' }, 'sk-fake'), 'bad_label')
+    const err = await TH.expectRefusal(vault.putBox({ boxlabel: 'secret_project_x' }, 'sk-fake'), 'bad_scope')
     expect(TH.thrownText(err)).to.not.include('secret_project_x')
   })
 
@@ -1131,21 +1131,21 @@ describe("the host's validators", () => {
     world.dbStore.write(u1BoxCkey('bell\u{7}'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), boxlabel: 'bell\u{7}' }))
     const fresh = await world.openUnlocked('pw')
     expect(boxlabelsOf(fresh)).to.deep.equal(['anthropic'])
-    await TH.expectRefusal(fresh.delBox('key \u{D83D}'), 'bad_label')
-    await TH.expectRefusal(fresh.getWhisper('bell\u{7}'), 'bad_label')
+    await TH.expectRefusal(fresh.delBox('key \u{D83D}'), 'bad_scope')
+    await TH.expectRefusal(fresh.getWhisper('bell\u{7}'), 'bad_scope')
   })
 
-  it("refuses a store under a refused boxlabel as 'bad_label', over a box stored there or not, writing nothing", async () => {
+  it("refuses a store under a refused boxlabel as 'bad_scope', over a box stored there or not, writing nothing", async () => {
     const world = makeWorld()
     const roomy = await world.openUnlocked('pw', { validators: AnyScript })
     await roomy.putBox({ boxlabel: 'OpenAI: work', sidecar: { note: 'personal account' } }, 'sk-fake')
     TH.closeVault(roomy)
     const stored = world.dbStore.read(u1BoxCkey('OpenAI: work'))
     const narrow = await world.openUnlocked('pw')
-    await TH.expectRefusal(narrow.putBox({ boxlabel: 'OpenAI: work' }, 'sk-new'), 'bad_label')
+    await TH.expectRefusal(narrow.putBox({ boxlabel: 'OpenAI: work' }, 'sk-new'), 'bad_scope')
     expect(world.dbStore.read(u1BoxCkey('OpenAI: work'))).to.eq(stored)
     expect(narrow.getSnapshot().boxes.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['OpenAI: work', false]])
-    await TH.expectRefusal(narrow.putBox({ boxlabel: 'Other: box' }, 'sk-fake'), 'bad_label')
+    await TH.expectRefusal(narrow.putBox({ boxlabel: 'Other: box' }, 'sk-fake'), 'bad_scope')
     await TH.expectRefusal(narrow.delBox('Other: box'), 'absent_box')
     expect(world.dbStore.read(u1BoxCkey('Other: box'))).to.be.null
   })

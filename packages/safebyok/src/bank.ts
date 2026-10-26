@@ -104,7 +104,7 @@ export class Bank {
   }
 
   /** The entry the snapshot holds for the vault `choice` names, or null for none: synchronous, and reading nothing.
-   * Refuses 'bad_label' for a name that fails its check.
+   * Refuses 'bad_scope' for a name that fails its check.
    *
    * @example bank.entryOf({ userId: 'u1', vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
    */
@@ -117,7 +117,7 @@ export class Bank {
 
   /** Make a bank for the app: its options checked, and nothing else done. It reads nothing, starts nothing, and is `made`.
    * It throws its misuse at once, synchronously: 'insecure_context' first, for a page that is not a
-   * secure context; 'bad_label' for an `applabel` that fails its check; 'bad_option' for any other
+   * secure context; 'bad_scope' for an `applabel` that fails its check; 'bad_option' for any other
    * option, one it does not take among them (a misspelling, a retired name, or `userId` and
    * `vaultlabel`, which each vault's draft takes), a `vaultDB` or `deviceDB` short of a verb, or
    * limits the `vaultDB` might not honour.
@@ -171,7 +171,7 @@ export class Bank {
    * birthing, names the stores it was born from (left out, the bank's own): the same objects, as
    * stores are compared by identity, so make each store once.
    *
-   * Refuses 'bad_label' or 'bad_option' for a draft amiss, before storage is touched, and
+   * Refuses 'bad_scope' or 'bad_option' for a draft amiss, before storage is touched, and
    * 'bad_option' for a draft naming another `vaultDB` or `deviceDB` object than the vault held was
    * born from, one made afresh over the same storage among them. Refuses as storage refuses:
    * 'damaged_vault' for vault props it cannot use (`delDamagedVault` clears them), 'newer_format',
@@ -213,7 +213,7 @@ export class Bank {
    * prompt up for a proof ends, its `lockLanded` settling as at a `lock()`, and each call waiting
    * on it refuses 'vault_gone', as a birth under way does; one let go in the task that asked for it
    * has read nothing.
-   * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_label' for a name that
+   * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_scope' for a name that
    * fails its check.
    *
    * @example bank.closeVault({ userId, vaultlabel: 'main' })
@@ -244,7 +244,7 @@ export class Bank {
    * does not hold, is no refusal: what this device keeps of it, if anything, is erased all the
    * same. The store erased is the draft's `deviceDB`, or the bank's own where it names none. The
    * entry let go is the one the bank holds for the draft's scope once both are erased, whichever
-   * stores it was born from, and only then: a draft amiss refuses 'bad_label' or 'bad_option',
+   * stores it was born from, and only then: a draft amiss refuses 'bad_scope' or 'bad_option',
    * and a device store that fails 'storage_unavailable' or 'storage_blocked', each keeping the
    * entry. Call again to finish.
    *
@@ -332,7 +332,7 @@ export class Bank {
     this.#listeners.forEach((listener) => { listener() })
   }
 
-  /** The scope `choice` names in the bank's app, its names checked: 'bad_label' for one that fails. */
+  /** The scope `choice` names in the bank's app, its names checked: 'bad_scope' for one that fails. */
   #scopeOf(choice: VaultChoice): VaultScope {
     return Names.checkScope(this.#parts.rules, { applabel: this.#parts.applabel, user_id: choice.userId, vaultlabel: choice.vaultlabel })
   }

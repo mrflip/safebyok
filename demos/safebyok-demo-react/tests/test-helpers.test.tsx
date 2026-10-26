@@ -35,7 +35,7 @@ describe("makeWorld", () => {
   it("lets go of the vault it seeds through, even when a store is refused", async () => {
     const world = TH.makeWorld()
     const tally = TH.tallyWatches(world.vaultDB)
-    await TH.expectRefusal(world.seed({ '': 'sk-ant-test-not-a-real-key' }), 'bad_label')
+    await TH.expectRefusal(world.seed({ '': 'sk-ant-test-not-a-real-key' }), 'bad_scope')
     expect(tally.opened).to.eq(1)
     expect(tally.opened - tally.closed).to.eq(0)
   })

@@ -17,7 +17,7 @@ export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 
 /** The options `Bank.make` takes: the app, the stores its vaults live in by default, the libraries they share, and how they behave.
  * `Bank.make` refuses ('bad_option') an option it does not take, and one out of its range or of
- * the wrong type; `applabel` refuses 'bad_label' instead. Each refusal names the option, never
+ * the wrong type; `applabel` refuses 'bad_scope' instead. Each refusal names the option, never
  * its value. Each vault is then named by a {@link VaultDraft}.
  */
 export type MakeBankOpts = {
@@ -117,7 +117,7 @@ export type MakeBankOpts = {
 }
 
 /** Which vault `bank.ensureVault` births: the user's, under its label, in the app the bank was made for; and the stores it lives in, where not the bank's.
- * It refuses 'bad_label' for a name that fails its check, and 'bad_option' for anything else
+ * It refuses 'bad_scope' for a name that fails its check, and 'bad_option' for anything else
  * amiss, naming the field, never its value.
  *
  * @example await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
@@ -520,7 +520,7 @@ export type ParsedBankOpts = {
 /** Bank.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take or out of range, and
- * 'bad_label' for an `applabel` that fails its `validators`. The limits are held to the default
+ * 'bad_scope' for an `applabel` that fails its `validators`. The limits are held to the default
  * `vaultDB`'s here, and to a draft's own at its birth.
  *
  * @example const { applabel, leaseMillis } = parseMakeBankOpts(opts)
@@ -555,7 +555,7 @@ export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'strengthChecker' | '
   vaultByteLimit:   number
 }
 
-/** The parts of the vault `draft` names, under `bank`, checked before storage is touched: 'bad_label' for a name that fails its check, 'bad_option' for anything else.
+/** The parts of the vault `draft` names, under `bank`, checked before storage is touched: 'bad_scope' for a name that fails its check, 'bad_option' for anything else.
  *
  * @example const { scope } = parseVaultDraft({ userId: 'u1', vaultlabel: 'main' }, bank)   // scope: { applabel, user_id: 'u1', vaultlabel: 'main' }
  */

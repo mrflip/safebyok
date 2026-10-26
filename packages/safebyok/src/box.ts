@@ -187,7 +187,7 @@ export class Box {
    * is the box's `baseRevisionTok`. The sidecar is `{}` when left out: a seal carries nothing from
    * the base but its revision and `registered_at`.
    *
-   * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_label' for a boxlabel below the
+   * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_scope' for a boxlabel below the
    * floor, and 'bad_option' for a sidecar JSON cannot carry or a malformed base. Refuses
    * 'vault_locked' when the vault holds no lease, and
    * otherwise as `lease.cipheredWith` does.

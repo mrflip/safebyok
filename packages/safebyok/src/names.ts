@@ -51,7 +51,7 @@ export const rulesOf = (validators: VaultValidators = {}): NameRules => {
   }
 }
 
-/** `candidate` as handed in, once it passes {@link checkFloor} and then the `field` check; refuses 'bad_label' when it does not.
+/** `candidate` as handed in, once it passes {@link checkFloor} and then the `field` check; refuses 'bad_scope' when it does not.
  * The host's check runs once, and only on text above the floor. A refusal says what one of our own
  * checks found wrong, and only names a host's. A check that throws, such as an async one, refuses
  * 'bad_option', carrying nothing of what it threw.
@@ -65,26 +65,26 @@ export const check = (rules: NameRules, field: NameField, candidate: unknown): s
   // quote the candidate, so its refusal is never passed on.
   const said = OurChecks.has(rules[field]) ? verdict.error.issues[0]?.message : undefined
   if (said === undefined) {
-    throw new VaultError('bad_label', `That ${field} does not pass the ${field} check passed in Bank.make's validators.`)
+    throw new VaultError('bad_scope', `That ${field} does not pass the ${field} check passed in Bank.make's validators.`)
   }
-  throw new VaultError('bad_label', `That ${field} does not pass the vault's ${field} check. ${said}.`)
+  throw new VaultError('bad_scope', `That ${field} does not pass the vault's ${field} check. ${said}.`)
 }
 
-/** `candidate` as handed in, once it passes {@link NameFloor}; refuses 'bad_label' when it does not, saying what was wrong. */
+/** `candidate` as handed in, once it passes {@link NameFloor}; refuses 'bad_scope' when it does not, saying what was wrong. */
 export const checkFloor = (field: NameField, candidate: unknown): string => {
   if (typeof candidate !== 'string') {
-    throw new VaultError('bad_label', `That ${field} is missing, or is not text.`)
+    throw new VaultError('bad_scope', `That ${field} is missing, or is not text.`)
   }
   const verdict = Z.safeParse(NameFloor, candidate)
   if (verdict.success) { return candidate }
-  throw new VaultError('bad_label', `That ${field} is not text any vault can hold. ${verdict.error.issues[0]?.message ?? 'It fails the floor every name is held to'}.`)
+  throw new VaultError('bad_scope', `That ${field} is not text any vault can hold. ${verdict.error.issues[0]?.message ?? 'It fails the floor every name is held to'}.`)
 }
 
 /** A frozen copy of `scope`, once its three names pass {@link check}: so no one it is handed to can change it for everyone else. */
 export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {
   const checked = ScopeShape.safeParse(scope)
   if (! checked.success) {
-    throw new VaultError('bad_label', 'A vault scope is an applabel, a user_id and a vaultlabel, each text that passes its check.')
+    throw new VaultError('bad_scope', 'A vault scope is an applabel, a user_id and a vaultlabel, each text that passes its check.')
   }
   check(rules, 'applabel', checked.data.applabel)
   check(rules, 'userId', checked.data.user_id)

@@ -400,7 +400,7 @@ describe("settledVault", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     vi.spyOn(vaultDB, 'ensureVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ vaultDB })), 'not_permitted')
-    await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ applabel: 'not-a-label' })), 'bad_label')
+    await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ applabel: 'not-a-label' })), 'bad_scope')
   })
 })
 
@@ -939,7 +939,7 @@ describe("expectRefusal", () => {
     }
     const NotQuite = [
       [Promise.resolve('fine'),                                     /operation resolved/],
-      [Promise.reject(new VaultError('bad_label', 'Not a label.')),  /kind/],
+      [Promise.reject(new VaultError('bad_scope', 'Not a label.')),  /kind/],
       [Promise.reject(new Error('plain trouble')),                  /instance of VaultError/],
       [Promise.reject(new LookalikeError('Unlock the vault first.')), /instance of VaultError/],
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a host's adapter may reject with anything, and the helper must say so
@@ -981,7 +981,7 @@ describe("expectBad", () => {
   it("fails the test on a good outcome, a refusal of another kind, or a rejection", async () => {
     const NotQuite = [
       [Promise.resolve(good('fine')),                                        /outcome was good/],
-      [Promise.resolve(bad(new VaultError('bad_label', 'Not a label.'))),    /refusalkind/],
+      [Promise.resolve(bad(new VaultError('bad_scope', 'Not a label.'))),    /refusalkind/],
       [Promise.reject(new VaultError('stale_write', 'Thrown, not resolved.')), /Thrown, not resolved/],
     ] as const
     for (const [operation, complaint] of NotQuite) {

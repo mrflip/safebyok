@@ -32,20 +32,20 @@ describe("Bank.make and bank.ensureVault", () => {
 
   it("refuses a hyphenated applabel or vaultlabel at the door", async () => {
     const world = makeWorld()
-    await TH.expectRefusal(world.open({ applabel: 'not-a-label' }), 'bad_label')
-    await TH.expectRefusal(world.open({ vaultlabel: 'not-a-label' }), 'bad_label')
+    await TH.expectRefusal(world.open({ applabel: 'not-a-label' }), 'bad_scope')
+    await TH.expectRefusal(world.open({ vaultlabel: 'not-a-label' }), 'bad_scope')
   })
 
   it("refuses to open without a signed-in user", async () => {
     const world = makeWorld()
-    await TH.expectRefusal(world.open({ userId: '' }), 'bad_label')
+    await TH.expectRefusal(world.open({ userId: '' }), 'bad_scope')
   })
 
   it("takes a userId of a hundred characters, and refuses a longer one, naming the bound and never the id", async () => {
     const world = makeWorld()
     expect(await world.stateOnOpen({ userId: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
     const overlong = `alice@example.com${'u'.repeat(MaxUserIdChars)}`
-    const err = await TH.expectRefusal(world.open({ userId: overlong }), 'bad_label')
+    const err = await TH.expectRefusal(world.open({ userId: overlong }), 'bad_scope')
     expect(err.message).to.include('at most 100 characters')
     expect(TH.thrownText(err)).to.not.include('alice')
   })
@@ -53,7 +53,7 @@ describe("Bank.make and bank.ensureVault", () => {
   it("refuses a userId that is not text, as no signed-in user", async () => {
     const world = makeWorld()
     for (const userId of [42, null, undefined, { id: 'u1' }]) {
-      await TH.expectRefusal(world.open({ userId: userId as unknown as string }), 'bad_label')
+      await TH.expectRefusal(world.open({ userId: userId as unknown as string }), 'bad_scope')
     }
   })
 
@@ -138,7 +138,7 @@ describe("Bank.make and bank.ensureVault", () => {
 describe("Bank.make's options", () => {
   it("throws misuse at once, never as a rejection: a bad label, a missing store", () => {
     const world = makeWorld()
-    TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { applabel: 'not-a-label' })), 'bad_label')
+    TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { applabel: 'not-a-label' })), 'bad_scope')
     TH.expectSyncRefusal(() => Bank.make(TH.omitting(bankOptsOf(world), 'vaultDB')), 'bad_option')
   })
 
@@ -636,7 +636,7 @@ describe("Bank.make, by the Contract", () => {
     const refusals = [
       TH.expectSyncRefusal(() => Bank.make(TH.omitting(bankOptsOf(world), 'deviceDB')), 'bad_option'),
       TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { staleMinutes: -1 })), 'bad_option'),
-      TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { applabel: 'not-a-label' })), 'bad_label'),
+      TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { applabel: 'not-a-label' })), 'bad_scope'),
     ]
     expect(refusals.map((err) => err.family)).to.deep.equal(['misuse', 'misuse', 'misuse'])
   })
