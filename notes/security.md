@@ -41,6 +41,25 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 11, branch `20261026-vault_object`, PR [#282](https://github.com/mrflip/safebyok/pull/282)): **a Vault object shows its
+  stamp alone and is frozen; a Box shows more than it did; the key deriver is reachable through no Vault object.**
+  (1) A Vault object's own enumerable fields are `format`, `applabel`, `user_id`, `vaultlabel`, `vault_tok` and `registered_at`, and the object is
+  frozen (`Object.freeze(this)` ends its constructor), so a spread, `JSON.stringify` or log line of it shows those six and nothing else. Every
+  changing value (the lease holding the wrapped vaultKey, the vault record with its gate, the listing) is in a private `#field`, read by the host
+  through `vault.snapshot`. The getters `keyDeriver`, `leaseMillis`, `now()` and `stamp` are gone. `getSnapshot` and `subscribe` are prototype
+  getters returning private bound arrows.
+  (2) Wayins, gates, leases, boxes and provings no longer read the key deriver, clock, lease length or epochs off the Vault object; each is handed
+  what it uses when it is made (`Wayin.make(vaultStamp, record, { keyDeriver })`, `sealLeaseRecord(standing, vaultKey, { leaseMillis, now })`,
+  `Box.make(vault, record, madeUnder)`, `Box.seal(vault, props, whisper, { madeUnder, now })`). A proving reaches the key deriver, logger, lease
+  length, clock and the vault record in hand through `ProvingInside`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
+  exports.
+  (3) A Box now shows, as own enumerable frozen fields, its scope, the `vault_tok`, `vault_epoch` and `gate_epoch` it was made under, and every field of
+  its record but the two ciphered ones; before, the scope, `vault_tok` and epochs were non-enumerable. A log line or JSON of a Box so carries the
+  vault's `vault_tok` and two epochs, all stored unencrypted, with the scope being the vault's address; the ciphertext stays in the private
+  `#record`. A Lease's `format` is likewise an own field; its leaseKey and wrapped vaultKey stay private. Older entries here that name
+  `vault.leaseMillis`, `vault.now()` or `vault.keyDeriver` as public describe what stood before.
+  (4) `vaultRecordHeldBy(vault)` is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
+  record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
