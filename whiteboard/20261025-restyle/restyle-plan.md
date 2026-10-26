@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 11 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#282](https://github.com/mrflip/safebyok/pull/282)); thread 12 built ([#283](https://github.com/mrflip/safebyok/pull/283)), in review.
+* **Status:** **paused at the Coach's request, 2026-10-26** (usage), threads 1 to 12 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#283](https://github.com/mrflip/safebyok/pull/283)); thread 13 not started (`human/20261026-sprint_restyle_paused.md`).
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -484,6 +484,18 @@ takes scope and `vault_tok` from `madeUnder` unchecked: take them from `vault` a
 identity already. **Depends on:** thread 11. **Look-ahead:** thread 13's bank listing mirrors
 `snapshot.boxes`'s sorted frozen form. **Size:** medium to large.
 
+*Review:* medium, `fixed`. Checked and holding: the snapshot carries no epoch, vault
+`registered_at`, salt, key deriver label, wrap or ciphertext; `keptIfSame` compares by
+`stableJsonify`, so a new `revision_tok`, `written_at` or `damage` is a change; the two-field
+screen choice matches the old `state` in every case; `askPasskey` refuses `absent_wayin` without a
+gate or passkey; `Box.seal` takes scope and `vault_tok` from the vault. Fixed: `askPasskey`'s doc
+block opening; a test for `TH.stateOf`'s example; a test that a rewritten box of the same size
+replaces `boxes` and keeps `capacity`. Left: `demandConsistentWith(snapshot)` no longer catches a
+change to the ways in (`gate_moved`), since the snapshot has no epochs (an Open Matter; thread 13
+adds a sentence to #283's changeset and the README); `Box.seal`'s epochs are still the caller's
+(a later change); repeated serializing; a check written three times in React; the demo's own
+comparator. Filed as [#283](https://github.com/mrflip/safebyok/pull/283).
+
 ### 13. The bank's listing (Preplan Phase 8; what is left of Phase 9) -- `bank_listing`
 
 > 8. **The bank's listing.** `bank.snapshot.vaults` as a sorted listing; `bank.vaultOf`;
@@ -493,7 +505,12 @@ identity already. **Depends on:** thread 11. **Look-ahead:** thread 13's bank li
 `(Lifecycled<BankScope, 'made' | 'starting' | 'ready'> | Refused<BankScope>) & { vaults: readonly
 BankVault[] }`, `VaultEntry` → `BankVault`, `BankStatus`/`EntryStatus` → `lifecycle` unions;
 `vaultOf(scope)` from a map keyed by scopepath; `VaultParts` with the scope's names as own fields,
-frozen. Phase 9 was finished by thread 8. **Depends on:** thread 12. **Size:** medium.
+frozen. Phase 9 was finished by thread 8. *Orchestrator, from #283's review:* add to #283's
+changeset (`.changeset/20261026-snapshot.md`) and the core README's *The snapshot* one sentence:
+`demandConsistentWith(snapshot)` checks the scope, the `vault_tok` and whether the Vault object
+is gone, and no longer catches a change to the ways in. Reuse `keptIfSame` (vault.ts) for
+`bank.snapshot.vaults`. `Bank`'s `getSnapshot`/`subscribe` are prototype getters already (thread
+11); the bank's status is `#libs.status` (`made | starting | timely | refused`, thread 7). **Depends on:** thread 12. **Size:** medium.
 
 ## Not in this sprint
 
