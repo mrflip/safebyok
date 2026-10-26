@@ -235,3 +235,27 @@ Who reads this: threads 11 to 13.
 * Test helpers: `TH.recordOfRead`, `TH.damagedBoxesOf`; `TH.summaryOf` is gone.
 * **The demo typechecks against the built `dist`**: a stale build hides breaks there until
   `pnpm justify` builds.
+
+## From thread 11 (vault_object, #282)
+
+Who reads this: threads 12 and 13; the restack.
+
+* **The Vault object** is its own stamp, frozen; everything that changes is read through
+  `vault.snapshot`. Gone: the per-field getters, `vault.stamp`, `keyDeriver`, `leaseMillis`,
+  `now()`. `getSnapshot`/`subscribe` are prototype getters on Vault and Bank (`Bank` is not
+  frozen and has no own stamp fields).
+* **The snapshot is unchanged** (still `registered_at`, `gate_epoch`, `passphrase`, `passkey`,
+  `state`): thread 12 reshapes it. Readers in tests, React and GraphQL now read
+  `vault.snapshot.<field>`, `vault.snapshot.gate_epoch` among them: thread 12 moves them. Tests
+  needing the vault's epochs use `TH.madeUnderOf(vault)` (through `vaultRecordHeldBy`, a
+  test-only accessor in src/proving.ts, exported by no entry).
+* **`gating.leaseMillis`** on every `Gating` replaces `vault.leaseMillis` (React's dialogs).
+  Provings get their key deriver, logger, lease length, clock and vault record through
+  `ProvingInside`, registered when the vault is made.
+* **Types**: `demandConsistentWith` takes `VaultMadeUnder`; `GatedVaultRecord` and `VaultDraft`
+  are exported, `VaultDraft` what `ensureVault`/`ensureVaultRecords`/`doEnsureVault` take.
+  `Lease.format` is public. Box and Lease have no `toJSON`; their JSON is their own fields.
+* **Lint vs NEWSTYLE**: `sonarjs/redundant-type-aliases` refuses `LeaseSparse = LeaseStamp`;
+  `no-misused-spread` refuses `{ ...vault }` (tests use `TH.shownOf(vault)`). At the restack,
+  NEWSTYLE's examples in #272's STYLE.md follow the lint. STYLE.md line 87 still cites
+  `vault.passphrase`/`vault.passkey`.

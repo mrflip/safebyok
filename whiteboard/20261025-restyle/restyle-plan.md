@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 10 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#281](https://github.com/mrflip/safebyok/pull/281)); thread 11 under way.
+* **Status:** threads 1 to 10 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#281](https://github.com/mrflip/safebyok/pull/281)); thread 11 built ([#282](https://github.com/mrflip/safebyok/pull/282)), in review.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
