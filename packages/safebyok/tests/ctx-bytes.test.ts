@@ -111,19 +111,32 @@ const changed = (val: unknown): unknown => {
   return { changed: 1 }
 }
 
-/** True when ciphertext sealed under `ctxOf(stamps)` opens under `ctxOf` of the same stamps with `field` of the one at `slot` changed; false when it will not, or the builder refuses the changed stamp ('bad_record') before any ctx is made. */
-const opensWithChange = async <StampsT extends readonly Record<string, unknown>[]>(ctxOf: (...stamps: StampsT) => Uint8Array, stamps: StampsT, slot: number, field: string) => {
+/** The fields a stamp's schema holds to one literal value: another is refused 'bad_record' before any ctx is made, and the pinned bytes above show each bound. */
+const LiteralFields: ReadonlySet<string> = new Set(['format', 'whisper_codec', 'whisper_schema_version'])
+
+/** What ciphertext sealed under `ctxOf(stamps)` does under `ctxOf` of the same stamps with `field` of the one at `slot` changed: 'opens'; 'sealed_apart' when AES-GCM will not open it; 'refused' when the builder refuses the changed stamp ('bad_record') before any ctx is made. Anything else thrown is a bug, and fails the test. */
+const fateOfChange = async <StampsT extends readonly Record<string, unknown>[]>(ctxOf: (...stamps: StampsT) => Uint8Array, stamps: StampsT, slot: number, field: string) => {
   const cipherKey = await makeBoxKey()
   const sealed = await cipherBytes(cipherKey, textBytes('sk-fake'), ctxOf(...stamps))
   const altered = stamps.map((stamp, ii) => (ii === slot ? { ...stamp, [field]: changed(stamp[field]) } : stamp)) as unknown as StampsT
+  let alteredCtx: Uint8Array
   try {
-    await decipherBytes(cipherKey, sealed, ctxOf(...altered))
-    return true
+    alteredCtx = ctxOf(...altered)
   } catch (err) {
-    if (isVaultError(err) && ! isVaultError(err, 'bad_record')) { throw err }
-    return false
+    if (isVaultError(err, 'bad_record')) { return 'refused' }
+    throw err
+  }
+  try {
+    await decipherBytes(cipherKey, sealed, alteredCtx)
+    return 'opens'
+  } catch (err) {
+    if ((err as { name?: unknown }).name === 'OperationError') { return 'sealed_apart' }
+    throw err
   }
 }
+
+/** What a change to `field` must come to: refused at the parse for a literal field, sealed apart for any other. */
+const fateExpected = (field: string) => (LiteralFields.has(field) ? 'refused' : 'sealed_apart')
 
 const vaultStamp: VaultStamp = { format: VaultFormat, ...scope, vault_tok: 'vault-tok-u1', registered_at: Date.UTC(2026, 9, 14) }
 const { format: _vaultFormat, ...vaultStampButFormat } = vaultStamp
@@ -147,31 +160,31 @@ describe("each ctx binds every field of its stamps", () => {
   for (const field of VaultStampFields) {
     it(`a wayin's ctx: a vault stamp with another ${field} does not open what the stamp sealed`, async () => {
       const ctxOf = (stamp: typeof vaultStamp) => wayinCtxOf(stamp, header)
-      expect(await opensWithChange(ctxOf, [vaultStamp] as const, 0, field)).to.be.false
+      expect(await fateOfChange(ctxOf, [vaultStamp] as const, 0, field)).to.eq(fateExpected(field))
     })
   }
 
   for (const field of VaultStampButFormatFields) {
     it(`a box's ctx: a vault stamp with another ${field} does not open what the stamp sealed`, async () => {
       const ctxOf = (vault: typeof vaultStamp, box: typeof boxStamp) => boxCtxOf(vault, box, 'whisper_ciphered')
-      expect(await opensWithChange(ctxOf, [vaultStamp, boxStamp] as const, 0, field)).to.be.false
+      expect(await fateOfChange(ctxOf, [vaultStamp, boxStamp] as const, 0, field)).to.eq(fateExpected(field))
     })
 
     it(`a lease's ctx: a vault stamp with another ${field} does not open what the stamp sealed`, async () => {
-      expect(await opensWithChange(leaseCtxOf, [vaultStamp, leaseStamp] as const, 0, field)).to.be.false
+      expect(await fateOfChange(leaseCtxOf, [vaultStamp, leaseStamp] as const, 0, field)).to.eq(fateExpected(field))
     })
   }
 
   for (const field of BoxStampFields) {
     it(`a box's ctx: a box stamp with another ${field} does not open what the stamp sealed`, async () => {
       const ctxOf = (vault: typeof vaultStamp, box: typeof boxStamp) => boxCtxOf(vault, box, 'whisper_ciphered')
-      expect(await opensWithChange(ctxOf, [vaultStamp, boxStamp] as const, 1, field)).to.be.false
+      expect(await fateOfChange(ctxOf, [vaultStamp, boxStamp] as const, 1, field)).to.eq(fateExpected(field))
     })
   }
 
   for (const field of LeaseStampFields) {
     it(`a lease's ctx: a lease stamp with another ${field} does not open what the stamp sealed`, async () => {
-      expect(await opensWithChange(leaseCtxOf, [vaultStamp, leaseStamp] as const, 1, field)).to.be.false
+      expect(await fateOfChange(leaseCtxOf, [vaultStamp, leaseStamp] as const, 1, field)).to.eq(fateExpected(field))
     })
   }
 
