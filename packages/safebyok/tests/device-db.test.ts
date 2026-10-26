@@ -52,6 +52,11 @@ describe("raisedDeviceRecord", () => {
       .to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 4 }))
   })
 
+  it("throws 'bad_record' rather than raise a stored record to an epoch that fails its check, as its doc block says: no record the core hands it carries one", () => {
+    const standing = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
+    TH.expectSyncRefusal(() => raisedDeviceRecord(standing, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
+  })
+
   const GivesWayCases = [
     // what may stand under the ckey that is no device record of this scope:
     [null,                                                       'a null left by a store'],

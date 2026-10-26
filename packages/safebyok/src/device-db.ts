@@ -116,6 +116,10 @@ export const memoryDeviceDB = (): DeviceDB => {
  * none, or a row that fails its check -- gives way to `record` as it came. A DeviceDB of your own
  * calls it inside the one transaction that reads and writes the row.
  *
+ * It builds a raised record afresh, checked, so it throws 'bad_record' when it must raise a stored
+ * record to a `record` whose `highest_vault_epoch` fails its check. The core never hands a DeviceDB
+ * such a record: only a host's own call can, so let the throw abort that transaction.
+ *
  * @example raisedDeviceRecord(undefined, record)                                    // record
  * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
  */
