@@ -124,7 +124,7 @@ const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?
  */
 export type BankProviderProps = MakeBankOpts & {
   /** The signed-in user from the host's auth, or null when nobody is: then the hooks hand down no vault, and ask for none. */
-  user_id:              string | null
+  user_id:             string | null
   /** What asks the user for a passphrase or passkey when a call needs one (Bank.make's `requestCleartext`).
    * Left out, the provider's own: `GatingModal`, the dialog for each gating's kind -- an unlock, a
    * first passphrase, a change to the ways in, a deletion -- one at a time, shown only while the

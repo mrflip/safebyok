@@ -167,7 +167,7 @@ const askable = (passkey: PasskeyWayinSummary) => {
 const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credential_id,
   prf_salt_b64: toB64(saltBytes),
-  prfBytes:   bytesOf(answer),
+  prfBytes:     bytesOf(answer),
 })
 
 /** A copy of `source`'s bytes, whichever kind of buffer the browser handed back. */

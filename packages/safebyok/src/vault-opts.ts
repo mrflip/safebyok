@@ -120,7 +120,7 @@ export type VaultDraft = {
    * It is 1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone, as the exported
    * `user_id` checks: percent-encode (RFC 3986) one that holds anything else.
    */
-  user_id:     string
+  user_id:    string
   /** The vault's own label; an app that keeps one vault per user calls it `main`. */
   vaultlabel: string
   /** Where this vault is stored, in place of the bank's `vaultDB`: the same object at every ask for the vault, as the bank compares stores by identity. */
@@ -156,7 +156,7 @@ const { makeBankOpts, vaultDraft } = Validator('bad_option', ({ obj, unk }) => {
     strengthChecker:        strengthChecker.default(() => DefaultStrengthChecker),
   } satisfies Record<keyof MakeBankOpts, Z.ZodType>).strict()
   const vaultDraft = obj({
-    user_id:     anyOpt,
+    user_id:    anyOpt,
     vaultlabel: anyOpt,
     vaultDB:    anyOpt,
     deviceDB:   anyOpt,

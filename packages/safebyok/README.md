@@ -49,7 +49,7 @@ const bank = Bank.make({          // once, at module level
 })
 
 const vault = await bank.ensureVault({
-  user_id:     session.user_id,     // your auth's stable, opaque id for the user; never an email
+  user_id:    session.user_id,   // your auth's stable, opaque id for the user; never an email
   vaultlabel: 'main',
 })
 vault.state                       // 'novel' | 'locked' | 'unlocked'

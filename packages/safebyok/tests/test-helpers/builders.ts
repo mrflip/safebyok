@@ -141,7 +141,7 @@ export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'user_id' | 'vaultla
  */
 export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVaultOpts => ({
   applabel:   'acme',
-  user_id:     'u1',
+  user_id:    'u1',
   vaultlabel: 'main',
   vaultDB:    localVaultDB({ store: memoryStore() }),
   deviceDB:   memoryDeviceDB(),

@@ -7,7 +7,7 @@ import { EpochMillis, label, wallClock, type Clock, type StringStore } from 'saf
  * creating the account on first sight.
  */
 export type Session = {
-  user_id:    string
+  user_id:   string
   userlabel: string
 }
 
