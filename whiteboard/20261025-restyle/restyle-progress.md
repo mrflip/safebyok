@@ -196,3 +196,22 @@ Who reads this: threads 9 to 13.
   component's tables before deploying (changeset, README).
 * VOCABULARY's "vault props" retirement is on this branch's text; at the restack, apply it to
   #272's VOCABULARY.
+
+## From thread 9 (cipher_ctx, #280)
+
+Who reads this: threads 10 to 13; the restack.
+
+* **`cipherCtx(stamp, purpose, ...header)`** (crypto.ts): stamp is one record or a list; bytes are
+  `stableJsonify([...stamps, purpose, ...header])`. Wayins bind `VaultStamp` (`registered_at`
+  now among it); a box binds `VaultStampButFormat` + `BoxStamp` (sidecar as its sorted JSON
+  string); a lease binds `VaultStampButFormat` + `LeaseStamp`. `boxCtxOf`, `leaseCtxOf`,
+  `VaultStampButFormat` in lease.ts. Nothing sealed before opens (no new damage beyond thread 8's).
+* **Public signatures**: `Wayin.make(vault, vaultStamp, record)` and the wayin constructors take a
+  stamp (a whole record passes); `WayinVault` is `keyDeriver | now`; `GateVault` names its scope;
+  `LeaseVault` adds `vault_tok`, `registered_at`; `Gate.of` takes a record carrying its stamp.
+  Provings keep a private `#vaultStamp`. Test helpers' `VaultSlice` gains `registered_at`.
+* **For thread 11**: "stamp" in its old sense (scope, `vault_tok`, epochs a thing was made under)
+  remains in Box's getter doc blocks, `vault.stamp`, provings' `stamp` parameter, `StampedShape`,
+  `checkedStamp`; VOCABULARY calls that set "made under". Rename them as Box and Vault reshape.
+* **For the restack**: VOCABULARY's ctx, stamp, visible, unencrypted, sidecar, revisionTok,
+  whisper codec and format rows are on this branch's text; apply them to #272's VOCABULARY.

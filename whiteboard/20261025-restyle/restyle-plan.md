@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 8 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#279](https://github.com/mrflip/safebyok/pull/279)); thread 9 under way.
+* **Status:** threads 1 to 8 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#279](https://github.com/mrflip/safebyok/pull/279)); thread 9 built ([#280](https://github.com/mrflip/safebyok/pull/280)), in review at high.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -413,7 +413,9 @@ returns a `VaultSparse` (rename or drop it); `Lease implements Omit<LeaseSparse,
 others. From #279's review: name what is written out at many sites (`GatedVaultRecord`, an
 exported `VaultDraft`, the `Stamped` parameter) if that reads better; derive `stampOf` by leaving
 out `gate` (`const { gate: _gate, ...sparse } = record`), not by listing fields; `MadeUnder` in
-box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`. **Depends on:** thread
+box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`. From #280: rename the old-sense "stamp" (what a thing was made
+under: scope, `vault_tok`, epochs) in Box's getters, `vault.stamp`, provings' `stamp` parameter,
+`StampedShape`, `checkedStamp`; VOCABULARY calls that set "made under". **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
 
 ### 12. The snapshot (Preplan Phase 7) -- `snapshot`
