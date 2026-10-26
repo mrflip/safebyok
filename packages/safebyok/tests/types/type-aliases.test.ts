@@ -99,7 +99,9 @@ describe("passphraseCleartext", () => {
   it("refuses anything but text as 'bad_option', quoting none of it, as its second example shows", () => {
     const err = TH.expectSyncRefusal(() => passphraseCleartext.parse(42), 'bad_option')
     expect(err.message).to.eq("A passphrase is the text the user typed, as a string")
-    TH.expectSyncRefusal(() => passphraseCleartext.parse({ passphrase: 'TELLTALE' }), 'bad_option')
+    const wrapped = TH.expectSyncRefusal(() => passphraseCleartext.parse({ passphrase: 'TELLTALE' }), 'bad_option')
+    expect(wrapped.message).to.not.include('TELLTALE')
+    expect(JSON.stringify(wrapped.meta)).to.not.include('TELLTALE')
   })
 
   it("takes a blank passphrase, which is the gating's to judge", () => {
