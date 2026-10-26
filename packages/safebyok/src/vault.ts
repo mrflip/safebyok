@@ -571,7 +571,7 @@ export class Vault {
       await this.#helloWithin(this.#staleMillis)
       this.#checkStanding()
       const kindNow = (): GatingKind => {
-        if (this.#vaultRecord.gate?.passkey == null) {
+        if (! isGated(this.#vaultRecord) || this.#vaultRecord.gate.passkey === null) {
           throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
         }
         return 'del_passkey'
