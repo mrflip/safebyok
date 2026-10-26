@@ -16,4 +16,12 @@ threads 2 to 13 → the sprint PR. Thread 1 (`guidance`) stands on #267 beside t
 
 ## Discoveries
 
-(none yet)
+* *Orchestrator:* **STYLE.md carries the rules from #272 on** (thread 1): NEWSTYLE §1–§10 are its
+  sections *Build for maintenance*, *Shapes and duck typing*, *Crossings, spreading and logging*,
+  *Stateful objects and snapshots*, *Order comes from an explicit list*, *Scopepaths*,
+  *Tree-shaking*, and a rewritten *Validation*. A thread cut from #267 does not hold them yet:
+  it reads NEWSTYLE.md.
+* *Orchestrator:* **a PR's base is `main`**, with "Stacked on #N" in its body. Workers may find
+  `gh pr edit` and `gh pr ready` denied; they report it and carry on, and the Coach is asked.
+* *Orchestrator:* the lint's `^_[a-zA-Z0-9]` flagged nothing in `src/` (`args: 'after-used'`
+  never reported `(_, ii) =>`); write named ignores anyway.

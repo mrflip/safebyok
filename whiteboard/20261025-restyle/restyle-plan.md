@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** planned; threads 1 and 2 under way.
+* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -90,6 +90,12 @@ wrong unless told. **Depends on:** nothing; cut from #267's tip, runs beside the
 **Look-ahead:** every later thread reads STYLE.md; until this files, they read NEWSTYLE.md.
 **Size:** medium.
 
+*Review:* none: its only code is eleven test bindings renamed to named ignores (an Open Matter). Filed
+as [#272](https://github.com/mrflip/safebyok/pull/272), still a draft based on #267's branch: the worker's
+`gh pr edit --base main` and `gh pr ready` were denied by the permission classifier (an Open Matter).
+It handed thread 2 the eslint tree-shaking comment (NEWSTYLE §11) and thread 9 VOCABULARY's `ctx`,
+**visible** and **unencrypted** rows.
+
 ### 2. The Validator factory and scope checks (Preplan Phase 1, first half) -- `validator`
 
 > 1. **Checks, and the `Validator` factory.** `src/checks/` after
@@ -114,7 +120,9 @@ the peer in `packages/safebyok` and `safebyok-indexeddb` (the version bump and t
 gives. The existing `zod/mini` schemas elsewhere stay for thread 3, so both flavours bundle for
 one thread: an interim cost, named in the PR. The eslint `no-restricted-imports` rule that holds
 `src/` to `zod/mini` loosens here to allow classic. **Depends on:** nothing unmerged beyond the
-base; cut from #267's tip. **Look-ahead:** thread 8 builds `vaultRecord` with a nested
+base; cut from #267's tip. *Orchestrator, from thread 1:* restate the eslint `safebyok/tree-shaking` comment and message (core,
+fastkey, graphql, postgres, indexeddb) as STYLE.md *Tree-shaking* says it; `src/utils.ts` sits
+beside the planned `src/utils/`, so pick names that do not resolve two ways. **Look-ahead:** thread 8 builds `vaultRecord` with a nested
 `gateRecord` and slices (`pick`, `omit`, `extend`, `.strict()`, `.readonly()`) from it through
 this factory, with `sources` modules spread into the kit: build and test that path now (a pick
 of a wrapped schema still refuses with the call's kind, or doesn't, and says so in its doc
@@ -277,7 +285,8 @@ run long, they are a thread of their own (8b), the core's change first.
 *Gloss:* *Preplan*, *Ctx*: `cipherCtx(stamp, purpose, header)`, a list of stamps where two are
 bound (`[vaultStamp, boxStamp]`), the vault's stamp without its `format` in a box's and a lease's,
 `registered_at` bound (crypto.ts:65's example made true), the encoding kept (`stableJsonify`,
-undefined or null refused). Every existing vault becomes unreadable: the changeset says so plainly
+undefined or null refused). VOCABULARY's `ctx`, **visible** and **unencrypted** rows are
+reworded in terms of stamps (*Orchestrator, from thread 1*). Every existing vault becomes unreadable: the changeset says so plainly
 (pre-1.0). The `notes/security.md` entry through a `sonnet` subagent, as CLAUDE.md says. This is
 cryptographic construction: follow what is in `src/` and the preplan, add no new primitive, and
 stop and report if the preplan's ctx seems to need one. **Depends on:** thread 8. **Look-ahead:**
