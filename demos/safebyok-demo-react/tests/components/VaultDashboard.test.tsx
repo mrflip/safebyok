@@ -288,6 +288,17 @@ describe("VaultDashboard, its boxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
+  it("lists damaged boxes among the sound ones, in boxlabel order", async () => {
+    const store = memoryStore()
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key', zed_api_key: 'zed-test-not-a-real-key' })
+    store.write(openaiScopepath, '{"not": json')
+    world.renderInVault(<VaultDashboard />)
+    await screen.findByText(/damaged: its stored record can't be read/)
+    const shown = screen.getAllByRole('row').slice(1).map((row) => row.querySelector('code')?.textContent)
+    expect(shown).to.deep.equal(['anthropic_api_key', 'openai_api_key', 'zed_api_key'])
+  })
+
   it("replaces a damaged box that names its revision with a fresh whisper", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })

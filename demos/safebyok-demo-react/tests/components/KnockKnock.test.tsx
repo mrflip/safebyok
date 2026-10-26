@@ -195,6 +195,19 @@ describe("KnockKnock", () => {
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
+  it("says a key a newer version of the app wrote is the app's to update, offering neither replacing nor removing it", async () => {
+    const store = memoryStore()
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    const boxScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic_api_key' })
+    const row = JSON.parse(store.read(boxScopepath) ?? '{}') as object
+    store.write(boxScopepath, JSON.stringify({ ...row, format: 'safebyok-box-v99' }))
+    world.renderInVault(<KnockKnock />)
+    await screen.findByText(/written by a newer version of this app: update the app/)
+    expect(screen.queryByRole('button', { name: 'replace it' })).to.be.null
+    expect(screen.queryByRole('button', { name: 'remove it' })).to.be.null
+  })
+
   it("offers a key damaged beyond naming only for removing, and then for adding anew", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })

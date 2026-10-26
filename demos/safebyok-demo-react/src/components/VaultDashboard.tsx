@@ -5,7 +5,7 @@ import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { Sidecar, Whisper, VaultSnapshot } from 'safebyok'
+import type { BoxDamaged, BoxSparse, Sidecar, Whisper, VaultSnapshot } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
@@ -151,6 +151,41 @@ export const VaultDashboard = () => {
     }
   }
 
+  // A damaged box can't be read, used or edited -- only removed, or stored over afresh while it
+  // names its revision: one damaged beyond naming putBox() refuses. One a newer safebyok wrote is
+  // the app's to update, not the user's to remove.
+  const damagedRow = (box: BoxDamaged) => (
+    <tr key={box.boxlabel} className="damaged">
+      <td><code>{box.boxlabel}</code></td>
+      <td colSpan={3} className="gripe">{box.damage === 'newer_format' ? "written by a newer version of this app: update the app to read it" : "damaged: its stored record can't be read"}</td>
+      <td className="row">
+        {box.damage === 'damaged' && box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
+        {box.damage === 'damaged' && <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>}
+      </td>
+    </tr>
+  )
+
+  const soundRow = (box: BoxSparse) => {
+    const viewed = shown[box.boxlabel]
+    return (
+      <tr key={box.boxlabel}>
+        <td><code>{box.boxlabel}</code></td>
+        <td className="whisper-cell">
+          {viewed === undefined
+            ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
+            : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
+        </td>
+        <td className="quiet">{noteOf(box.sidecar)}</td>
+        <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
+        <td className="row">
+          <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
+          <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
+          <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
+        </td>
+      </tr>
+    )
+  }
+
   return (
     <section className="vault-dashboard">
       <div className="row spread">
@@ -171,39 +206,7 @@ export const VaultDashboard = () => {
             <tr><th>label</th><th>whisper</th><th>note</th><th>written</th><th></th></tr>
           </thead>
           <tbody>
-            {snapshot.damagedBoxes.map((box) => (
-              // A damaged box can't be read, used or edited -- only removed, or stored over afresh
-              // while it names its revision: one damaged beyond naming putBox() refuses. One a newer
-              // safebyok wrote is the app's to update, not the user's to remove.
-              <tr key={box.boxlabel} className="damaged">
-                <td><code>{box.boxlabel}</code></td>
-                <td colSpan={3} className="gripe">{box.damage === 'newer_format' ? "written by a newer version of this app: update the app to read it" : "damaged: its stored record can't be read"}</td>
-                <td className="row">
-                  {box.damage === 'damaged' && box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
-                  {box.damage === 'damaged' && <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>}
-                </td>
-              </tr>
-            ))}
-            {snapshot.boxes.map((box) => {
-              const viewed = shown[box.boxlabel]
-              return (
-                <tr key={box.boxlabel}>
-                  <td><code>{box.boxlabel}</code></td>
-                  <td className="whisper-cell">
-                    {viewed === undefined
-                      ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
-                      : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
-                  </td>
-                  <td className="quiet">{noteOf(box.sidecar)}</td>
-                  <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
-                  <td className="row">
-                    <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
-                    <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
-                    <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
-                  </td>
-                </tr>
-              )
-            })}
+            {[...snapshot.boxes, ...snapshot.damagedBoxes].toSorted(byBoxlabel).map((box) => ('damage' in box ? damagedRow(box) : soundRow(box)))}
           </tbody>
         </table>
       )}
@@ -263,4 +266,10 @@ const LockChip = ({ snapshot, onLock }: { snapshot: VaultSnapshot, onLock: () =>
       <button className="mini" onClick={onLock}>lock now</button>
     </span>
   )
+}
+
+/** Boxes, sound and damaged alike, in boxlabel order, as the vault lists each kind: by code unit. */
+const byBoxlabel = (one: { boxlabel: string }, two: { boxlabel: string }): number => {
+  if (one.boxlabel === two.boxlabel) { return 0 }
+  return one.boxlabel < two.boxlabel ? -1 : 1
 }
