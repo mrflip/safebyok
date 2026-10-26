@@ -306,7 +306,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The phone deletes the vault; the laptop hears it gone, and its bank hands out no Vault object for it.
     await TH.del(phone, NewPassphrase)
-    await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ user_id: 'u1', vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
+    await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
     TH.closeVault(laptop)
     TH.closeVault(phone)
   })

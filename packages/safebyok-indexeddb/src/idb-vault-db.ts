@@ -25,8 +25,9 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * @returns The VaultDB, to hand `Bank.make`. Kind 'bad_option' for a `dbName` that is not non-empty text.
  *
  * @example
- *   const bank = Bank.make({ applabel: 'acme', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
- *   const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
+ *   const vaultDB = idbVaultDB({ dbName: 'acme' })   // once, at module level
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts({ dbName: 'acme' }) })   // as the user signs in
+ *   const vault = await bank.ensureVault({ vaultlabel: 'main' })
  */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 

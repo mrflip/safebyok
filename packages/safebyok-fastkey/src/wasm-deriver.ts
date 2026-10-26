@@ -47,7 +47,7 @@ export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver =>
  * any `browserOpts()` spread, so it wins.
  *
  * @example
- *   const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', user_id: session.user_id, vaultDB })
  * @example
  *   const keyBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', passphraseSalt)
  *   keyBytes.length  // 32

@@ -47,7 +47,7 @@ const ServerMaxNameBytes = 640
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
- *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB })   // as the user signs in
  * @example
  *   const vaultDB = graphqlVaultDB({ client, maxBoxes: 250 })  // the server's postgresVaultDB holds 250
  */
