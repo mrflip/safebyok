@@ -41,6 +41,26 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 4, branch `20261026-brands`): **salts, wraps and a parsed passphrase are branded types; a brand
+  is earned by a parse, never a cast.**
+  (1) `packages/safebyok/src/types/type-aliases.ts` brands, through each Zod validator's `.brand()`, `PassphraseSalt` (`salt_b64`),
+  `PrfSalt` (`prf_salt_b64`), `WhisperCiphered`, `BoxKeyWrapped`, `VaultKeyWayinWrapped`, `VaultKeyLeaseWrapped` and
+  `PassphraseCleartext`. A brand exists only for the compiler: at runtime the schema is the same one. It makes the compiler refuse one
+  role's salt or wrap where another's is wanted (a wayin's wrap where a lease's goes, a passkey's salt where a passphrase's goes) and
+  plain text where a parsed passphrase is wanted. Nothing at runtime refuses a mix-up.
+  (2) In `src/`, each value gets its brand by a parse of its own output with the field's validator: a fresh salt in
+  `mintedPassphraseHeader`, a passkey's salt from its checked answer, each wrap in `wrappedWith`, `Lease.tryCipheredWith` and
+  `sealLeaseRecord`. A stored record gets its brands from its record's parse, as before. The only casts are in tests, which plant
+  damaged values on purpose.
+  (3) `passphraseKeyOf`, the one function that hands a passphrase to the key deriver, takes a `PassphraseCleartext`.
+  `PassphraseProving.seal` parses the passphrase it is handed (`passphraseCleartext`; anything not text is refused `bad_option`,
+  quoting nothing) and passes on only the parsed value. A host's `KeyDeriver.deriveKeyBytes` still takes a plain string. The
+  cleartext check accepts a blank passphrase; whether a blank one is wrong is the gating's to say, as before.
+  (4) A salt's check in the record stays its shape only (non-empty text). Its length and base64url form are still judged per wayin
+  (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt`), so a salt of the wrong length or not base64url leaves that wayin
+  `damaged_wayin` while the vault's other wayin still opens, where checking it in the record would make the whole vault record damaged.
+  (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
+  with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
 * 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
   strict; a refusal repeats only keys shaped like our field names; classic Zod loads and sets its global locale.**
   (1) Every stored-record schema (vault props gated and gateless, the passphrase and passkey wayin records, the tombstone, the box record, the
