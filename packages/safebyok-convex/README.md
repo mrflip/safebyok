@@ -102,12 +102,13 @@ import { api } from '../convex/_generated/api'
 const convex = new ConvexClient(import.meta.env.VITE_CONVEX_URL)
 convex.setAuth(fetchToken) // your auth provider's token, as for any Convex call
 
-const bank = Bank.make({
+const bank = Bank.make({    // as the user signs in
   applabel: 'acme',
+  user_id:  session.user_id,
   vaultDB:  convexVaultDB({ client: convex, api: api.safebyok }),
   ...browserOpts(), // the key deriver and device store a browser wants
 })
-const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 In a React app, pass the `ConvexReactClient` you give `ConvexProvider`, so the vault shares its

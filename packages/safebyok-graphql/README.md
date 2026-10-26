@@ -77,8 +77,8 @@ import { Client, fetchExchange } from '@urql/core'
 import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB: graphqlVaultDB({ client }) })
-const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
+const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB: graphqlVaultDB({ client }) })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is

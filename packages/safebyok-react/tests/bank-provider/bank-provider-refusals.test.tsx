@@ -288,7 +288,7 @@ describe("BankProvider", () => {
       const elsewhere = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1', deviceDB: memoryDeviceDB() })
       const shown = latest().vault
       await TH.del(elsewhere, 'correct horse')
-      const remade = await TH.bankOf(elsewhere).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+      const remade = await TH.bankOf(elsewhere).ensureVault({ vaultlabel: 'main' })
       await TH.unlock(remade, 'a new pw')
       // The provider's watch hears it all; however its reads fall, its Vault object is gone.
       await waitFor(() => { expect(shownState()).to.match(/^refused: vault_(gone|remade)$/) })
@@ -335,7 +335,7 @@ describe("BankProvider", () => {
       rerender(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await act(async () => { await TH.wakeupAtNextTick() })
       expect(reads).toHaveBeenCalledOnce()
-      act(() => { latest().bank?.closeVault({ user_id: 'u1', vaultlabel: 'main' }) })
+      act(() => { latest().bank?.closeVault({ vaultlabel: 'main' }) })
       await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
       expect(reads).toHaveBeenCalledTimes(2)
     })
@@ -347,7 +347,7 @@ describe("BankProvider", () => {
       await expectShown('refused: damaged_vault')
       await act(async () => {
         await delDamagedVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: props.vaultDB, deviceDB })
-        await latest().bank?.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+        await latest().bank?.ensureVault({ vaultlabel: 'main' })
       })
       await expectShown('novel')
       expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])

@@ -114,7 +114,7 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
  *   always passes it.
  *
  * @example
- *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })  // brings it in
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })  // brings it in
  * @example await zxcvbnStrengthChecker('correct horse battery staple')  // { strong: true }
  * @example await zxcvbnStrengthChecker('password1234')                  // { strong: false, reason: 'That is very like a commonly used password: add a few more words, less common ones.' }
  * @example await zxcvbnStrengthChecker('hunter2')                       // { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }

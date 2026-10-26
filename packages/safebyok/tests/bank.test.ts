@@ -10,22 +10,23 @@ import type { Tombstone } from '../src/types/types'
 import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import { browserOpts } from '../src/browser'
-import { type MakeBankOpts, type VaultDraft, parseMakeBankOpts, parseVaultDraft } from '../src/vault-opts'
+import { type MakeBankOpts, type BankVaultOpts, parseMakeBankOpts, vaultPartsOf } from '../src/vault-opts'
 import type { Gating } from '../src/gating'
+import type { KeyDeriver } from '../src/key-deriver'
 import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
 import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
 
-// == [Helpers]: U1, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
+// == [Helpers]: Main, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
 
 type World = ReturnType<typeof makeWorld>
 
-/** The vault each world births, `u1`'s `main`, as a draft names it. */
-const U1 = Object.freeze({ user_id: 'u1', vaultlabel: 'main' })
+/** The vault each world births, `u1`'s `main`, as a call of u1's bank names it. */
+const Main = Object.freeze({ vaultlabel: 'main' })
 
-/** `world`'s options for Bank.make, `overrides` in place: its vault's user_id and vaultlabel left out, as each vault's draft takes them. */
+/** `world`'s options for Bank.make, u1's, `overrides` in place: its vault's vaultlabel left out, as each call naming the vault takes it. */
 const bankOptsOf = (world: World, overrides?: Partial<TH.BornVaultOpts>): MakeBankOpts => {
-  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return bankOpts
 }
 
@@ -69,23 +70,39 @@ const keptTombstones = (vaultDB: Pick<VaultDB, 'delVault'>): Tombstone[] => {
 }
 // --
 
-// == [Bank.make]: examples, user_id and vaultlabel refused, touches nothing
+// == [Bank.make]: examples, vaultlabel refused, user_id required, touches nothing
 
 describe("Bank.make", () => {
-  it("makes a bank of the app's options, and nothing more, as its first example shows", () => {
+  it("makes a bank of the app's options for the signed-in user, and nothing more, as its first example shows", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
+    const session = { user_id: 'u1' }
+    const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
     expect(bank.status).to.eq('made')
     expect(bank.applabel).to.eq('acme')
+    expect(bank.user_id).to.eq('u1')
+    expect(bank.scope).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    expect(Object.isFrozen(bank.scope)).to.be.true
     expect(bank.getSnapshot()).to.deep.equal({ status: 'made', err: null, vaults: {} })
   })
 
-  it("refuses user_id and vaultlabel as 'bad_option', naming each as a vault's own, as its second example shows", () => {
+  it("refuses vaultlabel as 'bad_option', naming it as a vault's own, as its second example shows", () => {
     const opts = bankOptsOf(makeWorld())
-    const err = TH.expectSyncRefusal(() => Bank.make({ ...opts, user_id: 'u1' } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.include("user_id (each vault's own: hand it to bank.ensureVault)")
-    const both = TH.expectSyncRefusal(() => Bank.make({ ...opts, user_id: 'u1', vaultlabel: 'main' } as MakeBankOpts), 'bad_option')
-    expect(both.message).to.include("vaultlabel (each vault's own")
+    const err = TH.expectSyncRefusal(() => Bank.make({ ...opts, vaultlabel: 'main' } as MakeBankOpts), 'bad_option')
+    expect(err.message).to.include("vaultlabel (each vault's own: hand it to bank.ensureVault)")
+  })
+
+  it("refuses a user_id left out or failing its check as 'bad_scope', naming the field", () => {
+    const { user_id: _user_id, ...opts } = bankOptsOf(makeWorld())
+    for (const user_id of [undefined, '', 'u^1', 42]) {
+      const err = TH.expectSyncRefusal(() => Bank.make({ ...opts, user_id } as MakeBankOpts), 'bad_scope')
+      expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
+    }
+  })
+
+  it("refuses a keyDeriver whose load is no function 'bad_option'", () => {
+    const keyDeriver = { ...TH.testDeriver, load: 'soon' }
+    const err = TH.expectSyncRefusal(() => bankIn(makeWorld(), { keyDeriver: keyDeriver as unknown as KeyDeriver }), 'bad_option')
+    expect(err.message).to.include('its load, if it carries one, is a function too')
   })
 
   it("touches nothing: the bank is 'made', its snapshot holds no vault, and no store verb or load is called", async () => {
@@ -102,7 +119,7 @@ describe("Bank.make", () => {
 })
 // --
 
-// == [bank.hello]: the strength checker's load, once, shared, and again after a failure
+// == [bank.hello]: the strength checker's and key deriver's loads, once, shared, and again after a failure
 
 describe("bank.hello", () => {
   it("loads the strength checker, and the bank is timely, as its example shows", async () => {
@@ -153,35 +170,89 @@ describe("bank.hello", () => {
     expect(strengthChecker.load).toHaveBeenCalledTimes(2)
   })
 
+  it("loads the key deriver too, beside the strength checker, once", async () => {
+    const keyDeriver = { ...TH.testDeriver, load: vi.fn(() => undefined) }
+    const strengthChecker = checkerLoading(() => undefined)
+    const bank = bankIn(makeWorld(), { keyDeriver, strengthChecker })
+    await bank.hello()
+    await bank.ensureVault(Main)
+    expect(bank.status).to.eq('timely')
+    expect(keyDeriver.load).toHaveBeenCalledOnce()
+    expect(strengthChecker.load).toHaveBeenCalledOnce()
+  })
+
+  it("refuses as the key deriver's load failed, 'unexpected_error' with what it threw the cause, and the next hello loads again", async () => {
+    const thrown = new Error('the WebAssembly module did not load')
+    const keyDeriver = { ...TH.testDeriver, load: vi.fn(() => undefined) }
+    keyDeriver.load.mockImplementationOnce(() => { throw thrown })
+    const bank = bankIn(makeWorld(), { keyDeriver })
+    const err = await TH.expectRefusal(bank.hello(), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
+    expect(err.message).to.include("keyDeriver's load()")
+    expect(bank.getSnapshot()).to.deep.include({ status: 'refused', err })
+    await bank.hello()
+    expect(bank.getSnapshot()).to.deep.include({ status: 'timely', err: null })
+    expect(keyDeriver.load).toHaveBeenCalledTimes(2)
+  })
+
+  it("refuses as the strength checker's load did where both fail", async () => {
+    const keyDeriver = { ...TH.testDeriver, load: vi.fn(() => Promise.reject(new Error('no wasm'))) }
+    const strengthChecker = checkerLoading(() => Promise.reject(new Error('no zxcvbn')))
+    const err = await TH.expectRefusal(bankIn(makeWorld(), { keyDeriver, strengthChecker }).hello(), 'unexpected_error')
+    expect(err.message).to.include("strengthChecker's load()")
+  })
+
+  it("is 'starting', its err null, as a hello after a failure loads again: the refusal told of a load no longer under way", async () => {
+    const gate = TH.makeLatch()
+    const strengthChecker = checkerLoading(() => gate.pass())
+    strengthChecker.load.mockRejectedValueOnce(new Error('offline'))
+    const bank = bankIn(makeWorld(), { strengthChecker })
+    await TH.expectRefusal(bank.hello(), 'unexpected_error')
+    const again = bank.hello()
+    await gate.reached
+    expect(bank.getSnapshot()).to.deep.include({ status: 'starting', err: null })
+    gate.release()
+    expect(await again).to.eq(bank)
+  })
+
+  it("runs a checker and a deriver made once and handed to two banks at each bank's hello, as each bank loads its own", async () => {
+    const world = makeWorld()
+    const keyDeriver = { ...TH.testDeriver, load: vi.fn(() => undefined) }
+    const strengthChecker = checkerLoading(() => undefined)
+    const banks = [bankIn(world, { keyDeriver, strengthChecker }), bankIn(world, { keyDeriver, strengthChecker, user_id: 'u2' })]
+    for (const bank of banks) { await bank.hello() }
+    expect(keyDeriver.load).toHaveBeenCalledTimes(2)
+    expect(strengthChecker.load).toHaveBeenCalledTimes(2)
+  })
+
   it("has ensureVault refuse while the load fails, birthing nothing", async () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world, { strengthChecker: checkerLoading(() => Promise.reject(new Error('offline'))) })
-    const err = await TH.expectRefusal(bank.ensureVault(U1), 'unexpected_error')
+    const err = await TH.expectRefusal(bank.ensureVault(Main), 'unexpected_error')
     expect(births).not.toHaveBeenCalled()
-    expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null, err })
+    expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null, err })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 })
 // --
 
-// == [bank.ensureVault]: examples, novel and locked births, a draft amiss, one birth at a time
+// == [bank.ensureVault]: examples, novel and locked births, a bag or options amiss, one birth at a time
 
 describe("bank.ensureVault", () => {
-  it("births the vault a draft names, as its first example shows", async () => {
+  it("births the vault a bag names, as its first example shows", async () => {
     const bank = bankIn(makeWorld())
-    const session = { user_id: 'u1' }
-    const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(vault.state).to.eq('novel')
-    expect(bank.entryOf(U1)).to.deep.include({ status: 'timely', vault })
+    expect(vault).to.deep.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+    expect(bank.entryOf(Main)).to.deep.include({ status: 'timely', vault })
   })
 
-  it("births a vault stored elsewhere, in the draft's own vaultDB, as its second example shows", async () => {
+  it("births a vault stored elsewhere, in its options' own vaultDB, as its second example shows", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const workVaultDB = localVaultDB({ store: memoryStore() })
-    const user_id = 'u1'
-    const vault = await bank.ensureVault({ user_id, vaultlabel: 'work', vaultDB: workVaultDB })   // a vault stored elsewhere
+    const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
     expect(vault.vaultlabel).to.eq('work')
     expect(await TH.propsOf(workVaultDB, TH.scopeOf('u1', 'work'))).to.deep.include({ vault_tok: vault.vault_tok })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1', 'work'))).to.be.null
@@ -189,7 +260,7 @@ describe("bank.ensureVault", () => {
 
   it("births 'novel' over empty storage, its gateless props stored, and its vault_tok fixed for the Vault object's life", async () => {
     const world = makeWorld()
-    const vault = await bankIn(world).ensureVault(U1)
+    const vault = await bankIn(world).ensureVault(Main)
     expect(vault.getSnapshot()).to.deep.include({ state: 'novel', gate_epoch: 0, passphrase: null })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ vault_tok: vault.vault_tok, gate_epoch: 0, passphrase: null, passkey: null })
     const bornAs = vault.vault_tok
@@ -201,44 +272,70 @@ describe("bank.ensureVault", () => {
   it("births 'locked' over a vault gated elsewhere", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    const vault = await bankIn(world).ensureVault(U1)
+    const vault = await bankIn(world).ensureVault(Main)
     expect(vault.getSnapshot()).to.deep.include({ state: 'locked', vault_tok: maker.vault_tok, gate_epoch: 1 })
   })
 
-  it("refuses a draft amiss before storage is touched: 'bad_option' for no bag or a field it does not take, 'bad_scope' for a name", async () => {
+  it("takes anything carrying the vault's scope as it is -- the Vault object, its snapshot, its entry's scope -- handing back the vault held", async () => {
+    const bank = bankIn(makeWorld())
+    const vault = await bank.ensureVault(Main)
+    const entry = bank.entryOf(Main)
+    for (const bag of [vault, vault.getSnapshot(), entry?.scope ?? Main, { ...Main, user_id: 'u1', applabel: 'acme', leaseHours: 1 }]) {
+      expect(await bank.ensureVault(bag)).to.eq(vault)
+    }
+  })
+
+  it("refuses a bag of another user or app than the bank's 'bad_scope', naming the field and quoting neither, before storage is touched", async () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world)
-    for (const draft of [undefined, null, 'u1', { ...U1, leaseHours: 1 }, { ...U1, vaultDB: 'elsewhere' }]) {
-      await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_option')
+    const other = await TH.expectRefusal(bank.ensureVault({ ...Main, user_id: 'u2' }), 'bad_scope')
+    expect(other.meta?.fieldnames).to.deep.equal(['user_id'])
+    expect(other.message).to.not.include('u2')
+    const both = await TH.expectRefusal(bank.ensureVault({ ...TH.scopeOf('u2'), applabel: 'other' }), 'bad_scope')
+    expect(both.meta?.fieldnames).to.deep.equal(['applabel', 'user_id'])
+    expect(births).not.toHaveBeenCalled()
+    expect(bank.snapshot.vaults).to.deep.equal({})
+  })
+
+  it("refuses a bag or options amiss before storage is touched: 'bad_scope' for no bag or a name that fails, 'bad_option' for stores in the bag or options it does not take", async () => {
+    const world = makeWorld()
+    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const bank = bankIn(world)
+    for (const bag of [undefined, null, 'main', {}, { ...Main, user_id: '' }, { vaultlabel: 'not-a-label' }]) {
+      await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
     }
-    for (const draft of [{ ...U1, user_id: '' }, { ...U1, vaultlabel: 'not-a-label' }, { vaultlabel: 'main' }]) {
-      await TH.expectRefusal(bank.ensureVault(draft as unknown as typeof U1), 'bad_scope')
+    for (const bag of [{ ...Main, vaultDB: world.vaultDB }, { ...Main, deviceDB: world.deviceDB }]) {
+      const err = await TH.expectRefusal(bank.ensureVault(bag), 'bad_option')
+      expect(err.message).to.include('second bag')
+    }
+    for (const opts of [null, 'elsewhere', { leaseHours: 1 }, { vaultlabel: 'main' }, { vaultDB: 'elsewhere' }]) {
+      await TH.expectRefusal(bank.ensureVault(Main, opts as unknown as BankVaultOpts), 'bad_option')
     }
     expect(births).not.toHaveBeenCalled()
   })
 
-  it("refuses a draft naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to a draft naming its own", async () => {
+  it("refuses options naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to options naming its own", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const elsewhere = { ...U1, vaultDB: localVaultDB({ store: memoryStore() }) }
-    const birth = bank.ensureVault(U1)
-    await TH.expectRefusal(bank.ensureVault(elsewhere), 'bad_option')
+    const elsewhere = { vaultDB: localVaultDB({ store: memoryStore() }) }
+    const birth = bank.ensureVault(Main)
+    await TH.expectRefusal(bank.ensureVault(Main, elsewhere), 'bad_option')
     const vault = await birth
-    await TH.expectRefusal(bank.ensureVault(elsewhere), 'bad_option')
-    await TH.expectRefusal(bank.ensureVault({ ...U1, deviceDB: memoryDeviceDB() }), 'bad_option')
-    expect(await bank.ensureVault({ ...U1, vaultDB: world.vaultDB, deviceDB: world.deviceDB })).to.eq(vault)
-    expect(bank.entryOf(U1)?.vault).to.eq(vault)
-    const moved = await bank.reopenVault(elsewhere)
+    await TH.expectRefusal(bank.ensureVault(Main, elsewhere), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(Main, { deviceDB: memoryDeviceDB() }), 'bad_option')
+    expect(await bank.ensureVault(Main, { vaultDB: world.vaultDB, deviceDB: world.deviceDB })).to.eq(vault)
+    expect(bank.entryOf(Main)?.vault).to.eq(vault)
+    const moved = await bank.reopenVault(Main, elsewhere)
     expect(moved).to.not.eq(vault)
-    await TH.expectRefusal(bank.ensureVault(U1), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(Main), 'bad_option')
   })
 
   it("refuses a vaultDB made afresh over the same storage 'bad_option', saying stores are compared as objects", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    await bank.ensureVault(U1)
-    const err = await TH.expectRefusal(bank.ensureVault({ ...U1, vaultDB: localVaultDB({ store: world.dbStore }) }), 'bad_option')
+    await bank.ensureVault(Main)
+    const err = await TH.expectRefusal(bank.ensureVault(Main, { vaultDB: localVaultDB({ store: world.dbStore }) }), 'bad_option')
     expect(err.message).to.include('the same vaultDB object')
     expect(err.message).to.include('make each store once')
   })
@@ -247,10 +344,10 @@ describe("bank.ensureVault", () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world)
-    const [first, second] = await Promise.all([bank.ensureVault(U1), bank.ensureVault(U1)])
+    const [first, second] = await Promise.all([bank.ensureVault(Main), bank.ensureVault(Main)])
     expect(second).to.eq(first)
     expect(births).toHaveBeenCalledOnce()
-    expect(await bank.ensureVault(U1)).to.eq(first)
+    expect(await bank.ensureVault(Main)).to.eq(first)
     expect(births).toHaveBeenCalledOnce()
   })
 })
@@ -283,7 +380,7 @@ describe("a lease taken up at birth", () => {
     [async (world) => {
       const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
       await TH.del(elsewhere, 'pw')
-      const remade = await TH.bankOf(elsewhere).ensureVault(U1)
+      const remade = await TH.bankOf(elsewhere).ensureVault(Main)
       await TH.unlock(remade, 'pw')
       return {}
     },                                                                                          'a lease of another vault_tok, another life of the vault'],
@@ -322,12 +419,12 @@ describe("a vault served behind this device's record", () => {
     const { world, olderEpoch } = await behindWorld()
     const onBadNews = vi.fn()
     const bank = bankIn(world, { onBadNews })
-    const err = await TH.expectRefusal(bank.ensureVault(U1), 'vault_behind')
-    expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null, err })
+    const err = await TH.expectRefusal(bank.ensureVault(Main), 'vault_behind')
+    expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null, err })
     expect(onBadNews).toHaveBeenCalledOnce()
     expect(onBadNews).toHaveBeenCalledWith(err)
-    await bank.clearCachedVault(U1)
-    const vault = await bank.ensureVault(U1)
+    await bank.clearCachedVault(Main)
+    const vault = await bank.ensureVault(Main)
     expect(vault.state).to.eq('locked')
     expect(vault.stamp.vault_epoch).to.eq(olderEpoch)
     expect(await highestEpochOf(world)).to.eq(olderEpoch)
@@ -337,13 +434,13 @@ describe("a vault served behind this device's record", () => {
   it("lets the entry go only once this device's record and lease are erased, so a listener asking again then takes up no lease", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const vault = await bank.ensureVault(U1)
+    const vault = await bank.ensureVault(Main)
     await TH.unlock(vault, 'pw')
     expect(await world.getLease()).to.not.be.null
     const asked: Promise<Vault>[] = []
-    bank.subscribe(() => { if (bank.entryOf(U1) === null && asked.length === 0) { asked.push(bank.ensureVault(U1)) } })
+    bank.subscribe(() => { if (bank.entryOf(Main) === null && asked.length === 0) { asked.push(bank.ensureVault(Main)) } })
     const gate = TH.holdNextCall(world.deviceDB, 'delLease')
-    const clearing = bank.clearCachedVault(U1)
+    const clearing = bank.clearCachedVault(Main)
     await gate.reached
     await TH.wakeupAtNextTick()
     gate.release()
@@ -359,13 +456,12 @@ describe("a vault served behind this device's record", () => {
     TH.closeVault(await world.openUnlocked('pw'))
     await TH.expectGood(world.deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
     const bank = bankIn(world)
-    const user_id = 'u1'
-    const err = await TH.expectRefusal(bank.ensureVault(U1), 'vault_behind')
+    const err = await TH.expectRefusal(bank.ensureVault(Main), 'vault_behind')
     if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
-      await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
-      await bank.ensureVault({ user_id, vaultlabel: 'main' })
+      await bank.clearCachedVault({ vaultlabel: 'main' })
+      await bank.ensureVault({ vaultlabel: 'main' })
     }
-    expect(bank.entryOf(U1)?.status).to.eq('timely')
+    expect(bank.entryOf(Main)?.status).to.eq('timely')
     expect(await world.getLease()).to.be.null
     expect(await highestEpochOf(world)).to.eq(1)
   })
@@ -377,9 +473,9 @@ describe("bank.clearCachedVault", () => {
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
     const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
     const bank = bankIn(world, { requestCleartext })
-    expect(await bank.tryClearCachedVault(U1)).to.deep.equal({ ok: true, val: undefined })
-    await bank.clearCachedVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
+    expect(await bank.tryClearCachedVault(Main)).to.deep.equal({ ok: true, val: undefined })
+    await bank.clearCachedVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
     expect(await recordOf(world)).to.be.null
     for (const called of [...vaultDBCalls, requestCleartext]) { expect(called).not.toHaveBeenCalled() }
   })
@@ -392,21 +488,21 @@ describe("bank.clearCachedVault", () => {
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
     const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
     const bank = bankIn(world, { requestCleartext })
-    await bank.clearCachedVault(U1)
+    await bank.clearCachedVault(Main)
     expect(await recordOf(world)).to.be.null
     expect(await world.getLease()).to.be.null
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
     for (const called of [...vaultDBCalls, requestCleartext]) { expect(called).not.toHaveBeenCalled() }
   })
 
-  it("erases in the deviceDB the draft names and lets go the entry the bank holds for the scope, whichever stores that was born from: no stores are checked", async () => {
+  it("erases in the deviceDB its options name and lets go the entry the bank holds for the scope, whichever stores that was born from: no stores are checked", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    await bank.ensureVault(U1)
+    await bank.ensureVault(Main)
     const otherDeviceDB = memoryDeviceDB()
     await TH.expectGood(otherDeviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')))
-    await bank.clearCachedVault({ ...U1, deviceDB: otherDeviceDB })
-    expect(bank.entryOf(U1)).to.be.null
+    await bank.clearCachedVault(Main, { deviceDB: otherDeviceDB })
+    expect(bank.entryOf(Main)).to.be.null
     const otherRecord = await TH.expectGood(otherDeviceDB.getDeviceRecord(TH.scopeOf('u1')))
     expect(otherRecord).to.be.null
     expect(await recordOf(world)).to.not.be.null
@@ -415,13 +511,13 @@ describe("bank.clearCachedVault", () => {
   it("keeps the entry when the device store refuses 'storage_unavailable' as it erases: a second call erases both and lets it go", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const vault = await bank.ensureVault(U1)
+    const vault = await bank.ensureVault(Main)
     vi.spyOn(world.deviceDB, 'delLease').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The device store could not be reached: try again shortly.')))
-    await TH.expectRefusal(bank.clearCachedVault(U1), 'storage_unavailable')
-    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+    await TH.expectRefusal(bank.clearCachedVault(Main), 'storage_unavailable')
+    expect(bank.entryOf(Main)?.vault).to.eq(vault)
     expect(await recordOf(world)).to.be.null
-    await bank.clearCachedVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
+    await bank.clearCachedVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
   })
 })
 // --
@@ -432,73 +528,74 @@ describe("bank.delDamagedVault", () => {
   it("deletes a vault refused 'damaged_vault' with the bank's own stores, letting its entry go; the next ensureVault births a new life, novel, as its example shows", async () => {
     const world = await damagedVaultWorld()
     const bank = bankIn(world)
-    const { user_id, vaultlabel } = U1
-    const { err } = await bank.tryEnsureVault(U1)
-    expect(bank.entryOf(U1)?.status).to.eq('refused')
+    await bank.tryEnsureVault(Main)
+    const entry = bank.entryOf(Main)
+    if (entry === null) { throw new Error('no entry was held') }
+    expect(entry.status).to.eq('refused')
     const confirm = vi.fn(() => true)
-    if (isVaultError(err, 'damaged_vault') && confirm()) {
-      await bank.delDamagedVault({ user_id, vaultlabel: 'main' })
-      expect(bank.entryOf(U1)).to.be.null
-      await bank.ensureVault({ user_id, vaultlabel })
+    if (isVaultError(entry.err, 'damaged_vault') && confirm()) {
+      await bank.delDamagedVault(entry.scope)
+      expect(bank.entryOf(Main)).to.be.null
+      await bank.ensureVault(entry.scope)
     }
     expect(confirm).toHaveBeenCalledOnce()
     expect(await world.getLease()).to.be.null
-    expect(bank.entryOf(U1)?.vault?.state).to.eq('novel')
+    expect(bank.entryOf(Main)?.vault?.state).to.eq('novel')
   })
 
   it("lets the entry go and still refuses 'stale_write' when the vault was made anew elsewhere as it deleted: the next ensureVault births the vault that stands", async () => {
     const world = await damagedVaultWorld()
     const bank = bankIn(world)
-    await TH.expectRefusal(bank.ensureVault(U1), 'damaged_vault')
+    await TH.expectRefusal(bank.ensureVault(Main), 'damaged_vault')
     const elsewhere = bankIn(world, { deviceDB: memoryDeviceDB() })
     const delDamagedVault = world.vaultDB.delDamagedVault.bind(world.vaultDB)
     vi.spyOn(world.vaultDB, 'delDamagedVault').mockImplementationOnce(async (scope) => {
       await TH.expectGood(delDamagedVault(scope))
-      await elsewhere.ensureVault(U1)
+      await elsewhere.ensureVault(Main)
       return TH.bad(new VaultError('stale_write', 'The vault was made anew elsewhere while it was being deleted.'))
     })
-    await TH.expectRefusal(bank.delDamagedVault(U1), 'stale_write')
-    expect(bank.entryOf(U1)).to.be.null
-    const standing = await bank.ensureVault(U1)
-    expect(standing.vault_tok).to.eq(elsewhere.entryOf(U1)?.vault?.vault_tok)
+    await TH.expectRefusal(bank.delDamagedVault(Main), 'stale_write')
+    expect(bank.entryOf(Main)).to.be.null
+    const standing = await bank.ensureVault(Main)
+    expect(standing.vault_tok).to.eq(elsewhere.entryOf(Main)?.vault?.vault_tok)
     expect(standing.state).to.eq('novel')
   })
 
   it("keeps the refused entry when storage refuses the delete 'storage_unavailable': a second call deletes, and the next ensureVault births a new life, novel", async () => {
     const world = await damagedVaultWorld()
     const bank = bankIn(world)
-    await TH.expectRefusal(bank.ensureVault(U1), 'damaged_vault')
+    await TH.expectRefusal(bank.ensureVault(Main), 'damaged_vault')
     vi.spyOn(world.vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
-    await TH.expectRefusal(bank.delDamagedVault(U1), 'storage_unavailable')
-    expect(bank.entryOf(U1)?.status).to.eq('refused')
-    await bank.delDamagedVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
-    const reborn = await bank.ensureVault(U1)
+    await TH.expectRefusal(bank.delDamagedVault(Main), 'storage_unavailable')
+    expect(bank.entryOf(Main)?.status).to.eq('refused')
+    await bank.delDamagedVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
+    const reborn = await bank.ensureVault(Main)
     expect(reborn.state).to.eq('novel')
   })
 
   it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_scope'", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const vault = await bank.ensureVault(U1)
-    await TH.expectRefusal(bank.delDamagedVault(U1), 'bad_option')
+    const vault = await bank.ensureVault(Main)
+    await TH.expectRefusal(bank.delDamagedVault(Main), 'bad_option')
     const stored = await TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
     expect(stored).to.not.be.null
-    expect(bank.entryOf(U1)?.vault).to.eq(vault)
-    await TH.expectRefusal(bank.delDamagedVault({ user_id: 'u1', vaultlabel: 'Not A Label' }), 'bad_scope')
+    expect(bank.entryOf(Main)?.vault).to.eq(vault)
+    await TH.expectRefusal(bank.delDamagedVault({ vaultlabel: 'Not A Label' }), 'bad_scope')
   })
 
   it("deletes a damaged vault the bank holds no entry for, never asked of it: storage's own checks decide, and the next ensureVault births a new life, novel", async () => {
     const world = await damagedVaultWorld()
     const requestCleartext = vi.fn(TH.scriptedRequestCleartext)
     const bank = bankIn(world, { requestCleartext })
-    expect(bank.entryOf(U1)).to.be.null
-    await bank.delDamagedVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
+    await bank.delDamagedVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
     expect(await gotVaultOf(world)).to.be.null
     expect(await world.getLease()).to.be.null
     expect(requestCleartext).not.toHaveBeenCalled()
-    const reborn = await bank.ensureVault(U1)
+    const reborn = await bank.ensureVault(Main)
     expect(reborn.state).to.eq('novel')
   })
 
@@ -506,27 +603,27 @@ describe("bank.delDamagedVault", () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
     const bank = bankIn(world)
-    await TH.expectRefusal(bank.delDamagedVault(U1), 'bad_option')
+    await TH.expectRefusal(bank.delDamagedVault(Main), 'bad_option')
     expect(await gotVaultOf(world)).to.not.be.null
     expect(await world.getLease()).to.not.be.null
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
   })
 
   it("is a quiet success with no vault stored and no entry held, as storage finds nothing to delete", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    await bank.delDamagedVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
+    await bank.delDamagedVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
     expect(await gotVaultOf(world)).to.be.null
   })
 
-  it("lets go the entry the bank holds for the scope once a draft naming another vaultDB deletes there, whichever stores the entry was born from: no stores are checked", async () => {
+  it("lets go the entry the bank holds for the scope once options naming another vaultDB delete there, whichever stores the entry was born from: no stores are checked", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    await bank.ensureVault(U1)
+    await bank.ensureVault(Main)
     const otherVaultDB = localVaultDB({ store: memoryStore() })
-    await bank.delDamagedVault({ ...U1, vaultDB: otherVaultDB })
-    expect(bank.entryOf(U1)).to.be.null
+    await bank.delDamagedVault(Main, { vaultDB: otherVaultDB })
+    expect(bank.entryOf(Main)).to.be.null
     expect(await gotVaultOf(world)).to.not.be.null
   })
 })
@@ -624,9 +721,9 @@ describe("a vault deleted, and its next life", () => {
     for (const call of [() => vault.hello(), () => TH.unlock(vault, 'pw'), () => vault.getBox('anthropic'), () => vault.lock(), () => vault.del()]) {
       await TH.expectRefusal(call(), 'vault_gone')
     }
-    expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null })
-    expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_gone')
-    const next = await bank.ensureVault(U1)
+    expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null })
+    expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
+    const next = await bank.ensureVault(Main)
     expect(next).to.not.eq(vault)
     expect(next.state).to.eq('novel')
     expect(next.vault_tok).to.not.eq(vault.vault_tok)
@@ -641,16 +738,16 @@ describe("a vault deleted, and its next life", () => {
     await stale.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.del(elsewhere, 'pw')
-    const remade = await TH.bankOf(elsewhere).ensureVault(U1)
+    const remade = await TH.bankOf(elsewhere).ensureVault(Main)
     await TH.unlock(remade, 'another phrase')
     await remade.putBox({ boxlabel: 'openai' }, 'sk-fake-two')
     await TH.expectRefusal(stale.hello({ staleMinutes: 0 }), 'vault_remade')
     await TH.expectRefusal(stale.getWhisper('anthropic'), 'vault_remade')
     await TH.expectRefusal(TH.unlock(stale, 'pw'), 'vault_remade')
     const bank = TH.bankOf(stale)
-    expect(bank.entryOf(U1)?.status).to.eq('refused')
-    expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_remade')
-    const reborn = await bank.ensureVault(U1)
+    expect(bank.entryOf(Main)?.status).to.eq('refused')
+    expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_remade')
+    const reborn = await bank.ensureVault(Main)
     expect(reborn.getSnapshot()).to.deep.include({ state: 'locked', vault_tok: remade.vault_tok })
     expect(reborn.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
     expect(await remade.getWhisper('openai')).to.eq('sk-fake-two')
@@ -664,8 +761,8 @@ describe("a vault deleted, and its next life", () => {
     await TH.expectRefusal(stale.refresh(), 'vault_gone')
     await TH.expectRefusal(stale.lock(), 'vault_gone')
     const bank = TH.bankOf(stale)
-    expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_gone')
-    const reborn = await bank.ensureVault(U1)
+    expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
+    const reborn = await bank.ensureVault(Main)
     expect(reborn.state).to.eq('novel')
     expect(reborn.vault_tok).to.not.eq(stale.vault_tok)
   })
@@ -685,10 +782,10 @@ describe("a vault deleted, and its next life", () => {
       queueMicrotask(() => { onGone(new VaultError('vault_gone', 'This vault was deleted.')) })
       return newborn
     })
-    await TH.expectBad(bank.tryEnsureVault(U1), 'vault_gone')
-    expect(bank.entryOf(U1)).to.deep.include({ status: 'refused', vault: null })
-    expect(bank.entryOf(U1)?.err?.refusalkind).to.eq('vault_gone')
-    const reborn = await bank.ensureVault(U1)
+    await TH.expectBad(bank.tryEnsureVault(Main), 'vault_gone')
+    expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null })
+    expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
+    const reborn = await bank.ensureVault(Main)
     expect(reborn.state).to.eq('novel')
   })
 })
@@ -701,25 +798,35 @@ describe("bank.closeVault", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const bank = TH.bankOf(vault)
-    bank.closeVault(U1)
+    bank.closeVault(Main)
     await TH.expectRefusal(vault.hello(), 'vault_gone')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
     expect(await world.getLease()).to.not.be.null
-    const next = await bank.ensureVault(U1)
+    const next = await bank.ensureVault(Main)
     expect(next).to.not.eq(vault)
     expect(next.state).to.eq('unlocked')
   })
 
-  it("lets the vault go, as its example shows", async () => {
-    const vault = await makeWorld().open()
+  it("lets the vault go, by its label or by the Vault object, as its examples show", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
     const bank = TH.bankOf(vault)
-    const user_id = 'u1'
-    bank.closeVault({ user_id, vaultlabel: 'main' })
+    bank.closeVault({ vaultlabel: 'main' })
     await TH.expectBad(vault.tryHello(), 'vault_gone')
     // A vault the bank no longer holds is no refusal.
-    bank.closeVault({ user_id, vaultlabel: 'main' })
+    bank.closeVault({ vaultlabel: 'main' })
     expect(bank.snapshot.vaults).to.deep.equal({})
+    const next = await bank.ensureVault(Main)
+    bank.closeVault(next)   // the vault a Vault object is of
+    await TH.expectBad(next.tryHello(), 'vault_gone')
+  })
+
+  it("refuses a bag of another user 'bad_scope', letting nothing go", async () => {
+    const vault = await makeWorld().open()
+    const bank = TH.bankOf(vault)
+    TH.expectSyncRefusal(() => { bank.closeVault({ ...Main, user_id: 'u2' }) }, 'bad_scope')
+    expect(bank.entryOf(Main)?.vault).to.eq(vault)
   })
 
   it("ends the gating standing: its lockLanded settles, and the call waiting on it refuses vault_gone", async () => {
@@ -742,14 +849,14 @@ describe("bank.closeVault", () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.vaultDB, 'ensureVault')
-    const birth = bank.tryEnsureVault(U1)
+    const birth = bank.tryEnsureVault(Main)
     await reading.reached
-    expect(bank.entryOf(U1)?.status).to.eq('starting')
-    bank.closeVault(U1)
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)?.status).to.eq('starting')
+    bank.closeVault(Main)
+    expect(bank.entryOf(Main)).to.be.null
     reading.release()
     await TH.expectBad(birth, 'vault_gone')
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
   })
 })
 
@@ -757,7 +864,7 @@ describe("bank.closeVaults and bank.reopenVault", () => {
   it("lets every vault go at sign-out, as closeVaults's example shows", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const vaults = [await bank.ensureVault(U1), await bank.ensureVault({ user_id: 'u1', vaultlabel: 'work' })]
+    const vaults = [await bank.ensureVault(Main), await bank.ensureVault({ vaultlabel: 'work' })]
     const signingOut: (() => void)[] = []
     const onSignOut = (handler: () => void) => { signingOut.push(handler) }
     onSignOut(() => { bank.closeVaults() })
@@ -769,12 +876,11 @@ describe("bank.closeVaults and bank.reopenVault", () => {
   it("hands back a new Vault object, the one let go gone, as reopenVault's example shows", async () => {
     const vault = await makeWorld().openUnlocked('pw')
     const bank = TH.bankOf(vault)
-    const user_id = 'u1'
-    const reopened = await bank.reopenVault({ user_id, vaultlabel: 'main' })   // after 'vault_gone', say
+    const reopened = await bank.reopenVault({ vaultlabel: 'main' })   // after 'vault_gone', say
     expect(reopened).to.not.eq(vault)
     expect(reopened.state).to.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
-    expect(bank.entryOf(U1)?.vault).to.eq(reopened)
+    expect(bank.entryOf(Main)?.vault).to.eq(reopened)
   })
 })
 
@@ -868,12 +974,12 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     const made = bank.getSnapshot()
     expect(bank.getSnapshot()).to.eq(made)
     const statuses: (string | undefined)[] = []
-    bank.subscribe(() => { statuses.push(bank.entryOf(U1)?.status) })
-    await bank.ensureVault(U1)
+    bank.subscribe(() => { statuses.push(bank.entryOf(Main)?.status) })
+    await bank.ensureVault(Main)
     expect(stepsOf(statuses)).to.deep.equal(['starting', 'timely'])
     const settled = bank.getSnapshot()
     expect(settled).to.not.eq(made)
-    await bank.ensureVault(U1)
+    await bank.ensureVault(Main)
     await bank.hello()
     expect(bank.getSnapshot()).to.eq(settled)
     expect(Object.isFrozen(settled)).to.be.true
@@ -885,12 +991,12 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world)
     const asked: Promise<Vault>[] = []
-    bank.subscribe(() => { if (bank.entryOf(U1)?.status !== 'timely') { asked.push(bank.ensureVault(U1)) } })
-    const vault = await bank.ensureVault(U1)
+    bank.subscribe(() => { if (bank.entryOf(Main)?.status !== 'timely') { asked.push(bank.ensureVault(Main)) } })
+    const vault = await bank.ensureVault(Main)
     expect(asked.length).to.be.at.least(2)
     for (const ask of asked) { expect(await ask).to.eq(vault) }
     expect(ensureVault).toHaveBeenCalledOnce()
-    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+    expect(bank.entryOf(Main)?.vault).to.eq(vault)
   })
 
   it("reads nothing for a birth let go in the task that asked for it, its caller refused 'vault_gone'", async () => {
@@ -898,12 +1004,12 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
     const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
     const bank = bankIn(world)
-    const asked = bank.ensureVault(U1)
-    bank.closeVault(U1)
+    const asked = bank.ensureVault(Main)
+    bank.closeVault(Main)
     await TH.expectRefusal(asked, 'vault_gone')
     expect(ensureVault).not.toHaveBeenCalled()
     expect(getDeviceRecord).not.toHaveBeenCalled()
-    expect(bank.entryOf(U1)).to.be.null
+    expect(bank.entryOf(Main)).to.be.null
   })
 
   it("moves an entry from starting to refused when its birth is refused, the refusal kept", async () => {
@@ -912,11 +1018,11 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable))
     const bank = bankIn(world)
     const statuses: (string | undefined)[] = []
-    bank.subscribe(() => { statuses.push(bank.entryOf(U1)?.status) })
-    await TH.expectRefusal(bank.ensureVault(U1), 'storage_unavailable')
+    bank.subscribe(() => { statuses.push(bank.entryOf(Main)?.status) })
+    await TH.expectRefusal(bank.ensureVault(Main), 'storage_unavailable')
     expect(stepsOf(statuses)).to.deep.equal(['starting', 'refused'])
-    expect(bank.entryOf(U1)?.err).to.eq(unreachable)
-    expect(await bank.ensureVault(U1)).to.eq(bank.entryOf(U1)?.vault)
+    expect(bank.entryOf(Main)?.err).to.eq(unreachable)
+    expect(await bank.ensureVault(Main)).to.eq(bank.entryOf(Main)?.vault)
   })
 
   it("hands subscribe and getSnapshot to useSyncExternalStore as they are, as the class's second example shows", async () => {
@@ -928,7 +1034,7 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     }
     const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
     expect(snapshot).to.eq(bank.snapshot)
-    await bank.ensureVault(U1)
+    await bank.ensureVault(Main)
     expect(heard).toHaveBeenCalled()
   })
 
@@ -937,58 +1043,90 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     const heard = vi.fn()
     const unsubscribe = bank.subscribe(heard)
     unsubscribe()
-    await bank.ensureVault(U1)
+    await bank.ensureVault(Main)
     expect(heard).not.toHaveBeenCalled()
     TH.expectSyncRefusal(() => bank.subscribe('listen' as unknown as () => void), 'bad_option')
   })
 
-  it("reads an entry's status, or undefined for a vault not asked for, as entryOf's example shows; a bad name refuses 'bad_scope'", async () => {
+  it("reads an entry's status, or undefined for a vault not asked for, as entryOf's example shows; a bad name or another user's bag refuses 'bad_scope'", async () => {
     const bank = bankIn(makeWorld())
-    expect(bank.entryOf({ user_id: 'u1', vaultlabel: 'main' })?.status).to.be.undefined
-    await bank.ensureVault(U1)
-    expect(bank.entryOf({ user_id: 'u1', vaultlabel: 'main' })?.status).to.eq('timely')
-    TH.expectSyncRefusal(() => bank.entryOf({ user_id: 'u1', vaultlabel: 'not-a-label' }), 'bad_scope')
+    expect(bank.entryOf({ vaultlabel: 'main' })?.status).to.be.undefined
+    await bank.ensureVault(Main)
+    expect(bank.entryOf({ vaultlabel: 'main' })?.status).to.eq('timely')
+    TH.expectSyncRefusal(() => bank.entryOf({ vaultlabel: 'not-a-label' }), 'bad_scope')
+    TH.expectSyncRefusal(() => bank.entryOf({ ...Main, user_id: 'u2' }), 'bad_scope')
   })
 
   it("births a vault through the browser's defaults, as the class's first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const session = { user_id: 'u1' }
-    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })   // once, at module level
-    const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+    const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(vault.state).to.eq('novel')   // 'novel' | 'locked' | 'unlocked'
     expect(bank.status).to.eq('timely')
   })
 })
 // --
 
-// == [Parsing]: parseMakeBankOpts, parseVaultDraft
+// == [Parsing]: demandConsistentWith, parseMakeBankOpts, vaultPartsOf
+
+describe("bank.demandConsistentWith", () => {
+  it("returns for a Vault object the bank handed out, as its first example shows", async () => {
+    const bank = bankIn(makeWorld())
+    const vault = await bank.ensureVault(Main)
+    for (const thing of [vault, vault.getSnapshot(), bank, {}]) {
+      expect(() => { bank.demandConsistentWith(thing) }).to.not.throw()
+    }
+    bank.demandConsistentWith(vault)   // returns, for a Vault object this bank handed out
+  })
+
+  it("refuses another user's scope 'bad_scope', naming the field, never its value, as its second example shows", () => {
+    const bank = bankIn(makeWorld())
+    const err = TH.expectSyncRefusal(() => { bank.demandConsistentWith({ user_id: 'u2' }) }, 'bad_scope')
+    expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
+    expect(err.message).to.include('a bank serves one app and one signed-in user')
+    expect(err.message).to.not.include('u2')
+  })
+
+  it("refuses another app's scope, a name that fails its check, and no bag at all 'bad_scope'", () => {
+    const bank = bankIn(makeWorld())
+    for (const thing of [{ applabel: 'other' }, { user_id: '' }, { applabel: 'Not A Label' }, null, 'u1']) {
+      TH.expectSyncRefusal(() => { bank.demandConsistentWith(thing as unknown as object) }, 'bad_scope')
+    }
+  })
+})
 
 describe("parseMakeBankOpts", () => {
   it("reads the bank's options before storage is touched, as its example shows", () => {
     const world = makeWorld()
-    const { applabel, leaseMillis } = parseMakeBankOpts(bankOptsOf(world, { leaseHours: 2 }))
+    const { applabel, user_id, leaseMillis } = parseMakeBankOpts(bankOptsOf(world, { leaseHours: 2 }))
     expect(applabel).to.eq('acme')
+    expect(user_id).to.eq('u1')
     expect(leaseMillis).to.eq(2 * 60 * 60 * 1000)
-  })
-})
-
-describe("parseVaultDraft", () => {
-  it("names the draft's scope under the bank's applabel, as its example shows", () => {
-    const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
-    const { scope } = parseVaultDraft({ user_id: 'u1', vaultlabel: 'main' }, bank)
-    expect(scope).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
-  })
-
-  it("refuses a name that fails its check as bad_scope, and a misspelt field as bad_option", () => {
-    const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
-    TH.expectSyncRefusal(() => parseVaultDraft({ user_id: 'u^1', vaultlabel: 'main' }, bank), 'bad_scope')
-    TH.expectSyncRefusal(() => parseVaultDraft({ user_id: 'u1', vaultlabel: 'main', vaultlable: 'x' } as VaultDraft, bank), 'bad_option')
   })
 
   it("refuses the camelCase userId a host wrote before user_id, as bad_option naming user_id", () => {
-    const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
-    const err = TH.expectSyncRefusal(() => parseVaultDraft({ userId: 'u1', vaultlabel: 'main' } as unknown as VaultDraft, bank), 'bad_option')
+    const { user_id, ...opts } = bankOptsOf(makeWorld())
+    const err = TH.expectSyncRefusal(() => parseMakeBankOpts({ ...opts, userId: user_id } as unknown as MakeBankOpts), 'bad_option')
     expect(err.message).to.include('user_id')
+  })
+})
+
+describe("vaultPartsOf", () => {
+  it("takes its options' own vaultDB, holding its limits to it, as its example shows", () => {
+    const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
+    const workVaultDB = localVaultDB({ store: memoryStore() })
+    const scope = TH.scopeOf('u1', 'work')
+    const { vaultDB } = vaultPartsOf(bank, scope, { vaultDB: workVaultDB })   // the work vault's own store, its limits held to it
+    expect(vaultDB).to.eq(workVaultDB)
+    expect(vaultPartsOf(bank, scope, undefined)).to.deep.include({ scope, vaultDB: bank.vaultDB, deviceDB: bank.deviceDB })
+  })
+
+  it("refuses a misspelt option, or a vaultlabel, as bad_option", () => {
+    const bank = parseMakeBankOpts(bankOptsOf(makeWorld()))
+    for (const opts of [{ vaultdb: bank.vaultDB }, { vaultlabel: 'main' }]) {
+      TH.expectSyncRefusal(() => vaultPartsOf(bank, TH.scopeOf('u1'), opts as unknown as BankVaultOpts), 'bad_option')
+    }
   })
 })
 // --

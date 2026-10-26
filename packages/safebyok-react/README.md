@@ -3,9 +3,9 @@
 The thin React binding for safebyok: no vault logic, only the React-shaped plumbing a host app would
 otherwise write itself.
 
-* `BankProvider` -- makes the app's bank (`Bank.make`) from its props, for the signed-in user
-  (the `user_id` prop from your auth); lets every vault in it go as the user signs out or changes
-  (`bank.closeVaults()`). It is the vaults' `requestCleartext`, unless you pass one of your own:
+* `BankProvider` -- makes the signed-in user's bank (`Bank.make`) from its props (the `user_id`
+  prop from your auth): a bank per user, dropped, with every vault in it let go
+  (`bank.closeVaults()`), as the user signs out or changes. It is the vaults' `requestCleartext`, unless you pass one of your own:
   whenever a call on a vault needs the user -- `vault.getWhisper(...)`, `vault.putBox(...)` or
   `vault.ensureUnlocked()` on a vault locked, `vault.putWayin(...)`, `vault.delWayin('passkey')`,
   `vault.del()` -- it shows the dialog for that gating's kind, one at a time, and the call waits on
@@ -70,7 +70,8 @@ import { BankProvider } from 'safebyok-react'
 </BankProvider>
 ```
 
-The provider takes every `Bank.make` option as a prop, beside the signed-in `user_id`, and throws
+The provider takes every `Bank.make` option as a prop, the signed-in `user_id` among them (null
+while nobody is), and throws
 one it does not take -- a misspelling, a name it no longer uses, or a `vaultlabel`, which each hook
 names -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
 browser app answers like any other, `keyDeriver`, `deviceDB` and `strengthChecker`;
@@ -84,8 +85,9 @@ changes, through the one logger it and its bank share: your `logger` prop, or, w
 none, the logger your `vaultDB` was made with (the default logger, if it was given none). The bank keeps the checker it
 was made with for its life; one that is no function is thrown, as `Bank.make` refuses it, as
 `bad_option`, to the nearest error boundary. Its `load`, if it carries one (`zxcvbnStrengthChecker`
-fetches its dictionary), runs at the bank's `hello()`, before a vault is born, and a load that
-fails is thrown, as `unexpected_error`, to the nearest error boundary. Leave it out and every new passphrase is refused as
+fetches its dictionary), runs at each bank's `hello()`, before a vault is born, as does the
+`keyDeriver`'s, and a load that fails is thrown, as `unexpected_error`, to the nearest error
+boundary. Make each once, outside the component, so every user's bank shares it. Leave it out and every new passphrase is refused as
 too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md).
 
 A handler is the other exception: `onBadNews` and `requestCleartext` make no new bank as they change, so
@@ -98,8 +100,10 @@ they may be written inline. The vaults call whichever the last render passed:
 </BankProvider>
 ```
 
-The provider owns the bank it makes, and the vaults in it: a new user, a sign-out or a changed
-option lets them go (`bank.closeVaults()`), and so does the provider unmounting. Under React's
+The provider owns the bank it makes, and the vaults in it. A bank serves one user: a new user or a
+sign-out drops the bank and lets its vaults go (`bank.closeVaults()`), and the next user gets a
+bank of their own. A changed option makes the bank anew likewise, and so does the provider
+unmounting. Under React's
 `StrictMode`, whose rehearsal in development asks for a vault and lets it go again at once, that
 rehearsal reads nothing from storage: only the vault kept is born.
 
@@ -156,17 +160,17 @@ the vault than this device has seen (`vault_behind`). (A damaged box never stops
 the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show
 it where the vault's UI would be. **A refused entry stays refused until the app asks again**:
-`useBank().ensureVault({ user_id, vaultlabel: 'main' })` reads storage afresh, the entry `starting`
+`useBank().ensureVault({ vaultlabel: 'main' })` reads storage afresh, the entry `starting`
 while it reads, then `timely`, or `refused` with what it met. A browser that keeps the app from
 storing anything on this device (`storage_blocked`) is a condition too, but one asking again will
 not mend until the browser's settings or room change: say so, rather than offering a Retry.
 
 ```tsx
-const VaultPanel = ({ user_id }: { user_id: string }) => {
+const VaultPanel = () => {
   const bank = useBank()
   const entry = useVault('main')
   if (entry?.err) {
-    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault({ user_id, vaultlabel: 'main' }) }}>Retry</button></p>
+    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault(entry.scope) }}>Retry</button></p>
   }
   if (! entry?.vault) { return <p>Opening your vault…</p> }
   return <Boxes vault={entry.vault} />
@@ -196,13 +200,13 @@ lets the entry go, so `useVault` asks for the vault again:
 const bank = useBank()
 const acceptRestore = async () => {
   if (bank === null) { return }
-  await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
-  await bank.ensureVault({ user_id, vaultlabel: 'main' })
+  await bank.clearCachedVault({ vaultlabel: 'main' })
+  await bank.ensureVault({ vaultlabel: 'main' })
 }
 ```
 
 **A damaged vault.** For a `damaged_vault`, the one way forward is to delete the vault and start
-over: `bank.delDamagedVault({ user_id, vaultlabel: 'main' })` does that with the bank's own stores
+over: `bank.delDamagedVault({ vaultlabel: 'main' })` does that with the bank's own stores
 (the `safebyok` README's *A vault that cannot be opened*), and lets the entry go, so `useVault`
 asks for the vault again: a new one, `novel`, for the user to choose a passphrase for. The user's
 boxes in it are lost for good, so ask first. It refuses with storage's refusal (say,

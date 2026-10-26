@@ -1,5 +1,6 @@
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
+import type { KeyDeriver } from './key-deriver'
 
 /** A keyDeriverSpec: Argon2id's whole parameter set, under the keyDeriverLabel a vault records.
  * A vault stores only the label, so a label must always mean the same parameters: change one and
@@ -70,6 +71,18 @@ export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown
   const kept = Object.entries(supplied).every(([field, val]) => carried[field] === val)
   if (! kept) {
     throw new VaultError('bad_option', `A key deriver labelled ${supplied.key_deriver_label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours and test that it derives the same bytes as argon2idWebV1Deriver, or choose a label of your own.`)
+  }
+}
+
+/** Run `keyDeriver`'s `load`, if it has one: what `bank.hello()` does before any vault is born. Its failure is 'unexpected_error', what it threw the cause, as a load hears no passphrase.
+ *
+ * @example await loadKeyDeriver(argon2idWebV1Deriver)   // resolves at once: it carries no load
+ */
+export const loadKeyDeriver = async (keyDeriver: Pick<KeyDeriver, 'load'>): Promise<void> => {
+  try {
+    await keyDeriver.load?.()
+  } catch (err) {
+    throw new VaultError('unexpected_error', "The keyDeriver's load() failed, so no passphrase could be turned into a key, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause: check that your build ships what the deriver loads and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause: err })
   }
 }
 

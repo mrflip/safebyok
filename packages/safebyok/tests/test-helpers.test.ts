@@ -412,8 +412,8 @@ describe("bankOf", () => {
   })
 
   it("throws for a vault settledVault did not hand out", async () => {
-    const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts()
-    const vault = await Bank.make(bankOpts).ensureVault({ user_id, vaultlabel })
+    const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts()
+    const vault = await Bank.make(bankOpts).ensureVault({ vaultlabel })
     expect(() => TH.bankOf(vault)).to.throw(/settledVault/)
   })
 })
@@ -466,9 +466,9 @@ describe("tallyWatches", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     vi.spyOn(vaultDB, 'ensureVault').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
     const tally = TH.tallyWatches(vaultDB)
-    const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+    const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
     const bank = Bank.make(bankOpts)
-    await TH.expectRefusal(bank.ensureVault({ user_id, vaultlabel }), 'not_permitted')
+    await TH.expectRefusal(bank.ensureVault({ vaultlabel }), 'not_permitted')
     bank.closeVaults()
     expect(tally.opened - tally.closed).to.eq(0)
   })
@@ -1657,9 +1657,9 @@ describe("VaultDBContract", () => {
 
 describe("the gating helpers", () => {
   it("answer a bank's gatings as scripted, given scriptedRequestCleartext, as its example shows", async () => {
-    const { user_id, vaultlabel, requestCleartext: _scripted, ...opts } = TH.memoryVaultOpts()
+    const { vaultlabel, requestCleartext: _scripted, ...opts } = TH.memoryVaultOpts()
     const bank = Bank.make({ ...opts, requestCleartext: TH.scriptedRequestCleartext })
-    const vault = await bank.ensureVault({ user_id, vaultlabel })
+    const vault = await bank.ensureVault({ vaultlabel })
     await TH.unlock(vault, 'pw')
     expect(vault.state).to.eq('unlocked')
   })

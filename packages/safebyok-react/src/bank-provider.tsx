@@ -5,13 +5,13 @@ import type { PassphraseAdvice } from './modal'
 
 // == [Hooks]: useBank, useVault, useEntry, useVaultSnapshot
 
-/** What the provider hands down: its bank, and the signed-in user whose vaults the hooks ask it for. */
-type Provided = { bank: Bank | null, user_id: string | null }
+/** What the provider hands down: the signed-in user's bank, whose vaults the hooks ask it for. */
+type Provided = { bank: Bank | null }
 
 const BankContext = createContext<Provided | null>(null)
 
-/** What a provider hands down while it holds no bank: on the server, in the first render, and while it makes one anew. */
-const NoneHeld: Provided = Object.freeze({ bank: null, user_id: null })
+/** What a provider hands down while it holds no bank: on the server, in the first render, while nobody is signed in, and while it makes one anew. */
+const NoneHeld: Provided = Object.freeze({ bank: null })
 
 /** What the nearest BankProvider hands down, or a calm throw where there is none. */
 const useProvided = (hookname: string): Provided => {
@@ -20,19 +20,19 @@ const useProvided = (hookname: string): Provided => {
   return provided
 }
 
-/** The bank the nearest BankProvider holds, or null before it is made -- on the server, and in the first render -- and while it is made anew.
+/** The signed-in user's bank the nearest BankProvider holds, or null while nobody is signed in, before it is made -- on the server, and in the first render -- and while it is made anew.
  * Reach it for what the hooks do not do: ask for a vault again after a refusal or a deletion
  * (`bank.ensureVault`), birth one anew (`bank.reopenVault`), or, on the user's or the host's say,
  * have this device accept a vault storage serves behind what it has seen (`bank.clearCachedVault`,
  * the way past 'vault_behind'). Call it in an event handler, not in render. It is the same object
- * while the user and the props that shape it stay the same.
+ * while the user and the props that shape it stay the same; another user gets a bank of their own.
  *
  * @example
  *   const bank = useBank()
  *   const acceptRestore = async () => {
  *     if (bank === null) { return }
- *     await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
- *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
+ *     await bank.clearCachedVault({ vaultlabel: 'main' })
+ *     await bank.ensureVault({ vaultlabel: 'main' })
  *   }
  */
 export const useBank = (): Bank | null => useProvided('useBank').bank
@@ -72,16 +72,16 @@ export const useVault = (vaultlabel: string): VaultEntry | null => useEntry('use
 
 /** {@link useVault}'s work, for `hookname`: the entry, asked for when the bank holds none, and misuse thrown. */
 const useEntry = (hookname: string, vaultlabel: string): VaultEntry | null => {
-  const { bank, user_id } = useProvided(hookname)
-  const readEntry = useCallback(() => (bank === null || user_id === null ? null : bank.entryOf({ user_id, vaultlabel })), [bank, user_id, vaultlabel])
+  const { bank } = useProvided(hookname)
+  const readEntry = useCallback(() => (bank === null ? null : bank.entryOf({ vaultlabel })), [bank, vaultlabel])
   // The server renders with no bank, as the client's first render does: no entry on either.
   const entry = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, readEntry, getNothing)
-  const unasked = bank !== null && user_id !== null && entry === null
+  const unasked = bank !== null && entry === null
   useEffect(() => {
     if (! unasked) { return }
     // A refusal lands in the entry, and is rendered from there.
-    void bank.tryEnsureVault({ user_id, vaultlabel })
-  }, [unasked, bank, user_id, vaultlabel])
+    void bank.tryEnsureVault({ vaultlabel })
+  }, [unasked, bank, vaultlabel])
   // Thrown here, in render, so the nearest error boundary (or the dev overlay) shows it: every hook
   // has run by now, so the throw leaves the rules of hooks alone.
   if (entry?.status === 'refused' && entry.err?.family === 'misuse') { throw entry.err }
@@ -113,7 +113,7 @@ type Showing = { round: number, gating: Gating, close: () => void }
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** Every Bank.make option, passed through as given, beside the signed-in `user_id`, and three for the provider's dialogs.
+/** Every Bank.make option, passed through as given, the signed-in `user_id` among them, and three for the provider's dialogs.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
  * boundary. `user_id` may be null, and `requestCleartext` left out means the provider's own
  * dialogs. Their three: whether they offer a forgetful user to start over (they offer nothing,
@@ -122,8 +122,8 @@ const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?
  * the `keyDeriver`, `deviceDB` and `strengthChecker` Bank.make asks for. `BankProvider` says
  * which props make the bank anew as they change, and which do not.
  */
-export type BankProviderProps = MakeBankOpts & {
-  /** The signed-in user from the host's auth, or null when nobody is: then the hooks hand down no vault, and ask for none. */
+export type BankProviderProps = Omit<MakeBankOpts, 'user_id'> & {
+  /** The signed-in user from the host's auth, or null when nobody is: then the provider holds no bank, and the hooks hand down no vault, and ask for none. */
   user_id:             string | null
   /** What asks the user for a passphrase or passkey when a call needs one (Bank.make's `requestCleartext`).
    * Left out, the provider's own: `GatingModal`, the dialog for each gating's kind -- an unlock, a
@@ -161,15 +161,16 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
   }
 }
 
-/** Makes the app's bank from its props, and hands it down to {@link useBank}, and the signed-in user's vaults to {@link useVault} and {@link useVaultSnapshot}.
- * It makes the bank (`Bank.make`) in an effect, once a user is signed in: that checks the
- * options, and reads nothing. A vault is asked for only by a hook that names it,
+/** Makes the signed-in user's bank from its props, and hands it down to {@link useBank}, and the user's vaults to {@link useVault} and {@link useVaultSnapshot}.
+ * It makes the bank (`Bank.make`) in an effect, once a user is signed in, for that user: that
+ * checks the options, and reads nothing. A vault is asked for only by a hook that names it,
  * `useVault('main')`; until its birth settles, there is no Vault object. A vault refused or
  * deleted stays so until the app asks again.
  *
- * The provider owns the bank. It lets every vault go (`bank.closeVaults()`) when the user signs
- * out or changes, and when it unmounts. It makes the bank anew, letting the last one's vaults go,
- * when a prop that shapes it changes -- the scope (`applabel`), the stores (`vaultDB`,
+ * The provider owns the bank, and a bank serves one user. When the `user_id` changes or goes
+ * null, and when the provider unmounts, it lets every vault go (`bank.closeVaults()`) and drops
+ * the bank; the next user gets a bank of their own. It makes the bank anew, letting the last
+ * one's vaults go, when a prop that shapes it changes -- the scope (`applabel`), the stores (`vaultDB`,
  * `deviceDB`), the `keyDeriver`, `leaseHours`, `staleMinutes`, `maxWhisperBytes`, `maxBoxes`, the
  * `clock`, the `logger` or the `strengthChecker`. So build each of those once -- at module level,
  * or memoized -- never inline in the props. A `logger`, `clock` or `strengthChecker` that changes
@@ -270,8 +271,8 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
   }, [askByDialog])
   const requestOpt = requestCleartext === undefined || requestCleartext === null || typeof requestCleartext === 'function' ? askUser : requestCleartext
 
-  // The bank the provider holds now and the user it is for, made and let go together by the effect
-  // below: the hooks never see one user beside another's bank.
+  // The bank the provider holds now, the signed-in user's, made and let go by the effect below: the
+  // hooks never see one user's bank once another signs in.
   const [held, setHeld] = useState<Provided>(NoneHeld)
 
   useEffect(() => {
@@ -286,11 +287,11 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
     // Likewise, a vault let go asks no one: the requestCleartext now may be the next user's.
     const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
-    const bankOpts = { ...refusable, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
+    const bankOpts = { ...refusable, applabel, user_id, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
     const made = Bank.make(bankOpts)
-    const holding = { bank: made, user_id }
+    const holding = { bank: made }
     setHeld(holding) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
     return () => {
       kept.held = false

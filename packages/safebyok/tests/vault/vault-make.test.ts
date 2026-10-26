@@ -17,7 +17,7 @@ import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMill
 
 /** `world`'s options for Bank.make, `overrides` in place: its vault's user_id and vaultlabel left out, as each vault's draft takes them. */
 const bankOptsOf = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>): MakeBankOpts => {
-  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return bankOpts
 }
 

@@ -5,14 +5,14 @@ import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import { randomId } from './crypto'
 import { type VaultScope, DeviceRecordFormat } from './types/types'
 import type { VaultDB } from './vault-db'
-import { type MakeBankOpts, type VaultDraft, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
+import { type MakeBankOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
-/** What {@link delDamagedVault} needs of Bank.make's options and the vault's draft: which vault, and the two stores it lives in. */
-export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'deviceDB'> & Pick<VaultDraft, 'user_id' | 'vaultlabel'>
+/** What {@link delDamagedVault} needs of Bank.make's options and the vault's label: which vault, and the two stores it lives in. */
+export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'vaultDB' | 'deviceDB'> & Pick<VaultScope, 'vaultlabel'>
 
 /** Delete a vault whose birth refuses it as `damaged_vault`: its vault props, every box, and this device's lease of it.
  * There is no Vault object to `del()` it with, so this is how to clear it and start over. It takes
- * the options `Bank.make` took beside the vault's `user_id` and `vaultlabel`, and refuses misuse as
+ * the options `Bank.make` took beside the vault's `vaultlabel`, and refuses misuse as
  * they do, before touching storage. What the vault held is gone for good: ask the user first. Goes
  * through `VaultDB.delDamagedVault`, then the DeviceDB's `delLease`, and raises this device's
  * record of the scope to the tombstone's `vault_epoch` with `raiseDeviceRecord`.
@@ -32,14 +32,14 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'd
  * 'identity_revoked' locks nothing.
  *
  * @example
- *   const { ok, err } = await bank.tryEnsureVault({ user_id, vaultlabel: 'main' })
+ *   const { ok, err } = await bank.tryEnsureVault({ vaultlabel: 'main' })
  *   if (! ok && isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) {
- *     await delDamagedVault({ ...bankOpts, user_id, vaultlabel: 'main' })
- *     await bank.ensureVault({ user_id, vaultlabel: 'main' })   // a new life, novel
+ *     await delDamagedVault({ ...bankOpts, vaultlabel: 'main' })
+ *     await bank.ensureVault({ vaultlabel: 'main' })   // a new life, novel
  *   }
  */
 export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> => {
-  if (! isBag(opts)) { throw new VaultError('bad_option', 'delDamagedVault takes one bag of options: applabel, user_id, vaultlabel, vaultDB and deviceDB, as Bank.make and bank.ensureVault took them.') }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "delDamagedVault takes one bag of options: applabel, user_id, vaultDB and deviceDB, as Bank.make took them, and the vault's vaultlabel.") }
   const scope = CX.vaultScope.parse({ applabel: opts.applabel, user_id: opts.user_id, vaultlabel: opts.vaultlabel })
   const vaultDB = parseVaultDB(opts.vaultDB)
   await delDamagedVaultIn(scope, vaultDB, parseDeviceDB(opts.deviceDB))

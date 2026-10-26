@@ -169,13 +169,13 @@ describe("delDamagedVault", () => {
 
   it("clears a vault its bank refused as damaged_vault, and the same bank then births a new life, novel, as its example shows", async () => {
     const world = await damagedVaultWorld()
-    const { user_id, vaultlabel, ...bankOpts } = world.optsWith()
+    const { vaultlabel, ...bankOpts } = world.optsWith()
     const bank = Bank.make(bankOpts)
-    const { ok, err } = await bank.tryEnsureVault({ user_id, vaultlabel: 'main' })
+    const { ok, err } = await bank.tryEnsureVault({ vaultlabel: 'main' })
     expect(ok).to.be.false
     expect(isVaultError(err, 'damaged_vault')).to.be.true
-    await delDamagedVault({ ...bankOpts, user_id, vaultlabel })
-    const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
+    await delDamagedVault({ ...bankOpts, vaultlabel })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(vault.getSnapshot().state).to.eq('novel')
     bank.closeVaults()
   })

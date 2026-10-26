@@ -50,16 +50,16 @@ describe("browserOpts", () => {
 
   it("spreads into Bank.make beside the host's vault store, as its first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }) })
-    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+    const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }) })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(vault.getSnapshot().state).to.eq('novel')
     bank.closeVaults()
   })
 
   it("yields to a strength checker of the host's own, passed after it, as its third example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext })
-    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', user_id: 'u1', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.unlock(vault, 'pw')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     bank.closeVaults()
@@ -67,8 +67,8 @@ describe("browserOpts", () => {
 
   it("brings the zxcvbn test to Bank.make: a common password is refused at a first unlock, as zxcvbnStrengthChecker's first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext })
-    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+    const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
     expect(vault.getSnapshot().state).to.eq('novel')
     bank.closeVaults()
@@ -76,10 +76,10 @@ describe("browserOpts", () => {
 
   it("yields to a field the host passes after it, as its second example shows", async () => {
     const { deviceDB } = browserOpts({ dbName: TH.freshDbName() })
-    const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB }
+    const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', user_id: 'u1', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB }
     expect(opts.deviceDB).to.eq(deviceDB)
     const bank = Bank.make(opts)
-    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(vault.getSnapshot().state).to.eq('novel')
     const scope = TH.scopeOf('u1')
     expect(await TH.expectGood(deviceDB.getDeviceRecord(scope))).to.not.be.null

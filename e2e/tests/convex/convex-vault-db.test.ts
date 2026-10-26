@@ -226,11 +226,11 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
     it(`is refused as identity_revoked over a ${clientTitle}, its entry refused with no Vault object, and leaves no watch live on the deployment once let go`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-      const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+      const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
       const bank = Bank.make(bankOpts)
-      await TH.expectRefusal(bank.ensureVault({ user_id, vaultlabel }), 'identity_revoked')
-      expect(bank.entryOf({ user_id, vaultlabel })).to.deep.include({ status: 'refused', vault: null })
-      bank.closeVault({ user_id, vaultlabel })
+      await TH.expectRefusal(bank.ensureVault({ vaultlabel }), 'identity_revoked')
+      expect(bank.entryOf({ vaultlabel })).to.deep.include({ status: 'refused', vault: null })
+      bank.closeVault({ vaultlabel })
       await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
     })
   }

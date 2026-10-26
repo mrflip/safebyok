@@ -218,9 +218,9 @@ describe("VaultLogger", () => {
  * through `logger`. `overrides` replace any of the bank's options.
  */
 const warnAtFirstUnlock = async (logger: VaultLogger, overrides: Partial<TH.BornVaultOpts> = {}): Promise<void> => {
-  const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ logger, ...overrides })
+  const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ logger, ...overrides })
   const bank = Bank.make(bankOpts)
-  const vault = await bank.ensureVault({ user_id, vaultlabel })
+  const vault = await bank.ensureVault({ vaultlabel })
   vi.spyOn(bankOpts.deviceDB, 'raiseDeviceRecord').mockRejectedValue(new Error('the disk said no'))
   await TH.unlock(vault, 'pw')
   bank.closeVaults()

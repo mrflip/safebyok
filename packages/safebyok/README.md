@@ -41,17 +41,17 @@ import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const bank = Bank.make({          // once, at module level
+const vaultDB = idbVaultDB({ dbName: 'acme' })   // once, at module level: or your backend's adapter
+
+const bank = Bank.make({          // as the user signs in: a bank per user
   applabel:   'acme',
-  vaultDB:    idbVaultDB({ dbName: 'acme' }), // or your backend's adapter
-  ...browserOpts({ dbName: 'acme' }),         // the key deriver, device store and passphrase strength checker a browser wants
+  user_id:    session.user_id,    // your auth's stable, opaque id for the user; never an email
+  vaultDB,
+  ...browserOpts({ dbName: 'acme' }), // the key deriver, device store and passphrase strength checker a browser wants, the same at every call
   requestCleartext: (gating) => showDialogFor(gating), // your dialog: see *Asking the user: gatings*
 })
 
-const vault = await bank.ensureVault({
-  user_id:    session.user_id,   // your auth's stable, opaque id for the user; never an email
-  vaultlabel: 'main',
-})
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 vault.state                       // 'novel' | 'locked' | 'unlocked'
 await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...')   // locked or novel: asks through requestCleartext first
 
@@ -63,15 +63,26 @@ makes for itself. Any option you pass after the spread replaces the default it n
 option `Bank.make` does not take -- a misspelling, or a name it no longer uses -- is refused with
 `bad_option` rather than quietly ignored.
 
+A bank serves one signed-in user, and lives as long as their session: make it as they sign in, and
+at sign-out let its vaults go (`bank.closeVaults()`) and drop it. What is costly to load -- the key
+deriver and the strength checker -- is made once, before any bank, and handed to each.
+
 `Bank.make` answers at once, and touches nothing: no storage, no device store, no timer, no
-prompt. `bank.ensureVault` says the bank's `hello()` first (loading the strength checker), then
+prompt. `bank.ensureVault` says the bank's `hello()` first (running the strength checker's and
+the key deriver's `load`, where they carry one), then
 births the vault's Vault object from one read of storage and this device's store: the vault as
 stored, or a new one with no passphrase yet (`novel`), stored at once; this device's lease taken up
 when it still fits. Two asks for one vault get one Vault object. A Vault object holds one life of
 the vault: deleted, or deleted and made anew, it is gone for good, and `bank.ensureVault` hands out
 the next. Once born, a vault's `hello()` within `staleMinutes` (five minutes, unless `Bank.make`
 or the call says otherwise) reads nothing anew; call `hello()` on `visibilitychange`, and
-`hello({ staleMinutes: 0 })` to read now. At sign-out, `bank.closeVaults()`.
+`hello({ staleMinutes: 0 })` to read now. At sign-out, `bank.closeVaults()`, and drop the bank.
+
+Each bank call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id`
+in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`);
+anything else in it is left out, so a Vault object, its snapshot or an entry's `scope` may be
+handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
+names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
 
 The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `ask_passphrase_at`, `trouble`,
 `vault_tok` and the rest -- are live and read-only: read them in an event handler and they are
@@ -106,8 +117,8 @@ code, the stored records and these docs all use its words.
 * Every encryption is bound to its **ctx**: the app, user and vault, the field, and every other
   field of its record. Ciphertext moved to another record, or under an altered field, will not
   open.
-* A **bank** (`Bank.make(opts)`, which answers at once) holds the app's vaults, and
-  `bank.ensureVault({ user_id, vaultlabel })` births a Vault object from what storage and this
+* A **bank** (`Bank.make(opts)`, which answers at once) holds the signed-in user's vaults, and
+  `bank.ensureVault({ vaultlabel })` births a Vault object from what storage and this
   device hold of the vault, storing it, with no passphrase yet, if none stands: the snapshot's
   `state` is `novel`, `locked` or `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
   whisper, refusing `absent_box` for none) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault, and the Vault object with it. A `Box` in hand
@@ -338,6 +349,13 @@ name its `algorithm`; it may not declare `'argon2id'` without being a whole spec
 a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
 tests, such as `safebyok/testing`'s.
 
+A deriver that must fetch or build something before it can derive (a WebAssembly module, say)
+carries that as `load`, as a strength checker does: each bank's `hello()` runs it, before any
+vault is born. Make the deriver once, before any bank, and hand the same one to each, so the
+`load` costs nothing once it has succeeded; it forgets a failure, which refuses the hello
+`unexpected_error`, the load's error its cause, and the next hello tries again. Call it early to
+warm up. The derivers above carry none.
+
 ## Asking the user: gatings
 
 Data calls never contain UI, and no vault call takes a passphrase. A call that needs the vault
@@ -460,7 +478,7 @@ trust (below). A refresh that finds the vault's ways in changed on another devic
 the same way; one that finds the vault deleted, or deleted and made anew, drops it too, and the
 Vault object is gone (`vault_gone`, `vault_remade`): ask the bank for the vault again.
 
-`bank.closeVault(choice)`, and `bank.closeVaults()` for every vault, is not a lock: it lets the
+`bank.closeVault({ vaultlabel })`, and `bank.closeVaults()` for every vault, is not a lock: it lets the
 Vault object go, and the lease stays, for the next birth, along with any an unlock under way
 granted before; an unlock under way on the Vault object let go takes nothing up, a `getWhisper()`
 or `useWhisper()` under way hands back nothing, and every call on it refuses `vault_gone`.
@@ -519,9 +537,10 @@ if (await IdleDetector.requestPermission() === 'granted') {   // from a click: i
 TypeScript's DOM types do not carry `IdleDetector` yet; declare it, or take it from a types
 package, before this compiles.
 
-For a sign-out, call `lock()`, then `bank.closeVaults()` (in React, the provider lets the vault go
-as `user_id` turns null: lock it first): the lock revokes the lease, and `closeVaults` lets every
-Vault object go.
+For a sign-out, call `lock()`, then `bank.closeVaults()`, and drop the bank (in React, the
+provider lets the vault go, and drops its bank, as `user_id` turns null: lock it first): the lock
+revokes the lease, and `closeVaults` lets every Vault object go. The next user signs in to a bank
+of their own.
 
 ### When the user signs out
 
@@ -542,7 +561,7 @@ vault locks it, in the call that met it or in a background refresh alike. There 
 stay unlocked: an adapter that refuses `identity_revoked` for a passing fault, rather than
 `storage_unavailable`, breaks its contract (VAULTDB.md, line 5.5), and is the bug to fix.
 
-Ask for the vault (`bank.ensureVault`) only once your backend knows who is signed in: a vault
+Make the bank, and ask for the vault (`bank.ensureVault`), only once your backend knows who is signed in: a vault
 born while its auth is still loading meets `identity_revoked` at once, and revokes the lease with it (safe:
 the user types the passphrase again). A backend that tells "who are you?" from "you may not"
 refuses the second as `not_permitted`, which locks nothing. A call that meets the refusal in a tab
@@ -712,7 +731,7 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember and
   no harder to guess. Its dictionary is about 214 kB (minified and brotlied), which a bundler
   splits into a chunk of its own, fetched with a dynamic `import()` by the checker's `load`: the
-  bank's `hello()` runs it, which `bank.ensureVault` awaits, so a page that never asks for a vault
+  each bank's `hello()` runs it, which `bank.ensureVault` awaits, so a page that never asks for a vault
   never fetches it. It answers through a promise, in a few milliseconds once loaded. Without its
   dictionary it cannot tell a common password from a good one, so a load that fails (the network
   dropped, the chunk was left out of the build) fails the bank's hello, `unexpected_error` with the
@@ -725,7 +744,7 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   (and the scope) to a verdict, `{ strong: true }` or `{ strong: false, reason }`, at once or as a
   promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
   passphrase. A checker that needs something fetched first carries it as `load`, idempotent, which
-  the bank's `hello()` runs once, before any vault is born; a `load` that fails fails the hello,
+  each bank's `hello()` runs once, before any vault is born; a `load` that fails fails the hello,
   and the next tries again. To ask for
   more, wrap ours, carrying its `load` along:
   `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
@@ -735,9 +754,10 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   answers anything but a verdict is refused `bad_option`, and one that throws `unexpected_error`,
   carrying nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to
   choose one.
-* **Build it once.** The bank keeps the checker it was made with for its life. A binding that
-  reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
-  at module level, or memoize it, rather than writing it inline.
+* **Build it once.** Make the checker once, before any bank, and hand the same one to every
+  user's bank: each keeps the checker it was made with for its life. A binding that reopens on a
+  changed option (`safebyok-react`'s provider) reopens for a new checker, so define it at module
+  level, or memoize it, rather than writing it inline.
 * **Call it from the field as well, through the vault.** The field the user types into can ask
   `vault.tryCheckStrength(typed)` on each keystroke, and show a `weak_passphrase` refusal's
   message, the checker's reason, before the user submits: the same check, held to the same contract, so the field and Create decide alike (a
@@ -845,15 +865,15 @@ boundary, and `useVault` throws a birth's misuse there; a condition lands in the
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `bad_scope`           | a name in a scope -- an `applabel`, `vaultlabel` or `boxlabel` that is no `label`, or a `user_id` that fails `user_id` -- the message naming each failing field, as `meta.fieldnames` does | Pass labels the app chose; check a user-typed one first with `label`; percent-encode a user id outside the rules |
+| `bad_scope`           | a name in a scope -- an `applabel`, `vaultlabel` or `boxlabel` that is no `label`, or a `user_id` that fails `user_id` -- the message naming each failing field, as `meta.fieldnames` does; or a bag handed to a bank's call naming another `applabel` or `user_id` than the bank's (`bank.demandConsistentWith`) | Pass labels the app chose; check a user-typed one first with `label`; percent-encode a user id outside the rules; make a bank per signed-in user, and drop it at sign-out |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
-| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's draft, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's draft naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
+| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's options, or one it does not take, a `vaultDB` or `deviceDB` beside a `vaultlabel` rather than in the vault's options, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's options naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
 | `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them that fails its check included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name that passes its check but is longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it that fails its check, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_props_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
 | `unknown_key_deriver` | the vault names a key deriver this bank was not made with        | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Bank.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
-| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load` failing at `hello()`). What a key deriver or a strength checker threw is kept nowhere, not its message, meta or `cause`, as each was handed a passphrase; the logger hears only that the deriver threw (`call: 'deriveKeyBytes'`), and the kind of a `VaultError` it threw when that kind is listed. (A key deriver's `VaultError` of the condition family keeps its kind, in safebyok's own words, rather than refusing here.) What a checker's `load` threw is its `cause`, as it heard nothing | Do not retry; read the log for the deriver's kind (or the `cause` of a `load`), and fix the function, or report the bug |
+| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load`, or the key deriver's, failing at `hello()`). What a key deriver or a strength checker threw is kept nowhere, not its message, meta or `cause`, as each was handed a passphrase; the logger hears only that the deriver threw (`call: 'deriveKeyBytes'`), and the kind of a `VaultError` it threw when that kind is listed. (A key deriver's `VaultError` of the condition family keeps its kind, in safebyok's own words, rather than refusing here.) What a `load` threw is its `cause`, as it heard nothing | Do not retry; read the log for the deriver's kind (or the `cause` of a `load`), and fix the function, or report the bug |
 | `passphrase_required` | `delWayin('passphrase')`: a vault keeps its passphrase, which can be replaced, never removed | Call `putWayin('passphrase')` to replace it |
 
 ### Conditions: handle them at run time
@@ -917,7 +937,7 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 `bank.ensureVault`, as it reads the vault from storage, can refuse with `storage_unavailable`,
 `not_permitted`, `identity_revoked`, `newer_format`, `vault_behind` or `damaged_vault` (a damaged
 box never stops it), and no Vault object is born: the refusal reaches its caller, the bad news
-among them `onBadNews` too, and the bank's entry for the vault keeps it (`bank.entryOf(choice)`).
+among them `onBadNews` too, and the bank's entry for the vault keeps it (`bank.entryOf({ vaultlabel })`).
 So can `storage_blocked`, from this device's own store or a vault store on it, which asking again
 will not mend. Ask with `bank.ensureVault` again to try again. Once born, a refused `hello()`
 leaves the Vault object as it was, its storage watch live, so the host calls `hello()` again, or
@@ -949,18 +969,18 @@ because storage cannot tell your app's other call from another device's.
 Stored vault props that fail their checks make `bank.ensureVault` (and a born vault's `hello()`)
 refuse with `damaged_vault`, and with no Vault object born there is no `del()` to call.
 `delDamagedVault` is the way to clear such a vault and start over. It takes the options
-`Bank.make` took beside the vault's `user_id` and `vaultlabel` (only the vault's names and its two
-stores matter) and deletes that vault's stored props and boxes through the `VaultDB`, and this
+`Bank.make` took beside the vault's `vaultlabel` (only the vault's names and its two stores
+matter) and deletes that vault's stored props and boxes through the `VaultDB`, and this
 device's lease of it through the `DeviceDB`, raising its device record to the tombstone: what
 `del()` does, for this one case. Whatever the vault held is gone for good, so ask the user first.
 
 ```ts
-const choice = { user_id: session.user_id, vaultlabel: 'main' }
+const choice = { vaultlabel: 'main' }
 const { ok, val, err } = await bank.tryEnsureVault(choice)
 let vault = val
 if (! ok) {
   if (! isVaultError(err, 'damaged_vault') || ! await userAgreesToStartOver()) { throw err }
-  await delDamagedVault({ ...bankOpts, ...choice })
+  await delDamagedVault({ ...bankOpts, ...choice })   // bankOpts: what Bank.make took, user_id among them
   vault = await bank.ensureVault(choice)   // a new life, novel: the next unlock sets its passphrase
 }
 ```
@@ -979,7 +999,7 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
-A bank deletes one with its own stores, `bank.delDamagedVault({ user_id, vaultlabel })`, which
+A bank deletes one with its own stores, `bank.delDamagedVault({ vaultlabel })`, which
 `safebyok-react`'s `useBank()` reaches. Storage decides, by the checks only it can make, so the
 bank need not hold the vault, or have refused it, first, and nothing asks for an unlock. Once
 storage deletes the vault, and on `stale_write` too, the bank lets go its entry for the scope,
@@ -1037,7 +1057,7 @@ same refusal, so a prompt asking "was your vault restored?" turns the check off 
 check is there to stop.
 
 ```ts
-const choice = { user_id: session.user_id, vaultlabel: 'main' }
+const choice = { vaultlabel: 'main' }
 const { ok, val, err } = await bank.tryEnsureVault(choice)
 let vault = val
 if (! ok) {

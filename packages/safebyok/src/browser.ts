@@ -23,11 +23,11 @@ const bagsByDbName = new Map<string, BrowserOpts>()
  * @param opts - Where the device store keeps its records: `dbName`, default 'safebyok'.
  *
  * @example
- *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })
  * @example
- *   const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', user_id: session.user_id, vaultDB })
  * @example
- *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB, strengthChecker: myStrengthChecker })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB, strengthChecker: myStrengthChecker })
  * @example
  *   browserOpts({ dbName: 'acme' }) === browserOpts({ dbName: 'acme' })  // true
  */

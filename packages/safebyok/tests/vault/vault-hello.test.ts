@@ -19,7 +19,7 @@ const u1Main = { user_id: 'u1', vaultlabel: 'main' } as const
 
 /** A bank of `world`'s options, `overrides` among them, for a test that asks it for a vault itself. */
 const bankIn = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>) => {
-  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return Bank.make(bankOpts)
 }
 

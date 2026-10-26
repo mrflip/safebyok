@@ -775,7 +775,7 @@ export class Vault {
    * {@link Vault.demandConsistentWith} finds it moved on. It awaits a hello first: a vault still
    * `novel` then has no passphrase to prove it with, and refuses 'absent_vault'.
    *
-   * @example await vault.del()   // storage holds a tombstone; bank.ensureVault(draft) births the next life, novel
+   * @example await vault.del()   // storage holds a tombstone; bank.ensureVault({ vaultlabel }) births the next life, novel
    */
   async del(): Promise<void> { valOf(await this.tryDel()) }
 

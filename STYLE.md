@@ -57,7 +57,7 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` or a `flavor`.
 
-**`ensure` acquires or constructs, idempotently.** `bank.ensureVault(draft)`,
+**`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
 nothing. A function that only checks and refuses is not an `ensure`: it is a `check`
 (`checkBoxlabel(label)`, `checkStrength(passphrase)`), a `demand` (below), or a `parse` when it

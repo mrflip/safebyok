@@ -32,7 +32,7 @@ export const Probe = () => {
   const [outcome, setOutcome] = useState('')
 
   if (entry?.err !== null && entry?.err !== undefined) {
-    const retry = () => { if (bank !== null) { void bank.tryEnsureVault({ user_id: entry.scope.user_id, vaultlabel: 'main' }) } }
+    const retry = () => { if (bank !== null) { void bank.tryEnsureVault(entry.scope) } }
     return <p><span data-testid="state">{`refused: ${entry.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
   }
   const vault = entry?.vault ?? null

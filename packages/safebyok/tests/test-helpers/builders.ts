@@ -8,7 +8,7 @@ import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, t
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
-import type { MakeBankOpts, VaultDraft } from '../../src/vault-opts'
+import type { MakeBankOpts } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/local-vault-db'
 import type { VaultDB } from '../../src/vault-db'
 import { good, valOf } from '../../src/outcome'
@@ -123,8 +123,8 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
-/** Everything a bank and one of its vaults need, in one bag: {@link Bank.make}'s options beside the vault's `user_id` and `vaultlabel`. */
-export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'user_id' | 'vaultlabel'>
+/** Everything a bank and one of its vaults need, in one bag: {@link Bank.make}'s options beside the vault's `vaultlabel`. */
+export type BornVaultOpts = MakeBankOpts & Pick<VaultScope, 'vaultlabel'>
 
 /** Everything a bank and its vault need, over stores in memory made fresh for each call.
  * That is `u1`'s `main` vault in the `acme` app (as {@link scopeOf} has it), deriving through
@@ -134,7 +134,7 @@ export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'user_id' | 'vaultla
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
- * @returns A complete bag for {@link settledVault}, or (`user_id` and `vaultlabel` aside) for Bank.make.
+ * @returns A complete bag for {@link settledVault}, or (`vaultlabel` aside) for Bank.make.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ user_id: 'u2', vaultDB: myVaultDB }))
@@ -154,13 +154,13 @@ export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVau
 // The bank each vault settledVault handed out was born of, so a test can let it go.
 const banksOf = new WeakMap<Vault, Bank>()
 
-/** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of `user_id` and `vaultlabel`.
+/** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of the `vaultlabel`.
  * Its snapshot says `novel`, `locked` or `unlocked`. A bag naming no `requestCleartext` is given
  * {@link scriptedRequestCleartext}, so `TH.unlock` and its kin answer its gatings. A bank of its own each time, so two calls
  * over one deviceDB are two tabs of one device. Rejects as `Bank.make` throws for misuse, and as
  * `ensureVault` rejects.
  *
- * @param opts - Everything Bank.make takes, and the vault's names; {@link memoryVaultOpts} makes a bag of them.
+ * @param opts - Everything Bank.make takes, and the vault's label; {@link memoryVaultOpts} makes a bag of them.
  * @returns The vault, settled.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
@@ -170,11 +170,11 @@ const banksOf = new WeakMap<Vault, Bank>()
  *   const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
  */
 export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
-  const { user_id, vaultlabel, ...given } = opts
+  const { vaultlabel, ...given } = opts
   // A bag that names no requestCleartext answers gatings as TH.unlock and its kin script them.
   const bankOpts = 'requestCleartext' in given ? given : { ...given, requestCleartext: scriptedRequestCleartext }
   const bank = Bank.make(bankOpts)
-  const vault = await bank.ensureVault({ user_id, vaultlabel })
+  const vault = await bank.ensureVault({ vaultlabel })
   banksOf.set(vault, bank)
   return vault
 }
@@ -182,7 +182,7 @@ export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
 /** The bank `vault` was born in, by {@link settledVault}: for a test that lets it go, reopens it, or clears what the device keeps of it.
  * Throws for a vault settledVault did not hand out.
  *
- * @example TH.bankOf(vault).closeVault({ user_id: 'u1', vaultlabel: 'main' })
+ * @example TH.bankOf(vault).closeVault({ vaultlabel: 'main' })
  */
 export const bankOf = (vault: Vault): Bank => {
   const bank = banksOf.get(vault)
@@ -196,7 +196,7 @@ export const bankOf = (vault: Vault): Bank => {
  * @example TH.closeVault(vault)   // the lease stays, for the next vault settled over this deviceDB
  */
 export const closeVault = (vault: Vault): void => {
-  bankOf(vault).closeVault({ user_id: vault.user_id, vaultlabel: vault.vaultlabel })
+  bankOf(vault).closeVault(vault)
 }
 
 /**

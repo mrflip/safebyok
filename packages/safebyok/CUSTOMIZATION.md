@@ -53,7 +53,7 @@ key deriver and the device store:
 import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
+const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })
 ```
 
 It is a good checker: at least 12 characters, then a zxcvbn score of at least 3 of 4, which turns

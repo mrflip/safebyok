@@ -15,20 +15,29 @@ import type { Gating, RequestCleartext } from './gating'
 /** The type of {@link MakeBankOpts.onBadNews}: told each piece of bad news, and never awaited. */
 export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 
-/** The options `Bank.make` takes: the app, the stores its vaults live in by default, the libraries they share, and how they behave.
+/** The options `Bank.make` takes: the app and the signed-in user, the stores their vaults live in by default, the libraries they share, and how they behave.
  * `Bank.make` refuses ('bad_option') an option it does not take, and one out of its range or of
- * the wrong type; `applabel` refuses 'bad_scope' instead. Each refusal names the option, never
- * its value. Each vault is then named by a {@link VaultDraft}.
+ * the wrong type; `applabel` and `user_id` refuse 'bad_scope' instead. Each refusal names the
+ * option, never its value. Each vault is then named by its `vaultlabel`, its own stores, if any,
+ * in a {@link BankVaultOpts}.
  */
 export type MakeBankOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
   applabel:   string
-  /** Where each vault is stored, unless its {@link VaultDraft} names another. */
+  /** The signed-in user's stable, opaque id from the host's auth: never an email or a handle, which can change and would orphan the vault.
+   * It is 1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone, as the exported
+   * `user_id` checks: percent-encode (RFC 3986) one that holds anything else. A bank serves this
+   * one user: make a bank as the user signs in, and drop it, with every Vault object it handed
+   * out, as they sign out.
+   */
+  user_id:    string
+  /** Where each vault is stored, unless its {@link BankVaultOpts} names another. */
   vaultDB:    VaultDB
-  /** What this device keeps of each vault, unless its {@link VaultDraft} names another: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
+  /** What this device keeps of each vault, unless its {@link BankVaultOpts} names another: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
   deviceDB:   DeviceDB
   /** What turns a passphrase into passphraseKey bytes: in a browser, the pinned Argon2id deriver `browserOpts()` supplies.
-   * See {@link KeyDeriver} for the narrow reasons to substitute.
+   * See {@link KeyDeriver} for the narrow reasons to substitute. Make it once, before any bank,
+   * and hand the same one to each: its `load`, if it carries one, runs at each bank's `hello()`.
    */
   keyDeriver: KeyDeriver
   /** How many hours a proof's lease keeps the vault unlocked on this device, across reloads. Default: {@link LeaseHours}, 168 (seven days).
@@ -101,32 +110,26 @@ export type MakeBankOpts = {
    * must be chosen (CUSTOMIZATION.md). In a browser, `browserOpts()` supplies
    * `zxcvbnStrengthChecker`.
    *
-   * Its `load`, if any, runs at `bank.hello()`, and one that fails fails that hello: no vault is
-   * born until it succeeds. Each vault asks it as `vault.checkStrength(typed)`.
+   * Make it once, before any bank, and hand the same one to each. Its `load`, if any, runs at
+   * `bank.hello()`, and one that fails fails that hello: no vault is born until it succeeds. Each
+   * vault asks it as `vault.checkStrength(typed)`.
    * A checker that answers anything but a verdict refuses the call that asked it 'bad_option'; one
    * that throws, 'unexpected_error', carrying nothing of what it threw.
    */
   strengthChecker?: StrengthChecker | undefined
 }
 
-/** Which vault `bank.ensureVault` births: the user's, under its label, in the app the bank was made for; and the stores it lives in, where not the bank's.
- * It refuses 'bad_scope' for a name that fails its check, and 'bad_option' for anything else
- * amiss, naming the field, never its value.
+/** A vault's own options, where they are not the bank's: the second bag `bank.ensureVault` and its siblings take, beside the one naming the vault.
+ * Left out, the bank's own. It refuses 'bad_option' for anything amiss, a field it does not take
+ * among them, naming the field, never its value.
  *
- * @example await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+ * @example await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })
  */
-export type VaultDraft = {
-  /** The signed-in user's stable, opaque id from the host's auth: never an email or a handle, which can change and would orphan the vault.
-   * It is 1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone, as the exported
-   * `user_id` checks: percent-encode (RFC 3986) one that holds anything else.
-   */
-  user_id:    string
-  /** The vault's own label; an app that keeps one vault per user calls it `main`. */
-  vaultlabel: string
+export type BankVaultOpts = {
   /** Where this vault is stored, in place of the bank's `vaultDB`: the same object at every ask for the vault, as the bank compares stores by identity. */
-  vaultDB?:   VaultDB | undefined
+  vaultDB?:  VaultDB | undefined
   /** What this device keeps of this vault, in place of the bank's `deviceDB`: the same object at every ask, likewise. */
-  deviceDB?:  DeviceDB | undefined
+  deviceDB?: DeviceDB | undefined
 }
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
@@ -134,13 +137,14 @@ const isFunction = (candidate: unknown) => typeof candidate === 'function'
 /** True for any object but null, an array included. */
 export const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
 
-/** Every option Bank.make takes, each checked here or by a parse of its own, and every field a {@link VaultDraft} holds, each likewise: each refuses any other, 'bad_option'.
+/** Every option Bank.make takes, each checked here or by a parse of its own, and every field a {@link BankVaultOpts} holds, each likewise: each refuses any other, 'bad_option'.
  * `makeBankOpts` checks `strengthChecker`, handing the default back in its place when left out.
  */
-const { makeBankOpts, vaultDraft } = Validator('bad_option', ({ obj, unk }) => {
+const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) => {
   const anyOpt = unk.optional()
   const makeBankOpts = obj({
     applabel:               anyOpt,
+    user_id:                anyOpt,
     vaultDB:                anyOpt,
     deviceDB:               anyOpt,
     keyDeriver:             anyOpt,
@@ -155,13 +159,11 @@ const { makeBankOpts, vaultDraft } = Validator('bad_option', ({ obj, unk }) => {
     // A function default is read as the factory for one, so the default checker is handed back by one.
     strengthChecker:        strengthChecker.default(() => DefaultStrengthChecker),
   } satisfies Record<keyof MakeBankOpts, Z.ZodType>).strict()
-  const vaultDraft = obj({
-    user_id:    anyOpt,
-    vaultlabel: anyOpt,
-    vaultDB:    anyOpt,
-    deviceDB:   anyOpt,
-  } satisfies Record<keyof VaultDraft, Z.ZodType>).strict()
-  return { makeBankOpts, vaultDraft }
+  const bankVaultOpts = obj({
+    vaultDB:  anyOpt,
+    deviceDB: anyOpt,
+  } satisfies Record<keyof BankVaultOpts, Z.ZodType>).strict()
+  return { makeBankOpts, bankVaultOpts }
 })
 
 /** Each option Bank.make (or Vault.make, before it) once took under another name, and the name it takes now (notes/old_vocabulary.md). */
@@ -181,7 +183,7 @@ export const checkMakeBankOpts = (opts: object) => {
     const named = unknownCkeys.map((ckey) => {
       const renamed = RenamedMakeBankOpts.get(ckey)
       if (renamed !== undefined) { return `${ckey} (called ${renamed} now)` }
-      return DraftCkeys.has(ckey) ? `${ckey} (each vault's own: hand it to bank.ensureVault)` : sayable(ckey)
+      return ckey === 'vaultlabel' ? `${ckey} (each vault's own: hand it to bank.ensureVault)` : sayable(ckey)
     })
     const takes = Object.keys(makeBankOpts.shape).join(', ')
     throw new VaultError('bad_option', `Bank.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
@@ -194,18 +196,16 @@ export const checkMakeBankOpts = (opts: object) => {
   }
 }
 
-/** The fields of a {@link VaultDraft}, which Bank.make names as each vault's own when handed one. */
-const DraftCkeys: ReadonlySet<string> = new Set(['user_id', 'vaultlabel'])
-
-/** `draft` as handed to `bank.ensureVault`, once a bag of no field it does not take: 'bad_option' otherwise, naming the field where it is shaped as one of ours. */
-const checkVaultDraft = (draft: unknown): VaultDraft => {
-  if (! isBag(draft)) { throw new VaultError('bad_option', "bank.ensureVault takes the vault it births as one bag: { user_id, vaultlabel }, and its own vaultDB or deviceDB where not the bank's.") }
+/** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise, naming the field where it is shaped as one of ours. Its stores are checked by {@link vaultPartsOf}. */
+const checkBankVaultOpts = (opts: unknown): BankVaultOpts => {
+  if (opts === undefined) { return {} }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "bank.ensureVault takes a vault's own options as a second bag, { vaultDB, deviceDB }, where they are not the bank's: leave it out for the bank's own.") }
   try {
-    vaultDraft.parse(draft)
-    return draft as VaultDraft
+    bankVaultOpts.parse(opts)
+    return opts
   } catch (err) {
     if (! isVaultError(err, 'bad_option')) { throw err }
-    throw new VaultError('bad_option', `In bank.ensureVault's draft: ${err.message}. It takes user_id, vaultlabel, vaultDB and deviceDB, and refuses any other rather than quietly ignore it.`, err.meta === undefined ? {} : { meta: err.meta })
+    throw new VaultError('bad_option', `In bank.ensureVault's options: ${err.message}. They take vaultDB and deviceDB, and refuse any other rather than quietly ignore it: the vault's vaultlabel goes in the first bag.`, err.meta === undefined ? {} : { meta: err.meta })
   }
 }
 
@@ -249,6 +249,7 @@ const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, d
       key_deriver_label: str.min(1),
       salt_bytes:        int.gte(1).lte(MaxSaltBytes),
       deriveKeyBytes:    custom<KeyDeriver['deriveKeyBytes']>(isFunction),
+      load:              custom<KeyDeriver['load']>(isFunction).optional(),
     }),
   }
 })
@@ -417,7 +418,7 @@ export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: Vault
     throw new VaultError('bad_option', "Bank.make needs a keyDeriver: in a browser, spread browserOpts() from 'safebyok/browser' into its options.")
   }
   if (! keyDeriverShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: it needs a key_deriver_label, a salt_bytes from 1 to 65536 and a deriveKeyBytes function.')
+    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: it needs a key_deriver_label, a salt_bytes from 1 to 65536 and a deriveKeyBytes function, and its load, if it carries one, is a function too.')
   }
   // A deriver declaring Argon2id must be one Argon2id can run: its refusal here, with a kind, is
   // the one it would otherwise make at the first unlock, as a plain Error from the library.
@@ -461,6 +462,7 @@ export const checkLimitsFit = (vaultDB: VaultDB, limits: { maxWhisperBytes: numb
 /** Bank.make's options as {@link parseMakeBankOpts} hands them back: each checked, and read into the form the bank keeps for its vaults. */
 export type ParsedBankOpts = {
   applabel:         string
+  user_id:          string
   vaultDB:          VaultDB
   deviceDB:         DeviceDB
   leaseMillis:      number
@@ -477,22 +479,19 @@ export type ParsedBankOpts = {
   maxBoxes:         number | undefined
 }
 
-/** The one name Bank.make's options hold, checked as a scope's names are: 'bad_scope' for an applabel that is not a label. */
-const { bankApplabel } = Validator('bad_scope', ({ obj, applabel }) => ({ bankApplabel: obj({ applabel }) }))
-
 /** Bank.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take or out of range, and
- * 'bad_scope' for an `applabel` that is not a label. The limits are held to the default
- * `vaultDB`'s here, and to a draft's own at its birth.
+ * 'bad_scope' for an `applabel` that is not a label or a `user_id` that fails its check. The
+ * limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
  *
- * @example const { applabel, leaseMillis } = parseMakeBankOpts(opts)
+ * @example const { applabel, user_id, leaseMillis } = parseMakeBankOpts(opts)
  */
 export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   checkSecureContext()
-  if (! isBag(opts)) { throw new VaultError('bad_option', "Bank.make takes one bag of options: applabel, vaultDB, deviceDB and keyDeriver at least.") }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "Bank.make takes one bag of options: applabel, user_id, vaultDB, deviceDB and keyDeriver at least.") }
   const shaped = checkMakeBankOpts(opts)
-  const { applabel } = bankApplabel.parse({ applabel: opts.applabel })
+  const { applabel, user_id } = CX.bankScope.parse(opts)
   const vaultDB = parseVaultDB(opts.vaultDB)
   const deviceDB = parseDeviceDB(opts.deviceDB)
   const leaseMillis = parseLeaseHours(opts.leaseHours)
@@ -506,11 +505,11 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const limits = { maxWhisperBytes: parseMaxWhisperBytes(opts.maxWhisperBytes), maxBoxes: opts.maxBoxes }
   // Held to the default vaultDB now, so misuse is refused at Bank.make, not at the first birth.
   limitsOf(vaultDB, limits)
-  return { applabel, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, maxWhisperBytes: limits.maxWhisperBytes, maxBoxes: limits.maxBoxes }
+  return { applabel, user_id, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, maxWhisperBytes: limits.maxWhisperBytes, maxBoxes: limits.maxBoxes }
 }
 
 /** What each vault is made of: the bank's parts, its own scope and stores, and its limits as held to its own vaultDB. */
-export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'strengthChecker' | 'maxBoxes'> & {
+export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'user_id' | 'strengthChecker' | 'maxBoxes'> & {
   scope:            VaultScope
   strengthChecker:  GuardedStrengthChecker
   /** The most boxes the vault holds: `maxBoxes` as given, or its default, held to the vaultDB's own. */
@@ -519,17 +518,16 @@ export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'strengthChecker' | '
   maxVaultBytes:    number
 }
 
-/** The parts of the vault `draft` names, under `bank`, checked before storage is touched: 'bad_scope' for a name that fails its check, 'bad_option' for anything else.
+/** The parts of the vault in `scope`, a scope of `bank`'s checked by the bank, under `bank`, with its own options `opts` checked before storage is touched: 'bad_option' for anything amiss in them.
  *
- * @example const { scope } = parseVaultDraft({ user_id: 'u1', vaultlabel: 'main' }, bank)   // scope: { applabel, user_id: 'u1', vaultlabel: 'main' }
+ * @example const { vaultDB } = vaultPartsOf(bank, scope, { vaultDB: workVaultDB })   // the work vault's own store, its limits held to it
  */
-export const parseVaultDraft = (draft: VaultDraft, bank: ParsedBankOpts): VaultParts => {
-  const checked = checkVaultDraft(draft)
-  const scope = CX.vaultScope.parse({ applabel: bank.applabel, user_id: checked.user_id, vaultlabel: checked.vaultlabel })
+export const vaultPartsOf = (bank: ParsedBankOpts, scope: VaultScope, opts: BankVaultOpts | undefined): VaultParts => {
+  const checked = checkBankVaultOpts(opts)
   const vaultDB = checked.vaultDB === undefined ? bank.vaultDB : parseVaultDB(checked.vaultDB)
   const deviceDB = checked.deviceDB === undefined ? bank.deviceDB : parseDeviceDB(checked.deviceDB)
   const limits = limitsOf(vaultDB, bank)
-  const { applabel: _applabel, maxBoxes: _maxBoxes, ...shared } = bank
+  const { applabel: _applabel, user_id: _user_id, maxBoxes: _maxBoxes, ...shared } = bank
   return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), maxBoxes: limits.maxBoxes, maxVaultBytes: limits.maxVaultBytes }
 }
 

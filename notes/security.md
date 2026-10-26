@@ -41,6 +41,19 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 7, branch `20261026-bank_per_user`): **a Bank serves one signed-in user, and the scope a vault is born
+  under comes from the bank, never from the caller's bag.**
+  (1) `Bank.make({ applabel, user_id, ... })`. Every bank call naming a vault (`ensureVault`, `reopenVault`, `closeVault`,
+  `clearCachedVault`, `delDamagedVault`, `entryOf`) takes a bag whose `vaultlabel` is required. An `applabel` or `user_id` the bag carries
+  must equal the bank's (`bank.demandConsistentWith`), else the call refuses `bad_scope`, naming the differing fields in `meta.fieldnames`
+  and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is. Sign-out is
+  expected to call `bank.closeVaults()` and drop the bank; `safebyok-react`'s `BankProvider` does so when its `user_id` prop changes or goes
+  null.
+  (2) A bag carrying `vaultDB` or `deviceDB` is refused `bad_option`, not ignored, since ignoring it would birth the vault in the bank's
+  default store. A vault's own stores go in a second, strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.)
+  (3) A `KeyDeriver` may carry an optional `load()`, as a strength checker can; each bank's `hello()` runs both before any vault is born.
+  A failing deriver `load` refuses `unexpected_error` with what it threw kept as the error's `cause`, unlike `deriveKeyBytes`, whose throws
+  are never kept: `load` is never handed a passphrase. `Bank.make` refuses a `load` that is not a function.
 * 2026-10-26 (restyle sprint, thread 6, PR [#277](https://github.com/mrflip/safebyok/pull/277)): **a host-facing function takes `applabel`,
   `user_id` and `vaultlabel` as flat arguments, so the `user_id` that is authorized is the one that scopes the call.**
   (1) `SafebyokComponent.api`'s `getVault`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `watchVault` and safebyok-graphql's
@@ -137,6 +150,7 @@ added or folded into through the subagent, and no other entry changes.
   failed leaves the vault showing locked and not unlocked under a lease from the previous gate.
 * 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **one vault, one place.** `bank.ensureVault(draft)` refuses `bad_option` when
   the draft names a `vaultDB` or `deviceDB` other than the stores the held (or being-born) Vault object was born from
+  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any `vaultDB` or `deviceDB` in it is refused `bad_option`; see the entry at the top)
   (`packages/safebyok/src/bank.ts`), so a vault read from one store is never written to another. A Vault object found
   gone (deleted or remade) in the microtasks before its birth was filed is never handed out.
 * 2026-10-23 (primitives sprint, thread 9, gating): **cleartext has one door: a gating's attempt.** No vault call takes a
@@ -471,7 +485,7 @@ added or folded into through the subagent, and no other entry changes.
   it as a bad Outcome, `ask.attempt` resolves it, the throwing forms throw it, and `safebyok-react`'s
   dialog meets it with its calm "Something went wrong" notice and reports it to React as it does any
   misuse), carrying nothing (no kind of the host's, `meta`, `cause` or text), because the checker
-  heard the passphrase. Misuse family, it is never told to `onBadNews`. (2) A checker may carry an idempotent `load`; every `hello()` runs it,
+  heard the passphrase. Misuse family, it is never told to `onBadNews`. (2) A checker may carry an idempotent `load` (amended 2026-10-26 (bank_per_user): so may a `KeyDeriver`, see the entry at the top); every `hello()` runs it,
   through the guard, beside the storage read (amended 2026-10-21 (checker2): `Promise.allSettled` of
   both; before, ahead of it). A load that fails fails the `hello()` as `unexpected_error` with the
   load's throw as `cause`: the load hears no passphrase, so its error may ride. No lease is taken

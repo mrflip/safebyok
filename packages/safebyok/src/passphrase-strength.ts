@@ -16,8 +16,9 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * that answers no verdict 'bad_option'.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`. `bank.hello()` runs it once it is called, so make it cost nothing once it has
- * succeeded, and forget a failure. A `load` that fails refuses the hello 'unexpected_error', so a
+ * `load`. Make the checker once, before any bank, and hand the same one to each: each bank's
+ * `hello()` runs its `load`, so make it cost nothing once it has succeeded, and forget a failure.
+ * Call it early only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
  * vault that cannot check a new passphrase never opens.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
@@ -32,7 +33,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  */
 export type StrengthChecker = {
   (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge; `bank.hello()` runs it. */
+  /** Fetch or build what the checker needs before it can judge; each bank's `hello()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 

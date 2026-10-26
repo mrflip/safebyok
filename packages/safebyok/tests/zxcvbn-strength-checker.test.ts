@@ -174,17 +174,17 @@ describe("zxcvbnStrengthChecker's loading", () => {
       import('../src/bank'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
     ])
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() })
+    const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() })
     const bank = FreshBank.make(bankOpts)
     try {
       // The fresh copy's VaultError is a class of its own: told by kind.
-      const refused = await bank.tryEnsureVault({ user_id, vaultlabel })
+      const refused = await bank.tryEnsureVault({ vaultlabel })
       if (refused.ok) { throw new Error('the birth was not refused') }
       expect(refused.err.refusalkind).to.eq('unexpected_error')
       expect(refused.err.cause).to.be.instanceOf(Error)
       expect(bank.getSnapshot().status).to.eq('refused')
       expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
-      const vault = await bank.ensureVault({ user_id, vaultlabel })
+      const vault = await bank.ensureVault({ vaultlabel })
       expect(vault.getSnapshot().state).to.eq('novel')
       await TH.unlock(vault, 'correct horse battery staple')
       expect(vault.getSnapshot().state).to.eq('unlocked')

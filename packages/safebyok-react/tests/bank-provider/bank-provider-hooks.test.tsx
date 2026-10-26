@@ -66,18 +66,18 @@ describe("BankProvider", () => {
       const { bank } = grab.latest()
       if (bank === null) { throw new Error('the provider held no bank') }
       expect(bank).to.be.an.instanceOf(Bank)
-      expect(bank.entryOf({ user_id: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
+      expect(bank.entryOf({ vaultlabel: 'main' })?.vault).to.eq(vault)
       // The device has seen a later epoch than storage serves: a restore from an older copy.
       const scope = TH.scopeOf('u1')
       const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
       if (record === null) { throw new Error('the birth kept no device record') }
       await TH.expectGood(world.deviceDB.raiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
-      await act(async () => { await TH.expectRefusal(bank.reopenVault({ user_id: 'u1', vaultlabel: 'main' }), 'vault_behind') })
+      await act(async () => { await TH.expectRefusal(bank.reopenVault(vault), 'vault_behind') })
       await waitFor(() => { expect(grab.latest().err?.refusalkind).to.eq('vault_behind') })
       // useBank's example: the host, on the user's say, has this device accept what storage holds.
       const acceptRestore = async () => {
-        await bank.clearCachedVault({ user_id: 'u1', vaultlabel: 'main' })
-        await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+        await bank.clearCachedVault({ vaultlabel: 'main' })
+        await bank.ensureVault({ vaultlabel: 'main' })
       }
       await act(acceptRestore)
       await waitFor(() => { expect(grab.latest().vault).to.not.be.null.and.not.eq(vault) })
@@ -123,21 +123,26 @@ describe("BankProvider", () => {
       expect(shownState()).to.eq('unlocked')
     })
 
-    it("closes the vault as the user signs out, and makes the next user's, reading once for each", async () => {
+    it("makes a bank per user: drops the user's bank and closes its vault as they sign out, and makes the next user's, reading once for each", async () => {
       const world = makeWorld()
       const counts = countStoreCalls(world)
       const { Grab, opened, latest } = grabber()
       const tree = (user_id: string | null) => <StrictMode><BankProvider {...world.props} user_id={user_id}><Grab /></BankProvider></StrictMode>
       const { rerender } = render(tree('u1'))
       const first = await opened()
+      const firstBank = latest().bank
+      expect(firstBank?.user_id).to.eq('u1')
       await waitFor(() => { expect(first.getSnapshot().state).to.eq('novel') })
       rerender(tree(null))
       expect(latest().vault).to.be.null
+      expect(latest().bank).to.be.null
       await TH.expectRefusal(first.hello(), 'vault_gone')
       rerender(tree('u2'))
       const second = await opened()
       await waitFor(() => { expect(second.getSnapshot().state).to.eq('novel') })
       expect(second.user_id).to.eq('u2')
+      expect(latest().bank).to.not.eq(firstBank)
+      expect(latest().bank?.user_id).to.eq('u2')
       expect(counts()).to.deep.equal({ subscribe: 2, ensureVault: 2, getDeviceRecord: 2 })
     })
 

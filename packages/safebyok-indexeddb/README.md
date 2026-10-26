@@ -29,12 +29,13 @@ import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const bank = Bank.make({
+const bank = Bank.make({   // as the user signs in
   applabel:   'acme',
+  user_id:    session.user_id,
   vaultDB:    idbVaultDB({ dbName: 'acme' }),
   ...browserOpts({ dbName: 'acme' }),   // the key deriver, and the device store beside the vault
 })
-const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's

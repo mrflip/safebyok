@@ -4,16 +4,20 @@ import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, v
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
+import type { BankScope } from './checks/core-checks'
+import type * as Z from 'zod'
+import { Validator } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
+import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
-import { type MakeBankOpts, type ParsedBankOpts, type VaultDraft, type VaultParts, parseMakeBankOpts, parseVaultDraft } from './vault-opts'
+import { type BankVaultOpts, type MakeBankOpts, type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import type { VaultDB } from './vault-db'
 
-// == [Public types]: BankStatus, EntryStatus, VaultEntry, BankSnapshot, VaultChoice
+// == [Public types]: BankStatus, EntryStatus, VaultEntry, BankSnapshot
 
 /** Where the bank stands, as a UI branches on it.
  *  * `made`: `Bank.make` checked its options, and nothing more.
@@ -46,25 +50,40 @@ export type BankSnapshot = Readonly<{
   err:    VaultError | null
   vaults: Readonly<Record<string, VaultEntry>>
 }>
-
-/** Which of the bank's vaults a call means: the user's, under its label. */
-export type VaultChoice = Pick<VaultDraft, 'user_id' | 'vaultlabel'>
 // --
 
 /** One entry as the bank keeps it: its view, and the birth under way, if any. */
 type HeldEntry = {
   view:     VaultEntry
   birth:    Promise<Vault> | null
-  /** The stores it was born from: `ensureVault` refuses a draft naming others for its scope, where `clearCachedVault` and `delDamagedVault` act on the draft's. */
+  /** The stores it was born from: `ensureVault` refuses options naming others for its scope, where `clearCachedVault` and `delDamagedVault` act on the options'. */
   vaultDB:  VaultDB
   deviceDB: DeviceDB
 }
 
-/** The app's vaults, one Vault object per scope, and what they share: the key deriver, the strength checker, the logger, the clock, the limits, and the stores each vault lives in unless told otherwise.
+/** Where the load of the libraries a bank's vaults share stands, as one value: the bank's status, the load under way while `starting`, and its refusal once `refused`.
+ * The snapshot's `status` and `err` are read from it alone, so they never disagree.
+ */
+type LibsLoad =
+  | { status: 'made' | 'timely' }
+  | { status: 'starting', loading: Promise<Outcome<void>> }
+  | { status: 'refused', err: VaultError }
+
+/** The signed-in user's vaults in one app, one Vault object per vault, and what they share: the key deriver, the strength checker, the logger, the clock, the limits, and the stores each vault lives in unless told otherwise.
+ * A bank serves one user. Make it as they sign in, and drop it as they sign out, once
+ * `closeVaults()` has let every Vault object it handed out go: a bank that outlives its user is a
+ * bug. What is costly to load -- the key deriver, the strength checker -- is made once, before any
+ * bank, and handed to each.
+ *
  * `Bank.make` checks its options and touches nothing. `bank.hello()` loads the libraries the
- * vaults share, once. `bank.ensureVault(draft)` births a vault's Vault object from one read of
- * storage and this device's store, or hands back the one it holds; two asks for one vault at once
- * get one Vault object. A UI renders from `getSnapshot()` and re-renders on `subscribe()`.
+ * vaults share, once. `bank.ensureVault({ vaultlabel })` births a vault's Vault object from one
+ * read of storage and this device's store, or hands back the one it holds; two asks for one vault
+ * at once get one Vault object. A UI renders from `getSnapshot()` and re-renders on `subscribe()`.
+ *
+ * Each call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id` the
+ * bag carries must be the bank's ({@link Bank.demandConsistentWith}), and anything else it carries
+ * is left out, so a Vault object, its snapshot, an entry's `scope` or a box may be handed in as it
+ * is. The vault's own stores, where not the bank's, go in a second bag ({@link BankVaultOpts}).
  *
  * This device keeps a record of each vault it has seen (its device record): its own id for the
  * vault, and the highest `vault_epoch` it has seen there. A vault storage serves below it is
@@ -73,19 +92,24 @@ type HeldEntry = {
  *
  * Every call comes in two forms, as on a Vault object: `tryEnsureVault()` and the rest resolve to
  * an {@link Outcome}; `ensureVault()` and the rest resolve its `val` or throw its `err`.
- * `closeVault()`, `closeVaults()`, `entryOf()`, `subscribe()` and `getSnapshot()` come in one form.
+ * `closeVault()`, `closeVaults()`, `entryOf()`, `demandConsistentWith()`, `subscribe()` and
+ * `getSnapshot()` come in one form.
  *
  * @example
- *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })   // once, at module level
- *   const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
+ *   const vault = await bank.ensureVault({ vaultlabel: 'main' })
  *   vault.state   // 'novel' | 'locked' | 'unlocked'
  * @example const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
  */
 export class Bank {
-  // == [Bank: fields]: applabel, status, snapshot, getSnapshot, subscribe, entryOf
+  // == [Bank: fields]: applabel, user_id, scope, status, snapshot, getSnapshot, subscribe, entryOf, demandConsistentWith
 
   /** The app the bank's vaults belong to. */
-  get applabel(): string { return this.#parts.applabel }
+  get applabel(): string { return this.#scope.applabel }
+  /** The signed-in user the bank serves: every vault it births is theirs. */
+  get user_id(): string { return this.#scope.user_id }
+  /** The bank's scope, frozen: its app and its user, which {@link Bank.demandConsistentWith} holds a bag to. */
+  get scope(): BankScope { return this.#scope }
   /** Where the bank stands: see {@link BankStatus}. */
   get status(): BankStatus { return this.#snapshot.status }
   /** Every field, frozen in one object: what {@link Bank.getSnapshot} returns. */
@@ -103,27 +127,40 @@ export class Bank {
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** The entry the snapshot holds for the vault `choice` names, or null for none: synchronous, and reading nothing.
-   * Refuses 'bad_scope' for a name that fails its check.
+  /** The entry the snapshot holds for the vault `bag` names, or null for none: synchronous, and reading nothing.
+   * Refuses 'bad_scope' for a name that fails its check, or a bag of another app or user than the bank's.
    *
-   * @example bank.entryOf({ user_id: 'u1', vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
+   * @example bank.entryOf({ vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
    */
-  entryOf(choice: VaultChoice): VaultEntry | null {
-    return this.#snapshot.vaults[Scopepath.vault(this.#scopeOf(choice))] ?? null
+  entryOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultEntry | null {
+    return this.#snapshot.vaults[Scopepath.vault(this.#vaultScopeOf(bag))] ?? null
+  }
+
+  /** Refuse 'bad_scope' unless `thing` is of the bank's scope: an `applabel` or `user_id` it carries must be the bank's, and one that fails its check refuses too.
+   * A name it leaves out passes, so `{ vaultlabel: 'main' }` is of every bank's scope, while a
+   * Vault object, its snapshot, an entry's `scope` or a box carries both names, and passes only in
+   * a bank of its own app and user. Every call naming a vault holds its bag to this first, before
+   * storage is touched. Synchronous, and reading nothing.
+   *
+   * @example bank.demandConsistentWith(vault)   // returns, for a Vault object this bank handed out
+   * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
+   */
+  demandConsistentWith(thing: Partial<BankScope>): void {
+    this.#demandSameScope(bankBag.parse(thing))
   }
   // --
 
   // == [Bank: opening]: make, hello
 
-  /** Make a bank for the app: its options checked, and nothing else done. It reads nothing, starts nothing, and is `made`.
+  /** Make a bank for the signed-in user of the app: its options checked, and nothing else done. It reads nothing, starts nothing, and is `made`.
    * It throws its misuse at once, synchronously: 'insecure_context' first, for a page that is not a
-   * secure context; 'bad_scope' for an `applabel` that fails its check; 'bad_option' for any other
-   * option, one it does not take among them (a misspelling, a retired name, or `user_id` and
-   * `vaultlabel`, which each vault's draft takes), a `vaultDB` or `deviceDB` short of a verb, or
-   * limits the `vaultDB` might not honour.
+   * secure context; 'bad_scope' for an `applabel` or `user_id` that fails its check; 'bad_option'
+   * for any other option, one it does not take among them (a misspelling, a retired name, or a
+   * `vaultlabel`, which each call naming a vault takes), a `vaultDB` or `deviceDB` short of a verb,
+   * or limits the `vaultDB` might not honour.
    *
-   * @example const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
-   * @example Bank.make({ ...opts, user_id: 'u1' })   // throws 'bad_option': each vault's draft names its user
+   * @example const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
+   * @example Bank.make({ ...opts, vaultlabel: 'main' })   // throws 'bad_option': each call names its vault
    */
   static make(opts: MakeBankOpts): Bank {
     return new Bank(opts)
@@ -132,14 +169,16 @@ export class Bank {
   /** The bank {@link Bank.make} makes. */
   private constructor(opts: MakeBankOpts) {
     this.#parts = parseMakeBankOpts(opts)
+    this.#scope = Object.freeze({ applabel: this.#parts.applabel, user_id: this.#parts.user_id })
     this.#snapshot = this.#picture()
   }
 
   /** Load the libraries the bank's vaults share, once, resolving the bank: it is `timely` once they have loaded.
-   * That is the strength checker's `load`, if it has one. A hello while one runs shares it; one
-   * after it succeeded resolves at once. One that fails refuses as the load did ('unexpected_error',
-   * what it threw the cause), leaves the bank `refused`, and the next hello loads again. No vault is
-   * born until it succeeds: `ensureVault` says hello first.
+   * That is the key deriver's `load` and the strength checker's, each that carries one, side by
+   * side. A hello while they load shares the load; one after it succeeded resolves at once. One
+   * that fails refuses as the load did ('unexpected_error', what it threw the cause; the strength
+   * checker's first, where both fail), leaves the bank `refused`, and the next hello loads again.
+   * No vault is born until it succeeds: `ensureVault` says hello first.
    *
    * @example await bank.hello()   // bank.status: 'timely'
    */
@@ -148,15 +187,15 @@ export class Bank {
   /** Load the libraries the vaults share, as an {@link Outcome}: the non-throwing form of {@link Bank.hello}. */
   async tryHello(): Promise<Outcome<Bank>> {
     try {
-      await this.#ensureLoaded()
-      return good(this)
+      const started = await this.#initialize()
+      return started.ok ? good(this) : started
     } catch (err) { return this.#badOutcome(err) }
   }
   // --
 
   // == [Bank: vaults]: ensureVault, reopenVault, closeVault, closeVaults, clearCachedVault, delDamagedVault
 
-  /** The Vault object for the vault `draft` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
+  /** The Vault object for the vault `bag` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
    * It says hello first. A birth reads this device's record of the scope, then `VaultDB.ensureVault`
    * (the vault as stored, or a new, gateless one stored in one transaction; past a tombstone, a new
    * life, its counter carried on) beside {@link DeviceDB.getLease}, then raises the record to what
@@ -167,62 +206,64 @@ export class Bank {
    * An ask while a birth of the same vault is under way gets the same Vault object. The bank holds
    * it until it is let go (`closeVault`, `reopenVault`, `closeVaults`, `clearCachedVault`), deleted,
    * or found deleted or made anew, during its birth or after: then the entry is `refused`, and the
-   * next ask births anew. One scope lives in one place: a draft for a vault the bank holds, or is
-   * birthing, names the stores it was born from (left out, the bank's own): the same objects, as
-   * stores are compared by identity, so make each store once.
+   * next ask births anew. One scope lives in one place: an ask for a vault the bank holds, or is
+   * birthing, names in `opts` the stores it was born from (left out, the bank's own): the same
+   * objects, as stores are compared by identity, so make each store once.
    *
-   * Refuses 'bad_scope' or 'bad_option' for a draft amiss, before storage is touched, and
-   * 'bad_option' for a draft naming another `vaultDB` or `deviceDB` object than the vault held was
-   * born from, one made afresh over the same storage among them. Refuses as storage refuses:
-   * 'damaged_vault' for vault props it cannot use (`delDamagedVault` clears them), 'newer_format',
-   * 'identity_revoked', 'storage_unavailable'. Refuses 'vault_behind' for a vault below this
-   * device's record, as the class says. The entry keeps the refusal; bad news among them is told
-   * to `onBadNews`.
+   * Refuses 'bad_scope' for a bag of another app or user than the bank's, or a name that fails its
+   * check, and 'bad_option' for options amiss -- or a bag carrying a `vaultDB` or `deviceDB`, which
+   * go in `opts` -- each before storage is touched; and 'bad_option' for options naming another
+   * `vaultDB` or `deviceDB` object than the vault held was born from, one made afresh over the same
+   * storage among them. Refuses as storage refuses: 'damaged_vault' for vault props it cannot use
+   * (`delDamagedVault` clears them), 'newer_format', 'identity_revoked', 'storage_unavailable'.
+   * Refuses 'vault_behind' for a vault below this device's record, as the class says. The entry
+   * keeps the refusal; bad news among them is told to `onBadNews`.
    *
-   * @example const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
-   * @example const vault = await bank.ensureVault({ user_id, vaultlabel: 'work', vaultDB: workVaultDB })   // a vault stored elsewhere
+   * @example const vault = await bank.ensureVault({ vaultlabel: 'main' })
+   * @example const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
    */
-  async ensureVault(draft: VaultDraft): Promise<Vault> { return valOf(await this.tryEnsureVault(draft)) }
+  async ensureVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Vault> { return valOf(await this.tryEnsureVault(bag, opts)) }
 
-  /** The Vault object for the vault `draft` names, as an {@link Outcome}: the non-throwing form of {@link Bank.ensureVault}. */
-  async tryEnsureVault(draft: VaultDraft): Promise<Outcome<Vault>> {
+  /** The Vault object for the vault `bag` names, as an {@link Outcome}: the non-throwing form of {@link Bank.ensureVault}. */
+  async tryEnsureVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
     try {
-      const parts = parseVaultDraft(draft, this.#parts)
+      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
       return good(await this.#ensureEntry(parts))
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** Let the vault `draft` names go, and birth it anew: a Vault object of what storage holds now, as {@link Bank.ensureVault} says.
+  /** Let the vault `bag` names go, and birth it anew: a Vault object of what storage holds now, as {@link Bank.ensureVault} says.
    * The Vault object let go is gone, as {@link Bank.closeVault} says.
    *
-   * @example const vault = await bank.reopenVault({ user_id, vaultlabel: 'main' })   // after 'vault_gone', say
+   * @example const vault = await bank.reopenVault({ vaultlabel: 'main' })   // after 'vault_gone', say
    */
-  async reopenVault(draft: VaultDraft): Promise<Vault> { return valOf(await this.tryReopenVault(draft)) }
+  async reopenVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Vault> { return valOf(await this.tryReopenVault(bag, opts)) }
 
   /** Let the vault go and birth it anew, as an {@link Outcome}: the non-throwing form of {@link Bank.reopenVault}. */
-  async tryReopenVault(draft: VaultDraft): Promise<Outcome<Vault>> {
+  async tryReopenVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
     try {
-      const parts = parseVaultDraft(draft, this.#parts)
+      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
       this.#letGoOf(Scopepath.vault(parts.scope))
       return good(await this.#ensureEntry(parts))
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** Let the vault `choice` names go: its Vault object is gone, every call on it refusing 'vault_gone', and its entry leaves the snapshot.
+  /** Let the vault `bag` names go: its Vault object is gone, every call on it refusing 'vault_gone', and its entry leaves the snapshot.
    * Not a lock: nothing stored is erased, and this device's lease stays for the next birth. A
    * prompt up for a proof ends, its `lockLanded` settling as at a `lock()`, and each call waiting
    * on it refuses 'vault_gone', as a birth under way does; one let go in the task that asked for it
    * has read nothing.
    * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_scope' for a name that
-   * fails its check.
+   * fails its check, or a bag of another app or user than the bank's.
    *
-   * @example bank.closeVault({ user_id, vaultlabel: 'main' })
+   * @example bank.closeVault({ vaultlabel: 'main' })
+   * @example bank.closeVault(vault)   // the vault a Vault object is of
    */
-  closeVault(choice: VaultChoice): void {
-    this.#letGoOf(Scopepath.vault(this.#scopeOf(choice)))
+  closeVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): void {
+    this.#letGoOf(Scopepath.vault(this.#vaultScopeOf(bag)))
   }
 
-  /** Let every vault go, as {@link Bank.closeVault} does each: what an app does at sign-out.
+  /** Let every vault go, as {@link Bank.closeVault} does each: what an app does at sign-out, before it drops the bank.
    *
    * @example onSignOut(() => { bank.closeVaults() })
    */
@@ -231,7 +272,7 @@ export class Bank {
     for (const vaultScopepath of this.#entries.keys()) { this.#letGoOf(vaultScopepath) }
   }
 
-  /** Forget what this device keeps of the vault `draft` names -- its device record and its lease -- letting the vault go: the way out of 'vault_behind'.
+  /** Forget what this device keeps of the vault `bag` names -- its device record and its lease -- letting the vault go: the way out of 'vault_behind'.
    * Once storage was restored from an older copy on purpose, this has the device accept it: the
    * next {@link Bank.ensureVault} births the vault as storage holds it. Erases with
    * {@link DeviceDB.delDeviceRecord} and {@link DeviceDB.delLease}, and lets the vault go once both
@@ -242,24 +283,24 @@ export class Bank {
    * It touches this device's store alone, as clearing the browser's site data would: no
    * VaultDB verb, no unlock, no passphrase. A vault the bank holds no entry for, or that storage
    * does not hold, is no refusal: what this device keeps of it, if anything, is erased all the
-   * same. The store erased is the draft's `deviceDB`, or the bank's own where it names none. The
-   * entry let go is the one the bank holds for the draft's scope once both are erased, whichever
-   * stores it was born from, and only then: a draft amiss refuses 'bad_scope' or 'bad_option',
-   * and a device store that fails 'storage_unavailable' or 'storage_blocked', each keeping the
-   * entry. Call again to finish.
+   * same. The store erased is the `deviceDB` in `opts`, or the bank's own where it names none. The
+   * entry let go is the one the bank holds for the scope once both are erased, whichever stores it
+   * was born from, and only then: a bag or options amiss refuse 'bad_scope' or 'bad_option', and a
+   * device store that fails 'storage_unavailable' or 'storage_blocked', each keeping the entry.
+   * Call again to finish.
    *
    * @example
    *   if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
-   *     await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
-   *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
+   *     await bank.clearCachedVault({ vaultlabel: 'main' })
+   *     await bank.ensureVault({ vaultlabel: 'main' })
    *   }
    */
-  async clearCachedVault(draft: VaultDraft): Promise<void> { valOf(await this.tryClearCachedVault(draft)) }
+  async clearCachedVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<void> { valOf(await this.tryClearCachedVault(bag, opts)) }
 
   /** Forget what this device keeps of the vault, as an {@link Outcome}: the non-throwing form of {@link Bank.clearCachedVault}. */
-  async tryClearCachedVault(draft: VaultDraft): Promise<Outcome<void>> {
+  async tryClearCachedVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<void>> {
     try {
-      const parts = parseVaultDraft(draft, this.#parts)
+      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
       const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
       valOf(await deviceDB.delDeviceRecord(parts.scope))
       valOf(await deviceDB.delLease(parts.scope))
@@ -270,32 +311,32 @@ export class Bank {
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** Delete the vault `draft` names, whose birth was refused 'damaged_vault' -- its vault props, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
-   * It is the `delDamagedVault` function with the draft's stores (the bank's own, where it names
+  /** Delete the vault `bag` names, whose birth was refused 'damaged_vault' -- its vault props, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
+   * It is the `delDamagedVault` function with the stores in `opts` (the bank's own, where it names
    * none), and refuses as it does: 'bad_option' for a vault that reads sound (delete that with
    * `vault.del()`), 'stale_write' for one made anew elsewhere meanwhile, 'storage_unavailable' and
    * the rest. What the vault held is gone for good, so ask the user first.
    *
    * Storage decides, by the checks it alone can make: it deletes only vault props that fail their
    * checks and still name their `vault_tok`. So it may be asked for a vault the bank holds no
-   * entry for: nothing on this device need agree first, and no unlock or passphrase is asked. With no vault stored it erases only this device's lease, and
-   * resolves. The entry let go is the one the bank holds for the draft's scope once storage
-   * answers, whichever stores it was born from: on success, and the next {@link Bank.ensureVault}
-   * births a new life, `novel`; and on 'stale_write', so the next ask births the vault that
-   * stands. Any other refusal keeps the entry.
+   * entry for: nothing on this device need agree first, and no unlock or passphrase is asked. With
+   * no vault stored it erases only this device's lease, and resolves. The entry let go is the one
+   * the bank holds for the scope once storage answers, whichever stores it was born from: on
+   * success, and the next {@link Bank.ensureVault} births a new life, `novel`; and on
+   * 'stale_write', so the next ask births the vault that stands. Any other refusal keeps the entry.
    *
    * @example
    *   if (isVaultError(entry.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
-   *     await bank.delDamagedVault({ user_id, vaultlabel: 'main' })
-   *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
+   *     await bank.delDamagedVault(entry.scope)
+   *     await bank.ensureVault(entry.scope)
    *   }
    */
-  async delDamagedVault(draft: VaultDraft): Promise<void> { valOf(await this.tryDelDamagedVault(draft)) }
+  async delDamagedVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<void> { valOf(await this.tryDelDamagedVault(bag, opts)) }
 
   /** Delete a vault refused 'damaged_vault', as an {@link Outcome}: the non-throwing form of {@link Bank.delDamagedVault}. */
-  async tryDelDamagedVault(draft: VaultDraft): Promise<Outcome<void>> {
+  async tryDelDamagedVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<void>> {
     try {
-      const parts = parseVaultDraft(draft, this.#parts)
+      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
       const vaultScopepath = Scopepath.vault(parts.scope)
       try {
         await delDamagedVaultIn(parts.scope, parts.vaultDB, parts.deviceDB)
@@ -311,19 +352,20 @@ export class Bank {
   }
   // --
 
-  // == [Options and state]: parts, entries, listeners, snapshot, picture, publish, scopeOf
+  // == [Options and state]: parts, scope, entries, listeners, libs, snapshot, picture, publish, vaultScopeOf, demandSameScope
 
   readonly #parts: ParsedBankOpts
+  readonly #scope: BankScope
   readonly #entries = new Map<Scopepath.VaultScopepath, HeldEntry>()
   readonly #listeners = new Set<() => void>()
-  #status: BankStatus = 'made'
-  #err: VaultError | null = null
+  #libs: LibsLoad = { status: 'made' }
   #snapshot: BankSnapshot
 
   /** The snapshot the private state makes now, frozen: each entry's view kept as it is. */
   #picture(): BankSnapshot {
     const vaults = Object.fromEntries([...this.#entries].map(([vaultScopepath, entry]) => [vaultScopepath, entry.view]))
-    return Object.freeze({ status: this.#status, err: this.#err, vaults: Object.freeze(vaults) })
+    const libs = this.#libs
+    return Object.freeze({ status: libs.status, err: libs.status === 'refused' ? libs.err : null, vaults: Object.freeze(vaults) })
   }
 
   /** Publish the snapshot the private state makes now, and tell every listener: the one place the snapshot is swapped. Callers call it only once something changed. */
@@ -332,39 +374,49 @@ export class Bank {
     this.#listeners.forEach((listener) => { listener() })
   }
 
-  /** The scope `choice` names in the bank's app, its names checked: 'bad_scope' for one that fails. */
-  #scopeOf(choice: VaultChoice): VaultScope {
-    return CX.vaultScope.parse({ applabel: this.#parts.applabel, user_id: choice.user_id, vaultlabel: choice.vaultlabel })
+  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise, and 'bad_option' for a bag carrying a vault's stores, which go in its options. */
+  #vaultScopeOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultScope {
+    const { vaultlabel, ...names } = vaultBag.parse(bag)
+    checkNoStoresIn(bag)
+    this.#demandSameScope(names)
+    return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
+  }
+
+  /** Refuse 'bad_scope' for `names`, already checked, holding an `applabel` or `user_id` other than the bank's: the one comparison {@link Bank.demandConsistentWith} and every call naming a vault make. */
+  #demandSameScope(names: Z.infer<typeof bankBag>) {
+    const others = CX.BankScopepathFieldnameVals.filter((fieldname) => names[fieldname] !== undefined && names[fieldname] !== this.#scope[fieldname])
+    if (others.length > 0) { throw otherScopeError(others) }
   }
   // --
 
-  // == [Loading]: loaded, ensureLoaded, load
+  // == [Starting]: initialize, loadThenSettle, setLibs
 
-  // The libraries' load, shared while it runs and kept once it succeeds; forgotten when it fails.
-  #loaded: Promise<void> | null = null
-
-  /** The libraries loaded, once: a load under way is shared, one that succeeded is kept. The bank is `starting` while one runs. */
-  #ensureLoaded(): Promise<void> {
-    if (this.#loaded !== null) { return this.#loaded }
-    this.#loaded = this.#load()
-    // Published once the load is held, so a listener saying hello now shares it.
-    this.#status = 'starting'
-    this.#err = null
-    this.#publish()
-    return this.#loaded
+  /** Run the bank's startup, loading the libraries its vaults share, unless it has succeeded, and publish the bank's status as it moves: `starting` while it runs, then `timely` or `refused`. Resolves to how it went: good once the libraries have loaded, now or before; bad with the load's refusal.
+   * A call while one runs shares it. A call after one failed begins anew: its `starting` takes the
+   * place of the `refused` status and the `err` beside it, which told of a load no longer under
+   * way, and the new load's end takes the place of `starting` in turn. A load that succeeded is
+   * never run again, so a `timely` bank stays so.
+   */
+  #initialize(): Promise<Outcome<void>> {
+    const libs = this.#libs
+    if (libs.status === 'timely') { return Promise.resolve(good(undefined)) }
+    if (libs.status === 'starting') { return libs.loading }
+    const loading = this.#loadThenSettle()
+    // Published once the load is held, so a listener saying hello as it hears shares it.
+    this.#setLibs({ status: 'starting', loading })
+    return loading
   }
 
-  /** Load the strength checker: the bank `timely` once it has, `refused` and the load forgotten when it fails, so the next hello loads afresh. */
-  async #load(): Promise<void> {
-    const loaded = await outcomeOf(() => loadStrengthChecker(this.#parts.strengthChecker), unexpectedError)
-    if (! loaded.ok) {
-      this.#loaded = null
-      this.#status = 'refused'
-      this.#err = loaded.err
-      this.#publish()
-      throw loaded.err
-    }
-    this.#status = 'timely'
+  /** {@link Bank.#initialize}'s load: the libraries loaded, then the bank moved to `timely` or `refused` and published, resolving how the load went. */
+  async #loadThenSettle(): Promise<Outcome<void>> {
+    const loaded = await loadLibs(this.#parts)
+    this.#setLibs(loaded.ok ? { status: 'timely' } : { status: 'refused', err: loaded.err })
+    return loaded
+  }
+
+  /** Move the libraries' load to `libs`, and publish. */
+  #setLibs(libs: LibsLoad) {
+    this.#libs = libs
     this.#publish()
   }
   // --
@@ -434,7 +486,7 @@ export class Bank {
    * birth asks for a proof.
    */
   async #bear(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
-    await this.#ensureLoaded()
+    valOf(await this.#initialize())
     const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     try {
       return await this.#bearFrom(vaultScopepath, parts, deviceDB)
@@ -522,10 +574,30 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: frozenEntry, checkSameStores, draftOf, goneError, behindError, otherStoresError
+// == [Helpers]: vaultBag, bankBag, loadLibs, frozenEntry, checkNoStoresIn, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError, storesInBagError
+
+/** What names one of a bank's vaults as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`, and everything else the thing carries left out. Each refuses 'bad_scope'. */
+const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+  const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
+  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }) }
+})
+
+/** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
+const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
+  const [checker, deriver] = await Promise.all([
+    outcomeOf(() => loadStrengthChecker(parts.strengthChecker), unexpectedError),
+    outcomeOf(() => loadKeyDeriver(parts.keyDeriver), unexpectedError),
+  ])
+  return checker.ok ? deriver : checker
+}
 
 /** An entry's view, frozen. */
 const frozenEntry = (scope: VaultScope, status: EntryStatus, vault: Vault | null, err: VaultError | null): VaultEntry => Object.freeze({ scope, status, vault, err })
+
+/** Refuse 'bad_option' for a bag naming a vault that carries a `vaultDB` or `deviceDB`: a vault's own stores go in its options, the second bag, and the bank's own would otherwise be used, quietly. */
+const checkNoStoresIn = (bag: object) => {
+  if ('vaultDB' in bag || 'deviceDB' in bag) { throw storesInBagError() }
+}
 
 /** Refuse 'bad_option' unless `parts` names the stores `held` was born from, the same objects: one scope lives in one place, and a vault read from one store and written to another is no vault at all.
  * Stores are compared by identity, never by what they reach: a vaultDB made afresh for each call
@@ -542,7 +614,12 @@ const draftOf = (scope: VaultScope, now: number): GatelessVaultProps => ({
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 
-const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than this draft names (its vaultDB or deviceDB, or the bank's own where the draft leaves one out): one vault lives in one place. Stores are compared as objects, so the draft must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
+const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
+
+/** The refusal of a bag naming another app or user than the bank's, naming the fields that differ, never their values. */
+const otherScopeError = (fieldnames: readonly string[]) => new VaultError('bad_scope', `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`, { meta: { fieldnames } })
+
+const storesInBagError = () => new VaultError('bad_option', "A vault's own vaultDB and deviceDB go in the call's second bag, its options, not beside the vaultlabel: bank.ensureVault({ vaultlabel }, { vaultDB }). Left there, the bank's own stores would be used instead.")
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --
