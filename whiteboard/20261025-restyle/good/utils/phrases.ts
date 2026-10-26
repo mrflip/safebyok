@@ -1,0 +1,43 @@
+/** What the checks say when input fails them: every sentence in one place, so wording and tone are reviewed together, and so is the rule that none quotes the input. */
+
+import { ScopepathDelimiter } from './consts'
+
+/** A label longer than `maxChars`. */
+export const labelTooLong = (maxChars: number): string => `A label is at most ${String(maxChars)} characters`
+
+/** A label of the wrong shape. */
+export const LabelShape = "A label is lowercase words of letters and digits joined by single underscores, starting with a letter"
+
+/** An empty user_id. */
+export const UserIdMissing = "A user_id can't be empty"
+
+/** A user_id longer than `maxChars`. */
+export const userIdTooLong = (maxChars: number): string => `A user_id is at most ${String(maxChars)} characters`
+
+/** A user_id holding a character outside its set, or only dots. */
+export const UserIdChars = "A user_id is ASCII letters, digits and - _ . ~ : @ + | %, and not dots alone: percent-encode (RFC 3986) any other character"
+
+/** A refused input whose check gave no sentence of its own. */
+export const FailedItsCheck = "It failed its check"
+
+/** A field name or key the refusal will not repeat, since it does not look like one of ours and could be the caller's data. */
+export const UnsaidName = "(a name not repeated here)"
+
+/** Fields the schema does not have, by the names it may repeat. */
+export const unknownFields = (fieldnames: readonly string[]): string => (
+  fieldnames.length === 1
+    ? `There is no field ${fieldnames[0]!}: check its spelling, or leave it out`
+    : `There are no fields ${fieldnames.join(', ')}: check their spelling, or leave them out`
+)
+
+/** How many more failures a refusal found than it names. */
+export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
+
+/** A bank's scopepath of the wrong shape. */
+export const BankScopepathShape = `A bank's scopepath is 'bank', an applabel and a user_id, joined on ${ScopepathDelimiter}`
+
+/** A vault's scopepath of the wrong shape. */
+export const VaultScopepathShape = `A vault's scopepath is 'vault', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
+
+/** A box's scopepath of the wrong shape. */
+export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
