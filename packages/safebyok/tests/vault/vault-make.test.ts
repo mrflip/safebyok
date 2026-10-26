@@ -851,4 +851,15 @@ describe("the vault's snapshot, slice by slice (Contract: VaultSnapshot)", () =>
     expect(vault.snapshot.boxes).to.eq(boxed.boxes)
     expect(vault.snapshot.capacity).to.eq(boxed.capacity)
   })
+
+  it("replaces the boxes when a box is written afresh, though the room stays the same: a new revision_tok is a change", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const before = vault.snapshot
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(vault.snapshot.boxes).to.not.eq(before.boxes)
+    expect(vault.snapshot.boxes[0]?.revision_tok).to.not.eq(before.boxes[0]?.revision_tok)
+    expect(vault.snapshot.capacity).to.eq(before.capacity)
+  })
 })
