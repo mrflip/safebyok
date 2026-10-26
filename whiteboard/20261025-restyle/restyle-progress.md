@@ -109,3 +109,21 @@ Who reads this: threads 5 to 13.
   Tests plant damage `as never`; `TH.fakeCiphered` returns `FakeCiphered` (all four ciphered
   brands, one cast inside).
 * **`gh pr ready` went through** for this thread; the refusal is not constant.
+
+## From thread 5 (scopepath, #276)
+
+Who reads this: threads 6, 8, 10 and 13.
+
+* **`Scopepath`** (`src/scopepath.ts`, a namespace export): makers `bank`, `vault`, `lease`,
+  `device`, `box` (each checks the whole scope, refuses `bad_scope`); inverses `bankScope`,
+  `vaultScope`, `boxscope`; kind tests `isLease`, `isDevice`, `isBox` (full `safeParse`s);
+  `withinVaultScopepathPrefix`, `withinVaultScopepathPred`, `Delimiter`; types are
+  `Z.input<typeof CX.*Scopepath>`. `CX.leaseScopepath` and `CX.deviceScopepath` are new.
+* **A listing** goes `withinVaultScopepathPred` → `Scopepath.isBox` → `boxscope`: a malformed row
+  under a vault's prefix is skipped, still counted by `getCapacity`, still erased by `delVault`.
+* **bank.ts** keys its entries `Map<Scopepath.VaultScopepath, ...>` already (thread 13).
+* **The IndexedDB adapter's** `src/ckeys.ts` is `src/box-range.ts`. `IdbRow.ckey` and
+  `StringStore.ckeys()` keep `ckey` in its generic sense (thread 6 may rename `IdbRow.ckey`).
+* Every read-back site refuses a misnamed record as its own kind, pinned by a test (the Coach's
+  TODO entry, settled); a lease stays `corrupt_record`.
+* `gh pr create` and `gh pr ready` both went through for this thread.
