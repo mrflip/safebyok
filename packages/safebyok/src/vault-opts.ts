@@ -232,7 +232,7 @@ const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, d
   const minutesToMillis = (minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis))
   return {
     // The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class.
-    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultProps: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, subscribe: verb }),
+    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultRecord: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, subscribe: verb }),
     deviceDBShape:        obj({ getLease: verb, putLease: verb, delLease: verb, getDeviceRecord: verb, raiseDeviceRecord: verb, delDeviceRecord: verb, delAll: verb }),
     maxWhisperBytes:      int.positive().default(MaxWhisperBytes),
     maxBoxes:             int.positive().optional(),

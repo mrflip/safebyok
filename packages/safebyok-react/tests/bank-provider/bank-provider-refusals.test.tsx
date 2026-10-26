@@ -350,7 +350,7 @@ describe("BankProvider", () => {
         await latest().bank?.ensureVault({ vaultlabel: 'main' })
       })
       await expectShown('novel')
-      expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])
+      expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
       expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
       expect(latest().err).to.be.null
     })

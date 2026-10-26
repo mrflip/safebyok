@@ -58,7 +58,7 @@ export const tablelessClient = (db: PGlite): PostgresClient => ({
 
 /**
  * The roles {@link roleClient} sends as, made once in this file's database. Each may keep its
- * vault props and its tombstone (a vault's birth writes both) and read every box;
+ * vault record and its tombstone (a vault's birth writes both) and read every box;
  * `safebyok_reader` lacks the privilege to write a box, and `safebyok_viewer` holds it, but no
  * row-level security policy lets it insert or change one.
  */

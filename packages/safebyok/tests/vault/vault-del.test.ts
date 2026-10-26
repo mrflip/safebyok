@@ -4,7 +4,7 @@ import { toB64 } from '../../src/crypto'
 import { StaleMinutes } from '../../src/types/types'
 import { MinuteMillis } from '../../src/consts'
 import * as TH from '../test-helpers'
-import { makeWorld, u1BoxScopepath, storedRowOf, storedVaultPropsOf, boxlabelsOf, rowsOf, u1VaultScopepath, vaultWithPasskey, spoilWayin } from './world'
+import { makeWorld, u1BoxScopepath, storedRowOf, storedVaultRecordOf, boxlabelsOf, rowsOf, u1VaultScopepath, vaultWithPasskey, spoilWayin } from './world'
 
 /** A stored box row, as text, with its whisper's ciphertext bent a little. */
 const withTweakedCiphertext = (row: Record<string, unknown>): string => {
@@ -29,7 +29,7 @@ describe("delBox and del()", () => {
       if (gating.gatingkind === 'del_vault') { await gating.attempt('pw') }
     })
     await vault.del()
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
     const next = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(next.state).to.eq('novel')
     expect(next.vault_tok).to.not.eq(vault.vault_tok)
@@ -81,8 +81,8 @@ describe("delBox and del()", () => {
 
     await TH.del(mine, 'my pw')
     await TH.expectRefusal(mine.hello(), 'vault_gone')
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultScopepath])
-    expect(storedVaultPropsOf(world)['format']).to.eq('safebyok-tombstone-v1')
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record').to.deep.equal([u1VaultScopepath])
+    expect(storedVaultRecordOf(world)['format']).to.eq('safebyok-tombstone-v1')
     expect(await world.getLease()).to.be.null
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
   })
@@ -103,7 +103,7 @@ describe("delBox and del()", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await TH.del(vault, 'pw')
-    const tombstoneEpoch = storedVaultPropsOf(world)['vault_epoch']
+    const tombstoneEpoch = storedVaultRecordOf(world)['vault_epoch']
     const deviceRecord = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
     expect(deviceRecord?.highest_vault_epoch).to.eq(tombstoneEpoch)
   })
@@ -115,11 +115,11 @@ describe("delBox and del()", () => {
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await TH.expectRefusal(TH.del(stale, 'pw'), 'absent_vault')
-    expect(storedVaultPropsOf(world)['format']).to.not.eq('safebyok-tombstone-v1')
+    expect(storedVaultRecordOf(world)['format']).to.not.eq('safebyok-tombstone-v1')
     await stale.hello({ staleMinutes: 0 })
     expect(stale.getSnapshot().state).to.eq('locked')
     await TH.del(stale, 'pw')
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultScopepath])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record').to.deep.equal([u1VaultScopepath])
   })
 
   it("del() from a novel picture older than staleMinutes reads first: the vault gated elsewhere since is asked for and deleted, never refused absent_vault", async () => {
@@ -130,7 +130,7 @@ describe("delBox and del()", () => {
     expect(stale.getSnapshot().state).to.eq('novel')
     world.advance(StaleMinutes * MinuteMillis)
     await TH.del(stale, 'pw')
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
   it("del() on a novel vault refuses absent_vault, asking nothing and writing nothing; once its first passphrase is set, del() lands, and a second refuses vault_gone; the next life's unlock and del() land", async () => {
@@ -146,7 +146,7 @@ describe("delBox and del()", () => {
     expect(world.dbStore.read(u1VaultScopepath)).to.eq(stored)
     await TH.unlock(vault, 'pw')
     await TH.del(vault, 'pw')
-    expect(storedVaultPropsOf(world)['format']).to.eq('safebyok-tombstone-v1')
+    expect(storedVaultRecordOf(world)['format']).to.eq('safebyok-tombstone-v1')
     await TH.expectRefusal(TH.del(vault, 'pw'), 'vault_gone')
     const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     await TH.unlock(reborn, 'pw')
@@ -156,7 +156,7 @@ describe("delBox and del()", () => {
 })
 
 /** The VaultDB verbs that write to storage, so a test can count every write a call makes. */
-const WriteVerbs = ['ensureVault', 'putVaultProps', 'putBox', 'delBox', 'delVault', 'delDamagedVault'] as const
+const WriteVerbs = ['ensureVault', 'putVaultRecord', 'putBox', 'delBox', 'delVault', 'delDamagedVault'] as const
 
 /** Ways a stored box row can be spoiled that the listing sees, so that it lists as damaged. */
 const DamagedListings = [
@@ -256,7 +256,7 @@ describe("damaged boxes", () => {
     const putBox = vi.spyOn(world.vaultDB, 'putBox')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new')
     const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
-    expect(callsOf).to.deep.equal({ ensureVault: 0, putVaultProps: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
+    expect(callsOf).to.deep.equal({ ensureVault: 0, putVaultRecord: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
     expect(putBox.mock.calls[0]?.[1]).to.deep.include({ revision_tok: revisionTok })
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
     vi.restoreAllMocks()
@@ -367,7 +367,7 @@ describe("a way in stored damaged", () => {
     expect(fresh.getSnapshot().passkey).to.be.null
   })
 
-  it("a passkey whose answer no longer opens vault props altered in storage is told that its way in may be damaged", async () => {
+  it("a passkey whose answer no longer opens vault record altered in storage is told that its way in may be damaged", async () => {
     const { world, laptop } = await vaultWithPasskey()
     const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as { gate: { passkey: { registered_at: number } } }
     world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, passkey: { ...vaultRecord.gate.passkey, registered_at: vaultRecord.gate.passkey.registered_at - 1 } } }))

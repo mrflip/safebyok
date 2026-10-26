@@ -24,7 +24,7 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 const served = new Map<string, Served>([
   ['getVault',         (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
   ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null })],
-  ['putVaultProps',    (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultProps(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
+  ['putVaultRecord',    (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
   ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
@@ -52,10 +52,10 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
  */
 const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
   if (ok) { return { result: val, meta: {} } }
-  const { box_stored, vault_props_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
+  const { box_stored, vault_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
   const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
   // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
-  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_props_stored, capacity } }
+  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_stored, capacity } }
 }
 
 /** A listed damaged box, rebuilt from its three public fields. */
@@ -106,7 +106,7 @@ class RouteVaultDB extends VaultDB {
 
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
   protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return storedVaultOf(await this.call('ensureVault', draft)) }
-  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultProps', vaultRecord, expected) }
+  protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultRecord', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
@@ -114,8 +114,8 @@ class RouteVaultDB extends VaultDB {
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
   // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
-  // with how full it is), so a write that answers landed: an update of the vault props answers with
-  // the vault props as the server's storage holds them, a box write with the box, a box deletion
+  // with how full it is), so a write that answers landed: an update of the vault record answers with
+  // the vault record as the server's storage holds it, a box write with the box, a box deletion
   // with what it removed, and a vault deletion with the tombstone it left.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await this.fetcher(VaultRouteUrl, {
@@ -141,7 +141,7 @@ class RouteVaultDB extends VaultDB {
 // VaultDB's to check. A thrown Error is met as storage_unavailable, quoting nothing it was sent.
 type RouteAnswer = { result: unknown, refusal?: undefined, meta: RefusalMeta } | { result?: undefined, refusal: { kind: RefusalKind, message: string, meta: RefusalMeta }, meta: RefusalMeta }
 
-const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_props_stored', 'capacity']
+const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_stored', 'capacity']
 const RefusalMetaCkeys: readonly string[] = ['box_listed', 'wayin_listed']
 
 const isObject = (sent: unknown): sent is object => typeof sent === 'object' && sent !== null && ! Array.isArray(sent)
@@ -172,7 +172,7 @@ const misshapen = () => new Error('The vault route answered something that is no
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 
-// A vault as the route sends it -- its vault props, and its boxes as stored records -- or null for
+// A vault as the route sends it -- its vault record, and its boxes as stored records -- or null for
 // none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
 const storedVaultOf = (sent: unknown): StoredVault => {
   if (sent === null) { return { vaultProps: null, boxes: [] } }
@@ -272,7 +272,7 @@ describe("the README route recipe", () => {
       expect(response.status).to.eq(400)
       expect(await response.json()).to.deep.equal({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} })
     }
-    const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultProps", ' }))
+    const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultRecord", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
     await TH.expectBad(broken.getVault(TH.scopeOf('u1')), 'storage_unavailable')
@@ -307,10 +307,10 @@ describe("the README route recipe's answer, which every call makes in one shape"
     const boxStored = { boxlabel: 'a', damaged: true, revision_tok: 'rev1' } as const
     const stale = new VaultError('stale_write', 'Another device wrote first.', { meta: { box_stored: boxStored } })
     expect(await crossed(answerOf({ ok: false, err: stale }))).to.deep.equal({ refusal: { kind: 'stale_write', message: 'Another device wrote first.', meta: {} }, meta: { box_stored: boxStored } })
-    // A null is a fact too: no vault props stand.
-    const none = new VaultError('stale_write', 'x', { meta: { vault_props_stored: null } })
+    // A null is a fact too: no vault record stands.
+    const none = new VaultError('stale_write', 'x', { meta: { vault_stored: null } })
     const noneSent = await crossed(answerOf({ ok: false, err: none }))
-    expect(noneSent.meta).to.deep.equal({ vault_props_stored: null })
+    expect(noneSent.meta).to.deep.equal({ vault_stored: null })
     const capacity = { boxes: { used: 3, max: 3 }, bytes: { used: 10, max: 100 } }
     const full = await crossed(answerOf({ ok: false, err: new VaultError('vault_full', 'x', { meta: { capacity } }) }))
     expect(full.meta).to.deep.equal({ capacity })
@@ -361,7 +361,7 @@ describe("the README route recipe's answer, which every call makes in one shape"
 
   it("rethrows a refusal's kind and message, and merges its main meta with its own", async () => {
     const wayinListed = { wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1' }
-    const body = { refusal: { kind: 'damaged_wayin', message: 'Damaged.', meta: { wayin_listed: wayinListed } }, meta: { vault_props_stored: null } }
+    const body = { refusal: { kind: 'damaged_wayin', message: 'Damaged.', meta: { wayin_listed: wayinListed } }, meta: { vault_stored: null } }
     const browser = new RouteVaultDB(() => Promise.resolve(Response.json(body)))
     let thrown: unknown = null
     try {
@@ -373,7 +373,7 @@ describe("the README route recipe's answer, which every call makes in one shape"
     const refusal = thrown as VaultError
     expect(refusal.refusalkind).to.eq('damaged_wayin')
     expect(refusal.message).to.eq('Damaged.')
-    expect(refusal.meta).to.deep.equal({ vault_props_stored: null, wayin_listed: wayinListed })
+    expect(refusal.meta).to.deep.equal({ vault_stored: null, wayin_listed: wayinListed })
   })
 })
 

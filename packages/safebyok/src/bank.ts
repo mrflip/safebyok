@@ -216,8 +216,8 @@ export class Bank {
    * check, and 'bad_option' for options amiss -- or a bag carrying a `vaultDB`, a `deviceDB`, or any
    * field named as a store (`vaultDb`), as stores go in `opts` -- each before storage is touched; and 'bad_option' for options naming another
    * `vaultDB` or `deviceDB` object than the vault held was born from, one made afresh over the same
-   * storage among them. Refuses as storage refuses: 'damaged_vault' for vault props it cannot use
-   * (`delDamagedVault` clears them), 'newer_format', 'identity_revoked', 'storage_unavailable'.
+   * storage among them. Refuses as storage refuses: 'damaged_vault' for a vault record it cannot use
+   * (`delDamagedVault` clears it), 'newer_format', 'identity_revoked', 'storage_unavailable'.
    * Refuses 'vault_behind' for a vault below this device's record, as the class says. The entry
    * keeps the refusal; bad news among them is told to `onBadNews`.
    *
@@ -313,13 +313,13 @@ export class Bank {
     } catch (err) { return this.#badOutcome(err) }
   }
 
-  /** Delete the vault `bag` names, whose birth was refused 'damaged_vault' -- its vault props, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
+  /** Delete the vault `bag` names, whose birth was refused 'damaged_vault' -- its vault record, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
    * It is the `delDamagedVault` function with the stores in `opts` (the bank's own, where it names
    * none), and refuses as it does: 'bad_option' for a vault that reads sound (delete that with
    * `vault.del()`), 'stale_write' for one made anew elsewhere meanwhile, 'storage_unavailable' and
    * the rest. What the vault held is gone for good, so ask the user first.
    *
-   * Storage decides, by the checks it alone can make: it deletes only vault props that fail their
+   * Storage decides, by the checks it alone can make: it deletes only a vault record that fails its
    * checks and still name their `vault_tok`. So it may be asked for a vault the bank holds no
    * entry for: nothing on this device need agree first, and no unlock or passphrase is asked. With
    * no vault stored it erases only this device's lease, and resolves. The entry let go is the one

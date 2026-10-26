@@ -155,7 +155,7 @@ act. The `safebyok` README's *Errors* section lists every kind, its family, and 
 **A condition or bad news stays in place,** in the entry: `refused`, its `err` a `VaultError`, no
 Vault object. Storage that cannot be reached (`storage_unavailable`), a user storage no longer
 serves (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a
-vault whose stored props fail their checks (`damaged_vault`), or storage serving an older copy of
+vault whose stored record fails its checks (`damaged_vault`), or storage serving an older copy of
 the vault than this device has seen (`vault_behind`). (A damaged box never stops the birth:
 the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show

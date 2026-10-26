@@ -12,7 +12,7 @@ import { toB64 } from '../../src/crypto'
 import type { StrengthChecker } from '../../src/passphrase-strength'
 import { heldLeaseOf } from '../../src/held-lease'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf, storedVaultPropsOf } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf, storedVaultRecordOf } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -616,7 +616,7 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
-    TH.beforeNextCall(world.vaultDB, 'putVaultProps', () => {
+    TH.beforeNextCall(world.vaultDB, 'putVaultRecord', () => {
       vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
       return Promise.resolve()
     })
@@ -704,7 +704,7 @@ describe("an unlock this device cannot keep a lease for", () => {
       const err = await TH.expectRefusal(TH.unlock(vault, 'pw one'), refusalkind)
       expect(err.message).to.include('passphrase was set')
       expect(err.message).to.not.include('pw one')
-      expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
+      expect(storedVaultRecordOf(world)).to.include({ gate_epoch: 1 })
       expect(vault.getSnapshot().state).to.eq('locked')
       await TH.unlock(vault, 'pw one')
       expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -716,7 +716,7 @@ describe("an unlock this device cannot keep a lease for", () => {
     const vault = await world.open()
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
     await TH.putWayin(vault, 'pw one', 'pw one')
-    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
+    expect(storedVaultRecordOf(world)).to.include({ gate_epoch: 1 })
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(vault.getSnapshot().state).to.eq('locked')
   })
@@ -1640,7 +1640,7 @@ describe("the gating's attempt, by the Contract", () => {
     const ensuring = vault.tryEnsureUnlocked()
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'putVaultProps', async () => { await TH.unlock(elsewhere, 'pw one') })
+    TH.beforeNextCall(deafDB, 'putVaultRecord', async () => { await TH.unlock(elsewhere, 'pw one') })
     await TH.expectBad(gating.attempt('pw one'), 'gate_made_elsewhere')
     expect(vault.state).to.eq('novel')
     await TH.expectBad(ensuring, 'gate_made_elsewhere')

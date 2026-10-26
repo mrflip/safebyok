@@ -1100,7 +1100,7 @@ const servingOnly = (signedIn: string | null, store: StringStore): TH.VaultDBVer
     ensureVault:        (draft) => permitted(draft, () => shared.ensureVault(draft)),
     getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
     ensureVaultRecords: (draft) => permitted(draft, () => shared.ensureVaultRecords(draft)),
-    putVaultProps:    (vaultProps, expected) => permitted(vaultProps, () => shared.putVaultProps(vaultProps, expected)),
+    putVaultRecord:    (vaultProps, expected) => permitted(vaultProps, () => shared.putVaultRecord(vaultProps, expected)),
     getBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.getBox(scope, boxlabel, expected)),
     putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
     getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),
@@ -1134,7 +1134,7 @@ const counted = () => {
 }
 
 describe("perUser", () => {
-  it("sends each verb to the VaultDB of the user its scope or vault props name", async () => {
+  it("sends each verb to the VaultDB of the user its scope or vault record names", async () => {
     const { vaultDB, store } = counted()
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u2'))
@@ -1143,12 +1143,12 @@ describe("perUser", () => {
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
   })
 
-  it("sends putVaultProps, subscribe, delBox and delVault to the user named, too", async () => {
+  it("sends putVaultRecord, subscribe, delBox and delVault to the user named, too", async () => {
     const { vaultDB, store } = counted()
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u2'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
-    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultRecordOf('u2'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })
+    await TH.expectingGood(vaultDB).putVaultRecord({ ...TH.vaultRecordOf('u2'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
     await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u2'), 'anthropic', { vault_tok: 'vault-tok-u2', revision_tok: 'rev-two' })
     expect(await TH.boxesOf(servingOnly('u2', store), TH.scopeOf('u2'))).to.have.lengthOf(0)
@@ -1330,17 +1330,17 @@ class RoundTripVaultDB extends VaultDB {
     return seen.vault
   }
 
-  protected async doPutVaultProps(vaultProps: VaultRecord, expected: VaultRecordExpectation) {
+  protected async doPutVaultRecord(vaultProps: VaultRecord, expected: VaultRecordExpectation) {
     const vaultScopepath = Scopepath.vault(vaultProps)
     // The refusal a miss throws, from the row its check read.
     const missed: { refusal: VaultError | null } = { refusal: null }
     const meets = (rows: Rows) => {
-      missed.refusal = Expectations.vaultPropsRefusalOf(rows.get(vaultScopepath), expected)
+      missed.refusal = Expectations.vaultRecordRefusalOf(rows.get(vaultScopepath), expected)
       return missed.refusal === null
     }
     const stored: { vaultProps: unknown } = { vaultProps: null }
     const write = (rows: Rows) => {
-      stored.vaultProps = Expectations.vaultPropsPutOf(vaultProps, rows.get(vaultScopepath))
+      stored.vaultProps = Expectations.vaultRecordPutOf(vaultProps, rows.get(vaultScopepath))
       rows.set(vaultScopepath, stored.vaultProps)
     }
     if (await this.step({ check: meets, write })) { return stored.vaultProps }
@@ -1440,7 +1440,7 @@ class RoundTripVaultDB extends VaultDB {
 
 const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string }) => Expectations.vaultMeets(rows.get(Scopepath.vault(scope)), expected)
 
-/** The vault of `scope` in `rows`: its vault props, or null, and its boxes. */
+/** The vault of `scope` in `rows`: its vault record, or null, and its boxes. */
 const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): StoredVault => ({ vaultProps: rows.get(Scopepath.vault(scope)) ?? null, boxes: boxesIn(rows, scope).slice(0, listedUpTo) })
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {
@@ -1485,7 +1485,7 @@ TH.describeVaultDB('an honest adapter making round trips through the turnstile',
 TH.describeVaultDB('an honest adapter that counts a vault apart from its write, as a best effort', ...roundTripBattery({ stepping: inOneStep, countsApart: true }))
 
 /** The races a write whose check and write are apart loses, in some interleaving. */
-const SplitLosses = ['rivalEnsures', 'rivalVaultPropsUpdates', 'rivalFirstGates', 'rivalFirstWrites', 'resentFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
+const SplitLosses = ['rivalEnsures', 'rivalVaultRecordUpdates', 'rivalFirstGates', 'rivalFirstWrites', 'resentFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
 
 /** The battery's checks over a check-then-write adapter whose devices share one lock, a fresh one for each call. */
 const lockedChecks = () => checksOver({ stepping: checkThenWriteUnder(sharedLock()), overTheWire: true })

@@ -177,7 +177,7 @@ describe("PassphraseModal", () => {
       const deafDB = localVaultDB({ store: { ...store, subscribe: neverRings } })
       const { vault: here, gating, ensuring } = await TH.gatedBy({ ...opts, vaultDB: deafDB })
       const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
-      TH.beforeNextCall(deafDB, 'putVaultProps', () => TH.unlock(there, 'pw one'))
+      TH.beforeNextCall(deafDB, 'putVaultRecord', () => TH.unlock(there, 'pw one'))
       const heard: DialogAnswer[] = []
       render(<PassphraseModal gating={gating} onDone={(answer) => { heard.push(answer) }} />)
       TH.typeNewPassphrase('pw two')

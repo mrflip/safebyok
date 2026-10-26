@@ -208,7 +208,7 @@ export type RefusalMeta = {
    * They are the winner's whole record, checked as a read checks one, so the caller can take them
    * up with no second read.
    */
-  vault_props_stored?: VaultRecord | null
+  vault_stored?: VaultRecord | null
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
    * `vault.capacity` before storage is asked.

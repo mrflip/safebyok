@@ -180,7 +180,7 @@ describe("graphqlVaultDB, as the README has it", () => {
 })
 
 describe("graphqlVaultDB, carrying a passkey's way in", () => {
-  it("stores vault props holding a passkey and reads them back exactly", async () => {
+  it("stores a vault record holding a passkey and reads it back exactly", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const withPasskey = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
     await TH.ensureGated(TH.browserFor(schema, 'u1'), withPasskey)
@@ -309,8 +309,8 @@ describe("graphqlVaultDB, its refusals", () => {
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     const past = 2 ** 31
     const refusals = [
-      await TH.expectBad(vaultDB.putVaultProps(TH.vaultRecordOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
-      await TH.expectBad(vaultDB.putVaultProps(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
+      await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
+      await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
       await TH.expectBad(vaultDB.delVault(u1, { ...thisVault, gate_epoch: past }), 'bad_record'),
     ]
     expect(refusals.map((refusal) => /^Nothing was (written|removed): .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true, true])
@@ -353,8 +353,8 @@ describe("graphqlVaultDB, its refusals", () => {
   })
 
   it("refuses a write that came back not landed and naming no kind as corrupt_record, quoting nothing of the answer", async () => {
-    const vague = answering({ safebyokPutVaultProps: { landed: false, refusalkind: 'made_up', message: 'sk-ant-not-a-real-key', vault_props_stored: null } })
-    const refusal = await TH.expectBad(vague.putVaultProps(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
+    const vague = answering({ safebyokPutVaultRecord: { landed: false, refusalkind: 'made_up', message: 'sk-ant-not-a-real-key', vault_stored: null } })
+    const refusal = await TH.expectBad(vague.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.not.include('sk-ant')
   })
 

@@ -6,7 +6,7 @@ import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectatio
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
  * Import it whole: `import { Expectations } from 'safebyok'`, then
- * `Expectations.vaultPropsMeets(standing, expected)`.
+ * `Expectations.vaultRecordMeets(standing, expected)`.
  *
  * Each compares only `vault_tok`, `gate_epoch` and `revision_tok`, on the standing row as it is,
  * unvalidated. A row too damaged to show a field fails, so nothing lands on it. Each `standing`
@@ -35,23 +35,23 @@ const fieldOf = (standing: unknown, field: string): unknown => (
 
 /** True when the vault record standing is `expected`'s vault at its gate epoch: what an update of the vault record compares (VAULTDB.md, line 3.2).
  *
- * @example Expectations.vaultPropsMeets(standing, { vault_tok: 'v1', gate_epoch: 2 })
+ * @example Expectations.vaultRecordMeets(standing, { vault_tok: 'v1', gate_epoch: 2 })
  */
-export const vaultPropsMeets = (standing: unknown, expected: VaultRecordExpectation): boolean => (
+export const vaultRecordMeets = (standing: unknown, expected: VaultRecordExpectation): boolean => (
   fieldOf(standing, 'vault_tok') === expected.vault_tok
   && fieldOf(standing, 'gate_epoch') === expected.gate_epoch
 )
 
 /** The refusal an update of the vault record meets from the vault record standing, or null when it may land.
- * It is {@link Refusals.staleVaultProps}, carrying what stands, unless {@link vaultPropsMeets}
+ * It is {@link Refusals.staleVaultRecord}, carrying what stands, unless {@link vaultRecordMeets}
  * (VAULTDB.md, line 3.2).
  *
  * @example
- *   const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
+ *   const refusal = Expectations.vaultRecordRefusalOf(standing, expected)
  *   if (refusal) { throw refusal }
  */
-export const vaultPropsRefusalOf = (standing: unknown, expected: VaultRecordExpectation): VaultError | null => (
-  vaultPropsMeets(standing, expected) ? null : Refusals.staleVaultProps(liveRecordOf(standing))
+export const vaultRecordRefusalOf = (standing: unknown, expected: VaultRecordExpectation): VaultError | null => (
+  vaultRecordMeets(standing, expected) ? null : Refusals.staleVaultRecord(liveRecordOf(standing))
 )
 
 /** True when the vault record standing is `expected`'s vault, at any epoch: what a box read, a box deletion, and a box write's vault half, compare.
@@ -75,9 +75,9 @@ const epochOf = (standing: unknown): number => {
 /** The vault record an update stores over `standing`, which it has met: `vaultRecord`, its gate with it, with `vault_epoch` the standing one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2).
  *
- * @example Expectations.vaultPropsPutOf(next, standing)   // next, its vault_epoch standing.vault_epoch + 1
+ * @example Expectations.vaultRecordPutOf(next, standing)   // next, its vault_epoch standing.vault_epoch + 1
  */
-export const vaultPropsPutOf = (vaultRecord: VaultRecord, standing: unknown): VaultRecord => (
+export const vaultRecordPutOf = (vaultRecord: VaultRecord, standing: unknown): VaultRecord => (
   { ...vaultRecord, vault_epoch: epochOf(standing) + 1 }
 )
 

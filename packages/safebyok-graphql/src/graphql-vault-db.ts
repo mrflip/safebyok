@@ -78,9 +78,9 @@ const isUrqlClient = (client: unknown): client is GraphqlVaultClient => {
 // user its own auth signed in.
 const ScopeVariables = '$applabel: String!, $user_id: String!, $vaultlabel: String!'
 const ScopeArgs = 'applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel'
-const VaultPropsSelection = selectionOf(VaultRecordFields)
+const VaultRecordSelection = selectionOf(VaultRecordFields)
 
-const VaultSelection = `vaultProps { ${VaultPropsSelection} } boxes { ${selectionOf(ListedBoxFields)} }`
+const VaultSelection = `vaultProps { ${VaultRecordSelection} } boxes { ${selectionOf(ListedBoxFields)} }`
 
 const GetVaultDoc = `query SafebyokGetVault(${ScopeVariables}) {
   safebyokGetVault(${ScopeArgs}) { ${VaultSelection} }
@@ -94,8 +94,8 @@ const GetBoxDoc = `query SafebyokGetBox(${ScopeVariables}, $boxlabel: String!, $
 const GetCapacityDoc = `query SafebyokGetCapacity(${ScopeVariables}) {
   safebyokGetCapacity(${ScopeArgs}) { boxes { used max } bytes { used max } }
 }`
-const PutVaultPropsDoc = `mutation SafebyokPutVaultProps($vaultProps: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
-  safebyokPutVaultProps(vaultProps: $vaultProps, expected: $expected) { landed refusalkind message vault_props_stored }
+const PutVaultRecordDoc = `mutation SafebyokPutVaultRecord($vaultProps: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
+  safebyokPutVaultRecord(vaultProps: $vaultProps, expected: $expected) { landed refusalkind message vault_stored }
 }`
 const PutBoxDoc = `mutation SafebyokPutBox(${ScopeVariables}, $box: SafebyokBoxInput!, $expected: SafebyokBoxExpectationInput!) {
   safebyokPutBox(${ScopeArgs}, box: $box, expected: $expected) { landed refusalkind message box_stored capacity { boxes { used max } bytes { used max } } }
@@ -122,7 +122,7 @@ export const VaultOperations = {
   safebyokEnsureVault:      EnsureVaultDoc,
   safebyokGetBox:           GetBoxDoc,
   safebyokGetCapacity:      GetCapacityDoc,
-  safebyokPutVaultProps:    PutVaultPropsDoc,
+  safebyokPutVaultRecord:    PutVaultRecordDoc,
   safebyokPutBox:           PutBoxDoc,
   safebyokDelBox:           DelBoxDoc,
   safebyokDelVault:         DelVaultDoc,
@@ -165,14 +165,14 @@ class UrqlVaultDB extends VaultDB {
   // A write that lands answers with the vault record as the server's storage holds it; a stale
   // one answers in the body, not landed, with what stands, which the base class checks: it is
   // refused here as the VaultError the server's VaultDB made of it.
-  protected async doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     checkInts('vault record', vaultRecord)
     checkInts('vault record expectation', expected)
     const { vault_tok, gate_epoch } = expected
-    const { safebyokPutVaultProps } = await this.told(PutVaultPropsDoc, { vaultProps: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
-    const answer = safebyokPutVaultProps as WriteAnswer
-    if (answer.landed) { return recordOf(answer.vault_props_stored, VaultRecordFields) }
-    throw refusalOfAnswer(answer, 'vault_props_stored')
+    const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultProps: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
+    const answer = safebyokPutVaultRecord as WriteAnswer
+    if (answer.landed) { return recordOf(answer.vault_stored, VaultRecordFields) }
+    throw refusalOfAnswer(answer, 'vault_stored')
   }
 
   // A read whose vault record is not the one expected refuses on the server, in the step that
@@ -317,13 +317,13 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-/** What a box write or an update of the vault record answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_props_stored` or `capacity`). */
+/** What a box write or an update of the vault record answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_stored` or `capacity`). */
 type WriteAnswer = {
   landed:              boolean
   refusalkind?:        unknown
   message?:            unknown
   box_stored?:         unknown
-  vault_props_stored?: unknown
+  vault_stored?: unknown
   capacity?:           unknown
 }
 
@@ -332,7 +332,7 @@ type WriteAnswer = {
  * checks a record, and a `vault_full`'s as `getCapacity` checks its answer. An answer that says
  * neither a kind nor a message is the server's bug, `corrupt_record`.
  */
-const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_props_stored'): VaultError => {
+const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_stored'): VaultError => {
   const { refusalkind, message, capacity } = answer
   if (typeof message !== 'string' || ! isKind(refusalkind)) {
     return new VaultError('corrupt_record', "The GraphQL server refused a write without saying why: is it serving safebyok-graphql of the same version as this app's client? Serve VaultSchemaSdl and vaultResolvers from it.")

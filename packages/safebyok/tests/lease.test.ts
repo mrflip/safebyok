@@ -58,7 +58,7 @@ const standIn = async () => await TH.leasedSliceOf('u1', await makeVaultKey())
 const bytesOf = (text: string) => new TextEncoder().encode(text)
 
 describe("sealLeaseRecord", () => {
-  it("makes a record whose scope is its vault's, its vault_tok and gate_epoch the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
+  it("makes a record whose scope is its vault's, its vault_tok and gate_epoch the vault record', and its deadline leaseMillis from now, as its example shows", async () => {
     const { record } = await sealedRecord()
     expect(record).to.deep.include({ format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline })
     expect(record.vault_key_lease_wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
@@ -95,9 +95,9 @@ describe("sealLeaseRecord", () => {
   })
 
   for (const [badStanding, blurb] of [
-    [{ ...standing, vault_tok: '' },             'vault props with an empty vault_tok'],
-    [{ ...standing, gate_epoch: 0 },             'vault props at gate_epoch 0'],
-    [TH.omitting(standing, 'gate_epoch'),        'vault props with no gate_epoch'],
+    [{ ...standing, vault_tok: '' },             'vault record with an empty vault_tok'],
+    [{ ...standing, gate_epoch: 0 },             'vault record at gate_epoch 0'],
+    [TH.omitting(standing, 'gate_epoch'),        'vault record with no gate_epoch'],
     [TH.omitting(standing, 'registered_at'),     'a vault record with no registered_at, whose stamp the wrap could not bind'],
   ] as const) {
     it(`refuses 'bad_record', as misuse, at ${blurb}: no lease record could hold them`, async () => {

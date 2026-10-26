@@ -122,7 +122,7 @@ export type VaultSnapshot = Readonly<{
 }>
 // --
 
-/** The ways in of a vault record's gate, as the vault holds them: the passphrase's, and the passkey's or null. */
+/** The ways in of a vault record's gate, as the vault holds it: the passphrase's, and the passkey's or null. */
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
 /** One user's vault of boxes, one life of it in storage, for as long as the bank holds it: every read and write of a whisper goes through here.
@@ -508,7 +508,7 @@ export class Vault {
    * replacing any; the snapshot's `passkey` says which, so the host can warn the user first. Only
    * the passphrase proves a change to the ways in, never a passkey. Boxes are untouched, so the
    * call costs the same however many there are. The gating's attempt writes with
-   * `VaultDB.putVaultProps`.
+   * `VaultDB.putVaultRecord`.
    *
    * A gating of the same kind standing is joined; one of another kind is waited out first. Once it
    * resolves, the change is in storage. The gate epoch moves, so every other device locks, and asks
@@ -916,7 +916,7 @@ export class Vault {
   }
   // The ways in of each gate the vault has held, made once per gate. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
-  // and the vault record they are bound to, never change under it.
+  // and the vault record it are bound to, never change under it.
   readonly #modelled = new WeakMap<GateRecord, HeldWayins>()
   #wayinsOf(standing: VaultRecord & { gate: GateRecord }): HeldWayins {
     const { gate } = standing
@@ -1003,7 +1003,7 @@ export class Vault {
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
   }
 
-  /** Fetch the vault record, listing and this device's lease, judge them against the picture in hand, and raise this device's record to what was taken.
+  /** Fetch the vault record, listing and this device's lease, judge it against the picture in hand, and raise this device's record to what was taken.
    * The device record is read first, so a raise this device's own write made is never held against a
    * read served before that write landed. The judgment is synchronous ({@link Vault.#judgeRead}).
    */
@@ -1317,7 +1317,7 @@ export class Vault {
 
   // == [Ways in]: putGate, gateWriteRefusal, takeOwnWrite
 
-  /** Store `gate` over its base, the gate in hand, with `VaultDB.putVaultProps` expecting its `vault_tok` and base epoch, resolving the gate as stored.
+  /** Store `gate` over its base, the gate in hand, with `VaultDB.putVaultRecord` expecting its `vault_tok` and base epoch, resolving the gate as stored.
    * It demands on the gate before and after the write. The picture takes what was stored, unless
    * a read has already taken a later copy, and the device record is raised to its `vault_epoch`.
    * A first gate losing to another device's refuses 'gate_made_elsewhere', and the next hello reads
@@ -1329,7 +1329,7 @@ export class Vault {
     const held = this.#vaultRecord
     // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
     const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
-    const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
+    const written = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
     // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
     this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
@@ -1351,7 +1351,7 @@ export class Vault {
    * stored vault record passes as it came.
    */
   #gateWriteRefusal(gate: Gate, err: VaultError): VaultError {
-    const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
+    const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_stored : undefined
     if (winner === undefined) { return err }
     if (winner?.vault_tok !== gate.vault_tok) {
       const told = winner === null ? goneError() : remadeError()

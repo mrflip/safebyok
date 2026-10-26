@@ -5,47 +5,47 @@ import * as TH from './test-helpers'
 const VaultRecord = TH.vaultRecordOf('u1')
 const Box = TH.boxOf('anthropic', 'one')
 
-const VaultPropsCases = [
+const VaultRecordCases = [
   // regular usage:
-  [VaultRecord,                                    { vault_tok: "vault-tok-u1", gate_epoch: 1 },  true,   'the vault props proven against'],
-  [VaultRecord,                                    { vault_tok: "vault-tok-u1", gate_epoch: 2 },  false,  'an epoch the vault props have not reached'],
+  [VaultRecord,                                    { vault_tok: "vault-tok-u1", gate_epoch: 1 },  true,   'the vault record proven against'],
+  [VaultRecord,                                    { vault_tok: "vault-tok-u1", gate_epoch: 2 },  false,  'an epoch the vault record has not reached'],
   [TH.vaultRecordOf('u1', { gate_epoch: 2 }),      { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'an epoch since moved on'],
   [TH.vaultRecordOf('u1', { vault_tok: 'reborn' }), { vault_tok: "vault-tok-u1", gate_epoch: 1 }, false,  'a vault made anew'],
   // nothing, or damage, standing:
-  [undefined,                                     { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'no vault props at all'],
+  [undefined,                                     { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'no vault record at all'],
   [null,                                          { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a null row, as a string store reads none'],
   [{ vault_tok: "vault-tok-u1" },                 { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a row that shows no epoch'],
   [{ vault_tok: "vault-tok-u1", gate_epoch: "1" },    { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'an epoch stored as text'],
   ["vault-tok-u1",                                { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a row that is no object'],
 ] as const
 
-describe("Expectations.vaultPropsMeets", () => {
-  for (const [standing, expected, landed, blurb] of VaultPropsCases) {
-    it(blurb, () => { expect(Expectations.vaultPropsMeets(standing, expected)).to.eq(landed) })
+describe("Expectations.vaultRecordMeets", () => {
+  for (const [standing, expected, landed, blurb] of VaultRecordCases) {
+    it(blurb, () => { expect(Expectations.vaultRecordMeets(standing, expected)).to.eq(landed) })
   }
 })
 
-describe("Expectations.vaultPropsRefusalOf", () => {
-  it("lets an update land over the vault props it expects, as its example asks before writing", () => {
-    expect(Expectations.vaultPropsRefusalOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.null
-    expect(Expectations.vaultPropsRefusalOf(TH.gatelessOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })).to.be.null
+describe("Expectations.vaultRecordRefusalOf", () => {
+  it("lets an update land over the vault record it expects, as its example asks before writing", () => {
+    expect(Expectations.vaultRecordRefusalOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.null
+    expect(Expectations.vaultRecordRefusalOf(TH.gatelessOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })).to.be.null
   })
 
-  it("refuses as stale_write, carrying what stands, vault props at another epoch or of another vault, or none", () => {
+  it("refuses as stale_write, carrying what stands, vault record at another epoch or of another vault, or none", () => {
     const Misses = [TH.vaultRecordOf('u1', { gate_epoch: 2 }), TH.vaultRecordOf('u1', { vault_tok: 'vault-tok-new' }), { gate_epoch: 'garbled' }]
     for (const standing of Misses) {
-      const refusal = Expectations.vaultPropsRefusalOf(standing, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+      const refusal = Expectations.vaultRecordRefusalOf(standing, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
       expect(refusal?.refusalkind).to.eq('stale_write')
-      expect(refusal?.meta).to.deep.equal({ vault_props_stored: standing })
+      expect(refusal?.meta).to.deep.equal({ vault_stored: standing })
     }
     for (const none of [null, undefined]) {
-      expect(Expectations.vaultPropsRefusalOf(none, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_props_stored: null })
+      expect(Expectations.vaultRecordRefusalOf(none, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_stored: null })
     }
   })
 })
 
 describe("Expectations.vaultMeets", () => {
-  it("holds for the vault props at any epoch, and for nothing else", () => {
+  it("holds for the vault record at any epoch, and for nothing else", () => {
     expect(Expectations.vaultMeets(VaultRecord, { vault_tok: 'vault-tok-u1' })).to.be.true
     expect(Expectations.vaultMeets(TH.vaultRecordOf('u1', { gate_epoch: 9 }), { vault_tok: 'vault-tok-u1' })).to.be.true
     expect(Expectations.vaultMeets(VaultRecord, { vault_tok: 'reborn' })).to.be.false
@@ -53,7 +53,7 @@ describe("Expectations.vaultMeets", () => {
     expect(Expectations.vaultMeets(null, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
 
-  it("fails vault props too damaged to show an epoch, though they show the vault_tok", () => {
+  it("fails vault record too damaged to show an epoch, though it show the vault_tok", () => {
     expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
     expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1', gate_epoch: '1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
@@ -63,7 +63,7 @@ const VaultTombstone = { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), v
 const scope = TH.scopeOf('u1')
 
 describe("Expectations.isTombstone", () => {
-  it("holds for a row of the tombstone's format, however damaged the rest of it, and for no vault props", () => {
+  it("holds for a row of the tombstone's format, however damaged the rest of it, and for no vault record", () => {
     expect(Expectations.isTombstone(VaultTombstone)).to.be.true
     expect(Expectations.isTombstone({ format: 'safebyok-tombstone-v1' })).to.be.true
     expect(Expectations.isTombstone(VaultRecord)).to.be.false
@@ -74,24 +74,24 @@ describe("Expectations.isTombstone", () => {
 
 describe("Expectations, over a tombstone", () => {
   it("fails every comparison a write makes: it holds no vault_tok, so a stale writer never finds the vault standing", () => {
-    expect(Expectations.vaultPropsMeets(VaultTombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.false
+    expect(Expectations.vaultRecordMeets(VaultTombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.false
     expect(Expectations.vaultMeets(VaultTombstone, { vault_tok: 'vault-tok-u1' })).to.be.false
     expect(Expectations.boxRefusalOf(VaultTombstone, undefined, { vault_tok: 'vault-tok-u1', revision_tok: null })?.refusalkind).to.eq('vault_mismatch')
   })
 
-  it("is no vault props to a refused update, which names none standing", () => {
-    expect(Expectations.vaultPropsRefusalOf(VaultTombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_props_stored: null })
+  it("is no vault record to a refused update, which names none standing", () => {
+    expect(Expectations.vaultRecordRefusalOf(VaultTombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_stored: null })
   })
 })
 
-describe("Expectations.vaultPropsPutOf", () => {
-  it("stores the vault props with the counter the standing ones show plus one, whatever the writer sent, as its example shows", () => {
+describe("Expectations.vaultRecordPutOf", () => {
+  it("stores the vault record with the counter the standing ones show plus one, whatever the writer sent, as its example shows", () => {
     const next = TH.vaultRecordOf('u1', { gate_epoch: 2, vault_epoch: 99 })
-    expect(Expectations.vaultPropsPutOf(next, TH.vaultRecordOf('u1', { vault_epoch: 4 }))).to.deep.equal({ ...next, vault_epoch: 5 })
+    expect(Expectations.vaultRecordPutOf(next, TH.vaultRecordOf('u1', { vault_epoch: 4 }))).to.deep.equal({ ...next, vault_epoch: 5 })
   })
 
-  it("counts from zero over vault props that show no counter, damaged ones", () => {
-    expect(Expectations.vaultPropsPutOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', vault_epoch: 'x' }).vault_epoch).to.eq(1)
+  it("counts from zero over a vault record that shows no counter, a damaged one", () => {
+    expect(Expectations.vaultRecordPutOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', vault_epoch: 'x' }).vault_epoch).to.eq(1)
   })
 })
 
@@ -110,7 +110,7 @@ describe("Expectations.newLifeOf", () => {
   it("is nothing where a vault stands, gated or not, damaged or not: it stores nothing", () => {
     expect(Expectations.newLifeOf(draft, VaultRecord)).to.be.null
     expect(Expectations.newLifeOf(draft, TH.gatelessOf('u1'))).to.be.null
-    expect(Expectations.newLifeOf(draft, 'not vault props')).to.be.null
+    expect(Expectations.newLifeOf(draft, 'not vault record')).to.be.null
   })
 })
 
@@ -131,7 +131,7 @@ describe("Expectations.tombstoneOf", () => {
     expect(Expectations.tombstoneOf({ gate_epoch: 1 }, scope, gate1)).to.be.null
   })
 
-  it("expects the vault_tok alone for a null gate_epoch, however damaged the rest of the vault props, and counts from zero", () => {
+  it("expects the vault_tok alone for a null gate_epoch, however damaged the rest of the vault record, and counts from zero", () => {
     const damaged = { vault_tok: 'vault-tok-u1', gate_epoch: 'one', vault_epoch: 'x' }
     expect(Expectations.tombstoneOf(damaged, scope, { vault_tok: 'vault-tok-u1', gate_epoch: null })).to.deep.equal({ ...VaultTombstone, vault_epoch: 1 })
     expect(Expectations.tombstoneOf(damaged, scope, { vault_tok: 'reborn', gate_epoch: null })).to.be.null
@@ -150,8 +150,8 @@ const BoxCases = [
   [VaultRecord, Box,                           "rev-two",  "stale_write",    'a write over a revision never read'],
   [VaultRecord, Box,                           null,       "stale_write",    'a first write where a box now stands'],
   [VaultRecord, undefined,                     "rev-one",  "stale_write",    'a write over a box since deleted'],
-  // the vault props half:
-  [undefined,  undefined,                     null,       "vault_mismatch", 'a write into a scope with no vault props'],
+  // the vault record half:
+  [undefined,  undefined,                     null,       "vault_mismatch", 'a write into a scope with no vault record'],
   [TH.vaultRecordOf('u1', { vault_tok: 'reborn' }), Box, "rev-one", "vault_mismatch", 'a write sealed for a vault since made anew'],
   // nothing, or damage, standing:
   [{ vault_tok: "vault-tok-u1" },  undefined, null,       "vault_mismatch", 'a vault row that shows no epoch'],
@@ -161,9 +161,9 @@ const BoxCases = [
 ] as const
 
 describe("Expectations.boxRefusalOf", () => {
-  for (const [standingVaultProps, standingBox, revisionTok, refusalkind, blurb] of BoxCases) {
+  for (const [standingVaultRecord, standingBox, revisionTok, refusalkind, blurb] of BoxCases) {
     it(`${refusalkind ?? 'lands'}: ${blurb}`, () => {
-      const refusal = Expectations.boxRefusalOf(standingVaultProps, standingBox, { vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
+      const refusal = Expectations.boxRefusalOf(standingVaultRecord, standingBox, { vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
       expect(refusal?.refusalkind ?? null).to.eq(refusalkind)
     })
   }
@@ -178,7 +178,7 @@ describe("Expectations.boxRefusalOf", () => {
     expect(refusal?.meta).to.deep.equal({ box_stored: null })
   })
 
-  it("refuses a vault mismatch carrying nothing of the vault props standing", () => {
+  it("refuses a vault mismatch carrying nothing of the vault record standing", () => {
     const refusal = Expectations.boxRefusalOf(TH.vaultRecordOf('u1', { vault_tok: 'reborn' }), Box, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-one' })
     expect(refusal).to.not.have.property('meta')
     expect(TH.thrownText(refusal)).to.not.include('reborn')

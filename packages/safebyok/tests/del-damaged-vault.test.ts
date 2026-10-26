@@ -8,16 +8,16 @@ import { Bank } from '../src/bank'
 import { isVaultError } from '../src/errors'
 import * as Scopepath from '../src/scopepath'
 import * as TH from './test-helpers'
-import { damagedVaultWorld, rowsOf, makeWorld, u1VaultScopepath, isU1Box, storedVaultPropsOf, MisfitStores, VaultDBVerbsUsed } from './vault/world'
+import { damagedVaultWorld, rowsOf, makeWorld, u1VaultScopepath, isU1Box, storedVaultRecordOf, MisfitStores, VaultDBVerbsUsed } from './vault/world'
 
 
 describe("delDamagedVault", () => {
-  it("clears a vault whose birth refuses it as damaged_vault -- its vault props, its boxes and this device's lease -- so a new one can be born", async () => {
+  it("clears a vault whose birth refuses it as damaged_vault -- its vault record, its boxes and this device's lease -- so a new one can be born", async () => {
     const world = await damagedVaultWorld()
     expect(await world.getLease()).to.not.be.null
     await TH.expectRefusal(world.open(), 'damaged_vault')
     await delDamagedVault(world.optsWith())
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultScopepath])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
     expect(fresh.getSnapshot().state).to.eq('novel')
@@ -33,7 +33,7 @@ describe("delDamagedVault", () => {
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/writing its record of this vault/)
     expect(err.cause).to.eq(trouble)
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultScopepath])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
   })
 
   it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
@@ -59,7 +59,7 @@ describe("delDamagedVault", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("refuses vault props too damaged to name their vault, removing nothing, the lease included", async () => {
+  it("refuses a vault record too damaged to name its vault, removing nothing, the lease included", async () => {
     const world = await damagedVaultWorld()
     world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v1"}')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'damaged_vault')
@@ -71,7 +71,7 @@ describe("delDamagedVault", () => {
 
   it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing deleted, the lease kept", async () => {
     const world = await damagedVaultWorld()
-    const newer = JSON.stringify({ ...storedVaultPropsOf(world), format: 'safebyok-vault-v7' })
+    const newer = JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v7' })
     world.dbStore.write(u1VaultScopepath, newer)
     const atOpen = await TH.expectRefusal(world.open(), 'newer_format')
     expect(atOpen.message).to.include('update the app')
@@ -94,7 +94,7 @@ describe("delDamagedVault", () => {
     }
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')
     expect((err.cause as Error).message).to.include('busy')
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultScopepath])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.not.be.null
     await delDamagedVault(world.optsWith({ deviceDB: flakyDevice }))
     expect(await world.getLease()).to.be.null
@@ -102,7 +102,7 @@ describe("delDamagedVault", () => {
 
   it("lets a vault made anew since survive: stale_write, the new vault and its unlock untouched", async () => {
     const world = await damagedVaultWorld()
-    // Storage answers the first look at the vault props with the damaged vault, and every later one with another.
+    // Storage answers the first look at the vault record with the damaged vault, and every later one with another.
     let looks = 0
     const replacing = localVaultDB({
       store: {
@@ -110,7 +110,7 @@ describe("delDamagedVault", () => {
         read: (ckey) => {
           if (ckey !== u1VaultScopepath) { return world.dbStore.read(ckey) }
           looks += 1
-          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultPropsOf(world), vault_tok: 'made-anew' })
+          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultRecordOf(world), vault_tok: 'made-anew' })
         },
       },
     })
@@ -127,7 +127,7 @@ describe("delDamagedVault", () => {
     expect(verb).not.toHaveBeenCalled()
     await delDamagedVault(world.optsWith())
     expect(verb.mock.calls[0]).to.deep.equal([TH.scopeOf('u1')])
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultScopepath])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
   })
 
   it("takes the options Bank.make took beside the vault's names, and refuses misuse before touching storage", async () => {

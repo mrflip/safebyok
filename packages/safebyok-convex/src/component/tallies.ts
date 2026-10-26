@@ -29,7 +29,7 @@ export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
 /** The most one vault's boxes weigh together, in bytes as Convex counts a document: 7 MiB less 1 KiB.
  * That is half of what a transaction may read, as a delete reads every row twice, less a whole
- * document for the vault props and room for the tally.
+ * document for the vault record and room for the tally.
  */
 export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
 

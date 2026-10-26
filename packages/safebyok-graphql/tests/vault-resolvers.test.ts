@@ -36,7 +36,7 @@ const fakeServed = (answer: () => Promise<unknown>) => {
   const served: ServedVaultDB = {
     getVaultRecords:    answer as ServedVaultDB['getVaultRecords'],
     ensureVaultRecords: answer as ServedVaultDB['ensureVaultRecords'],
-    putVaultProps:    answer as ServedVaultDB['putVaultProps'],
+    putVaultRecord:    answer as ServedVaultDB['putVaultRecord'],
     getBox:           answer as ServedVaultDB['getBox'],
     putBox:           answer as ServedVaultDB['putBox'],
     getCapacity:      answer as ServedVaultDB['getCapacity'],
@@ -147,7 +147,7 @@ const extensionsLogged = (result: ExecutionResult): string => JSON.stringify((re
 describe("vaultResolvers, a write's answer in the body", () => {
   const winner = TH.vaultRecordOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 2 })
 
-  /** u1's vault on `db` with vault props that a write expecting gate_epoch 1 finds stale. */
+  /** u1's vault on `db` with a vault record that a write expecting gate_epoch 1 finds stale. */
   const staleOver = async (maxBoxes?: number) => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id, ...(maxBoxes !== undefined && { maxBoxes }) }))
@@ -155,19 +155,19 @@ describe("vaultResolvers, a write's answer in the body", () => {
     return schema
   }
 
-  it("answers a stale update of the vault props landed false, with the winning props whole, and no error to log", async () => {
+  it("answers a stale update of the vault record landed false, with the winning record whole, and no error to log", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
     expect(result.errors).to.be.undefined
-    expect(result.data).to.deep.equal({ safebyokPutVaultProps: {
-      landed: false, refusalkind: 'stale_write', message: Refusals.StaleVaultPropsMessage, vault_props_stored: winner,
+    expect(result.data).to.deep.equal({ safebyokPutVaultRecord: {
+      landed: false, refusalkind: 'stale_write', message: Refusals.StaleVaultRecordMessage, vault_stored: winner,
     } })
   })
 
-  it("answers an update of the vault props that landed landed true, naming no refusal and carrying the vault props as stored, their vault_epoch moved", async () => {
+  it("answers an update of the vault record that landed landed true, naming no refusal and carrying the vault record as stored, its vault_epoch moved", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
-    expect(result).to.deep.equal({ data: { safebyokPutVaultProps: { landed: true, refusalkind: null, message: null, vault_props_stored: TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 2 }) } } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
+    expect(result).to.deep.equal({ data: { safebyokPutVaultRecord: { landed: true, refusalkind: null, message: null, vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 2 }) } } })
   })
 
   it("answers a stale box write landed false, with the winning box whole, and no error to log", async () => {
@@ -203,7 +203,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
 
   it("crosses a stale_write from a verb that answers in no body as its kind alone, whatever meta a VaultDB hangs on it", async () => {
     const standing = TH.vaultRecordOf('u1')
-    const stale = new VaultError('stale_write', 'The vault changed.', { meta: { vault_props_stored: standing, box_stored: TH.boxOf('openai', 'r1') } })
+    const stale = new VaultError('stale_write', 'The vault changed.', { meta: { vault_stored: standing, box_stored: TH.boxOf('openai', 'r1') } })
     const { served } = fakeServed(() => Promise.resolve({ ok: false, err: stale }))
     const schema = TH.schemaOver(await TH.database(), () => served)
     const results = [
@@ -232,7 +232,7 @@ const OnU2Vault: [string, string, Record<string, unknown>][] = (() => {
   return [
     ['safebyokGetVault',      VaultOperations.safebyokGetVault,      { ...scope }],
     ['safebyokEnsureVault',   VaultOperations.safebyokEnsureVault,   { draft: TH.gatelessOf('u2', { vault_tok: 'vault-tok-late' }) }],
-    ['safebyokPutVaultProps', VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
+    ['safebyokPutVaultRecord', VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
     ['safebyokGetBox',        VaultOperations.safebyokGetBox,        { ...scope, boxlabel: 'openai', expected: { vault_tok } }],
     ['safebyokPutBox',        VaultOperations.safebyokPutBox,        { ...scope, box: TH.boxOf('openai', 'r2'), expected: { vault_tok, revision_tok: 'rev-r1' } }],
     ['safebyokGetCapacity',   VaultOperations.safebyokGetCapacity,   { ...scope }],

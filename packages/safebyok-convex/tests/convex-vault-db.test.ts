@@ -271,7 +271,7 @@ describe("a record the deployment refused", () => {
   const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
   const standing = TH.vaultRecordOf(subject, { ...scope, gate_epoch: 52_871, gate: quotableWayins })
-  const nextVaultProps = { ...standing, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
+  const nextVaultRecord = { ...standing, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
   const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
@@ -282,13 +282,13 @@ describe("a record the deployment refused", () => {
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
   const rivalWayin = { device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) }
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
-  const rivalVaultProps = TH.vaultRecordOf('user_rival', { ...rivalScope, gate_epoch: 7, gate: rivalWayins })
+  const rivalVaultRecord = TH.vaultRecordOf('user_rival', { ...rivalScope, gate_epoch: 7, gate: rivalWayins })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, gate: { ...rivalWayins, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } } }, rivalBox] }))
+  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultRecord, { ...rivalVaultRecord, gate_epoch: 8, gate: { ...rivalWayins, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } } }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ ...scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
-    ['putVaultProps', nextVaultProps, (vaultDB) => vaultDB.putVaultProps(nextVaultProps, { vault_tok: standing.vault_tok, gate_epoch: 52_871 })],
+    ['putVaultRecord', nextVaultRecord, (vaultDB) => vaultDB.putVaultRecord(nextVaultRecord, { vault_tok: standing.vault_tok, gate_epoch: 52_871 })],
     ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_tok: standing.vault_tok, revision_tok: null }, box)],
   ]
 

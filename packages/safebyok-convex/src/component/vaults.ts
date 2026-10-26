@@ -5,7 +5,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
+  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
@@ -23,17 +23,17 @@ import {
 
 // ------------------------------------------------------------------------------- the vault
 
-/** The vault props and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
+/** The vault record and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
 export const getVault = query({
   args:    { ...VaultScope.fields },
   returns: v.nullable(VaultAnswer),
   handler: async (ctx, scope) => {
-    const row = await findVaultPropsRow(ctx.db, scope)
-    return row && { vaultProps: vaultPropsOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    const row = await findVaultRecordRow(ctx.db, scope)
+    return row && { vaultProps: vaultRecordOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
-/** Store `draft` only if its scope holds no vault props, and return whichever vault props stand there afterwards, with every box, from one transaction.
+/** Store `draft` only if its scope holds no vault record, and return whichever vault record stands there afterwards, with every box, from one transaction.
  * Over a tombstone the new vault's `vault_epoch` is the tombstone's, and the tombstone goes: a new life, the counter carried on.
  */
 export const ensureVault = mutation({
@@ -41,48 +41,48 @@ export const ensureVault = mutation({
   returns: VaultAnswer,
   handler: async (ctx, { draft }) => {
     const scope = scopeOf(draft)
-    const standing = await findVaultPropsRow(ctx.db, scope)
+    const standing = await findVaultRecordRow(ctx.db, scope)
     const created = standing ? null : { ...draft, vault_epoch: await carriedEpoch(ctx.db, scope) }
     if (created) { await ctx.db.insert('safebyok_vaults', created) }
-    return { vaultProps: standing ? vaultPropsOfRow(standing) : created!, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    return { vaultProps: standing ? vaultRecordOfRow(standing) : created!, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
-// ------------------------------------------------------------------------------- the vault props
+// ------------------------------------------------------------------------------- the vault record
 
-/** Replace the vault props, only while those standing have `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link PutVaultPropsAnswer}.
+/** Replace the vault record, only while the one standing has `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link PutVaultRecordAnswer}.
  * What lands is `vaultProps` with its `vault_epoch` the standing one plus one, whatever it carries.
- * It also misses, writing nothing, for vault props that name another vault or do not move
- * `gate_epoch` forward. A miss names the vault props standing, or null for none.
+ * It also misses, writing nothing, for a vault record that names another vault or does not move
+ * `gate_epoch` forward. A miss names the vault record standing, or null for none.
  */
-export const putVaultProps = mutation({
+export const putVaultRecord = mutation({
   args:    { vaultProps: VaultRecord, expected: VaultRecordExpectation },
-  returns: PutVaultPropsAnswer,
-  handler: async (ctx, { vaultProps, expected }): Promise<Infer<typeof PutVaultPropsAnswer>> => {
-    const standing = await findVaultPropsRow(ctx.db, scopeOf(vaultProps))
+  returns: PutVaultRecordAnswer,
+  handler: async (ctx, { vaultProps, expected }): Promise<Infer<typeof PutVaultRecordAnswer>> => {
+    const standing = await findVaultRecordRow(ctx.db, scopeOf(vaultProps))
     const meetsExpectation = standing !== null
       && standing.vault_tok === expected.vault_tok
       && standing.gate_epoch === expected.gate_epoch
     const movesForward = standing !== null
       && vaultProps.vault_tok === standing.vault_tok
       && vaultProps.gate_epoch > standing.gate_epoch
-    if (! (meetsExpectation && movesForward)) { return { landed: false, vault_props_stored: standing && vaultPropsOfRow(standing) } }
+    if (! (meetsExpectation && movesForward)) { return { landed: false, vault_stored: standing && vaultRecordOfRow(standing) } }
     const stored = { ...vaultProps, vault_epoch: standing.vault_epoch + 1 }
     await ctx.db.replace('safebyok_vaults', standing._id, stored)
-    return { landed: true, vault_props_stored: stored }
+    return { landed: true, vault_stored: stored }
   },
 })
 
 // ----------------------------------------------------------------------------- the boxes
 
 /** Read the box under `boxlabel` as `VaultDB`'s `doGetBox` does, resolving a {@link GetBoxAnswer} where that throws.
- * The vault props and the box are read from one query's snapshot.
+ * The vault record and the box are read from one query's snapshot.
  */
 export const getBox = query({
   args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
   returns: GetBoxAnswer,
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) {
       return { read: false, refusalkind: 'vault_mismatch' }
     }
@@ -101,7 +101,7 @@ export const putBox = mutation({
   args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
   returns: PutBoxAnswer,
   handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof PutBoxAnswer>> => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) {
       return { landed: false, refusalkind: 'vault_mismatch' }
     }
@@ -140,7 +140,7 @@ export const getCapacity = query({
   args:    { ...VaultScope.fields },
   returns: Capacity,
   handler: async (ctx, scope) => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     if (vaultProps === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
     const { tally } = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
     return Tallies.capacityOf(tally)
@@ -152,7 +152,7 @@ export const delBox = mutation({
   args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
   returns: v.nullable(BoxDeletion),
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof BoxDeletion> | null> => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
     if (! standing) { return { outcome: 'absent' } }
@@ -166,15 +166,15 @@ export const delBox = mutation({
 
 // --------------------------------------------------------------------------------- the vault
 
-/** Remove the vault props, every box and the tally in one transaction, only while the vault props have `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone, which it resolves.
+/** Remove the vault record, every box and the tally in one transaction, only while the vault record has `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone, which it resolves.
  * The tombstone takes the vault's place in the scope, its `vault_epoch` the vault's plus one.
- * Null when the vault props do not meet the expectation, or none stand.
+ * Null when the vault record do not meet the expectation, or none stand.
  */
 export const delVault = mutation({
   args:    { ...VaultScope.fields, expected: VaultDelExpectation },
   returns: v.nullable(VaultTombstone),
   handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof VaultTombstone> | null> => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
     if (expected.gate_epoch !== null && vaultProps.gate_epoch !== expected.gate_epoch) { return null }
     const boxes = await vaultBoxRows(ctx.db, scope)
@@ -195,7 +195,7 @@ export const watchVault = query({
   args:    { ...VaultScope.fields },
   returns: VaultSignature,
   handler: async (ctx, scope) => {
-    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    const vaultProps = await findVaultRecordRow(ctx.db, scope)
     const boxes = await vaultBoxRows(ctx.db, scope)
     return {
       vault_tok:  vaultProps?.vault_tok ?? null,
@@ -211,12 +211,12 @@ type VaultScope = Infer<typeof VaultScope>
 type VaultRecord = Infer<typeof VaultRecord>
 type BoxRecord = Infer<typeof BoxRecord>
 
-/** The scope vault props name: their three names picked out, and nothing else. */
+/** The scope vault record names: its three names picked out, and nothing else. */
 const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
 
 // `.unique()` throws on a second row: find-or-insert never makes one, so two would be damage,
 // and damage surfaces rather than being papered over.
-const findVaultPropsRow = (db: DatabaseReader, scope: VaultScope) => (
+const findVaultRecordRow = (db: DatabaseReader, scope: VaultScope) => (
   db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel))
     .unique()
@@ -253,8 +253,8 @@ const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_boxes'>, ro
   return rowId
 }
 
-/** A vault row as the vault props it holds: Convex's system fields stripped. */
-const vaultPropsOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_vaults'>): VaultRecord => vaultProps
+/** A vault row as the vault record it holds: Convex's system fields stripped. */
+const vaultRecordOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_vaults'>): VaultRecord => vaultProps
 
 /** A box row as the record it holds: system fields and scope columns stripped. */
 const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {

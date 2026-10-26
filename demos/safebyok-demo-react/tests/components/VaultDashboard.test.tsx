@@ -118,7 +118,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
     confirming.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])
+    expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
   })
 
   it("says why deleting it failed, and keeps offering it", async () => {

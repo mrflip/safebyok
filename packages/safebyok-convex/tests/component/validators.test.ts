@@ -147,15 +147,15 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
   }
 }
 
-const { vault_tok: _vaultTok, ...vaultPropsWithoutVaultTok } = TH.vaultRecordOf('u1')
+const { vault_tok: _vaultTok, ...vaultRecordWithoutVaultTok } = TH.vaultRecordOf('u1')
 const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultRecordOf('u1')
-const { gate: _gate, ...vaultPropsWithoutWayins } = TH.vaultRecordOf('u1')
+const { registered_at: _vaultPropsTime, ...vaultRecordWithoutTime } = TH.vaultRecordOf('u1')
+const { gate: _gate, ...vaultRecordWithoutWayins } = TH.vaultRecordOf('u1')
 const { passkey: _noPasskey, ...gateWithoutPasskey } = TH.gateOf('u1')
-const vaultPropsWithoutPasskey = { ...TH.vaultRecordOf('u1'), gate: gateWithoutPasskey }
+const vaultRecordWithoutPasskey = { ...TH.vaultRecordOf('u1'), gate: gateWithoutPasskey }
 /** A vault record as this format held it before its gate was nested: the two ways in flat beside its fields. */
-const flatVaultProps = { ...vaultPropsWithoutWayins, ...TH.gateOf('u1') }
-/** The three fields the vault props held their one passphrase in, before they held ways in. */
+const flatVaultRecord = { ...vaultRecordWithoutWayins, ...TH.gateOf('u1') }
+/** The three fields the vault record held their one passphrase in, before they held ways in. */
 const OldWayinFields = {
   key_deriver_label:            'test_digest_v0',
   // base64 of the literal text 'salt': a fake salt, public material anyway
@@ -167,28 +167,28 @@ const boxV3 = { ...boxWithoutTimes, format: 'safebyok-box-v3', registered_at: Da
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
 
-const VaultPropsCases = [
+const VaultRecordCases = [
   // both accept:
-  [TH.vaultRecordOf('u1'),                                                    true,   true,   'whole vault props'],
+  [TH.vaultRecordOf('u1'),                                                    true,   true,   'whole vault record'],
   // names are any text to Convex: the client's VaultDB checks them
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) },     true,   true,   'vault props with a passphrase and a passkey'],
+  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) },     true,   true,   'vault record with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
-  [vaultPropsWithoutVaultTok,                                              false,  false,  'vault props missing their vault_tok'],
+  [vaultRecordWithoutVaultTok,                                              false,  false,  'vault record missing its vault_tok'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: '1' },                          false,  false,  'an epoch written as text'],
   [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }) }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }) }, false, false, 'a wayinkind this package does not know'],
   [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.wayinOf('laptop', { wayinkind: 'passkey' as never }) as never }) }, false, false, "a passphrase's fields in the passkey slot"],
   [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.passkeyWayinOf('laptop') as never }) },  false,  false,  'a passkey in the passphrase slot'],
-  [vaultPropsWithoutPasskey,                                               false,  false,  'a gate with no passkey field: null is written when there is none'],
-  [vaultPropsWithoutWayins,                                                false,  false,  'a record with no gate field: null is written while the vault is novel'],
-  [flatVaultProps,                                                         false,  false,  'a record from before its gate was nested, its ways in flat beside its fields'],
-  [{ ...vaultPropsWithoutWayins, wayins: [TH.wayinOf('passphrase')] },     false,  false,  'vault props holding a list of wayins, as v4 did'],
-  [{ ...vaultPropsWithoutWayins, ...OldWayinFields },                        false,  false,  'vault props from before their wayins were a list'],
+  [vaultRecordWithoutPasskey,                                               false,  false,  'a gate with no passkey field: null is written when there is none'],
+  [vaultRecordWithoutWayins,                                                false,  false,  'a record with no gate field: null is written while the vault is novel'],
+  [flatVaultRecord,                                                         false,  false,  'a record from before its gate was nested, its ways in flat beside its fields'],
+  [{ ...vaultRecordWithoutWayins, wayins: [TH.wayinOf('passphrase')] },     false,  false,  'vault record holding a list of wayins, as v4 did'],
+  [{ ...vaultRecordWithoutWayins, ...OldWayinFields },                        false,  false,  'vault record from before its wayins were a list'],
   [{ ...TH.vaultRecordOf('u1'), registered_at: null },                        false,  false,  'a null registered_at'],
   [{ ...TH.vaultRecordOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },  false,  false,  'a registered_at as an ISO string'],
-  [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso },     false,  false,  'vault props from before their time was named registered_at'],
+  [{ ...vaultRecordWithoutTime, created_at: OldIso, updated_at: OldIso },     false,  false,  'vault record from before its time was named registered_at'],
   // Both refuse: a stored record is strict, so a field neither record has never reaches storage.
   [{ ...TH.vaultRecordOf('u1'), passphrase_text: 'not-a-real-passphrase' },   false,  false,  'a field the record does not have'],
   // Zod refuses, Convex accepts -- the finer rules are the client's:
@@ -224,7 +224,7 @@ const BoxCases = [
 ] as const
 
 describe("the Convex validators, against the core's Zod records, record by record", () => {
-  for (const [vaultRecord, zodOk, convexOk, blurb] of VaultPropsCases) {
+  for (const [vaultRecord, zodOk, convexOk, blurb] of VaultRecordCases) {
     it(`vault record: ${blurb}`, async () => {
       expect(Records.VaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultRecord, { vaultRecord: vaultRecord as never }))).to.eq(convexOk)

@@ -140,7 +140,7 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultTokMeets`), and a box read before it
+  (`Expectations.vaultRecordMeets`, `vaultMeets`, `vaultTokMeets`), and a box read before it
   hands its box up (`vaultMeets`, else `Refusals.vaultMismatch()`), and for a box write, the
   refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
   `stale_write` carrying the box that stands). An adapter

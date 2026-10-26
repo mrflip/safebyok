@@ -12,10 +12,10 @@ import type { Vault } from '../src/vault'
 import { leaseRecordOf } from '../src/lease'
 import { heldLeaseOf } from '../src/held-lease'
 import * as TH from './test-helpers'
-import { makeRacingWorld, makeWorld, storedVaultPropsOf, vaultWithPasskey } from './vault/world'
+import { makeRacingWorld, makeWorld, storedVaultRecordOf, vaultWithPasskey } from './vault/world'
 
-/** The gated vault props `world` stores now. */
-const propsOf = (world: ReturnType<typeof makeWorld>): TH.GatedRecord => VaultRecord.parse(storedVaultPropsOf(world)) as TH.GatedRecord
+/** The gated vault record `world` stores now. */
+const propsOf = (world: ReturnType<typeof makeWorld>): TH.GatedRecord => VaultRecord.parse(storedVaultRecordOf(world)) as TH.GatedRecord
 
 /** A world holding `u1`'s vault with the passphrase `pw`, locked, and its stored props. */
 const lockedWorld = async () => {

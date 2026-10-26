@@ -166,18 +166,18 @@ describe("idbVaultDB", () => {
     expect(await get(boxScopepath, rawShelf(dbName))).to.be.undefined
   })
 
-  it("refuses damaged vault props as damaged_vault, and leaves them as they are", async () => {
+  it("refuses a damaged vault record as damaged_vault, and leaves it as it is", async () => {
     const dbName = TH.freshDbName()
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1', gate_epoch: 'one' }, rawShelf(dbName))
     await TH.expectBad(idbVaultDB({ dbName }).getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_tok: 'vault-tok-u1', gate_epoch: 'one' })
   })
 
-  it("lands no update on damaged vault props, even ones that show the expected vault_tok, refusing as a read of them does", async () => {
+  it("lands no update on a damaged vault record, even one that shows the expected vault_tok, refusing as a read of it does", async () => {
     const dbName = TH.freshDbName()
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1' }, rawShelf(dbName))
     const next = TH.vaultRecordOf('u1', { gate_epoch: 2 })
-    await TH.expectBad(idbVaultDB({ dbName }).putVaultProps(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
+    await TH.expectBad(idbVaultDB({ dbName }).putVaultRecord(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
     const standing: unknown = await get(Scopepath.vault(TH.scopeOf('u1')), rawShelf(dbName))
     expect(standing).to.deep.equal({ vault_tok: 'vault-tok-u1' })
   })
@@ -197,7 +197,7 @@ describe("idbVaultDB", () => {
     expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
   })
 
-  it("deletes a vault whose vault props are damaged -- delDamagedVault reads its vault_tok as stored -- and only that vault", async () => {
+  it("deletes a vault whose vault record is damaged -- delDamagedVault reads its vault_tok as stored -- and only that vault", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     for (const user of ['u1', 'u2']) {
@@ -208,16 +208,16 @@ describe("idbVaultDB", () => {
     await TH.expectBad(vaultDB.delDamagedVault(TH.scopeOf('u2')), 'bad_option')
     await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
     const shelf = rawShelf(dbName)
-    const ourVaultProps = Scopepath.vault(TH.scopeOf('u1'))
+    const ourVaultRecord = Scopepath.vault(TH.scopeOf('u1'))
     const ourBox = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' })
-    expect(await get(ourVaultProps, shelf), 'a tombstone in the place of the vault props').to.deep.include({ format: 'safebyok-tombstone-v1', vault_epoch: 1 })
+    expect(await get(ourVaultRecord, shelf), 'a tombstone in the place of the vault record').to.deep.include({ format: 'safebyok-tombstone-v1', vault_epoch: 1 })
     expect(await get(ourBox, shelf)).to.be.undefined
     expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u2'))).to.deep.equal(TH.vaultRecordOf('u2'))
     const theirs = await TH.boxesOf(vaultDB, TH.scopeOf('u2'))
     expect(theirs.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
   })
 
-  it("lays the tombstone of a deleted vault in the row its vault props were in, boxes gone, and replaces it with the new life", async () => {
+  it("lays the tombstone of a deleted vault in the row its vault record was in, boxes gone, and replaces it with the new life", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
@@ -377,7 +377,7 @@ describe("idbVaultDB's subscribe", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     let heardCount = 0
     vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
-    await TH.expectBad(vaultDB.putVaultProps(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
+    await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'too-late' }))
     await TH.wakeupAtNextTick()

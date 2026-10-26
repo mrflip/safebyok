@@ -250,7 +250,7 @@ export abstract class VaultDB {
 
   // --
 
-  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultProps, readVault, ensuredVault
+  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultRecord, readVault, ensuredVault
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -289,7 +289,7 @@ export abstract class VaultDB {
     return answering(() => this.ensuredVault(draft, listingOf))
   }
 
-  /** The scope's vault record and every box as stored, read as {@link VaultDB.getVault} reads them: what a server hands a browser's VaultDB.
+  /** The scope's vault record and every box as stored, read as {@link VaultDB.getVault} reads it: what a server hands a browser's VaultDB.
    * The vault record is checked as `getVault` checks it. The boxes come as stored but for their
    * two ciphered fields, unchecked and in no particular order: the receiving VaultDB's listing
    * checks them.
@@ -312,7 +312,7 @@ export abstract class VaultDB {
    * The record and its gate are written in this one step. The store moves `vault_epoch` up by one
    * in the same step, whatever value `vaultRecord` carries, so what is resolved is the vault as it
    * now stands. Otherwise it refuses `stale_write` and writes nothing, as it does when no vault
-   * record stands, or only a tombstone does. `err.meta.vault_props_stored` then holds what stands,
+   * record stands, or only a tombstone does. `err.meta.vault_stored` then holds what stands,
    * from the same atomic step, checked as {@link VaultDB.getVault} checks it, or null for none; a
    * vault record standing that fails that check refuses as a read of it does. A vault's
    * `vault_tok` never changes, so `vaultRecord` must carry the one in `expected`: 'bad_record'
@@ -320,18 +320,18 @@ export abstract class VaultDB {
    * `gate_epoch` 0.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putVaultProps(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
-   *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_props_stored }   // what won
+   *   const { ok, val, err } = await vaultDB.putVaultRecord(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
+   *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_stored }   // what won
    */
-  putVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<Outcome<VaultRecord>> {
+  putVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<Outcome<VaultRecord>> {
     return answering(async () => {
       const outgoing = checkOutgoing(VaultRecord, vaultRecord, 'vault record')
       const asked = heldScope(this, outgoing)
       const expectation = checkOutgoing(VaultRecordExpectation, expected, 'vault record expectation')
       if (outgoing.vault_tok !== expectation.vault_tok) {
-        throw new VaultError('bad_record', "putVaultProps replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
+        throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
       }
-      const raw = await withStaleVaultRecordChecked(adapterAnswer('doPutVaultProps', () => this.doPutVaultProps(outgoing, expectation)), asked)
+      const raw = await withStaleVaultRecordChecked(adapterAnswer('doPutVaultRecord', () => this.doPutVaultRecord(outgoing, expectation)), asked)
       return checkWrittenVaultRecord(raw, outgoing, asked)
     })
   }
@@ -597,7 +597,7 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [The half you write]: doGetVault, doEnsureVault, doPutVaultProps, doDelVault, doSubscribe, others
+  // == [The half you write]: doGetVault, doEnsureVault, doPutVaultRecord, doDelVault, doSubscribe, others
 
   // --------------------------------------------------------------------------- the half you write
 
@@ -623,14 +623,14 @@ export abstract class VaultDB {
   /** Replace the standing vault record with `vaultRecord` if, and only if, it has `expected.vault_tok` and `expected.gate_epoch`, resolving it as stored.
    * Store `vaultRecord`, its gate with it, with its `vault_epoch` set to the standing one plus one,
    * whatever it carries, and resolve the record as stored, read back in that same step: a key-value
-   * backend asks `Expectations.vaultPropsPutOf`. Otherwise write nothing, and throw
-   * `Refusals.staleVaultProps(standing)` from the same atomic step, `standing` the vault record
+   * backend asks `Expectations.vaultRecordPutOf`. Otherwise write nothing, and throw
+   * `Refusals.staleVaultRecord(standing)` from the same atomic step, `standing` the vault record
    * exactly as stored, or null for none (a tombstone is none). A key-value backend asks
-   * `Expectations.vaultPropsRefusalOf`. A server-side adapter also refuses a vault record that
+   * `Expectations.vaultRecordRefusalOf`. A server-side adapter also refuses a vault record that
    * moves `gate_epoch` back or leaves it where it stands. How the record is laid out in storage
    * (columns, documents, one JSON value) is the adapter's own.
    */
-  protected abstract doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown>
+  protected abstract doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown>
   /** The stored box record under `boxlabel`, exactly as saved, or null for none, if, and only if, the standing vault record has `expected.vault_tok`.
    * Compare the vault record in the same atomic step as the read of the box. Otherwise read
    * nothing more, and throw `Refusals.vaultMismatch()` from that step: none stand, a tombstone
@@ -867,7 +867,7 @@ const fullChecked = (err: VaultError): VaultError => {
   return remade(err, { capacity: capacity.data })
 }
 
-/** What an update of the vault record resolves, or its refusal, its `stale_write`'s `vault_props_stored` checked as a read checks it.
+/** What an update of the vault record resolves, or its refusal, its `stale_write`'s `vault_stored` checked as a read checks it.
  * A vault record standing that fails that check refuses as the read does: 'damaged_vault' or
  * 'newer_format'. A stale write naming nothing standing refuses as `corrupt_record`.
  */
@@ -877,14 +877,14 @@ const withStaleVaultRecordChecked = async <ValT>(writing: Promise<ValT>, scope: 
   } catch (err) {
     if (! isVaultError(err, 'stale_write')) { throw err }
     const said = err.meta ?? {}
-    if (! ('vault_props_stored' in said)) { throw unsaidVaultRecord({ cause: err }) }
-    const standing: unknown = said.vault_props_stored
-    throw remade(err, { vault_props_stored: standing === null || standing === undefined ? null : checkVaultRecord(standing, scope) })
+    if (! ('vault_stored' in said)) { throw unsaidVaultRecord({ cause: err }) }
+    const standing: unknown = said.vault_stored
+    throw remade(err, { vault_stored: standing === null || standing === undefined ? null : checkVaultRecord(standing, scope) })
   }
 }
 
 /** An update of the vault record refused without saying what stands: the adapter's bug, `corrupt_record`. */
-const unsaidVaultRecord = (opts?: ErrorOptions) => new VaultError('corrupt_record', "Storage refused an update of the vault record, so nothing was written, but did not say what stands. The storage adapter needs a developer's look: its doPutVaultProps throws Refusals.staleVaultProps(standing).", opts)
+const unsaidVaultRecord = (opts?: ErrorOptions) => new VaultError('corrupt_record', "Storage refused an update of the vault record, so nothing was written, but did not say what stands. The storage adapter needs a developer's look: its doPutVaultRecord throws Refusals.staleVaultRecord(standing).", opts)
 
 /** `err` made again with `meta`, its kind, message and cause kept. */
 const remade = (err: VaultError, meta: RefusalMeta): VaultError => (

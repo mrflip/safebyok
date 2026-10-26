@@ -66,13 +66,13 @@ class IdbVaultDB extends VaultDB {
 
   // The props stored are the row as the put left it, read in the same transaction; a write that
   // misses is refused from the row its transaction read, once that has ended.
-  protected async doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
       const standing = await rowAt(store, vaultScopepath)
-      const missed = Expectations.vaultPropsRefusalOf(standing, expected)
+      const missed = Expectations.vaultRecordRefusalOf(standing, expected)
       if (missed) { return { refusal: missed, stored: null } }
-      store.put(Expectations.vaultPropsPutOf(vaultRecord, standing), vaultScopepath)
+      store.put(Expectations.vaultRecordPutOf(vaultRecord, standing), vaultScopepath)
       return { refusal: null, stored: await rowAt(store, vaultScopepath) }
     })
     if (refusal) { throw refusal }

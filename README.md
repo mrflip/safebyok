@@ -34,7 +34,7 @@ This repository is a pnpm workspace. Its packages:
 Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
 Holds vault​s and box​es scoped by applabel, user_id, vaultlabel and boxlabel.
 * A box holds a sidecar under the app's control and an encrypted whisper​
-* verbs: vault: getVault (props and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultProps, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
+* verbs: vault: getVault (record and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultRecord, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
 
 ### Browser
 

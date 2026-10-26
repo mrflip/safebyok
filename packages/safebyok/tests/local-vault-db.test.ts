@@ -21,7 +21,7 @@ describe("localVaultDB", () => {
     const vaultDB = localVaultDB({ store })
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
     expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.gatelessOf('u1')))
-    await TH.expectingGood(vaultDB).putVaultProps(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
+    await TH.expectingGood(vaultDB).putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
     expect(read?.vaultProps).to.deep.equal(TH.vaultRecordOf('u1'))
@@ -139,7 +139,7 @@ describe("localVaultDB", () => {
     expect(store.ckeys()).to.have.members([u1VaultScopepath, u1BoxScopepath('anthropic')])
   })
 
-  it("refuses a mangled vault props row as damaged_vault, quoting none of it", async () => {
+  it("refuses a mangled vault record row as damaged_vault, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     store.write(u1VaultScopepath, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
@@ -158,7 +158,7 @@ describe("localVaultDB", () => {
     expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
   })
 
-  it("hands vault props that are not JSON up as their text, which reads back as damaged_vault", async () => {
+  it("hands vault record that is not JSON up as its text, which reads back as damaged_vault", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     store.write(u1VaultScopepath, 'SUPERSECRET{')
@@ -169,7 +169,7 @@ describe("localVaultDB", () => {
   it("refuses as damaged a record that names a scope or label other than the one asked for", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
-    // u2's vault props smuggled into u1's slot, and a box row moved under another label.
+    // u2's vault record smuggled into u1's slot, and a box row moved under another label.
     store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u2')))
     const elsewhere = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(elsewhere.message).to.match(/different app, user or vault/)

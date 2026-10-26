@@ -1,7 +1,7 @@
 # safebyok-convex
 
 safebyok's storage on [Convex](https://convex.dev): a Convex **component** that holds each vault's
-props and boxes, ciphertext and unencrypted fields only, in tables of its own, and
+records and boxes, ciphertext and unencrypted fields only, in tables of its own, and
 **`convexVaultDB`**, the client side a vault stores through. Your Convex backend never sees a
 whisper, a passphrase, or any key that opens one.
 
@@ -39,7 +39,7 @@ import { SafebyokComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
 export const {
-  getVault, ensureVault, putVaultProps, getBox, putBox, getCapacity, delBox, delVault, watchVault,
+  getVault, ensureVault, putVaultRecord, getBox, putBox, getCapacity, delBox, delVault, watchVault,
 } = new SafebyokComponent(components.safebyok).api({
   getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
 })
@@ -63,14 +63,14 @@ mistake for the first request.
   unlocked, and its next call is asked again. `identity_revoked` thrown the same way locks the
   vault: throw it only for a user your app knows is gone. Anything else `getUserId` throws -- an
   auth provider that is down -- reaches the client as `storage_unavailable`, a passing fault.
-* **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a delete
+* **Writes that come too late.** An update (`putVaultRecord`, `putBox`) or a delete
   (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_tok`,
-  and the vault props' `gate_epoch`, or the box's `revision_tok` -- and checks it in the same
+  and the vault record's `gate_epoch`, or the box's `revision_tok` -- and checks it in the same
   transaction it writes in. When that no longer stands, it writes nothing and resolves `false`
   (`putBox` and `delBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
   A `delBox` also carries the `revision_tok` its writer read, but only to say what it removed:
   within the expected vault it removes whatever stands.
-  An update of the vault props lands, too, only when the new vault props keep the vault's
+  An update of the vault record lands, too, only when the new vault record keep the vault's
   `vault_tok` and move their `gate_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `putBox` refuses, writing nothing, a box
   that would take its vault past the component's own limits (see *How big a vault can be*): it
@@ -78,7 +78,7 @@ mistake for the first request.
   tally stood, which the client turns into a `VaultError` of that kind carrying it as
   `meta.capacity`. The limits are the component's, not your app's or the client's to set.
 * **Reads from another vault.** A `getBox` carries the `vault_tok` of the vault its reader
-  holds the key for, and reads the box only while those vault props stand, in the same query.
+  holds the key for, and reads the box only while that vault record stands, in the same query.
   Otherwise it resolves `{ read: false, refusalkind: 'vault_mismatch' }`, reading nothing more:
   the vault was deleted, or made anew, since the reader read it.
 * **One version, both ends.** A client meeting a `getBox` or `putBox` answer in a shape it does not know --
@@ -160,7 +160,7 @@ Three tables, inside the component, beside nothing of your app's:
 
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
   box's boxKey (`box_key_wrapped`), and the vaultKey once for each of the vault's
-  ways in (the `vault_key_wayin_wrapped` of the vault props' `passphrase`, and of its `passkey`
+  ways in (the `vault_key_wayin_wrapped` of the vault record's `passphrase`, and of its `passkey`
   when it has one).
 * **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and `sidecar`,
   the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and
@@ -200,7 +200,7 @@ which the core's `maxWhisperBytes` keeps well inside. `convexVaultDB` declares t
 The component holds every vault to limits of its own, whatever its client asks, so that even a
 modified client cannot grow a vault past what deleting can reach: **8,000 boxes**, and
 **7 MiB less 1 KiB** of them as Convex weighs a document (half the read budget, less a whole
-document for the vault props and room for the tally). A client within its own `maxBoxes` stays
+document for the vault record and room for the tally). A client within its own `maxBoxes` stays
 well inside both, at the defaults far inside; at extreme settings (a small `maxWhisperBytes`,
 thousands of boxes, every sidecar full) a client can meet the component's `vault_full`
 just short of its own `maxBoxes`. That is the design working: the component's limit is the
@@ -227,8 +227,8 @@ the core's own records, scopes and expectations.
 | Function                  | Kind     | Arguments                                                                   | Resolves                                                                                   |
 | ------------------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `getVault`                | query    | `{ ...scope }`                                                              | `{ vaultProps, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order; or null |
-| `ensureVault`             | mutation | `{ draft }`, gateless vault props                                           | `{ vaultProps, boxes }` standing afterwards: the draft, or another device's, with its boxes |
-| `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true, vault_props_stored }`, the vault props as stored (their `vault_epoch` one up) if written; else `{ landed: false, vault_props_stored }`, the vault props standing or null |
+| `ensureVault`             | mutation | `{ draft }`, gateless vault record                                           | `{ vaultProps, boxes }` standing afterwards: the draft, or another device's, with its boxes |
+| `putVaultRecord`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true, vault_stored }`, the vault record as stored (its `vault_epoch` one up) if written; else `{ landed: false, vault_stored }`, the vault record standing or null |
 | `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault stands; else `{ read: false, refusalkind: 'vault_mismatch' }` |
 | `putBox`               | mutation | `{ ...scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ ...scope }`                                                              | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |

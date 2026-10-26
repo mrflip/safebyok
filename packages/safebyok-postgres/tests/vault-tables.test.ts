@@ -61,7 +61,7 @@ describe("VaultTablesSql", () => {
     expect(await TH.vaultRecordIn(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 
-  it("makes the vault props' columns exactly as the adapter writes them, in order, and no more", async () => {
+  it("makes the vault record's columns exactly as the adapter writes it, in order, and no more", async () => {
     const db = await TH.database()
     expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultRowColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
   })
@@ -95,7 +95,7 @@ describe("VaultTablesSql", () => {
     ])
   })
 
-  it("holds every column NOT NULL but the vault props' passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
+  it("holds every column NOT NULL but the vault record's passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
     const db = await tablesOnlyDatabase()
     const { rows } = await db.query(
       "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",

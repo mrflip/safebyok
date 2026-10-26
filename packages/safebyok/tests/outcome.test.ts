@@ -131,7 +131,7 @@ describe("isOutcomeShaped", () => {
 
 describe("valOf", () => {
   it("hands back a good outcome's val, and throws a bad one's err, as its example shows", () => {
-    expect(valOf(good('vault props'))).to.eq('vault props')
+    expect(valOf(good('vault record'))).to.eq('vault record')
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => valOf(bad(refusal))).to.throw(refusal)
   })

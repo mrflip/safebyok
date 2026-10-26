@@ -10,7 +10,7 @@ import { passphraseCleartext, prf_salt_b64 } from '../src/types/type-aliases'
 import type { Vault } from '../src/vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
-import { addLaptopPasskey, makeWorld, storedVaultPropsOf, u1VaultScopepath } from './vault/world'
+import { addLaptopPasskey, makeWorld, storedVaultRecordOf, u1VaultScopepath } from './vault/world'
 
 /** The slice of a vault every record-only way in here is made under: `u1`'s `main` vault, deriving with the test deriver. */
 const slice: TH.VaultSlice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) })
@@ -20,12 +20,12 @@ const vaultRecord = TH.vaultRecordOf('u1')
 /** The vaultKey's usage when it is unwrapped only to see that it opens. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
-/** The gated vault props `world` stores now. */
-const propsOf = (world: ReturnType<typeof makeWorld>): TH.GatedRecord => VaultRecord.parse(storedVaultPropsOf(world)) as TH.GatedRecord
+/** The gated vault record `world` stores now. */
+const propsOf = (world: ReturnType<typeof makeWorld>): TH.GatedRecord => VaultRecord.parse(storedVaultRecordOf(world)) as TH.GatedRecord
 
 /** The passkey way in `props` hold: the test's vault was given one. */
 const passkeyRecordOf = (props: TH.GatedRecord): PasskeyWayinRecord => {
-  if (props.gate.passkey === null) { throw new Error("these vault props hold no passkey") }
+  if (props.gate.passkey === null) { throw new Error("this vault record holds no passkey") }
   return props.gate.passkey
 }
 
@@ -43,9 +43,9 @@ const lockedWorld = async (opts: { passkey?: boolean } = {}) => {
   return { world, vault, keyDeriver, props: propsOf(world) }
 }
 
-/** `world`'s stored vault props with `changes` written over them, a Vault object opened on them afresh, and the props as stored. */
+/** `world`'s stored vault record with `changes` written over it, a Vault object opened on it afresh, and the record as stored. */
 const reopenedWith = async (world: ReturnType<typeof makeWorld>, changes: Record<string, unknown>) => {
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), ...changes }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), ...changes }))
   const vault = await world.open()
   return { vault, props: propsOf(world) }
 }
@@ -93,7 +93,7 @@ describe("Wayin.make", () => {
     expect(wayin.wayinkind).to.eq('passphrase')
   })
 
-  it("makes the vault props' passphrase a PassphraseWayin, bound to those props, as the Wayin's first example shows", async () => {
+  it("makes the vault record's passphrase a PassphraseWayin, bound to that record, as the Wayin's first example shows", async () => {
     const { vault, props } = await lockedWorld()
     const passphrase = Wayin.make(vault, props, props.gate.passphrase)
     expect(passphrase.wayinkind).to.eq('passphrase')

@@ -332,10 +332,10 @@ export const vaultRecordOf = (user_id: string, overrides: Partial<GatedRecord> =
  * @example const stored = await ensureGated(vaultDB, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  * @example await ensureGated(vaultDB, vaultRecordOf('u1', { gate_epoch: 2 }))
  */
-export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultProps'>, vaultRecord: GatedRecord): Promise<GatedRecord> => {
+export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultRecord'>, vaultRecord: GatedRecord): Promise<GatedRecord> => {
   const ensured = valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })).vaultProps
   if (ensured.gate_epoch > 0) { return ensured as GatedRecord }
-  return valOf(await vaultDB.putVaultProps({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedRecord
+  return valOf(await vaultDB.putVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedRecord
 }
 
 /** The vault record `scope` holds in `vaultDB`, as `getVault` reads it, or null for none. Throws the refusal of a read that is refused.

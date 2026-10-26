@@ -15,7 +15,7 @@ import { StoredBytesPerWhisperByte, BoxFieldsBytes, BoxFixedBytes } from '../../
 import { cipherCtx, makeBoxKey, wrapKeyUnder, makeVaultKey, cipherBytes, randomBytes } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import * as TH from '../test-helpers'
-import { makeWorld, boxlabelsOf, storedRowOf, u1BoxScopepath, u1PlantedScopepath, storedVaultPropsOf, u1VaultScopepath, isU1Box } from './world'
+import { makeWorld, boxlabelsOf, storedRowOf, u1BoxScopepath, u1PlantedScopepath, storedVaultRecordOf, u1VaultScopepath, isU1Box } from './world'
 
 
 // == [Storing and reading]: RoundTrips, putBox and getWhisper, times a vault keeps
@@ -415,21 +415,21 @@ describe("the times a vault keeps", () => {
     expect(await fresh.getWhisper('reordered')).to.eq('sk-fake-two')
   })
 
-  it("stamps the vault props' registered_at when the vault is made, and keeps it through a passphrase change", async () => {
+  it("stamps the vault record's registered_at when the vault is made, and keeps it through a passphrase change", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const madeAt = world.clock.now()
-    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt })
+    expect(storedVaultRecordOf(world)).to.include({ registered_at: madeAt })
     world.advance(60_000)
     await TH.putWayin(vault, 'pw one', 'pw two')
-    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, gate_epoch: 2 })
+    expect(storedVaultRecordOf(world)).to.include({ registered_at: madeAt, gate_epoch: 2 })
   })
 
-  it("writes no created_at or updated_at, to a box or the vault props", async () => {
+  it("writes no created_at or updated_at, to a box or the vault record", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    for (const row of [storedRowOf(world, 'anthropic'), storedVaultPropsOf(world)]) {
+    for (const row of [storedRowOf(world, 'anthropic'), storedVaultRecordOf(world)]) {
       expect(row).to.not.have.any.keys('created_at', 'updated_at')
     }
   })
@@ -438,11 +438,11 @@ describe("the times a vault keeps", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.75 } })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    expect(storedVaultPropsOf(world)).to.include({ registered_at: world.clock.now() })
+    expect(storedVaultRecordOf(world)).to.include({ registered_at: world.clock.now() })
     expect(storedRowOf(world, 'anthropic')).to.include({ registered_at: world.clock.now(), written_at: world.clock.now() })
   })
 
-  it("refuses a stored box or vault props whose time holds a fraction of a millisecond, leaving the record as it is", async () => {
+  it("refuses a stored box or vault record whose time holds a fraction of a millisecond, leaving the record as it is", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -450,7 +450,7 @@ describe("the times a vault keeps", () => {
     world.dbStore.write(u1BoxScopepath('anthropic'), box)
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(box)
-    const vaultProps = JSON.stringify({ ...storedVaultPropsOf(world), registered_at: world.clock.now() + 0.5 })
+    const vaultProps = JSON.stringify({ ...storedVaultRecordOf(world), registered_at: world.clock.now() + 0.5 })
     world.dbStore.write(u1VaultScopepath, vaultProps)
     await TH.expectRefusal(world.open(), 'damaged_vault')
     expect(world.dbStore.read(u1VaultScopepath)).to.eq(vaultProps)
@@ -482,10 +482,10 @@ describe("the times a vault keeps", () => {
     expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(olden)
   })
 
-  it("refuses stored vault props from before their time was renamed, leaving them as they are", async () => {
+  it("refuses stored vault record from before its time was renamed, leaving it as it is", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const { registered_at: _registered, ...row } = storedVaultPropsOf(world)
+    const { registered_at: _registered, ...row } = storedVaultRecordOf(world)
     const olden = JSON.stringify({ ...row, created_at: '2026-10-14T00:00:00.000Z', updated_at: '2026-10-14T00:00:00.000Z' })
     world.dbStore.write(u1VaultScopepath, olden)
     await TH.expectRefusal(world.open(), 'damaged_vault')

@@ -136,7 +136,7 @@ code, the stored records and these docs all use its words.
   and a first unlock that loses the race to set the vault's first passphrase is
   `gate_made_elsewhere`.
 * Storage is two plug-ins the core speaks to only as interfaces: a **vaultDB** for what syncs
-  (vault props and boxes) and a **deviceDB** for this device's lease and its **device record** of
+  (vault record and boxes) and a **deviceDB** for this device's lease and its **device record** of
   each vault (the highest `vault_epoch` it has seen there).
 
 ```text
@@ -696,12 +696,12 @@ the dialog open, as a wrong passphrase does.
   one passkey, added by proving the passphrase. A new passphrase removes the passkey with the old
   one: the user adds a passkey again, proving the new passphrase. Warn them before they change it
   ("your passkey will be removed; add it again afterwards").
-* **Every change locks the other devices.** It moves the vault props' `gate_epoch`, so each
+* **Every change locks the other devices.** It moves the vault record's `gate_epoch`, so each
   other device falls back to `locked` and must unlock again. This device stays unlocked.
 * **An unlock tries the one passphrase**: one key derivation, about 0.6 s with the browser's
   deriver.
 * **Removal is not revocation.** An old passphrase, or a removed passkey, stops opening the vault
-  from here on, but whoever knew it and kept a copy of the vault props from before can still open
+  from here on, but whoever knew it and kept a copy of the vault record from before can still open
   that copy, and the vaultKey inside is the one the vault still uses. There is no key rotation yet.
 
 ## A new passphrase's strength
@@ -817,7 +817,7 @@ await vault.delWayin('passkey')                                // del_passkey: t
   key wherever it is plugged in. Browsers and authenticators without PRF refuse with kind
   `passkey_unavailable`; offer the passphrase then.
 * **Removal is not revocation**, here as for the passphrase: a removed passkey still opens a copy
-  of the vault props kept from before.
+  of the vault record kept from before.
 
 ## No recovery
 
@@ -857,7 +857,7 @@ The kinds fall into three families, told apart by who handles them.
 
 A record that fails its checks takes its kind from who is at fault, the same from a `VaultDB`
 as from a vault. One read from storage that fails them, or a box that will not open, is damaged:
-`damaged_vault` for the vault props, `damaged_box` for a box (a listing shows it as damaged
+`damaged_vault` for the vault record, `damaged_box` for a box (a listing shows it as damaged
 instead, *Damaged boxes* below), Zod's own error its `cause` where a check failed. One your code
 handed in is `bad_record` (a box handed to a `VaultDB`'s `putBox`, `invalid_box`). A storage
 adapter that answers in a shape its protocol does not allow is `corrupt_record`: a bug in that
@@ -875,9 +875,9 @@ boundary, and `useVault` throws a birth's misuse there; a condition lands in the
 | `bad_scope`           | a name in a scope -- an `applabel`, `vaultlabel` or `boxlabel` that is no `label`, or a `user_id` that fails `user_id` -- the message naming each failing field, as `meta.fieldnames` does; or a bag handed to a bank's call naming another `applabel` or `user_id` than the bank's (`bank.demandConsistentWith`) | Pass labels the app chose; check a user-typed one first with `label`; percent-encode a user id outside the rules; make a bank per signed-in user, and drop it at sign-out |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
 | `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's options, or one it does not take, a `vaultDB` or `deviceDB` (or any field named as a store, ending `db` in any case: `vaultDb`) beside a `vaultlabel` rather than in the vault's options, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's options naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
-| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them that fails its check included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name that passes its check but is longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: a malformed vault record, a name in it that fails its check included, an expectation missing a field, or a vault record and its expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name that passes its check but is longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it that fails its check, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
-| `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_props_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
+| `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
 | `unknown_key_deriver` | the vault names a key deriver this bank was not made with        | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Bank.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
 | `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load`, or the key deriver's, failing at `hello()`). What a key deriver or a strength checker threw is kept nowhere, not its message, meta or `cause`, as each was handed a passphrase; the logger hears only that the deriver threw (`call: 'deriveKeyBytes'`), and the kind of a `VaultError` it threw when that kind is listed. (A key deriver's `VaultError` of the condition family keeps its kind, in safebyok's own words, rather than refusing here.) What a `load` threw is its `cause`, as it heard nothing | Do not retry; read the log for the deriver's kind (or the `cause` of a `load`), and fix the function, or report the bug |
@@ -902,7 +902,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a backend with small records meets it | Tell the user to store a smaller whisper or sidecar |
 | `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows. The backend's own refusal carries how full it reckons the vault as `meta.capacity` |
 | `stale_write`         | storage changed since this call read it, so the write was refused and nothing was written: another call, here or on another device, wrote, created or deleted the box a `putBox()` was writing; a `delBox()`, `putWayin()` or `del()` into a vault deleted, made anew, or with its ways in changed elsewhere | Nothing is read after the refusal and nothing is tried again by itself: `hello()` to see what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). A `putBox()`'s refusal carries the box that won as `meta.box_stored`, and a second `putBox()` reads the box afresh |
-| `vault_mismatch`      | a box write or read met vault props other than the ones it expected: the vault deleted, made anew under another `vault_tok`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` or `getBox` called directly, or a vault's box read that met it; nothing was written or read | The device that expected that vault is out of date: read the vault again (`hello()`), and unlock the vault that stands now before reading or writing a box |
+| `vault_mismatch`      | a box write or read met a vault record other than the one it expected: the vault deleted, made anew under another `vault_tok`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` or `getBox` called directly, or a vault's box read that met it; nothing was written or read | The device that expected that vault is out of date: read the vault again (`hello()`), and unlock the vault that stands now before reading or writing a box |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `vault_gone`          | the Vault object is gone: the vault was deleted, here or on another device, or the bank let the Vault object go (`closeVault`, `closeVaults`, `reopenVault`, `clearCachedVault`). A call under way found so at one of its own steps, and did nothing more; every later call on it refuses so. A box read also refuses so when storage no longer holds the vault this device read | Ask the bank for the vault again (`bank.ensureVault`): it hands out a new Vault object, novel where the vault was deleted |
@@ -932,11 +932,11 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `damaged_vault`       | the vault's props, read from storage, failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVault` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
+| `damaged_vault`       | the vault's record, read from storage, failed its checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVault` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passphrase, or the passkey. The other is still tried | A damaged passkey: unlock with the passphrase, and add the passkey again. A damaged passphrase: unlock with the passkey, if there is one, to read what the vault holds; it cannot be changed, so the vault is then removed and made again |
 | `damaged_box`     | a box failed its checks as read from storage (a `VaultDB`'s `getBox` refuses it so too), or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, moved there from elsewhere, or written by a vault deleted and made anew on another device since this one read it. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing | Nothing was changed. Read the vault again, `hello({ staleMinutes: 0 })`: a vault made anew elsewhere relocks this device. A box still damaged: offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `damaged_lease`       | this device's lease would not open under its leaseKey: damaged where the device keeps it. It was erased, and the vault locked, at the first call that used it | Unlock again: that grants a new lease. Reading the vault (`hello()`) does not mend it |
-| `newer_format`        | the vault's stored props are in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
+| `newer_format`        | the vault's stored record is in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `vault_behind`        | this device has already seen the vault at a higher `vault_epoch` than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked, or was not born: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device with `bank.clearCachedVault` (see *A vault behind this device*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 
@@ -973,11 +973,11 @@ because storage cannot tell your app's other call from another device's.
 
 ### A vault that cannot be opened
 
-Stored vault props that fail their checks make `bank.ensureVault` (and a born vault's `hello()`)
+A stored vault record that fails its checks makes `bank.ensureVault` (and a born vault's `hello()`)
 refuse with `damaged_vault`, and with no Vault object born there is no `del()` to call.
 `delDamagedVault` is the way to clear such a vault and start over. It takes the options
 `Bank.make` took beside the vault's `vaultlabel` (only the vault's names and its two stores
-matter) and deletes that vault's stored props and boxes through the `VaultDB`, and this
+matter) and deletes that vault's stored record and boxes through the `VaultDB`, and this
 device's lease of it through the `DeviceDB`, raising its device record to the tombstone: what
 `del()` does, for this one case. Whatever the vault held is gone for good, so ask the user first.
 
@@ -995,8 +995,8 @@ if (! ok) {
 It refuses a vault that is sound, with `bad_option` and nothing removed: a vault that opens is
 deleted through its Vault object's `del()`. With no vault stored it erases only the device's
 lease, so a call cut short can be made again. It needs the stored record's `vault_tok`
-to aim the deletion, so vault props too damaged to show one are refused as `damaged_vault`
-still, with nothing removed: the backend's own tools can clear them (`localVaultDB`'s vault props
+to aim the deletion, so vault record too damaged to show one are refused as `damaged_vault`
+still, with nothing removed: the backend's own tools can clear it (`localVaultDB`'s vault record
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
 safebyok, which opens it; so one in a `format` this version does not know is refused with a kind of its
 own, `newer_format`, by `bank.ensureVault`, `hello()` and `delDamagedVault` alike, nothing removed, with a message
@@ -1005,7 +1005,7 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 `format`**, so an older build can tell "newer" from "damaged". Where it cannot
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
-clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
+clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault record.
 A bank deletes one with its own stores, `bank.delDamagedVault({ vaultlabel })`, which
 `safebyok-react`'s `useBank()` reaches. Storage decides, by the checks only it can make, so the
 bank need not hold the vault, or have refused it, first, and nothing asks for an unlock. Once
@@ -1013,7 +1013,7 @@ storage deletes the vault, and on `stale_write` too, the bank lets go its entry 
 whichever stores that was born from, so the next `bank.ensureVault` births what stands; any other
 refusal leaves the entry as it was. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
-deletion aims at the stored `vault_tok` alone, so vault props rewritten under that same
+deletion aims at the stored `vault_tok` alone, so vault record rewritten under that same
 `vault_tok` between its read and the deletion go too: it is the same vault, the one the user
 asked to delete.
 
@@ -1029,7 +1029,7 @@ of the life deleted refuses as stale.
 
 Two things this asks of a host that handles its storage itself:
 
-* **A server that restores a backup must wipe the restored vaults** (their props, their boxes and
+* **A server that restores a backup must wipe the restored vaults** (their records, their boxes and
   their tombstones) rather than serve them: a backup holds the counters of its day, so a restored
   vault shows a `vault_epoch` older than the one devices have seen, a vault deleted since comes
   back to life, and a backup taken between the writes of a deletion can hold both a vault and its

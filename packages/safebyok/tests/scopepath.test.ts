@@ -13,7 +13,7 @@ describe("Scopepath, the scopepath of each row", () => {
     expect(Scopepath.bank({ applabel: 'acme', user_id: 'u1' })).to.eq('bank^acme^u1')
   })
 
-  it("files the vault props under their kind and scope, joined on ^, as the first example shows", () => {
+  it("files the vault record under its kind and scope, joined on ^, as the first example shows", () => {
     expect(Scopepath.vault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.eq('vault^acme^u1^main')
   })
 
@@ -184,7 +184,7 @@ describe("Scopepath.withinVaultScopepathPrefix and withinVaultScopepathPred", ()
     expect(isWithinVault(['box', 'acme', 'u1', 'main', 'anthropic'])).to.be.false
   })
 
-  it("never take vault props, a lease or a device record for a box", () => {
+  it("never take vault record, a lease or a device record for a box", () => {
     const isWithinVault = Scopepath.withinVaultScopepathPred(u1)
     expect(isWithinVault(Scopepath.vault(u1))).to.be.false
     expect(isWithinVault(Scopepath.lease(u1))).to.be.false

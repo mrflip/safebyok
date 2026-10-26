@@ -9,7 +9,7 @@ import { type Vault } from '../../src/vault'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { type Outcome, bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultScopepath, u1BoxScopepath, storedRowOf, storedVaultPropsOf, storedWayinOf, boxlabelsOf, addLaptopPasskey, HourMillis, SevenDaysMillis } from './world'
+import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultScopepath, u1BoxScopepath, storedRowOf, storedVaultRecordOf, storedWayinOf, boxlabelsOf, addLaptopPasskey, HourMillis, SevenDaysMillis } from './world'
 
 
 // == [hello]: u1Main, bankIn, seedVault, unreachable, recordEpochIn, hello
@@ -521,7 +521,7 @@ describe("a hello that fails", () => {
     expect(await TH.expectRefusal(world.open(), 'not_permitted')).to.eq(refusal)
   })
 
-  it("says stored vault props that do not parse as damaged_vault, which the snapshot keeps as its trouble", async () => {
+  it("says a stored vault record that does not parse as damaged_vault, which the snapshot keeps as its trouble", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v6"}')
@@ -593,7 +593,7 @@ const bornThenDamaged = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   await seedVault(world)
   const vault = await world.open({ vaultDB: world.deafVaultDB(), ...overrides })
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return { world, vault }
 }
 
@@ -625,7 +625,7 @@ const behindWorld = async (overrides?: Partial<TH.BornVaultOpts>) => {
 }
 
 describe("vault.hello, by the Contract", () => {
-  it("reads the vault props, the ways in and the box listing, once (Contract: vault.hello, Does 1)", async () => {
+  it("reads the vault record, the ways in and the box listing, once (Contract: vault.hello, Does 1)", async () => {
     const world = makeWorld()
     await seedVault(world)
     const vault = await world.open()
@@ -759,7 +759,7 @@ describe("vault.hello, by the Contract", () => {
     const writer = await world.openUnlocked('pw')
     await writer.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await writer.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
-    const stored = storedVaultPropsOf(world)
+    const stored = storedVaultRecordOf(world)
     await vault.hello({ staleMinutes: 0 })
     expect(vault).to.deep.include({ vault_tok: stored['vault_tok'], registered_at: stored['registered_at'], gate_epoch: stored['gate_epoch'] })
     expect(vault.passphrase).to.deep.include({ device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })

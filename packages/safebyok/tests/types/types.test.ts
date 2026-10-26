@@ -104,7 +104,7 @@ describe("BoxSummary", () => {
     expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok', 'damaged'])
   })
 
-  it("refuses a summary with no vault_tok: it names the vault props the box lies under", () => {
+  it("refuses a summary with no vault_tok: it names the vault record the box lies under", () => {
     expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_tok')).success).to.be.false
   })
 })

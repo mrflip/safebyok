@@ -95,13 +95,13 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+  protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
       const standing = readJson(this.store, vaultScopepath)
-      const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
+      const refusal = Expectations.vaultRecordRefusalOf(standing, expected)
       if (refusal) { throw refusal }
-      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultPropsPutOf(vaultRecord, standing)))
+      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, standing)))
       return readJson(this.store, vaultScopepath)
     })
   }

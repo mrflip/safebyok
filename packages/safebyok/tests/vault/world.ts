@@ -63,7 +63,7 @@ export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summ
 
 /** Storage adapters Bank.make refuses: short of a verb the vault calls. */
 export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
-  [{ vaultDB: { getVaultProps: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
+  [{ vaultDB: { getVaultRecord: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
   [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
   [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getDeviceRecord') }, 'a deviceDB that keeps no device record'],
 ]
@@ -104,11 +104,11 @@ export const storedRowOf = (world: ReturnType<typeof makeWorld>, boxlabel: strin
 )
 
 /** The vault's stored props, as the backend holds them. */
-export const storedVaultPropsOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
+export const storedVaultRecordOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
   JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as Record<string, unknown>
 )
 
-/** The ckeys of every row `user_id`'s vault has in storage: its vault props and its boxes. */
+/** The ckeys of every row `user_id`'s vault has in storage: its vault record and its boxes. */
 export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => (
   world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
 )
@@ -119,18 +119,18 @@ export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'pass
   world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, [wayinkind]: { ...vaultRecord.gate[wayinkind], ...spoil } } }))
 }
 
-/** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
+/** A world whose `u1` vault, with a box and a lease, has had its stored vault record spoiled. */
 export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return world
 }
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
@@ -150,7 +150,7 @@ export const vaultWithPasskey = async () => {
 
 /**
  * A world whose slow waits can be held mid-flight, to land a lock inside an unlock: each
- * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, the answer of
+ * `holdNext` arms a gate on the next look at the vault record, passphrase derivation, the answer of
  * a lease write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
  * own copy of testDeriver, so a spy on it stays here.
  */
@@ -167,7 +167,7 @@ export const makeRacingWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
 
 /** The stored vault record's way in of `wayinkind`, as the backend holds it in its gate: null for no passkey, or no gate. */
 export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => {
-  const gate = storedVaultPropsOf(world)['gate'] as Record<string, Record<string, unknown> | null> | null
+  const gate = storedVaultRecordOf(world)['gate'] as Record<string, Record<string, unknown> | null> | null
   return gate === null ? null : gate[wayinkind] ?? null
 }
 

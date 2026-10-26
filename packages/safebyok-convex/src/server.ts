@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
+  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -48,7 +48,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getVault, ensureVault, putVaultProps, getBox, putBox, getCapacity, delBox, delVault, watchVault,
+ *     getVault, ensureVault, putVaultRecord, getBox, putBox, getCapacity, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -111,12 +111,12 @@ export class SafebyokComponent {
           return await ctx.runMutation(vaults.ensureVault, args)
         },
       }),
-      putVaultProps: publicMutation({
+      putVaultRecord: publicMutation({
         args:    { vaultProps: VaultRecord, expected: VaultRecordExpectation },
-        returns: PutVaultPropsAnswer,
+        returns: PutVaultRecordAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.putVaultProps, args)
+          return await ctx.runMutation(vaults.putVaultRecord, args)
         },
       }),
       getBox: publicQuery({

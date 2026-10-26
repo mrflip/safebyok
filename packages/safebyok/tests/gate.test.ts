@@ -3,13 +3,13 @@ import { Gate } from '../src/gate'
 import { PassphraseProving, StandingGating } from '../src/proving'
 import { VaultRecord } from '../src/vault-record'
 import * as TH from './test-helpers'
-import { makeWorld, storedVaultPropsOf } from './vault/world'
+import { makeWorld, storedVaultRecordOf } from './vault/world'
 
 /** A world holding `u1`'s vault, gated with `pw`, and its stored props. */
 const gatedWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  return { world, vault, props: VaultRecord.parse(storedVaultPropsOf(world)) as TH.GatedRecord }
+  return { world, vault, props: VaultRecord.parse(storedVaultRecordOf(world)) as TH.GatedRecord }
 }
 
 describe("Gate.make", () => {
@@ -43,7 +43,7 @@ describe("Gate.make", () => {
 })
 
 describe("Gate.of", () => {
-  it("is the gate stored vault props hold, its base one epoch below, as its example shows", async () => {
+  it("is the gate stored vault record holds, its base one epoch below, as its example shows", async () => {
     const { vault, props } = await gatedWorld()
     const gate = Gate.of(vault, props)
     expect(gate.gate_epoch).to.eq(props.gate_epoch)

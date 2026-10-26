@@ -29,12 +29,12 @@ is no migration: a release that changes the tables says so in its changelog, and
 and run it again.
 
 **Upgrading from a release whose tables have a `vault_key_epoch` or `sidecar_json` column**: the
-vault props and boxes hold neither now, and a box's sidecar is the column `sidecar`, a `jsonb`.
+vault record and boxes hold neither now, and a box's sidecar is the column `sidecar`, a `jsonb`.
 No vault stored before is read (each reads as damaged, its boxes with it), so drop both tables --
 the boxes too, or the new vaults table would stand without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
 
-**Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault props
+**Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault record
 hold a `vault_epoch` now (the counter a gate write and a deletion move), and a deleted vault leaves
 a row in the new table `safebyok_vault_tombstones`. No vault stored before is read (each reads as
 damaged, its boxes with it, and `VaultTablesSql` never adds a column to a table already there), so
@@ -83,11 +83,11 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
   transaction of your driver and no retry: a write lands only while what it expects still
   stands, and refuses with kind `stale_write` otherwise -- a box write with what stands under
-  its boxlabel, read by that same statement, or with kind `vault_mismatch` when its vault props
+  its boxlabel, read by that same statement, or with kind `vault_mismatch` when its vault record
   no longer stand. A box read is one statement too, reading the vault row and the box together,
   and refuses `vault_mismatch` likewise. A box write reads its vault row
   `FOR SHARE`, a shared lock: box writes never wait for each other on the vault row (two
-  writes to one boxlabel still meet at that box's row), and an update of the vault props waits
+  writes to one boxlabel still meet at that box's row), and an update of the vault record waits
   for the box writes under way (or they for it), so a box lands only under the vaultKey
   that stands.
 * **Isolation**: every guarantee here holds under READ COMMITTED, Postgres's default. Above it --
@@ -112,7 +112,7 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
   write them, say. Opening a vault writes, even one that stands: its birth is `ensureVault`, one
-  statement that deletes the scope's tombstone and inserts the vault props or meets the ones
+  statement that deletes the scope's tombstone and inserts the vault record or meets the ones
   standing (`ON CONFLICT ... DO UPDATE`), and lists their boxes. So the role needs `SELECT`,
   `INSERT` and `UPDATE` on `safebyok_vaults`, `SELECT` and `DELETE` on
   `safebyok_vault_tombstones`, and `SELECT` on `safebyok_boxes`, to open a vault at all: a
@@ -151,7 +151,7 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 const served = new Map<string, Served>([
   ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
   ['ensureVault',  (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null })],
-  ['putVaultProps', (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultProps(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
+  ['putVaultRecord', (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
@@ -179,10 +179,10 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
  */
 const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
   if (ok) { return { result: val, meta: {} } }
-  const { box_stored, vault_props_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
+  const { box_stored, vault_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
   const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
   // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
-  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_props_stored, capacity } }
+  return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_stored, capacity } }
 }
 
 /** A listed damaged box, rebuilt from its three public fields. */
@@ -212,7 +212,7 @@ export async function POST(request: Request): Promise<Response> {
 A vault is read through `getVaultRecords` and `ensureVaultRecords`, not `getVault` and
 `ensureVault`: those hand back summaries, the shape a vault shows, and a VaultDB in the browser
 must hand back records as stored. Each is one statement on the server, so the browser's read of a
-vault, its listing included, is one request. An update of the vault props answers the props as
+vault, its listing included, is one request. An update of the vault record answers the record as
 stored, and a deletion of the vault the tombstone it left: both go to the browser as the route's
 `result`.
 
@@ -222,7 +222,7 @@ stored, and a deletion of the vault the tombstone it left: both go to the browse
 
 * **The main `meta`** holds what a call learned about what stands, the facts that are not errors
   but the caller's next step: a stale box write's `box_stored`, a stale update's
-  `vault_props_stored` (a record whole, as a read would send it, or null for none), and a full
+  `vault_stored` (a record whole, as a read would send it, or null for none), and a full
   vault's `capacity`. A served call has none today, and sends `meta: {}`. Records here are
   ciphertext and visible fields, as a read sends them; the browser's VaultDB checks each.
 * **`refusal.meta`** holds error information only, a damaged record's listing (`box_listed`,
@@ -236,7 +236,7 @@ its place, a missing `meta`, both a `result` and a `refusal`), as `storage_unava
 rethrows a refusal as the `VaultError` the server made, with both metas merged into its `meta`.
 **Redeploy the route and the app together**: a route that sends the older `{ refusal: { meta } }`
 and no main `meta` is refused by a newer browser, and an older browser reads a newer route's
-refusal without the main meta's `box_stored`, `vault_props_stored` or `capacity`.
+refusal without the main meta's `box_stored`, `vault_stored` or `capacity`.
 
 The client half, a VaultDB over `fetch`, to hand `Bank.make` as its `vaultDB`:
 
@@ -257,7 +257,7 @@ export class RouteVaultDB extends VaultDB {
 
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
   protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return storedVaultOf(await this.call('ensureVault', draft)) }
-  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultProps', vaultRecord, expected) }
+  protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultRecord', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
@@ -291,7 +291,7 @@ export class RouteVaultDB extends VaultDB {
 // VaultDB's to check. A thrown Error is met as storage_unavailable, quoting nothing it was sent.
 type RouteAnswer = { result: unknown, refusal?: undefined, meta: RefusalMeta } | { result?: undefined, refusal: { kind: RefusalKind, message: string, meta: RefusalMeta }, meta: RefusalMeta }
 
-const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_props_stored', 'capacity']
+const MainMetaCkeys: readonly string[] = ['box_stored', 'vault_stored', 'capacity']
 const RefusalMetaCkeys: readonly string[] = ['box_listed', 'wayin_listed']
 
 const isObject = (sent: unknown): sent is object => typeof sent === 'object' && sent !== null && ! Array.isArray(sent)
@@ -322,7 +322,7 @@ const misshapen = () => new Error('The vault route answered something that is no
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 
-// A vault as the route sends it -- its vault props, and its boxes as stored records -- or null for
+// A vault as the route sends it -- its vault record, and its boxes as stored records -- or null for
 // none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
 const storedVaultOf = (sent: unknown): StoredVault => {
   if (sent === null) { return { vaultProps: null, boxes: [] } }
@@ -445,12 +445,12 @@ subscriber: at worst, a refresh that finds nothing new.
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or one of the vault
-props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's
+the vault record's two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's
 sidecar is a `jsonb` too, never null, which your server can query: always a JSON object, `{}` for none.
 `jsonb` may reorder an object's keys and drop its spacing, which changes nothing: safebyok binds
 each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
 Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as
-it must, since every field a record holds is bound into its encryption (all but the vault props'
+it must, since every field a record holds is bound into its encryption (all but the vault record's
 `gate_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
 cannot hold -- a string holding `\u0000`, say -- is refused by Postgres, and the write fails with
 its error as the cause, nothing written.
@@ -463,7 +463,7 @@ its error as the cause, nothing written.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
-  `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
+  `vault_key_wayin_wrapped` inside the vault record's `passphrase`, and inside its `passkey` when
   they have one).
 * **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
   and schema version, the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
@@ -473,8 +473,8 @@ its error as the cause, nothing written.
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
-* **A box stands only beside its vault props**, under the same `vault_tok`: the foreign key
-  deletes a vault's boxes with its props, in one statement, and refuses a box written for
+* **A box stands only beside its vault record**, under the same `vault_tok`: the foreign key
+  deletes a vault's boxes with its record, in one statement, and refuses a box written for
   a vault since deleted and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
   connects as -- reaches them as before, and every other role reaches no row. To serve the

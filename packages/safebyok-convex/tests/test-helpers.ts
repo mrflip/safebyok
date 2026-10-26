@@ -30,12 +30,12 @@ export const componentTest = (transactionLimits = false) => convexTest({ schema,
  */
 export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedRecord) => {
   await CVX.mutation(vaults.ensureVault, { draft: { ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null } })
-  const answer = await CVX.mutation(vaults.putVaultProps, { vaultProps: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
+  const answer = await CVX.mutation(vaults.putVaultRecord, { vaultProps: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
   if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }
-  return answer.vault_props_stored
+  return answer.vault_stored
 }
 
-/** The vault props a component test's CVX holds for `scope`, as `getVault` reads them, or null. */
+/** The vault record a component test's CVX holds for `scope`, as `getVault` reads it, or null. */
 export const propsIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
   const read = await CVX.query(vaults.getVault, { ...scope })
   return read?.vaultProps ?? null
@@ -71,7 +71,7 @@ export const installedComponent = () => {
  * @returns The refusal's data, its `kind` and `message`.
  *
  * @example
- *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getVaultProps, { ...scope }))
+ *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getVaultRecord, { ...scope }))
  *   expect(refusal.kind).to.eq('identity_revoked')
  */
 export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {
@@ -122,7 +122,7 @@ export const RealPassphrase = 'correct horse battery staple'
 export const openOver = (store: StringStore, user_id = 'u1') => settledVault(memoryVaultOpts({ user_id, vaultDB: localVaultDB({ store }) }))
 
 /**
- * A real vault, made by the core's own code: vault props and a box per {@link RealWhispers}
+ * A real vault, made by the core's own code: vault record and a box per {@link RealWhispers}
  * entry, each record exactly as the core stores it, read back from its in-memory store by ckey.
  */
 export const realRecords = async (user_id = 'u1') => {
@@ -134,11 +134,11 @@ export const realRecords = async (user_id = 'u1') => {
   }
   closeVault(vault)
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
-  const vaultPropsRow = rows.find((row) => VaultRecord.safeParse(row.record).success)
-  if (! vaultPropsRow) { throw new Error('the core stored no vault props') }
+  const vaultRecordRow = rows.find((row) => VaultRecord.safeParse(row.record).success)
+  if (! vaultRecordRow) { throw new Error('the core stored no vault record') }
   return {
-    vaultPropsCkey: vaultPropsRow.ckey,
-    vaultProps:     VaultRecord.parse(vaultPropsRow.record),
+    vaultRecordCkey: vaultRecordRow.ckey,
+    vaultProps:     VaultRecord.parse(vaultRecordRow.record),
     boxes:          rows.flatMap((row) => {
       const checked = BoxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []

@@ -118,10 +118,10 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, user_i
   crosses as `storage_unavailable`.
 * **What a refusal learned crosses in the mutation's body, not in the error.** GraphQL servers,
   gateways and APM tools commonly log an error's `extensions`, and a stale write learns the
-  winning vault props (both ways in, their salts and wrapped vaultKeys) or a winning box. So
-  `safebyokPutVaultProps` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
+  winning vault record (both ways in, its salts and wrapped vaultKeys) or a winning box. So
+  `safebyokPutVaultRecord` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
   for a `vault_full` box write), `landed: false` with the `refusalkind`, the `message`, and
-  `vault_props_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
+  `vault_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
   VaultError from it. Those fields are in the response's `data`: take care that your server's
   logging of responses, where it has any, does not write them down. Upgrade the client and the
   server together; a client and a server of different versions refuse each other's operations
@@ -151,7 +151,7 @@ The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault ca
 records, their two ciphered fields left out. A VaultDB's own `getVault` and `ensureVault` give
 summaries instead -- the shape a vault shows, without `format` -- which the browser's VaultDB may
 not hand back from its own listing. A
-vault read is one query, its props and its boxes from one step of the server's VaultDB.
+vault read is one query, its record and its boxes from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
 Every stored field is non-null in the schema but the vault record's `gate`, null while a vault

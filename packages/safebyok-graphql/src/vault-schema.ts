@@ -219,17 +219,17 @@ type SafebyokCapacity {
 }
 
 """
-What an update of the vault record answered. It \`landed\`, and \`vault_props_stored\` is the vault
+What an update of the vault record answered. It \`landed\`, and \`vault_stored\` is the vault
 record as stored, its vault_epoch moved up by one; or it was refused and nothing was written:
-\`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_props_stored\` carries the vault
+\`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_stored\` carries the vault
 record standing, whole, or null when none stands. It holds the ways in, so it rides in this body,
 never in an error's \`extensions\`.
 """
-type SafebyokPutVaultPropsAnswer {
+type SafebyokPutVaultRecordAnswer {
   landed:             Boolean!
   refusalkind:        String
   message:            String
-  vault_props_stored: SafebyokStoredRecord
+  vault_stored: SafebyokStoredRecord
 }
 
 """
@@ -259,7 +259,7 @@ type Mutation {
   """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its record and every box, from one step: these, or another device's already standing. Over a tombstone it starts a new life, the counter carried on."""
   safebyokEnsureVault(draft: SafebyokVaultRecordInput!): SafebyokVault!
   """Replaces the vault record, its gate with it, only while the one standing is the one expected, and answers with the vault record as stored when it landed, or the one standing when it did not."""
-  safebyokPutVaultProps(vaultProps: SafebyokVaultRecordInput!, expected: SafebyokVaultRecordExpectationInput!): SafebyokPutVaultPropsAnswer!
+  safebyokPutVaultRecord(vaultProps: SafebyokVaultRecordInput!, expected: SafebyokVaultRecordExpectationInput!): SafebyokPutVaultRecordAnswer!
   """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
   safebyokPutBox(applabel: String!, user_id: String!, vaultlabel: String!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""

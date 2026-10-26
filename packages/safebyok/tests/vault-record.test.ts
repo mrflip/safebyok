@@ -28,9 +28,9 @@ const VaultRecordCases = [
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },     false,  'a format this version does not know'],
   [flatOf(TH.vaultRecordOf('u1')),                                 false,  'a record from before its gate was nested, the wayins flat beside its fields'],
   [{ ...omit(TH.gatelessOf('u1'), ['gate']), passphrase: null, passkey: null }, false, 'a novel record from before its gate was nested, its two slots null, never read as a novel vault'],
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1 }, false, 'v5 vault props, which carried a vaultKey epoch'],
-  [{ ...recordWithoutGate, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v3' },     false,  'vault props from before the prior vaultKey went'],
+  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1 }, false, 'v5 vault record, which carried a vaultKey epoch'],
+  [{ ...recordWithoutGate, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault record, its ways in a list'],
+  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v3' },     false,  'vault record from before the prior vaultKey went'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: 0 },                   false,  'a gate at gate_epoch 0'],
   [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                      false,  'no gate at a later gate_epoch: a gate that lost its ways in'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: 1.5 },                 false,  'an epoch that is no whole number'],
@@ -45,9 +45,9 @@ const VaultRecordCases = [
   [recordWithoutGate,                                              false,  'a record that leaves out its gate, rather than saying null'],
   [recordWithoutEpoch,                                             false,  'a record missing its gate_epoch'],
   [{ ...recordWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'a record from before its time was named registered_at'],
-  [{ ...recordWithoutGate, ...WayinFieldsOfOld },                  false,  'vault props from before their passphrase was a way in'],
-  [{ ...recordWithoutEpoch, passphrase_epoch: 1 },                 false,  'vault props from before their epoch was named gate_epoch'],
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v1' },     false,  'vault props from before vaultKey epochs'],
+  [{ ...recordWithoutGate, ...WayinFieldsOfOld },                  false,  'vault record from before its passphrase was a way in'],
+  [{ ...recordWithoutEpoch, passphrase_epoch: 1 },                 false,  'vault record from before its epoch was named gate_epoch'],
+  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v1' },     false,  'vault record from before vaultKey epochs'],
   [{ ...TH.vaultRecordOf('u1'), note: 'hello' },                   false,  'a field this version does not know'],
 ] as const
 
@@ -155,7 +155,7 @@ describe("the vault record's shapes", () => {
 // == [isGated]
 
 describe("isGated", () => {
-  it("is true for a gated vault record and false for a novel one, as its example tells them apart", () => {
+  it("is true for a gated vault record and false for a novel one, as its example tells it apart", () => {
     expect(isGated(TH.vaultRecordOf('u1'))).to.be.true
     expect(isGated(TH.gatelessOf('u1'))).to.be.false
   })

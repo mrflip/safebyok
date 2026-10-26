@@ -86,9 +86,9 @@ export class OutageVaultDB extends VaultDB {
   // The inner adapter's public verbs refuse a failed expectation as stale_write themselves, and a
   // refusal thrown here passes through this adapter's verbs untouched: so reaching the end means
   // it landed, and the vault record as the inner adapter stored it is the answer.
-  protected async doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.putVaultProps(vaultRecord, expected))
+    return valOf(await this.inner.putVaultRecord(vaultRecord, expected))
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
@@ -117,7 +117,7 @@ export class OutageVaultDB extends VaultDB {
     return valOf(await this.inner.delVault(scope, expected))
   }
 
-  // The one public verb this adapter hands on itself: deleting a vault whose props are damaged
+  // The one public verb this adapter hands on itself: deleting a vault whose record is damaged
   // needs the record as stored, which this adapter's own doGetVault never sees, as the inner
   // verbs refuse it. The inner adapter does the checking and the deleting.
   override delDamagedVault(scope: VaultScope): Promise<Outcome<VaultTombstone | null>> {

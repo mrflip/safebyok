@@ -193,15 +193,15 @@ export const PutBoxAnswer = v.union(
 )
 
 /** What an update of the vault record answers, from its one transaction: `landed` with the vault record as stored, or the vault record standing that it did not land over.
- * A landed update carries it as stored, its `vault_epoch` moved up by one (`vault_props_stored`).
- * A miss carries what stands as a read returns it (`vault_props_stored`; null for none).
+ * A landed update carries it as stored, its `vault_epoch` moved up by one (`vault_stored`).
+ * A miss carries what stands as a read returns it (`vault_stored`; null for none).
  *
- * @example { landed: true, vault_props_stored: stored }
- * @example { landed: false, vault_props_stored: winner }
+ * @example { landed: true, vault_stored: stored }
+ * @example { landed: false, vault_stored: winner }
  */
-export const PutVaultPropsAnswer = v.union(
-  v.object({ landed: v.literal(true), vault_props_stored: VaultRecord }),
-  v.object({ landed: v.literal(false), vault_props_stored: v.nullable(VaultRecord) }),
+export const PutVaultRecordAnswer = v.union(
+  v.object({ landed: v.literal(true), vault_stored: VaultRecord }),
+  v.object({ landed: v.literal(false), vault_stored: v.nullable(VaultRecord) }),
 )
 
 /** What a vault delete was meant for: it lands only while the scope's vault record has this `vault_tok` and `gate_epoch`.

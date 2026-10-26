@@ -302,7 +302,7 @@ export class Box {
 
 // == [Listing]: heldListing
 
-/** A listed box as a vault holds it and hands it out, lying under `vaultTok`, the vault props the listing was read beside.
+/** A listed box as a vault holds it and hands it out, lying under `vaultTok`, the vault record the listing was read beside.
  * A sound one is a box's visible fields and `vault_tok`, and `damaged: false`, frozen through. Its
  * sidecar is the one the listing's check made, frozen where it stands, never parsed again. A
  * damaged one keeps its boxlabel and revision alone.

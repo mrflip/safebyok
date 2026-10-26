@@ -7,7 +7,7 @@ const { api, createTest } = TH.hostWith(TH.bySubject)
 
 const u1 = TH.scopeOf('u1')
 
-/** A CVX where each of `user_ids` has a vault holding vault props and one box, written as that user. */
+/** A CVX where each of `user_ids` has a vault holding a vault record and one box, written as that user. */
 const seeded = async (user_ids: readonly string[] = ['u1']) => {
   const CVX = createTest()
   for (const user_id of user_ids) {
@@ -27,7 +27,7 @@ const callsOn = (user_id: string): [string, (caller: Caller) => Promise<unknown>
   return [
     ['getVault',         (caller) => caller.query(api.safebyok.getVault, { ...scope })],
     ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf(user_id, { vault_tok: 'vault-tok-late' }) })],
-    ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultRecordOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
+    ['putVaultRecord',    (caller) => caller.mutation(api.safebyok.putVaultRecord, { vaultProps: TH.vaultRecordOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
     ['getBox',           (caller) => caller.query(api.safebyok.getBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok } })],
     ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { ...scope, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_tok, revision_tok: 'rev-a1' } })],
     ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { ...scope })],
@@ -40,7 +40,7 @@ const callsOn = (user_id: string): [string, (caller: Caller) => Promise<unknown>
 const EveryCall = callsOn('u1')
 
 /** The writes among {@link callsOn}'s calls that change the vault `seeded` leaves, when its own user makes them. */
-const LandingWrites: ReadonlySet<string> = new Set(['putVaultProps', 'putBox', 'delBox', 'delVault'])
+const LandingWrites: ReadonlySet<string> = new Set(['putVaultRecord', 'putBox', 'delBox', 'delVault'])
 
 /** Each of the seven functions that take a scope, called as before the scope's names were flattened into its arguments: `{ scope, ... }`. */
 const NestedCalls: [string, (caller: Caller) => Promise<unknown>][] = [

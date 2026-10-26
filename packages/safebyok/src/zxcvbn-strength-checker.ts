@@ -10,7 +10,7 @@ export const MinPassphraseChars = 12
 
 /** The least zxcvbn score, of 0 to 4, {@link zxcvbnStrengthChecker} admits.
  * zxcvbn calls 3 safely unguessable: it holds against an offline attack on a slow hash, which is
- * what a copy of the vault props meets under Argon2id.
+ * what a copy of the vault record meets under Argon2id.
  */
 export const MinZxcvbnScore = 3
 
