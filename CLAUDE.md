@@ -37,7 +37,10 @@ passphrase, the customer integrating the package, and the security reviewer read
   misdirected you: say so.
 * **Maintainability and legibility beat performance** unless it is shown to be slow where it
   matters. Cleverness is rarely called for; if it seems to be, propose it.
-* **Validate at module entrypoints**, then write confident, paranoia-free code past that boundary.
+* **Validate with Zod at each module entrypoint**, every export, then write confident,
+  paranoia-free code past it: a private helper trusts its exported caller.
+* **Take a part of a thing by parsing or destructuring, never by spreading it**: a spread drops
+  its getters and copies every other field. Host code gets plain data, never the thing.
 * **Security first.** Where the stronger measure (Argon2id, say) is not available on every
   platform, implement it first anyway, and make it pluggable second.
 * **Secret material never leaves through a side door**: beware leakage via error objects or logging.
@@ -102,9 +105,9 @@ A code file's section banners are its table of contents:
   encrypted forms. Its names are the only names for those things, in code, docs and stored
   fields. **Look up a term you do not recognize**, and look before naming a new thing in the cast.
 * `STYLE.md` -- naming (`val`, `ckey`, `bag`, `kind`, what `key` means here), layout, doc blocks,
-  validation and tests: specific, unguessable, and only partly linted. **Writing code, read
-  *Naming* once; read *Comments and doc blocks*, *Tests* or *Validation* when you write a doc
-  block, a test, or an entrypoint that takes a caller's input.**
+  validation, shapes and tests: specific, unguessable, and only partly linted. **Writing code,
+  read *Naming* once; read *Comments and doc blocks*, *Tests*, *Validation* or *Shapes and duck
+  typing* when you write a doc block, a test, a validator, or a type or class that holds state.**
   Every export has a doc block written for its caller and tests in proportion.
 * `packages/safebyok/eslint.config.mjs` -- the final authority on formatting; the other configs
   are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error` and
@@ -123,5 +126,6 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
   cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
-* Stored fields are underbar_case (`salt_bytes`), everything else camelCase. Times are integer
-  UTC epoch milliseconds, never strings or `Date`s.
+* Stored fields are underbar_case (`salt_bytes`), and so is a host-facing field holding one
+  (`user_id`, never `userId`); everything else camelCase. Times are integer UTC epoch
+  milliseconds, never strings or `Date`s.
