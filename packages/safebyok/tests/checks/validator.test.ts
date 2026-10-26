@@ -101,6 +101,15 @@ describe("Validator", () => {
     expect(err.cause).to.be.undefined
   })
 
+  it("never repeats an unknown key shaped as a credential, while it repeats one shaped as our snake_case or camelCase field names", () => {
+    const credentials = [`ghp_${'aB3'.repeat(12)}`, `sk_live_${'0Fake'.repeat(5)}`, 'sk_live_abc123def', 'AKIAIOSFODNN7EXAMPLE', 'deadbeef0123', 'a'.repeat(33)]
+    const ours = ['salt_b64', 'vault_key_wayin_wrapped', 'staleMinute', 'idbVaultDB', 'prfSaltB64']
+    const { strictBag } = Validator('bad_option', ({ obj }) => ({ strictBag: obj({}).strict() }))
+    const err = TH.expectSyncRefusal(() => strictBag.parse(Object.fromEntries([...credentials, ...ours].map((ckey) => [ckey, 1]))), 'bad_option')
+    for (const credential of credentials) { expect(err.message).to.not.include(credential) }
+    expect(err.message).to.eq(`There are no fields ${[...credentials.map(() => '(a name not repeated here)'), ...ours].join(', ')}: check their spelling, or leave them out`)
+  })
+
   it("never repeats a record's key that may be the caller's data in a failing field's path", () => {
     const { listing } = Validator('bad_record', ({ rec, str, label }) => ({ listing: rec(str, label) }))
     const err = TH.expectSyncRefusal(() => listing.parse({ 'sk-live-0xSECRET': 'Not A Label', fine_name: 'Nor This' }), 'bad_record')
@@ -119,6 +128,23 @@ describe("Validator", () => {
     expect(checked.success).to.be.false
     expect(checked.error).to.be.instanceOf(Zod.ZodError)
     await expect(vaultScope.parseAsync({ ...scope, vaultlabel: 'Main' })).rejects.toThrow(Zod.ZodError)
+  })
+
+  it("renders to JSON Schema as the schema it was made from, a pipe and a recursion through a lazy included", () => {
+    const build = ({ lazy, union, arr, str, num, obj }: typeof Kit) => {
+      const tree: Zod.ZodType = lazy(() => union([num, arr(tree)]))
+      return { piped: str.transform((text) => text.length).pipe(num), tree, holder: obj({ tree }).strict() }
+    }
+    const made = Validator('bad_record', build)
+    const plain = build(Kit)
+    for (const valname of ['piped', 'holder'] as const) {
+      expect(Zod.toJSONSchema(made[valname], { unrepresentable: 'any' })).to.deep.equal(Zod.toJSONSchema(plain[valname], { unrepresentable: 'any' }))
+    }
+    // A recursive validator at the root refers to itself through a definition, where Zod's own says '#'.
+    const { $schema: _schema, ...plainTree } = Zod.toJSONSchema(plain.tree, { unrepresentable: 'any' })
+    const madeTree = Zod.toJSONSchema(made.tree, { unrepresentable: 'any' })
+    expect(madeTree.$ref).to.eq('#/$defs/__schema0')
+    expect(JSON.stringify(madeTree.$defs?.['__schema0'])).to.eq(JSON.stringify(plainTree).replaceAll('"#"', '"#/$defs/__schema0"'))
   })
 
   it("makes each slice made in the call refuse: pick, omit, extend, partial, strict, strip and readonly", () => {

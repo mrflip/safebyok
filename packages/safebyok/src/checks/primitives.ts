@@ -43,5 +43,5 @@ export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
  * @example user_id.safeParse('..').success                  // false: dots alone
  * @example user_id.safeParse('a/b').success                 // false: percent-encode it, 'a%2Fb'
  */
-export const user_id = str().min(1, Phrases.UserIdMissing).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(UserIdPattern, Phrases.UserIdChars)
+export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(UserIdPattern, Phrases.UserIdChars)
 // --

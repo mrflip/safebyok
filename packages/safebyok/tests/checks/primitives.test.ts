@@ -129,6 +129,10 @@ describe("user_id", () => {
     expect(refusals[2]).to.include('percent-encode')
     expect(refusals.join(' ')).to.not.include('alice')
   })
+
+  it("says only that an empty user_id can't be empty, not also that its characters are wrong", () => {
+    expect(user_id.safeParse('').error?.issues.map((issue) => issue.message)).to.deep.equal(["A user_id names the signed-in user, so it can't be empty"])
+  })
 })
 
 describe("UserIdPattern", () => {

@@ -87,11 +87,15 @@ export const Validator = <ValsT extends Record<string, Z.ZodType>, const Sources
 }
 // --
 
-// == [Refusals]: refusing, InEnglish, MaxFailuresSaid, SayableName, sayable, fieldnameOf, sentenceOf, refusalOf
+// == [Refusals]: refusing, InEnglish, MaxFailuresSaid, MaxSayableChars, SnakeFieldname, CamelFieldname, isSayable, sayable, fieldnameOf, sentenceOf, refusalOf
 
-/** `schema`, but for a `parse` that throws a VaultError of `kind` where Zod's would throw its own. */
+/** `schema`, but for a `parse` that throws a VaultError of `kind` where Zod's would throw its own.
+ * It is a clone, a schema of its own over the same definition: Zod binds each schema's own methods
+ * to it, so a schema that only inherited them (`Object.create`) would render to JSON Schema as the
+ * schema it came from, losing a pipe's or a lazy's place.
+ */
 const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT): SchemaT => {
-  const wrapped = Object.create(schema) as SchemaT
+  const wrapped = schema.clone()
   wrapped.parse = (val: unknown): Z.output<SchemaT> => {
     const result = schema.safeParse(val, InEnglish)
     if (result.success) { return result.data }
@@ -106,12 +110,29 @@ const InEnglish = { error: Zod.locales.en().localeError }
 /** The most failures a refusal's message names; it counts the rest. */
 const MaxFailuresSaid = 8
 
-/** A name a refusal may repeat: shaped as one of our field names. Any other key could be the caller's data. */
-const SayableName = /^[A-Za-z_]\w{0,63}$/
+/** The longest name a refusal repeats: longer than any of our field names, shorter than most credentials. */
+const MaxSayableChars = 32
 
-/** One step of a failing field's path as a refusal says it: an index, a field name, or a stand-in for a key that may be the caller's data. */
-const sayable = (step: PropertyKey): string => (
-  typeof step === 'number' || (typeof step === 'string' && SayableName.test(step)) ? String(step) : Phrases.UnsaidName
+/** A field name of ours in snake_case: lowercase words joined by single underscores, each word letters ending in at most three digits (`salt_b64`). */
+const SnakeFieldname = /^[a-z]+\d{0,3}(?:_[a-z]+\d{0,3})*$/
+
+/** A field name of ours in camelCase: a lowercase word, then words each opening on a capital, each ending in at most three digits (`maxWhisperBytes`, `vaultDB`). */
+const CamelFieldname = /^[a-z]+\d{0,3}(?:[A-Z][a-z]*\d{0,3})*$/
+
+/** True for a key a refusal may repeat: shaped as one of our field names, {@link SnakeFieldname} or {@link CamelFieldname}, and no longer than {@link MaxSayableChars}.
+ * A credential (`ghp_` and 36 mixed characters, `sk_live_0Fake...`, `AKIA...`) mixes digits and
+ * cases within a word, so it is never repeated: any key not shaped as ours could be the caller's data.
+ */
+const isSayable = (ckey: string): boolean => ckey.length <= MaxSayableChars && (SnakeFieldname.test(ckey) || CamelFieldname.test(ckey))
+
+/** One step of a failing field's path as a refusal says it: an index, a field name, or a stand-in for a key that may be the caller's data.
+ * A check that names a key itself, outside a refusal, says it through this.
+ *
+ * @example sayable('staleMinute')                        // 'staleMinute'
+ * @example sayable('sk_live_0FakeKey9')                  // '(a name not repeated here)'
+ */
+export const sayable = (step: PropertyKey): string => (
+  typeof step === 'number' || (typeof step === 'string' && isSayable(step)) ? String(step) : Phrases.UnsaidName
 )
 
 /** Where one failure is, as a refusal says it: its path's steps joined on `.`, and '' for the input as a whole. */
