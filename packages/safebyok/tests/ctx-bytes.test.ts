@@ -1,7 +1,7 @@
 import { hex } from '@scure/base'
 import { describe, expect, it } from 'vitest'
 import { BoxStamp } from '../src/box'
-import { cipherBytes, cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBoxKey, unwrapKeyUnder } from '../src/crypto'
+import { cipherBytes, cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder } from '../src/crypto'
 import { isVaultError } from '../src/errors'
 import { LeaseStamp, boxCtxOf, leaseCtxOf } from '../src/lease'
 import { memoryDeviceDB } from '../src/device-db'
@@ -202,6 +202,19 @@ describe("each ctx binds every field of its stamps", () => {
 
   it("a box's two purposes make two ctxs: its wrapped key will not open as its ciphered whisper", () => {
     expect(hex.encode(boxCtxOf(vaultStamp, boxStamp, 'box_key_wrapped'))).to.not.eq(hex.encode(boxCtxOf(vaultStamp, boxStamp, 'whisper_ciphered')))
+  })
+
+  it("boxCtxOf takes the vault's stamp from a Vault object, as its example shows, binding the same bytes as from the stamp alone", async () => {
+    const vault = await makeWorld().open()
+    const { format: _format, vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, ...stampAlone } = vault.stamp
+    const ownStamp = { ...boxStamp, vault_tok: vault.vault_tok }
+    expect(hex.encode(boxCtxOf(vault, ownStamp, 'whisper_ciphered'))).to.eq(hex.encode(boxCtxOf(stampAlone, ownStamp, 'whisper_ciphered')))
+  })
+
+  it("leaseCtxOf takes a whole vault record and a whole lease record, as its example shows, binding their stamps alone", async () => {
+    const vaultRecord = { ...vaultStamp, vault_epoch: 3, gate_epoch: 2, gate: null }
+    const leaseRecord = { ...leaseStamp, lease_key: await makeLeaseKey(), vault_key_lease_wrapped: { cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' } }
+    expect(hex.encode(leaseCtxOf(vaultRecord, leaseRecord))).to.eq(hex.encode(leaseCtxOf(vaultStampButFormat, leaseStamp)))
   })
 
   it("a box's ctx refuses a box stamp holding a field beyond its own, 'bad_record', rather than binding it or dropping it unseen", () => {
