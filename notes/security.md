@@ -50,7 +50,11 @@ added or folded into through the subagent, and no other entry changes.
   getters returning private bound arrows.
   (2) Wayins, gates, leases, boxes and provings no longer read the key deriver, clock, lease length or epochs off the Vault object; each is handed
   what it uses when it is made (`Wayin.make(vaultStamp, record, { keyDeriver })`, `sealLeaseRecord(standing, vaultKey, { leaseMillis, now })`,
-  `Box.make(vault, record, madeUnder)`, `Box.seal(vault, props, whisper, { madeUnder, now })`). A proving reaches the key deriver, logger, lease
+  `Box.make(vault, record, madeUnder)`, `Box.seal(vault, props, whisper, { madeUnder, now })`; amended 2026-10-26 (snapshot): `Box.seal` takes the new Box's scope
+  and `vault_tok` from the `vault` it seals in and reads only `vault_epoch` and `gate_epoch` from `madeUnder`, dropping a scope or `vault_tok`
+  in `madeUnder` unread; before, it took all of them from `madeUnder` without checking them against `vault`, and a mismatched box failed
+  only at open, the ciphertext's ctx binding the lease's `vault_tok`; this changes the Box object's own visible fields and what
+  `demandConsistentWith` judges). A proving reaches the key deriver, logger, lease
   length, clock and the vault record in hand through `ProvingInside`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
   exports.
   (3) A Box now shows, as own enumerable frozen fields, its scope, the `vault_tok`, `vault_epoch` and `gate_epoch` it was made under, and every field of
@@ -118,7 +122,10 @@ added or folded into through the subagent, and no other entry changes.
   none: a field added to it later would make an older build discard the record, and with it the `highest_vault_epoch` rollback watermark, until
   its next read raises it again; so a new field moves its `format` on.
   (7) `PassphraseWayinSparse` (leaves out a passphrase wayin's `salt_b64`, `key_deriver_label` and wrap: what an offline guess at the passphrase
-  needs) and `PasskeyWayinSparse` (leaves out its wrap) are defined but not yet shown anywhere; a later thread puts them on the snapshot.
+  needs) and `PasskeyWayinSparse` (leaves out its wrap) are defined but not yet shown anywhere; a later thread puts them on the snapshot (amended 2026-10-26 (snapshot): now shown. A vault's
+  snapshot (`vault.snapshot`, `getSnapshot()`, what a React host renders and may put in devtools or an error report) carries `gate:
+  GateSparse | null`, each wayin in its sparse shape, with no salt, key deriver label, wrap or `vault_tok`; a passkey's `credential_id` and
+  `prf_salt_b64` still show. The snapshot no longer carries `registered_at`, `gate_epoch` or a `state` field).
 * 2026-10-26 (restyle sprint, thread 7, branch `20261026-bank_per_user`): **a Bank serves one signed-in user, and the scope a vault is born
   under comes from the bank, never from the caller's bag.**
   (1) `Bank.make({ applabel, user_id, ... })`. Every bank call naming a vault (`ensureVault`, `reopenVault`, `closeVault`,

@@ -53,7 +53,8 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
  * credential and salt, which a host asks the passkey with, and the `vault_tok` of the vault record it
  * is one of. Its wrap, and a passphrase's salt and key deriver's label, stay in its `record`; the
  * stamp of its vault record, which its wrap's ctx holds, stays private. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
- * nothing else. The vault shows those, never the wayins, as its `passphrase` and `passkey`.
+ * nothing else. A vault's snapshot shows each, never the wayin, as its `gate`'s sparse shape:
+ * those fields but the `vault_tok`.
  *
  * @example Wayin.make(vaultRecord, vaultRecord.gate.passphrase, { keyDeriver }).wayinkind  // 'passphrase'
  * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
