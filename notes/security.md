@@ -2606,6 +2606,18 @@ added or folded into through the subagent, and no other entry changes.
   it hides nothing (each name is plaintext in the row, and an indexed column in Convex and
   Postgres) and loses the name of a damaged row, which the listing needs to offer `delBox()`. Rows
   under the JSON ckeys read as absent; the device shelf sweeps them as strays.
+  (Amended 2026-10-26 (scopepath, branch `20261026-scopepath`): `Ckeys` is now `Scopepath` (`src/scopepath.ts`), and the stored strings are
+  unchanged. Each maker parses its whole scope with the `bad_scope` validators the public verbs use (label and `user_id` checks, which
+  already forbid `^`), where `Ckeys` refused only a name holding `^`; so the one-row-one-address guarantee rests on the name checks,
+  run again at the maker. Each inverse (`bankScope`, `vaultScope`, `boxscope`) and kind test (`isLease`, `isDevice`, `isBox`) is a full
+  parse of the scopepath (kind, count of parts, every name's check), never a prefix test, and a kind test answers false rather than
+  throwing. `withinVaultScopepathPred`/`withinVaultScopepathPrefix` stay prefix tests, the prefix ending in the delimiter so `main` never
+  matches `main2`'s rows; a vault's deletion erases every row under it, a malformed one too. A listing (`localVaultDB`, `idbVaultDB`)
+  passes over a row under the vault's prefix that `isBox` rejects rather than failing the read. `idbDeviceDB`'s sweep of rows it did not
+  file now also deletes, unread, a lease or device record filed under a malformed scopepath (`lease^acme^u1^Main`), which no read could
+  reach and so no lock could revoke. A stored record whose name fails its check refuses as that site's own kind, never the misuse kind
+  `bad_scope`: `damaged_vault` (cause `bad_record`) for vault props, `damaged_box` for a box, `corrupt_record` for an adapter's answer to
+  a write or a lease handed to `Lease.make`, and a device record reads as none.)
 * 2026-10-16: **a floor beneath every name, and the host's validators at entry only**
   (thread 1). `NameFloor` (well-formed Unicode, NFC, no control character, 1 KiB a name) now
   runs beneath whatever schema a host passes, at the vault's entry, in every `VaultDB` verb, and
