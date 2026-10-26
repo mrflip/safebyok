@@ -130,7 +130,7 @@ describe("PasskeyProving.seal", () => {
     const { vault, props } = await lockedWorld()
     const answer = await TH.passkeyOf('phone')
     const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer, { gating: StandingGating })
-    expect(proving.header).to.include({ wayinkind: 'passkey', credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64, device_id: props.passphrase.device_id })
+    expect(proving.header).to.include({ wayinkind: 'passkey', credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64, device_id: props.passphrase.device_id })
   })
 
   it("refuses another credential's answer, or one over another salt, as wrong_passkey; a fresh one over a short salt as bad_option; and zeroes the bytes all the same", async () => {
@@ -148,7 +148,7 @@ describe("PasskeyProving.seal", () => {
 
   it("refuses what is no passkey's answer as bad_option, quoting none of it", async () => {
     const { vault } = await lockedWorld()
-    const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, { credentialId: 'abc' } as never, { gating: StandingGating }), 'bad_option')
+    const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, { credential_id: 'abc' } as never, { gating: StandingGating }), 'bad_option')
     expect(err.message).to.not.include('abc')
   })
 })
@@ -513,8 +513,8 @@ describe("PasskeyProving.seal, the key", () => {
 const misshapenAnswers = (answer: PasskeyAnswer) => [
   [{ ...answer, prfBytes: [...answer.prfBytes] },          'its bytes an array, not a Uint8Array'],
   [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'its bytes one short of 32'],
-  [{ ...answer, credentialId: '' },                         'an empty credential'],
-  [{ ...answer, prfSaltB64: undefined },                    'no salt'],
+  [{ ...answer, credential_id: '' },                         'an empty credential'],
+  [{ ...answer, prf_salt_b64: undefined },                    'no salt'],
   ["pw",                                                   'a passphrase: text is no answer'],
   [42,                                                     'a number'],
   [null,                                                   'nothing at all'],
@@ -524,12 +524,12 @@ describe("checkedPasskeyAnswer", () => {
   it("takes a passkey's answer as it is, as its first example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
     const checked = checkedPasskeyAnswer(answer)
-    expect(checked).to.include({ credentialId: answer.credentialId, prfSaltB64: answer.prfSaltB64 })
+    expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(checked.prfBytes).to.eq(answer.prfBytes)
   })
 
   it("refuses an answer short of its fields as bad_option, as its second example shows", () => {
-    TH.expectSyncRefusal(() => checkedPasskeyAnswer({ credentialId: 'abc' }), 'bad_option')
+    TH.expectSyncRefusal(() => checkedPasskeyAnswer({ credential_id: 'abc' }), 'bad_option')
   })
 
   it("refuses an answer already used, its bytes zeroed, as bad_option, as its third example shows", async () => {
@@ -545,8 +545,8 @@ describe("checkedPasskeyAnswer", () => {
     const answer = await TH.passkeyOf('laptop')
     for (const [given, blurb] of misshapenAnswers(answer)) {
       const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(given), 'bad_option')
-      expect(err.message, blurb).to.include('credentialId, prfSaltB64, prfBytes')
-      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credentialId)
+      expect(err.message, blurb).to.include('credential_id, prf_salt_b64, prfBytes')
+      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
     }
   })
 })
@@ -565,12 +565,12 @@ describe("checkFreshSalt", () => {
 
   it("refuses an answer over a salt too short as bad_option, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    TH.expectSyncRefusal(() => { checkFreshSalt({ ...answer, prfSaltB64: 'c2hvcnQ' }) }, 'bad_option')
+    TH.expectSyncRefusal(() => { checkFreshSalt({ ...answer, prf_salt_b64: 'c2hvcnQ' }) }, 'bad_option')
   })
 
-  for (const [prfSaltB64, blurb] of SaltShapeCases) {
+  for (const [saltB64, blurb] of SaltShapeCases) {
     it(`refuses an answer over ${blurb} as bad_option, naming createPasskey`, async () => {
-      const answer = await TH.passkeyOf('laptop', prfSaltB64)
+      const answer = await TH.passkeyOf('laptop', saltB64)
       expect(() => { checkFreshSalt(answer) }).to.throw(/createPasskey/).with.property('refusalkind', 'bad_option')
     })
   }

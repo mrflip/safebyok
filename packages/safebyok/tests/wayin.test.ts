@@ -263,7 +263,7 @@ describe("each field of a way in, as sealed (Contract: Wayin, How each field is 
     const answer = await TH.passkeyOf('laptop')
     const { passkey: wayin } = await novelPasskey(answer)
     expect(fromB64(wayin.prf_salt_b64)).to.have.lengthOf(32)
-    expect(wayin).to.include({ credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
+    expect(wayin).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(wayin.record).to.not.have.property('key_deriver_label')
   })
 
@@ -294,7 +294,7 @@ describe("a passkey's way in, as a proving seals it", () => {
     const { passkey: wayin } = await novelPasskey(answer)
     expect(wayin).to.be.instanceOf(PasskeyWayin)
     expect(VaultProps.safeParse(TH.vaultPropsOf('u1', { passkey: wayin.record })).success).to.be.true
-    expect(wayin).to.include({ wayinkind: 'passkey', credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
+    expect(wayin).to.include({ wayinkind: 'passkey', credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(JSON.stringify(wayin.record)).to.not.include(prfB64)
   })
 })
@@ -316,7 +316,7 @@ describe("a proving's refusals of a way in", () => {
     const laptop = await TH.passkeyOf('laptop')
     const notIt = await PasskeyProving.seal(vault, header, { ...laptop, prfBytes: new Uint8Array(32).fill(1) }, { gating: StandingGating })
     await TH.expectRefusal(notIt.checkWayin(), 'wrong_passkey')
-    const { prfSaltB64: otherSalt } = await TH.passkeyOf('elsewhere')
+    const { prf_salt_b64: otherSalt } = await TH.passkeyOf('elsewhere')
     const overOtherSalt = await TH.passkeyOf('laptop', otherSalt)
     await TH.expectRefusal(PasskeyProving.seal(vault, header, overOtherSalt, { gating: StandingGating }), 'wrong_passkey')
   })
@@ -447,7 +447,7 @@ describe("a passkey's way in's ctx", () => {
     it(`refuses to open with ${blurb}`, async () => {
       const { vault, props } = await lockedWorld({ passkey: true })
       const header = { ...headerOf(passkeyRecordOf(props)), ...altered }
-      const answering = { ...await TH.passkeyOf('laptop'), credentialId: header.credential_id }
+      const answering = { ...await TH.passkeyOf('laptop'), credential_id: header.credential_id }
       const proving = await PasskeyProving.seal(vault, header, answering, { gating: StandingGating })
       await TH.expectRefusal(proving.checkWayin(), 'wrong_passkey')
     })
@@ -456,9 +456,9 @@ describe("a passkey's way in's ctx", () => {
   it("refuses to open with its salt swapped for another, the answer kept", async () => {
     const { vault, props } = await lockedWorld({ passkey: true })
     const laptop = await TH.passkeyOf('laptop')
-    const { prfSaltB64: otherSalt } = await TH.passkeyOf('elsewhere')
+    const { prf_salt_b64: otherSalt } = await TH.passkeyOf('elsewhere')
     const header = { ...headerOf(passkeyRecordOf(props)), prf_salt_b64: prf_salt_b64.parse(otherSalt) }
-    const proving = await PasskeyProving.seal(vault, header, { ...laptop, prfSaltB64: otherSalt }, { gating: StandingGating })
+    const proving = await PasskeyProving.seal(vault, header, { ...laptop, prf_salt_b64: otherSalt }, { gating: StandingGating })
     await TH.expectRefusal(proving.checkWayin(), 'wrong_passkey')
   })
 
@@ -500,7 +500,7 @@ describe("a passkey's way in's key", () => {
     const wayin = passkeyRecordOf(props)
     const laptop = await TH.passkeyOf('laptop')
     const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', props.vault_tok, 'vault_key_passkey_wrapped', headerOf(wayin))
-    const vaultlessInfo = cipherCtx('safebyok-vault-v6', 'vault_key_passkey_wrapped', laptop.credentialId)
+    const vaultlessInfo = cipherCtx('safebyok-vault-v6', 'vault_key_passkey_wrapped', laptop.credential_id)
     await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, ctx)).rejects.toThrow()
   })
 })

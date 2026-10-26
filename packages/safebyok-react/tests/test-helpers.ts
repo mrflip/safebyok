@@ -349,12 +349,12 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     calls.get.push(options)
     refuseIfTold()
     const offered = (options.publicKey?.allowCredentials ?? []).map((descriptor) => b64Of(descriptor.id))
-    const credentialId = offered.find((candidate) => secrets.has(candidate) && (touched === null || candidate === touched))
-    const secretBytes = credentialId === undefined ? undefined : secrets.get(credentialId)
-    if (credentialId === undefined || secretBytes === undefined) { throw new DOMException('None of these passkeys is here.', 'NotAllowedError') }
-    const rawId = fromB64(credentialId) as Uint8Array<ArrayBuffer>
+    const credential_id = offered.find((candidate) => secrets.has(candidate) && (touched === null || candidate === touched))
+    const secretBytes = credential_id === undefined ? undefined : secrets.get(credential_id)
+    if (credential_id === undefined || secretBytes === undefined) { throw new DOMException('None of these passkeys is here.', 'NotAllowedError') }
+    const rawId = fromB64(credential_id) as Uint8Array<ArrayBuffer>
     const prf = options.publicKey?.extensions?.prf
-    const salt = prf?.evalByCredential?.[credentialId]?.first ?? prf?.eval?.first
+    const salt = prf?.evalByCredential?.[credential_id]?.first ?? prf?.eval?.first
     if (! offersPrf || salt === undefined) { return credentialOf(rawId, undefined) }
     return credentialOf(rawId, { results: { first: await prfOf(secretBytes, salt) } })
   }
@@ -368,7 +368,7 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
     refuseNext:    (errname: string) => { refusal = errname },
     /** Answer the next `get`s with this credential (base64url id) only, as the user touching it. */
-    touch:         (credentialId: string) => { touched = credentialId },
+    touch:         (credential_id: string) => { touched = credential_id },
     uninstall:     uninstallFakeAuthenticator,
   }
 }

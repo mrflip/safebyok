@@ -22,13 +22,13 @@ const lockedVaultWithPasskey = async () => {
 }
 
 /** The `unlock_vault` gating of a stub vault with a passkey, `stubOpts` its own: by default its every attempt refused with `err`. */
-const stubUnlockGating = (credentialId: string, stubOpts: TH.GatingOfOpts & TH.StubVaultOpts): UnlockVaultGating => TH.asKind(TH.stubGating({
-  passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_tok: 'vault-tok-u1' },
+const stubUnlockGating = (credential_id: string, stubOpts: TH.GatingOfOpts & TH.StubVaultOpts): UnlockVaultGating => TH.asKind(TH.stubGating({
+  passkey: { ...TH.passkeyWayinOf('laptop', { credential_id }), vault_tok: 'vault-tok-u1' },
   ...stubOpts,
 }), 'unlock_vault')
 
 /** The `unlock_vault` gating of a vault that refuses every attempt with `err`, and has a passkey. */
-const gatingRefusing = (err: Error, credentialId: string) => stubUnlockGating(credentialId, { attempt: () => Promise.reject(err) })
+const gatingRefusing = (err: Error, credential_id: string) => stubUnlockGating(credential_id, { attempt: () => Promise.reject(err) })
 
 const noop = () => undefined
 
@@ -89,10 +89,10 @@ describe("PasskeyUnlockButton", () => {
 
   it("starts afresh when handed another vault: one that took itself away comes back", async () => {
     const { authenticator, gating } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const gripes: (string | null)[] = []
     const onGripe = (gripe: string | null) => { gripes.push(gripe) }
-    const { rerender } = TH.renderReporting(<PasskeyUnlockButton gating={gatingRefusing(new TypeError('fell over'), credentialId)} onDone={noop} onGripe={onGripe} />)
+    const { rerender } = TH.renderReporting(<PasskeyUnlockButton gating={gatingRefusing(new TypeError('fell over'), credential_id)} onDone={noop} onGripe={onGripe} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(screen.queryByText('Use a passkey')).to.be.null
@@ -109,14 +109,14 @@ describe("PasskeyUnlockButton", () => {
 
   it("hands a condition's message to onGripe, and a lock that wins to onDone(false)", async () => {
     const { authenticator, vault } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const gripes: (string | null)[] = []
-    render(<PasskeyUnlockButton gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
+    render(<PasskeyUnlockButton gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credential_id)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, "That passkey's answer didn't unlock the vault."]) })
     cleanup()
     const heard: DialogAnswer[] = []
-    render(<PasskeyUnlockButton gating={gatingRefusing(new VaultError('vault_locked', 'Locked meanwhile.'), credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={noop} />)
+    render(<PasskeyUnlockButton gating={gatingRefusing(new VaultError('vault_locked', 'Locked meanwhile.'), credential_id)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={noop} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
     expect(vault.getSnapshot().state).to.eq('locked')
@@ -124,11 +124,11 @@ describe("PasskeyUnlockButton", () => {
 
   it("leaves an attempt under way to answer when pressed during it: attempt_in_flight reaches neither onDone nor onGripe's word", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const heard: DialogAnswer[] = []
     const gripes: (string | null)[] = []
     const attempt = vi.fn(() => Promise.reject(new VaultError('attempt_in_flight', 'An attempt is already under way.')))
-    render(<PasskeyUnlockButton gating={stubUnlockGating(credentialId, { attempt })} onDone={(answer) => { heard.push(answer) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
+    render(<PasskeyUnlockButton gating={stubUnlockGating(credential_id, { attempt })} onDone={(answer) => { heard.push(answer) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(attempt).toHaveBeenCalledTimes(1) })
     await act(async () => { await TH.wakeupAtNextTick() })
@@ -138,11 +138,11 @@ describe("PasskeyUnlockButton", () => {
 
   it("meets misuse by taking itself away and pointing to the passphrase, reporting the very error to React", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const misuse = new VaultError('bad_option', 'This call was handed an option it does not take.')
     const gripes: (string | null)[] = []
     const heard: DialogAnswer[] = []
-    const { reported } = TH.renderReporting(<TH.Catcher><PasskeyUnlockButton gating={gatingRefusing(misuse, credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} /></TH.Catcher>)
+    const { reported } = TH.renderReporting(<TH.Catcher><PasskeyUnlockButton gating={gatingRefusing(misuse, credential_id)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} /></TH.Catcher>)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(screen.queryByRole('button')).to.be.null
@@ -166,10 +166,10 @@ describe("PasskeyUnlockButton", () => {
 
   it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, reported to React without what was thrown, its cause", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const fell = new TypeError('fell over')
     const gripes: (string | null)[] = []
-    const { reported } = TH.renderReporting(<PasskeyUnlockButton gating={gatingRefusing(fell, credentialId)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
+    const { reported } = TH.renderReporting(<PasskeyUnlockButton gating={gatingRefusing(fell, credential_id)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.have.lengthOf(1)
@@ -192,10 +192,10 @@ describe("PasskeyUnlockButton", () => {
     for (const [refusal, blurb] of UnlockOutcomes) {
       it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
         const { authenticator } = await lockedVaultWithPasskey()
-        const [credentialId = ''] = authenticator.credentialIds()
+        const [credential_id = ''] = authenticator.credentialIds()
         const unlocking = TH.held()
         const attempt = vi.fn<TH.StubAttempt>(() => unlocking.promise)
-        const gating = stubUnlockGating(credentialId, { attempt })
+        const gating = stubUnlockGating(credential_id, { attempt })
         const gripes: (string | null)[] = []
         const heard: DialogAnswer[] = []
         const { reported, unmount } = TH.renderReporting(<PasskeyUnlockButton gating={gating} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
@@ -259,8 +259,8 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("drops the passkey's word once a later press of it is dismissed", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
-    render(<PassphraseModal gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} />)
+    const [credential_id = ''] = authenticator.credentialIds()
+    render(<PassphraseModal gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credential_id)} onDone={noop} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await screen.findByText("That passkey's answer didn't unlock the vault.")
     authenticator.refuseNext('NotAllowedError')
@@ -270,9 +270,9 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const misuse = new VaultError('bad_option', 'This call was handed an option it does not take.')
-    const { reported } = TH.renderReporting(<PassphraseModal gating={gatingRefusing(misuse, credentialId)} onDone={noop} />)
+    const { reported } = TH.renderReporting(<PassphraseModal gating={gatingRefusing(misuse, credential_id)} onDone={noop} />)
     screen.getByText('Use a passkey').focus()
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq(PasskeyTrouble) })
@@ -284,14 +284,14 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("leaves the focus on the passkey button after a condition, inside a shadow root too", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const shadowHost = document.createElement('div')
     document.body.append(shadowHost)
     const shadowRoot = shadowHost.attachShadow({ mode: 'open' })
     const container = document.createElement('div')
     shadowRoot.append(container)
     try {
-      render(<PassphraseModal gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} />, { container })
+      render(<PassphraseModal gating={gatingRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credential_id)} onDone={noop} />, { container })
       const passkey = within(container).getByText('Use a passkey')
       passkey.focus()
       fireEvent.click(passkey)
@@ -304,9 +304,9 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("keeps the passkey's word while the user types the passphrase, until they submit", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
-    const [credentialId = ''] = authenticator.credentialIds()
+    const [credential_id = ''] = authenticator.credentialIds()
     const unlocked: string[] = []
-    const misused = stubUnlockGating(credentialId, {
+    const misused = stubUnlockGating(credential_id, {
       attempt: (cleartext) => {
         if (typeof cleartext === 'string') { unlocked.push(cleartext); return Promise.resolve() }
         return Promise.reject(new VaultError('bad_option', 'This call was handed an option it does not take.'))

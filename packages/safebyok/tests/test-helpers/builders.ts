@@ -283,10 +283,10 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * @example await TH.unlock(vault, await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
-export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<PasskeyAnswer> => {
-  const credentialId = toB64(new TextEncoder().encode(`cred-${tag}`))
-  const saltB64 = prfSaltB64 ?? toB64(await digestOf(`salt-${tag}`))
-  return { credentialId, prfSaltB64: saltB64, prfBytes: await digestOf(`${credentialId}:${saltB64}`) }
+export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<PasskeyAnswer> => {
+  const credential_id = toB64(new TextEncoder().encode(`cred-${tag}`))
+  const saltB64 = prfSaltGiven ?? toB64(await digestOf(`salt-${tag}`))
+  return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
 }
 
 /** Shape-valid gated vault props for `user_id`'s `main` vault, its passphrase's wrap fake and no passkey.

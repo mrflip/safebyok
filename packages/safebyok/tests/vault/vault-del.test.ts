@@ -330,7 +330,7 @@ const vaultWithDamagedPasskey = async () => {
   const shortSalt = toB64(new Uint8Array(16))
   spoilWayin(world, 'passkey', { prf_salt_b64: shortSalt })
   const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-  return { world, fresh, spoiledLaptop: { ...laptop, prfSaltB64: shortSalt } }
+  return { world, fresh, spoiledLaptop: { ...laptop, prf_salt_b64: shortSalt } }
 }
 
 describe("a way in stored damaged", () => {

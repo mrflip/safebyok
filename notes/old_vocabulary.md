@@ -141,3 +141,4 @@ To be deleted at 1.0.0.
 | `VaultDB.getVaultProps`, `ensureVaultProps`, `listBoxes`, `listBoxRecords` | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords` |
 | `TH.makeGate`                                          | `TH.makeLatch`: a gate is the vault's ways in       |
 | `userId` (a draft's field, `BankProvider`'s prop, `postgresVaultDB`'s option) | `user_id`, as stored |
+| `PasskeyAnswer`'s `credentialId`, `prfSaltB64`          | `credential_id`, `prf_salt_b64`, as the wayin stores them |

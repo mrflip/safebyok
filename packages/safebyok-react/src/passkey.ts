@@ -81,9 +81,9 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
     },
   }))
   if (created === null) { return null }
-  const credentialId = toB64(new Uint8Array(created.rawId))
+  const credential_id = toB64(new Uint8Array(created.rawId))
   const { prf } = created.getClientExtensionResults()
-  if (prf?.results !== undefined) { return answerOf(credentialId, prfSaltBytes, prf.results.first) }
+  if (prf?.results !== undefined) { return answerOf(credential_id, prfSaltBytes, prf.results.first) }
   if (prf?.enabled !== true) { throw noPrf() }
   // Many authenticators turn PRF on as they make the passkey, and answer only when asked again.
   const asked = await askAuthenticator(() => navigator.credentials.get({
@@ -99,7 +99,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
-  return answerOf(credentialId, prfSaltBytes, answer)
+  return answerOf(credential_id, prfSaltBytes, answer)
 }
 
 /**
@@ -134,15 +134,15 @@ export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskP
       allowCredentials: [{ type: 'public-key', id: asking.credentialBytes }],
       userVerification: 'required',
       ...optional('timeout', opts.timeout),
-      extensions:       { prf: { evalByCredential: { [asking.credentialId]: { first: asking.saltBytes } } } },
+      extensions:       { prf: { evalByCredential: { [asking.credential_id]: { first: asking.saltBytes } } } },
     },
   }))
   if (asked === null) { return null }
-  const credentialId = toB64(new Uint8Array(asked.rawId))
+  const credential_id = toB64(new Uint8Array(asked.rawId))
   const answer = asked.getClientExtensionResults().prf?.results?.first
   // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
-  if (answer === undefined || credentialId !== asking.credentialId) { throw noPrf() }
-  return answerOf(credentialId, asking.saltBytes, answer)
+  if (answer === undefined || credential_id !== asking.credential_id) { throw noPrf() }
+  return answerOf(credential_id, asking.saltBytes, answer)
 }
 
 /**
@@ -154,7 +154,7 @@ const askable = (passkey: PasskeyWayinSummary) => {
     const saltBytes = fromB64(passkey.prf_salt_b64) as Uint8Array<ArrayBuffer>
     if (saltBytes.length !== PasskeySaltBytes) { return null }
     return {
-      credentialId:    passkey.credential_id,
+      credential_id:   passkey.credential_id,
       credentialBytes: fromB64(passkey.credential_id) as Uint8Array<ArrayBuffer>,
       saltBytes,
     }
@@ -163,10 +163,10 @@ const askable = (passkey: PasskeyWayinSummary) => {
   }
 }
 
-/** A PasskeyAnswer of the credential `credentialId`, answering `answer` over `saltBytes`. */
-const answerOf = (credentialId: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
-  credentialId,
-  prfSaltB64: toB64(saltBytes),
+/** A PasskeyAnswer of the credential `credential_id`, answering `answer` over `saltBytes`. */
+const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
+  credential_id,
+  prf_salt_b64: toB64(saltBytes),
   prfBytes:   bytesOf(answer),
 })
 

@@ -199,7 +199,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
 
     const second = await opened()
     expect(second.getSnapshot().passkey).to.deep.include({
-      wayinkind: 'passkey', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
+      wayinkind: 'passkey', credential_id: laptop.credential_id, prf_salt_b64: laptop.prf_salt_b64,
     })
     await TH.unlock(second, await TH.passkeyOf('laptop'))
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')

@@ -28,7 +28,7 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
 /** The vault's passkey as its snapshot has it, for `proof`. */
 const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
   wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_tok: 'vault-tok-u1',
-  credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64 as PrfSalt,
+  credential_id: proof.credential_id, prf_salt_b64: proof.prf_salt_b64 as PrfSalt,
 })
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
@@ -56,11 +56,11 @@ describe("createPasskey", () => {
     install()
     const passkey = await createPasskey(passkeyOpts)
     expect(passkey).to.not.be.null
-    expect(fromB64(passkey?.prfSaltB64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
+    expect(fromB64(passkey?.prf_salt_b64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
     expect(passkey?.prfBytes).to.have.lengthOf(32)
     const again = await createPasskey(passkeyOpts)
-    expect(again?.prfSaltB64).to.not.eq(passkey?.prfSaltB64)
-    expect(again?.credentialId).to.not.eq(passkey?.credentialId)
+    expect(again?.prf_salt_b64).to.not.eq(passkey?.prf_salt_b64)
+    expect(again?.credential_id).to.not.eq(passkey?.credential_id)
   })
 
   it("asks for user verification, under a random user handle, with the host's names", async () => {
@@ -120,7 +120,7 @@ describe("askPasskey", () => {
     expect(request?.allowCredentials).to.have.lengthOf(1)
     expect(request?.rpId).to.eq('acme.example')
     expect(request?.userVerification).to.eq('required')
-    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([laptop.credentialId])
+    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([laptop.credential_id])
   })
 
   it("refuses as absent_wayin a vault with no passkey, before the browser is asked", async () => {
@@ -159,8 +159,8 @@ describe("askPasskey", () => {
     await expectRefusal(askPasskey(summaryOf(laptop)), 'passkey_unavailable')
     const fake = install({ prf: false })
     await expectRefusal(createPasskey(passkeyOpts), 'passkey_unavailable')
-    const [credentialId = ''] = fake.credentialIds()
-    const stray = { ...await TH.passkeyOf('stray'), credentialId }
+    const [credential_id = ''] = fake.credentialIds()
+    const stray = { ...await TH.passkeyOf('stray'), credential_id }
     await expectRefusal(askPasskey(summaryOf(stray)), 'passkey_unavailable')
   })
 })
@@ -172,7 +172,7 @@ describe("a passkey unlock, end to end", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const answer = await createPasskey(passkeyOpts)
     if (answer !== null) { await TH.putWayin(vault, 'pw', answer) }
-    expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credentialId)
+    expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credential_id)
 
     const elsewhere = await open()
     expect(elsewhere.getSnapshot().state).to.eq('locked')
@@ -201,6 +201,6 @@ describe("a passkey unlock, end to end", () => {
     const { passkey } = elsewhere.getSnapshot()
     expect(passkey?.credential_id).to.not.eq(first)
     const asked = await askPasskey(passkey)
-    expect(asked?.credentialId).to.eq(passkey?.credential_id)
+    expect(asked?.credential_id).to.eq(passkey?.credential_id)
   })
 })

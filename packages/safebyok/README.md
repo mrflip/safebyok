@@ -749,7 +749,7 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
 
 A vault may have one passkey: a fingerprint, a face, a phone or a security key, whose
 authenticator answers for the vault through the WebAuthn PRF extension. The core never calls
-WebAuthn: it takes the answer as a `PasskeyAnswer` (`{ credentialId, prfSaltB64, prfBytes }`),
+WebAuthn: it takes the answer as a `PasskeyAnswer` (`{ credential_id, prf_salt_b64, prfBytes }`),
 which `safebyok-react`'s `createPasskey` and `askPasskey` make (they import no React, so any
 framework's host can use them).
 

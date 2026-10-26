@@ -308,9 +308,9 @@ const PrfAnswerBytes = 32
 /** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
 const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
   passkeyAnswerShape: obj({
-    credentialId: str.min(1),
-    prfSaltB64:   str.min(1),
-    prfBytes:     custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
+    credential_id: str.min(1),
+    prf_salt_b64:  str.min(1),
+    prfBytes:      custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
   }),
 }))
 
@@ -402,13 +402,13 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
  * too: sealed again, it would make a key anyone could rebuild.
  *
  * @example checkedPasskeyAnswer(await askPasskey(vault.passkey))
- * @example checkedPasskeyAnswer({ credentialId: 'abc' })   // throws 'bad_option'
+ * @example checkedPasskeyAnswer({ credential_id: 'abc' })   // throws 'bad_option'
  * @example checkedPasskeyAnswer(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
 export const checkedPasskeyAnswer = (given: unknown): PasskeyAnswer => {
   const checked = passkeyAnswerShape.safeParse(given)
   if (! checked.success) {
-    throw new VaultError('bad_option', `A passkey's answer is { credentialId, prfSaltB64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
+    throw new VaultError('bad_option', `A passkey's answer is { credential_id, prf_salt_b64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
   }
   if (isAllZero(checked.data.prfBytes)) {
     throw new VaultError('bad_option', "This passkey's answer was used already: the vault zeroes an answer's bytes once it has used them. Ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer.")
@@ -419,10 +419,10 @@ export const checkedPasskeyAnswer = (given: unknown): PasskeyAnswer => {
 /** Refuse 'bad_option' for a new passkey's answer over a salt that is not {@link PasskeySaltBytes} bytes as base64url text: a passkey wayin sealed over another would read as damaged at every later unlock.
  *
  * @example checkFreshSalt(await createPasskey(opts))   // passes
- * @example checkFreshSalt({ ...answer, prfSaltB64: 'c2hvcnQ' })   // throws 'bad_option'
+ * @example checkFreshSalt({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
  */
 export const checkFreshSalt = (answer: PasskeyAnswer): void => {
-  if (fromB64OrNull(answer.prfSaltB64)?.length !== PasskeySaltBytes) {
+  if (fromB64OrNull(answer.prf_salt_b64)?.length !== PasskeySaltBytes) {
     throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
   }
 }
@@ -432,8 +432,8 @@ const mintedPasskeyHeader = (vault: ProvingVault, answer: PasskeyAnswer): Passke
   checkFreshSalt(answer)
   return {
     wayinkind:     'passkey',
-    credential_id: answer.credentialId,
-    prf_salt_b64:  prf_salt_b64.parse(answer.prfSaltB64),
+    credential_id: answer.credential_id,
+    prf_salt_b64:  prf_salt_b64.parse(answer.prf_salt_b64),
     device_id:     insideOf(vault).deviceId(),
     registered_at: vault.now(),
   }
@@ -444,10 +444,10 @@ const checkedPasskeyHeader = (header: PasskeyWayinHeader, answer: PasskeyAnswer)
   if (fromB64OrNull(header.prf_salt_b64)?.length !== PasskeySaltBytes) {
     throw new VaultError('damaged_wayin', "This vault's passkey is stored damaged, so it could not be tried. Unlock with the passphrase, then add the passkey again, which replaces it. The vault was left as it is.")
   }
-  if (answer.credentialId !== header.credential_id) {
+  if (answer.credential_id !== header.credential_id) {
     throw new VaultError('wrong_passkey', "That passkey is not this vault's: it may have been replaced or removed on another device, or belong to another vault. Ask the credential the snapshot's passkey names.")
   }
-  if (answer.prfSaltB64 !== header.prf_salt_b64) {
+  if (answer.prf_salt_b64 !== header.prf_salt_b64) {
     throw new VaultError('wrong_passkey', "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the snapshot's passkey names.")
   }
   return header

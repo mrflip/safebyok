@@ -1662,7 +1662,7 @@ describe("the gating's attempt, by the Contract", () => {
     const vault = await world.open({ requestCleartext: dialog.requestCleartext, deviceDB: memoryDeviceDB() })
     const ensuring = vault.tryEnsureUnlocked()
     const gating = await unlockAsked(dialog)
-    await TH.expectBad(gating.attemptPasskey({ ...laptop, prfSaltB64: shortSalt }), 'damaged_wayin')
+    await TH.expectBad(gating.attemptPasskey({ ...laptop, prf_salt_b64: shortSalt }), 'damaged_wayin')
     await TH.expectGood(gating.attemptPassphrase('pw'))
     dialog.close()
     await TH.expectGood(ensuring)

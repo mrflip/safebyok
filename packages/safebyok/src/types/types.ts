@@ -239,7 +239,7 @@ export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
 /** What a passkey answers when asked for a vault's PRF, to hand to the vault as proof: `safebyok-react`'s `askPasskey` makes one.
- * `credentialId` is base64url, as `PublicKeyCredential.id` gives it. `prfBytes`, 32 of them, are
+ * `credential_id` is base64url, as `PublicKeyCredential.id` gives it. `prfBytes`, 32 of them, are
  * as good as the passphrase for this vault: pass them to the vault, then drop them.
  *
  * @example
@@ -247,9 +247,9 @@ export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
 export type PasskeyAnswer = {
-  credentialId: string
-  prfSaltB64:   string
-  prfBytes:     Uint8Array
+  credential_id: string
+  prf_salt_b64:  string
+  prfBytes:      Uint8Array
 }
 
 /** The vault props of a vault whose gate is made: a `gate_epoch` of 1 or more, its passphrase wayin, and its passkey or null.
