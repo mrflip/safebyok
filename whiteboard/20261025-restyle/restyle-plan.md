@@ -2,13 +2,13 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **paused at the Coach's request, 2026-10-26** (usage), threads 1 to 12 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#283](https://github.com/mrflip/safebyok/pull/283)); thread 13 not started (`human/20261026-sprint_restyle_paused.md`).
+* **Status:** **paused at the Coach's request, 2026-10-26** (usage), threads 1 to 12 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#283](https://github.com/mrflip/safebyok/pull/283)); thread 13 not started (`human/20261026-sprint_restyle_paused.md`); thread 14 (the Coach's rulings of 2026-10-26) planned.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
 * **Issued by:** the Coach (flip), by `/sprint restyle` with `/turbochat`.
 * **Sprint PR:** [#271](https://github.com/mrflip/safebyok/pull/271), the `20261026-restyle` branch (`plan:`), a draft; it joins the line last.
-* **Sprint doc:** [Sprint restyle](https://claude.ai/artifact/4Hx2VL1fu4qUMQV9z6rJFz): Open Matters, Progress, Resolved.
+* **Sprint doc:** [Sprint restyle](https://claude.ai/artifact/4Hx2VL1fu4qUMQV9z6rJFz): Open Matters, Cleanup (your calls and the finally block), Progress, Resolved.
 * **Base:** the primitives line's top, [#267](https://github.com/mrflip/safebyok/pull/267)
   (`20261024-contract_tab`, 68dabab1), in the line main → #265 → #252 → #268 → #269 → #270 → #266
   → #267. Those seven PRs rewrite `vault.ts`, `vault-db.ts`, `wayin.ts`, `gating.ts`, `proving.ts`,
@@ -511,6 +511,46 @@ changeset (`.changeset/20261026-snapshot.md`) and the core README's *The snapsho
 is gone, and no longer catches a change to the ways in. Reuse `keptIfSame` (vault.ts) for
 `bank.snapshot.vaults`. `Bank`'s `getSnapshot`/`subscribe` are prototype getters already (thread
 11); the bank's status is `#libs.status` (`made | starting | timely | refused`, thread 7). **Depends on:** thread 12. **Size:** medium.
+
+### 14. The Coach's rulings of 2026-10-26 -- `rulings`
+
+*Orchestrator:* no Coach text of its own. The thread gathers the code rulings the Coach gave in
+the sprint doc's Open Matters on 2026-10-26, quoted below from its *Resolved* tab, and the
+error-handler audit (`error-handlers-audit.md` in this directory).
+
+* **Cut the key sifting.** "Is someone sifting through all the keys to find out why a strict
+  mode error was thrown? If so ... remove that. Beware complicated logic in a handler." With the
+  audit's list: delete `isSayable`, its two regexes and `MaxSayableChars` (checks/validator.ts);
+  a refusal for unknown fields says how many and lists the names the bag takes, never the names
+  it was given; `refusalOf` joins the first issues' messages; drop `checkMakeBankOpts`'s pre-scan
+  and `RenamedMakeBankOpts` and let `.strict()` speak; `checkNoStoresIn` names no key;
+  `parseKeyDeriverSpec` gives one fixed sentence (drop `SpecLimitForField`); drop `optionsCheck`'s
+  `isPlainBag` hint. The six catch blocks stay. Add a test that no refusal repeats a value from
+  its input.
+* **Nothing fine-grained on broken data.** "Do not make fine grained decisions on broken data,
+  especially in an exception handler." `Wayin.make`'s failure is our `bad_record`, nothing
+  compared or re-parsed.
+* **Validator is public.** "No, public: we need pr's." Export it from the main entry; the
+  IndexedDB package makes its option checks with it.
+* **Convex imports the core.** "Why would it not import most of what it does from core?
+  Validators, the checks you mentioned -- having a separation sounds like a terrible plan.
+  Explain and/or fix." Make the component import the core's validators and checks; if Convex's
+  component bundling forbids it, report the constraint instead.
+* **Adapters' box rows unbranded.** What an adapter hands `splitStoredBoxes` is the unbranded
+  input type, so no adapter casts.
+* **The redundant-alias lint rule goes.** "Reject the first rule, it's stupid. Make a getter
+  .props returning a shallow copy or whatever the best equivalent of spreading it is." Turn off
+  `redundant-type-aliases`; give the Vault object a getter handing out a frozen shallow copy of
+  its fields, named per VOCABULARY ("props" is retired: look up the name before choosing).
+  `no-misused-spread` stays.
+* **A test helper for the epochs.** "cheatGetVaultEpoch(vault) says everything I need to know."
+  Tests read epochs through `TH.cheatGetVaultEpoch(vault)`, not `vaultRecordHeldBy`.
+* **Small leftovers** (the Cleanup tab): restore the passphrase refusal's full stop (#275); one
+  sentence in VAULTDB.md that an adapter enforcing `maxBoxes` from capacity counts rows the
+  listing skips.
+
+**Depends on:** thread 13. **Size:** medium; split the Convex import into its own thread if it
+runs long.
 
 ## Not in this sprint
 
