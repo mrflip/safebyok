@@ -110,6 +110,9 @@ describe("Bank.make and bank.ensureVault", () => {
     const world = makeWorld()
     const vault = await world.open()
     const { subscribe, getSnapshot } = vault
+    // One identity each for the Vault object's life, as useSyncExternalStore asks.
+    expect(vault.subscribe).to.eq(subscribe)
+    expect(vault.getSnapshot).to.eq(getSnapshot)
     const heard = vi.fn()
     const unsubscribe = subscribe(heard)
     await vault.hello()
@@ -167,8 +170,8 @@ describe("Bank.make's options", () => {
 
   it("takes an option given as undefined as one left out", async () => {
     const world = makeWorld()
-    const vault = await world.open({ leaseHours: undefined, clock: undefined, logger: undefined })
-    expect(vault.leaseMillis).to.eq(LeaseHours * HourMillis)
+    const vault = await world.openUnlocked('pw', { leaseHours: undefined, logger: undefined })
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + (LeaseHours * HourMillis))
   })
 })
 // --
@@ -236,17 +239,16 @@ describe("the host's clock", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("reads now() off the clock, rounded down to whole milliseconds, the time the lease is judged by, as its example shows", async () => {
+  it("reads the clock rounded down to whole milliseconds: the time a box is written at and a lease is judged by", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
-    expect(vault.now()).to.eq(world.clock.now())
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + (LeaseHours * HourMillis))
     const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    world.advance(MinuteMillis)
-    expect(vault.now() - box.written_at).to.eq(MinuteMillis)
+    expect(box.written_at).to.eq(world.clock.now())
     const lease = Lease.make(vault, await world.getLease())
-    expect(lease.endsBy(vault.now())).to.be.false
-    world.advance(vault.leaseMillis)
-    expect(lease.endsBy(vault.now())).to.be.true
+    expect(lease.endsBy(world.clock.now())).to.be.false
+    world.advance(LeaseHours * HourMillis)
+    expect(lease.endsBy(world.clock.now())).to.be.true
   })
 
   it("checks the clock once, at Bank.make: a later reading in seconds is taken as it comes, and checked by nothing", async () => {
@@ -591,7 +593,7 @@ describe("Bank.make, by the Contract", () => {
     expect(tally).to.deep.equal({ opened: 0, closed: 0 })
     const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     await vault.hello({ staleMinutes: 0 })
     expect(tally.opened).to.eq(1)
   })
@@ -612,7 +614,7 @@ describe("Bank.make, by the Contract", () => {
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     expect(births).toHaveBeenCalledTimes(1)
     expect(propsReads).toHaveBeenCalledTimes(1)
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
   })
 
   it("ends the watch it started when the bank lets the vault go, and only once", async () => {
@@ -666,17 +668,47 @@ describe("Bank.make, by the Contract", () => {
 // == [The vault's fields]: fields, snapshot, capacity, the host's writes
 
 describe("the vault's fields, by the Contract", () => {
-  it("shows each field as the snapshot holds it, live, in an event handler as in render (Contract: Vault)", async () => {
+  it("holds its stamp as its own fields, frozen, which a spread shows alone (Contract: Vault)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const stored = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
+    expect(TH.shownOf(vault)).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: stored?.vault_tok, registered_at: stored?.registered_at })
+    expect(Object.isFrozen(vault)).to.be.true
+  })
+
+  it("writes its stamp alone as JSON, as the class's third example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(TH.jsonOf(vault)).to.deep.equal(TH.shownOf(vault))
+    for (const unshown of ['gate', 'snapshot', 'ask_passphrase_at', 'logger']) {
+      expect(JSON.stringify(vault)).to.not.include(unshown)
+    }
+  })
+
+  it("hands its snapshot out through a getter, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const { state, boxes } = vault.snapshot
+    expect(state).to.eq('unlocked')
+    expect(boxes).to.deep.equal([])
+    expect(vault.snapshot).to.eq(vault.getSnapshot())
+  })
+
+  it("shows what changes through its snapshot alone, live, in an event handler as in render (Contract: Vault)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const snapshot = vault.getSnapshot()
     expect(vault.snapshot).to.eq(snapshot)
-    for (const [field, shown] of Object.entries(snapshot)) {
-      expect(vault[field as keyof typeof snapshot], field).to.eq(shown)
-    }
+    // Each field of the snapshot is the Vault object's own, of its stamp, or none of its at all.
+    const own = new Set(Object.keys(vault))
+    const elsewhere = Object.keys(snapshot).filter((field) => ! own.has(field))
+    expect(elsewhere).to.include.members(['state', 'boxes', 'gate_epoch', 'ask_passphrase_at'])
+    expect(elsewhere.filter((field) => Reflect.has(vault, field))).to.deep.equal([])
     await vault.lock()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
+    expect(vault.snapshot).to.not.eq(snapshot)
   })
 
   it("reads the live fields in a handler, as the Vault's second example shows", async () => {
@@ -685,47 +717,46 @@ describe("the vault's fields, by the Contract", () => {
     const vault = await world.open()
     const asked: unknown[] = []
     const askForProof = (passkey: unknown) => { asked.push(passkey) }
-    if (vault.state === 'locked') { askForProof(vault.passkey) }
-    expect(vault.passkey).to.not.be.null
-    expect(asked).to.deep.equal([vault.passkey])
+    if (vault.snapshot.state === 'locked') { askForProof(vault.snapshot.passkey) }
+    expect(vault.snapshot.passkey).to.not.be.null
+    expect(asked).to.deep.equal([vault.snapshot.passkey])
   })
 
-  it("lets no host write over a field: each is a getter with no setter, and the snapshot is frozen", async () => {
+  it("lets no host write over a field: the Vault object is frozen, its getters have no setter, and the snapshot is frozen", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await addLaptopPasskey(vault)
-    // Every field the snapshot shows, the scope's among them, and those only the handle has.
-    for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'keyDeriver']) {
+    // Its own fields, the getters it shows, a method, and a field it never had.
+    for (const field of [...Object.keys(vault), 'snapshot', 'getSnapshot', 'subscribe', 'logger', 'hello', 'state']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     const { snapshot } = vault
     for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.passphrase, snapshot.passkey, snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
       expect(Object.isFrozen(part)).to.be.true
     }
   })
 
-  it("keeps its own hello, whatever a host writes over the handle's", async () => {
+  it("refuses a host's write over its hello, or a spy on it: a frozen Vault object takes no new field", async () => {
     const world = makeWorld({ leaseHours: 1 })
     const vault = await world.open()
     const helloWrittenOver = vi.fn(() => Promise.resolve(vault))
-    Object.defineProperties(vault, { hello: { value: helloWrittenOver } })
+    expect(() => Object.defineProperties(vault, { hello: { value: helloWrittenOver } })).to.throw(TypeError)
+    expect(() => vi.spyOn(vault, 'hello')).to.throw(TypeError)
     await TH.unlock(vault, 'pw')
-    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
-    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    expect(helloWrittenOver).not.toHaveBeenCalled()
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
   })
 
   it("reckons capacity from the last read: the boxes against maxBoxes, and the bytes they reserve against what storage holds (Contract: Vault)", async () => {
     const world = makeWorld({ maxBoxes: 3 })
     const vault = await world.openUnlocked('pw')
-    const before = vault.capacity
+    const before = vault.snapshot.capacity
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
-    expect(vault.capacity.boxes).to.deep.equal({ used: 2, max: 3 })
-    expect(vault.capacity.bytes.used).to.be.greaterThan(0)
-    expect(vault.capacity.bytes.max).to.eq(before.bytes.max)
+    expect(vault.snapshot.capacity.boxes).to.deep.equal({ used: 2, max: 3 })
+    expect(vault.snapshot.capacity.bytes.used).to.be.greaterThan(0)
+    expect(vault.snapshot.capacity.bytes.max).to.eq(before.bytes.max)
     expect(before.boxes).to.deep.equal({ used: 0, max: 3 })
   })
 
@@ -736,7 +767,7 @@ describe("the vault's fields, by the Contract", () => {
     await vault.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     const warnings: string[] = []
     const warn = (said: string) => { warnings.push(said) }
-    const { boxes } = vault.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
+    const { boxes } = vault.snapshot.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
     expect(warnings).to.deep.equal(['Your vault is nearly full.'])
   })
 })

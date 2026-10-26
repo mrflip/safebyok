@@ -229,7 +229,7 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
 }
 
 /**
- * What a dialog promises about how long an unlock lasts, from the vault's `leaseMillis`:
+ * What a dialog promises about how long an unlock lasts, from the gating's `leaseMillis`:
  * 'Locks again on this device in 7 days' (a whole number of days, else of hours, else of
  * minutes, phrased by `Intl.RelativeTimeFormat`), or 'Locks on this device in 7 days' when the
  * dialog is creating the vault, which has nothing yet to lock "again". A lease within a minute

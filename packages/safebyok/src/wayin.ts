@@ -1,11 +1,9 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
 import { VaultError, isVaultError } from './errors'
 import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
-import { VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
-import { Validator } from './checks/validator'
+import { type VaultStamp, VaultStampPicked, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './types/type-aliases'
-import type { Vault } from './vault'
 
 /** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
  * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one
@@ -17,9 +15,6 @@ import type { Vault } from './vault'
  * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
  */
 
-/** The slice of a {@link Vault} a wayin reads: the key deriver a passphrase wayin derives through, and the time a new one is made at. */
-export type WayinVault = Pick<Vault, 'keyDeriver' | 'now'>
-
 /** `RecordT` with every field but its wrap, member by member of a union. */
 type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayin_wrapped'> : never
 /** A wayin's visible header, every field but its wrap: what the wrap is bound to. */
@@ -30,9 +25,6 @@ const PurposeForWayinkind = {
   passphrase: 'vault_key_passphrase_wrapped',
   passkey:    'vault_key_passkey_wrapped',
 } as const satisfies Readonly<Record<WayinKind, string>>
-
-/** A vault's {@link VaultStamp} picked from whatever carries it, a vault record or its sparse shape: its six fields alone. Refuses 'bad_record'. */
-const { VaultStampPicked } = Validator('bad_record', () => ({ VaultStampPicked: VaultStamp.strip() }))
 
 /** The ctx a wayin's wrap is bound to, and a passkey's key made with: the stamp of the vault record it lets into, its purpose, and its whole visible header.
  * `vaultStamp` may be the whole vault record: only its six stamp fields are taken. It refuses
@@ -63,14 +55,14 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
  * stamp of its vault record, which its wrap's ctx holds, stays private. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
  * nothing else. The vault shows those, never the wayins, as its `passphrase` and `passkey`.
  *
- * @example Wayin.make(vault, vaultRecord, vaultRecord.gate.passphrase).wayinkind  // 'passphrase'
+ * @example Wayin.make(vaultRecord, vaultRecord.gate.passphrase, { keyDeriver }).wayinkind  // 'passphrase'
  * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
  */
 export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** The stored record, frozen, its wrap with it: the one source of every field. */
   readonly #record: RecordT
-  /** The vault it lets into: its key deriver and its clock. */
-  readonly #vault: WayinVault
+  /** The key deriver of the vault it lets into, which a passphrase wayin is judged by. */
+  readonly #keyDeriver: KeyDeriver
   /** The stamp of the vault record it is one of, frozen: what its wrap's ctx begins with. */
   readonly #vaultStamp: VaultStamp
 
@@ -83,9 +75,9 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** The token of the vault record it is one of: in its wrap's ctx, with the rest of that record's stamp. */
   readonly vault_tok:     string
 
-  protected constructor(vault: WayinVault, vaultStamp: VaultStamp, record: RecordT) {
+  protected constructor(vaultStamp: VaultStamp, record: RecordT, kit: { keyDeriver: KeyDeriver }) {
     this.#record = frozenRecord(record)
-    this.#vault = vault
+    this.#keyDeriver = kit.keyDeriver
     this.#vaultStamp = Object.freeze(VaultStampPicked.parse(vaultStamp))
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
@@ -102,18 +94,19 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
    * The schema's 'bad_record' is the refusal's cause, naming each failing field and repeating no
    * key that is not shaped as one of ours.
    *
-   * @param vaultStamp - The stamp of the vault record it is one of: that record itself will do, as
-   *   only its six stamp fields are taken. One missing any of them refuses 'bad_record'.
+   * @param vaultStamp - The stamp of the vault record it is one of: that record itself will do, or
+   *   the Vault object, as only its six stamp fields are taken. One missing any refuses 'bad_record'.
+   * @param kit.keyDeriver - The vault's key deriver, which judges a passphrase wayin's salt.
    *
-   * @example Wayin.make(vault, vaultRecord, vaultRecord.gate.passphrase)  // a PassphraseWayin
-   * @example Wayin.make(vault, vaultRecord, { ...record, device_id: '' })  // throws 'damaged_wayin'
+   * @example Wayin.make(vaultRecord, vaultRecord.gate.passphrase, { keyDeriver })  // a PassphraseWayin
+   * @example Wayin.make(vaultRecord, { ...record, device_id: '' }, { keyDeriver })  // throws 'damaged_wayin'
    */
-  static make(vault: WayinVault, vaultStamp: VaultStamp, record: PassphraseWayinRecord): PassphraseWayin
-  static make(vault: WayinVault, vaultStamp: VaultStamp, record: PasskeyWayinRecord): PasskeyWayin
-  static make(vault: WayinVault, vaultStamp: VaultStamp, record: unknown): PassphraseWayin | PasskeyWayin
-  static make(vault: WayinVault, vaultStamp: VaultStamp, record: unknown): PassphraseWayin | PasskeyWayin {
+  static make(vaultStamp: VaultStamp, record: PassphraseWayinRecord, kit: { keyDeriver: KeyDeriver }): PassphraseWayin
+  static make(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }): PasskeyWayin
+  static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin
+  static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin {
     const checked = damagedWayinUnless(record)
-    return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vault, vaultStamp, checked) : new PasskeyWayin(vault, vaultStamp, checked)
+    return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vaultStamp, checked, kit) : new PasskeyWayin(vaultStamp, checked, kit)
   }
 
   /** The ctx this wayin's wrap is bound to: the stamp of the vault record it is one of, its purpose, and its whole header. */
@@ -123,7 +116,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
 
   /** The key deriver of its vault, which a passphrase wayin derives through. */
   protected get keyDeriver(): KeyDeriver {
-    return this.#vault.keyDeriver
+    return this.#keyDeriver
   }
 
   /** True when this wayin is stored in a form this package never writes, so it cannot be tried.
@@ -141,8 +134,8 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
  */
 export class PassphraseWayin extends Wayin<PassphraseWayinRecord> {
   /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
-  constructor(vault: WayinVault, vaultStamp: VaultStamp, record: PassphraseWayinRecord) {
-    super(vault, vaultStamp, record)
+  constructor(vaultStamp: VaultStamp, record: PassphraseWayinRecord, kit: { keyDeriver: KeyDeriver }) {
+    super(vaultStamp, record, kit)
     Object.freeze(this)
   }
 
@@ -173,8 +166,8 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   readonly prf_salt_b64: PrfSalt
 
   /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
-  constructor(vault: WayinVault, vaultStamp: VaultStamp, record: PasskeyWayinRecord) {
-    super(vault, vaultStamp, record)
+  constructor(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }) {
+    super(vaultStamp, record, kit)
     this.credential_id = record.credential_id
     this.prf_salt_b64 = record.prf_salt_b64
     Object.freeze(this)

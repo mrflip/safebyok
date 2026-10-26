@@ -111,7 +111,7 @@ const ChangePassphraseForm = ({ gating, done, passphraseUsername, passphraseAdvi
       submitWord={Messages.changeButton}
       gripe={gripe}
       gripeId={gripeId}
-      footnote={unlockedFor(vault.leaseMillis, false)}
+      footnote={unlockedFor(gating.leaseMillis, false)}
       done={done}
       onSubmit={submit}
     >
@@ -175,7 +175,7 @@ const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutP
       blurb={replacing ? Messages.replacePasskeyBlurb : Messages.putPasskeyBlurb}
       submitWord={replacing ? Messages.replacePasskeyButton : Messages.putPasskeyButton}
       gripe={gripe}
-      footnote={unlockedFor(vault.leaseMillis, false)}
+      footnote={unlockedFor(gating.leaseMillis, false)}
       done={done}
       onSubmit={submit}
     >
@@ -196,7 +196,7 @@ const DelPasskeyModal = (props: KindModalProps<DelPasskeyGating>) => (
         {...props}
         done={done}
         words={{ title: Messages.delPasskeyTitle, blurb: Messages.delPasskeyBlurb, submitWord: Messages.delPasskeyButton }}
-        footnote={unlockedFor(props.gating.vault.leaseMillis, false)}
+        footnote={unlockedFor(props.gating.leaseMillis, false)}
         answer="unlocked"
       />
     )}

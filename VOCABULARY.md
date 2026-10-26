@@ -108,9 +108,10 @@ epoch moves within a record's life, so it is in no long-lived stamp. Say "stamp"
 fields, never "the binding" or "the authentics".
 
 **Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the
-vault it was made under, and `vault.demandConsistentWith(thing)` compares them with the vault's
-own (`vault.stamp`, for now the vault's `VaultSparse`): the vault gone (`vault_gone`), another
-life (`vault_remade`), another gate (`gate_moved`).
+vault it was made under (`VaultMadeUnder`), as the vault handed them in when it made the thing,
+and `vault.demandConsistentWith(thing)` compares them with the vault record it holds: the vault
+gone (`vault_gone`), another life (`vault_remade`), another gate (`gate_moved`). A Vault object's
+own fields are its stamp alone; the epochs it makes things under are no field of it.
 
 ## Names, records and times
 

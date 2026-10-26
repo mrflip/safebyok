@@ -1,6 +1,5 @@
 import { deepFreeze } from 'es-toolkit'
 import type * as Z from 'zod'
-import { decorate } from './adorn'
 import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -8,9 +7,9 @@ import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { Sidecar, Whisper } from './types/types'
-import { VaultSparse } from './vault-record'
-import { box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './types/type-aliases'
-import type { Vault } from './vault'
+import { type VaultStamp, VaultSparse } from './vault-record'
+import { type ConsistencyWith, box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './types/type-aliases'
+import type { Boxscope } from './checks/core-checks'
 import { Validator } from './checks/validator'
 
 // == [The record]: BoxRecord, BoxFormat, BoxStamp
@@ -106,13 +105,7 @@ export const { BoxStamp } = Validator('bad_record', () => ({
 export type BoxStamp = Z.infer<typeof BoxStamp>
 // --
 
-// == [Box]: BoxVault, BoxView, BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper, toJSON
-
-/** The slice of a {@link Vault} a box reads: the stamp it is made under, its demand, and the time a seal stamps. The lease that seals and opens it the box reads inside the package, as no getter shows it. */
-export type BoxVault = Pick<Vault, 'stamp' | 'now' | 'demandConsistentWith'>
-
-/** A box's visible fields, each once: what `{ ...box }` and `box.toJSON()` hold, its stamp left out. A {@link BoxSparse} holds them, and its record's format, codec and schema version. */
-export type BoxView = Pick<BoxSparse, 'boxlabel' | 'revision_tok' | 'sidecar' | 'registered_at' | 'written_at'>
+// == [Box]: BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
 
 /** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
  * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
@@ -133,20 +126,20 @@ const checkSealProps = optionsCheck(({ unk }) => ({ boxlabel: unk, sidecar: unk.
 /** The boxlabel a seal is handed, checked as a scope's names are: 'bad_scope' for one that is not a label. */
 const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBoxlabel: obj({ boxlabel }) }))
 
-/** One box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and the stamp of the vault it was made under.
- * Its visible fields (boxlabel, revision, its sidecar, and times) are its own, and it carries its
- * stamp: the scope, `vault_tok`, `vault_epoch` and `gate_epoch` of the vault as it stood when the
- * box was read, stored or sealed, which `vault.demandConsistentWith` judges. The stamp reads as
- * `box.vault_tok` and the like, but it is the vault's, not the box's: no spread, key list or JSON
- * shows it. The ciphertext and the storage
- * mechanics (format, codec, schema version) stay in its `record`, which is what crosses to storage
- * and holds no secret: neither key is in it. The box, its record and its sidecar are frozen through.
+/** One revision of one box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and what it was made under.
+ * A box revision is never rewritten, so every field a Box shows is fixed for its life, its own and
+ * frozen: its {@link Boxscope} (the vault's scope and its boxlabel), its {@link BoxSparse} (every
+ * field of its record but the two ciphered ones), and the `vault_tok`, `vault_epoch` and
+ * `gate_epoch` of the vault as it stood when the box was read, stored or sealed, which
+ * `vault.demandConsistentWith` judges. A spread, JSON or a log line shows those fields, and
+ * nothing secret: the ciphertext stays in its `record`, which is what crosses to storage, and
+ * neither key is in it. The box, its record and its sidecar are frozen through.
  *
  * A Box comes from a read or a write that landed (`vault.getBox`, `vault.putBox`), or from
  * {@link Box.seal}, not yet stored, which carries the revision it was sealed over as
- * `baseRevisionTok`. It is immutable between. `box.extractWhisper()` opens it under the lease the
- * vault holds. The box keeps its record and its vault in private fields: no loop, spread, log line
- * or `JSON.stringify` sees them.
+ * `baseRevisionTok`. `box.extractWhisper()` opens it under the lease the vault holds. The box
+ * keeps its record and its vault in private fields: no loop, spread, log line or
+ * `JSON.stringify` sees them.
  *
  * A missing or malformed vault, record or option throws 'bad_option'. No refusal quotes what the
  * call was handed.
@@ -155,53 +148,66 @@ const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBo
  *   const box = await vault.getBox('anthropic_api_key')
  *   box.boxlabel        // 'anthropic_api_key'
  *   box.sidecar         // { note: 'work account' }
- *   box.vault_tok       // the vault it lies in, of its stamp
+ *   box.vault_tok       // the vault it lies in
  *   box.record          // the record, as storage holds it
- *   { ...box }          // its visible fields alone: boxlabel, revision_tok, sidecar, registered_at, written_at
+ *   { ...box }          // its fields: the scope, boxlabel, its sparse fields, and the vault_tok and epochs it was made under
  */
-export class Box {
+export class Box implements Boxscope, BoxSparse {
   /** The stored record this box was made from, frozen through: the one source of every visible field. */
   readonly #record: BoxRecord
-  /** The vault it is of: its stamp, its lease and its clock. */
-  readonly #vault: BoxVault
+  /** The vault it is of: its demand, and the lease that opens it, which the box reads inside the package. */
+  readonly #vault: ConsistencyWith<VaultStamp>
   /** The revision a sealed box is written over, or null for a new box, or a box read or stored. */
   readonly #baseRevisionTok: string | null
 
-  readonly boxlabel:      string
+  /** The app of the vault it lies in. */
+  readonly applabel:               string
+  /** The user of the vault it lies in. */
+  readonly user_id:                string
+  /** The label of the vault it lies in. */
+  readonly vaultlabel:             string
+  /** The token of the vault it lies in: in both its encryptions' ctx, and named by the write that puts it. */
+  readonly vault_tok:              string
+  /** The vault's `vault_epoch` when this box was read, stored or sealed. */
+  readonly vault_epoch:            number
+  /** The vault's `gate_epoch` when this box was read, stored or sealed. */
+  readonly gate_epoch:             number
+  /** The box record's format, `safebyok-box-v8`. */
+  readonly format:                 BoxSparse['format']
+  /** The box's own label within the vault. */
+  readonly boxlabel:               string
   /** Fresh on every put: what a conditional write over this box names. */
-  readonly revision_tok:  string
+  readonly revision_tok:           string
+  /** How the whisper became the bytes ciphered: `json_v1`. */
+  readonly whisper_codec:          BoxSparse['whisper_codec']
+  /** Which generation of the whisper's own shape this box holds: 1. */
+  readonly whisper_schema_version: BoxSparse['whisper_schema_version']
   /** The app's own JSON beside the whisper, `{}` when none: stored in the clear, never encrypted. */
-  readonly sidecar:       Sidecar
+  readonly sidecar:                Sidecar
   /** When this boxlabel was first put, in epoch milliseconds. */
-  readonly registered_at: number
+  readonly registered_at:          number
   /** When this revision was put, in epoch milliseconds, whether or not the whisper changed. */
-  readonly written_at:    number
-  /** The app of the vault it lies in: of its stamp, which no spread or JSON shows. */
-  declare readonly applabel:    string
-  /** The user of the vault it lies in: of its stamp, which no spread or JSON shows. */
-  declare readonly user_id:     string
-  /** The label of the vault it lies in: of its stamp, which no spread or JSON shows. */
-  declare readonly vaultlabel:  string
-  /** The token of the vault it lies in: in both its encryptions' ctx, and named by the write that puts it. Of its stamp, which no spread or JSON shows. */
-  declare readonly vault_tok:   string
-  /** The vault's `vault_epoch` when this box was made: of its stamp, which no spread or JSON shows. */
-  declare readonly vault_epoch: number
-  /** The vault's `gate_epoch` when this box was made: of its stamp, which no spread or JSON shows. */
-  declare readonly gate_epoch:  number
+  readonly written_at:             number
 
-  private constructor(vault: BoxVault, stamp: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
+  private constructor(vault: ConsistencyWith<VaultStamp>, madeUnder: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
     // The record is the check's own copy, which nothing else holds: frozen where it stands.
     this.#record          = deepFreeze(record)
     this.#vault           = vault
     this.#baseRevisionTok = baseRevisionTok
-    this.boxlabel      = record.boxlabel
-    this.revision_tok  = record.revision_tok
-    this.sidecar       = this.#record.sidecar
-    this.registered_at = record.registered_at
-    this.written_at    = record.written_at
-    // The stamp is the vault's, for its demand to judge: readable, but no field a spread or JSON shows.
-    const { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch } = stamp
-    decorate<Box>(this, { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch })
+    this.applabel               = madeUnder.applabel
+    this.user_id                = madeUnder.user_id
+    this.vaultlabel             = madeUnder.vaultlabel
+    this.vault_tok              = madeUnder.vault_tok
+    this.vault_epoch            = madeUnder.vault_epoch
+    this.gate_epoch             = madeUnder.gate_epoch
+    this.format                 = record.format
+    this.boxlabel               = record.boxlabel
+    this.revision_tok           = record.revision_tok
+    this.whisper_codec          = record.whisper_codec
+    this.whisper_schema_version = record.whisper_schema_version
+    this.sidecar                = this.#record.sidecar
+    this.registered_at          = record.registered_at
+    this.written_at             = record.written_at
     Object.freeze(this)
   }
 
@@ -215,18 +221,20 @@ export class Box {
     return this.#baseRevisionTok
   }
 
-  /** The box a stored record makes, of `vault`, made under `stamp`; the record kept, frozen, as `record`.
+  /** The box a stored record makes, of `vault`, made under `madeUnder`; the record kept, frozen, as `record`.
    * Touches no storage and no key. Throws 'bad_record' for a record this package does not write,
-   * and 'bad_option' for a `stamp` that is none.
+   * and 'bad_option' for a `madeUnder` that is none.
    *
-   * @param stamp - The {@link VaultSparse} of the vault the record was read or written under, as `vault.stamp` holds it; the box keeps its scope, `vault_tok` and both epochs. Default: the vault's own now.
+   * @param madeUnder - What the vault the record was read or written under showed then: its scope,
+   *   the `vault_tok` the read or write expected, and both epochs. A {@link VaultSparse} will do,
+   *   as only those fields are taken.
    *
-   * @example const box = Box.make(vault, record)   // record: what a VaultDB's getBox resolved
-   * @example Box.make(vault, { boxlabel: 'anthropic_api_key' })   // throws 'bad_record': no box record
+   * @example const box = Box.make(vault, record, madeUnder)   // record: what a VaultDB's getBox resolved
+   * @example Box.make(vault, { boxlabel: 'anthropic_api_key' }, madeUnder)   // throws 'bad_record': no box record
    */
-  static make(vault: BoxVault, record: BoxRecord, stamp: VaultSparse = vault.stamp): Box {
+  static make(vault: ConsistencyWith<VaultStamp>, record: BoxRecord, madeUnder: MadeUnder): Box {
     const checked = checkedBoxRecord(record)
-    return new this(vault, checkedStamp(stamp), checked, null)
+    return new this(vault, checkedMadeUnder(madeUnder), checked, null)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
@@ -234,34 +242,35 @@ export class Box {
    * under a boxKey made fresh for this box alone, wrapped under the vaultKey. Both bind the vault's
    * stamp and the box's own: every visible field, the sidecar among them, and the lease's
    * `vault_tok`, so the record moved or altered anywhere will not open. Its `revision_tok` is
-   * fresh, and `written_at` is the vault's time now. `registered_at` is the base's when it gives
-   * one, else now; the base's revision
-   * is the box's `baseRevisionTok`. The sidecar is `{}` when left out: a seal carries nothing from
-   * the base but its revision and `registered_at`.
+   * fresh, and `written_at` is `made.now`, the vault's time. `registered_at` is the base's when it
+   * gives one, else now; the base's revision is the box's `baseRevisionTok`. The sidecar is `{}`
+   * when left out: a seal carries nothing from the base but its revision and `registered_at`.
    *
    * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_scope' for a boxlabel that is not
-   * a label, and 'bad_option' for a sidecar JSON cannot carry or a malformed base. Refuses
-   * 'vault_locked' when the vault holds no lease, and
-   * otherwise as `lease.cipheredWith` does.
+   * a label, and 'bad_option' for a sidecar JSON cannot carry, a malformed base, or a `made` that
+   * is none. Refuses 'vault_locked' when the vault holds no lease, and otherwise as
+   * `lease.cipheredWith` does.
    *
-   * @example const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...')
-   * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...')   // next.baseRevisionTok: box.revision_tok
+   * @param made.madeUnder - What the vault shows as it seals: its scope, `vault_tok` and both epochs, as {@link Box.make} takes them.
+   * @param made.now - The time by the vault's clock, in epoch milliseconds: the new revision's `written_at`.
+   *
+   * @example const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...', { madeUnder, now })
+   * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
-  static async seal(vault: BoxVault, props: SealBoxProps, whisper: Whisper): Promise<Box> { return valOf(await this.trySeal(vault, props, whisper)) }
+  static async seal(vault: ConsistencyWith<VaultStamp>, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> { return valOf(await this.trySeal(vault, props, whisper, made)) }
 
   /** A new box of `vault` holding `whisper`, as an {@link Outcome}: the non-throwing form of {@link Box.seal}. */
-  static async trySeal(vault: BoxVault, props: SealBoxProps, whisper: Whisper): Promise<Outcome<Box>> {
+  static async trySeal(vault: ConsistencyWith<VaultStamp>, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Outcome<Box>> {
     return await outcomeOf(async () => {
       checkSealProps(props)
       const { boxlabel } = sealBoxlabel.parse({ boxlabel: props.boxlabel })
       const sidecar = props.sidecar === undefined ? {} : checkedSidecar(props.sidecar)
       const base = checkedBase(props.base)
+      const { madeUnder, now } = checkedMade(made)
       const whisperBytes = whisperBytesOf(whisper)
       try {
         const lease = heldLeaseOf(vault)
         if (lease === null) { throw lockedError() }
-        const { stamp } = vault
-        const now = vault.now()
         const record = await lease.sealProps({
           format:                 BoxFormat,
           boxlabel,
@@ -272,7 +281,7 @@ export class Box {
           registered_at:          base?.registered_at ?? now,
           written_at:             now,
         }, { whisper: whisperBytes })
-        return new Box(vault, stamp, checkedBoxRecord(record), base?.revision_tok ?? null)
+        return new Box(vault, madeUnder, checkedBoxRecord(record), base?.revision_tok ?? null)
       } finally {
         whisperBytes.fill(0)
       }
@@ -323,15 +332,6 @@ export class Box {
       }
     }, unexpectedError)
   }
-
-  /** The box's visible fields, each once, as a plain object: what `JSON.stringify(box)` writes and a log line shows, its stamp left out. Storage takes `record`, not this.
-   *
-   * @example JSON.parse(JSON.stringify(box))   // { boxlabel, revision_tok, sidecar, registered_at, written_at }
-   */
-  toJSON(): BoxView {
-    const { ...visible } = this
-    return visible
-  }
 }
 // --
 
@@ -348,7 +348,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 }
 // --
 
-// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkedBase, checkedStamp, lockedError
+// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkedBase, MadeUnder, checkedMadeUnder, checkedMade, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
@@ -389,14 +389,18 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
   return checked.data
 }
 
-/** The fields of the vault a box keeps, of the {@link VaultSparse} it is made under: the scope, the `vault_tok`, and both epochs. */
-type MadeUnder = Pick<VaultSparse, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'vault_epoch' | 'gate_epoch'>
+/** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; what a box is made under must show, the vault's scope, the `vault_tok` and both epochs, every other field dropped unread; and what a seal is made with, that and the time. */
+const { BaseShape, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
+  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
+  return {
+    BaseShape: obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
+    MadeUnderShape,
+    MadeShape: obj({ madeUnder: MadeUnderShape, now: epochMillis }),
+  }
+})
 
-/** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; and what the {@link VaultSparse} a box is made under must show, the scope, the `vault_tok` and both epochs, every other field dropped unread. */
-const { BaseShape, StampShape } = Validator('bad_option', ({ obj, epochMillis }) => ({
-  BaseShape:  obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
-  StampShape: VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip(),
-}))
+/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
+type MadeUnder = Z.infer<typeof MadeUnderShape>
 
 /** `base`, once it is a {@link BoxBase} or none: 'bad_option' otherwise, quoting none of it. */
 const checkedBase = (base: unknown): BoxBase | null => {
@@ -407,14 +411,22 @@ const checkedBase = (base: unknown): BoxBase | null => {
   return checked.data
 }
 
-/** The fields a box keeps of `stamp`, frozen, once it shows them: 'bad_option' for anything else. */
-const checkedStamp = (stamp: unknown): MadeUnder => {
-  const checked = StampShape.safeParse(stamp)
-  if (! checked.success) {
-    throw new VaultError('bad_option', "Box.make's stamp is the stamp of the vault the record was read or written under, as vault.stamp holds it: its scope, vault_tok, vault_epoch and gate_epoch.")
-  }
+/** The fields a box keeps of `madeUnder`, frozen, once it shows them: 'bad_option' for anything else. */
+const checkedMadeUnder = (madeUnder: unknown): MadeUnder => {
+  const checked = MadeUnderShape.safeParse(madeUnder)
+  if (! checked.success) { throw badMadeUnder() }
   return Object.freeze(checked.data)
 }
+
+/** `made`, once it shows what a seal is made under and the time: 'bad_option' for anything else. */
+const checkedMade = (made: unknown): { madeUnder: MadeUnder, now: number } => {
+  const checked = MadeShape.safeParse(made)
+  if (! checked.success) { throw badMadeUnder() }
+  return { madeUnder: Object.freeze(checked.data.madeUnder), now: checked.data.now }
+}
+
+/** The refusal of a box made under something that shows no vault as it stood. */
+const badMadeUnder = () => new VaultError('bad_option', "A box is made under the vault as it stood when the box was read, written or sealed: its scope, the vault_tok, vault_epoch and gate_epoch, as a VaultSparse holds them, and a seal also the time it is made at. The vault hands these in itself.")
 
 /** The refusal of a seal or an extract with no lease in hand. */
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so the box was neither sealed nor opened: unlock it first, or go through the vault (getWhisper, putBox), which asks for a proof.')

@@ -82,7 +82,7 @@ export const tryPutWayin = async (vault: Vault, passphrase: string, newProof: st
   const made = attempted as Outcome<Vault> | null
   if (made !== null && ! made.ok) { return made }
   if (! put.ok) { return put }
-  const summary = slotlabel === 'passphrase' ? vault.passphrase : vault.passkey
+  const summary = slotlabel === 'passphrase' ? vault.snapshot.passphrase : vault.snapshot.passkey
   if (summary === null) { throw new Error('putWayin resolved, but the snapshot shows no way in at its slot.') }
   return good(summary)
 }

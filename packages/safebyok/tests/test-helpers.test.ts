@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, raisedDeviceRecord, type DeviceDB, type StringStore } from '../src/index'
 import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good } from '../src/outcome'
+import { type Outcome, bad, good, valOf } from '../src/outcome'
 import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
@@ -324,7 +324,7 @@ describe("holdNextCall", () => {
     const unlocked = await unlocking
     gate.release()
     expect(unlocked.ok).to.be.false
-    expect(vault.state).to.not.eq('unlocked')
+    expect(vault.snapshot.state).to.not.eq('unlocked')
   })
 })
 
@@ -707,10 +707,10 @@ describe("the fixtures", () => {
   it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
     const { now, ...rest } = TH.vaultSliceOf('u1')
     expect(now()).to.eq(TH.SliceNow)
-    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
+    expect(rest).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
     expect(slice.keyDeriver).to.eq(argon2idWebV1Deriver)
-    expect(Wayin.make(slice, TH.vaultRecordOf('u1'), TH.passkeyWayinOf('laptop')).wayinkind).to.eq('passkey')
+    expect(Wayin.make(TH.vaultSliceOf('u1'), TH.passkeyWayinOf('laptop'), { keyDeriver: argon2idWebV1Deriver }).wayinkind).to.eq('passkey')
   })
 
   it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
@@ -730,18 +730,34 @@ describe("the fixtures", () => {
     expect(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })).to.include({ user_id: 'u1', device_id: 'device-one', highest_vault_epoch: 3 })
   })
 
-  it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, stamped with its scope and vault token, as its examples show", async () => {
+  it("madeUnderOf: the vault record a Vault object holds but its gate, what a box made of it now is made under, as its example shows", async () => {
+    const opts = TH.memoryVaultOpts()
+    const vault = await TH.settledVault(opts)
+    await TH.unlock(vault, 'pw')
+    const stored = await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1'))
+    if (stored === null) { throw new Error('no vault was stored') }
+    const { gate: _gate, ...sparse } = stored
+    expect(TH.madeUnderOf(vault)).to.deep.equal(sparse)
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const record = valOf(await opts.vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', { vault_tok: vault.vault_tok }))
+    if (record === null) { throw new Error('no box was stored') }
+    expect(await Box.make(vault, record, TH.madeUnderOf(vault)).extractWhisper()).to.eq('sk-fake')
+    TH.expectSyncRefusal(() => TH.madeUnderOf({} as never), 'bad_option')
+  })
+
+  it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, made under its scope and vault token, as its examples show", async () => {
     const vaultKey = await makeVaultKey()
     const vault = await TH.leasedSliceOf('u1', vaultKey)
-    expect(vault.stamp).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: Date.UTC(2026, 9, 14), vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.madeUnder).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: Date.UTC(2026, 9, 14), vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.making()).to.deep.equal({ madeUnder: vault.madeUnder, now: TH.SliceNow })
     expect(vault.lease).to.include({ vault_tok: 'vault-tok-u1', gate_epoch: 1 })
-    const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
+    const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake', vault.making())
     expect(await box.extractWhisper()).to.eq('sk-fake')
   })
 
   it("leasedSliceOf's demand refuses as the vault's does, and its tryLock drops the lease and counts", async () => {
     const vault = await TH.leasedSliceOf('u1', await makeVaultKey(), { vault_tok: 'vault-tok-other' })
-    expect(vault.stamp.vault_tok).to.eq('vault-tok-other')
+    expect(vault.madeUnder.vault_tok).to.eq('vault-tok-other')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-u1' }) }, 'vault_remade')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other', gate_epoch: 2 }) }, 'gate_moved')
     await TH.expectGood(vault.tryLock())
@@ -1664,14 +1680,14 @@ describe("the gating helpers", () => {
     const bank = Bank.make({ ...opts, requestCleartext: TH.scriptedRequestCleartext })
     const vault = await bank.ensureVault({ vaultlabel })
     await TH.unlock(vault, 'pw')
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
   })
 
   it("decline the next gating when answering scripts it so, as answering's example shows", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
     TH.answering(vault, (gating) => { gating.decline() })
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
   })
 
   it("resolve a wrong passphrase's refusal from tryUnlock, as its example shows", async () => {
@@ -1689,7 +1705,7 @@ describe("the gating helpers", () => {
     await TH.putWayin(vault, 'correct horse battery staple', await TH.passkeyOf('laptop'))
     await vault.lock()
     await TH.unlock(vault, await TH.passkeyOf('laptop'))
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
   })
 
   it("put a new passphrase and a passkey, resolving each one's summary, as putWayin's examples show", async () => {
@@ -1697,9 +1713,9 @@ describe("the gating helpers", () => {
     const passphrase = 'pw'
     await TH.unlock(vault, passphrase)
     const summary = await TH.putWayin(vault, passphrase, 'a new passphrase')
-    expect(summary).to.deep.equal(vault.passphrase)
+    expect(summary).to.deep.equal(vault.snapshot.passphrase)
     const passkey = await TH.putWayin(vault, 'a new passphrase', await TH.passkeyOf('laptop'))
-    expect(passkey).to.deep.equal(vault.passkey)
+    expect(passkey).to.deep.equal(vault.snapshot.passkey)
   })
 
   it("take the passkey away, and delete the vault, as delWayin's and del's examples show", async () => {
@@ -1708,7 +1724,7 @@ describe("the gating helpers", () => {
     await TH.unlock(vault, passphrase)
     await TH.putWayin(vault, passphrase, await TH.passkeyOf('laptop'))
     await TH.delWayin(vault, passphrase)
-    expect(vault.passkey).to.be.null
+    expect(vault.snapshot.passkey).to.be.null
     await TH.del(vault, passphrase)
     await TH.expectRefusal(vault.hello(), 'vault_gone')
   })

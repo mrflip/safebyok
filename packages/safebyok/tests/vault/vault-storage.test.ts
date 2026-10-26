@@ -372,9 +372,9 @@ describe("the logger", () => {
       return { ...row, vault_key_lease_wrapped: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }
     })
     const reopened = await world.open({ deviceDB: device.deviceDB })
-    expect(reopened.state).to.eq('unlocked')
+    expect(reopened.snapshot.state).to.eq('unlocked')
     await TH.expectRefusal(reopened.getWhisper('anthropic'), 'damaged_lease')
-    expect(reopened.state).to.eq('locked')
+    expect(reopened.snapshot.state).to.eq('locked')
     await TH.wakeupAtNextTick()
     const kept = await device.deviceDB.getLease(TH.scopeOf('u1'))
     expect(valOf(kept)).to.be.null
@@ -539,7 +539,7 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     // Told locked, then told of the bad news as its trouble: never unlocked again between.
     expect([...new Set(heard)]).to.deep.equal(['locked'])
-    expect(vault.trouble?.refusalkind).to.eq('identity_revoked')
+    expect(vault.snapshot.trouble?.refusalkind).to.eq('identity_revoked')
   })
 
   it("revokes the lease when it meets the vault's birth, which then refuses", async () => {
@@ -691,7 +691,7 @@ describe("this device's record of the vault", () => {
     const misfiled = vi.spyOn(world.deviceDB, 'getDeviceRecord').mockResolvedValue(TH.good(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 })))
     const vault = await world.open()
     misfiled.mockRestore()
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     expect(await recordIn(world)).to.deep.include({ ...TH.scopeOf('u1'), highest_vault_epoch: 1 })
   })
 
@@ -702,7 +702,7 @@ describe("this device's record of the vault", () => {
     const spoiled = vi.spyOn(world.deviceDB, 'getDeviceRecord').mockResolvedValue(TH.good(malformed as unknown as DeviceRecord))
     const vault = await world.open()
     spoiled.mockRestore()
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     await TH.unlock(vault, 'pw')
     const record = await recordIn(world)
     expect(record?.device_id).to.be.a('string').and.not.be.empty
@@ -723,8 +723,8 @@ describe("this device's record of the vault", () => {
     const misfiled = vi.spyOn(world.deviceDB, 'getDeviceRecord').mockResolvedValue(TH.good(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 })))
     await vault.hello({ staleMinutes: 0 })
     misfiled.mockRestore()
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.trouble).to.be.null
+    expect(vault.snapshot.state).to.eq('unlocked')
+    expect(vault.snapshot.trouble).to.be.null
   })
 
   it("is raised by delDamagedVault to the tombstone's vault_epoch, never erased", async () => {

@@ -211,7 +211,7 @@ export type RefusalMeta = {
   vault_stored?: VaultRecord | null
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
-   * `vault.capacity` before storage is asked.
+   * `vault.snapshot.capacity` before storage is asked.
    */
   capacity?:     Capacity
   /** `damaged_box` told of a listing: the box as the listing shows it among `damagedBoxes`, its boxlabel, the revision it names, and its `damage`. */

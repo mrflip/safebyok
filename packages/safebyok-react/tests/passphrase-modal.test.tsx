@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext, type Vault } from 'safebyok'
 import type { DialogAnswer, PassphraseAdvice } from '../src/modal'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 // == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, confirmField, renderUnlocking, others
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
-const vaultInState = (state: 'novel' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
+const vaultInState = (state: 'novel' | 'locked') => TH.stubVault({ state })
 
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_answer: DialogAnswer) => undefined
@@ -440,12 +440,23 @@ describe("PassphraseModal", () => {
       [1.5,        "in 90 minutes",  'an hour and a half reads as minutes'],
     ] as const
 
-    // Each from a vault opened with the hours given, so the dialog reads what Vault.make made of
-    // them: one not yet created reads 'Locks on', one created and locked 'Locks again'.
+    /** The `leaseMillis` `vault`'s next gating tells its dialog: what the bank made of its `leaseHours`. The gating is declined. */
+    const toldLeaseMillisOf = async (vault: Vault): Promise<number> => {
+      const told: number[] = []
+      TH.answering(vault, (gating) => { told.push(gating.leaseMillis); gating.decline() })
+      await vault.tryEnsureUnlocked()
+      const [leaseMillis] = told
+      if (leaseMillis === undefined) { throw new Error('expected a gating') }
+      return leaseMillis
+    }
+
+    // Each from a vault opened with the hours given, so the dialog reads what the bank made of
+    // them, as its gating tells it: one not yet created reads 'Locks on', one created and locked 'Locks again'.
     for (const [hours, relative, blurb] of WindowCases) {
       it(`${blurb}, while it creates the vault`, async () => {
         const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
-        render(<PassphraseModal gating={TH.gatingOf(vault)} onDone={noop} />)
+        const leaseMillis = await toldLeaseMillisOf(vault)
+        render(<PassphraseModal gating={TH.gatingOf(vault, { leaseMillis })} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, true))).to.not.be.null
         TH.closeVault(vault)
       })
@@ -454,24 +465,25 @@ describe("PassphraseModal", () => {
         const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         await TH.unlock(vault, 'pw')
         await vault.lock()
-        render(<PassphraseModal gating={TH.gatingOf(vault)} onDone={noop} />)
+        const leaseMillis = await toldLeaseMillisOf(vault)
+        render(<PassphraseModal gating={TH.gatingOf(vault, { leaseMillis })} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, false))).to.not.be.null
         TH.closeVault(vault)
       })
     }
 
     it("reads ForeverMillis, the longest window a vault keeps, as until locked", () => {
-      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked', ForeverMillis))} onDone={noop} />)
+      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked'), { leaseMillis: ForeverMillis })} onDone={noop} />)
       expect(screen.queryByText("Stays unlocked on this device until you lock it.")).to.not.be.null
     })
 
     it("reads anything within a minute of ForeverMillis as until locked, never comparing for equality", () => {
-      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked', ForeverMillis - MinuteMillis))} onDone={noop} />)
+      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked'), { leaseMillis: ForeverMillis - MinuteMillis })} onDone={noop} />)
       expect(screen.queryByText("Stays unlocked on this device until you lock it.")).to.not.be.null
     })
 
     it("reads a window more than a minute short of ForeverMillis as a count", () => {
-      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked', ForeverMillis - MinuteMillis - 1))} onDone={noop} />)
+      render(<PassphraseModal gating={TH.gatingOf(vaultInState('locked'), { leaseMillis: ForeverMillis - MinuteMillis - 1 })} onDone={noop} />)
       expect(screen.queryByText(/Locks again on this device in [\d,]+ minutes\./)).to.not.be.null
     })
   })
@@ -831,12 +843,12 @@ describe("PassphraseModal", () => {
       fireEvent.click(screen.getByText('Create vault'))
       await act(async () => { await TH.wakeupAtNextTick() })
       expect(deriveKeyBytes.mock.calls).to.have.lengthOf(0)
-      expect(vault.state).to.eq('novel')
+      expect(vault.snapshot.state).to.eq('novel')
       fireEvent.change(confirmField(), { target: { value: 'pw-the-passphrase' } })
       fireEvent.click(screen.getByText('Create vault'))
       await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
       await TH.expectGood(ensuring)
-      expect(vault.state).to.eq('unlocked')
+      expect(vault.snapshot.state).to.eq('unlocked')
       TH.closeVault(vault)
     })
 

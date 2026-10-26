@@ -349,10 +349,20 @@ describe("the lease, when the host changes leaseHours", () => {
   })
 })
 
-/** How long an unlock of `vault` lasts, as `Vault.leaseMillis`'s example says it. */
-const windowSaidBy = (vault: Vault): string => (
-  vault.leaseMillis === ForeverMillis ? 'until you lock it' : `for ${String(Math.round(vault.leaseMillis / 60_000))} minutes`
+/** How long an unlock lasts, as a gating's `leaseMillis` example says it. */
+const windowSaidBy = (leaseMillis: number): string => (
+  leaseMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(leaseMillis / MinuteMillis))} minutes`
 )
+
+/** The `leaseMillis` the first gating of a vault opened from `world` with `opts` tells the host, which declines it. */
+const gatingLeaseMillisOf = async (world: ReturnType<typeof makeWorld>, opts: Partial<TH.BornVaultOpts>): Promise<number> => {
+  const told: number[] = []
+  const vault = await world.open({ ...opts, requestCleartext: (gating) => { told.push(gating.leaseMillis); gating.decline() } })
+  await TH.expectBad(vault.tryEnsureUnlocked(), 'vault_locked')
+  const [leaseMillis] = told
+  if (leaseMillis === undefined || told.length !== 1) { throw new Error('expected one gating') }
+  return leaseMillis
+}
 
 const LeaseHoursCases = [
   // regular usage:
@@ -365,50 +375,42 @@ const LeaseHoursCases = [
   [1 / 7,            514_286,                        'a window that is no whole number of milliseconds, rounded to one'],
 ] as const
 
-describe("the vault's leaseMillis", () => {
+describe("a gating's leaseMillis", () => {
   for (const [hours, expected, blurb] of LeaseHoursCases) {
     it(`reports ${blurb}`, async () => {
-      const world = makeWorld()
-      const vault = await world.open({ leaseHours: hours })
-      expect(vault.leaseMillis).to.eq(expected)
+      expect(await gatingLeaseMillisOf(makeWorld(), { leaseHours: hours })).to.eq(expected)
     })
   }
 
   it("is the window an unlock lasts: ask_passphrase_at is the unlock's time plus it", async () => {
     const world = makeWorld()
+    const leaseMillis = await gatingLeaseMillisOf(world, { leaseHours: 0.25 })
     const vault = await world.openUnlocked('pw one', { leaseHours: 0.25 })
-    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + vault.leaseMillis)
-  })
-
-  it("stays the same for the handle's life, through unlock and lock", async () => {
-    const world = makeWorld()
-    const vault = await world.open({ leaseHours: 12 })
-    await TH.unlock(vault, 'pw one')
-    await vault.lock()
-    expect(vault.leaseMillis).to.eq(12 * HourMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + leaseMillis)
   })
 
   it("lets a UI say how long an unlock lasts, as its example shows", async () => {
-    const world = makeWorld()
-    expect(windowSaidBy(await world.open({ leaseHours: Infinity }))).to.eq('until you lock it')
-    expect(windowSaidBy(await world.open({ leaseHours: 0.25 }))).to.eq('for 15 minutes')
+    const forever = await gatingLeaseMillisOf(makeWorld(), { leaseHours: Infinity })
+    const quarterHour = await gatingLeaseMillisOf(makeWorld(), { leaseHours: 0.25 })
+    expect(windowSaidBy(forever)).to.eq('until you lock it')
+    expect(windowSaidBy(quarterHour)).to.eq('for 15 minutes')
   })
 })
 
-/** The minutes left before `vault` locks of itself, as `Vault.ask_passphrase_at`'s example counts them; null while locked. */
-const minutesLeftOf = (vault: Vault): number | null => (
-  vault.ask_passphrase_at === null ? null : Math.ceil((vault.ask_passphrase_at - vault.now()) / MinuteMillis)
+/** The minutes left at `now` before `vault` locks of itself, as the snapshot's `ask_passphrase_at` example counts them; null while locked. */
+const minutesLeftOf = (vault: Vault, now: number): number | null => (
+  vault.snapshot.ask_passphrase_at === null ? null : Math.ceil((vault.snapshot.ask_passphrase_at - now) / MinuteMillis)
 )
 
 describe("the vault's ask_passphrase_at", () => {
   it("lets a UI say how many minutes are left before the vault locks of itself, as its example shows; null once locked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 0.25 })
-    expect(minutesLeftOf(vault)).to.eq(15)
+    expect(minutesLeftOf(vault, world.clock.now())).to.eq(15)
     world.advance(5 * MinuteMillis)
-    expect(minutesLeftOf(vault)).to.eq(10)
+    expect(minutesLeftOf(vault, world.clock.now())).to.eq(10)
     await vault.lock()
-    expect(minutesLeftOf(vault)).to.be.null
+    expect(minutesLeftOf(vault, world.clock.now())).to.be.null
   })
 })
 
@@ -635,7 +637,7 @@ describe("a change to the ways in, once it has landed", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
     await TH.putWayin(vault, 'pw one', await TH.passkeyOf('laptop'))
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null
     TH.answering(vault, async (gating) => { await TH.expectGood(TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw one')) })
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
@@ -883,7 +885,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   it("resolves the vault at once while unlocked and the lease not ending within renewMinutes: no prompt, no write (Contract: ensureUnlocked, Does 2)", async () => {
@@ -904,8 +906,8 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const vault = await world.open({ requestCleartext })
     expect(await vault.ensureUnlocked()).to.eq(vault)
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('initialize_gate')
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.passphrase).to.not.be.null
+    expect(vault.snapshot.state).to.eq('unlocked')
+    expect(vault.snapshot.passphrase).to.not.be.null
   })
 
   it("raises unlock_vault on a vault that stands, with no lease on this device (Contract: ensureUnlocked, Does 3)", async () => {
@@ -913,7 +915,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const { vault } = await lockedVaultWith({ requestCleartext })
     await vault.ensureUnlocked()
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('unlock_vault')
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
   })
 
   it("raises unlock_vault when the lease ends within renewMinutes, and renews it, never taking its own twilight lease back up from this device's store (Contract: ensureUnlocked, Does 3)", async () => {
@@ -928,7 +930,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await vault.ensureUnlocked({ renewMinutes: 15 })
     expect(requestCleartext).toHaveBeenCalledOnce()
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('unlock_vault')
-    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     const renewed = await world.getLease()
     expect(renewed?.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     expect(twilight?.ask_passphrase_at).to.be.below(world.clock.now() + HourMillis)
@@ -964,7 +966,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
     await TH.expectRefusal(vault.putBox({ boxlabel: 'openai' }, 'sk-fake'), 'vault_locked')
     await TH.expectRefusal(vault.delBox('anthropic'), 'vault_locked')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   it("hands requestCleartext a gating: the standing vault, its gatingkind, its attempts, decline and lockLanded (Contract: ensureUnlocked, Does 3.3)", async () => {
@@ -1002,7 +1004,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const reads = vi.spyOn(world.vaultDB, 'getVault')
     world.advance((StaleMinutes + 1) * MinuteMillis)
     expect(await vault.ensureUnlocked()).to.eq(vault)
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     // The hello before the gating, and the attempt's own read, once staleMinutes have passed.
     expect(reads.mock.calls.length).to.be.at.least(2)
   })
@@ -1011,7 +1013,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const { vault } = await lockedVaultWith({ requestCleartext: (gating) => { gating.decline() } })
     const err = await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
     expect(err.message).to.include('declined')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   it("refuses vault_locked when the user declines a gating raised as the lease nears its end, and does not lock: the lease in hand stands, its deadline unmoved (Contract: ensureUnlocked, Does 3.6)", async () => {
@@ -1019,13 +1021,13 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext, leaseHours: 1 })
     requestCleartext.mockClear()
-    const deadline = vault.ask_passphrase_at
+    const deadline = vault.snapshot.ask_passphrase_at
     world.advance(HourMillis - MinuteMillis)
     // Nothing scripted: the dialog closes unanswered.
     await TH.expectRefusal(vault.ensureUnlocked({ renewMinutes: 5 }), 'vault_locked')
     expect(requestCleartext).toHaveBeenCalledOnce()
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.ask_passphrase_at).to.eq(deadline)
+    expect(vault.snapshot.state).to.eq('unlocked')
+    expect(vault.snapshot.ask_passphrase_at).to.eq(deadline)
     expect(await vault.ensureUnlocked()).to.eq(vault)
   })
 
@@ -1065,7 +1067,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await TH.expectBad(gating.attemptPassphrase('pw'), 'gating_landed')
     expect(derive).not.toHaveBeenCalled()
     expect(reads).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
@@ -1085,7 +1087,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     gate.release()
     const err = await TH.expectBad(attempting, 'gating_landed')
     expect(err.message).to.include('while this proof was being checked')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     await TH.expectBad(ensuring, 'vault_locked')
   })
@@ -1126,7 +1128,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await TH.expectBad(ensuring, 'vault_locked')
     held.release()
     await TH.expectBad(attempting, 'gating_landed')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null
   })
 
@@ -1149,7 +1151,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     gate.release()
     const err = await TH.expectBad(attempting, 'gating_landed')
     expect(err.message).to.include('while this proof was being checked')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')
   })
@@ -1171,7 +1173,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await TH.expectGood(first)
     await TH.expectGood(ensuring)
     await vault.lock()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
   })
 
@@ -1188,7 +1190,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(err.message).to.include('This dialog is over')
     expect(derive).not.toHaveBeenCalled()
     expect(reads).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   it("refuses unexpected_error when requestCleartext throws an error quoting the passphrase, carrying nothing of it, no cause among it, never told as bad news, the logger hearing only that it threw (Contract: ensureUnlocked, Refuses)", async () => {
@@ -1255,7 +1257,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     world.advance(SevenDaysMillis - (30 * MinuteMillis))
     await vault.ensureUnlocked({ renewMinutes: 60 })
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('unlock_vault')
-    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("refuses an event in place of options as bad_option, naming the wrap, and asks no one", async () => {
@@ -1264,7 +1266,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const err = await TH.expectBad(vault.tryEnsureUnlocked(new Event('click') as unknown as { renewMinutes?: number }), 'bad_option')
     expect(err.message).to.include('`() => vault.tryEnsureUnlocked()`')
     expect(requestCleartext).to.not.have.been.called
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   it("unlocks from a button's handler wrapped as its second example shows", async () => {
@@ -1274,7 +1276,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
     button.addEventListener('click', () => vault.tryEnsureUnlocked())
     button.dispatchEvent(new Event('click'))
-    await vi.waitFor(() => { expect(vault.state).to.eq('unlocked') })
+    await vi.waitFor(() => { expect(vault.snapshot.state).to.eq('unlocked') })
   })
 
   it("resolves unlocked or refuses vault_locked, as its first example shows", async () => {
@@ -1335,7 +1337,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     reading.release()
     await TH.expectRefusal(ensuring, 'vault_gone')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.ask_passphrase_at).to.be.null
+    expect(vault.snapshot.ask_passphrase_at).to.be.null
     expect(await world.getLease()).to.not.be.null
   })
 
@@ -1350,7 +1352,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await vault.lock()
     reading.release()
     await TH.expectRefusal(ensuring, 'vault_locked')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
   })
 })
@@ -1386,7 +1388,7 @@ describe("a lock or a let-go landing while a box call waits to be unlocked (risk
         await vault.lock()
         held.release()
         await TH.expectBad(calling, 'vault_locked')
-        expect(vault.state).to.eq('locked')
+        expect(vault.snapshot.state).to.eq('locked')
         expect(await world.getLease()).to.be.null
         expect(storedRowOf(world, 'anthropic')).to.deep.equal(boxBefore)
       })
@@ -1405,7 +1407,7 @@ describe("a lock or a let-go landing while a box call waits to be unlocked (risk
         held.release()
         await TH.expectBad(calling, 'vault_gone')
         expect(requestCleartext).not.toHaveBeenCalled()
-        expect(vault.ask_passphrase_at).to.be.null
+        expect(vault.snapshot.ask_passphrase_at).to.be.null
         expect(await world.getLease()).to.deep.equal(leaseBefore)
         expect(storedRowOf(world, 'anthropic')).to.deep.equal(boxBefore)
       })
@@ -1448,7 +1450,7 @@ describe("Bank.make's requestCleartext", () => {
       const { vault } = await lockedVaultWith({ requestCleartext })
       await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
       expect(showDialogFor).not.toHaveBeenCalled()
-      expect(vault.state).to.eq('locked')
+      expect(vault.snapshot.state).to.eq('locked')
     } finally {
       vi.unstubAllGlobals()
     }
@@ -1468,7 +1470,7 @@ describe("every data call, through ensureUnlocked", () => {
       const { vault } = await lockedVaultWith({ requestCleartext })
       await call(vault)
       expect(requestCleartext).toHaveBeenCalledOnce()
-      expect(vault.state).to.eq('unlocked')
+      expect(vault.snapshot.state).to.eq('unlocked')
     })
   }
 
@@ -1477,7 +1479,7 @@ describe("every data call, through ensureUnlocked", () => {
     const { vault } = await lockedVaultWith({ requestCleartext })
     await TH.expectRefusal(vault.putBox({ boxlabel: 'openai', sidecar: { note: 'work' } }), 'no_whisper')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work' } })
     expect(requestCleartext).toHaveBeenCalledOnce()
   })
@@ -1511,7 +1513,7 @@ describe("every data call, through ensureUnlocked", () => {
       await TH.expectRefusal(call(vault, 'no such label!'), 'bad_scope')
       await expectUnlisted('openai')
       expect(requestCleartext).not.toHaveBeenCalled()
-      expect(vault.state).to.eq('locked')
+      expect(vault.snapshot.state).to.eq('locked')
       // A box the listing shows is asked for as before.
       await call(vault, 'anthropic')
       expect(requestCleartext).toHaveBeenCalledOnce()
@@ -1544,7 +1546,7 @@ describe("every data call, through ensureUnlocked", () => {
     const world = makeWorld()
     const requestCleartext = typingPw()
     const vault = await world.open({ vaultDB: world.deafVaultDB(), requestCleartext })
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(elsewhere, 'pw')
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -1562,7 +1564,7 @@ describe("every data call, through ensureUnlocked", () => {
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
   })
 
   it("reads storage for the box once unlocked, whatever the listing shows: the listing in hand only spares a prompt", async () => {
@@ -1583,7 +1585,7 @@ describe("the gating's attempt, by the Contract", () => {
     const { ok, val } = await gating.attemptPassphrase('pw')
     expect(ok).to.be.true
     expect(val).to.eq(vault)
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     dialog.close()
     expect(await ensuring).to.eq(vault)
   })
@@ -1611,7 +1613,7 @@ describe("the gating's attempt, by the Contract", () => {
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     const err = await TH.expectBad(gating.attempt('pw'), 'weak_passphrase')
     expect(err.message).to.eq('Found in a breach: pick another.')
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     await TH.expectGood(gating.attempt('a longer one'))
     dialog.close()
     await TH.expectGood(ensuring)
@@ -1642,7 +1644,7 @@ describe("the gating's attempt, by the Contract", () => {
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     TH.beforeNextCall(deafDB, 'putVaultRecord', async () => { await TH.unlock(elsewhere, 'pw one') })
     await TH.expectBad(gating.attempt('pw one'), 'gate_made_elsewhere')
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     await TH.expectBad(ensuring, 'gate_made_elsewhere')
     await TH.expectBad(gating.attempt('pw one'), 'gating_landed')
     const again = vault.tryEnsureUnlocked()

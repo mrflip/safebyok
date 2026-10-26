@@ -23,7 +23,7 @@ describe("Gate.make", () => {
 
   it("builds one epoch past its base, keeping the wayins it is handed, as its second example shows", async () => {
     const { vault, props } = await gatedWorld()
-    const base = Gate.of(vault, props)
+    const base = Gate.of(vault, props, { keyDeriver: TH.testDeriver })
     const next = Gate.make(vault, { base, passphrase: base.passphrase, passkey: null })
     expect(next).to.include({ gate_epoch: props.gate_epoch + 1, base_epoch: props.gate_epoch })
     expect(next.passphrase).to.eq(base.passphrase)
@@ -31,21 +31,21 @@ describe("Gate.make", () => {
 
   it("refuses wayins of another vault_tok as bad_option", async () => {
     const { vault, props } = await gatedWorld()
-    const base = Gate.of(vault, props)
-    const stranger = Gate.of(vault, { ...props, vault_tok: 'other-tok' })
+    const base = Gate.of(vault, props, { keyDeriver: TH.testDeriver })
+    const stranger = Gate.of(vault, { ...props, vault_tok: 'other-tok' }, { keyDeriver: TH.testDeriver })
     TH.expectSyncRefusal(() => Gate.make(vault, { base, passphrase: stranger.passphrase, passkey: null }), 'bad_option')
   })
 
   it("is frozen", async () => {
     const { vault, props } = await gatedWorld()
-    expect(Object.isFrozen(Gate.of(vault, props))).to.be.true
+    expect(Object.isFrozen(Gate.of(vault, props, { keyDeriver: TH.testDeriver }))).to.be.true
   })
 })
 
 describe("Gate.of", () => {
   it("is the gate stored vault record holds, its base one epoch below, as its example shows", async () => {
     const { vault, props } = await gatedWorld()
-    const gate = Gate.of(vault, props)
+    const gate = Gate.of(vault, props, { keyDeriver: TH.testDeriver })
     expect(gate.gate_epoch).to.eq(props.gate_epoch)
     expect(gate.base_epoch).to.eq(props.gate_epoch - 1)
     expect(gate.record).to.deep.eq(props.gate)
@@ -55,10 +55,10 @@ describe("Gate.of", () => {
 describe("the demand on a gate", () => {
   it("passes a gate built on the gate in hand, and the gate in hand itself, and refuses gate_moved for one built on another", async () => {
     const { vault, props } = await gatedWorld()
-    const base = Gate.of(vault, props)
+    const base = Gate.of(vault, props, { keyDeriver: TH.testDeriver })
     vault.demandConsistentWith(base)
     vault.demandConsistentWith(Gate.make(vault, { base, passphrase: base.passphrase, passkey: null }))
-    const another = Gate.of(vault, { ...props, gate_epoch: props.gate_epoch + 5 })
+    const another = Gate.of(vault, { ...props, gate_epoch: props.gate_epoch + 5 }, { keyDeriver: TH.testDeriver })
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(Gate.make(vault, { base: another, passphrase: base.passphrase, passkey: null })) }, 'gate_moved')
   })
 })

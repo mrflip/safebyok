@@ -37,7 +37,6 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 export type StubVaultOpts = {
   state?:            VaultState
   passkey?:          PasskeyWayinSummary | null
-  leaseMillis?:      number
   tryCheckStrength?: Vault['tryCheckStrength']
   tryHello?:         Vault['tryHello']
 }
@@ -51,8 +50,7 @@ export const DefaultLeaseMillis = LeaseHours * 3_600_000
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
- * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven
- * days), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
+ * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
  * a `tryHello` settling at once unless the test hands it others. What it does when the user
  * answers is its gating's: see {@link gatingOf}.
  *
@@ -64,7 +62,6 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     ...scopeOf('u1'),
     getSnapshot:      () => snapshot,
     subscribe:        () => unsubscribeFromNothing,
-    leaseMillis:      opts.leaseMillis ?? DefaultLeaseMillis,
     tryCheckStrength: opts.tryCheckStrength ?? admitsEvery,
     // Settles at once, reading nothing.
     tryHello:         opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
@@ -83,6 +80,8 @@ export type GatingOfOpts = {
   lockLanded?: Promise<void>
   /** By default `initialize_gate` for a vault shown novel, `unlock_vault` otherwise. */
   gatingkind?: PassphraseGating['gatingkind']
+  /** How long an unlock the gating grants lasts, as it tells the dialog: by default {@link DefaultLeaseMillis}, seven days. */
+  leaseMillis?: number
 }
 
 /** A promise that never settles: a lock that never lands. */
@@ -103,7 +102,7 @@ const gatingsMade = new WeakMap<Vault, PassphraseGating>()
  * @example const landing = TH.held(); const gating = TH.gatingOf(vault, { lockLanded: landing.promise })
  */
 export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGating => {
-  const plain = opts.attempt === undefined && opts.lockLanded === undefined && opts.gatingkind === undefined
+  const plain = opts.attempt === undefined && opts.lockLanded === undefined && opts.gatingkind === undefined && opts.leaseMillis === undefined
   const kept = plain ? gatingsMade.get(vault) : undefined
   if (kept !== undefined) { return kept }
   const attempt = opts.attempt ?? (() => Promise.resolve())
@@ -111,7 +110,7 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
     const { ok, err } = await outcomeOf(() => attempt(cleartext), unexpectedError)
     return ok ? { ok, val: vault } : { ok, err }
   }
-  const common = { vault, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }
+  const common = { vault, leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }
   const gatingkind = opts.gatingkind ?? (vault.getSnapshot().state === 'novel' ? 'initialize_gate' : 'unlock_vault')
   const gating: PassphraseGating = gatingkind === 'initialize_gate'
     ? { ...common, gatingkind, attempt: tried }
@@ -126,8 +125,8 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
  * @example const gating = TH.stubGating({ state: 'novel', attempt: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
  */
 export const stubGating = (opts: StubVaultOpts & GatingOfOpts = {}): PassphraseGating => {
-  const { attempt, lockLanded, gatingkind, ...vaultOpts } = opts
-  return gatingOf(stubVault(vaultOpts), { ...(attempt && { attempt }), ...(lockLanded && { lockLanded }), ...(gatingkind && { gatingkind }) })
+  const { attempt, lockLanded, gatingkind, leaseMillis, ...vaultOpts } = opts
+  return gatingOf(stubVault(vaultOpts), { ...(attempt && { attempt }), ...(lockLanded && { lockLanded }), ...(gatingkind && { gatingkind }), ...(leaseMillis !== undefined && { leaseMillis }) })
 }
 
 /**

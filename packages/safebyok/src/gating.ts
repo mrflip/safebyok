@@ -3,7 +3,8 @@ import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
 import type { PasskeyAnswer } from './types/types'
-import { type GateRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
+import type { KeyDeriver } from './key-deriver'
+import { type GatedVaultRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, isGated } from './vault-record'
 import { passphraseCleartext } from './types/type-aliases'
 import type { Vault } from './vault'
 
@@ -34,8 +35,13 @@ export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
 
 /** What every gating carries, whatever its kind. */
 type GatingCommon = {
-  /** The vault asking, its fields live while the dialog is up. */
+  /** The vault asking: its `snapshot` stays live while the dialog is up. */
   readonly vault:      Vault
+  /** How long an unlock this gating grants lasts on this device, in whole milliseconds: the `leaseHours` the bank was made with. A vault that stays unlocked until `lock()` reads `ForeverMillis`.
+   *
+   * @example gating.leaseMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(gating.leaseMillis / MinuteMillis))} minutes`
+   */
+  readonly leaseMillis: number
   /** Settles only when a `lock()` lands while the gating stands, or the vault goes gone: close the dialog. Every call waiting on it is then refused: 'vault_locked' for a lock, 'vault_gone' or 'vault_remade' for a vault gone, and storage's own refusal for a lock storage's refusal made ('identity_revoked', 'vault_behind').
    * A deletion whose write is sent is past its reach: it settles only once storage refuses that write.
    */
@@ -57,7 +63,7 @@ export type UnlockVaultGating = GatingCommon & {
   readonly gatingkind: 'unlock_vault'
   /** Unlock with the passphrase. */
   attemptPassphrase:   (passphrase: string) => Promise<Outcome<Vault>>
-  /** Unlock with the passkey's answer, as `askPasskey(vault.passkey)` gives it. */
+  /** Unlock with the passkey's answer, as `askPasskey(vault.snapshot.passkey)` gives it. */
   attemptPasskey:      (passkey: PasskeyAnswer) => Promise<Outcome<Vault>>
 }
 /** `putWayin('passphrase')` asks for the current passphrase and the next: the next replaces it, and the passkey goes with it. */
@@ -135,9 +141,13 @@ export type GatingInside = {
   /** The refusal `thrown` makes, bad news told, as a public call's outcome. */
   badOutcome:  (thrown: unknown) => BadOutcome
   /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
-  demand:      (thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, call: GatingCall, opts?: { firstGate: boolean }) => void
+  demand:      (thing: VaultMadeUnder, call: GatingCall, opts?: { firstGate: boolean }) => void
   /** The host's request for cleartext, guarded, or null for none. */
   request:     ((gating: Gating) => Promise<void>) | null
+  /** The vault's key deriver, which the gates a chain reads judge their wayins by. */
+  keyDeriver:  KeyDeriver
+  /** How long a lease the vault grants lasts, in whole milliseconds: what the gating tells the host. */
+  leaseMillis: number
 }
 
 /** One gating, raised: what the vault keeps to run, join, settle and land it, and the {@link Gating} it hands the host.
@@ -275,7 +285,7 @@ export class RaisedGating implements ProvingGating {
 
   /** The {@link Gating} the host is handed, frozen: its kind's attempt, `decline` and `lockLanded`. */
   #gatingOf(lockLanded: Promise<void>): Gating {
-    const common = { vault: this.#vault, lockLanded, decline: () => { this.#decline() } }
+    const common = { vault: this.#vault, leaseMillis: this.#inside.leaseMillis, lockLanded, decline: () => { this.#decline() } }
     // One attempt of the kind: its arguments checked, then its chain, each handed what the host handed in.
     const attemptOf = <ArgsT extends unknown[]>(check: (...args: ArgsT) => void, chain: (...args: ArgsT) => Promise<void>) => (
       async (...args: ArgsT): Promise<Outcome<Vault>> => await this.#attempt(() => { check(...args) }, async () => { await chain(...args) })
@@ -344,7 +354,7 @@ export class RaisedGating implements ProvingGating {
     // Two strings this tab's user typed, which no attacker observes: no constant time needed.
     if (current === next) { throw samePassphraseError() }
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    const base = Gate.of(this.#vault, held)
+    const base = Gate.of(this.#vault, held, { keyDeriver: this.#inside.keyDeriver })
     await this.#strengthUnder(next, base)
     const currentProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), current, { gating: this })
     await currentProving.checkWayin()
@@ -360,7 +370,7 @@ export class RaisedGating implements ProvingGating {
    */
   async #putPasskey(passphrase: string, passkey: PasskeyAnswer): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    const base = Gate.of(this.#vault, held)
+    const base = Gate.of(this.#vault, held, { keyDeriver: this.#inside.keyDeriver })
     const passphraseProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await passphraseProving.checkWayin()
     const passkeyProving = await PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this })
@@ -373,7 +383,7 @@ export class RaisedGating implements ProvingGating {
   async #delPasskey(passphrase: string): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
     if (held.gate.passkey === null) { throw absentPasskey("Nothing was changed.") }
-    const base = Gate.of(this.#vault, held)
+    const base = Gate.of(this.#vault, held, { keyDeriver: this.#inside.keyDeriver })
     const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await proving.checkWayin()
     await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: null }), this.call)
@@ -420,7 +430,7 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** `held`, once gated: a gating other than `initialize_gate` is raised only on a vault with its gate, and a gate never goes. */
-  #gatedOf(held: VaultRecord): VaultRecord & { gate: GateRecord } {
+  #gatedOf(held: VaultRecord): GatedVaultRecord {
     if (! isGated(held)) { throw new VaultError('absent_vault', "This vault has no passphrase yet, so nothing can prove this change: unlock it first, which sets its passphrase.") }
     return held
   }

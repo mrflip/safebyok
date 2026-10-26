@@ -1,5 +1,5 @@
 import { type Capacity, type Clock, type VaultScope, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
-import { type GateRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
+import { type GatedVaultRecord, type GateRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, isGated, vaultSparseOf } from './vault-record'
 import { vault_tok } from './types/type-aliases'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, type BoxBase, type BoxDamaged, type BoxRecord, type BoxSparse, boxSparseOf, checkedSidecar, checkedWhisper, whisperBytesOf } from './box'
@@ -59,50 +59,55 @@ export type VaultFreshness = 'timely' | 'aged' | 'refused'
  */
 export type VaultSnapshot = Readonly<{
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
-  applabel:        string
+  applabel:          string
   /** The signed-in user the vault is found under, as `bank.ensureVault` was given it. Fixed for the Vault object's life. */
-  user_id:         string
+  user_id:           string
   /** The vault's own label within the app. Fixed for the Vault object's life. */
-  vaultlabel:      string
+  vaultlabel:        string
   /** The stored vault's token, minted when it was made: one life of the vault in its scope. Fixed for the Vault object's life. */
-  vault_tok:       string
+  vault_tok:         string
   /** When the stored vault was made, in epoch milliseconds. */
-  registered_at:   number
+  registered_at:     number
   /** Up by one on every change to the ways in, which sends every other device back to `locked`; 0 while `novel`. */
-  gate_epoch:      number
+  gate_epoch:        number
   /** The vault's passphrase, as its {@link PassphraseWayinSummary}: when it was set, and from which device; null while `novel`. */
-  passphrase:      PassphraseWayinSummary | null
+  passphrase:        PassphraseWayinSummary | null
   /** The vault's passkey, as its {@link PasskeyWayinSummary}; null while it has none.
    * It shows while locked, so a host can offer the passkey, ask its authenticator for an answer
    * (`safebyok-react`'s `askPasskey` takes it), and say which passkey a new one would replace.
    */
-  passkey:         PasskeyWayinSummary | null
+  passkey:           PasskeyWayinSummary | null
   /** Where the vault stands: see {@link VaultState}. */
-  state:           VaultState
+  state:             VaultState
   /** Every sound box, sorted by boxlabel, as its {@link BoxSparse}: every field of its record but the two ciphered ones.
    * The listing never opens a box's ciphertext, so ciphertext altered in storage shows only when
    * the box is read. A box whose record does not read back is in `damagedBoxes`, never here.
    */
-  boxes:           readonly BoxSparse[]
+  boxes:             readonly BoxSparse[]
   /** Every box whose stored record does not read back, sorted by boxlabel, as its {@link BoxDamaged}: its boxlabel, the revision it names, and its `damage`.
    * Each holds room in the vault, and meets a `putBox()` under its boxlabel. Offer one only for
    * {@link Vault.delBox}, or a fresh `putBox()` while it names a revision; for a `damage` of
    * `newer_format`, a box a newer safebyok wrote, offer to update the app instead.
    */
-  damagedBoxes:    readonly BoxDamaged[]
+  damagedBoxes:      readonly BoxDamaged[]
   /** How much room the vault has, as this device reckons it from its last read.
    * It counts boxes against `maxBoxes`, and bytes against what storage holds of one vault. Each box
    * reserves room for a whisper and sidecar of `maxWhisperBytes`, its fixed fields and its names.
    * Storage checks again on every write, and its `vault_full` or `box_too_large` is the truth: read
    * this only to warn the user ahead of time.
    *
-   * @example const { boxes } = vault.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
+   * @example const { boxes } = vault.snapshot.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
    */
-  capacity:        Readonly<{ boxes: Readonly<Capacity['boxes']>, bytes: Readonly<Capacity['bytes']> }>
+  capacity:          Readonly<{ boxes: Readonly<Capacity['boxes']>, bytes: Readonly<Capacity['bytes']> }>
   /** Epoch ms from which the vault asks for a proof again, while unlocked; null otherwise.
    * It is `leaseHours` after a proof last unlocked the vault, or a passphrase last proved a change
    * to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
-   * compare with `>= FarFuture - MinuteMillis`, never for equality.
+   * compare with `>= FarFuture - MinuteMillis`, never for equality. To show it, format it in the
+   * user's locale with `Intl`: `Intl.DateTimeFormat` for the deadline itself ("Tue, Oct 27, 3:00
+   * PM"), and `Intl.RelativeTimeFormat` for the time left ("in 2 days"); show "until locked" instead
+   * for any deadline at or past `FarFuture - MinuteMillis`.
+   *
+   * @example const minutesLeft = snapshot.ask_passphrase_at === null ? null : Math.ceil((snapshot.ask_passphrase_at - Date.now()) / MinuteMillis)
    */
   ask_passphrase_at: number | null
   /** The latest bad news the vault has learned, or what its `onBadNews` handler threw; null when there is none.
@@ -117,13 +122,13 @@ export type VaultSnapshot = Readonly<{
    *   const { trouble } = vault.getSnapshot()
    *   if (trouble?.refusalkind === 'damaged_box') { offerToRemove(trouble.meta?.box_listed?.boxlabel) }
    */
-  trouble:         VaultError | null
+  trouble:           VaultError | null
   /** How far to trust what the vault shows: see {@link VaultFreshness}.
    * The vault keeps working whatever it says: every write still lands only where storage stands as
    * this device last read it. It is reckoned when the snapshot is replaced, so `aged` shows at the
    * next change, or the next `hello()`.
    */
-  freshness:       VaultFreshness
+  freshness:         VaultFreshness
 }>
 // --
 
@@ -132,9 +137,11 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
 
 /** One user's vault of boxes, one life of it in storage, for as long as the bank holds it: every read and write of a whisper goes through here.
  * `bank.ensureVault` births one from one read of storage: never absent, `novel` until its
- * first passphrase is set, and holding one `vault_tok` for its life. Its fields (`state`, `boxes`,
- * `passkey`, `capacity`, `trouble` and the rest) are live and read-only. A UI renders from
- * `getSnapshot()`, the same fields frozen in one object, and re-renders on `subscribe()`.
+ * first passphrase is set, and holding one `vault_tok` for its life. Its own fields are its
+ * {@link VaultStamp} (its format, scope, `vault_tok` and `registered_at`), fixed for its life and
+ * frozen, so a spread or a log line of it shows those alone. Everything that changes (`state`,
+ * `boxes`, `passkey`, `capacity`, `trouble` and the rest) is read through `vault.snapshot`, frozen
+ * in one object: a UI renders from `getSnapshot()` and re-renders on `subscribe()`.
  *
  * A call that needs a whisper goes through {@link Vault.ensureUnlocked}: a vault that is not unlocked
  * raises a gating, handed to the host's `requestCleartext`, one at a time. Nothing prompts on open.
@@ -157,16 +164,17 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * record, in the deviceDB), raised at each read and at each write of its own, never lowered. A
  * read below the device record refuses 'vault_behind', taking nothing from it and writing nothing,
  * though the Vault object holds the newer copy: an older vault could bring back a way in that was
- * removed. It locks the vault, as 'identity_revoked' from storage does. Any other read of vault
- * props older than the ones a Vault object holds (one served before a write of this device's own)
+ * removed. It locks the vault, as 'identity_revoked' from storage does. Any other read of a vault
+ * record older than the one a Vault object holds (one served before a write of this device's own)
  * is ignored: it takes nothing from them, refuses nothing, and keeps the newer. A host
  * that restored storage from an older copy on purpose accepts it on this device with
  * `bank.clearCachedVault`, which erases the record, and asks the bank for the vault again.
  *
  * Storage alone settles a race, and the vault argues with none. A write storage refuses as stale
  * is refused as it came: the vault reads nothing after it, and `hello()` shows what stands. Every
- * thing a Vault object hands out was made under its `stamp`, and each call demands, at each of
- * its steps, that the vault still stands as the thing it holds was made under: a call that finds
+ * thing a Vault object hands out was made under the vault as it stood then (its scope, `vault_tok`
+ * and epochs), and each call demands, at each of its steps, that the vault still stands as the
+ * thing it holds was made under: a call that finds
  * the vault deleted, made anew, its ways in changed, or locked meanwhile refuses 'vault_gone',
  * 'vault_remade', 'gate_moved' or 'vault_locked' (see {@link Vault.demandConsistentWith}). A box
  * that will not open under the lease in hand is 'damaged_box' at once, with no read of storage
@@ -180,12 +188,13 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * `onBadNews` once, whichever form met it. `subscribe()` and `useWhisper()` come in the throwing
  * form alone.
  *
- * `subscribe` and `getSnapshot` are bound to their vault, so they can go to
- * `useSyncExternalStore` as they are. Every other call is a method: call it on the vault, or wrap
- * it to hand it on, as an event handler does: `() => vault.tryHello()`.
+ * `subscribe` and `getSnapshot` are bound to their vault, each keeping one identity, so they can go
+ * to `useSyncExternalStore` as they are. Every other call is a method: call it on the vault, or
+ * wrap it to hand it on, as an event handler does: `() => vault.tryHello()`.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
- * @example if (vault.state === 'locked') { askForProof(vault.passkey) }
+ * @example if (vault.snapshot.state === 'locked') { askForProof(vault.snapshot.passkey) }
+ * @example JSON.stringify(vault)   // its stamp alone: format, scope, vault_tok and registered_at
  * @example
  *   await vault.ensureUnlocked()   // asks through requestCleartext while locked
  *   const whisper = await vault.getWhisper('anthropic_api_key')
@@ -193,88 +202,47 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   const { ok, err } = await vault.tryGetWhisper('anthropic_api_key')
  *   if (! ok && err.refusalkind === 'vault_locked') { offerUnlock() }
  */
-export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, passphrase, passkey, state, boxes, damagedBoxes, capacity, trouble, freshness, snapshot, getSnapshot, subscribe, logger, keyDeriver, now
+export class Vault implements VaultStamp {
+  // == [Vault: fields]: format, applabel, user_id, vaultlabel, vault_tok, registered_at, snapshot, getSnapshot, subscribe, logger
 
-  // Each field reads the snapshot `#replaceSnapshot()` last published, so the fields and the snapshot always
-  // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
-  // Its boxes, ways in and lease read back only what is fixed for the Vault object's life -- its stamp, its
-  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault record it was made under.
+  // Its own fields are its stamp, fixed for its life and frozen with it. Everything that changes
+  // lives in a private field, which a freeze leaves writable, and is read through the snapshot that
+  // `#replaceSnapshot()` last published. Its boxes, ways in and lease are each handed what they
+  // use of it as they are made: the time, the epochs it showed then, its key deriver, its lease length.
 
+  /** The vault record's format, `safebyok-vault-v6`. Fixed for the Vault object's life. */
+  readonly format:        VaultStamp['format']
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
-  get applabel(): string { return this.#snapshot.applabel }
+  readonly applabel:      string
   /** The signed-in user the vault is found under. Fixed for the Vault object's life. */
-  get user_id(): string { return this.#snapshot.user_id }
+  readonly user_id:       string
   /** The vault's own label within the app. Fixed for the Vault object's life. */
-  get vaultlabel(): string { return this.#snapshot.vaultlabel }
+  readonly vaultlabel:    string
   /** The stored vault's token: the one life of it this Vault object holds. Fixed for the Vault object's life. */
-  get vault_tok(): string { return this.#snapshot.vault_tok }
-  /** When the stored vault was made, in epoch milliseconds: of its stamp, so fixed for the Vault object's life. */
-  get registered_at(): number { return this.#snapshot.registered_at }
-  /** Up by one on every change to the ways in, which sends every other device back to `locked`; 0 while `novel`. */
-  get gate_epoch(): number { return this.#snapshot.gate_epoch }
-  /** The vault's passphrase, as its summary; null while `novel`. See {@link VaultSnapshot}. */
-  get passphrase(): PassphraseWayinSummary | null { return this.#snapshot.passphrase }
-  /** The vault's passkey, as its summary; null while it has none. See {@link VaultSnapshot}. */
-  get passkey(): PasskeyWayinSummary | null { return this.#snapshot.passkey }
-  /** Where the vault stands: see {@link VaultState}. */
-  get state(): VaultState { return this.#snapshot.state }
-  /** Every sound box, sorted by boxlabel, no whisper among them. See {@link VaultSnapshot}. */
-  get boxes(): readonly BoxSparse[] { return this.#snapshot.boxes }
-  /** Every box whose stored record does not read back, sorted by boxlabel. See {@link VaultSnapshot}. */
-  get damagedBoxes(): readonly BoxDamaged[] { return this.#snapshot.damagedBoxes }
-  /** How much room the vault has, as this device reckons it from its last read. See {@link VaultSnapshot}. */
-  get capacity(): VaultSnapshot['capacity'] { return this.#snapshot.capacity }
-  /** The latest bad news, or what the `onBadNews` handler threw; null when there is none. See {@link VaultSnapshot}. */
-  get trouble(): VaultError | null { return this.#snapshot.trouble }
-  /** How far to trust what the vault shows: `timely`, `aged` or `refused`. See {@link VaultSnapshot}. */
-  get freshness(): VaultFreshness { return this.#snapshot.freshness }
-  /** Every field above, frozen in one object: what {@link Vault.getSnapshot} returns. */
+  readonly vault_tok:     string
+  /** When the stored vault was made, in epoch milliseconds. Fixed for the Vault object's life. */
+  readonly registered_at: number
+
+  /** Everything about the vault that changes, frozen in one object: what {@link Vault.getSnapshot} returns. See {@link VaultSnapshot}.
+   *
+   * @example const { state, boxes } = vault.snapshot
+   */
   get snapshot(): VaultSnapshot { return this.#snapshot }
 
-  /** The current {@link VaultSnapshot}: the same object until something changes. */
-  getSnapshot = (): VaultSnapshot => this.#snapshot
-  /** Call `listener` after every snapshot change, returning the unsubscribe. */
-  subscribe = (listener: () => void): (() => void) => {
+  /** The current {@link VaultSnapshot}, as a function bound to its vault, of one identity for the Vault object's life: the same object until something changes. */
+  get getSnapshot(): () => VaultSnapshot { return this.#getSnapshot }
+  readonly #getSnapshot = (): VaultSnapshot => this.#snapshot
+
+  /** Call `listener` after every snapshot change, returning the unsubscribe: a function bound to its vault, of one identity for the Vault object's life. */
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  readonly #subscribe = (listener: () => void): (() => void) => {
     if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each snapshot change.') }
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
-  /** The logger the vault was made with, which its boxes and ways in log through. */
+
+  /** The logger the vault was made with, which its boxes and ways in log through: for host code that logs about a vault. */
   get logger(): VaultLogger { return this.#logger }
-  /** The key deriver the vault was made with, which its ways in derive through. */
-  get keyDeriver(): KeyDeriver { return this.#keyDeriver }
-  /**
-   * The time it is by the clock the vault was made with, in whole epoch milliseconds (a reading's
-   * fraction rounded down): what the vault's boxes, ways in and lease are stamped and judged by.
-   *
-   * @example vault.now() - box.written_at   // how long ago the box was written, by the vault's clock
-   */
-  now(): number { return this.#clockNow() }
-  // --
-
-  // == [Vault: the lease, delegated]: ask_passphrase_at, leaseMillis
-
-  // The lease this device holds is the Vault object's own: no getter, field or JSON shows it, and
-  // its boxes reach it inside the package alone (`heldLeaseOf`). What an app reads of it is here.
-
-  /** When this device's lease ends and the vault locks of itself, in epoch milliseconds, while unlocked; null otherwise: for an autolock, or a "locks in 10 minutes" line. See {@link VaultSnapshot}.
-   * It reads the snapshot, so a component subscribed to it sees the deadline move as a renewal
-   * moves it. A vault that stays unlocked until `lock()` reads {@link FarFuture}. To show it, format
-   * it in the user's locale with `Intl`: `Intl.DateTimeFormat` for the deadline itself ("Tue, Oct 27,
-   * 3:00 PM"), and `Intl.RelativeTimeFormat` for the time left ("in 2 days"); show "until locked"
-   * instead for any deadline at or past `FarFuture - MinuteMillis`.
-   *
-   * @example const minutesLeft = vault.ask_passphrase_at === null ? null : Math.ceil((vault.ask_passphrase_at - vault.now()) / MinuteMillis)
-   */
-  get ask_passphrase_at(): number | null { return this.#snapshot.ask_passphrase_at }
-  /** How long a lease lasts on this device: the `leaseHours` the vault was made with, in whole milliseconds.
-   * A vault that stays unlocked until `lock()` (`Infinity` hours) reads `ForeverMillis`. Fixed for
-   * the Vault object's life.
-   *
-   * @example vault.leaseMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(vault.leaseMillis / MinuteMillis))} minutes`
-   */
-  get leaseMillis(): number { return this.#leaseMillis }
   // --
 
   // == [Vault: opening]: hello, refresh, ensureUnlocked
@@ -293,13 +261,13 @@ export class Vault {
    * nothing is taken from it, and nothing refused. It raises this device's record of the vault to
    * what it read.
    *
-   * A refused hello applies no partial read: the vault stands as its last read left it. Stored vault
-   * props it cannot use refuse with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format'
+   * A refused hello applies no partial read: the vault stands as its last read left it. A stored
+   * vault record it cannot use refuses with 'damaged_vault' (`delDamagedVault` clears it), 'newer_format'
    * or 'vault_behind'. Finding the vault deleted, it refuses 'vault_gone'; deleted and made anew,
    * 'vault_remade': either way this Vault object is gone for good, and the bank hands out the next.
    * A box or way in stored damaged refuses nothing: it lists damaged, and is told as bad news.
    *
-   * @example await vault.hello()   // vault.state: 'novel' | 'locked' | 'unlocked'
+   * @example await vault.hello()   // vault.snapshot.state: 'novel' | 'locked' | 'unlocked'
    * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.tryHello() } })
    * @example window.addEventListener('focus', () => vault.tryHello())   // wrapped: vault.hello itself would refuse the event as its options
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
@@ -384,22 +352,13 @@ export class Vault {
   }
   // --
 
-  // == [Vault: demand]: stamp, demandConsistentWith, consistentWith
-
-  /** The vault's {@link VaultSparse}, frozen: its vault record but for the gate, the `vault_tok`, `vault_epoch` and `gate_epoch` among it, as the vault holds it now.
-   * Each thing the vault hands out was made under the stamp it held then, and
-   * {@link Vault.demandConsistentWith} compares the two.
-   *
-   * @example vault.stamp?.gate_epoch   // up by one on every change to the ways in
-   */
-  get stamp(): VaultSparse {
-    return stampOf(this.#vaultRecord)
-  }
+  // == [Vault: demand]: demandConsistentWith, consistentWith
 
   /** Refuse unless `thing` is consistent with the vault as it stands now: what each call asks before and after each wait.
-   * `thing` is something the vault handed out (a box, a lease, a listing's entry) or a
-   * {@link VaultSparse}. Each field it carries is compared with the vault's own {@link Vault.stamp}, in
-   * this order, and the first that disagrees refuses. The vault is gone: 'vault_gone'.
+   * `thing` is something the vault handed out (a box, a lease, a listing's entry), its snapshot, or
+   * a {@link VaultSparse}: anything carrying the `vault_tok` it was made under ({@link VaultMadeUnder}).
+   * Each of the scope, `vault_tok` and epochs it carries is compared with the vault record in hand,
+   * in this order, and the first that disagrees refuses. The vault is gone: 'vault_gone'.
    * Another scope or `vault_tok`, the vault deleted and made anew: 'vault_remade'. Another
    * `gate_epoch`, or a `vault_epoch` past the vault's: 'gate_moved'. With `opts.leaseBound`, the
    * vault must also hold a lease that has not ended: 'vault_locked'; one found ended is dropped,
@@ -410,11 +369,11 @@ export class Vault {
    *
    * @example vault.demandConsistentWith(box)                              // the vault half: 'vault_gone' or 'vault_remade' once it moved on
    * @example vault.demandConsistentWith(box, { leaseBound: true })        // and 'vault_locked' once a lock lands
-   * @example vault.demandConsistentWith({ ...stamp, gate_epoch: 0 })      // throws 'gate_moved' for a vault with a way in
+   * @example vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 })   // throws 'gate_moved' for a vault with a way in
    */
-  demandConsistentWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { leaseBound?: boolean | undefined }): void {
+  demandConsistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): void {
     const demandOpts = checkDemandOpts(opts)
-    this.#demand(checkedStamped(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
+    this.#demand(checkedMadeUnder(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
 
   /** True while `thing` is consistent with the vault as it stands now: the question {@link Vault.demandConsistentWith} refuses on, asked without refusing.
@@ -424,10 +383,10 @@ export class Vault {
    *
    * @example if (! vault.consistentWith(box)) { box = await vault.getBox(box.boxlabel) }   // read it again once the vault moved on
    */
-  consistentWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { leaseBound?: boolean | undefined }): boolean {
+  consistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
     const leaseStands = this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
-    return this.#inconsistencyWith(checkedStamped(thing)) === null && (! leaseBound || leaseStands)
+    return this.#inconsistencyWith(checkedMadeUnder(thing)) === null && (! leaseBound || leaseStands)
   }
   // --
 
@@ -815,8 +774,7 @@ export class Vault {
   readonly #vaultDB: RefusalPolicy.HeededVaultDB
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   readonly #deviceDB: DeviceDB
-  // The vault reads its own lease length, and calls its own hello: a host writing over the public
-  // `hello` on the Vault object changes nothing inside the vault.
+  // How long a lease lasts on this device: what a grant runs for, and what a lease taken up may run past.
   readonly #leaseMillis: number
   // How long a hello trusts the last read when its call says nothing: see hello().
   readonly #staleMillis: number
@@ -842,6 +800,13 @@ export class Vault {
 
   /** The Vault object {@link Vault[bear]} births. */
   private constructor(parts: VaultParts, born: BirthRead, onGone: (refusal: VaultError) => void) {
+    const { format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at } = born.vaultRecord
+    this.format = format
+    this.applabel = applabel
+    this.user_id = user_id
+    this.vaultlabel = vaultlabel
+    this.vault_tok = vaultTok
+    this.registered_at = registered_at
     this.#scope = parts.scope
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
@@ -863,6 +828,10 @@ export class Vault {
     registerLeaseReader(this, () => this.#lease)
     registerProvingInside(this, {
       vaultRecord: () => this.#vaultRecord,
+      keyDeriver:  this.#keyDeriver,
+      logger:      this.#logger,
+      leaseMillis: this.#leaseMillis,
+      now:         () => this.#clockNow(),
       deviceId:   () => this.#deviceId,
       putLease:   (record) => this.#deviceDB.putLease(record),
       holdLease:  (stored) => this.#holdLease(stored),
@@ -877,10 +846,13 @@ export class Vault {
       badOutcome: (thrown) => this.#badOutcome(thrown),
       demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
       request:    this.#requestCleartext,
+      keyDeriver: this.#keyDeriver,
+      leaseMillis: this.#leaseMillis,
     }
     this.#takePicture({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
+    Object.freeze(this)
   }
 
   /** The host's clock, read now, rounded down to whole milliseconds: every time a record keeps is an integer. */
@@ -928,13 +900,14 @@ export class Vault {
   // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
   // and the vault record they are bound to, never change under it.
   readonly #modelled = new WeakMap<GateRecord, HeldWayins>()
-  #wayinsOf(standing: VaultRecord & { gate: GateRecord }): HeldWayins {
+  #wayinsOf(standing: GatedVaultRecord): HeldWayins {
     const { gate } = standing
     const known = this.#modelled.get(gate)
     if (known !== undefined) { return known }
+    const kit = { keyDeriver: this.#keyDeriver }
     const wayins = Object.freeze({
-      passphrase: Wayin.make(this, standing, gate.passphrase),
-      passkey:    gate.passkey === null ? null : Wayin.make(this, standing, gate.passkey),
+      passphrase: Wayin.make(standing, gate.passphrase, kit),
+      passkey:    gate.passkey === null ? null : Wayin.make(standing, gate.passkey, kit),
     })
     this.#modelled.set(gate, wayins)
     return wayins
@@ -964,18 +937,18 @@ export class Vault {
     const { boxes, bytes } = this.#capacity()
     return Object.freeze({
       ...this.#scope,
-      vault_tok:       standing.vault_tok,
-      registered_at:   standing.registered_at,
-      gate_epoch:      standing.gate_epoch,
-      passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.toJSON()),
-      passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.toJSON()) : null,
+      vault_tok:         standing.vault_tok,
+      registered_at:     standing.registered_at,
+      gate_epoch:        standing.gate_epoch,
+      passphrase:        wayins === null ? null : Object.freeze(wayins.passphrase.toJSON()),
+      passkey:           wayins?.passkey ? Object.freeze(wayins.passkey.toJSON()) : null,
       state,
-      boxes:           this.#boxes,
-      damagedBoxes:    this.#damagedBoxes,
-      capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
+      boxes:             this.#boxes,
+      damagedBoxes:      this.#damagedBoxes,
+      capacity:          Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
       ask_passphrase_at: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
-      trouble:         this.#trouble,
-      freshness:       this.#freshness(now),
+      trouble:           this.#trouble,
+      freshness:         this.#freshness(now),
     })
   }
 
@@ -1130,7 +1103,7 @@ export class Vault {
    * With `opts.firstGate`, `thing` was made for the vault's first gate, which is not yet written: a
    * gate in the picture is another device's first, and refuses 'gate_made_elsewhere', not 'gate_moved'.
    */
-  #demand(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
+  #demand(thing: VaultMadeUnder, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
     const refusal = this.#inconsistencyWith(thing, { firstGate: opts.firstGate === true }) ?? (opts.leaseBound === true ? this.#leaseRefusal() : null)
     if (refusal === null) { return }
     // The thing's fields never reach the logger: a lease's are its scope and epoch, but the rule is one.
@@ -1143,7 +1116,7 @@ export class Vault {
    * it is what moved the picture. A lease-bound demand asks for the lease only of an answer that
    * came: a lease that refused its own use (`damaged_lease`) has dropped itself.
    */
-  #demandAfterWait(settled: Outcome<unknown>, thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
+  #demandAfterWait(settled: Outcome<unknown>, thing: VaultMadeUnder, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
     if (! settled.ok && UntrustedStorageKinds.some((kind) => isVaultError(settled.err, kind))) { throw settled.err }
     this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, firstGate: opts.firstGate === true, call: opts.call })
   }
@@ -1152,7 +1125,7 @@ export class Vault {
    * Ways in moved past a thing made for the first gate, before that gate is written
    * (`opts.firstGate`), are another device's first gate: 'gate_made_elsewhere'.
    */
-  #inconsistencyWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { firstGate: boolean }): VaultError | null {
+  #inconsistencyWith(thing: VaultMadeUnder, opts?: { firstGate: boolean }): VaultError | null {
     if (this.#goneBy !== null) { return this.#goneBy() }
     const held = this.#vaultRecord
     const sameScope = (thing.applabel ?? this.#scope.applabel) === this.#scope.applabel
@@ -1194,7 +1167,7 @@ export class Vault {
   }
 
   /** The vault record in hand, once the vault has its passphrase: 'absent_vault' while it is novel. */
-  #gatedRecord(): VaultRecord & { gate: GateRecord } {
+  #gatedRecord(): GatedVaultRecord {
     if (! isGated(this.#vaultRecord)) {
       throw new VaultError('absent_vault', 'This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does.')
     }
@@ -1347,8 +1320,8 @@ export class Vault {
     // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
     this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
     if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
-    const next = frozenVaultRecord(written.val) as VaultRecord & { gate: GateRecord }
-    const stored = Gate.of(this, next)
+    const next = frozenVaultRecord(written.val) as GatedVaultRecord
+    const stored = Gate.of(this, next, { keyDeriver: this.#keyDeriver })
     this.#demand(stored, { call })
     // The picture takes it first, so the record raised after never outruns the picture.
     this.#takeOwnWrite(next)
@@ -1385,7 +1358,7 @@ export class Vault {
    * it: the grant that follows holds the new one, and a grant that fails leaves the vault locked,
    * as its snapshot then says.
    */
-  #takeOwnWrite(next: VaultRecord & { gate: GateRecord }) {
+  #takeOwnWrite(next: GatedVaultRecord) {
     if (this.#goneBy !== null || isOlderPicture(this.#vaultRecord, next)) { return }
     this.#vaultRecord = next
     const held = this.#lease
@@ -1668,10 +1641,9 @@ export class Vault {
     return gone
   }
 
-  /** `record` as a {@link Box}, lying in the vault `vaultTok`, which the read or write that handed it back expected; stamped with the picture's scope and epochs.
-   */
+  /** `record` as a {@link Box}, lying in the vault `vaultTok`, which the read or write that handed it back expected; made under the picture's scope and epochs. */
   #boxUnder(record: BoxRecord, vaultTok: string): Box {
-    return Box.make(this, record, { ...this.stamp, vault_tok: vaultTok })
+    return Box.make(this, record, { ...vaultSparseOf(this.#vaultRecord), vault_tok: vaultTok })
   }
   // --
 
@@ -1692,7 +1664,7 @@ export class Vault {
     // A sidecar kept counts toward the limit as one given does, weighed before any key is made.
     this.#checkWhisperFits(whisper, sidecar)
     this.#checkRoomFor(boxlabel, base)
-    const sealed = await Box.trySeal(this, { boxlabel, sidecar, base }, whisper)
+    const sealed = await Box.trySeal(this, { boxlabel, sidecar, base }, whisper, { madeUnder: vaultSparseOf(this.#vaultRecord), now: this.#clockNow() })
     // A lock landing during the seal refuses, writing nothing.
     this.#demandAfterWait(sealed, lease, { leaseBound: true, call: 'putBox' })
     const box = valOf(sealed)
@@ -1923,7 +1895,7 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // --
 
-// == [Vocabulary]: BirthRead, frozenVaultRecord, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
+// == [Vocabulary]: BirthRead, frozenVaultRecord, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
 /** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. */
 type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>
@@ -1946,12 +1918,6 @@ const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
   const { gate } = record
   if (gate === null) { return Object.freeze({ ...record }) }
   return Object.freeze({ ...record, gate: Object.freeze({ passphrase: frozenRecord(gate.passphrase), passkey: gate.passkey === null ? null : frozenRecord(gate.passkey) }) })
-}
-
-/** The {@link VaultSparse} of `record`, frozen: every field of it but the gate, taken by name. */
-const stampOf = (record: VaultRecord): VaultSparse => {
-  const { format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at, vault_epoch, gate_epoch } = record
-  return Object.freeze({ format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at, vault_epoch, gate_epoch })
 }
 
 /** True when `fresh`, a vault record a read or a write returned, is older than `inHand`: the same vault at a lower epoch.
@@ -2010,8 +1976,8 @@ const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s re
 const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand.")
 
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
-const { StampedShape } = Validator('bad_option', ({ obj, str, num }) => ({
-  StampedShape: obj({
+const { madeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
+  madeUnderShape: obj({
     vault_tok,
     applabel:    str.optional(),
     user_id:     str.optional(),
@@ -2022,9 +1988,9 @@ const { StampedShape } = Validator('bad_option', ({ obj, str, num }) => ({
 }))
 
 /** `thing`, as `demandConsistentWith()` was handed it, once it carries a `vault_tok`: 'bad_option' for anything else, quoting none of it. */
-const checkedStamped = (thing: unknown): Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse> => {
-  if (StampedShape.safeParse(thing).success) { return thing as Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse> }
-  throw new VaultError('bad_option', "demandConsistentWith() takes something the vault handed out -- a box, a lease, a listing's entry -- or a stamp: an object carrying the vault_tok it was made under, and its epochs as numbers.")
+const checkedMadeUnder = (thing: unknown): VaultMadeUnder => {
+  if (madeUnderShape.safeParse(thing).success) { return thing as VaultMadeUnder }
+  throw new VaultError('bad_option', "demandConsistentWith() takes something the vault handed out -- a box, a lease, a listing's entry -- or its snapshot: an object carrying the vault_tok it was made under, and its epochs as numbers.")
 }
 
 /** What `putBox()` is handed to name the box it seals: its boxlabel, and its sidecar, left out to keep the one it has. */

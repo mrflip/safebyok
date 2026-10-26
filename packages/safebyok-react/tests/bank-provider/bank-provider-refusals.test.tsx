@@ -217,7 +217,7 @@ describe("BankProvider", () => {
       expect(latest().vault).to.eq(shown)
       expect(latest().entry?.status).to.eq('timely')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
-      expect(shown?.gate_epoch).to.eq(2)
+      expect(shown?.snapshot.gate_epoch).to.eq(2)
     })
 
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {

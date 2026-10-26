@@ -31,7 +31,7 @@ describe("delBox and del()", () => {
     await vault.del()
     expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
     const next = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
-    expect(next.state).to.eq('novel')
+    expect(next.snapshot.state).to.eq('novel')
     expect(next.vault_tok).to.not.eq(vault.vault_tok)
   })
 

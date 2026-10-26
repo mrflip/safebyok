@@ -5,7 +5,7 @@ import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-streng
 import { memoryStore } from '../../src/string-store'
 import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/box'
 import type { VaultScope, PasskeyAnswer, DeviceRecord, LeaseRecord } from '../../src/types/types'
-import { type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, VaultFormat } from '../../src/vault-record'
+import { type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf } from '../../src/vault-record'
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
@@ -16,6 +16,7 @@ import { good, valOf } from '../../src/outcome'
 import { VaultError } from '../../src/errors'
 import { Lease, sealLeaseRecord } from '../../src/lease'
 import { registerLeaseReader } from '../../src/held-lease'
+import { vaultRecordHeldBy } from '../../src/proving'
 import { scriptedRequestCleartext } from './gating'
 
 
@@ -39,18 +40,18 @@ export const testDeriver: KeyDeriver = {
   },
 }
 
-/**
- * The slice of a vault a box, a way in or a lease reads, for a test that makes one with
- * no vault behind it: `user_id`'s `main` vault, as {@link scopeOf} has it, its `vault_tok`
- * `vault-tok-<user_id>` and its `registered_at` 14 October 2026, as {@link vaultRecordOf} has them,
- * deriving with `keyDeriver`, granting leases of seven days, and reading {@link SliceNow} on its
- * clock -- each as `overrides` does not say otherwise.
+/** A stand-in for `user_id`'s `main` vault, for a test that makes a box, a way in or a lease with no vault behind it: its {@link VaultStamp}, and what a vault hands each as it is made.
+ * Its stamp is `user_id`'s `main` vault, as {@link scopeOf} has it, its `vault_tok`
+ * `vault-tok-<user_id>` and its `registered_at` 14 October 2026, as {@link vaultRecordOf} has
+ * them; it derives with `keyDeriver`, grants leases of seven days, and reads {@link SliceNow} on
+ * its clock -- each as `overrides` does not say otherwise.
  *
- * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), TH.vaultRecordOf('u1'), TH.passkeyWayinOf('laptop'))
- * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
+ * @example Wayin.make(TH.vaultSliceOf('u1'), TH.passkeyWayinOf('laptop'), { keyDeriver: argon2idWebV1Deriver })
+ * @example Lease.make(TH.vaultSliceOf('u1'), record)
  */
 export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
   return {
+    format:          VaultFormat,
     ...scopeOf(user_id),
     vault_tok:       `vault-tok-${user_id}`,
     registered_at:   Date.UTC(2026, 9, 14),
@@ -64,12 +65,13 @@ export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriv
 /** The time a {@link vaultSliceOf} slice's clock reads, unless told otherwise: noon, 19 October 2026. */
 export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
-/** What {@link vaultSliceOf} makes: the slice of a vault a box, a way in and a lease read. */
-export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'registered_at' | 'keyDeriver' | 'leaseMillis' | 'now'>
+/** What {@link vaultSliceOf} makes: a vault's stamp, and the key deriver, lease length and clock a vault hands what it makes. */
+export type VaultSlice = VaultStamp & { keyDeriver: KeyDeriver, leaseMillis: number, now: () => number }
 
-/** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */
+/** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. What it shows as made under, its lease and its goneness are the test's to change. */
 export type LeasedSlice = VaultSlice & {
-  stamp:                VaultSparse
+  /** The vault record it holds but its gate: what a box sealed or made of it is made under. */
+  madeUnder:            VaultSparse
   lease:                Lease | null
   /** True once the test has the vault gone: its demand then refuses 'vault_gone'. */
   gone:                 boolean
@@ -77,33 +79,34 @@ export type LeasedSlice = VaultSlice & {
   tryLock:              Vault['tryLock']
   /** How many times something called `tryLock`: what a damaged lease does. */
   locks:                number
+  /** What `Box.seal` is handed as it seals in this vault: its `madeUnder`, and its clock's time. */
+  making:               () => { madeUnder: VaultSparse, now: number }
 }
 
 /** A stand-in for `user_id`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
  * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
- * stamped with its scope, `vault_tok` and `registered_at`, vault epoch 1 and gate epoch 1, holding a lease granted
- * at its clock's time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope
- * or `vault_tok`, `vault_remade`; another `gate_epoch`, `gate_moved`; lease-bound, no lease or one
- * ended by its clock, `vault_locked`. Its `tryLock` drops the lease and counts the call.
+ * made under its stamp at vault epoch 1 and gate epoch 1, holding a lease granted at its clock's
+ * time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope or `vault_tok`
+ * than its `madeUnder`'s, `vault_remade`; another `gate_epoch`, `gate_moved`; lease-bound, no
+ * lease or one ended by its clock, `vault_locked`. Its `tryLock` drops the lease and counts the call.
  *
  * @example const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
- * @example const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
+ * @example const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake', vault.making())
  */
 export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
   const base = vaultSliceOf(user_id, testDeriver, overrides)
-  const vaultTok = base.vault_tok
   const slice: LeasedSlice = {
     ...base,
-    stamp: Object.freeze({ format: VaultFormat, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 }),
+    madeUnder: Object.freeze({ format: base.format, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: base.vault_tok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 }),
     lease: null,
     gone:  false,
     locks: 0,
     demandConsistentWith: (thing, opts) => {
-      const { stamp, lease } = slice
+      const { madeUnder, lease } = slice
       if (slice.gone) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
-      const sameScope = (thing.applabel ?? stamp.applabel) === stamp.applabel && (thing.user_id ?? stamp.user_id) === stamp.user_id && (thing.vaultlabel ?? stamp.vaultlabel) === stamp.vaultlabel
-      if (! sameScope || thing.vault_tok !== stamp.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
-      if ((thing.gate_epoch ?? stamp.gate_epoch) !== stamp.gate_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
+      const sameScope = (thing.applabel ?? madeUnder.applabel) === madeUnder.applabel && (thing.user_id ?? madeUnder.user_id) === madeUnder.user_id && (thing.vaultlabel ?? madeUnder.vaultlabel) === madeUnder.vaultlabel
+      if (! sameScope || thing.vault_tok !== madeUnder.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
+      if ((thing.gate_epoch ?? madeUnder.gate_epoch) !== madeUnder.gate_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
       if (opts?.leaseBound === true && (lease === null || lease.endsBy(slice.now()))) { throw new VaultError('vault_locked', 'The vault this test holds is locked.') }
     },
     tryLock: () => {
@@ -111,12 +114,19 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
       slice.lease = null
       return Promise.resolve(good(undefined))
     },
+    making: () => ({ madeUnder: slice.madeUnder, now: slice.now() }),
   }
-  slice.lease = Lease.make(slice, await sealLeaseRecord(slice, slice.stamp, vaultKey))
+  slice.lease = Lease.make(slice, await sealLeaseRecord(slice.madeUnder, vaultKey, { leaseMillis: slice.leaseMillis, now: slice.now() }))
   // A box and a lease read the lease the slice holds as they read a Vault object's.
   registerLeaseReader(slice, () => slice.lease)
   return slice
 }
+
+/** What a thing the Vault object `vault` makes now is made under: the vault record it holds, but its gate, frozen. Read inside the package, as no getter of the Vault object shows its epochs.
+ *
+ * @example Box.make(vault, record, TH.madeUnderOf(vault))
+ */
+export const madeUnderOf = (vault: Vault): VaultSparse => vaultSparseOf(vaultRecordHeldBy(vault))
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a

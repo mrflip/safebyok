@@ -206,7 +206,7 @@ describe("each ctx binds every field of its stamps", () => {
 
   it("boxCtxOf takes the vault's stamp from a Vault object, as its example shows, binding the same bytes as from the stamp alone", async () => {
     const vault = await makeWorld().open()
-    const { format: _format, vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, ...stampAlone } = vault.stamp
+    const { format: _format, ...stampAlone } = vault
     const ownStamp = { ...boxStamp, vault_tok: vault.vault_tok }
     expect(hex.encode(boxCtxOf(vault, ownStamp, 'whisper_ciphered'))).to.eq(hex.encode(boxCtxOf(stampAlone, ownStamp, 'whisper_ciphered')))
   })

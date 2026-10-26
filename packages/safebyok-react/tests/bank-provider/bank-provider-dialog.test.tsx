@@ -489,7 +489,7 @@ describe("BankProvider", () => {
       fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
       await TH.expectGood(changing)
       await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-      expect(vault.state).to.eq('unlocked')
+      expect(vault.snapshot.state).to.eq('unlocked')
       await vault.lock()
       await TH.unlock(await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), user_id: 'u1', vaultlabel: 'main' }), 'pw two')
     })

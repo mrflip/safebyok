@@ -66,17 +66,21 @@ describe("PassphraseProving.seal", () => {
   })
 
   it("mints a fresh header for { slotlabel }, as its second example shows: the vault's deriver, a fresh salt, this device's id, and the time now", async () => {
-    const { vault, props } = await lockedWorld()
+    const { world, vault, props } = await lockedWorld()
     const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
-    expect(proving.header).to.include({ wayinkind: 'passphrase', key_deriver_label: TH.testDeriver.key_deriver_label, device_id: props.gate.passphrase.device_id, registered_at: vault.now() })
+    expect(proving.header).to.include({ wayinkind: 'passphrase', key_deriver_label: TH.testDeriver.key_deriver_label, device_id: props.gate.passphrase.device_id, registered_at: world.clock.now() })
     expect(proving.header.salt_b64).to.not.eq(props.gate.passphrase.salt_b64)
     const again = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'next', { gating: StandingGating })
     expect(again.header.salt_b64).to.not.eq(proving.header.salt_b64)
   })
 
   it("refuses over a current header, deriving nothing: a blank passphrase wrong_passphrase, another deriver's unknown_key_deriver, a misshapen salt damaged_wayin", async () => {
-    const { vault, props } = await lockedWorld()
-    const derive = vi.spyOn(vault.keyDeriver, 'deriveKeyBytes')
+    const keyDeriver = { ...TH.testDeriver }
+    const world = makeWorld({ keyDeriver })
+    const vault = await world.openUnlocked('pw')
+    await vault.lock()
+    const props = propsOf(world)
+    const derive = vi.spyOn(keyDeriver, 'deriveKeyBytes')
     const header = headerOf(props.gate.passphrase)
     await TH.expectRefusal(PassphraseProving.seal(vault, header, '  ', { gating: StandingGating }), 'wrong_passphrase')
     await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, key_deriver_label: 'other' }, 'pw', { gating: StandingGating }), 'unknown_key_deriver')
@@ -501,7 +505,7 @@ describe("PasskeyProving.seal, the key", () => {
     const { vault } = await lockedWorld()
     const { prfBytes } = await TH.passkeyOf('laptop')
     const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
-    const ctx = wayinCtxOf(vault.stamp, proving.header)
+    const ctx = wayinCtxOf(vault, proving.header)
     const wrapped = await proving.wrappedWith(await makeVaultKey(), proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)

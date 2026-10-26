@@ -52,7 +52,7 @@ const bank = Bank.make({          // as the user signs in: a bank per user
 })
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
-vault.state                       // 'novel' | 'locked' | 'unlocked'
+vault.snapshot.state              // 'novel' | 'locked' | 'unlocked'
 await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...')   // locked or novel: asks through requestCleartext first
 
 const answer = await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
@@ -84,9 +84,12 @@ anything else in it is left out, so a Vault object, its snapshot or an entry's `
 handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
 names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
 
-The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `ask_passphrase_at`, `trouble`,
-`vault_tok` and the rest -- are live and read-only: read them in an event handler and they are
-current. React renders from `getSnapshot()`, the same fields frozen in one object.
+A Vault object's own fields are its stamp, fixed for its life: `format`, `applabel`, `user_id`,
+`vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a spread or a log line of it shows
+those alone. Everything that changes -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`,
+`ask_passphrase_at`, `trouble` and the rest -- is read through `vault.snapshot`, frozen in one
+object: read it in an event handler and it is current. React renders from `getSnapshot()`, the
+same object, and re-renders on `subscribe()`.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
 `Bank.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
@@ -126,12 +129,13 @@ code, the stored records and these docs all use its words.
   `state` is `novel`, `locked` or `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
   whisper, refusing `absent_box` for none) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault, and the Vault object with it. A `Box` in hand
   opens with `box.extractWhisper()`, under the vault's lease, reading nothing.
-  A `Box` holds its stored record as `box.record`, and shows (and serializes as) its visible
-  fields alone, each once; the stamp of the vault it was made under reads as `box.vault_tok` and
-  the like, but no spread or JSON shows it. While unlocked, the vault keeps the vaultKey in one
+  A `Box` is one revision of one box, every field it shows fixed for its life and frozen: its
+  scope and boxlabel, its record's fields but the two ciphered ones, and the `vault_tok`,
+  `vault_epoch` and `gate_epoch` of the vault it was made under. It holds its stored record as
+  `box.record`, which no spread or JSON shows. While unlocked, the vault keeps the vaultKey in one
   place, wrapped in its `Lease`, which is the Vault object's own: no getter shows it. A box seals
-  and opens under it (`Box.seal(vault, props, whisper)`, `box.extractWhisper()`), and locking
-  drops it; `vault.ask_passphrase_at` is when it ends. Two devices that write at once
+  and opens under it (`vault.putBox()`, `box.extractWhisper()`), and locking drops it;
+  `vault.snapshot.ask_passphrase_at` is when it ends. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to set the vault's first passphrase is
   `gate_made_elsewhere`.
@@ -454,10 +458,10 @@ reloads, until the lease runs out (`leaseHours`, seven days by default, at most 
 on this device, until a lock: `ask_passphrase_at` is then the exported `FarFuture`, the latest
 instant the package accepts (in 2255). A finite number past 588 is refused, since no timer
 reaches further. Show "until locked" for any `ask_passphrase_at >= FarFuture - MinuteMillis`;
-never compare a time for equality. The vault reports the lease it was opened with as
-`vault.leaseMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
-reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
-told the option again.
+never compare a time for equality. Each gating reports the lease the bank was made with as
+`gating.leaseMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
+reads as the exported `ForeverMillis`), so a dialog can say how long an unlock lasts without
+being told the option again.
 
 The deadline is the truth, and a timer enforces it. At `ask_passphrase_at` a timer drops the key,
 with no call needed: the snapshot reads `locked`, and every call that needs the key throws
@@ -674,7 +678,7 @@ its own salt, no passphrase is ever stored, and changing either rewrites no box.
 shows them, locked or not, as `passphrase` and `passkey` (null while the vault has none): each a
 `wayinkind`, and when it was set and by which device (`registered_at`, `device_id`); the
 passkey's carries its `credential_id` and `prf_salt_b64` too, for asking the authenticator.
-`vault.passphrase` and `vault.passkey` are the same. Neither holds the passphrase's salt or any
+Neither holds the passphrase's salt or any
 wrapped vaultKey -- what an offline guess at a passphrase starts from -- so a snapshot in React
 state, devtools or an error report gives none away; the vault keeps the stored records to itself.
 A way in stored in a form this package never writes cannot be tried, but the other still opens

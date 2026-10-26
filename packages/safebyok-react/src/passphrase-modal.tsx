@@ -43,8 +43,8 @@ import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
  * default, with the component stack), where the developer and an error tracker meet it. A passkey
  * that fails that way takes its button away and leaves the passphrase.
  *
- * How long a lease lasts it reads from the vault itself (its `leaseMillis`, the `leaseHours` it
- * was opened with): 'Locks again on this device in 7 days', 'in 15 minutes', 'Stays unlocked on
+ * How long a lease lasts it reads from the gating (its `leaseMillis`, the `leaseHours` the bank
+ * was made with): 'Locks again on this device in 7 days', 'in 15 minutes', 'Stays unlocked on
  * this device until you lock it' for `Infinity`; while it creates the vault, 'Locks on this
  * device in 7 days', with nothing yet to lock again. Nobody need tell the dialog the lease again.
  * It needs `Intl.RelativeTimeFormat`, which a host on an engine without it (Hermes, an older
@@ -150,7 +150,7 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
       submitWord={creating ? Messages.createButton : Messages.unlockButton}
       gripe={gripe}
       gripeId={gripeId}
-      footnote={unlockedFor(vault.leaseMillis, creating)}
+      footnote={unlockedFor(gating.leaseMillis, creating)}
       formRef={formRef}
       done={done}
       onSubmit={submit}

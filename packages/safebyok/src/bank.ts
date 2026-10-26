@@ -100,7 +100,7 @@ type LibsLoad =
  * @example
  *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
  *   const vault = await bank.ensureVault({ vaultlabel: 'main' })
- *   vault.state   // 'novel' | 'locked' | 'unlocked'
+ *   vault.snapshot.state   // 'novel' | 'locked' | 'unlocked'
  * @example const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
  */
 export class Bank {
@@ -117,13 +117,16 @@ export class Bank {
   /** Every field, frozen in one object: what {@link Bank.getSnapshot} returns. */
   get snapshot(): BankSnapshot { return this.#snapshot }
 
-  /** The current {@link BankSnapshot}: the same object until something changes. */
-  getSnapshot = (): BankSnapshot => this.#snapshot
-  /** Call `listener` after every snapshot change, returning the unsubscribe.
+  /** The current {@link BankSnapshot}, as a function bound to its bank, of one identity for the bank's life: the same object until something changes. */
+  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
+  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
+
+  /** Call `listener` after every snapshot change, returning the unsubscribe: a function bound to its bank, of one identity for the bank's life.
    * A listener may call into the bank as it hears: an ask for a vault, as its entry goes
    * `starting`, joins the birth under way.
    */
-  subscribe = (listener: () => void): (() => void) => {
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  readonly #subscribe = (listener: () => void): (() => void) => {
     if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each snapshot change.') }
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
@@ -600,8 +603,7 @@ const frozenEntry = (scope: VaultScope, status: EntryStatus, vault: Vault | null
 const StoreFieldnamePattern = /db$/i
 
 /** Refuse 'bad_option' for a bag naming a vault that carries a field named as a store is -- ending `db` in any case, as `vaultDB`, `vaultDb` or `deviceDB` do -- its own or inherited: a vault's own stores go in its options, the second bag, and the bank's own would otherwise be used, quietly.
- * Only names are judged, never values: a Vault object's own functions (`getSnapshot`,
- * `subscribe`) pass, as it may be handed in as the bag.
+ * Only names are judged, never values: a Vault object passes, as it may be handed in as the bag.
  */
 const checkNoStoresIn = (bag: object) => {
   // A store's own name is caught inherited too, as a getter on a class's prototype is no own key.

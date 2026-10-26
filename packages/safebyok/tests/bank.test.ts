@@ -243,7 +243,7 @@ describe("bank.ensureVault", () => {
   it("births the vault a bag names, as its first example shows", async () => {
     const bank = bankIn(makeWorld())
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    expect(vault.state).to.eq('novel')
+    expect(vault.snapshot.state).to.eq('novel')
     expect(vault).to.deep.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
     expect(bank.entryOf(Main)).to.deep.include({ status: 'timely', vault })
   })
@@ -330,11 +330,11 @@ describe("bank.ensureVault", () => {
     expect(births).not.toHaveBeenCalled()
   })
 
-  it("still takes a Vault object, its own functions and all, its snapshot and its record as the bag", async () => {
+  it("still takes a Vault object, its own stamp and all, its snapshot and its record as the bag", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
-    expect(Object.keys(vault)).to.include.members(['getSnapshot', 'subscribe'])
+    expect(Object.keys(vault)).to.include.members(['format', 'vault_tok', 'registered_at'])
     const record = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     if (record === null) { throw new Error('no vault was stored') }
     for (const bag of [vault, vault.getSnapshot(), record]) {
@@ -389,11 +389,11 @@ describe("a lease taken up at birth", () => {
     const kept = await leaseFieldsOf(world)
     TH.closeVault(maker)
     const vault = await world.open()
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.ask_passphrase_at).to.eq(kept?.ask_passphrase_at)
+    expect(vault.snapshot.state).to.eq('unlocked')
+    expect(vault.snapshot.ask_passphrase_at).to.eq(kept?.ask_passphrase_at)
     world.advance((kept?.ask_passphrase_at ?? 0) - world.clock.now() + 1)
     await vault.hello()
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
   })
 
   /** Each lease that does not fit the vault born after it: what happens between the unlock that granted it and the birth, and the birth's options. */
@@ -421,7 +421,7 @@ describe("a lease taken up at birth", () => {
       const kept = await leaseFieldsOf(world)
       const overrides = await meanwhile(world)
       const vault = await world.open(overrides)
-      expect(vault.state).to.eq('locked')
+      expect(vault.snapshot.state).to.eq('locked')
       expect(await leaseFieldsOf(world)).to.deep.equal(kept)
     })
   }
@@ -452,8 +452,8 @@ describe("a vault served behind this device's record", () => {
     expect(onBadNews).toHaveBeenCalledWith(err)
     await bank.clearCachedVault(Main)
     const vault = await bank.ensureVault(Main)
-    expect(vault.state).to.eq('locked')
-    expect(vault.stamp.vault_epoch).to.eq(olderEpoch)
+    expect(vault.snapshot.state).to.eq('locked')
+    expect(TH.madeUnderOf(vault).vault_epoch).to.eq(olderEpoch)
     expect(await highestEpochOf(world)).to.eq(olderEpoch)
     expect(onBadNews).toHaveBeenCalledOnce()
   })
@@ -474,7 +474,7 @@ describe("a vault served behind this device's record", () => {
     await clearing
     expect(asked).to.have.lengthOf(1)
     const reborn = await asked[0]
-    expect(reborn?.state).to.eq('locked')
+    expect(reborn?.snapshot.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
   })
 
@@ -567,7 +567,7 @@ describe("bank.delDamagedVault", () => {
     }
     expect(confirm).toHaveBeenCalledOnce()
     expect(await world.getLease()).to.be.null
-    expect(bank.entryOf(Main)?.vault?.state).to.eq('novel')
+    expect(bank.entryOf(Main)?.vault?.snapshot.state).to.eq('novel')
   })
 
   it("lets the entry go and still refuses 'stale_write' when the vault was made anew elsewhere as it deleted: the next ensureVault births the vault that stands", async () => {
@@ -585,7 +585,7 @@ describe("bank.delDamagedVault", () => {
     expect(bank.entryOf(Main)).to.be.null
     const standing = await bank.ensureVault(Main)
     expect(standing.vault_tok).to.eq(elsewhere.entryOf(Main)?.vault?.vault_tok)
-    expect(standing.state).to.eq('novel')
+    expect(standing.snapshot.state).to.eq('novel')
   })
 
   it("keeps the refused entry when storage refuses the delete 'storage_unavailable': a second call deletes, and the next ensureVault births a new life, novel", async () => {
@@ -598,7 +598,7 @@ describe("bank.delDamagedVault", () => {
     await bank.delDamagedVault(Main)
     expect(bank.entryOf(Main)).to.be.null
     const reborn = await bank.ensureVault(Main)
-    expect(reborn.state).to.eq('novel')
+    expect(reborn.snapshot.state).to.eq('novel')
   })
 
   it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_scope'", async () => {
@@ -623,7 +623,7 @@ describe("bank.delDamagedVault", () => {
     expect(await world.getLease()).to.be.null
     expect(requestCleartext).not.toHaveBeenCalled()
     const reborn = await bank.ensureVault(Main)
-    expect(reborn.state).to.eq('novel')
+    expect(reborn.snapshot.state).to.eq('novel')
   })
 
   it("refuses a sound vault the bank holds no entry for 'bad_option', as storage decides: nothing deleted, this device's lease kept", async () => {
@@ -688,7 +688,7 @@ describe("this device's record of the vault", () => {
     for (const write of [() => TH.unlock(vault, 'pw'), async () => TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop')), () => TH.delWayin(vault, 'pw')]) {
       await write()
       seen.push(await highestEpochOf(world) ?? -1)
-      expect(seen.at(-1)).to.eq(vault.stamp.vault_epoch)
+      expect(seen.at(-1)).to.eq(TH.madeUnderOf(vault).vault_epoch)
     }
     expect(seen).to.deep.equal([1, 2, 3])
   })
@@ -711,8 +711,8 @@ describe("this device's record of the vault", () => {
     await TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     const record = await recordOf(world)
     const deviceId = record?.device_id
-    expect(vault.passphrase?.device_id).to.eq(deviceId)
-    expect(vault.passkey?.device_id).to.eq(deviceId)
+    expect(vault.snapshot.passphrase?.device_id).to.eq(deviceId)
+    expect(vault.snapshot.passkey?.device_id).to.eq(deviceId)
   })
 
   it("is never lowered by another tab's raise of a lower epoch: one whose read was served before this tab's change", async () => {
@@ -727,7 +727,7 @@ describe("this device's record of the vault", () => {
     expect(await highestEpochOf(world)).to.eq(2)
     served.release()
     await TH.expectGood(refreshing)
-    expect(otherTab.stamp.vault_epoch).to.eq(1)
+    expect(TH.madeUnderOf(otherTab).vault_epoch).to.eq(1)
     expect(await highestEpochOf(world)).to.eq(2)
   })
 })
@@ -752,10 +752,10 @@ describe("a vault deleted, and its next life", () => {
     expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
     const next = await bank.ensureVault(Main)
     expect(next).to.not.eq(vault)
-    expect(next.state).to.eq('novel')
+    expect(next.snapshot.state).to.eq('novel')
     expect(next.vault_tok).to.not.eq(vault.vault_tok)
-    expect(next.stamp.vault_epoch).to.be.at.least(tombstoneEpoch)
-    expect(next.boxes).to.have.lengthOf(0)
+    expect(TH.madeUnderOf(next).vault_epoch).to.be.at.least(tombstoneEpoch)
+    expect(next.snapshot.boxes).to.have.lengthOf(0)
     expect(await highestEpochOf(world)).to.be.at.least(tombstoneEpoch)
   })
 
@@ -776,7 +776,7 @@ describe("a vault deleted, and its next life", () => {
     expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_remade')
     const reborn = await bank.ensureVault(Main)
     expect(reborn.getSnapshot()).to.deep.include({ state: 'locked', vault_tok: remade.vault_tok })
-    expect(reborn.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
+    expect(reborn.snapshot.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
     expect(await remade.getWhisper('openai')).to.eq('sk-fake-two')
   })
 
@@ -790,7 +790,7 @@ describe("a vault deleted, and its next life", () => {
     const bank = TH.bankOf(stale)
     expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
     const reborn = await bank.ensureVault(Main)
-    expect(reborn.state).to.eq('novel')
+    expect(reborn.snapshot.state).to.eq('novel')
     expect(reborn.vault_tok).to.not.eq(stale.vault_tok)
   })
 
@@ -813,7 +813,7 @@ describe("a vault deleted, and its next life", () => {
     expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null })
     expect(bank.entryOf(Main)?.err?.refusalkind).to.eq('vault_gone')
     const reborn = await bank.ensureVault(Main)
-    expect(reborn.state).to.eq('novel')
+    expect(reborn.snapshot.state).to.eq('novel')
   })
 })
 // --
@@ -832,7 +832,7 @@ describe("bank.closeVault", () => {
     expect(await world.getLease()).to.not.be.null
     const next = await bank.ensureVault(Main)
     expect(next).to.not.eq(vault)
-    expect(next.state).to.eq('unlocked')
+    expect(next.snapshot.state).to.eq('unlocked')
   })
 
   it("lets the vault go, by its label or by the Vault object, as its examples show", async () => {
@@ -905,7 +905,7 @@ describe("bank.closeVaults and bank.reopenVault", () => {
     const bank = TH.bankOf(vault)
     const reopened = await bank.reopenVault({ vaultlabel: 'main' })   // after 'vault_gone', say
     expect(reopened).to.not.eq(vault)
-    expect(reopened.state).to.eq('unlocked')
+    expect(reopened.snapshot.state).to.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
     expect(bank.entryOf(Main)?.vault).to.eq(reopened)
   })
@@ -975,7 +975,7 @@ describe("the first unlock of a novel vault", () => {
     const world = makeRacingWorld()
     const here = await world.open({ vaultDB: world.deafVaultDB() })
     const there = await world.open({ deviceDB: memoryDeviceDB() })
-    expect([here.state, there.state]).to.deep.equal(['novel', 'novel'])
+    expect([here.snapshot.state, there.snapshot.state]).to.deep.equal(['novel', 'novel'])
     const deriving = world.holdNextDerive()
     const unlocking = TH.tryUnlock(here, 'there phrase')
     await deriving.reached
@@ -984,11 +984,11 @@ describe("the first unlock of a novel vault", () => {
     deriving.release()
     await TH.expectBad(unlocking, 'gate_made_elsewhere')
     expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(gated)
-    expect(here.state).to.eq('novel')
+    expect(here.snapshot.state).to.eq('novel')
     await here.hello()
-    expect(here.state).to.eq('locked')
+    expect(here.snapshot.state).to.eq('locked')
     await TH.unlock(here, 'there phrase')
-    expect(here.state).to.eq('unlocked')
+    expect(here.snapshot.state).to.eq('unlocked')
   })
 })
 // --
@@ -1089,7 +1089,7 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     const session = { user_id: 'u1' }
     const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    expect(vault.state).to.eq('novel')   // 'novel' | 'locked' | 'unlocked'
+    expect(vault.snapshot.state).to.eq('novel')   // 'novel' | 'locked' | 'unlocked'
     expect(bank.status).to.eq('timely')
   })
 })

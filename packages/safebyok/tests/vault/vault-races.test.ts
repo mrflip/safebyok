@@ -78,7 +78,7 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     await vault.lock()
     gate.release()
     await TH.expectRefusal(changing, 'vault_locked')
-    expect(vault.state).to.eq('locked')
+    expect(vault.snapshot.state).to.eq('locked')
     expect(putLease).not.toHaveBeenCalled()
     expect(await world.getLease()).to.be.null
 
@@ -308,7 +308,7 @@ describe("a first unlock that loses the race to create the vault", () => {
     expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
     expect(await world.getLease()).to.be.null
     await TH.unlock(there, 'pw one')
-    expect(there.state).to.eq('unlocked')
+    expect(there.snapshot.state).to.eq('unlocked')
   })
 
   it("is plain wrong_passphrase when the other device's vault was in storage before this unlock looked: the look finds it", async () => {
@@ -343,7 +343,7 @@ const expectLostToPwOne = async (world: ReturnType<typeof makeRacingWorld>, ther
   expect(there.getSnapshot()).to.deep.include({ state: 'locked', gate_epoch: 1 })
   expect(await world.getLease()).to.be.null
   await TH.unlock(there, 'pw one')
-  expect(there.state).to.eq('unlocked')
+  expect(there.snapshot.state).to.eq('unlocked')
 }
 
 describe("a first unlock that loses the race midway, a refresh taking the other device's gate in", () => {
@@ -524,7 +524,7 @@ describe("a first unlock's gate, and a read while it is under way", () => {
     await vault.hello({ staleMinutes: 0 })
     noting.release()
     await unlocking
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     expect(await world.getLease()).to.not.be.null
   })
 })
@@ -544,14 +544,14 @@ describe("a read that began before this device's own change to the ways in lande
       await listing.reached
     })
     await addLaptopPasskey(vault)
-    expect(vault.gate_epoch).to.eq(2)
+    expect(vault.snapshot.gate_epoch).to.eq(2)
     listing?.release()
     await reading
-    expect(vault.gate_epoch).to.eq(2)
-    expect(vault.passkey).to.not.be.null
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.gate_epoch).to.eq(2)
+    expect(vault.snapshot.passkey).to.not.be.null
+    expect(vault.snapshot.state).to.eq('unlocked')
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.state).to.eq('unlocked')
     expect(await world.getLease()).to.not.be.null
   })
 })
@@ -569,7 +569,7 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     landed.release()
     // The change landed before the deletion, but the demand after the write finds the Vault object gone.
     await TH.expectRefusal(changing, 'vault_gone')
-    expect(vault.state).to.not.eq('unlocked')
+    expect(vault.snapshot.state).to.not.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
     expect(await world.stateOnOpen()).to.eq('novel')
   })
@@ -590,11 +590,11 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     landed.release()
     // The change landed before the deletion, but the demand after the write finds the vault made anew.
     await TH.expectRefusal(changing, 'vault_remade')
-    expect(vault.state).to.not.eq('unlocked')
+    expect(vault.snapshot.state).to.not.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_remade')
     const next = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(next.vault_tok).to.eq(reborn.vault_tok)
-    expect(next.state).to.eq('locked')
+    expect(next.snapshot.state).to.eq('locked')
     await TH.expectRefusal(TH.unlock(next, 'pw two'), 'wrong_passphrase')
   })
 })
@@ -1210,7 +1210,7 @@ describe("the races the contract tests own, of a box write", () => {
     await TH.putWayin(here, 'shared pw', await TH.passkeyOf('laptop'))
     writing.release()
     const box = await putting
-    expect(box.gate_epoch).to.eq(here.gate_epoch)
+    expect(box.gate_epoch).to.eq(here.snapshot.gate_epoch)
     expect(boxlabelsOf(here)).to.deep.equal(['anthropic'])
     expect(await here.getWhisper('anthropic')).to.eq('sk-ant-fake')
   })
@@ -1282,7 +1282,7 @@ describe("the races the contract tests own, of a gate change", () => {
     expect(storedWayinOf(world, 'passkey')).to.be.null
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(fresh, 'pw theirs')
-    expect(fresh.state).to.eq('unlocked')
+    expect(fresh.snapshot.state).to.eq('unlocked')
   })
 
   it("a gate change racing another device's that this device has not heard of is refused by storage as stale_write, the other change kept", async () => {

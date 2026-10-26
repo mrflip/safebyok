@@ -212,8 +212,8 @@ describe("vault.hello as an event handler", () => {
     window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(propsReads).toHaveBeenCalledOnce() })
-    expect(vault.state).to.eq('novel')
-    expect(vault.trouble).to.be.null
+    expect(vault.snapshot.state).to.eq('novel')
+    expect(vault.snapshot.trouble).to.be.null
   })
 
   it("refuses any object that is no plain bag of options, as a React event is, as bad_option", async () => {

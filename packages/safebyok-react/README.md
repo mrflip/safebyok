@@ -488,7 +488,7 @@ if (answer !== null) { await gating.attempt(passphrase, answer) }   // null: the
 
 // Unlocking, inside an unlock_vault gating's dialog of your own: the browser asks the user to
 // touch the vault's passkey, and it answers.
-const passkey = await askPasskey(gating.vault.passkey)
+const passkey = await askPasskey(gating.vault.snapshot.passkey)
 if (passkey !== null) { const { ok } = await gating.attemptPasskey(passkey) }
 ```
 

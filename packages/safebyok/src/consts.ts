@@ -23,11 +23,11 @@ export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
  */
 export const MinuteMillis = 60_000
 
-/** The lease a vault grants for "until `lock()`", in milliseconds: `leaseHours: Infinity` reads as this in a vault's `leaseMillis`.
+/** The lease a vault grants for "until `lock()`", in milliseconds: `leaseHours: Infinity` reads as this in a gating's `leaseMillis`.
  * It spans {@link FarPast} to {@link FarFuture}, so a lease granted at any instant the clock may
  * read ends at {@link FarFuture}.
  *
- * @example vault.leaseMillis >= ForeverMillis - MinuteMillis           // true when opened with leaseHours: Infinity
+ * @example gating.leaseMillis >= ForeverMillis - MinuteMillis          // true when the bank was made with leaseHours: Infinity
  * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
  */
 export const ForeverMillis = FarFuture - FarPast

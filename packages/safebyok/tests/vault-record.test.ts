@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
-import { describe, expect, it } from 'vitest'
-import { GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, VaultFormat, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, isGated } from '../src/vault-record'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, isGated, vaultSparseOf } from '../src/vault-record'
 import * as TH from './test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -124,6 +124,12 @@ describe("the vault record's shapes", () => {
     expect(Object.keys(stamp)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'])
   })
 
+  it("makes VaultStampButFormat the stamp but its format, picked from a whole record, as its example shows", () => {
+    expect(VaultStampButFormat.parse(record)).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
+    expect(VaultStampPicked.parse(record)).to.deep.equal({ format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
+    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
+  })
+
   it("makes VaultTombstone the format, the scope and a vault_epoch of 1 or more, as its example shows", () => {
     const tombstone = { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 4 }
     expect(VaultTombstone.parse(tombstone)).to.deep.equal(tombstone)
@@ -162,6 +168,34 @@ describe("isGated", () => {
 
   it("names the format every vault record carries", () => {
     expect(TH.vaultRecordOf('u1').format).to.eq(VaultFormat)
+  })
+})
+// --
+
+// == [vaultSparseOf, and the named record types]
+
+describe("vaultSparseOf", () => {
+  it("is the record without its gate, frozen, as its example shows", () => {
+    const record = TH.vaultRecordOf('u1')
+    const sparse = vaultSparseOf(record)
+    expect(sparse.gate_epoch).to.eq(record.gate_epoch)
+    expect(sparse).to.not.have.property('gate')
+    expect(sparse).to.deep.equal(VaultSparse.parse(omit(record, ['gate'])))
+    expect(Object.isFrozen(sparse)).to.be.true
+  })
+})
+
+describe("the named vault record types", () => {
+  it("names a gated record GatedVaultRecord, and a novel draft VaultDraft, as its example shows", () => {
+    expectTypeOf(TH.vaultRecordOf('u1')).toExtend<GatedVaultRecord>()
+    expectTypeOf(TH.gatelessOf('u1')).toExtend<VaultDraft>()
+    expect(VaultRecord.safeParse(TH.gatelessOf('u1')).success).to.be.true
+  })
+
+  it("takes a vault_tok and whichever of the scope and epochs a thing carries as VaultMadeUnder, as its example shows, a box's own format and times beside them", () => {
+    expectTypeOf({ vault_tok: 'vault-tok-u1', gate_epoch: 1 }).toExtend<VaultMadeUnder>()
+    expectTypeOf({ format: 'safebyok-box-v8', vault_tok: 'vault-tok-u1', registered_at: 1 }).toExtend<VaultMadeUnder>()
+    expectTypeOf({ gate_epoch: 1 }).not.toExtend<VaultMadeUnder>()
   })
 })
 // --
