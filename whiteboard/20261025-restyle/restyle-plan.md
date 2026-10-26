@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 6 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#277](https://github.com/mrflip/safebyok/pull/277)); thread 7 built ([#278](https://github.com/mrflip/safebyok/pull/278)), in review.
+* **Status:** threads 1 to 7 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#278](https://github.com/mrflip/safebyok/pull/278)); thread 8 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -301,6 +301,16 @@ when the `user_id` changes or goes. The bank's snapshot keeps its shape here; th
 **Depends on:** thread 6. **Look-ahead:** thread 13 reshapes the snapshot as `Lifecycled<BankScope>
 | Refused<BankScope>` and adds `vaultOf`; leave the status as one field that maps onto that.
 **Size:** large.
+
+*Review:* medium, `fixed`. Fixed: `BankProvider` handed the last user's bank down for one render
+after `user_id` changed or went (now only while `held.bank.user_id === user_id`; a test records
+every render). Checked and holding: every bag-taking call checks the bag against `bank.scope`
+before storage, parses it once, and hands storage a scope rebuilt from `bank.scope` and the
+`vaultlabel`; each of the Coach's FIXMEs is met; no retry or refresh added. Follow-ups the worker
+made before filing (YOLO): four adapter `@example`s brought to `Bank.make({ ..., user_id })`; any
+first-bag key named like a store (ending `db`, any case) refuses `bad_option`. Left: a misspelt
+`userId` in the first bag is dropped (safe: it falls back to the bank's own user); `loadKeyDeriver`
+repeats `loadStrengthChecker`'s wrapper. Filed as [#278](https://github.com/mrflip/safebyok/pull/278).
 
 ### 8. The vault record and its shapes (Preplan Phase 4, the record; Phase 9 where it meets it) -- `vault_record`
 
