@@ -147,3 +147,25 @@ Who reads this: threads 7, 9, 11 and 12.
 * **For thread 9**: the "stamp" wording was deferred to it (today's `Stamp` type holds the epochs).
 * **A blanket rename can collapse a comparison** (`user_id !== user_id` happened once;
   `noUnusedLocals` caught it): grep for tautologies after any sweep.
+
+## From thread 7 (bank_per_user, #278)
+
+Who reads this: threads 8, 11 and 13.
+
+* **`Bank.make({ applabel, user_id, ... })`**, its scope read by `CX.bankScope` (thread 2's
+  interim `bankApplabel` is gone); `bank.user_id`, `bank.scope` and the public
+  `bank.demandConsistentWith(thing)` are new.
+* **Bag-taking calls**: `ensureVault`, `reopenVault`, `clearCachedVault`, `delDamagedVault` (and
+  their `try` forms) take `(bag, opts?: BankVaultOpts)`; `closeVault` and `entryOf` take `(bag)`.
+  `vaultlabel` required; a bag's `applabel`/`user_id` must be the bank's (`bad_scope`); the rest is
+  dropped; a store in the first bag refuses `bad_option`. `VaultChoice` gone, `VaultDraft` is
+  `BankVaultOpts`.
+* **Load**: `KeyDeriver` has an optional `load` (`loadKeyDeriver` in key-deriver-spec.ts); each
+  `hello()` runs both loads side by side. One `LibsLoad` value holds the bank's status and its
+  `err`; `#initialize()` returns an `Outcome` and alone moves and publishes the status (the
+  Coach's FIXMEs). Status values unchanged: `made | starting | timely | refused`; thread 13 maps
+  `#libs.status` onto `Lifecycled | Refused`.
+* **React**: `BankProvider` makes a new bank when `user_id` changes; `useBank()` is null while no
+  one is signed in.
+* **For thread 8**: `draftOf` in bank.ts still spreads the parsed scope into the record (Phase 9).
+  `sealBoxlabel` in box.ts stays (no bag reaches `Box.seal`).
