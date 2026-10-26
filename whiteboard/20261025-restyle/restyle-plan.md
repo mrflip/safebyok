@@ -7,7 +7,8 @@
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
 * **Issued by:** the Coach (flip), by `/sprint restyle` with `/turbochat`.
-* **Sprint PR:** the `20261026-restyle` branch (`plan:`), a draft; it joins the line last.
+* **Sprint PR:** [#271](https://github.com/mrflip/safebyok/pull/271), the `20261026-restyle` branch (`plan:`), a draft; it joins the line last.
+* **Sprint doc:** [Sprint restyle](https://claude.ai/artifact/4Hx2VL1fu4qUMQV9z6rJFz): Open Matters, Progress, Resolved.
 * **Base:** the primitives line's top, [#267](https://github.com/mrflip/safebyok/pull/267)
   (`20261024-contract_tab`, 68dabab1), in the line main → #265 → #252 → #268 → #269 → #270 → #266
   → #267. Those seven PRs rewrite `vault.ts`, `vault-db.ts`, `wayin.ts`, `gating.ts`, `proving.ts`,
