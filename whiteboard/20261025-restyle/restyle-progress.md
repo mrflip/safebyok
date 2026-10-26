@@ -25,3 +25,34 @@ threads 2 to 13 → the sprint PR. Thread 1 (`guidance`) stands on #267 beside t
   `gh pr edit` and `gh pr ready` denied; they report it and carry on, and the Coach is asked.
 * *Orchestrator:* the lint's `^_[a-zA-Z0-9]` flagged nothing in `src/` (`args: 'after-used'`
   never reported `(_, ii) =>`); write named ignores anyway.
+
+## From thread 2 (validator, #273)
+
+Who reads this: threads 3, 5 and 8.
+
+* **Where things are.** `src/checks/validator.ts` (the factory), `src/checks/primitives.ts`,
+  `src/checks/core-checks.ts` (star-imported as `CX`); `src/phrases.ts` and `src/consts.ts` sit at
+  the top of `src/`, not in `utils/` (`src/utils.ts` already exists).
+* **The kit** holds `obj arr tuple rec oneof union discrim lit lazy custom unk str num int uint bool`
+  and `label applabel vaultlabel boxlabel user_id`; **no `zod` namespace** (it kept every locale:
+  +49 kB). Null is `lit(null)`; `.strict()` / `.loose()` for object modes. Not in the kit:
+  `Z.core` types, `Z.locales` (options.ts `InEnglish`), `Z.config`: import those as types or
+  directly where needed.
+* **A variation of a wrapped validator** (`pick`, `omit`, `extend`, `.strict()`, `.optional()`)
+  made outside a `Validator` call is plain Zod and throws a ZodError; made inside a call it
+  refuses with that call's kind. A validator nested in another refuses with the outer call's
+  kind. Tested, and in the doc block.
+* **Scope validators are `.readonly()`**, which has no `.extend`: a record builds from the kit's
+  names, and slices its scope with `pick(...).strip()`.
+* **Interim validators**: `bankApplabel` (vault-opts.ts) and `sealBoxlabel` (box.ts), one-field
+  `bad_scope` validators holding the place until thread 7.
+* **Two `VaultScope` types** for now: types.ts's (mutable, a Convex type test needs it) and
+  `CX.VaultScope` (readonly). Thread 8 unifies them.
+* **Scopepaths**: `CX.bankScopepath`, `CX.vaultScopepath`, `CX.boxScopepath` (tuples) and the
+  `*ScopepathFieldnameVals`, for thread 5.
+* **Names are strict at every layer**: a vault's entry, each VaultDB verb, each record read back.
+  A box stored under a non-label name is no longer listed (pre-1.0, in the changeset).
+* **Size**: `everything` 61.1 kB (budget 65), `Bank` 53.7 (57), `idbDeviceDB` 22.6 (26),
+  `browserOpts` 28.3 (32), with both Zod flavours bundled. Thread 3 should bring these down.
+* **Permissions**: workers' `gh pr edit` and `gh pr ready` are denied; a worker writes its PR
+  body to its scratch directory and reports. The `--base main` at `gh pr create` works.

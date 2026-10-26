@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 under way.
+* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 built ([#273](https://github.com/mrflip/safebyok/pull/273)), in review.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -144,7 +144,8 @@ every core line up (`Bank`, `everything` and the entries importing a check).
 *Orchestrator's choice:* stored records parse **strict** (an unknown field reads as damage or a
 newer `format`), as suggested. `zod/mini` leaves `src/`, and the eslint rule that held it goes
 the other way (classic only). Keep each schema's shape as today: thread 8 restructures the vault
-record, so don't polish `vaultProps` beyond the conversion. **Depends on:** thread 2.
+record, so don't polish `vaultProps` beyond the conversion. *Orchestrator, from thread 2:* the kit and its limits are in the progress document, *From thread
+2*; `bankApplabel` and `sealBoxlabel` are interim, for thread 7. **Depends on:** thread 2.
 **Look-ahead:** threads 4 and 8 brand and slice these. **Size:** large, mostly mechanical; it
 may run long: if it does, split by package or concern and report. Moves the core lines (down,
 once mini is gone).
