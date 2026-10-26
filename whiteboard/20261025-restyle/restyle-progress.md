@@ -56,3 +56,30 @@ Who reads this: threads 3, 5 and 8.
   `browserOpts` 28.3 (32), with both Zod flavours bundled. Thread 3 should bring these down.
 * **Permissions**: workers' `gh pr edit` and `gh pr ready` are denied; a worker writes its PR
   body to its scratch directory and reports. The `--base main` at `gh pr create` works.
+
+## From thread 3 (zod_classic, #274)
+
+Who reads this: threads 4 and 8; any thread writing a validator.
+
+* **Every schema is classic Zod in a `Validator` call, by concern**; `zod/mini` is banned by lint.
+  Each export keeps today's name as a value and type pair (`VaultProps`, `BoxRecord`, `Whisper`,
+  ...), its detailed doc block on the `export type X = Z.infer<...>` line.
+* **Stored records parse strict**; a read-back helper re-throws `damaged_*` with its check's
+  `bad_record` as cause.
+* **`refusing` wraps a `schema.clone()`**, not `Object.create`: classic Zod ties JSON Schema
+  rendering to the original object. `sayable` is exported from `src/checks/validator.ts`; it
+  repeats an unknown key only when snake_case or camelCase and at most 32 characters.
+* **`Validator` is not exported**: safebyok-indexeddb's `idb-opts.ts` is plain classic Zod.
+* **Tree-shaking is per module, not per call**: esbuild never drops a destructured or exported
+  `Validator` call, `@__PURE__` or not. An unexported `const X = /* @__PURE__ */ Validator(...)`
+  read inside a function is dropped with the function (key-deriver-spec does this, keeping
+  `argon2idWebV1Deriver` at 5.5 kB). Finer granularity means a module of its own.
+* **For thread 4**: `EpochMillis` is still plain Zod in types.ts, outside the kit; move it with the
+  aliases.
+* **For thread 8**: `VaultProps` is a union of two strict objects, whose refusal names no field
+  ("Invalid input"); the single record with a nullable gate fixes that.
+* **GitHub push protection** refuses a test fixture shaped like a real key (`sk_live_...`): build
+  such fakes at runtime (CLAUDE.md: an obvious fake that validates).
+* **Size** (budgets raised): `idbDeviceDB` 28.1 kB, `browserOpts` 33.7, `mask` 25.2 (was ~6),
+  `argon2idWasmDeriver` 34.7 (was ~16); `everything` 61.0 and `Bank` 53.7 barely moved (mini and
+  classic share `zod/v4/core`).
