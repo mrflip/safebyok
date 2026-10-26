@@ -405,6 +405,17 @@ describe("settledVault", () => {
   })
 })
 
+describe("stateOf", () => {
+  it("reads novel with no gate, unlocked with ask_passphrase_at set, and locked once it is null, as its example shows", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
+    await TH.unlock(vault, 'pw')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    await vault.lock()
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+  })
+})
+
 describe("bankOf", () => {
   it("answers the bank a vault was born in, which can let it go, as its example shows", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
