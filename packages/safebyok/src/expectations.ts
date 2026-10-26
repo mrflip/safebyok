@@ -89,7 +89,7 @@ export const vaultRecordPutOf = (vaultRecord: VaultRecord, standing: unknown): V
  *   const life = Expectations.newLifeOf(draft, standing)
  *   if (life) { write(life) }
  */
-export const newLifeOf = (draft: VaultDraft, standing: unknown): (VaultDraft) | null => {
+export const newLifeOf = (draft: VaultDraft, standing: unknown): VaultDraft | null => {
   if (standing === null || standing === undefined) { return draft }
   return isTombstone(standing) ? { ...draft, vault_epoch: epochOf(standing) } : null
 }
