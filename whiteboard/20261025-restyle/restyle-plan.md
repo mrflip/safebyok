@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); thread 2 filed ([#273](https://github.com/mrflip/safebyok/pull/273)); thread 3 under way.
+* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); threads 2 and 3 filed ([#273](https://github.com/mrflip/safebyok/pull/273), [#274](https://github.com/mrflip/safebyok/pull/274)); thread 4 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -163,6 +163,13 @@ lines. **Depends on:** thread 2.
 may run long: if it does, split by package or concern and report. Moves the core lines (down,
 once mini is gone).
 
+*Review:* medium, `fixed`. Fixed: two check messages in single quotes; tests for `sayable`'s two
+`@example`s. Left: the format guard cannot see strictness (thread 8 renders with `io: 'input'`);
+a strict device record drops its watermark on an unknown field (keep strict; thread 8 states the
+format rule); lowercase snake_case keys of 32 characters or fewer are still repeated (accepted,
+in notes/security.md); `VaultProps`' union names no field (thread 8); STYLE.md still says mini
+(#272); `Wayin.make`'s raw ZodError cause (thread 8). Filed as [#274](https://github.com/mrflip/safebyok/pull/274), still a draft.
+
 ### 4. Type aliases and brands (Preplan Phase 1a) -- `brands`
 
 > 1a. **Type aliases and brands.** Survey `src/` for the most common primitives (labels,
@@ -181,6 +188,9 @@ salts' brands (shape in the record, length where each wayin is judged: *Preplan*
 where a doc block can say what each is for, or leave each to its first user and say so.
 **Depends on:** thread 3. **Look-ahead:** thread 11 writes the collaborators as
 `ConsistencyWith<...>`; thread 13 the bank's `Lifecycled`/`Refused`. **Size:** medium.
+*Orchestrator, from thread 3:* `EpochMillis` is still plain Zod in types.ts, outside the kit: move
+it with the aliases. Tree-shaking is per module, not per `Validator` call, so the folder split is
+where finer granularity comes, if a module boundary earns it; say what moved each size line.
 
 ### 5. Scopepath replaces Ckeys (Preplan Phase 2) -- `scopepath`
 
@@ -285,7 +295,13 @@ in; VOCABULARY retires "vault props" into `notes/old_vocabulary.md`. The box's, 
 device record's stamps (*Preplan*, *The box, the lease...*). Adapters: Postgres, Convex, GraphQL,
 IndexedDB, local. Phase 9's lines (`draftOf`, each `raiseDeviceRecord`) are rewritten here if
 this thread opens them; otherwise thread 13 takes them. The `gate_epoch` report goes in the PR
-and the thread file, and becomes an Open Matter. **Depends on:** thread 7. **Look-ahead:** thread
+and the thread file, and becomes an Open Matter. *Orchestrator, from thread 3's review:* the
+single record replaces `VaultProps`' union of two strict objects (whose refusal names no field);
+render the stored-record format snapshots with `io: 'input'`, so strictness shows in the guard;
+write where the stored shapes are described that any new device-record field bumps `format` (a
+strict device record with an unknown field is discarded with its rollback watermark); move
+`Wayin.make`'s `damaged_wayin` cause from a raw ZodError to a re-thrown `bad_record`.
+**Depends on:** thread 7. **Look-ahead:** thread
 9 binds `VaultStamp`, `BoxStamp` and `LeaseStamp` into each ctx; thread 10's reads answer
 `VaultRecord`; thread 11's Vault object `implements VaultStamp`. **Size:** large; if the adapters
 run long, they are a thread of their own (8b), the core's change first.
