@@ -149,7 +149,7 @@ describe("a gating, kind by kind", () => {
     await TH.expectGood(gating.attempt('pw'))
     await TH.expectGood(removing)
     expect(vault.passkey).to.be.null
-    expect(storedVaultPropsOf(world)).to.include({ passkey: null })
+    expect(storedVaultPropsOf(world)['gate']).to.include({ passkey: null })
   })
 
   it("del_vault deletes the vault, proven by the passphrase, settling with success, and then the vault locks and goes", async () => {

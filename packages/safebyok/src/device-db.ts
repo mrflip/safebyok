@@ -1,4 +1,5 @@
-import { DeviceRecord, LeaseRecord, type VaultScope } from './types/types'
+import { DeviceRecord, DeviceRecordFormat, LeaseRecord, type VaultScope } from './types/types'
+import * as CX from './checks/core-checks'
 import * as Scopepath from './scopepath'
 import { sameScope } from './names'
 import { VaultError } from './errors'
@@ -123,7 +124,18 @@ export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): Devic
   if (! checked.success || Scopepath.device(checked.data) !== Scopepath.device(record)) { return record }
   const standing = checked.data
   if (standing.highest_vault_epoch >= record.highest_vault_epoch) { return standing }
-  return { ...standing, highest_vault_epoch: record.highest_vault_epoch }
+  return deviceRecordOf(standing, standing.device_id, record.highest_vault_epoch)
+}
+
+/** The device record of `scope` holding `device_id` and `highest_vault_epoch`, frozen: built from the scope's parsed names, so nothing else `scope` carries is stored.
+ * Throws 'bad_scope' for a scope that fails its check, and 'bad_record' for a `device_id` or an
+ * epoch that does.
+ *
+ * @example deviceDB.raiseDeviceRecord(deviceRecordOf(vault, deviceId, vaultEpoch))   // a Vault object passes as its scope
+ */
+export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vault_epoch: number): DeviceRecord => {
+  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
+  return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
 /** `answer`, a device record a DeviceDB handed back for `scope`, checked: the record, or null for one that fails its check or names another scope, as for none.

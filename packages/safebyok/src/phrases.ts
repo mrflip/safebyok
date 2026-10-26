@@ -38,6 +38,12 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const InstantNotWhole = "An instant is whole epoch milliseconds"
 // --
 
+// == [Records]: GateEpochAndGate
+
+/** A vault record whose `gate_epoch` and `gate` disagree: a gate at epoch 0, or none at a later epoch. */
+export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
+// --
+
 // == [Passphrases]: PassphraseNotText
 
 /** A passphrase handed over as anything but text. */

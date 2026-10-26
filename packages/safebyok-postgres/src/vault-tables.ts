@@ -2,7 +2,7 @@
  * Run it once, as a migration or at your server's start: it is safe to run again. The package also
  * ships it as `vault-tables.sql`, for a migration tool to copy.
  *
- * It makes `safebyok_vaults`, a row of vault props per vault, `safebyok_vault_tombstones`, the
+ * It makes `safebyok_vaults`, a row per vault record, `safebyok_vault_tombstones`, the
  * mark a deleted vault leaves, and `safebyok_boxes`, a row per box: no trigger, no function, no
  * other table. Row-level security is on with no policy, so only the
  * tables' owner reaches them. Push between devices is {@link VaultNotifySql}'s, which you opt in to.
@@ -16,10 +16,12 @@ export const VaultTablesSql = `-- safebyok-postgres: the tables a safebyok vault
 --
 -- Each record is stored field by field, a column to a field, exactly as safebyok wrote it:
 -- text as text, a time or a count as a bigint, and each structured value -- an encrypted value
--- (a cipherIv and its ciphertext), or one of the vault props' two ways in -- as one opaque jsonb. A record's secret fields are ciphertext, every one.
+-- (a cipherIv and its ciphertext), or one of the two ways in of a vault record's gate -- as one
+-- opaque jsonb. A record's secret fields are ciphertext, every one.
 
--- One row of vault props per vault: its passphrase and passkey both null until its gate is made
--- (gate_epoch 0), then its passphrase always, and its passkey null when it has none. Its
+-- One row per vault record: its gate's passphrase and passkey, each a column, both null until
+-- its gate is made (gate_epoch 0), then its passphrase always, and its passkey null when it has
+-- none; the adapter nests the two as the record's gate. Its
 -- vault_epoch is moved up by the statements that write its gate and delete it, never by a client.
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
@@ -38,7 +40,7 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
 );
 
 -- What a deleted vault leaves in its scope: its counter, which the next vault made there carries
--- on. A scope holds a row of vault props or a tombstone, never both: a deletion moves the one to
+-- on. A scope holds a vault record's row or a tombstone, never both: a deletion moves the one to
 -- the other in one statement, and a vault made anew moves it back.
 CREATE TABLE IF NOT EXISTS safebyok_vault_tombstones (
   applabel         text   NOT NULL,

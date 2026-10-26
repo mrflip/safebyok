@@ -41,6 +41,28 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
+  an old flat vault reads as damaged under an unbumped format; a device record is strict, frozen and built from the scope's names alone.**
+  (1) `VaultRecord` (`packages/safebyok/src/vault-record.ts`) is `{ format, applabel, user_id, vaultlabel, vault_tok, registered_at, vault_epoch,
+  gate_epoch, gate }`, its ways in nested as `gate: { passphrase, passkey | null }` (`GateRecord`), and `gate` null while the vault is novel. Its
+  strict check holds `gate_epoch` 0 exactly when `gate` is null: the rule the union of a gated and a gateless shape held, now in one object,
+  so a refusal names the failing field. Every check of a `vault_tok` uses the package's `vault_tok` validator (non-empty text); the write
+  expectations still drop any field they do not compare, as before.
+  (2) `format` stays `safebyok-vault-v6`, per the pre-1.0 rule of no format bumps. A vault stored in the earlier flat layout (`passphrase` and
+  `passkey` beside the record's fields) fails the strict check and reads as `damaged_vault`, never `newer_format`; nothing reads it, no shim.
+  (3) No ctx changes in this thread: each wayin's wrap still binds `safebyok-vault-v6`, the scope, the `vault_tok`, its purpose and its header;
+  the box and lease ctxs are unchanged. (A later thread, 9, reworks the ctxs.)
+  (4) `safebyok-postgres` keeps its table: `gate_epoch` stays a column with its SQL check, each wayin its own `jsonb` column. The adapter nests the
+  two columns as the gate when it reads (`vaultRecordOfRow`, `columns.ts`): both null is no gate; a passkey stored without a passphrase is handed
+  up as a gate with a null passphrase, so it reads as damaged, never as a novel vault (nothing is repaired).
+  (5) `Wayin.make`'s `damaged_wayin` refusal carries the record check's own `bad_record` as its `cause`, which names each failing field and repeats
+  a key only when it is shaped as one of the package's field names, where it carried a raw ZodError, which could repeat an unknown key verbatim.
+  (6) A device record is handed out frozen (its check is `.readonly()`), and `deviceRecordOf(scope, device_id, highest_vault_epoch)` builds one from
+  the scope's parsed names alone, so nothing else a holder carries is stored. The device record is strict and one failing its check reads as
+  none: a field added to it later would make an older build discard the record, and with it the `highest_vault_epoch` rollback watermark, until
+  its next read raises it again; so a new field moves its `format` on.
+  (7) `PassphraseWayinSparse` (leaves out a passphrase wayin's `salt_b64`, `key_deriver_label` and wrap: what an offline guess at the passphrase
+  needs) and `PasskeyWayinSparse` (leaves out its wrap) are defined but not yet shown anywhere; a later thread puts them on the snapshot.
 * 2026-10-26 (restyle sprint, thread 7, branch `20261026-bank_per_user`): **a Bank serves one signed-in user, and the scope a vault is born
   under comes from the bank, never from the caller's bag.**
   (1) `Bank.make({ applabel, user_id, ... })`. Every bank call naming a vault (`ensureVault`, `reopenVault`, `closeVault`,

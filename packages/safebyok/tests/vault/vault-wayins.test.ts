@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { type PasskeyAnswer, VaultProps, VaultScope } from '../../src/types/types'
+import { type PasskeyAnswer, VaultScope } from '../../src/types/types'
+import { VaultRecord } from '../../src/vault-record'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
@@ -321,7 +322,7 @@ describe("the vault's passphrase", () => {
 
   it("vault props in the shape before wayins read as damaged, and are left as they are", async () => {
     const world = makeWorld()
-    const { passphrase: _passphrase, passkey: _passkey, ...rest } = TH.vaultPropsOf('u1')
+    const { gate: _gate, ...rest } = TH.vaultRecordOf('u1')
     const oldText = JSON.stringify({ ...rest, format: 'safebyok-vault-v3', key_deriver_label: 'test_digest_v0', passphrase_salt_b64: 'c2FsdA', vault_key_passphrase_wrapped: TH.fakeCiphered('old') })
     const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
     world.dbStore.write(vaultScopepath, oldText)
@@ -331,7 +332,7 @@ describe("the vault's passphrase", () => {
 
   it("vault props in the list shape, safebyok-vault-v4, read as damaged, and are left as they are", async () => {
     const world = makeWorld()
-    const { passphrase, passkey: _passkey, ...rest } = TH.vaultPropsOf('u1')
+    const { gate: { passphrase }, ...rest } = TH.vaultRecordOf('u1')
     const listed = { ...passphrase, wayin_id: 'wayin-one', wayinlabel: 'passphrase' }
     const oldText = JSON.stringify({ ...rest, format: 'safebyok-vault-v4', wayins: [listed] })
     world.dbStore.write(u1VaultScopepath, oldText)
@@ -713,11 +714,11 @@ describe("a new passphrase's strength", () => {
     await world.openUnlocked('pw')
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ keyDeriver, strengthChecker: refusing('acme acme acme') })
-    const before = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const before = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     const err = await TH.expectRefusal(TH.putWayin(vault, 'pw', 'acme acme acme'), 'weak_passphrase')
     expect(err.message).to.eq('That one is on every list of guesses: try another.')
     expect(derivations).not.toHaveBeenCalled()
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
   })
 
   it("never puts a passkey's answer to the checker: it judges passphrases alone", async () => {
@@ -869,10 +870,10 @@ describe("a new passphrase's strength", () => {
   it("refuses a broken checker from tryPutWayin too, changing nothing stored", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const before = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const before = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     const vault = await world.open({ strengthChecker: () => Promise.reject(new Error('down')), deviceDB: memoryDeviceDB() })
     await TH.expectBad(TH.tryPutWayin(vault, 'pw', 'a new passphrase'), 'unexpected_error')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
   })
 
   it("refuses a broken checker from a gating's attempt, which requestCleartext sees, and the call that raised it, writing nothing", async () => {
@@ -964,9 +965,9 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
 
   it("makes its ways in from the vault props as storage holds them, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const stored = VaultProps.parse(storedVaultPropsOf(world))
-    const passphrase = Wayin.make(vault, stored.vault_tok, stored.passphrase)
-    const passkey = Wayin.make(vault, stored.vault_tok, stored.passkey ?? TH.passkeyWayinOf('none'))
+    const stored = VaultRecord.parse(storedVaultPropsOf(world)) as TH.GatedRecord
+    const passphrase = Wayin.make(vault, stored.vault_tok, stored.gate.passphrase)
+    const passkey = Wayin.make(vault, stored.vault_tok, stored.gate.passkey ?? TH.passkeyWayinOf('none'))
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
     const told = wayins.map((wayin) => (wayin instanceof PassphraseWayin ? wayin.record.key_deriver_label : wayin.credential_id))

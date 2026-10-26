@@ -404,7 +404,7 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     TH.beforeNextCall(crypto.subtle, 'generateKey', gateElsewhere)
     TH.answering(there, async (gating) => { await TH.expectBad(TH.asKind(gating, 'initialize_gate').attempt('pw two', passkey), 'gate_made_elsewhere') })
     await TH.expectRefusal(there.ensureUnlocked(), 'gate_made_elsewhere')
-    expect(storedVaultPropsOf(world)).to.deep.include({ passkey: null })
+    expect(storedVaultPropsOf(world)['gate']).to.deep.include({ passkey: null })
     await expectLostToPwOne(world, there)
   })
 

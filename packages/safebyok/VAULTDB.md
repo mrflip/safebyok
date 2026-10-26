@@ -151,6 +151,13 @@ that order changes nothing. A box's `sidecar` is always a JSON object, `{}` for 
 comes back as that object. Before anything is written, a read finds nothing: `null`, never a
 default.
 
+The contract is the logical record, never the row. The vault record (`VaultRecord`) holds its gate
+nested, `gate: { passphrase, passkey }`, null while the vault is novel, its `gate_epoch` beside it,
+0 exactly while `gate` is null; the record and its gate are read in one step and written in one
+compare-and-write. How an adapter lays them out is its own -- one JSON value, a document, or
+columns (`safebyok-postgres` keeps `gate_epoch` a column and each wayin a `jsonb` one) -- so long
+as it hands the record back whole, as written.
+
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
 colon, an underscore, a digit), never share a record, a listing or a deletion, whatever names
 that pass their checks and fit the adapter's declared limits they hold (*Names*, above).

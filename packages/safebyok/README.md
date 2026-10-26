@@ -108,7 +108,9 @@ code, the stored records and these docs all use its words.
   or passkey, so changing the
   passphrase, or adding or removing the passkey, rewrites no box. The vaultKey wraps a fresh
   **boxKey** for every stored whisper, and the boxKey encrypts the whisper. The wayins live in
-  the **vault props**, the one record per vault that every device syncs. The backend holds those
+  the vault's **gate**, nested in the **vault record**, the one record per vault that every
+  device syncs (`VaultRecord`: its scope, `vault_tok`, `registered_at`, `vault_epoch`,
+  `gate_epoch`, and `gate`, null until the first passphrase is set). The backend holds those
   and the boxes, nothing else: every key and whisper in them is ciphertext; only their labels,
   ids, times and sidecars are not, and those are unencrypted, readable by anyone who can read your database.
 * A **lease** lets this device unlock again without asking for a while: when a gating unlocks the
@@ -279,7 +281,11 @@ higher of the two in one transaction -- keeping the first `device_id` stored and
 `highest_vault_epoch` -- resolving what it stored, so a tab that saw less never lowers what
 another saw. The exported `raisedDeviceRecord(stored, record)` is that rule: call it inside your
 transaction, handing it the row as read. `getDeviceRecord(scope)` reads the record, and
-`delDeviceRecord(scope)` erases it (`bank.clearCachedVault` calls it). One scope's calls
+`delDeviceRecord(scope)` erases it (`bank.clearCachedVault` calls it). `deviceRecordOf(scope,
+device_id, highest_vault_epoch)` builds a record from a scope's names alone. The device record is
+strict, and one that fails its check reads as none: so a field added to it moves its `format` on,
+and a device whose safebyok predates the field discards the record, its watermark with it, until
+its next read raises it again. One scope's calls
 take effect in the order they were made, awaited or not (a `putLease` then a `delLease` leaves no
 lease: the lock that erases a lease must beat the grant that wrote it); `describeDeviceDB` checks
 it. Each verb resolves an `Outcome`, as a VaultDB's do:

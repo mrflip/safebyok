@@ -4,7 +4,7 @@ import * as TH from 'safebyok/testing'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 
 const scope = TH.scopeOf('u1')
-const vaultProps = TH.vaultPropsOf('u1')
+const vaultProps = TH.vaultRecordOf('u1')
 
 /** An OutageVaultDB over a fresh in-memory adapter, with its switch. */
 const downOver = () => {
@@ -106,7 +106,7 @@ describe("OutageVaultDB, while down", () => {
     const draft = TH.gatelessOf('u1')
     expect(await TH.expectBad(vaultDB.ensureVault(draft), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
-    expect(await TH.propsOf(vaultDB, scope)).to.be.null
+    expect(await TH.vaultRecordIn(vaultDB, scope)).to.be.null
   })
 
   it("serves again once the switch is back up", async () => {
@@ -115,7 +115,7 @@ describe("OutageVaultDB, while down", () => {
     outage.setDown(true)
     expect(await TH.expectBad(vaultDB.getVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
-    expect(await TH.propsOf(vaultDB, scope)).to.deep.equal(vaultProps)
+    expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(vaultProps)
   })
 
   it("keeps watching through the outage", async () => {

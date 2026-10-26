@@ -12,11 +12,12 @@ import { type Outcome, bad, good } from '../src/outcome'
 import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type GatelessVaultProps, type DeviceRecord, type LeaseRecord } from '../src/types/types'
+import { PasskeySaltBytes, VaultScope, type Capacity, type DeviceRecord, type LeaseRecord } from '../src/types/types'
+import { VaultRecord } from '../src/vault-record'
 import * as Refusals from '../src/refusals'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
-import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
+import { VaultDB, type VaultRecordExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
 
@@ -198,7 +199,7 @@ describe("beforeNextCall", () => {
 
   it("slips another device's write in between a look at storage and the write", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     TH.beforeNextCall(vaultDB, 'putBox', async () => {
       await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'theirs'))
     })
@@ -374,7 +375,7 @@ describe("settledVault", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     expect(vault.getSnapshot().state).to.eq('novel')
-    expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
+    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
     expect(TH.bankOf(vault).entryOf({ user_id: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
   })
 
@@ -648,7 +649,7 @@ describe("memoryVaultOpts", () => {
     expect(opts).to.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver })
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
-    expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1'))).to.not.be.null
     expect(await TH.expectingGood(opts.deviceDB).getLease(TH.scopeOf('u1'))).to.not.be.null
   })
 
@@ -732,7 +733,7 @@ describe("the fixtures", () => {
   it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, stamped with its scope and vault token, as its examples show", async () => {
     const vaultKey = await makeVaultKey()
     const vault = await TH.leasedSliceOf('u1', vaultKey)
-    expect(vault.stamp).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.stamp).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: Date.UTC(2026, 9, 14), vault_epoch: 1, gate_epoch: 1 })
     expect(vault.lease).to.include({ vault_tok: 'vault-tok-u1', gate_epoch: 1 })
     const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
     expect(await box.extractWhisper()).to.eq('sk-fake')
@@ -750,42 +751,42 @@ describe("the fixtures", () => {
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: 'vault-tok-other' }) }, 'vault_gone')
   })
 
-  it("vaultPropsOf: a shape-valid VaultProps, with any field overridden", () => {
-    expect(VaultProps.safeParse(TH.vaultPropsOf('u1')).success).to.be.true
-    expect(TH.vaultPropsOf('u1', { gate_epoch: 2 })).to.deep.equal({ ...TH.vaultPropsOf('u1'), gate_epoch: 2 })
+  it("vaultRecordOf: a shape-valid VaultRecord, with any field overridden", () => {
+    expect(VaultRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.true
+    expect(TH.vaultRecordOf('u1', { gate_epoch: 2 })).to.deep.equal({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 })
   })
 
   it("noBoxYet and thisVault: the expectations u1's vault meets, before its first box and for a deletion", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u1'), TH.thisVault)
-    expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
     expect(Object.isFrozen(TH.noBoxYet)).to.be.true
     expect(Object.isFrozen(TH.thisVault)).to.be.true
   })
 
   it("inThisVault: the expectation a box read in u1's vault meets, and no other vault's, as its example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u2'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u2'))
     await TH.expectBad(vaultDB.getBox(TH.scopeOf('u2'), 'anthropic', TH.inThisVault), 'vault_mismatch')
     expect(Object.isFrozen(TH.inThisVault)).to.be.true
   })
 
   it("deleting: the expectation a deletion of u1's box meets, naming the revision boxOf gave it, as its example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     expect(await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
     expect(TH.deleting(null)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: null })
   })
 
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
-    const vaultProps = TH.vaultPropsOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
-    expect(VaultProps.safeParse(vaultProps).success).to.be.true
+    const vaultProps = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
+    expect(VaultRecord.safeParse(vaultProps).success).to.be.true
     expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', credential_id: 'cred-laptop' })
     expect(TH.passkeyWayinOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
   })
@@ -904,7 +905,7 @@ describe("leafTexts", () => {
   })
 
   it("lists every value of a stored record", () => {
-    const leaves = TH.leafTexts(TH.vaultPropsOf('u1'))
+    const leaves = TH.leafTexts(TH.vaultRecordOf('u1'))
     expect(leaves).to.include.members(['vault-tok-u1', 'ct-vault-u1', 'iv-vault-u1', String(Date.UTC(2026, 9, 14))])
   })
 })
@@ -999,9 +1000,9 @@ describe("expectBad", () => {
 describe("expectingGood", () => {
   it("answers each verb with its good outcome's val, as its example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)).to.be.null
-    expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 
   it("fails the test, naming the refusal, on a bad outcome, and leaves every other member as it was", async () => {
@@ -1135,8 +1136,8 @@ const counted = () => {
 describe("perUser", () => {
   it("sends each verb to the VaultDB of the user its scope or vault props name", async () => {
     const { vaultDB, store } = counted()
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u2'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u2'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
     expect(await TH.expectingGood(servingOnly('u2', store)).getBox(TH.scopeOf('u2'), 'anthropic', { vault_tok: 'vault-tok-u2' })).to.deep.equal(TH.boxOf('anthropic', 'two'))
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
@@ -1144,16 +1145,16 @@ describe("perUser", () => {
 
   it("sends putVaultProps, subscribe, delBox and delVault to the user named, too", async () => {
     const { vaultDB, store } = counted()
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u2'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u2'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
-    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u2'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })
+    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultRecordOf('u2'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
     await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u2'), 'anthropic', { vault_tok: 'vault-tok-u2', revision_tok: 'rev-two' })
     expect(await TH.boxesOf(servingOnly('u2', store), TH.scopeOf('u2'))).to.have.lengthOf(0)
     await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', gate_epoch: 2 })
-    expect(await TH.propsOf(servingOnly('u2', store), TH.scopeOf('u2'))).to.be.null
-    expect(await TH.propsOf(servingOnly('u1', store), TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(await TH.vaultRecordIn(servingOnly('u2', store), TH.scopeOf('u2'))).to.be.null
+    expect(await TH.vaultRecordIn(servingOnly('u1', store), TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 
   it("refuses a blank user_id as a server does for no one signed in, never as a bad label", async () => {
@@ -1164,9 +1165,9 @@ describe("perUser", () => {
 
   it("makes each user's VaultDB once, and keeps it", async () => {
     const { vaultDB, askedFor } = counted()
-    await TH.propsOf(vaultDB, TH.scopeOf('u1'))
-    await TH.propsOf(vaultDB, TH.scopeOf('u1', 'spare'))
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))
+    await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1', 'spare'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
     expect(askedFor).to.deep.equal(['anyone', 'u1', 'u2'])
   })
@@ -1314,7 +1315,7 @@ class RoundTripVaultDB extends VaultDB {
   }
 
   // What it hands back is the vault as the step that checked, or that wrote, left it.
-  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
     const vaultScopepath = Scopepath.vault(draft)
     const seen: { vault: StoredVault } = { vault: { vaultProps: null, boxes: [] } }
     const absent = (rows: Rows) => {
@@ -1329,7 +1330,7 @@ class RoundTripVaultDB extends VaultDB {
     return seen.vault
   }
 
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
+  protected async doPutVaultProps(vaultProps: VaultRecord, expected: VaultRecordExpectation) {
     const vaultScopepath = Scopepath.vault(vaultProps)
     // The refusal a miss throws, from the row its check read.
     const missed: { refusal: VaultError | null } = { refusal: null }
@@ -1583,7 +1584,7 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
         const deviceFor = await roundTripDevices({ stepping: inOneStep, overTheWire: true, countsApart: true })(turnstile)
         return () => deviceFor({ maxBoxes: 3 })
       },
-      setup:   async (first) => { await TH.ensureGated(first, TH.vaultPropsOf('u1')); await TH.expectingGood(first).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one')) },
+      setup:   async (first) => { await TH.ensureGated(first, TH.vaultRecordOf('u1')); await TH.expectingGood(first).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one')) },
       moves:   ['openai', 'mistral', 'gemini', 'cohere'].map((boxlabel) => (racer: TH.VaultDBVerbs) => racer.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf(boxlabel, boxlabel))),
       verdict: (outcomes) => { landedCounts.push(outcomes.filter((outcome) => outcome.kind === 'landed').length) },
     })

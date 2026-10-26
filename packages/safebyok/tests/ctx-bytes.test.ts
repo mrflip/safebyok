@@ -4,7 +4,7 @@ import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKey
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
-import { GatedVaultProps } from '../src/types/types'
+import { VaultRecord } from '../src/vault-record'
 import { passphraseCleartext } from '../src/types/type-aliases'
 import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
@@ -74,7 +74,7 @@ describe("the ctx builders' output, byte for byte", () => {
     })
     await TH.unlock(vault, 'pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const vaultProps = (await TH.propsOf(vaultDB, scope))!
+    const vaultProps = (await TH.vaultRecordIn(vaultDB, scope))!
     const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', { vault_tok: vaultProps.vault_tok }))!
     const lease = (await TH.expectGood(deviceDB.getLease(scope)))!
     const scopeText = `"acme","u1","main","${vaultProps.vault_tok}"`
@@ -83,7 +83,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const whisperCtx = textBytes(`["safebyok-box-v8",${scopeText},"whisper_ciphered",${header}]`)
     const leaseCtx = textBytes(`["safebyok-lease-v1",${scopeText},${String(lease.gate_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
-    const { passphrase } = GatedVaultProps.parse(vaultProps)
+    const { gate: { passphrase } } = VaultRecord.parse(vaultProps) as TH.GatedRecord
     const wayinKey = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), fromB64(passphrase.salt_b64), TH.spyLogger().logger)
     const wayinCtx = wayinCtxOf(scope, vaultProps.vault_tok, headerOf(passphrase))
     const vaultKey = await unwrapKeyUnder(wayinKey, passphrase.vault_key_wayin_wrapped, wayinCtx, { extractable: false, usage: ['unwrapKey'] })

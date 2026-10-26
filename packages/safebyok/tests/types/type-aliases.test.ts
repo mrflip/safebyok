@@ -11,7 +11,8 @@ import {
   type Refused, type RevisionTok, type UserId, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type Vaultlabel, type VaultTok, type WhisperCiphered,
   box_key_wrapped, passphraseCleartext, prf_salt_b64, revision_tok, salt_b64, vault_key_lease_wrapped, vault_key_wayin_wrapped, vault_tok, whisper_ciphered,
 } from '../../src/types/type-aliases'
-import type { LeaseRecord, PasskeyWayinRecord, PassphraseWayinRecord } from '../../src/types/types'
+import type { LeaseRecord } from '../../src/types/types'
+import type { PasskeyWayinRecord, PassphraseWayinRecord } from '../../src/vault-record'
 import type { Vault } from '../../src/vault'
 import * as TH from '../test-helpers'
 

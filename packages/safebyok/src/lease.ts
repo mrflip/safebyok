@@ -7,13 +7,14 @@ import { sameScope } from './names'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseRecord, type VaultProps } from './types/types'
+import { LeaseRecord } from './types/types'
+import type { VaultSparse } from './vault-record'
 import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './types/type-aliases'
 import { FarFuture } from './consts'
 import type { Vault } from './vault'
 
 /** Leases: what lets a vault open on this device without a proof, across page loads, until its `ask_passphrase_at`.
- * A lease's wrap is bound to the scope, the props' `vault_tok` and `gate_epoch` at the grant, and
+ * A lease's wrap is bound to the scope, the vault record's `vault_tok` and `gate_epoch` at the grant, and
  * the deadline. A lease holds the vaultKey only wrapped: each cipher and decipher unwraps it for
  * that call alone and keeps nothing. When to grant, when to ask, and the write to the device store
  * are the vault's.
@@ -22,11 +23,17 @@ import type { Vault } from './vault'
 /** The slice of a {@link Vault} a lease reads: the scope every lease of it names, how long a grant lasts, its clock, its demand, and its lock. Whether it is the lease the vault holds, it asks inside the package, as no getter shows that one. */
 export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now' | 'demandConsistentWith' | 'tryLock'>
 
-/** The vault props a lease is granted under: their `vault_tok` and `gate_epoch`, which its wrap is bound to. A whole {@link VaultProps} is one. */
-export type LeaseStanding = Pick<VaultProps, 'vault_tok' | 'gate_epoch'>
+/** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
+ * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
+ * gate it was granted under.
+ *
+ * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
+ */
+export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }) }))
+export type LeaseStamp = Z.infer<typeof LeaseStamp>
 
-/** A lease's visible fields, each once: which vault it opens and until when, as `{ ...lease }` and `lease.toJSON()` hold them. */
-export type LeaseView = Pick<LeaseRecord, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'gate_epoch' | 'ask_passphrase_at'>
+/** A lease's sparse shape: the same fields as its {@link LeaseStamp}, named for what a log line or a listing shows. A Lease shows them but for its format, which it keeps in its record. */
+export type LeaseSparse = Z.infer<typeof LeaseStamp>
 
 /** A box record's visible fields: every field but its two ciphered ones. What {@link Lease.cipheredWith} binds a whisper to, and its ctx is rebuilt from. */
 export type BoxVisible = Omit<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
@@ -37,7 +44,7 @@ export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'
 /** The ctx's first part: the lease record's format. */
 const LeaseFormat = 'safebyok-lease-v1'
 
-/** What {@link sealLeaseRecord} binds, the scope, the vault props it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
+/** What {@link sealLeaseRecord} binds, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
 const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
   LeaseGrant:    LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
   VisibleShape:  BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
@@ -59,9 +66,9 @@ let recordOf: (lease: Lease) => LeaseRecord
 
 /** This device's lease on one vault: the vaultKey wrapped under a leaseKey that never leaves this browser profile, and the instant it ends.
  * Its visible fields (the scope, `vault_tok`, `gate_epoch` and `ask_passphrase_at`) are its own,
- * read-only: `{ ...lease }`, `toJSON()` and a log line show each once. They are its stamp, which
- * `vault.demandConsistentWith` judges. The leaseKey, the wrap and the format stay in its record,
- * private, which no getter, spread or JSON yields: the device store keeps it by structured clone.
+ * read-only: `{ ...lease }`, `toJSON()` and a log line show each once. They are its stamp but for
+ * its format, which `vault.demandConsistentWith` judges. The leaseKey, the wrap and the format stay
+ * in its record, private, which no getter, spread or JSON yields: the device store keeps it by structured clone.
  * Nothing of a lease reaches the backend.
  *
  * A lease is usable as read: nothing is unwrapped when it is made. Each {@link Lease.cipheredWith}
@@ -78,7 +85,7 @@ let recordOf: (lease: Lease) => LeaseRecord
  *   const lease = Lease.make(vault, record)                 // once it is not null
  *   lease.ask_passphrase_at               // when the vault asks again
  */
-export class Lease {
+export class Lease implements Omit<LeaseSparse, 'format'> {
   /** The stored record, frozen, its wrap with it: the one source of every field. */
   readonly #record: LeaseRecord
   /** The vault it is a lease on: its scope, its clock, its demand and its lock. */
@@ -90,9 +97,9 @@ export class Lease {
   readonly user_id:           string
   /** The label of the vault it is for. */
   readonly vaultlabel:        string
-  /** The token of the vault props it was granted under. */
+  /** The token of the vault it was granted under. */
   readonly vault_tok:         string
-  /** The vault props' `gate_epoch` when it was granted: a change of wayins voids it. */
+  /** The vault record's `gate_epoch` when it was granted: a change of wayins voids it. */
   readonly gate_epoch:        number
   /** The instant from which the lease opens nothing, and the vault asks for a proof. */
   readonly ask_passphrase_at: number
@@ -232,7 +239,7 @@ export class Lease {
   }
 
   /** Which vault it opens and until when, each once: all JSON and a log line show of it. */
-  toJSON(): LeaseView {
+  toJSON(): Omit<LeaseSparse, 'format'> {
     const { ...visible } = this
     return visible
   }
@@ -275,12 +282,12 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  * It ends the vault's `leaseMillis` from now, never past {@link FarFuture}, which is how
  * `leaseHours: Infinity` reads. It writes nothing: the vault puts the record in the device store,
  * and makes its Lease from what was stored. `vaultKey` must be extractable, to be wrapped: keep it
- * only for this call. It refuses 'bad_record', as misuse, for vault props a {@link LeaseRecord}
+ * only for this call. It refuses 'bad_record', as misuse, for a vault record a {@link LeaseRecord}
  * could not hold.
  *
- * @example const record = await sealLeaseRecord(vault, vaultProps, vaultKey)   // record.ask_passphrase_at: leaseHours from now
+ * @example const record = await sealLeaseRecord(vault, vaultRecord, vaultKey)   // record.ask_passphrase_at: leaseHours from now
  */
-export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now'>, standing: LeaseStanding, vaultKey: CryptoKey): Promise<LeaseRecord> => {
+export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now'>, standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, vaultKey: CryptoKey): Promise<LeaseRecord> => {
   const granted = LeaseGrant.parse({
     applabel:          vault.applabel,
     user_id:           vault.user_id,

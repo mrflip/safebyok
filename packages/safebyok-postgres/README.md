@@ -136,7 +136,7 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, DamagedBox, GatelessVaultProps, VaultProps, VaultScope, WayinSummary } from 'safebyok'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, DamagedBox, VaultRecord, VaultScope, WayinSummary } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -150,8 +150,8 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 // VaultDB validates.
 const served = new Map<string, Served>([
   ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
-  ['ensureVault',  (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
-  ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
+  ['ensureVault',  (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null })],
+  ['putVaultProps', (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultProps(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
@@ -242,7 +242,7 @@ The client half, a VaultDB over `fetch`, to hand `Bank.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -256,8 +256,8 @@ export class RouteVaultDB extends VaultDB {
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
-  protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultProps', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
@@ -457,7 +457,7 @@ its error as the cause, nothing written.
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
+| `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultRecord`, its gate's `passphrase` and `passkey` in `jsonb` columns of their own, both null while novel |
 | `safebyok_vault_tombstones` | deleted vault | `applabel`, `user_id`, `vaultlabel`   | `format` and `vault_epoch`: what a deleted vault leaves, until the scope gets a new vault |
 | `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_tok`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 

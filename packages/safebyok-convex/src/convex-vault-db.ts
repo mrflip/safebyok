@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { GetBoxAnswer, ListedBox, PutBoxAnswer, PutVaultPropsAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
@@ -108,15 +108,15 @@ class ConvexVaultDB extends VaultDB {
     return answer === null ? { vaultProps: null, boxes: [] } : { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
   }
 
-  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<StoredVault> {
     const answer = await refusing(() => this.client.mutation(this.api.ensureVault, { draft }))
     return { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
   }
 
   // The component answers the props as stored, or what stands when an update misses, from the
   // transaction that decided it: the base class checks it.
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
-    const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultProps, { vaultProps, expected }))
+  protected async doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+    const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultProps, { vaultProps: vaultRecord, expected }))
     if (! isPutVaultPropsAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
     if (answer.landed) { return answer.vault_props_stored }
     throw Refusals.staleVaultProps(answer.vault_props_stored)

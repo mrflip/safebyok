@@ -1,9 +1,9 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
-import type { GatedVaultProps, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
+import { BoxRecord, VaultRecord, localVaultDB, memoryStore } from 'safebyok'
+import type { Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
+import { boxOf, closeVault, type FakeCiphered, type GatedRecord, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -22,16 +22,15 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
 
 /**
- * Store `vaultProps` in a component test's CVX as a first unlock does: the vault ensured gateless,
- * then its gate written over it expecting `gate_epoch` 0. Resolves the vault props as stored, their
+ * Store `vaultRecord` in a component test's CVX as a first unlock does: the vault ensured novel,
+ * then its gate written over it expecting `gate_epoch` 0. Resolves the vault record as stored, its
  * `vault_epoch` the component's.
  *
- * @example const stored = await ensureGatedIn(CVX, vaultPropsOf('u1'))   // stored.vault_epoch is 1
+ * @example const stored = await ensureGatedIn(CVX, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  */
-export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultProps: GatedVaultProps) => {
-  const { vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, passphrase: _passphrase, passkey: _passkey, ...head } = vaultProps
-  await CVX.mutation(vaults.ensureVault, { draft: { ...head, vault_epoch: 0, gate_epoch: 0, passphrase: null, passkey: null } })
-  const answer = await CVX.mutation(vaults.putVaultProps, { vaultProps, expected: { vault_tok: vaultProps.vault_tok, gate_epoch: 0 } })
+export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedRecord) => {
+  await CVX.mutation(vaults.ensureVault, { draft: { ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null } })
+  const answer = await CVX.mutation(vaults.putVaultProps, { vaultProps: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
   if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }
   return answer.vault_props_stored
 }
@@ -135,11 +134,11 @@ export const realRecords = async (user_id = 'u1') => {
   }
   closeVault(vault)
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
-  const vaultPropsRow = rows.find((row) => VaultProps.safeParse(row.record).success)
+  const vaultPropsRow = rows.find((row) => VaultRecord.safeParse(row.record).success)
   if (! vaultPropsRow) { throw new Error('the core stored no vault props') }
   return {
     vaultPropsCkey: vaultPropsRow.ckey,
-    vaultProps:     VaultProps.parse(vaultPropsRow.record),
+    vaultProps:     VaultRecord.parse(vaultPropsRow.record),
     boxes:          rows.flatMap((row) => {
       const checked = BoxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []

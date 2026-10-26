@@ -25,7 +25,7 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('COMMIT')
     await write
 
-    expect(await TH.propsOf(device, u1)).to.be.null
+    expect(await TH.vaultRecordIn(device, u1)).to.be.null
     expect(await TH.boxesStanding(db)).to.eq(0)
   })
 

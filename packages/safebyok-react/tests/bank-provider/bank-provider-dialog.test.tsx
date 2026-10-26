@@ -504,7 +504,7 @@ describe("BankProvider", () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete vault' }))
       await TH.expectGood(deleting)
       await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-      expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+      expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
     })
 
     it("has a read wait behind a change's dialog, and go on unasked once the change leaves the vault unlocked", async () => {

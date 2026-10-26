@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deviceOutcomeOf, deviceRecordFor, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
+import { deviceOutcomeOf, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
 import { VaultError } from '../src/errors'
 import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types/types'
 import * as TH from './test-helpers'
@@ -64,6 +64,21 @@ describe("raisedDeviceRecord", () => {
       expect(raisedDeviceRecord(stored, record)).to.eq(record)
     })
   }
+})
+
+describe("deviceRecordOf", () => {
+  it("builds the record from the scope's parsed names alone, frozen: a Vault object passes as its scope, as its example shows", () => {
+    const holder = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', lock: () => undefined }
+    const record = deviceRecordOf(holder, 'device-one', 3)
+    expect(record).to.deep.equal(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 }))
+    expect(Object.isFrozen(record)).to.be.true
+  })
+
+  it("refuses a scope that fails its check as bad_scope, and a device_id or epoch that fails as bad_record", () => {
+    TH.expectSyncRefusal(() => deviceRecordOf({ ...TH.scopeOf('u1'), vaultlabel: 'Main' }, 'device-one', 3), 'bad_scope')
+    TH.expectSyncRefusal(() => deviceRecordOf(TH.scopeOf('u1'), '', 3), 'bad_record')
+    TH.expectSyncRefusal(() => deviceRecordOf(TH.scopeOf('u1'), 'device-one', -1), 'bad_record')
+  })
 })
 
 describe("deviceRecordFor", () => {

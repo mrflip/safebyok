@@ -1,4 +1,6 @@
-import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type GatedVaultProps, type VaultProps, type DeviceRecord, DeviceRecordFormat, type LeaseRecord, type WayinKind, isGated } from './types/types'
+import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
+import { type GateRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
+import { vault_tok } from './types/type-aliases'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
 import * as CX from './checks/core-checks'
@@ -15,9 +17,9 @@ import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type BadNewsHandler, type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { Lease, type LeaseView } from './lease'
+import { Lease, type LeaseSparse } from './lease'
 import { registerLeaseReader } from './held-lease'
 import { type PassphraseProving, Proving, registerProvingInside } from './proving'
 import { Gate } from './gate'
@@ -120,7 +122,7 @@ export type VaultSnapshot = Readonly<{
 }>
 // --
 
-/** The ways in of vault props, as the vault holds them: the passphrase's, and the passkey's or null. */
+/** The ways in of a vault record's gate, as the vault holds them: the passphrase's, and the passkey's or null. */
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
 /** One user's vault of boxes, one life of it in storage, for as long as the bank holds it: every read and write of a whisper goes through here.
@@ -192,7 +194,7 @@ export class Vault {
   // Each field reads the snapshot `#replaceSnapshot()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
   // Its boxes, ways in and lease read back only what is fixed for the Vault object's life -- its scope, its
-  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault props it is bound to.
+  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault record it is bound to.
 
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
   get applabel(): string { return this.#snapshot.applabel }
@@ -377,19 +379,19 @@ export class Vault {
 
   // == [Vault: demand]: stamp, demandConsistentWith, consistentWith
 
-  /** The vault's {@link Stamp}, frozen: its scope, and the `vault_tok`, `vault_epoch` and `gate_epoch` of the vault it holds now.
+  /** The vault's {@link VaultSparse}, frozen: its vault record but for the gate, the `vault_tok`, `vault_epoch` and `gate_epoch` among it, as the vault holds it now.
    * Each thing the vault hands out was made under the stamp it held then, and
    * {@link Vault.demandConsistentWith} compares the two.
    *
    * @example vault.stamp?.gate_epoch   // up by one on every change to the ways in
    */
-  get stamp(): Stamp {
-    return stampOf(this.#scope, this.#vaultProps)
+  get stamp(): VaultSparse {
+    return stampOf(this.#vaultRecord)
   }
 
   /** Refuse unless `thing` is consistent with the vault as it stands now: what each call asks before and after each wait.
    * `thing` is something the vault handed out (a box, a lease, a listing's entry) or a
-   * {@link Stamp}. Each field it carries is compared with the vault's own {@link Vault.stamp}, in
+   * {@link VaultSparse}. Each field it carries is compared with the vault's own {@link Vault.stamp}, in
    * this order, and the first that disagrees refuses. The vault is gone: 'vault_gone'.
    * Another scope or `vault_tok`, the vault deleted and made anew: 'vault_remade'. Another
    * `gate_epoch`, or a `vault_epoch` past the vault's: 'gate_moved'. With `opts.leaseBound`, the
@@ -403,7 +405,7 @@ export class Vault {
    * @example vault.demandConsistentWith(box, { leaseBound: true })        // and 'vault_locked' once a lock lands
    * @example vault.demandConsistentWith({ ...stamp, gate_epoch: 0 })      // throws 'gate_moved' for a vault with a way in
    */
-  demandConsistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): void {
+  demandConsistentWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { leaseBound?: boolean | undefined }): void {
     const demandOpts = checkDemandOpts(opts)
     this.#demand(checkedStamped(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
@@ -415,7 +417,7 @@ export class Vault {
    *
    * @example if (! vault.consistentWith(box)) { box = await vault.getBox(box.boxlabel) }   // read it again once the vault moved on
    */
-  consistentWith(thing: Stamped, opts?: { leaseBound?: boolean | undefined }): boolean {
+  consistentWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
     const leaseStands = this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
     return this.#inconsistencyWith(checkedStamped(thing)) === null && (! leaseBound || leaseStands)
@@ -520,7 +522,7 @@ export class Vault {
    * damaged ('damaged_wayin'), the dialog meets in place.
    *
    * Replacing is not revoking: whoever holds the old passphrase or passkey, and kept a copy of the
-   * vault props from before, can still open that copy. The vaultKey inside it is the one the vault
+   * vault record from before, can still open that copy. The vaultKey inside it is the one the vault
    * still uses.
    *
    * @example await vault.putWayin('passphrase')   // the dialog asks for the current and the next
@@ -535,7 +537,7 @@ export class Vault {
       checkSlotlabel(slotlabel, 'putWayin')
       await this.#helloWithin(this.#staleMillis)
       const kindNow = (): GatingKind => {
-        if (isGated(this.#vaultProps)) { return slotlabel === 'passphrase' ? 'change_passphrase' : 'put_passkey' }
+        if (isGated(this.#vaultRecord)) { return slotlabel === 'passphrase' ? 'change_passphrase' : 'put_passkey' }
         if (slotlabel === 'passkey') { throw passkeyBeforePassphrase() }
         return 'initialize_gate'
       }
@@ -551,7 +553,7 @@ export class Vault {
    * locks and must unlock again with the passphrase; this one is left unlocked, its lease starting
    * again from now.
    *
-   * Removing is not revoking: whoever holds the removed passkey, and kept a copy of the vault props
+   * Removing is not revoking: whoever holds the removed passkey, and kept a copy of the vault record
    * from before, can still open that copy. The vaultKey inside it is the one the vault still uses.
    *
    * @example await vault.delWayin('passkey')   // the passkey is gone
@@ -569,7 +571,7 @@ export class Vault {
       await this.#helloWithin(this.#staleMillis)
       this.#checkStanding()
       const kindNow = (): GatingKind => {
-        if (! isGated(this.#vaultProps) || this.#vaultProps.passkey === null) {
+        if (this.#vaultRecord.gate?.passkey == null) {
           throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
         }
         return 'del_passkey'
@@ -786,7 +788,7 @@ export class Vault {
       // Judged on a picture within staleMinutes, as putWayin's and delWayin's are: a stale novel one may be gated by now.
       await this.#helloWithin(this.#staleMillis)
       this.#checkStanding()
-      this.#gatedProps()
+      this.#gatedRecord()
       await this.#gatingFor(() => 'del_vault', 'del')
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
@@ -848,12 +850,12 @@ export class Vault {
     this.#maxBoxes = parts.maxBoxes
     this.#maxVaultBytes = parts.maxVaultBytes
     this.#onGone = onGone
-    this.#vaultProps = frozenVaultProps(born.vaultProps)
+    this.#vaultRecord = frozenVaultRecord(born.vaultRecord)
     this.#deviceId = born.record.device_id
     this.#snapshot = this.#picture()
     registerLeaseReader(this, () => this.#lease)
     registerProvingInside(this, {
-      vaultProps: () => this.#vaultProps,
+      vaultRecord: () => this.#vaultRecord,
       deviceId:   () => this.#deviceId,
       putLease:   (record) => this.#deviceDB.putLease(record),
       holdLease:  (stored) => this.#holdLease(stored),
@@ -869,7 +871,7 @@ export class Vault {
       demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
       request:    this.#requestCleartext,
     }
-    this.#takePicture({ fresh: this.#vaultProps, listed: born.listed, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
+    this.#takePicture({ fresh: this.#vaultRecord, listed: born.listed, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
   }
@@ -878,10 +880,10 @@ export class Vault {
   #clockNow(): number { return Math.floor(this.#clock.now()) }
   // --
 
-  // == [State and snapshot]: vaultProps, lease, expiry, unlockStands, listeners, snapshot, picture, replaceSnapshot
+  // == [State and snapshot]: vaultRecord, lease, expiry, unlockStands, listeners, snapshot, picture, replaceSnapshot
 
-  // The vault props in hand, frozen: gateless while novel, and of one vault_tok for the Vault object's life.
-  #vaultProps: VaultProps
+  // The vault record in hand, frozen: gateless while novel, and of one vault_tok for the Vault object's life.
+  #vaultRecord: VaultRecord
   // This device's id for the scope, from its device record: every way in it seals carries it.
   #deviceId: string
   #boxes: readonly (BoxSummary | DamagedBox)[] = []
@@ -901,7 +903,7 @@ export class Vault {
 
   readonly #listeners = new Set<() => void>()
   #vaultState(now: number): VaultState {
-    if (! isGated(this.#vaultProps)) { return 'novel' }
+    if (! isGated(this.#vaultRecord)) { return 'novel' }
     return this.#unlockStands(now) ? 'unlocked' : 'locked'
   }
   #freshness(now: number): VaultFreshness {
@@ -912,22 +914,23 @@ export class Vault {
   #unlockStands(now: number): boolean {
     return this.#lease !== null && ! this.#lease.endsBy(now)
   }
-  // The ways in of each vault props record the vault has held, made once per record. Every record
-  // the vault holds is frozen as it takes it up (see frozenVaultProps), so the ways in made of one,
-  // and the vault props they are bound to, never change under it.
-  readonly #modelled = new WeakMap<GatedVaultProps, HeldWayins>()
-  #wayinsOf(standing: GatedVaultProps): HeldWayins {
-    const known = this.#modelled.get(standing)
+  // The ways in of each gate the vault has held, made once per gate. Every record
+  // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
+  // and the vault record they are bound to, never change under it.
+  readonly #modelled = new WeakMap<GateRecord, HeldWayins>()
+  #wayinsOf(standing: VaultRecord & { gate: GateRecord }): HeldWayins {
+    const { gate } = standing
+    const known = this.#modelled.get(gate)
     if (known !== undefined) { return known }
     const wayins = Object.freeze({
-      passphrase: Wayin.make(this, standing.vault_tok, standing.passphrase),
-      passkey:    standing.passkey === null ? null : Wayin.make(this, standing.vault_tok, standing.passkey),
+      passphrase: Wayin.make(this, standing.vault_tok, gate.passphrase),
+      passkey:    gate.passkey === null ? null : Wayin.make(this, standing.vault_tok, gate.passkey),
     })
-    this.#modelled.set(standing, wayins)
+    this.#modelled.set(gate, wayins)
     return wayins
   }
-  /** The ways in of `standing`, the passphrase's first, as a list: none for gateless vault props. */
-  #wayinListOf(standing: VaultProps | null): readonly (PassphraseWayin | PasskeyWayin)[] {
+  /** The ways in of `standing`, the passphrase's first, as a list: none for a novel vault's record. */
+  #wayinListOf(standing: VaultRecord | null): readonly (PassphraseWayin | PasskeyWayin)[] {
     if (standing === null || ! isGated(standing)) { return [] }
     const { passphrase, passkey } = this.#wayinsOf(standing)
     return passkey === null ? [passphrase] : [passphrase, passkey]
@@ -939,14 +942,14 @@ export class Vault {
   // The latest bad news, or what the handler threw at it: the snapshot's trouble. See [Bad news].
   #trouble: VaultError | null = null
   #snapshot: VaultSnapshot
-  // The vault props the snapshot was last settled from, whose ways in it shows as summaries: the
+  // The vault record the snapshot was last settled from, whose ways in it shows as summaries: the
   // vault's alone, as their salts and wraps are what an offline guess at a passphrase needs.
-  #shownProps: VaultProps | null = null
+  #shownRecord: VaultRecord | null = null
 
   /** The snapshot the private state makes at `now`, frozen: the clock read now, unless the caller knows the time without it. */
   #picture(now = this.#clockNow()): VaultSnapshot {
     const state = this.#vaultState(now)
-    const standing = this.#vaultProps
+    const standing = this.#vaultRecord
     const wayins = isGated(standing) ? this.#wayinsOf(standing) : null
     const { boxes, bytes } = this.#capacity()
     return Object.freeze({
@@ -971,7 +974,7 @@ export class Vault {
    * the time it is reckoned at, the clock read now unless the caller knows it.
    */
   #replaceSnapshot(now?: number) {
-    this.#shownProps = this.#vaultProps
+    this.#shownRecord = this.#vaultRecord
     const next = this.#picture(now)
     // Trouble is told apart by identity, as two refusals of one kind read alike as JSON.
     if (next.trouble === this.#snapshot.trouble && stableJsonify({ ...next, trouble: null }) === stableJsonify({ ...this.#snapshot, trouble: null })) { return }
@@ -1000,7 +1003,7 @@ export class Vault {
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
   }
 
-  /** Fetch the vault props, listing and this device's lease, judge them against the picture in hand, and raise this device's record to what was taken.
+  /** Fetch the vault record, listing and this device's lease, judge them against the picture in hand, and raise this device's record to what was taken.
    * The device record is read first, so a raise this device's own write made is never held against a
    * read served before that write landed. The judgment is synchronous ({@link Vault.#judgeRead}).
    */
@@ -1017,7 +1020,7 @@ export class Vault {
       await this.#heedRefusal(refusal)
       throw refusal
     }
-    this.#takePicture({ fresh: frozenVaultProps(verdict.vaultProps), listed: verdict.boxes, leaseKept: valOf(leaseKept), readAt, leasesSeen })
+    this.#takePicture({ fresh: frozenVaultRecord(verdict.vaultProps), listed: verdict.boxes, leaseKept: valOf(leaseKept), readAt, leasesSeen })
     await this.#raiseRecordAfter(verdict.vaultProps.vault_epoch, 'refresh')
   }
 
@@ -1036,28 +1039,28 @@ export class Vault {
       this.#letGo(gone)
       throw gone
     }
-    if (read.vaultProps.vault_tok !== this.#vaultProps.vault_tok) {
+    if (read.vaultProps.vault_tok !== this.#vaultRecord.vault_tok) {
       const remade = remadeError()
       this.#letGo(remade)
       throw remade
     }
     if (record !== null && read.vaultProps.vault_epoch < record.highest_vault_epoch) { return 'behind' }
-    if (isOlderPicture(this.#vaultProps, read.vaultProps)) { return 'ignore' }
+    if (isOlderPicture(this.#vaultRecord, read.vaultProps)) { return 'ignore' }
     return read
   }
 
-  /** Replace the picture with what one read found, synchronously: vault props and listing together, never a vault beside another's boxes.
-   * The lease in hand is dropped, in memory only, when it no longer fits the vault props' ways in.
+  /** Replace the picture with what one read found, synchronously: vault record and listing together, never a vault beside another's boxes.
+   * The lease in hand is dropped, in memory only, when it no longer fits the vault record's ways in.
    * It is dropped too when this device's store holds no lease (a lock in another tab), or one under
    * another gate, unless the read began before the lease in hand was taken: a read older than the
    * lease, which changes nothing. A lease another tab's unlock or renewal wrote under the same gate
    * leaves it standing. None is taken up here. Bad news is told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultProps, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
+  #takePicture(found: { fresh: VaultRecord, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
     const { fresh } = found
     const shown = this.#boxes
-    const shownWayins = this.#wayinListOf(this.#shownProps)
-    this.#vaultProps = fresh
+    const shownWayins = this.#wayinListOf(this.#shownRecord)
+    this.#vaultRecord = fresh
     this.#boxes = found.listed.map((box) => heldListing(box, fresh.vault_tok))
     this.#readRefused = false
     this.#readAt = found.readAt
@@ -1097,7 +1100,7 @@ export class Vault {
    * vault served behind what this device has seen, until a later read raises it.
    */
   async #raiseRecordAfter(vaultEpoch: number, call: VaultCall): Promise<void> {
-    const raised = await this.#deviceDB.raiseDeviceRecord({ format: DeviceRecordFormat, ...this.#scope, device_id: this.#deviceId, highest_vault_epoch: vaultEpoch })
+    const raised = await this.#deviceDB.raiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
     if (raised.ok) { return }
     this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, raised.err)
   }
@@ -1114,7 +1117,7 @@ export class Vault {
    * With `opts.firstGate`, `thing` was made for the vault's first gate, which is not yet written: a
    * gate in the picture is another device's first, and refuses 'gate_made_elsewhere', not 'gate_moved'.
    */
-  #demand(thing: Stamped, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
+  #demand(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
     const refusal = this.#inconsistencyWith(thing, { firstGate: opts.firstGate === true }) ?? (opts.leaseBound === true ? this.#leaseRefusal() : null)
     if (refusal === null) { return }
     // The thing's fields never reach the logger: a lease's are its scope and epoch, but the rule is one.
@@ -1127,7 +1130,7 @@ export class Vault {
    * it is what moved the picture. A lease-bound demand asks for the lease only of an answer that
    * came: a lease that refused its own use (`damaged_lease`) has dropped itself.
    */
-  #demandAfterWait(settled: Outcome<unknown>, thing: Stamped, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
+  #demandAfterWait(settled: Outcome<unknown>, thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
     if (! settled.ok && UntrustedStorageKinds.some((kind) => isVaultError(settled.err, kind))) { throw settled.err }
     this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, firstGate: opts.firstGate === true, call: opts.call })
   }
@@ -1136,9 +1139,9 @@ export class Vault {
    * Ways in moved past a thing made for the first gate, before that gate is written
    * (`opts.firstGate`), are another device's first gate: 'gate_made_elsewhere'.
    */
-  #inconsistencyWith(thing: Stamped, opts?: { firstGate: boolean }): VaultError | null {
+  #inconsistencyWith(thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, opts?: { firstGate: boolean }): VaultError | null {
     if (this.#goneBy !== null) { return this.#goneBy() }
-    const held = this.#vaultProps
+    const held = this.#vaultRecord
     const sameScope = (thing.applabel ?? this.#scope.applabel) === this.#scope.applabel
       && (thing.user_id ?? this.#scope.user_id) === this.#scope.user_id
       && (thing.vaultlabel ?? this.#scope.vaultlabel) === this.#scope.vaultlabel
@@ -1155,7 +1158,7 @@ export class Vault {
    * sealed under must stand.
    */
   #provingInconsistency(proving: Proving, moved: () => VaultError): VaultError | null {
-    const held = this.#vaultProps
+    const held = this.#vaultRecord
     if (! proving.isCarriedBy(held) && proving.gate_epoch !== held.gate_epoch) { return moved() }
     if (proving.gating.landed) { return gatingLandedError() }
     return null
@@ -1177,12 +1180,12 @@ export class Vault {
     return lease
   }
 
-  /** The vault props in hand, once the vault has its passphrase: 'absent_vault' while it is novel. */
-  #gatedProps(): GatedVaultProps {
-    if (! isGated(this.#vaultProps)) {
+  /** The vault record in hand, once the vault has its passphrase: 'absent_vault' while it is novel. */
+  #gatedRecord(): VaultRecord & { gate: GateRecord } {
+    if (! isGated(this.#vaultRecord)) {
       throw new VaultError('absent_vault', 'This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does.')
     }
-    return this.#vaultProps
+    return this.#vaultRecord
   }
   // --
 
@@ -1221,7 +1224,7 @@ export class Vault {
         continue
       }
       if (shouldAsk?.() === false) { return false }
-      const settled = await (standing ?? this.#raiseGating(isGated(this.#vaultProps) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
+      const settled = await (standing ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
       this.#checkStanding()
       valOf(settled)
@@ -1233,7 +1236,7 @@ export class Vault {
   #leaseStandsPast(renewMillis: number): boolean {
     const held = this.#lease
     if (held === null) { return false }
-    return fitsLease(this.#vaultProps, held) && ! held.endsBy(this.#clockNow() + renewMillis)
+    return fitsLease(this.#vaultRecord, held) && ! held.endsBy(this.#clockNow() + renewMillis)
   }
 
   /** Join the gating standing when it is of the kind `kindNow` names, else wait it out and raise one of that kind, for `call`; resolve once it settled with success.
@@ -1274,13 +1277,13 @@ export class Vault {
     this.#gating?.landLock(told)
   }
 
-  /** An attempt's first step: storage read now through the refresh join, the Vault object demanded to stand and `gating` not to have landed, resolving the vault props in hand. */
-  async #freshen(gating: RaisedGating): Promise<VaultProps> {
+  /** An attempt's first step: storage read now through the refresh join, the Vault object demanded to stand and `gating` not to have landed, resolving the vault record in hand. */
+  async #freshen(gating: RaisedGating): Promise<VaultRecord> {
     this.#checkStanding()
     await this.#helloWithin(0)
     this.#checkStanding()
     if (gating.landed) { throw gatingLandedError() }
-    return this.#vaultProps
+    return this.#vaultRecord
   }
 
   /** Delete the vault `proving` proved, within its gating's hold, with `VaultDB.delVault` expecting the `vault_tok` and `gate_epoch` in hand, resolving the tombstone's `vault_epoch`.
@@ -1290,7 +1293,7 @@ export class Vault {
    */
   async #delVault(proving: PassphraseProving): Promise<number> {
     this.#demand(proving, { call: 'del' })
-    const doomed = this.#vaultProps
+    const doomed = this.#vaultRecord
     const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok, gate_epoch: doomed.gate_epoch }), unexpectedError)
     if (! deleted.ok) {
       this.#demandAfterWait(deleted, proving, { call: 'del' })
@@ -1323,15 +1326,15 @@ export class Vault {
   async #putGate(gate: Gate, call: GatingCall): Promise<Gate> {
     const firstGate = gate.base_epoch === 0
     this.#demand(gate, { call, firstGate })
-    const held = this.#vaultProps
+    const held = this.#vaultRecord
     // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
-    const drafted = frozenVaultProps({ ...held, vault_epoch: held.vault_epoch + 1, ...gate.storedFields })
+    const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
     const written = await outcomeOf(() => this.#vaultDB.putVaultProps(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
     // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
     this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
     if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
-    const next = frozenVaultProps(written.val) as GatedVaultProps
+    const next = frozenVaultRecord(written.val) as VaultRecord & { gate: GateRecord }
     const stored = Gate.of(this, next)
     this.#demand(stored, { call })
     // The picture takes it first, so the record raised after never outruns the picture.
@@ -1345,7 +1348,7 @@ export class Vault {
    * object goes for good, as a refresh finding it so does ('vault_remade', 'vault_gone'). A first
    * gate losing to another device's is 'gate_made_elsewhere', and the next hello reads the gate that
    * stands. Any other stale write is 'stale_write', naming nothing stored. A refusal naming no
-   * stored vault props passes as it came.
+   * stored vault record passes as it came.
    */
   #gateWriteRefusal(gate: Gate, err: VaultError): VaultError {
     const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
@@ -1364,14 +1367,14 @@ export class Vault {
     return new VaultError('stale_write', "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.", err.cause === undefined ? {} : { cause: err.cause })
   }
 
-  /** Take `next`, vault props a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease.
+  /** Take `next`, a vault record a write of this Vault object's own just stored, into the picture, unless a read has already taken a later copy, or the Vault object went gone meanwhile: then the grant that follows finds the vault moved on, and writes no lease.
    * A lease in hand of the gate before is dropped from memory, as a read taking a new gate drops
    * it: the grant that follows holds the new one, and a grant that fails leaves the vault locked,
    * as its snapshot then says.
    */
-  #takeOwnWrite(next: GatedVaultProps) {
-    if (this.#goneBy !== null || isOlderPicture(this.#vaultProps, next)) { return }
-    this.#vaultProps = next
+  #takeOwnWrite(next: VaultRecord & { gate: GateRecord }) {
+    if (this.#goneBy !== null || isOlderPicture(this.#vaultRecord, next)) { return }
+    this.#vaultRecord = next
     const held = this.#lease
     if (held !== null && ! fitsLease(next, held)) {
       this.#dropLease()
@@ -1536,7 +1539,7 @@ export class Vault {
    */
   #fitsTakeUp(lease: Lease, renewMillis: number): boolean {
     const now = this.#clockNow()
-    return fitsLease(this.#vaultProps, lease) && ! lease.endsBy(now + renewMillis) && lease.endsBy(now + this.#leaseMillis)
+    return fitsLease(this.#vaultRecord, lease) && ! lease.endsBy(now + renewMillis) && lease.endsBy(now + this.#leaseMillis)
   }
   // --
 
@@ -1898,44 +1901,46 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // --
 
-// == [Vocabulary]: BirthRead, frozenVaultProps, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
+// == [Vocabulary]: BirthRead, frozenVaultRecord, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it.
- * `vaultProps` and `listed` are what `vaultDB.ensureVault` resolved; `leaseKept` what
+ * `vaultRecord` and `listed` are what `vaultDB.ensureVault` resolved; `leaseKept` what
  * `deviceDB.getLease` found; `record` this device's record of the scope as raised at birth; and
  * `readAt` when the read began, by the bank's clock.
  */
 export type BirthRead = Readonly<{
-  vaultProps: VaultProps
-  listed:     readonly (ListedSummary | DamagedBox)[]
-  leaseKept:  LeaseRecord | null
-  record:     DeviceRecord
-  readAt:     number
+  vaultRecord: VaultRecord
+  listed:      readonly (ListedSummary | DamagedBox)[]
+  leaseKept:   LeaseRecord | null
+  record:      DeviceRecord
+  readAt:      number
 }>
 
-/** A copy of `props`, frozen through its ways in: the vault props the vault holds, which no host can write to. */
-const frozenVaultProps = (props: VaultProps): VaultProps => {
-  if (! isGated(props)) { return Object.freeze({ ...props }) }
-  return Object.freeze({ ...props, passphrase: frozenRecord(props.passphrase), passkey: props.passkey === null ? null : frozenRecord(props.passkey) })
+/** A copy of `record`, frozen through its gate and ways in: the vault record the vault holds, which no host can write to. */
+const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
+  const { gate } = record
+  if (gate === null) { return Object.freeze({ ...record }) }
+  return Object.freeze({ ...record, gate: Object.freeze({ passphrase: frozenRecord(gate.passphrase), passkey: gate.passkey === null ? null : frozenRecord(gate.passkey) }) })
 }
 
-/** The {@link Stamp} of `props` in `scope`, frozen. */
-const stampOf = (scope: VaultScope, props: VaultProps): Stamp => Object.freeze({
-  ...scope, vault_tok: props.vault_tok, vault_epoch: props.vault_epoch, gate_epoch: props.gate_epoch,
-})
+/** The {@link VaultSparse} of `record`, frozen: every field of it but the gate, taken by name. */
+const stampOf = (record: VaultRecord): VaultSparse => {
+  const { format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at, vault_epoch, gate_epoch } = record
+  return Object.freeze({ format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at, vault_epoch, gate_epoch })
+}
 
-/** True when `fresh`, vault props a read or a write returned, are older than `inHand`: the same vault at a lower epoch.
+/** True when `fresh`, a vault record a read or a write returned, is older than `inHand`: the same vault at a lower epoch.
  * That is a read served before this device's own write and answered after it, or a write a read
  * has already passed. Data cannot tell it from storage restored from an older copy, so it is
  * ignored, never refused.
  */
-const isOlderPicture = (inHand: VaultProps, fresh: VaultProps): boolean => (
+const isOlderPicture = (inHand: VaultSparse, fresh: VaultSparse): boolean => (
   inHand.vault_tok === fresh.vault_tok
   && (fresh.vault_epoch < inHand.vault_epoch || fresh.gate_epoch < inHand.gate_epoch)
 )
 
 /** True when `lease` was granted under the vault and ways in `standing` holds. */
-const fitsLease = (standing: VaultProps, lease: Lease): boolean => lease.vault_tok === standing.vault_tok && lease.gate_epoch === standing.gate_epoch
+const fitsLease = (standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, lease: Lease): boolean => lease.vault_tok === standing.vault_tok && lease.gate_epoch === standing.gate_epoch
 
 /** True when `kept`, what this device's store held as its lease when a read looked, leaves `held`, the lease in hand, standing: a lease of the same vault and ways in.
  * Its deadline is not compared: another tab's unlock or renewal writes a lease ending later, and
@@ -1944,7 +1949,7 @@ const fitsLease = (standing: VaultProps, lease: Lease): boolean => lease.vault_t
  */
 const standsBeside = (kept: unknown, held: Lease): boolean => {
   if (typeof kept !== 'object' || kept === null) { return false }
-  const record: Partial<Record<keyof LeaseView, unknown>> = kept
+  const record: Partial<Record<keyof LeaseSparse, unknown>> = kept
   return record.vault_tok === held.vault_tok && record.gate_epoch === held.gate_epoch
 }
 
@@ -1982,7 +1987,7 @@ const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional(
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
 const { StampedShape } = Validator('bad_option', ({ obj, str, num }) => ({
   StampedShape: obj({
-    vault_tok:   str,
+    vault_tok,
     applabel:    str.optional(),
     user_id:     str.optional(),
     vaultlabel:  str.optional(),
@@ -1992,8 +1997,8 @@ const { StampedShape } = Validator('bad_option', ({ obj, str, num }) => ({
 }))
 
 /** `thing`, as `demandConsistentWith()` was handed it, once it carries a `vault_tok`: 'bad_option' for anything else, quoting none of it. */
-const checkedStamped = (thing: unknown): Stamped => {
-  if (StampedShape.safeParse(thing).success) { return thing as Stamped }
+const checkedStamped = (thing: unknown): Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse> => {
+  if (StampedShape.safeParse(thing).success) { return thing as Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse> }
   throw new VaultError('bad_option', "demandConsistentWith() takes something the vault handed out -- a box, a lease, a listing's entry -- or a stamp: an object carrying the vault_tok it was made under, and its epochs as numbers.")
 }
 

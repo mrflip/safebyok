@@ -53,7 +53,7 @@ describe("Refusals.staleWrite", () => {
 
 describe("Refusals.staleVaultProps", () => {
   it("refuses an update of the vault props as stale_write, carrying what stands as meta.vault_props_stored, as its example shows", () => {
-    const standing = TH.vaultPropsOf('u1', { gate_epoch: 2 })
+    const standing = TH.vaultRecordOf('u1', { gate_epoch: 2 })
     const refusal = Refusals.staleVaultProps(standing)
     expect(refusal.refusalkind).to.eq('stale_write')
     expect(refusal.message).to.eq(Refusals.StaleVaultPropsMessage)

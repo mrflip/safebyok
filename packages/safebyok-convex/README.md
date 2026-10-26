@@ -154,7 +154,7 @@ Three tables, inside the component, beside nothing of your app's:
 
 | Table                    | One row per | Columns                                                  | Index                                                     |
 | ------------------------ | ----------- | -------------------------------------------------------- | --------------------------------------------------------- |
-| `safebyok_vaults`        | vault       | the `VaultProps` record as-is                            | `by_scope`: `user_id`, `applabel`, `vaultlabel`           |
+| `safebyok_vaults`        | vault       | the `VaultRecord` as-is, its `gate` a nested object      | `by_scope`: `user_id`, `applabel`, `vaultlabel`           |
 | `safebyok_boxes`         | box         | the `BoxRecord` as-is, and its vault's scope columns   | `by_box`: `user_id`, `applabel`, `vaultlabel`, `boxlabel` |
 | `safebyok_vault_tallies` | vault       | `vault_row_id` (its vault row), `box_count`, `box_bytes` | `by_vault_row`: `vault_row_id`                            |
 
@@ -179,9 +179,9 @@ Three tables, inside the component, beside nothing of your app's:
   were kept has none, and reads as ever: its next box write counts it, reading the vault
   once (and no further than its limits). A delete never counts a vault.
 
-**Upgrading from an older version.** The vault props are format `safebyok-vault-v6` and each box
-`safebyok-box-v8`, neither holding a `vault_key_epoch` any more, and a box holds its sidecar as a
-JSON value; no older vault is read: each one reads as damaged, its boxes with it. Convex refuses to deploy a schema its documents do not
+**Upgrading from an older version.** The vault record is format `safebyok-vault-v6`, its ways in
+nested in its `gate`, and each box `safebyok-box-v8`; a vault stored before its gate was nested,
+its ways in flat beside its fields, is not read: each one reads as damaged, its boxes with it. Convex refuses to deploy a schema its documents do not
 match, so clear the component's three tables before you deploy (on the dashboard's Data page,
 pick the `safebyok` component); each user then makes their vault anew.
 

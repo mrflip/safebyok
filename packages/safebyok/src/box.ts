@@ -7,12 +7,13 @@ import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { type BoxSummary, type DamagedBox, type ListedSummary, Sidecar, type Stamp, Whisper } from './types/types'
-import { box_key_wrapped, revision_tok, whisper_ciphered } from './types/type-aliases'
+import { type BoxSummary, type DamagedBox, type ListedSummary, Sidecar, Whisper } from './types/types'
+import { VaultSparse } from './vault-record'
+import { box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './types/type-aliases'
 import type { Vault } from './vault'
 import { Validator } from './checks/validator'
 
-// == [The record]: BoxRecord, BoxFormat
+// == [The record]: BoxRecord, BoxFormat, BoxStamp
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
 export const BoxFormat = 'safebyok-box-v8'
@@ -58,6 +59,17 @@ export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epoc
   }).strict(),
 }))
 export type BoxRecord = Z.infer<typeof BoxRecord>
+
+/** A box's stamp: every field of its record but the two ciphered ones, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
+ * A box revision is never rewritten, so every field it shows is fixed for its life, and each is
+ * bound into both its encryptions.
+ *
+ * @example BoxStamp.parse({ ...visible, vault_tok: box.vault_tok })   // visible: box.record but its two ciphered fields
+ */
+export const { BoxStamp } = Validator('bad_record', () => ({
+  BoxStamp: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).extend({ vault_tok }),
+}))
+export type BoxStamp = Z.infer<typeof BoxStamp>
 // --
 
 // == [Box]: BoxVault, BoxView, BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper, toJSON
@@ -143,7 +155,7 @@ export class Box {
   /** The vault's `gate_epoch` when this box was made: of its stamp, which no spread or JSON shows. */
   declare readonly gate_epoch:  number
 
-  private constructor(vault: BoxVault, stamp: Stamp, record: BoxRecord, baseRevisionTok: string | null) {
+  private constructor(vault: BoxVault, stamp: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
     // The record is the check's own copy, which nothing else holds: frozen where it stands.
     this.#record          = deepFreeze(record)
     this.#vault           = vault
@@ -173,12 +185,12 @@ export class Box {
    * Touches no storage and no key. Throws 'bad_record' for a record this package does not write,
    * and 'bad_option' for a `stamp` that is none.
    *
-   * @param stamp - The stamp of the vault the record was read or written under. Default: the vault's own now.
+   * @param stamp - The {@link VaultSparse} of the vault the record was read or written under, as `vault.stamp` holds it; the box keeps its scope, `vault_tok` and both epochs. Default: the vault's own now.
    *
    * @example const box = Box.make(vault, record)   // record: what a VaultDB's getBox resolved
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' })   // throws 'bad_record': no box record
    */
-  static make(vault: BoxVault, record: BoxRecord, stamp: Stamp = vault.stamp): Box {
+  static make(vault: BoxVault, record: BoxRecord, stamp: VaultSparse = vault.stamp): Box {
     const checked = checkedBoxRecord(record)
     return new this(vault, checkedStamp(stamp), checked, null)
   }
@@ -346,10 +358,13 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
   return checked.data
 }
 
-/** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; and what a {@link Stamp} must show, the scope, the `vault_tok`, and both epochs. */
-const { BaseShape, StampShape } = Validator('bad_option', ({ obj, str, uint, epochMillis }) => ({
+/** The fields of the vault a box keeps, of the {@link VaultSparse} it is made under: the scope, the `vault_tok`, and both epochs. */
+type MadeUnder = Pick<VaultSparse, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'vault_epoch' | 'gate_epoch'>
+
+/** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; and what the {@link VaultSparse} a box is made under must show, the scope, the `vault_tok` and both epochs, every other field dropped unread. */
+const { BaseShape, StampShape } = Validator('bad_option', ({ obj, epochMillis }) => ({
   BaseShape:  obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
-  StampShape: obj({ applabel: str, user_id: str, vaultlabel: str, vault_tok: str.min(1), vault_epoch: uint, gate_epoch: uint }),
+  StampShape: VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip(),
 }))
 
 /** `base`, once it is a {@link BoxBase} or none: 'bad_option' otherwise, quoting none of it. */
@@ -361,8 +376,8 @@ const checkedBase = (base: unknown): BoxBase | null => {
   return checked.data
 }
 
-/** `stamp`, once it is a {@link Stamp}: 'bad_option' for anything else. */
-const checkedStamp = (stamp: unknown): Stamp => {
+/** The fields a box keeps of `stamp`, frozen, once it shows them: 'bad_option' for anything else. */
+const checkedStamp = (stamp: unknown): MadeUnder => {
   const checked = StampShape.safeParse(stamp)
   if (! checked.success) {
     throw new VaultError('bad_option', "Box.make's stamp is the stamp of the vault the record was read or written under, as vault.stamp holds it: its scope, vault_tok, vault_epoch and gate_epoch.")

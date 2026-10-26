@@ -2,7 +2,8 @@ import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
-import { type GatedVaultProps, type PasskeyAnswer, type Stamped, type VaultProps, isGated } from './types/types'
+import type { PasskeyAnswer } from './types/types'
+import { type GateRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
 import { passphraseCleartext } from './types/type-aliases'
 import type { Vault } from './vault'
 
@@ -121,8 +122,8 @@ export type RequestCleartext = (gating: Gating) => void | Promise<void>
 
 /** What a gating reaches of its Vault object inside the package, which no getter of the Vault object shows. */
 export type GatingInside = {
-  /** Read storage now through the refresh join, demand the Vault object stands and `gating` has not landed, and resolve the vault props in hand. */
-  freshen:     (gating: RaisedGating) => Promise<VaultProps>
+  /** Read storage now through the refresh join, demand the Vault object stands and `gating` has not landed, and resolve the vault record in hand. */
+  freshen:     (gating: RaisedGating) => Promise<VaultRecord>
   /** Store `gate` over its base, `vault.putGate`, within the attempt's hold. */
   putGate:     (gate: Gate, call: GatingCall) => Promise<Gate>
   /** Delete the vault `proving` proved, once a demand on it holds, expecting the `vault_tok` and `gate_epoch` of the picture in hand, resolving the tombstone's `vault_epoch`. */
@@ -134,7 +135,7 @@ export type GatingInside = {
   /** The refusal `thrown` makes, bad news told, as a public call's outcome. */
   badOutcome:  (thrown: unknown) => BadOutcome
   /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
-  demand:      (thing: Stamped, call: GatingCall, opts?: { firstGate: boolean }) => void
+  demand:      (thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, call: GatingCall, opts?: { firstGate: boolean }) => void
   /** The host's request for cleartext, guarded, or null for none. */
   request:     ((gating: Gating) => Promise<void>) | null
 }
@@ -322,15 +323,15 @@ export class RaisedGating implements ProvingGating {
   /** `unlock_vault` by the passphrase: proven over the gate's passphrase wayin, then the lease granted. */
   async #unlockByPassphrase(passphrase: string): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
+    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await proving.grantLease()
   }
 
   /** `unlock_vault` by the passkey: proven over the gate's passkey wayin, then the lease granted; 'absent_wayin' when the vault has none. */
   async #unlockByPasskey(passkey: PasskeyAnswer): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    if (held.passkey === null) { throw absentPasskey("Unlock with the passphrase.") }
-    const proving = await PasskeyProving.seal(this.#vault, headerOf(held.passkey), passkey, { gating: this })
+    if (held.gate.passkey === null) { throw absentPasskey("Unlock with the passphrase.") }
+    const proving = await PasskeyProving.seal(this.#vault, headerOf(held.gate.passkey), passkey, { gating: this })
     await proving.grantLease()
   }
 
@@ -345,7 +346,7 @@ export class RaisedGating implements ProvingGating {
     const held = this.#gatedOf(await this.#inside.freshen(this))
     const base = Gate.of(this.#vault, held)
     await this.#strengthUnder(next, base)
-    const currentProving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), current, { gating: this })
+    const currentProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), current, { gating: this })
     await currentProving.checkWayin()
     const newProving = await PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, next, { gating: this })
     const wayin = await currentProving.resealWayinFor(newProving)
@@ -360,7 +361,7 @@ export class RaisedGating implements ProvingGating {
   async #putPasskey(passphrase: string, passkey: PasskeyAnswer): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
     const base = Gate.of(this.#vault, held)
-    const passphraseProving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
+    const passphraseProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await passphraseProving.checkWayin()
     const passkeyProving = await PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this })
     const wayin = await passphraseProving.resealWayinFor(passkeyProving)
@@ -371,9 +372,9 @@ export class RaisedGating implements ProvingGating {
   /** `del_passkey`: the passkey removed, proven by the passphrase, whose wayin stays and grants the lease; 'absent_wayin' when the vault has none. */
   async #delPasskey(passphrase: string): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    if (held.passkey === null) { throw absentPasskey("Nothing was changed.") }
+    if (held.gate.passkey === null) { throw absentPasskey("Nothing was changed.") }
     const base = Gate.of(this.#vault, held)
-    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
+    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await proving.checkWayin()
     await this.#inside.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: null }), this.call)
     await this.#grantAfterChange(proving)
@@ -382,7 +383,7 @@ export class RaisedGating implements ProvingGating {
   /** `del_vault`: the vault deleted, proven by the passphrase, leaving its tombstone; the gating settles with success, and then the vault locks and goes. */
   async #delVault(passphrase: string): Promise<void> {
     const held = this.#gatedOf(await this.#inside.freshen(this))
-    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.passphrase), passphrase, { gating: this })
+    const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
     await proving.checkWayin()
     // Sent in this same step: from here a lock or a decline leaves the settling to this chain.
     this.#deletionSent = true
@@ -395,7 +396,7 @@ export class RaisedGating implements ProvingGating {
    * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'; a
    * gate made elsewhere meanwhile, for a `thing` made on a vault with none, is 'gate_made_elsewhere'.
    */
-  async #strengthUnder(passphrase: string, thing: Stamped): Promise<void> {
+  async #strengthUnder(passphrase: string, thing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>): Promise<void> {
     const verdict = await this.#vault.tryCheckStrength(passphrase)
     this.#inside.demand(thing, this.call, { firstGate: thing.gate_epoch === 0 })
     if (this.landed) { throw gatingOverError() }
@@ -419,7 +420,7 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** `held`, once gated: a gating other than `initialize_gate` is raised only on a vault with its gate, and a gate never goes. */
-  #gatedOf(held: VaultProps): GatedVaultProps {
+  #gatedOf(held: VaultRecord): VaultRecord & { gate: GateRecord } {
     if (! isGated(held)) { throw new VaultError('absent_vault', "This vault has no passphrase yet, so nothing can prove this change: unlock it first, which sets its passphrase.") }
     return held
   }

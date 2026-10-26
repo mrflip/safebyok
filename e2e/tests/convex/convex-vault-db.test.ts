@@ -72,7 +72,7 @@ const u1 = TH.scopeOf('u1')
 
 /** `vaultDB`'s `u1` vault, made and filled with eight boxes of 900,000 bytes: a little under the component's limit. */
 const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
-  await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+  await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
   for (let ii = 0; ii < 8; ii++) {
     await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.heavyBox(`heavy_${String(ii)}`, 900_000))
   }
@@ -135,7 +135,7 @@ describe("convexVaultDB, refusing", () => {
 })
 
 /** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
-const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.propsOf(vaultDB, u1) }
+const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.vaultRecordIn(vaultDB, u1) }
 
 /**
  * A watch of `u1`'s vault through `vaultDB`, once its first result has come in: its `onChange`,
@@ -155,7 +155,7 @@ describe("convexVaultDB.subscribe", () => {
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const there = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const watch = await settledWatch(here)
-      await TH.ensureGated(there, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(there, TH.vaultRecordOf('u1'))
       await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })
     })
 
@@ -163,7 +163,7 @@ describe("convexVaultDB.subscribe", () => {
       const deployment = deploy()
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const watch = await settledWatch(here)
-      await TH.ensureGated(here, { ...TH.vaultPropsOf('u1'), vaultlabel: 'work' })
+      await TH.ensureGated(here, { ...TH.vaultRecordOf('u1'), vaultlabel: 'work' })
       await caughtUp(here)
       expect(watch.onChange.mock.calls.length).to.eq(watch.heardBefore)
     })
@@ -176,14 +176,14 @@ describe("convexVaultDB.subscribe", () => {
       unsubscribe()
       unsubscribe()
       const heardBefore = alongside.onChange.mock.calls.length
-      await TH.ensureGated(convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok }), TH.vaultPropsOf('u1'))
+      await TH.ensureGated(convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok }), TH.vaultRecordOf('u1'))
       await vi.waitFor(() => { expect(alongside.onChange.mock.calls.length).to.be.greaterThan(heardBefore) })
     })
 
     it(`calls onChange over a ${clientTitle} when a sign-out fails its watch, so the vault looks again`, async () => {
       const deployment = deploy()
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      await TH.ensureGated(here, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(here, TH.vaultRecordOf('u1'))
       const watch = await settledWatch(here)
       deployment.signOut()
       await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })

@@ -27,10 +27,10 @@ describe("vault.stamp", () => {
     expect(Object.isFrozen(vault.stamp)).to.be.true
   })
 
-  it("is the scope, and the vault_tok, vault_epoch and gate_epoch of the vault held, frozen", async () => {
+  it("is the vault record held but for its gate: its format, scope, vault_tok and registered_at, and its vault_epoch and gate_epoch, frozen", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    expect(vault.stamp).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, vault_epoch: 1, gate_epoch: 1 })
+    expect(vault.stamp).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, registered_at: vault.registered_at, vault_epoch: 1, gate_epoch: 1 })
     expect(Object.isFrozen(vault.stamp)).to.be.true
   })
 

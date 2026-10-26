@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError, isVaultError } from 'safebyok'
-import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, VaultProps, VaultDB, VaultScope } from 'safebyok'
-import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
+import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope } from 'safebyok'
+import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, the ones handing on records in place of those handing back summaries.
  * That is `getVaultRecords` and `ensureVaultRecords` in place of `getVault` and `ensureVault`:
@@ -130,7 +130,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
-      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultPropsFields) as GatelessVaultProps)),
+      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultRecord & { gate: null })),
       safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), (stored) => ({ landed: true, vault_props_stored: stored }), staleVaultPropsInBody),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
@@ -160,10 +160,10 @@ const MisconfiguredMessage = "The vault's server could not serve this request: i
 // The arguments as the schema shapes them, rebuilt field by field as plain records: the
 // VaultDB checks them as it would any caller's.
 const scopeIn = (args: VaultFieldArgs) => recordOf(args, ScopeFields) as VaultScope
-const vaultPropsIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultPropsFields) as VaultProps
+const vaultPropsIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultRecordFields) as VaultRecord
 
-const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation => {
-  const { vault_tok, gate_epoch } = args.expected as VaultPropsExpectation
+const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultRecordExpectation => {
+  const { vault_tok, gate_epoch } = args.expected as VaultRecordExpectation
   return { vault_tok, gate_epoch }
 }
 
@@ -250,7 +250,7 @@ const refusedBoxInBody = (refusal: VaultError): object | undefined => {
   return undefined
 }
 
-/** The body answering an update of the vault props refused as `stale_write`, carrying the vault props standing, or null for none; undefined for any other refusal, which crosses as an error. */
+/** The body answering an update of the vault record refused as `stale_write`, carrying the vault record standing, or null for none; undefined for any other refusal, which crosses as an error. */
 const staleVaultPropsInBody = (refusal: VaultError): object | undefined => {
   const vaultPropsStored = refusal.meta?.vault_props_stored
   if (vaultPropsStored !== undefined && refusal.refusalkind === 'stale_write') { return refusedBody(refusal, { vault_props_stored: vaultPropsStored }) }

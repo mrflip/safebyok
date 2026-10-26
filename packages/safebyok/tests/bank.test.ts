@@ -6,7 +6,7 @@ import { Bank } from '../src/bank'
 import { VaultError, isVaultError } from '../src/errors'
 import { memoryDeviceDB } from '../src/device-db'
 import type { VaultDB } from '../src/vault-db'
-import type { Tombstone } from '../src/types/types'
+import type { VaultTombstone } from '../src/vault-record'
 import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import { browserOpts } from '../src/browser'
@@ -58,8 +58,8 @@ const stepsOf = (statuses: readonly (string | undefined)[]) => statuses.filter((
 const checkerLoading = (load: () => void | Promise<void>) => Object.assign(vi.fn(TH.anyStrengthChecker), { load: vi.fn(load) })
 
 /** The tombstones `vaultDB.delVault` resolves from now on, kept in a list as they land. */
-const keptTombstones = (vaultDB: Pick<VaultDB, 'delVault'>): Tombstone[] => {
-  const kept: Tombstone[] = []
+const keptTombstones = (vaultDB: Pick<VaultDB, 'delVault'>): VaultTombstone[] => {
+  const kept: VaultTombstone[] = []
   const delVault = vaultDB.delVault.bind(vaultDB)
   vi.spyOn(vaultDB, 'delVault').mockImplementation(async (scope, expected) => {
     const deleted = await delVault(scope, expected)
@@ -232,7 +232,7 @@ describe("bank.hello", () => {
     const err = await TH.expectRefusal(bank.ensureVault(Main), 'unexpected_error')
     expect(births).not.toHaveBeenCalled()
     expect(bank.entryOf(Main)).to.deep.include({ status: 'refused', vault: null, err })
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 })
 // --
@@ -254,15 +254,15 @@ describe("bank.ensureVault", () => {
     const workVaultDB = localVaultDB({ store: memoryStore() })
     const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
     expect(vault.vaultlabel).to.eq('work')
-    expect(await TH.propsOf(workVaultDB, TH.scopeOf('u1', 'work'))).to.deep.include({ vault_tok: vault.vault_tok })
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1', 'work'))).to.be.null
+    expect(await TH.vaultRecordIn(workVaultDB, TH.scopeOf('u1', 'work'))).to.deep.include({ vault_tok: vault.vault_tok })
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1', 'work'))).to.be.null
   })
 
   it("births 'novel' over empty storage, its gateless props stored, and its vault_tok fixed for the Vault object's life", async () => {
     const world = makeWorld()
     const vault = await bankIn(world).ensureVault(Main)
     expect(vault.getSnapshot()).to.deep.include({ state: 'novel', gate_epoch: 0, passphrase: null })
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ vault_tok: vault.vault_tok, gate_epoch: 0, passphrase: null, passkey: null })
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ vault_tok: vault.vault_tok, gate_epoch: 0, gate: null })
     const bornAs = vault.vault_tok
     await TH.unlock(vault, 'pw')
     await vault.hello({ staleMinutes: 0 })
@@ -335,7 +335,7 @@ describe("bank.ensureVault", () => {
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
     expect(Object.keys(vault)).to.include.members(['getSnapshot', 'subscribe'])
-    const record = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const record = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     if (record === null) { throw new Error('no vault was stored') }
     for (const bag of [vault, vault.getSnapshot(), record]) {
       expect(await bank.ensureVault(bag)).to.eq(vault)
@@ -968,7 +968,7 @@ describe("the first unlock of a novel vault", () => {
     TH.closeVault(vault)
     deriving.release()
     await TH.expectBad(unlocking, 'vault_gone')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, passphrase: null })
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, gate: null })
   })
 
   it("refuses 'gate_made_elsewhere' when another device set the first gate meanwhile, even with its passphrase, writing nothing; the next hello shows locked, and that passphrase unlocks", async () => {
@@ -980,10 +980,10 @@ describe("the first unlock of a novel vault", () => {
     const unlocking = TH.tryUnlock(here, 'there phrase')
     await deriving.reached
     await TH.unlock(there, 'there phrase')
-    const gated = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const gated = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     deriving.release()
     await TH.expectBad(unlocking, 'gate_made_elsewhere')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(gated)
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(gated)
     expect(here.state).to.eq('novel')
     await here.hello()
     expect(here.state).to.eq('locked')

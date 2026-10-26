@@ -1,9 +1,9 @@
 import * as CX from './checks/core-checks'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
-import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import { randomId } from './crypto'
-import { type VaultScope, DeviceRecordFormat } from './types/types'
+import type { VaultScope } from './types/types'
 import type { VaultDB } from './vault-db'
 import { type MakeBankOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
@@ -57,6 +57,7 @@ export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, dev
   valOf(await deviceDB.delLease(scope))
   if (tombstone === null) { return }
   // The device_id is kept where a record stands: raising keeps the first one stored.
-  valOf(await deviceDB.raiseDeviceRecord({ format: DeviceRecordFormat, ...scope, device_id: randomId(), highest_vault_epoch: tombstone.vault_epoch }))
+  const raising = deviceRecordOf(scope, randomId(), tombstone.vault_epoch)
+  valOf(await deviceDB.raiseDeviceRecord(raising))
 }
 

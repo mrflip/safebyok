@@ -90,7 +90,7 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     await TH.expectProbeState('locked')
-    const deleted = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const deleted = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     expect(deleted).to.not.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
@@ -100,7 +100,7 @@ describe("SessionBar", () => {
     // This provider's user_id is not the auth's: it stays on u1, and still asks for nothing anew.
     await TH.expectProbeState('none')
     await new Promise((resolve) => { setTimeout(resolve, 50) })
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 
   it("keeps the account and says why when the vault cannot be deleted", async () => {
@@ -114,7 +114,7 @@ describe("SessionBar", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     expect(await screen.findByText('The vault storage could not be reached: try again shortly.')).to.not.be.null
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("deletes the account and its vault through the provider's own dialog, proven by the passphrase", async () => {
@@ -129,7 +129,7 @@ describe("SessionBar", () => {
     await TH.answerPassphraseDialog()
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 
   it("keeps the account and its vault, saying nothing, when the user cancels the deletion's dialog", async () => {
@@ -146,7 +146,7 @@ describe("SessionBar", () => {
     await TH.wakeupAtNextTick()
     expect(document.querySelector('.gripe')).to.be.null
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("deletes an account whose vault has no passphrase yet without asking: there is nothing in it, and nothing to prove its deletion", async () => {
@@ -159,7 +159,7 @@ describe("SessionBar", () => {
     await screen.findByPlaceholderText('username')
     expect(screen.queryByRole('dialog')).to.be.null
     expect(auth.getSnapshot()).to.be.null
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {

@@ -1,8 +1,8 @@
 import { BoxRecord } from './box'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type GatelessVaultProps, type Tombstone, type VaultProps } from './types/types'
-import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultPropsExpectation } from './vault-db'
+import { TombstoneFormat, type VaultRecord, type VaultTombstone } from './vault-record'
+import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './vault-db'
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
  * Import it whole: `import { Expectations } from 'safebyok'`, then
@@ -13,36 +13,36 @@ import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectatio
  * argument is the row in storage, or undefined or null for none. The expectation needs no check:
  * `VaultDB` checked it before the adapter saw it.
  *
- * A key-value adapter keeps a vault's tombstone in the row its vault props were in. Every
+ * A key-value adapter keeps a vault's tombstone in the row its vault record was in. Every
  * comparison here reads that row as no vault, as it holds no `vault_tok` for an expectation to
  * name: a stale writer never finds a deleted vault standing.
  */
 
 /** True when a stored row is a tombstone, the mark a deleted vault leaves in its place: judged by its `format` alone.
- * A tombstone too damaged to parse still reads as one, so it is never taken for vault props.
+ * A tombstone too damaged to parse still reads as one, so it is never taken for a vault record.
  *
  * @example Expectations.isTombstone({ format: 'safebyok-tombstone-v1', vault_epoch: 3 })  // true
  */
 export const isTombstone = (standing: unknown): boolean => fieldOf(standing, 'format') === TombstoneFormat
 
-/** The row `standing` as vault props: itself, or null for none or for a tombstone. */
-const livePropsOf = (standing: unknown): unknown => (isTombstone(standing) ? null : standing ?? null)
+/** The row `standing` as a vault record: itself, or null for none or for a tombstone. */
+const liveRecordOf = (standing: unknown): unknown => (isTombstone(standing) ? null : standing ?? null)
 
 /** The field `field` of a standing row, or undefined when the row is no object or has none. */
 const fieldOf = (standing: unknown, field: string): unknown => (
   typeof standing === 'object' && standing !== null ? (standing as Record<string, unknown>)[field] : undefined
 )
 
-/** True when the vault props standing are `expected`'s vault at its gate epoch: what an update of the vault props compares (VAULTDB.md, line 3.2).
+/** True when the vault record standing is `expected`'s vault at its gate epoch: what an update of the vault record compares (VAULTDB.md, line 3.2).
  *
  * @example Expectations.vaultPropsMeets(standing, { vault_tok: 'v1', gate_epoch: 2 })
  */
-export const vaultPropsMeets = (standing: unknown, expected: VaultPropsExpectation): boolean => (
+export const vaultPropsMeets = (standing: unknown, expected: VaultRecordExpectation): boolean => (
   fieldOf(standing, 'vault_tok') === expected.vault_tok
   && fieldOf(standing, 'gate_epoch') === expected.gate_epoch
 )
 
-/** The refusal an update of the vault props meets from the vault props standing, or null when it may land.
+/** The refusal an update of the vault record meets from the vault record standing, or null when it may land.
  * It is {@link Refusals.staleVaultProps}, carrying what stands, unless {@link vaultPropsMeets}
  * (VAULTDB.md, line 3.2).
  *
@@ -50,12 +50,12 @@ export const vaultPropsMeets = (standing: unknown, expected: VaultPropsExpectati
  *   const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
  *   if (refusal) { throw refusal }
  */
-export const vaultPropsRefusalOf = (standing: unknown, expected: VaultPropsExpectation): VaultError | null => (
-  vaultPropsMeets(standing, expected) ? null : Refusals.staleVaultProps(livePropsOf(standing))
+export const vaultPropsRefusalOf = (standing: unknown, expected: VaultRecordExpectation): VaultError | null => (
+  vaultPropsMeets(standing, expected) ? null : Refusals.staleVaultProps(liveRecordOf(standing))
 )
 
-/** True when the vault props standing are `expected`'s vault, at any epoch: what a box read, a box deletion, and a box write's vault half, compare.
- * Vault props that show no `gate_epoch` fail.
+/** True when the vault record standing is `expected`'s vault, at any epoch: what a box read, a box deletion, and a box write's vault half, compare.
+ * A vault record that shows no `gate_epoch` fails.
  *
  * @example Expectations.vaultMeets(standing, { vault_tok: 'v1' })
  */
@@ -64,24 +64,24 @@ export const vaultMeets = (standing: unknown, expected: Pick<VaultDelExpectation
   && Number.isFinite(fieldOf(standing, 'gate_epoch'))
 )
 
-/** The `vault_epoch` of a stored row, vault props or tombstone, as a whole number from zero: zero where the row shows none that reads so.
- * Damaged vault props can show no `vault_epoch`; their deletion still leaves a tombstone.
+/** The `vault_epoch` of a stored row, a vault record or a tombstone, as a whole number from zero: zero where the row shows none that reads so.
+ * A damaged vault record can show no `vault_epoch`; its deletion still leaves a tombstone.
  */
 const epochOf = (standing: unknown): number => {
   const val = fieldOf(standing, 'vault_epoch')
   return typeof val === 'number' && Number.isSafeInteger(val) && val >= 0 ? val : 0
 }
 
-/** The vault props an update stores over `standing`, which it has met: `vaultProps` with `vault_epoch` the standing one plus one, whatever `vaultProps` carries.
+/** The vault record an update stores over `standing`, which it has met: `vaultRecord`, its gate with it, with `vault_epoch` the standing one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2).
  *
  * @example Expectations.vaultPropsPutOf(next, standing)   // next, its vault_epoch standing.vault_epoch + 1
  */
-export const vaultPropsPutOf = (vaultProps: VaultProps, standing: unknown): VaultProps => (
-  { ...vaultProps, vault_epoch: epochOf(standing) + 1 }
+export const vaultPropsPutOf = (vaultRecord: VaultRecord, standing: unknown): VaultRecord => (
+  { ...vaultRecord, vault_epoch: epochOf(standing) + 1 }
 )
 
-/** The vault props a creation stores over `standing`, or null when a vault already stands and nothing is stored.
+/** The vault record a creation stores over `standing`, or null when a vault already stands and nothing is stored.
  * Over no row it is `draft`. Over a tombstone it is `draft` with the tombstone's `vault_epoch`: a
  * new life, the counter carried on (VAULTDB.md, line 3.1).
  *
@@ -89,7 +89,7 @@ export const vaultPropsPutOf = (vaultProps: VaultProps, standing: unknown): Vaul
  *   const life = Expectations.newLifeOf(draft, standing)
  *   if (life) { write(life) }
  */
-export const newLifeOf = (draft: GatelessVaultProps, standing: unknown): GatelessVaultProps | null => {
+export const newLifeOf = (draft: VaultRecord & { gate: null }, standing: unknown): (VaultRecord & { gate: null }) | null => {
   if (standing === null || standing === undefined) { return draft }
   return isTombstone(standing) ? { ...draft, vault_epoch: epochOf(standing) } : null
 }
@@ -103,7 +103,7 @@ export const newLifeOf = (draft: GatelessVaultProps, standing: unknown): Gateles
  *
  * @example Expectations.tombstoneOf(standing, scope, { vault_tok: 'v1', gate_epoch: 2 })   // while v1 stands at gate 2
  */
-export const tombstoneOf = (standing: unknown, scope: Pick<Tombstone, 'applabel' | 'user_id' | 'vaultlabel'>, expected: VaultDelExpectation): Tombstone | null => {
+export const tombstoneOf = (standing: unknown, scope: Pick<VaultTombstone, 'applabel' | 'user_id' | 'vaultlabel'>, expected: VaultDelExpectation): VaultTombstone | null => {
   if (fieldOf(standing, 'vault_tok') !== expected.vault_tok) { return null }
   if (expected.gate_epoch !== null && fieldOf(standing, 'gate_epoch') !== expected.gate_epoch) { return null }
   return {
@@ -115,17 +115,17 @@ export const tombstoneOf = (standing: unknown, scope: Pick<Tombstone, 'applabel'
   }
 }
 
-/** The refusal a box write meets from the vault props and box standing, or null when it may land.
- * It is {@link Refusals.vaultMismatch} when the vault props are not `expected`'s vault. Else it is
+/** The refusal a box write meets from the vault record and box standing, or null when it may land.
+ * It is {@link Refusals.vaultMismatch} when the vault record is not `expected`'s vault. Else it is
  * {@link Refusals.staleBox} when the box is not at `expected.revision_tok`, or when any box stands
  * and that is null (VAULTDB.md, line 3.3).
  *
  * @example
- *   const refusal = Expectations.boxRefusalOf(vaultProps, standingBox, expected)
+ *   const refusal = Expectations.boxRefusalOf(standingVaultRecord, standingBox, expected)
  *   if (refusal) { throw refusal }
  */
-export const boxRefusalOf = (standingVaultProps: unknown, standingBox: unknown, expected: BoxExpectation): VaultError | null => {
-  if (! vaultMeets(standingVaultProps, expected)) { return Refusals.vaultMismatch() }
+export const boxRefusalOf = (standingVaultRecord: unknown, standingBox: unknown, expected: BoxExpectation): VaultError | null => {
+  if (! vaultMeets(standingVaultRecord, expected)) { return Refusals.vaultMismatch() }
   const standing = standingBox ?? null
   const boxMeets = standing === null
     ? expected.revision_tok === null

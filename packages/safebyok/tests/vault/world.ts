@@ -113,10 +113,10 @@ export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => 
   world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
 )
 
-/** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */
+/** u1's stored vault record in `world`, its gate's way in of `wayinkind` spoiled by `spoil`. */
 export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
-  const vaultProps = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as Record<string, Record<string, unknown>>
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
+  const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as Record<string, unknown> & { gate: Record<string, Record<string, unknown>> }
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, [wayinkind]: { ...vaultRecord.gate[wayinkind], ...spoil } } }))
 }
 
 /** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
@@ -165,8 +165,11 @@ export const makeRacingWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 
-/** The stored vault props' way in of `wayinkind`, as the backend holds it: null for no passkey. */
-export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => storedVaultPropsOf(world)[wayinkind] as Record<string, unknown> | null
+/** The stored vault record's way in of `wayinkind`, as the backend holds it in its gate: null for no passkey, or no gate. */
+export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => {
+  const gate = storedVaultPropsOf(world)['gate'] as Record<string, Record<string, unknown> | null> | null
+  return gate === null ? null : gate[wayinkind] ?? null
+}
 
 /**
  * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored once a

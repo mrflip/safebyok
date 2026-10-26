@@ -3,8 +3,9 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { BoxFormat, type BoxRecord } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { type BoxVisible, Lease, type LeaseStanding, leaseRecordOf, sealLeaseRecord } from '../src/lease'
+import { type BoxVisible, Lease, LeaseStamp, leaseRecordOf, sealLeaseRecord } from '../src/lease'
 import { type LeaseRecord } from '../src/types/types'
+import type { VaultSparse } from '../src/vault-record'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
 import * as TH from './test-helpers'
 
@@ -14,7 +15,7 @@ const LeaseMillis = 7 * 24 * HourMillis
 const Deadline = GrantedAt + LeaseMillis
 
 /** The vault props every lease record here is sealed under: u1's `main` vault, at gate epoch 3. */
-const standing: LeaseStanding = { vault_tok: 'vault-tok-u1', gate_epoch: 3 }
+const standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'> = { vault_tok: 'vault-tok-u1', gate_epoch: 3 }
 
 /** A slice of u1's `main` vault whose clock reads what `clock.at` holds: GrantedAt, unless a test moves it. */
 const vaultAt = (clock?: { at: number }, overrides: Partial<TH.VaultSlice> = {}) => (
@@ -112,10 +113,19 @@ describe("sealLeaseRecord", () => {
   }
 
   it("takes whole vault props, keeping only their vault_tok and gate_epoch", async () => {
-    const whole = TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 3 })
+    const whole = TH.vaultRecordOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 3 })
     const record = await sealLeaseRecord(vaultAt(), whole, await makeVaultKey())
     expect(record).to.deep.include({ vault_tok: 'vault-tok-u1', gate_epoch: 3 })
     expect(record).to.not.have.property('passphrase')
+  })
+})
+
+describe("LeaseStamp", () => {
+  it("is the lease record but its key material, as its example shows: what a lease shows, and its format", async () => {
+    const { lease_key: _leaseKey, vault_key_lease_wrapped: _wrapped, ...stamped } = await TH.leaseOf('u1')
+    expect(LeaseStamp.parse(stamped)).to.deep.equal(stamped)
+    expect(Object.keys(stamped)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'gate_epoch', 'ask_passphrase_at'])
+    expect(LeaseStamp.safeParse(await TH.leaseOf('u1')).success, 'a stamp holds no key material').to.be.false
   })
 })
 

@@ -27,7 +27,7 @@ const callsOn = (user_id: string): [string, (caller: Caller) => Promise<unknown>
   return [
     ['getVault',         (caller) => caller.query(api.safebyok.getVault, { ...scope })],
     ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf(user_id, { vault_tok: 'vault-tok-late' }) })],
-    ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
+    ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultRecordOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
     ['getBox',           (caller) => caller.query(api.safebyok.getBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok } })],
     ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { ...scope, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_tok, revision_tok: 'rev-a1' } })],
     ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { ...scope })],

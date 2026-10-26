@@ -69,10 +69,10 @@ describe("VaultDashboard, opening", () => {
     const startNew = await screen.findByRole('button', { name: 'Start a new vault' })
     expect(screen.getByText(/This vault was deleted/)).to.not.be.null
     await TH.wakeupAtNextTick()
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
     fireEvent.click(startNew)
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("offers to accept an older copy storage serves, accepting it only once the user confirms", async () => {

@@ -154,8 +154,8 @@ not hand back from its own listing. A
 vault read is one query, its props and its boxes from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
-Every stored field is non-null in the schema but the vault props' `passphrase` and `passkey`,
-both null while a vault has no gate. A listing of yours that hands back a record missing
+Every stored field is non-null in the schema but the vault record's `gate`, null while a vault
+has none, and its `passkey`, null when the vault has none. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
 `storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.
@@ -213,16 +213,17 @@ through the recipe, that line included.
 Every record crosses **field by field**, each its own GraphQL field under the name it is stored
 by, exactly as safebyok wrote it:
 
-| Type                 | Carries                                                           |
-| -------------------- | ----------------------------------------------------------------- |
-| `SafebyokVaultProps` | every field of the `VaultProps`                                   |
-| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
-| `SafebyokTombstone`  | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
+| Type                     | Carries                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `SafebyokVaultRecord`    | every field of the `VaultRecord`; its `gate` a `SafebyokGate`, null while the vault is novel |
+| `SafebyokGate`           | the vault's ways in: its `passphrase` and its `passkey` or null   |
+| `SafebyokBox`            | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
+| `SafebyokVaultTombstone` | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`, as a subscription sends it |
 
-Each record has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation
+Each record has an input type twin (`SafebyokVaultRecordInput`, `SafebyokGateInput`, and so on), and each expectation
 one of its own. A vault's scope is no input type: a root field aimed at a vault takes its
 `applabel`, `user_id` and `vaultlabel` as three `String!` arguments of its own, beside the rest.
 
@@ -232,7 +233,7 @@ one of its own. A vault's scope is no input type: a root field aimed at a vault 
   change to a vault's ways in, and `vault_epoch`, which goes up with it and with a deletion. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
+* **The gate's two ways in**, `passphrase` (always there) and `passkey` (null when the
   vault has none), are each a `SafebyokWayin`, one opaque JSON, its `wayinkind` saying its shape:
   the adapter carries a way in as it is, never looking inside, as the Postgres table stores each
   as one `jsonb`. A change inside a way in reaches the browser with no change here. That is by

@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, DamagedBox, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope, WayinSummary } from 'safebyok'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, DamagedBox, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -23,8 +23,8 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
  */
 const served = new Map<string, Served>([
   ['getVault',         (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
-  ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
-  ['putVaultProps',    (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
+  ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null })],
+  ['putVaultProps',    (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultProps(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
   ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
@@ -105,8 +105,8 @@ class RouteVaultDB extends VaultDB {
   }
 
   protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
-  protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultProps', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }

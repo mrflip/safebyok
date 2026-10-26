@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, BoxRecord, GatedVaultProps, GatelessVaultProps, VaultScope } from 'safebyok'
+import { Ciphered, BoxRecord, GateRecord, VaultRecord, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -12,14 +12,13 @@ const schema = buildSchema(VaultSchemaSdl)
 // nullable when its validator is Zod's nullable.
 type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
 
-/** The fields of vault props gated or gateless, as one GraphQL type carries both: the gated ones, the passphrase taking null as a gateless vault's does. */
-const EitherVaultProps = { shape: { ...GatedVaultProps.shape, passphrase: GatelessVaultProps.shape.passphrase } }
-
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
-  ['SafebyokVaultScope',         VaultScope,  []],
-  ['SafebyokVaultProps',         EitherVaultProps, []],
-  ['SafebyokVaultPropsInput',    EitherVaultProps, []],
+  ['SafebyokVaultScope',         VaultScope.unwrap(), []],
+  ['SafebyokVaultRecord',        VaultRecord, []],
+  ['SafebyokVaultRecordInput',   VaultRecord, []],
+  ['SafebyokGate',               GateRecord,  []],
+  ['SafebyokGateInput',          GateRecord,  []],
   ['SafebyokBox',                BoxRecord,   []],
   ['SafebyokBoxInput',           BoxRecord,   []],
   ['SafebyokListedBox',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
@@ -64,10 +63,13 @@ describe("VaultSchemaSdl", () => {
     })
   }
 
-  it("carries the vault props' passphrase and passkey each as opaque JSON, both nullable, as a gateless vault holds neither", () => {
-    for (const typename of ['SafebyokVaultProps', 'SafebyokVaultPropsInput']) {
-      const { passphrase, passkey } = fieldsOf(typename)
-      expect(isNonNullType(passphrase!.type)).to.be.false
+  it("carries the vault record's gate nested and nullable, as a novel vault holds none, its passphrase required and its passkey nullable, each as opaque JSON", () => {
+    for (const [recordType, gateType] of [['SafebyokVaultRecord', 'SafebyokGate'], ['SafebyokVaultRecordInput', 'SafebyokGateInput']] as const) {
+      const { gate } = fieldsOf(recordType)
+      expect(isNonNullType(gate!.type)).to.be.false
+      expect(getNamedType(gate!.type).name).to.eq(gateType)
+      const { passphrase, passkey } = fieldsOf(gateType)
+      expect(isNonNullType(passphrase!.type)).to.be.true
       expect(isNonNullType(passkey!.type)).to.be.false
       expect(getNamedType(passphrase!.type).name).to.eq('SafebyokWayin')
       expect(getNamedType(passkey!.type).name).to.eq('SafebyokWayin')

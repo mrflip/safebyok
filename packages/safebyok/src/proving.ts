@@ -6,7 +6,8 @@ import { type Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types/types'
+import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
+import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultRecord, type VaultSparse } from './vault-record'
 import { decorate } from './adorn'
 import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
 import { Validator } from './checks/validator'
@@ -41,8 +42,8 @@ export const StandingGating: ProvingGating = Object.freeze({ landed: false })
 
 /** What a proving reaches of its Vault object inside the package, which no getter of the Vault object shows. */
 export type ProvingInside = {
-  /** The vault props in hand: the gate whose wayins a proving opens. */
-  vaultProps: () => VaultProps
+  /** The vault record in hand: the gate whose wayins a proving opens. */
+  vaultRecord: () => VaultRecord
   /** This device's id for the vault, from the bank's device record: what a fresh header carries. */
   deviceId:   () => string
   /** Store `record` as this device's lease, {@link DeviceDB.putLease}, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
@@ -50,7 +51,7 @@ export type ProvingInside = {
   /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
   holdLease:  (stored: LeaseRecord) => Lease
   /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
-  demand:     (thing: Stamped, call: ProvingCall, opts?: { firstGate: boolean }) => void
+  demand:     (thing: Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>, call: ProvingCall, opts?: { firstGate: boolean }) => void
 }
 
 /** Each registered vault's inside: a weak map, so a vault let go is let go here too. */
@@ -58,7 +59,7 @@ const insides = new WeakMap<object, ProvingInside>()
 
 /** Let this package's provings reach `vault`'s inside, once: what a Vault object's constructor calls.
  *
- * @example registerProvingInside(this, { vaultProps: () => this.#vaultProps, ... })
+ * @example registerProvingInside(this, { vaultRecord: () => this.#vaultRecord, ... })
  */
 export const registerProvingInside = (vault: object, inside: ProvingInside): void => {
   if (! insides.has(vault)) { insides.set(vault, inside) }
@@ -111,7 +112,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The wayinKey: non-extractable, never handed out. */
   readonly #wayinKey: CryptoKey
 
-  protected constructor(vault: ProvingVault, stamp: Stamp, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
+  protected constructor(vault: ProvingVault, stamp: VaultSparse, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
     // The stamp is the vault's, for its demand to judge: readable, but no field a spread or JSON shows.
     const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = stamp
     decorate<Proving<HeaderT>>(this, { vault, header: Object.freeze({ ...header }), gating, applabel, user_id, vaultlabel, vault_tok, gate_epoch })
@@ -119,12 +120,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     this.#wayinKey = wayinKey
   }
 
-  /** True when `vaultProps`' wayin at this proving's slotlabel carries its header: the proving opens the gate they hold.
+  /** True when `vaultRecord`'s wayin at this proving's slotlabel carries its header: the proving opens the gate it holds.
    *
-   * @example proving.isCarriedBy(vaultProps)   // false once another device replaced the passphrase
+   * @example proving.isCarriedBy(vaultRecord)   // false once another device replaced the passphrase
    */
-  isCarriedBy(vaultProps: VaultProps): boolean {
-    const wayin = wayinRecordAt(vaultProps, this.slotlabel)
+  isCarriedBy(vaultRecord: Pick<VaultRecord, 'gate'>): boolean {
+    const wayin = wayinRecordAt(vaultRecord, this.slotlabel)
     if (wayin === null) { return false }
     const { vault_key_wayin_wrapped: _wrapped, ...carried } = wayin
     return stableJsonify(carried) === stableJsonify(this.header)
@@ -183,7 +184,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async grantLease(): Promise<Lease> {
     const inside = insideOf(this.vault)
     this.#demand()
-    const standing = inside.vaultProps()
+    const standing = inside.vaultRecord()
     const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
     const record = await sealLeaseRecord(this.vault, standing, vaultKey)
     // Nothing is awaited between these demands and the write.
@@ -225,7 +226,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** The wrap of the gate's wayin at this proving's slotlabel, as the vault holds it now; a gate with none there has moved past it. */
   #currentWrap(): VaultKeyWayinWrapped {
-    const wayin = wayinRecordAt(insideOf(this.vault).vaultProps(), this.slotlabel)
+    const wayin = wayinRecordAt(insideOf(this.vault).vaultRecord(), this.slotlabel)
     if (wayin === null) { throw gateMovedPast() }
     return wayin.vault_key_wayin_wrapped
   }
@@ -246,11 +247,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
 /** The proving of a passphrase: the passphraseKey the key deriver makes of it over the header's salt.
  *
- * @example const proving = await PassphraseProving.seal(vault, headerOf(vaultProps.passphrase), typed, { gating })
+ * @example const proving = await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
  * @example const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })   // a fresh header, its salt minted
  */
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
-  private constructor(vault: ProvingVault, stamp: Stamp, header: PassphraseWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
+  private constructor(vault: ProvingVault, stamp: VaultSparse, header: PassphraseWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
     super(vault, stamp, header, gating, wayinKey)
     Object.freeze(this)
   }
@@ -265,7 +266,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    *
    * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link StandingGating}.
    *
-   * @example await PassphraseProving.seal(vault, headerOf(vaultProps.passphrase), typed, { gating })
+   * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })
    */
   static async seal(vault: ProvingVault, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
@@ -316,10 +317,10 @@ const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) =>
 
 /** The proving of a passkey's answer: the passkeyKey HKDF makes of its PRF bytes, with the header's whole wayin ctx as its `info`.
  *
- * @example const proving = await PasskeyProving.seal(vault, headerOf(vaultProps.passkey), answer, { gating })
+ * @example const proving = await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), answer, { gating })
  */
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
-  private constructor(vault: ProvingVault, stamp: Stamp, header: PasskeyWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
+  private constructor(vault: ProvingVault, stamp: VaultSparse, header: PasskeyWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
     super(vault, stamp, header, gating, wayinKey)
     Object.freeze(this)
   }
@@ -333,7 +334,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    *
    * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link StandingGating}.
    *
-   * @example await PasskeyProving.seal(vault, headerOf(vaultProps.passkey), await askPasskey(vault.passkey), { gating })
+   * @example await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), await askPasskey(vault.passkey), { gating })
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
    */
   static async seal(vault: ProvingVault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
@@ -361,7 +362,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 /** `record`'s visible fields: the header a proving of the wayin it is seals over.
  *
- * @example await PassphraseProving.seal(vault, headerOf(vaultProps.passphrase), typed, { gating })
+ * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
  */
 export function headerOf(record: PassphraseWayinRecord): PassphraseWayinHeader
 export function headerOf(record: PasskeyWayinRecord): PasskeyWayinHeader
@@ -370,10 +371,11 @@ export function headerOf(record: PassphraseWayinRecord | PasskeyWayinRecord): Pa
   return header
 }
 
-/** The wayin record `vaultProps` hold at `slotlabel`, or null: a novel vault's, or no passkey. */
-const wayinRecordAt = (vaultProps: VaultProps, slotlabel: WayinKind): PassphraseWayinRecord | PasskeyWayinRecord | null => {
-  if (! isGated(vaultProps)) { return null }
-  return slotlabel === 'passphrase' ? vaultProps.passphrase : vaultProps.passkey
+/** The wayin record `vaultRecord`'s gate holds at `slotlabel`, or null: a novel vault's, or no passkey. */
+const wayinRecordAt = (vaultRecord: Pick<VaultRecord, 'gate'>, slotlabel: WayinKind): PassphraseWayinRecord | PasskeyWayinRecord | null => {
+  const { gate } = vaultRecord
+  if (gate === null) { return null }
+  return slotlabel === 'passphrase' ? gate.passphrase : gate.passkey
 }
 
 /** A fresh passphrase header: the vault's key deriver, a fresh salt of its length, this device's id, and the time now. */
@@ -468,7 +470,7 @@ const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker chang
 /** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `stamp`, as it stood when the seal began, and `gating` not landed ('gating_landed').
  * A seal begun on a vault with no gate was for the first: a gate standing now was made elsewhere ('gate_made_elsewhere').
  */
-const demandAfterFailedSeal = (vault: ProvingVault, stamp: Stamp, gating: ProvingGating) => {
+const demandAfterFailedSeal = (vault: ProvingVault, stamp: VaultSparse, gating: ProvingGating) => {
   insideOf(vault).demand(stamp, gating.call ?? 'demandConsistentWith', { firstGate: stamp.gate_epoch === 0 })
   if (gating.landed) { throw sealLandedError() }
 }

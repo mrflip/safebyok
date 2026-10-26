@@ -30,7 +30,7 @@ describe("Scopepath, the scopepath of each row", () => {
   })
 
   it("takes the scope out of any record carrying it, its other fields left out", () => {
-    const record = { ...TH.vaultPropsOf('u1'), boxlabel: 'openai' }
+    const record = { ...TH.vaultRecordOf('u1'), boxlabel: 'openai' }
     expect(Scopepath.vault(record)).to.eq('vault^acme^u1^main')
     expect(Scopepath.lease(record)).to.eq('lease^acme^u1^main')
     expect(Scopepath.bank(record)).to.eq('bank^acme^u1')

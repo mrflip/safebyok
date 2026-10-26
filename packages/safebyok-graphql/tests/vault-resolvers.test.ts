@@ -91,23 +91,23 @@ describe("vaultResolvers, in a host's schema", () => {
 
   it("answers a vault read with the records as stored, format and all, not a vault's summaries", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokGetVault, { ...u1 })
     const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('openai', 'r1')
-    expect(result.data).to.deep.equal({ safebyokGetVault: { vaultProps: TH.vaultPropsOf('u1'), boxes: [listed] } })
+    expect(result.data).to.deep.equal({ safebyokGetVault: { vaultProps: TH.vaultRecordOf('u1'), boxes: [listed] } })
   })
 
   it("takes a box expectation that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokPutBox, { ...u1, box: TH.boxOf('openai', 'r1'), expected: { vault_tok: 'vault-tok-u1' } })
     expect(result).to.deep.equal({ data: { safebyokPutBox: { landed: true, refusalkind: null, message: null, box_stored: TH.boxOf('openai', 'r1'), capacity: null } } })
   })
 
   it("answers a box delete with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('mistral', 'm1')))
     const named = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { ...u1, boxlabel: 'openai', expected: { vault_tok: 'vault-tok-u1', revision_tok: 'rev-r1' } })
@@ -120,7 +120,7 @@ describe("vaultResolvers, in a host's schema", () => {
 describe("vaultResolvers, reading a box", () => {
   it("answers a box read in the vault it names with the box, and crosses one naming another vault as vault_mismatch, its kind alone", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
     const read = await asked(TH.schemaOver(db), VaultOperations.safebyokGetBox, { ...u1, boxlabel: 'openai', expected: { vault_tok: 'vault-tok-u1' } })
     expect(read).to.deep.equal({ data: { safebyokGetBox: TH.boxOf('openai', 'r1') } })
@@ -133,7 +133,7 @@ describe("vaultResolvers, reading a box", () => {
 describe("vaultResolvers, deleting a vault", () => {
   it("answers the tombstone it leaves, and takes an expectation that leaves out its null gate_epoch as the damaged path's, which names the vault_tok alone", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     const stale = await asked(TH.schemaOver(db), VaultOperations.safebyokDelVault, { ...u1, expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
     expect(stale.errors?.[0]?.extensions).to.deep.equal({ kind: 'stale_write' })
     const deleted = await asked(TH.schemaOver(db), VaultOperations.safebyokDelVault, { ...u1, expected: { vault_tok: 'vault-tok-u1' } })
@@ -145,7 +145,7 @@ describe("vaultResolvers, deleting a vault", () => {
 const extensionsLogged = (result: ExecutionResult): string => JSON.stringify((result.errors ?? []).map((err) => err.extensions))
 
 describe("vaultResolvers, a write's answer in the body", () => {
-  const winner = TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 2 })
+  const winner = TH.vaultRecordOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 2 })
 
   /** u1's vault on `db` with vault props that a write expecting gate_epoch 1 finds stale. */
   const staleOver = async (maxBoxes?: number) => {
@@ -157,7 +157,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
 
   it("answers a stale update of the vault props landed false, with the winning props whole, and no error to log", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultPropsOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
     expect(result.errors).to.be.undefined
     expect(result.data).to.deep.equal({ safebyokPutVaultProps: {
       landed: false, refusalkind: 'stale_write', message: Refusals.StaleVaultPropsMessage, vault_props_stored: winner,
@@ -166,8 +166,8 @@ describe("vaultResolvers, a write's answer in the body", () => {
 
   it("answers an update of the vault props that landed landed true, naming no refusal and carrying the vault props as stored, their vault_epoch moved", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultPropsOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
-    expect(result).to.deep.equal({ data: { safebyokPutVaultProps: { landed: true, refusalkind: null, message: null, vault_props_stored: TH.vaultPropsOf('u1', { gate_epoch: 3, vault_epoch: 2 }) } } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
+    expect(result).to.deep.equal({ data: { safebyokPutVaultProps: { landed: true, refusalkind: null, message: null, vault_props_stored: TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 2 }) } } })
   })
 
   it("answers a stale box write landed false, with the winning box whole, and no error to log", async () => {
@@ -202,7 +202,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
   })
 
   it("crosses a stale_write from a verb that answers in no body as its kind alone, whatever meta a VaultDB hangs on it", async () => {
-    const standing = TH.vaultPropsOf('u1')
+    const standing = TH.vaultRecordOf('u1')
     const stale = new VaultError('stale_write', 'The vault changed.', { meta: { vault_props_stored: standing, box_stored: TH.boxOf('openai', 'r1') } })
     const { served } = fakeServed(() => Promise.resolve({ ok: false, err: stale }))
     const schema = TH.schemaOver(await TH.database(), () => served)
@@ -232,7 +232,7 @@ const OnU2Vault: [string, string, Record<string, unknown>][] = (() => {
   return [
     ['safebyokGetVault',      VaultOperations.safebyokGetVault,      { ...scope }],
     ['safebyokEnsureVault',   VaultOperations.safebyokEnsureVault,   { draft: TH.gatelessOf('u2', { vault_tok: 'vault-tok-late' }) }],
-    ['safebyokPutVaultProps', VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultPropsOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
+    ['safebyokPutVaultProps', VaultOperations.safebyokPutVaultProps, { vaultProps: TH.vaultRecordOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
     ['safebyokGetBox',        VaultOperations.safebyokGetBox,        { ...scope, boxlabel: 'openai', expected: { vault_tok } }],
     ['safebyokPutBox',        VaultOperations.safebyokPutBox,        { ...scope, box: TH.boxOf('openai', 'r2'), expected: { vault_tok, revision_tok: 'rev-r1' } }],
     ['safebyokGetCapacity',   VaultOperations.safebyokGetCapacity,   { ...scope }],
@@ -245,7 +245,7 @@ const OnU2Vault: [string, string, Record<string, unknown>][] = (() => {
 const withU2Vault = async () => {
   const db = await TH.emptyDatabase()
   const asU2 = TH.requestFor(db, 'u2')
-  await TH.ensureGated(asU2, TH.vaultPropsOf('u2'))
+  await TH.ensureGated(asU2, TH.vaultRecordOf('u2'))
   await TH.expectingGood(asU2).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('openai', 'r1'))
   return db
 }
@@ -354,7 +354,7 @@ describe("vaultResolvers, the subscription", () => {
     const changes = await subscribed(TH.schemaOver(db))
     const next = changes.next()
     await TH.aWhile()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     expect(await next).to.deep.equal({ done: false, value: { data: { safebyokVaultChanged: u1 } } })
     expect(await changes.return()).to.deep.equal({ done: true, value: undefined })
   })

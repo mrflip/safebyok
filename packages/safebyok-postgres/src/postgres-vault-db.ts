@@ -1,7 +1,7 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredVault, VaultProps } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredVault, VaultRecord } from 'safebyok'
 import * as Columns from './columns'
-import { VaultPropsColumns, ListedBoxColumns, BoxColumns, TombstoneColumns } from './columns'
+import { VaultRowColumns, ListedBoxColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
 
 /** What this VaultDB needs of a Postgres driver: one statement, its parameters numbered `$1` on, and the rows it returns.
@@ -106,7 +106,7 @@ const isPostgresClient = (client: unknown): client is PostgresClient => (
 
 // Every statement names its vault by these three parameters, first.
 const ScopeIs = 'applabel = $1::text AND user_id = $2::text AND vaultlabel = $3::text'
-const VaultPropsParamCount = VaultPropsColumns.length
+const VaultRowParamCount = VaultRowColumns.length
 // A box write's parameters: the scope, then $4 the expected vault_tok, $5 the expected
 // revision_tok (a replace) or the box limit (an insert), and the box's own columns from $6.
 const BoxParamsFrom = 6
@@ -120,7 +120,7 @@ const VaultBoxesJsonSql = (vaultRow: string) => `(SELECT COALESCE(json_agg(liste
   ) AS listed) AS boxes`
 
 // The vault props and their boxes, from one snapshot: no write lands between the two reads.
-const GetVaultSql = `SELECT ${Columns.selected(VaultPropsColumns)}, ${VaultBoxesJsonSql('vault')}
+const GetVaultSql = `SELECT ${Columns.selected(VaultRowColumns)}, ${VaultBoxesJsonSql('vault')}
   FROM safebyok_vaults AS vault WHERE ${ScopeIs}`
 
 // A vault created where none stands, and the boxes of the vault props it returns. Its scope
@@ -134,10 +134,10 @@ const GetVaultSql = `SELECT ${Columns.selected(VaultPropsColumns)}, ${VaultBoxes
 const EnsureVaultSql = `WITH carried AS (
     DELETE FROM safebyok_vault_tombstones WHERE ${ScopeIs} RETURNING vault_epoch
   ), ensured AS (
-    INSERT INTO safebyok_vaults (${Columns.names(VaultPropsColumns)})
-    SELECT ${Columns.placeholders(VaultPropsColumns, 1, { vault_epoch: `GREATEST(${Columns.placeholderOf(VaultPropsColumns, 'vault_epoch', 1)}, COALESCE((SELECT max(vault_epoch) FROM carried), 0))` })}
+    INSERT INTO safebyok_vaults (${Columns.names(VaultRowColumns)})
+    SELECT ${Columns.placeholders(VaultRowColumns, 1, { vault_epoch: `GREATEST(${Columns.placeholderOf(VaultRowColumns, 'vault_epoch', 1)}, COALESCE((SELECT max(vault_epoch) FROM carried), 0))` })}
     ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET format = safebyok_vaults.format
-    RETURNING ${Columns.selected(VaultPropsColumns)}
+    RETURNING ${Columns.selected(VaultRowColumns)}
   )
   SELECT ensured.*, ${VaultBoxesJsonSql('ensured')} FROM ensured`
 
@@ -149,15 +149,15 @@ const EnsureVaultSql = `WITH carried AS (
 // standing one plus one whatever the client sent. One row back, either way: `landed`, `stands`
 // (whether vault props stood), and their columns as written, or as locked on a miss.
 const PutVaultPropsSql = `WITH standing AS MATERIALIZED (
-    SELECT ${Columns.selected(VaultPropsColumns)} FROM safebyok_vaults WHERE ${ScopeIs} FOR UPDATE
+    SELECT ${Columns.selected(VaultRowColumns)} FROM safebyok_vaults WHERE ${ScopeIs} FOR UPDATE
   ), written AS (
-    UPDATE safebyok_vaults SET (${Columns.names(VaultPropsColumns)}) = ROW(${Columns.placeholders(VaultPropsColumns, 1, { vault_epoch: `vault_epoch + 1 + (${Columns.placeholderOf(VaultPropsColumns, 'vault_epoch', 1)} * 0)` })})
+    UPDATE safebyok_vaults SET (${Columns.names(VaultRowColumns)}) = ROW(${Columns.placeholders(VaultRowColumns, 1, { vault_epoch: `vault_epoch + 1 + (${Columns.placeholderOf(VaultRowColumns, 'vault_epoch', 1)} * 0)` })})
     WHERE ${ScopeIs}
-      AND vault_tok = $${String(VaultPropsParamCount + 1)}::text AND gate_epoch = $${String(VaultPropsParamCount + 2)}::bigint
-      AND vault_tok = ${Columns.placeholderOf(VaultPropsColumns, 'vault_tok', 1)}
-      AND gate_epoch < ${Columns.placeholderOf(VaultPropsColumns, 'gate_epoch', 1)}
+      AND vault_tok = $${String(VaultRowParamCount + 1)}::text AND gate_epoch = $${String(VaultRowParamCount + 2)}::bigint
+      AND vault_tok = ${Columns.placeholderOf(VaultRowColumns, 'vault_tok', 1)}
+      AND gate_epoch < ${Columns.placeholderOf(VaultRowColumns, 'gate_epoch', 1)}
       AND EXISTS (SELECT 1 FROM standing)
-    RETURNING ${Columns.selected(VaultPropsColumns)}
+    RETURNING ${Columns.selected(VaultRowColumns)}
   )
   SELECT EXISTS (SELECT 1 FROM written) AS landed, EXISTS (SELECT 1 FROM standing) AS stands, stored.*
   FROM (SELECT 1) AS answer LEFT JOIN (
@@ -328,21 +328,21 @@ class TablesVaultDB extends VaultDB {
     return rows.length === 0 ? { vaultProps: null, boxes: [] } : storedVaultOf(rows[0])
   }
 
-  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
     this.mustReach(draft)
-    const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(draft, VaultPropsColumns))
+    const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(rowOfVaultRecord(draft), VaultRowColumns))
     return storedVaultOf(rows[0])
   }
 
   // What a miss reports is the row as the statement's FOR UPDATE read it; what a write that lands
   // answers is the row as the statement's UPDATE left it.
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
-    this.mustReach(vaultProps)
-    const params = [...Columns.paramsOf(vaultProps, VaultPropsColumns), expected.vault_tok, expected.gate_epoch]
+  protected async doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+    this.mustReach(vaultRecord)
+    const params = [...Columns.paramsOf(rowOfVaultRecord(vaultRecord), VaultRowColumns), expected.vault_tok, expected.gate_epoch]
     const { rows } = await this.sent(PutVaultPropsSql, params)
     const answer = rows[0] as { landed: boolean, stands: boolean }
-    if (answer.landed) { return Columns.recordOf(answer, VaultPropsColumns) }
-    throw Refusals.staleVaultProps(answer.stands ? Columns.recordOf(answer, VaultPropsColumns) : null)
+    if (answer.landed) { return vaultRecordOfRow(Columns.recordOf(answer, VaultRowColumns)) }
+    throw Refusals.staleVaultProps(answer.stands ? vaultRecordOfRow(Columns.recordOf(answer, VaultRowColumns)) : null)
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
@@ -483,7 +483,7 @@ const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user
 const storedVaultOf = (row: unknown): StoredVault => {
   const listed = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
   return {
-    vaultProps: Columns.recordOf(row, VaultPropsColumns),
+    vaultProps: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)),
     boxes:      listed.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, ListedBoxColumns) })),
   }
 }

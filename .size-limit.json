@@ -1,10 +1,10 @@
 [
-  { "name": "everything", "path": "packages/safebyok/dist/index.js", "limit": "65 kB" },
+  { "name": "everything", "path": "packages/safebyok/dist/index.js", "limit": "66 kB" },
   { "name": "Bank", "path": "packages/safebyok/dist/index.js", "import": "{ Bank }", "limit": "58 kB" },
   { "name": "stableJsonify", "path": "packages/safebyok/dist/index.js", "import": "{ stableJsonify }", "limit": "3.5 kB" },
   { "name": "argon2idWebV1Deriver", "path": "packages/safebyok/dist/index.js", "import": "{ argon2idWebV1Deriver }", "limit": "8.5 kB" },
   { "name": "idbDeviceDB", "path": "packages/safebyok/dist/idb.js", "import": "{ idbDeviceDB }", "limit": "32 kB" },
-  { "name": "browserOpts", "path": "packages/safebyok/dist/browser.js", "import": "{ browserOpts }", "entry": ["index"], "limit": "38 kB" },
+  { "name": "browserOpts", "path": "packages/safebyok/dist/browser.js", "import": "{ browserOpts }", "entry": ["index"], "limit": "37 kB" },
   { "name": "mask", "path": "packages/safebyok/dist/utils.js", "import": "{ mask }", "limit": "29 kB" },
   { "name": "argon2idWasmWebV1Deriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmWebV1Deriver }", "limit": "13 kB" },
   { "name": "argon2idWasmDeriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmDeriver }", "limit": "38 kB" },

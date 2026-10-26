@@ -1,8 +1,8 @@
-import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import { BoxRecord } from '../../src/box'
-import { DeviceRecord, Tombstone, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../../src/types/types'
+import { DeviceRecord, LeaseRecord, BoxSummary, Sidecar, VaultScope, Whisper } from '../../src/types/types'
+import { VaultRecord, VaultTombstone } from '../../src/vault-record'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [
@@ -55,109 +55,6 @@ describe("VaultScope", () => {
   for (const [candidate, expected, blurb] of ScopeCases) {
     it(blurb, () => { expect(VaultScope.safeParse(candidate).success).to.eq(expected) })
   }
-})
-
-/** An ISO time, as records stored them before every time became epoch milliseconds. */
-const OldIso = '2026-10-14T00:00:00.000Z'
-const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
-const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
-const { passkey: _noPasskey, ...vaultPropsWithoutPasskey } = TH.vaultPropsOf('u1')
-const { gate_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
-/** The three fields the vault props held their one passphrase in, before it was a way in. */
-const WayinFieldsOfOld = {
-  key_deriver_label:            'test_digest_v0',
-  // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- base64 of the literal text 'saltsaltsaltsalt': a fake salt (which is public material anyway), not a credential
-  passphrase_salt_b64:          'c2FsdHNhbHRzYWx0c2FsdA',
-  vault_key_passphrase_wrapped: TH.fakeCiphered('old'),
-}
-
-
-const VaultPropsCases = [
-  // regular usage:
-  [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
-  // refused, as a damaged or foreign record:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' }, false,  'a format this version does not know'],
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1, passphrase: { ...TH.wayinOf('passphrase'), vault_key_epoch: 1 } }, false, 'v5 vault props, which carried a vaultKey epoch'],
-  [{ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v3' }, false,  'vault props from before the prior vaultKey went'],
-  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },              false,  'an epoch starts at one'],
-  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 1.5 },            false,  'an epoch is a whole number'],
-  [{ ...TH.vaultPropsOf('u1'), vault_tok: '' },              false,  'an empty vault_tok'],
-  [TH.vaultPropsOf('u'.repeat(101)),                        false,  'a user_id over a hundred characters'],
-  [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
-  [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, 'a passphrase missing its ciphertext'],
-  [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 }, false,  'a registered_at in epoch seconds'],
-  [{ ...TH.vaultPropsOf('u1'), registered_at: Infinity },    false,  'a registered_at that never comes'],
-  [{ ...TH.vaultPropsOf('u1'), registered_at: OldIso },      false,  'a registered_at as an ISO string'],
-  [vaultPropsWithoutTime,                                   false,  'vault props missing their registered_at'],
-  [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
-  [{ ...vaultPropsWithoutSlots, ...WayinFieldsOfOld },       false,  'vault props from before their passphrase was a way in'],
-  [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named gate_epoch'],
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
-] as const
-
-const SlotCases = [
-  // regular usage:
-  [{ passkey: null },                                                      true,   'a passphrase and no passkey'],
-  [{ passkey: TH.passkeyWayinOf('laptop') },                               true,   'a passphrase and a passkey'],
-  // refused, as a damaged or foreign record:
-  [{ passphrase: null },                                                   false,  'no passphrase at all'],
-  [{ passkey: [TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone')] }, false,  'a list of passkeys where there is room for one'],
-  [{ passphrase: TH.passkeyWayinOf('laptop') },                            false,  'a passkey in the passphrase slot'],
-  [{ passkey: TH.wayinOf('passphrase') },                                  false,  'a passphrase in the passkey slot'],
-  [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, 'a wayinkind this version does not know'],
-  [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'passkey' as never }) },     false, "a passphrase's fields under the passkey wayinkind"],
-  [{ passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) },        false,  'a passkey with an empty credential_id'],
-  [{ passkey: TH.passkeyWayinOf('laptop', { prf_salt_b64: '' as never }) },         false,  'a passkey with an empty salt'],
-  [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' as never }) },             false,  'an empty salt'],
-  [{ passphrase: TH.wayinOf('passphrase', { device_id: '' }) },            false,  'an empty device_id'],
-  [{ passkey: TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 }) }, false, 'a registered_at in epoch seconds'],
-] as const
-
-describe("VaultProps.passphrase and VaultProps.passkey", () => {
-  for (const [slots, expected, blurb] of SlotCases) {
-    it(blurb, () => { expect(VaultProps.safeParse({ ...TH.vaultPropsOf('u1'), ...slots }).success).to.eq(expected) })
-  }
-
-  it("refuses vault props with no passkey field: a vault without one says so with null", () => {
-    expect(VaultProps.safeParse(vaultPropsWithoutPasskey).success).to.be.false
-  })
-})
-
-describe("VaultProps", () => {
-  for (const [candidate, expected, blurb] of VaultPropsCases) {
-    it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
-  }
-})
-
-const GatelessCases = [
-  // regular usage:
-  [TH.gatelessOf('u1'),                                                     true,   "gateless vault props: gate_epoch 0, and no way in, as GatelessVaultProps' example shows"],
-  [TH.vaultPropsOf('u1'),                                                   true,   'gated vault props: gate_epoch 1, and a passphrase'],
-  // refused, as a damaged record:
-  [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                               false,  'a gated epoch with no passphrase: a gate that lost its way in'],
-  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },                             false,  'a passphrase at gate_epoch 0'],
-  [{ ...TH.gatelessOf('u1'), passkey: TH.passkeyWayinOf('laptop') },        false,  'a passkey with no gate'],
-  [{ ...TH.gatelessOf('u1'), gate_epoch: -1 },                              false,  'a gate_epoch below 0'],
-  [omit(TH.gatelessOf('u1'), ['passphrase']),                               false,  'gateless vault props that leave out the passphrase slot, rather than saying null'],
-] as const
-
-describe("VaultProps, gated or gateless", () => {
-  for (const [candidate, expected, blurb] of GatelessCases) {
-    it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
-  }
-
-  it("tells the two shapes apart: gateless props are no GatedVaultProps, and gated ones no GatelessVaultProps", () => {
-    expect(GatedVaultProps.safeParse(TH.gatelessOf('u1')).success).to.be.false
-    expect(GatelessVaultProps.safeParse(TH.vaultPropsOf('u1')).success).to.be.false
-  })
-})
-
-describe("isGated", () => {
-  it("is true for gated vault props and false for gateless ones, as its example tells them apart", () => {
-    expect(isGated(TH.vaultPropsOf('u1'))).to.be.true
-    expect(isGated(TH.gatelessOf('u1'))).to.be.false
-  })
 })
 
 const SidecarCases = [
@@ -249,22 +146,35 @@ describe("DeviceRecord", () => {
 // After a bump, the new format's snapshot is written once (`vitest -u`), and the old one goes as
 // obsolete: never update the snapshot of a format that stands. A refinement (a `.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
-// the ranges a check states, not every rule.
-// Each schema beside its format: the vault props are a union of two shapes under one format.
+// the ranges a check states, not every rule. Each is rendered twice. As output, it shows every
+// field's shape, a sidecar's JSON among them. As input, a strict record shows
+// `additionalProperties: false` and a stripping one does not, which output renders alike: so
+// strictness is guarded too.
 const StoredRecords = [
-  [GatedVaultProps.shape.format, VaultProps],
+  [VaultRecord.shape.format, VaultRecord],
   [BoxRecord.shape.format, BoxRecord],
   [LeaseRecord.shape.format, LeaseRecord],
-  [DeviceRecord.shape.format, DeviceRecord],
-  [Tombstone.shape.format, Tombstone],
+  [DeviceRecord.unwrap().shape.format, DeviceRecord],
+  [VaultTombstone.shape.format, VaultTombstone],
 ] as const
 
 describe("Stored record formats", () => {
   for (const [formatSchema, schema] of StoredRecords) {
     const format = formatSchema.def.values.join(' | ')
     it(format, () => {
-      const rendered = Zod.toJSONSchema(schema, { unrepresentable: 'any' })
+      const rendered = {
+        output: Zod.toJSONSchema(schema, { unrepresentable: 'any' }),
+        input:  Zod.toJSONSchema(schema, { unrepresentable: 'any', io: 'input' }),
+      }
       expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed, bump format, then write the new format's snapshot (vitest -u)`).toMatchSnapshot()
     })
   }
+
+  it("renders a stripping schema apart from a strict one as input, where output renders them alike, so strictness shows in the guard", () => {
+    const strict = Zod.object({ field: Zod.string() }).strict()
+    const stripping = Zod.object({ field: Zod.string() })
+    expect(Zod.toJSONSchema(strict, { io: 'input' })).to.include({ additionalProperties: false })
+    expect(Zod.toJSONSchema(stripping, { io: 'input' })).to.not.have.property('additionalProperties')
+    expect(Zod.toJSONSchema(stripping)).to.include({ additionalProperties: false })
+  })
 })

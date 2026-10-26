@@ -1,12 +1,13 @@
 import { BoxRecord } from './box'
-import type { GatelessVaultProps, VaultScope, VaultProps } from './types/types'
+import type { VaultScope } from './types/types'
+import type { VaultRecord } from './vault-record'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -79,12 +80,12 @@ class StringStoreVaultDB extends VaultDB {
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
-  // read of a vault reads its props and its boxes in one such step.
+  // read of a vault reads its record and its boxes in one such step.
   protected doGetVault(scope: VaultScope): Promise<StoredVault> {
     return soon(() => ({ vaultProps: readJson(this.store, Scopepath.vault(scope)), boxes: this.storedBoxesOf(scope) }))
   }
 
-  protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
       const standing = readJson(this.store, vaultScopepath)
@@ -94,13 +95,13 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
+  protected doPutVaultProps(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
-      const vaultScopepath = Scopepath.vault(vaultProps)
+      const vaultScopepath = Scopepath.vault(vaultRecord)
       const standing = readJson(this.store, vaultScopepath)
       const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
       if (refusal) { throw refusal }
-      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultPropsPutOf(vaultProps, standing)))
+      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultPropsPutOf(vaultRecord, standing)))
       return readJson(this.store, vaultScopepath)
     })
   }
@@ -160,7 +161,7 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  // The tombstone takes the place of the vault props, in their row, so a scope holds one or the other.
+  // The tombstone takes the place of the vault record, in its row, so a scope holds one or the other.
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(scope)

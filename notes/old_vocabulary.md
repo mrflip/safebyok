@@ -143,3 +143,7 @@ To be deleted at 1.0.0.
 | `userId` (a draft's field, `BankProvider`'s prop, `postgresVaultDB`'s option) | `user_id`, as stored |
 | `PasskeyAnswer`'s `credentialId`, `prfSaltB64`          | `credential_id`, `prf_salt_b64`, as the wayin stores them |
 | the snapshot's and `vault.askPassphraseAt`             | `ask_passphrase_at`, as the lease stores it             |
+| vault props, `VaultProps`, `GatedVaultProps`, `GatelessVaultProps`; their flat `passphrase` and `passkey` | vault record, `VaultRecord`, its `gate` nested (`GateRecord`), null while novel |
+| `Tombstone`, `VaultPropsExpectation`, `LeaseView`, `LeaseStanding` | `VaultTombstone`, `VaultRecordExpectation`, `LeaseSparse`, `Pick<VaultSparse, 'vault_tok' \| 'gate_epoch'>` |
+| `Stamp`, `Stamped` (the scope, `vault_tok` and both epochs) | `VaultSparse`; `Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>` written out |
+| `TH.vaultPropsOf`, `TH.propsOf`, `gate.storedFields`   | `TH.vaultRecordOf` (and `TH.gateOf`), `TH.vaultRecordIn`, `gate.record` |

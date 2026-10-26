@@ -116,7 +116,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id, maxBoxes: 1 }))
     // A browser declaring more than its server holds: the server holds the line.
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: Infinity })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
     const refusal = await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('secret_project_x', 'sk-fake-two')), 'vault_full')
     expect(refusal).to.be.instanceOf(VaultError)
@@ -132,7 +132,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id }))
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1') })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
     const capacity = await TH.expectingGood(vaultDB).getCapacity(u1)
     expect(capacity.boxes).to.deep.equal({ used: 1, max: Number.MAX_SAFE_INTEGER })
@@ -173,18 +173,18 @@ describe("graphqlVaultDB, as the README has it", () => {
   it("never lets the Client's cache answer: a read after another device's write sees it", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const browser = TH.browserFor(schema, 'u1')
-    expect(await TH.propsOf(browser, u1)).to.be.null
-    await TH.ensureGated(TH.browserFor(schema, 'u1'), TH.vaultPropsOf('u1'))
-    expect(await TH.propsOf(browser, u1)).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(await TH.vaultRecordIn(browser, u1)).to.be.null
+    await TH.ensureGated(TH.browserFor(schema, 'u1'), TH.vaultRecordOf('u1'))
+    expect(await TH.vaultRecordIn(browser, u1)).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 })
 
 describe("graphqlVaultDB, carrying a passkey's way in", () => {
   it("stores vault props holding a passkey and reads them back exactly", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const withPasskey = TH.vaultPropsOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
+    const withPasskey = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
     await TH.ensureGated(TH.browserFor(schema, 'u1'), withPasskey)
-    expect(await TH.propsOf(TH.browserFor(schema, 'u1'), u1)).to.deep.equal(withPasskey)
+    expect(await TH.vaultRecordIn(TH.browserFor(schema, 'u1'), u1)).to.deep.equal(withPasskey)
   })
 
   it("lets a real vault add a passkey through it, an update of its props, and unlock it on another device with that passkey alone", async () => {
@@ -309,8 +309,8 @@ describe("graphqlVaultDB, its refusals", () => {
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     const past = 2 ** 31
     const refusals = [
-      await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
-      await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
+      await TH.expectBad(vaultDB.putVaultProps(TH.vaultRecordOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
+      await TH.expectBad(vaultDB.putVaultProps(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
       await TH.expectBad(vaultDB.delVault(u1, { ...thisVault, gate_epoch: past }), 'bad_record'),
     ]
     expect(refusals.map((refusal) => /^Nothing was (written|removed): .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true, true])
@@ -321,7 +321,7 @@ describe("graphqlVaultDB, its refusals", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = TH.browserFor(schema, 'u1')
     const most = (2 ** 31) - 1
-    const created = await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1', { gate_epoch: most }))
+    const created = await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1', { gate_epoch: most }))
     expect(created.gate_epoch).to.eq(most)
   })
 
@@ -354,7 +354,7 @@ describe("graphqlVaultDB, its refusals", () => {
 
   it("refuses a write that came back not landed and naming no kind as corrupt_record, quoting nothing of the answer", async () => {
     const vague = answering({ safebyokPutVaultProps: { landed: false, refusalkind: 'made_up', message: 'sk-ant-not-a-real-key', vault_props_stored: null } })
-    const refusal = await TH.expectBad(vague.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
+    const refusal = await TH.expectBad(vague.putVaultProps(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.not.include('sk-ant')
   })
 
@@ -386,7 +386,7 @@ describe("graphqlVaultDB, hearing other writes", () => {
   it("hears another device's write to its vault, and stops when unsubscribed", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const elsewhere = TH.browserFor(schema, 'u1')
-    await TH.ensureGated(elsewhere, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
     const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), u1)
     await TH.expectingGood(elsewhere).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1'))
     await TH.eventually(() => heard.count === 1)
@@ -399,8 +399,8 @@ describe("graphqlVaultDB, hearing other writes", () => {
   it("hears nothing of another vault's writes", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), u1)
-    await TH.ensureGated(TH.browserFor(schema, 'u2'), TH.vaultPropsOf('u2'))
-    await TH.ensureGated(TH.browserFor(schema, 'u1'), TH.vaultPropsOf('u1', { vaultlabel: 'spare' }))
+    await TH.ensureGated(TH.browserFor(schema, 'u2'), TH.vaultRecordOf('u2'))
+    await TH.ensureGated(TH.browserFor(schema, 'u1'), TH.vaultRecordOf('u1', { vaultlabel: 'spare' }))
     await TH.aWhile()
     expect(heard.count).to.eq(0)
     unsubscribe()
@@ -411,7 +411,7 @@ describe("graphqlVaultDB, hearing other writes", () => {
     const { heard, onChange } = TH.changeCounter()
     const spy = TH.spyLogger()
     const unsubscribe = TH.browserFor(schema, 'u1', { logger: spy.logger }).subscribe(TH.scopeOf('u2'), onChange)
-    await TH.ensureGated(TH.browserFor(schema, 'u2'), TH.vaultPropsOf('u2'))
+    await TH.ensureGated(TH.browserFor(schema, 'u2'), TH.vaultRecordOf('u2'))
     await TH.aWhile()
     expect(heard.count).to.eq(1)
     expect(spy.calls.map((call) => [call.level, call.story])).to.deep.equal([['warn', { call: 'subscribe' }]])

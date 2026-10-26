@@ -1,4 +1,5 @@
-import { type DeviceRecord, type GatelessVaultProps, type VaultScope, DeviceRecordFormat } from './types/types'
+import type { VaultScope } from './types/types'
+import { type VaultRecord, VaultFormat } from './vault-record'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { randomId } from './crypto'
@@ -9,7 +10,7 @@ import type * as Z from 'zod'
 import { Validator, sayable } from './checks/validator'
 import * as Phrases from './phrases'
 import * as RefusalPolicy from './refusal-policy'
-import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
@@ -508,13 +509,13 @@ export class Bank {
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
     const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), deviceDB.getLease(scope)])
-    const { vaultProps, boxes } = valOf(ensured)
-    if (recordBefore !== null && vaultProps.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
+    const { vaultProps: vaultRecord, boxes } = valOf(ensured)
+    if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
-    const raising: DeviceRecord = { format: DeviceRecordFormat, ...scope, device_id: recordBefore?.device_id ?? randomId(), highest_vault_epoch: vaultProps.vault_epoch }
+    const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.raiseDeviceRecord(raising))) ?? raising
-    const vault: Vault = Vault[bear](parts, { vaultProps, listed: boxes, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultRecord, listed: boxes, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 
@@ -617,10 +618,11 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
   if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
 }
 
-/** The gateless vault props a birth hands `VaultDB.ensureVault`: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
-const draftOf = (scope: VaultScope, now: number): GatelessVaultProps => ({
-  format: 'safebyok-vault-v6', ...scope, vault_tok: randomId(), vault_epoch: 0, registered_at: now, gate_epoch: 0, passphrase: null, passkey: null,
-})
+/** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
+const draftOf = (scope: VaultScope, now: number): VaultRecord & { gate: null } => {
+  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
+  return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
+}
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 

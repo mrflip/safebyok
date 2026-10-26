@@ -4,7 +4,8 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceRecord, type LeaseRecord, type Stamp } from '../../src/types/types'
+import type { VaultScope, PasskeyAnswer, ListedSummary, DamagedBox, DeviceRecord, LeaseRecord } from '../../src/types/types'
+import { type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, VaultFormat } from '../../src/vault-record'
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
@@ -66,7 +67,7 @@ export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'va
 
 /** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */
 export type LeasedSlice = VaultSlice & {
-  stamp:                Stamp
+  stamp:                VaultSparse
   lease:                Lease | null
   /** True once the test has the vault gone: its demand then refuses 'vault_gone'. */
   gone:                 boolean
@@ -91,7 +92,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
   const vaultTok = base.vault_tok
   const slice: LeasedSlice = {
     ...base,
-    stamp: Object.freeze({ applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, vault_epoch: 1, gate_epoch: 1 }),
+    stamp: Object.freeze({ format: VaultFormat, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, registered_at: Date.UTC(2026, 9, 14), vault_epoch: 1, gate_epoch: 1 }),
     lease: null,
     gone:  false,
     locks: 0,
@@ -234,7 +235,7 @@ export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ 
  * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by `device-one`.
  *
- * @example wayinOf('passphrase')                                            // as vaultPropsOf's, but for its wrap
+ * @example wayinOf('passphrase')                                            // as gateOf's, but for its wrap
  * @example wayinOf('home_phrase', { registered_at: Date.UTC(2026, 9, 15) })
  */
 export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
@@ -254,7 +255,7 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
  * by `device-one`.
  *
  * @example passkeyWayinOf('laptop')
- * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
+ * @example gateOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
 export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecord> = {}): PasskeyWayinRecord => ({
   wayinkind:               'passkey',
@@ -289,45 +290,57 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
   return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
 }
 
-/** Shape-valid gated vault props for `user_id`'s `main` vault, its passphrase's wrap fake and no passkey.
- * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<user_id>`, its
- * gate_epoch 1, and its passphrase a {@link wayinOf} whose wrap is `vault-<user_id>`.
+/** A vault record whose gate is made: what {@link vaultRecordOf} makes. */
+export type GatedRecord = VaultRecord & { gate: GateRecord }
+
+/** A shape-valid gate for `user_id`'s `main` vault: its passphrase a {@link wayinOf} whose wrap is `vault-<user_id>`, and no passkey.
+ * For storage-layer tests, which never decrypt. Any field as `overrides` says otherwise.
  *
- * @example vaultPropsOf('u1', { gate_epoch: 2 })
- * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
+ * @example gateOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
-export const vaultPropsOf = (user_id: string, overrides: Partial<GatedVaultProps> = {}): GatedVaultProps => ({
-  format:              'safebyok-vault-v6',
-  ...scopeOf(user_id),
-  vault_tok:           `vault-tok-${user_id}`,
-  vault_epoch:         1,
-  gate_epoch:          1,
+export const gateOf = (user_id: string, overrides: Partial<GateRecord> = {}): GateRecord => ({
   passphrase:          wayinOf(`vault-${user_id}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${user_id}`) }),
   passkey:             null,
-  registered_at:       Date.UTC(2026, 9, 14),
   ...overrides,
 })
 
-/** Store `vaultProps` in `vaultDB` as a first unlock does: the vault ensured gateless, then its gate written over it expecting `gate_epoch` 0.
- * Resolves the vault props as stored, so with `vault_epoch` the store's: 1 after the first gate.
- * Vault props already standing gated are resolved as they stand, as `ensureVault` leaves them.
+/** A shape-valid gated vault record for `user_id`'s `main` vault, its gate a {@link gateOf}'s.
+ * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<user_id>`, its
+ * vault_epoch and gate_epoch 1.
+ *
+ * @example vaultRecordOf('u1', { gate_epoch: 2 })
+ * @example vaultRecordOf('u1', { gate: gateOf('u1', { passkey: passkeyWayinOf('laptop') }) })
+ */
+export const vaultRecordOf = (user_id: string, overrides: Partial<GatedRecord> = {}): GatedRecord => ({
+  format:              VaultFormat,
+  ...scopeOf(user_id),
+  vault_tok:           `vault-tok-${user_id}`,
+  registered_at:       Date.UTC(2026, 9, 14),
+  vault_epoch:         1,
+  gate_epoch:          1,
+  gate:                gateOf(user_id),
+  ...overrides,
+})
+
+/** Store `vaultRecord` in `vaultDB` as a first unlock does: the vault ensured novel, then its gate written over it expecting `gate_epoch` 0.
+ * Resolves the vault record as stored, so with `vault_epoch` the store's: 1 after the first gate.
+ * A vault record already standing gated is resolved as it stands, as `ensureVault` leaves it.
  * Throws the refusal of whichever step is refused. For setting a storage-layer test's scene.
  *
- * @example const stored = await ensureGated(vaultDB, vaultPropsOf('u1'))   // stored.vault_epoch is 1
- * @example await ensureGated(vaultDB, vaultPropsOf('u1', { gate_epoch: 2 }))
+ * @example const stored = await ensureGated(vaultDB, vaultRecordOf('u1'))   // stored.vault_epoch is 1
+ * @example await ensureGated(vaultDB, vaultRecordOf('u1', { gate_epoch: 2 }))
  */
-export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultProps'>, vaultProps: GatedVaultProps): Promise<GatedVaultProps> => {
-  const { vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, passphrase: _passphrase, passkey: _passkey, ...head } = vaultProps
-  const ensured = valOf(await vaultDB.ensureVault({ ...head, vault_epoch: 0, gate_epoch: 0, passphrase: null, passkey: null })).vaultProps
-  if (ensured.gate_epoch > 0) { return ensured as GatedVaultProps }
-  return valOf(await vaultDB.putVaultProps({ ...vaultProps, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedVaultProps
+export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultProps'>, vaultRecord: GatedRecord): Promise<GatedRecord> => {
+  const ensured = valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })).vaultProps
+  if (ensured.gate_epoch > 0) { return ensured as GatedRecord }
+  return valOf(await vaultDB.putVaultProps({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedRecord
 }
 
-/** The vault props `scope` holds in `vaultDB`, as `getVault` reads them, or null for none. Throws the refusal of a read that is refused.
+/** The vault record `scope` holds in `vaultDB`, as `getVault` reads it, or null for none. Throws the refusal of a read that is refused.
  *
- * @example expect(await propsOf(vaultDB, scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
+ * @example expect(await vaultRecordIn(vaultDB, scopeOf('u1'))).to.deep.equal(vaultRecordOf('u1'))
  */
-export const propsOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<VaultProps | null> => (
+export const vaultRecordIn = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<VaultRecord | null> => (
   valOf(await vaultDB.getVault(scope))?.vaultProps ?? null
 )
 
@@ -339,21 +352,20 @@ export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultSc
   valOf(await vaultDB.getVault(scope))?.boxes ?? []
 )
 
-/** The gateless vault props a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no way in.
- * Otherwise as {@link vaultPropsOf} makes them, its vault_tok `vault-tok-<user_id>`.
+/** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
+ * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`.
  *
  * @example vaultDB.ensureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
  */
-export const gatelessOf = (user_id: string, overrides: Partial<GatelessVaultProps> = {}): GatelessVaultProps => ({
-  format:              'safebyok-vault-v6',
+export const gatelessOf = (user_id: string, overrides: Partial<VaultRecord & { gate: null, gate_epoch: 0 }> = {}): VaultRecord & { gate: null, gate_epoch: 0 } => ({
+  format:              VaultFormat,
   ...scopeOf(user_id),
   vault_tok:           `vault-tok-${user_id}`,
+  registered_at:       Date.UTC(2026, 9, 14),
   vault_epoch:         0,
   gate_epoch:          0,
-  passphrase:          null,
-  passkey:             null,
-  registered_at:       Date.UTC(2026, 9, 14),
+  gate:                null,
   ...overrides,
 })
 
@@ -396,14 +408,14 @@ export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | Damage
 }
 
 /**
- * What a write into {@link vaultPropsOf}('u1')'s vault expects when its box is not there yet:
+ * What a write into {@link vaultRecordOf}('u1')'s vault expects when its box is not there yet:
  * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
  *
  * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
 export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
 
-/** What a box read in {@link vaultPropsOf}('u1')'s vault expects: that vault.
+/** What a box read in {@link vaultRecordOf}('u1')'s vault expects: that vault.
  * Frozen, since every test shares it.
  *
  * @example vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
@@ -411,7 +423,7 @@ export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok:
 export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
 
 /**
- * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault, at its first gate.
+ * What a deletion of {@link vaultRecordOf}('u1')'s vault expects: that vault, at its first gate.
  * Frozen, since every test shares it.
  *
  * @example vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault)
@@ -419,7 +431,7 @@ export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
 export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 1 } as const)
 
 /**
- * What a deletion of a box in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
+ * What a deletion of a box in {@link vaultRecordOf}('u1')'s vault expects: that vault, and
  * the revision the deleting device read -- `rev-` and its tag, for a box {@link boxOf} made --
  * or null, for one listed with none.
  *

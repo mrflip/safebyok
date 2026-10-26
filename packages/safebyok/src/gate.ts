@@ -1,13 +1,13 @@
 import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
-import { type GatedVaultProps, type VaultProps, isGated } from './types/types'
+import { type GateRecord, type VaultRecord, isGated } from './vault-record'
 import type { Vault } from './vault'
 import { type PasskeyWayin, type PassphraseWayin, Wayin, type WayinVault } from './wayin'
 
 /** Gates: a vault's ways in as one frozen value, its passphrase wayin and its passkey wayin or none, at one `gate_epoch`.
  * A chain builds the next gate from the one it captured at its start, its base, and
- * `vault.putGate` stores it over that base alone. The stored vault props keep the gate's fields
- * flat beside the vault's own.
+ * `vault.putGate` stores it over that base alone. The vault record holds it as its `gate`, a
+ * {@link GateRecord}, its `gate_epoch` beside it.
  */
 
 /** The slice of a {@link Vault} a gate reads: its scope, the `vault_tok` it is of, and what its wayins read. */
@@ -21,7 +21,7 @@ export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | 
  * its base, or is itself ({@link Gate.isHeldBy}), as once a read took it after it was stored. A spread, JSON or a log line shows its stamp and
  * its wayins' visible fields.
  *
- * @example const next = Gate.make(vault, { base: Gate.of(vault, vaultProps), passphrase: wayin, passkey: null })
+ * @example const next = Gate.make(vault, { base: Gate.of(vault, vaultRecord), passphrase: wayin, passkey: null })
  * @example next.gate_epoch === next.base_epoch + 1   // true
  */
 export class Gate {
@@ -68,29 +68,29 @@ export class Gate {
     return new Gate(vault, vaultTok, props.base?.gate_epoch ?? 0, { passphrase: props.passphrase, passkey: props.passkey })
   }
 
-  /** The gate `vaultProps` hold, as stored: its base one epoch below.
+  /** The gate `vaultRecord` holds, as stored: its base one epoch below.
    *
-   * @example Gate.of(vault, vaultProps).gate_epoch === vaultProps.gate_epoch   // true
+   * @example Gate.of(vault, vaultRecord).gate_epoch === vaultRecord.gate_epoch   // true
    */
-  static of(vault: GateVault, vaultProps: GatedVaultProps): Gate {
-    return new Gate(vault, vaultProps.vault_tok, vaultProps.gate_epoch - 1, {
-      passphrase: Wayin.make(vault, vaultProps.vault_tok, vaultProps.passphrase),
-      passkey:    vaultProps.passkey === null ? null : Wayin.make(vault, vaultProps.vault_tok, vaultProps.passkey),
+  static of(vault: GateVault, vaultRecord: Pick<VaultRecord, 'vault_tok' | 'gate_epoch'> & { gate: GateRecord }): Gate {
+    const { vault_tok: vaultTok, gate } = vaultRecord
+    return new Gate(vault, vaultTok, vaultRecord.gate_epoch - 1, {
+      passphrase: Wayin.make(vault, vaultTok, gate.passphrase),
+      passkey:    gate.passkey === null ? null : Wayin.make(vault, vaultTok, gate.passkey),
     })
   }
 
-  /** True when `vaultProps` hold this gate: its epoch, and each of its wayins' records.
+  /** True when `vaultRecord` holds this gate: its epoch, and each of its wayins' records.
    *
-   * @example Gate.of(vault, vaultProps).isHeldBy(vaultProps)   // true
+   * @example Gate.of(vault, vaultRecord).isHeldBy(vaultRecord)   // true
    */
-  isHeldBy(vaultProps: VaultProps): boolean {
-    if (! isGated(vaultProps)) { return false }
-    const { gate_epoch, passphrase, passkey } = vaultProps
-    return stableJsonify({ gate_epoch, passphrase, passkey }) === stableJsonify(this.storedFields)
+  isHeldBy(vaultRecord: Pick<VaultRecord, 'gate_epoch' | 'gate'>): boolean {
+    if (! isGated(vaultRecord)) { return false }
+    return vaultRecord.gate_epoch === this.gate_epoch && stableJsonify(vaultRecord.gate) === stableJsonify(this.record)
   }
 
-  /** The gate's fields as the stored vault props hold them, flat: its epoch and each wayin's record. */
-  get storedFields(): Pick<GatedVaultProps, 'gate_epoch' | 'passphrase' | 'passkey'> {
-    return { gate_epoch: this.gate_epoch, passphrase: this.passphrase.record, passkey: this.passkey?.record ?? null }
+  /** The gate as the vault record holds it, its `gate`: each wayin's record, the passkey's or null. Its `gate_epoch` rides beside it in the record. */
+  get record(): GateRecord {
+    return { passphrase: this.passphrase.record, passkey: this.passkey?.record ?? null }
   }
 }

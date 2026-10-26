@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
 import * as Columns from '../src/columns'
-import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from '../src/columns'
+import { VaultRowColumns, ListedBoxColumns, BoxColumns, rowOfVaultRecord, vaultRecordOfRow } from '../src/columns'
 import type { Column } from '../src/columns'
 
 const Pair: Column[] = [['vault_tok', 'text'], ['registered_at', 'bigint']]
@@ -57,8 +57,9 @@ describe("Columns.paramsOf", () => {
       .to.deep.equal(['{"cipher_iv_b64":"iv-a1","ciphertext_b64":"ct-a1"}'])
   })
 
-  it("covers every column of real vault props and a real box", () => {
-    expect(Columns.paramsOf(TH.vaultPropsOf('u1'), VaultPropsColumns)).to.have.lengthOf(VaultPropsColumns.length)
+  it("covers every column of a real vault record's row and a real box", () => {
+    const row = rowOfVaultRecord(TH.vaultRecordOf('u1'))
+    expect(Columns.paramsOf(row, VaultRowColumns)).to.not.include(undefined)
     expect(Columns.paramsOf(TH.boxOf('anthropic', 'a1'), BoxColumns)).to.not.include(undefined)
   })
 })
@@ -93,5 +94,30 @@ describe("Columns.recordOf", () => {
 describe("ListedBoxColumns", () => {
   it("is every box column but the two ciphered ones", () => {
     expect(ListedBoxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'registered_at', 'written_at'])
+  })
+})
+
+describe("rowOfVaultRecord and vaultRecordOfRow", () => {
+  it("lays a vault record's gate into its two wayin columns, and nests them back, as their examples show", () => {
+    const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
+    const row = rowOfVaultRecord(record)
+    expect(row).to.deep.equal({ ...TH.omitting(record, 'gate'), passphrase: record.gate.passphrase, passkey: record.gate.passkey })
+    expect(vaultRecordOfRow(row)).to.deep.equal(record)
+  })
+
+  it("lays a novel vault's record as two null columns, and reads two nulls back as no gate", () => {
+    const row = rowOfVaultRecord(TH.gatelessOf('u1'))
+    expect(row).to.include({ passphrase: null, passkey: null })
+    expect(vaultRecordOfRow(row)).to.deep.equal(TH.gatelessOf('u1'))
+  })
+
+  it("reads a passkey beside no passphrase as the damaged gate it is, never as a novel vault", () => {
+    const row = { ...rowOfVaultRecord(TH.gatelessOf('u1')), passkey: TH.passkeyWayinOf('laptop') }
+    expect(vaultRecordOfRow(row)).to.deep.include({ gate: { passphrase: null, passkey: TH.passkeyWayinOf('laptop') } })
+  })
+
+  it("hands back a row that is no object as it came, for the VaultDB's check to refuse", () => {
+    expect(vaultRecordOfRow(null)).to.be.null
+    expect(vaultRecordOfRow('nope')).to.eq('nope')
   })
 })

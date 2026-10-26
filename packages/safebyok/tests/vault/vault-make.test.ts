@@ -336,8 +336,8 @@ describe("the key deriver seam", () => {
     for (const saltBytes of [1, MaxSaltBytes]) {
       const world = makeWorld()
       await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, salt_bytes: saltBytes } })
-      const stored = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
-      expect(fromB64(stored?.passphrase?.salt_b64 ?? '')).to.have.lengthOf(saltBytes)
+      const stored = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
+      expect(fromB64(stored?.gate?.passphrase.salt_b64 ?? '')).to.have.lengthOf(saltBytes)
     }
   })
 
@@ -358,8 +358,8 @@ describe("the key deriver seam", () => {
     const world = makeWorld()
     const standIn: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: cheapDerive }
     await world.openUnlocked('pw', { keyDeriver: standIn })
-    const stored = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
-    expect(stored?.passphrase?.key_deriver_label).to.eq('argon2id_web_v1')
+    const stored = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
+    expect(stored?.gate?.passphrase.key_deriver_label).to.eq('argon2id_web_v1')
   })
 
   it("refuses a deriver that hands back anything but 32 key bytes, and sets no passphrase with it", async () => {
@@ -369,7 +369,7 @@ describe("the key deriver seam", () => {
       const shortDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
       const vault = await world.open({ keyDeriver: shortDeriver })
       await TH.expectRefusal(TH.unlock(vault, 'pw'), 'bad_option')
-      expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, passphrase: null })
+      expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, gate: null })
       expect(vault.getSnapshot().state).to.eq('novel')
     }
   })
@@ -382,7 +382,7 @@ describe("the key deriver seam", () => {
       const vault = await world.open({ keyDeriver: zeroDeriver })
       const err = await TH.expectRefusal(TH.unlock(vault, 'pw'), 'bad_option')
       expect(err.message).to.match(/zero bytes/)
-      expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, passphrase: null })
+      expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, gate: null })
     }
   })
 
@@ -451,7 +451,7 @@ describe("the key deriver seam", () => {
         const world = makeWorld()
         const err = await TH.expectRefusal(world.open({ keyDeriver: handBuilt(change) }), 'bad_option')
         expect(err.message).to.include('keyDeriverSpec')
-        expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+        expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
       })
     }
 

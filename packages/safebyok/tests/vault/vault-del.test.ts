@@ -369,8 +369,8 @@ describe("a way in stored damaged", () => {
 
   it("a passkey whose answer no longer opens vault props altered in storage is told that its way in may be damaged", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    const vaultProps = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as { passkey: { registered_at: number } }
-    world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultProps, passkey: { ...vaultProps.passkey, registered_at: vaultProps.passkey.registered_at - 1 } }))
+    const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as { gate: { passkey: { registered_at: number } } }
+    world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, passkey: { ...vaultRecord.gate.passkey, registered_at: vaultRecord.gate.passkey.registered_at - 1 } } }))
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     const err = await TH.expectRefusal(TH.unlock(fresh, laptop), 'wrong_passkey')
     expect(err.message).to.include('may be damaged')

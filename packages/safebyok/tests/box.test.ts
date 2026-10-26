@@ -1,13 +1,15 @@
 import { inspect } from 'node:util'
+import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Box, BoxRecord, type SealBoxProps } from '../src/box'
+import { Box, BoxRecord, BoxStamp, type SealBoxProps } from '../src/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
-import { BoxSummary, type Stamp, type Whisper } from '../src/types/types'
+import { BoxSummary, type Whisper } from '../src/types/types'
+import type { VaultSparse } from '../src/vault-record'
 import { box_key_wrapped, whisper_ciphered } from '../src/types/type-aliases'
 import { FarFuture } from '../src/consts'
 import * as TH from './test-helpers'
@@ -62,7 +64,7 @@ describe("BoxRecord", () => {
   })
 
   it("tells a row that is no box from one that is, as its example shows", () => {
-    expect(BoxRecord.safeParse(TH.vaultPropsOf('u1')).success).to.be.false
+    expect(BoxRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.false
     expect(BoxRecord.safeParse(wholeBox).success).to.be.true
   })
 })
@@ -116,12 +118,22 @@ const handSealedOf = async (vault: TH.LeasedSlice, vaultKey: CryptoKey, plainByt
 }
 
 /** The stamp `box` carries, read field by field: no spread or key list shows it. */
-const boxStampOf = (box: Box): Stamp => {
+const boxStampOf = (box: Box): Omit<VaultSparse, 'format' | 'registered_at'> => {
   const { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch } = box
   return { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
 }
 
 afterEach(() => { vi.restoreAllMocks() })
+
+describe("BoxStamp", () => {
+  it("is every field of the box record but its two ciphered ones, and the vault_tok of its vault, as its example shows", () => {
+    const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...visible } = TH.boxOf('anthropic_api_key', 'a1')
+    const stamp = BoxStamp.parse({ ...visible, vault_tok: 'vault-tok-u1' })
+    expect(Object.keys(stamp)).to.have.members([...Object.keys(visible), 'vault_tok'])
+    expect(BoxStamp.safeParse(visible).success, 'a stamp names its vault').to.be.false
+    expect(BoxStamp.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), vault_tok: 'vault-tok-u1' }).success, 'a stamp holds no ciphertext').to.be.false
+  })
+})
 
 describe("Box.make", () => {
   it("makes a box whose visible fields are its own, read from the record, the sidecar parsed, and the vault's stamp beside them, as the class's example shows (Contract: Box)", async () => {
@@ -147,12 +159,12 @@ describe("Box.make", () => {
 
   it("refuses a null stamp as 'bad_option': a vault always holds one, so there is no vault-not-made-yet to say", async () => {
     const vault = await vaultOf()
-    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), null as unknown as Stamp), 'bad_option')
+    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), null as unknown as VaultSparse), 'bad_option')
   })
 
   it("refuses a stamp that is no stamp as 'bad_option'", async () => {
     const vault = await vaultOf()
-    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), { vault_tok: 'vault-tok-u1' } as Stamp), 'bad_option')
+    TH.expectSyncRefusal(() => Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'), { vault_tok: 'vault-tok-u1' } as VaultSparse), 'bad_option')
   })
 
   it("gives the record back whole as record, frozen through, the one source of its fields (Contract: Box)", async () => {
@@ -181,8 +193,9 @@ describe("Box.make", () => {
     const vault = await vaultOf()
     const box = Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'))
     const { stamp } = vault
-    expect(boxStampOf(box)).to.deep.equal(stamp)
-    for (const ckey of Object.keys(stamp)) {
+    const kept = boxStampOf(box)
+    expect(kept).to.deep.equal(omit(stamp, ['format', 'registered_at']))
+    for (const ckey of Object.keys(kept)) {
       expect(Object.getOwnPropertyDescriptor(box, ckey)).to.include({ enumerable: false, writable: false, configurable: false })
     }
   })
@@ -215,7 +228,7 @@ describe("Box.make", () => {
 
   it("makes a box from a record a VaultDB hands back, as its first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     valOf(await vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')))
     const record = valOf(await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic_api_key', TH.inThisVault))
     if (record === null) { throw new Error('expected a box record') }
@@ -249,7 +262,7 @@ describe("Box.seal", () => {
 
   it("stamps the box with the vault as it stood at the seal, the lease's vault_tok among it", async () => {
     const { vault, box } = await sealedOf()
-    expect(boxStampOf(box)).to.deep.equal(vault.stamp)
+    expect(boxStampOf(box)).to.deep.equal(omit(vault.stamp, ['format', 'registered_at']))
     expect(box.vault_tok).to.eq(vault.lease?.vault_tok)
   })
 

@@ -109,7 +109,7 @@ describe("convexVaultDB, as it is made", () => {
 
 /** `vaultDB`'s `u1` vault, made and filled with eight boxes of 900,000 bytes: a little under the component's limit. */
 const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
-  await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+  await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
   for (let ii = 0; ii < 8; ii++) {
     await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.heavyBox(`heavy_${String(ii)}`, 900_000))
   }
@@ -138,7 +138,7 @@ describe("convexVaultDB, answered by a component of another version", () => {
       const deployment = deploy()
       const client = deployment.client('u1')
       const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-      await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
       vi.spyOn(client, 'query').mockResolvedValue(answer)
       const refusal = await TH.expectBad(vaultDB.getBox(u1, 'anthropic_api_key', TH.inThisVault), 'corrupt_record')
       expect(refusal.message).to.match(/deployed safebyok component is out of date/)
@@ -151,7 +151,7 @@ describe("convexVaultDB, answered by a component of another version", () => {
       const deployment = deploy()
       const client = deployment.client('u1')
       const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-      await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
       vi.spyOn(client, 'mutation').mockResolvedValue(answer)
       const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'corrupt_record')
       expect(refusal.message).to.match(/deployed safebyok component is out of date/)
@@ -211,7 +211,7 @@ describe("convexVaultDB, refusing", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
     const box = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
@@ -243,7 +243,7 @@ describe("convexVaultDB, refusing", () => {
     await TH.unlock(vault, TH.RealPassphrase)
     // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-    const vaultProps = await TH.propsOf(vaultDB, u1)
+    const vaultProps = await TH.vaultRecordIn(vaultDB, u1)
     const vaultTok = vaultProps?.vault_tok ?? ''
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
       await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
@@ -270,8 +270,8 @@ describe("a record the deployment refused", () => {
   const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
   const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
-  const standing = TH.vaultPropsOf(subject, { ...scope, gate_epoch: 52_871, ...quotableWayins })
-  const nextVaultProps = { ...standing, gate_epoch: 52_872, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } }
+  const standing = TH.vaultRecordOf(subject, { ...scope, gate_epoch: 52_871, gate: quotableWayins })
+  const nextVaultProps = { ...standing, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
   const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
@@ -282,9 +282,9 @@ describe("a record the deployment refused", () => {
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
   const rivalWayin = { device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) }
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
-  const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, gate_epoch: 7, ...rivalWayins })
+  const rivalVaultProps = TH.vaultRecordOf('user_rival', { ...rivalScope, gate_epoch: 7, gate: rivalWayins })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } }, rivalBox] }))
+  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, gate: { ...rivalWayins, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } } }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ ...scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
@@ -316,7 +316,7 @@ describe("a record the deployment refused", () => {
       for (const leaf of quotables) {
         expect(thrown).to.not.include(leaf)
       }
-      expect(await TH.propsOf(vaultDB, scope)).to.deep.equal(standing)
+      expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(standing)
       expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: standing.vault_tok })).to.be.null
     })
   }
@@ -345,7 +345,7 @@ describe("a record the deployment refused", () => {
 const withRevisionNotText = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, box: { ...(args as { box?: object }).box, revision_tok: ['quoted_by_convex'] } })
 
 /** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
-const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.propsOf(vaultDB, u1) }
+const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.vaultRecordIn(vaultDB, u1) }
 
 /**
  * A watch of `u1`'s vault through `vaultDB`, once its first result has come in: its `onChange`,
@@ -365,7 +365,7 @@ describe("convexVaultDB.subscribe", () => {
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const there = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const watch = await settledWatch(here)
-      await TH.ensureGated(there, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(there, TH.vaultRecordOf('u1'))
       await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })
     })
 
@@ -373,7 +373,7 @@ describe("convexVaultDB.subscribe", () => {
       const deployment = deploy()
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       const watch = await settledWatch(here)
-      await TH.ensureGated(here, { ...TH.vaultPropsOf('u1'), vaultlabel: 'work' })
+      await TH.ensureGated(here, { ...TH.vaultRecordOf('u1'), vaultlabel: 'work' })
       await caughtUp(here)
       expect(watch.onChange.mock.calls.length).to.eq(watch.heardBefore)
     })
@@ -386,14 +386,14 @@ describe("convexVaultDB.subscribe", () => {
       unsubscribe()
       unsubscribe()
       const heardBefore = alongside.onChange.mock.calls.length
-      await TH.ensureGated(convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok }), TH.vaultPropsOf('u1'))
+      await TH.ensureGated(convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok }), TH.vaultRecordOf('u1'))
       await vi.waitFor(() => { expect(alongside.onChange.mock.calls.length).to.be.greaterThan(heardBefore) })
     })
 
     it(`calls onChange over a ${clientTitle} when a sign-out fails its watch, so the vault looks again`, async () => {
       const deployment = deploy()
       const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      await TH.ensureGated(here, TH.vaultPropsOf('u1'))
+      await TH.ensureGated(here, TH.vaultRecordOf('u1'))
       const watch = await settledWatch(here)
       deployment.signOut()
       await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })

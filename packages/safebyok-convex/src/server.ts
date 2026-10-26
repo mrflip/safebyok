@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, Tombstone, VaultProps, VaultScope, VaultSignature,
+  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -104,7 +104,7 @@ export class SafebyokComponent {
         },
       }),
       ensureVault: publicMutation({
-        args:    { draft: GatelessVaultProps },
+        args:    { draft: NovelVaultRecord },
         returns: VaultAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.draft.user_id)
@@ -112,7 +112,7 @@ export class SafebyokComponent {
         },
       }),
       putVaultProps: publicMutation({
-        args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
+        args:    { vaultProps: VaultRecord, expected: VaultRecordExpectation },
         returns: PutVaultPropsAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
@@ -153,7 +153,7 @@ export class SafebyokComponent {
       }),
       delVault: publicMutation({
         args:    { ...VaultScope.fields, expected: VaultDelExpectation },
-        returns: v.nullable(Tombstone),
+        returns: v.nullable(VaultTombstone),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delVault, args)
