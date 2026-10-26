@@ -47,7 +47,7 @@ export const testDeriver: KeyDeriver = {
  * its clock -- each as `overrides` does not say otherwise.
  *
  * @example Wayin.make(TH.vaultSliceOf('u1'), TH.passkeyWayinOf('laptop'), { keyDeriver: argon2idWebV1Deriver })
- * @example Lease.make(TH.vaultSliceOf('u1'), record)
+ * @example TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: 'vault-tok-other' })
  */
 export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
   return {
