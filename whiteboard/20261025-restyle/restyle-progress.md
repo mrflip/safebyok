@@ -259,3 +259,22 @@ Who reads this: threads 12 and 13; the restack.
   `no-misused-spread` refuses `{ ...vault }` (tests use `TH.shownOf(vault)`). At the restack,
   NEWSTYLE's examples in #272's STYLE.md follow the lint. STYLE.md line 87 still cites
   `vault.passphrase`/`vault.passkey`.
+
+## From thread 12 (snapshot, #283)
+
+Who reads this: thread 13; the restack.
+
+* **The snapshot**: scope, `format`, `vault_tok`, `gate` (`GateSparse` | null), `boxes`,
+  `damagedBoxes`, `capacity`, `ask_passphrase_at`, `freshness`, `trouble`. Gone: `state`,
+  `passphrase`, `passkey`, `registered_at`, `gate_epoch`, `VaultState`.
+* **`keptIfSame`** (vault.ts, *Vocabulary* section) keeps each slice's identity while its contents
+  are unchanged: reuse it for `bank.snapshot.vaults`. (Thread 10's note was too strong: the box
+  arrays only held identity across this device's own writes until this thread.)
+* `gateSparseOf` in vault-record.ts (no entry exports it). `Box.seal` takes scope and `vault_tok`
+  from `vault`, only the epochs from `madeUnder`. Provings type `vault` as the Vault object.
+* React: `askPasskey(snapshot.gate)` (refuses `absent_wayin` without gate or passkey); readers use
+  `gate` and `ask_passphrase_at`. Tests read the three-way state through `TH.stateOf(snapshot)`
+  (exported from safebyok/testing).
+* STYLE.md line ~87 now cites `vault.snapshot.gate` and says `putWayin` resolves the vault: the
+  restack carries it to #272.
+* A combined shell command (commit, push, `gh pr ready`) was refused once; run one at a time.
