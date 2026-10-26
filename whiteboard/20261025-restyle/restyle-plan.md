@@ -547,7 +547,7 @@ error-handler audit (`error-handlers-audit.md` in this directory).
   Tests read epochs through `TH.cheatGetVaultEpoch(vault)`, not `vaultRecordHeldBy`.
 * **Small leftovers** (the Cleanup tab): restore the passphrase refusal's full stop (#275); one
   sentence in VAULTDB.md that an adapter enforcing `maxBoxes` from capacity counts rows the
-  listing skips.
+  listing skips; `.claude/agents/documentarian.md`'s example names `bad_label`, now `bad_scope`.
 
 **Depends on:** thread 13. **Size:** medium; split the Convex import into its own thread if it
 runs long.
