@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 10 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#281](https://github.com/mrflip/safebyok/pull/281)); thread 11 built ([#282](https://github.com/mrflip/safebyok/pull/282)), in review.
+* **Status:** threads 1 to 11 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#282](https://github.com/mrflip/safebyok/pull/282)); thread 12 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -451,6 +451,18 @@ to #281's changeset (`.changeset/20261026-reads.md`) that GraphQL persisted oper
 (`VaultOperations.safebyokPutVaultRecord`) change with the schema. **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
 
+*Review:* medium, `fixed`. Checked and holding: `ProvingInside` was already a module-level
+`WeakMap` keyed by the Vault object, written once by its constructor; one vault's proving cannot
+reach another's, nothing outlives the vault, and no entry exports the registry or
+`vaultRecordHeldBy`; own fields of Vault, Box and Lease hold nothing sensitive, each frozen;
+`getSnapshot`/`subscribe` keep one identity on both; `demandConsistentWith` behaves as before.
+Fixed: a README line and #281's changeset named removed getters; a `TH.vaultSliceOf` example that
+did not typecheck; `madeUnderShape` renamed `vaultMadeUnderShape`; a Bank identity test. Left:
+`Box.seal` takes `madeUnder` unchecked against `vault` (fails safe); provings' `vault` typed
+`VaultStamp` though a registered Vault object is needed; the kit handed twice (`ProvingInside`
+and `GatingInside`); `checkedMade` repeats `checkedMadeUnder`; stale `TH.shownOf`/`TH.jsonOf`
+examples. Filed as [#282](https://github.com/mrflip/safebyok/pull/282).
+
 ### 12. The snapshot (Preplan Phase 7) -- `snapshot`
 
 > 7. **The snapshot.** The shape above; each slice reused while unchanged (today vault.ts:972
@@ -461,7 +473,13 @@ to #281's changeset (`.changeset/20261026-reads.md`) that GraphQL persisted oper
 *Gloss:* *Preplan*, *The snapshot a React host renders*; the demo app (`demos/`) follows, as it
 reads the snapshot. *Orchestrator, from #281's review:* the demo's key slot (`ApiKeySlot`) offers to
 replace or remove a `newer_format` box: show "update the app" there, as the dashboard does; the
-dashboard lists every damaged row before every sound row: restore boxlabel order. Thread 10 left
+dashboard lists every damaged row before every sound row: restore boxlabel order. *From #282:*
+readers in tests, React and GraphQL read `vault.snapshot.<field>` today, `gate_epoch` among them:
+move them as the snapshot loses fields; `Box.seal(vault, props, whisper, { madeUnder, now })`
+takes scope and `vault_tok` from `madeUnder` unchecked: take them from `vault` and narrow
+`madeUnder` to the epochs (YOLO, an Open Matter); type provings' `vault` as the Vault object
+(`import type { Vault }`), not `VaultStamp`; fix `TH.shownOf`'s and `TH.jsonOf`'s examples in
+`tests/test-helpers/logging.ts` (`box.toJSON()` is gone). Thread 10 left
 `#boxes`/`#damagedBoxes` as frozen arrays replaced only when a box changes, so those slices hold
 identity already. **Depends on:** thread 11. **Look-ahead:** thread 13's bank listing mirrors
 `snapshot.boxes`'s sorted frozen form. **Size:** medium to large.
