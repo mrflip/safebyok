@@ -41,6 +41,16 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 6, PR [#277](https://github.com/mrflip/safebyok/pull/277)): **a host-facing function takes `applabel`,
+  `user_id` and `vaultlabel` as flat arguments, so the `user_id` that is authorized is the one that scopes the call.**
+  (1) `SafebyokComponent.api`'s `getVault`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `watchVault` and safebyok-graphql's
+  `safebyokGetVault`, `safebyokGetBox`, `safebyokGetCapacity`, `safebyokPutBox`, `safebyokDelBox`, `safebyokDelVault`,
+  `safebyokVaultChanged` took one nested `scope` object. On Convex, `mustBe(ctx, args.scope.user_id)` became `mustBe(ctx, args.user_id)`, and
+  the wrapper passes the same validated `args` to the component. `ensureVault` and `putVaultProps` still check the record's own `user_id`.
+  (2) A call still nesting `scope` is refused by Convex's argument validator before the check or the component runs; a call naming another
+  user's existing vault is refused `identity_revoked` by every function and leaves that vault unchanged (tested on both).
+  (3) On GraphQL the server's VaultDB (e.g. `postgresVaultDB`, made for the signed-in user) still does the check; resolvers build the scope
+  from the three arguments.
 * 2026-10-26 (restyle sprint, thread 4, branch `20261026-brands`): **salts, wraps and a parsed passphrase are branded types; a brand
   is earned by a parse, never a cast.**
   (1) `packages/safebyok/src/types/type-aliases.ts` brands, through each Zod validator's `.brand()`, `PassphraseSalt` (`salt_b64`),
@@ -1937,7 +1947,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: the Convex component (`packages/safebyok-convex`) authenticates in the host app,
   not inside the component (where `ctx.auth` does not exist): `SafebyokComponent.api({ getUserId })`
   builds the nine public functions the host re-exports, and each refuses unless the host's
-  `getUserId(ctx)` returns a non-empty id equal to the scope's or vault props' `user_id`. The
+  `getUserId(ctx)` returns a non-empty id equal to the scope's or vault props' `user_id` (amended 2026-10-26 (restyle, thread 6): the scope's `user_id` is now a flat `args.user_id`; see the entry at the top). The
   component's own functions check no caller and trust their `user_id` argument; Convex lets only
   the host app call them, so a host that wraps them itself, without this check, exposes every
   user's rows.
