@@ -266,7 +266,7 @@ describe("a lease taken up at birth", () => {
     TH.closeVault(maker)
     const vault = await world.open()
     expect(vault.state).to.eq('unlocked')
-    expect(vault.askPassphraseAt).to.eq(kept?.ask_passphrase_at)
+    expect(vault.ask_passphrase_at).to.eq(kept?.ask_passphrase_at)
     world.advance((kept?.ask_passphrase_at ?? 0) - world.clock.now() + 1)
     await vault.hello()
     expect(vault.state).to.eq('locked')

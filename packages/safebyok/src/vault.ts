@@ -37,7 +37,7 @@ export const goneBy = Symbol('Vault.goneBy')
 /** Where the vault stands, as a UI branches on it.
  *  * `novel`: stored, with no passphrase yet. The first gating, `initialize_gate`, sets it.
  *  * `locked`: has its passphrase; box summaries are readable, whispers not.
- *  * `unlocked`: whispers are readable until `askPassphraseAt` or `lock()`.
+ *  * `unlocked`: whispers are readable until `ask_passphrase_at` or `lock()`.
  */
 export type VaultState = 'novel' | 'locked' | 'unlocked'
 
@@ -97,7 +97,7 @@ export type VaultSnapshot = Readonly<{
    * to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
    * compare with `>= FarFuture - MinuteMillis`, never for equality.
    */
-  askPassphraseAt: number | null
+  ask_passphrase_at: number | null
   /** The latest bad news the vault has learned, or what its `onBadNews` handler threw; null when there is none.
    * Bad news is a refusal of the `bad_news` family: `damaged_vault` or `vault_behind`, say, or a box
    * listed damaged (`damaged_box`, its `meta.box_listed` the box), or a way in stored damaged
@@ -244,7 +244,7 @@ export class Vault {
   now(): number { return this.#clockNow() }
   // --
 
-  // == [Vault: the lease, delegated]: askPassphraseAt, leaseMillis
+  // == [Vault: the lease, delegated]: ask_passphrase_at, leaseMillis
 
   // The lease this device holds is the Vault object's own: no getter, field or JSON shows it, and
   // its boxes reach it inside the package alone (`heldLeaseOf`). What an app reads of it is here.
@@ -256,9 +256,9 @@ export class Vault {
    * 3:00 PM"), and `Intl.RelativeTimeFormat` for the time left ("in 2 days"); show "until locked"
    * instead for any deadline at or past `FarFuture - MinuteMillis`.
    *
-   * @example const minutesLeft = vault.askPassphraseAt === null ? null : Math.ceil((vault.askPassphraseAt - vault.now()) / MinuteMillis)
+   * @example const minutesLeft = vault.ask_passphrase_at === null ? null : Math.ceil((vault.ask_passphrase_at - vault.now()) / MinuteMillis)
    */
-  get askPassphraseAt(): number | null { return this.#snapshot.askPassphraseAt }
+  get ask_passphrase_at(): number | null { return this.#snapshot.ask_passphrase_at }
   /** How long a lease lasts on this device: the `leaseHours` the vault was made with, in whole milliseconds.
    * A vault that stays unlocked until `lock()` (`Infinity` hours) reads `ForeverMillis`. Fixed for
    * the Vault object's life.
@@ -895,7 +895,7 @@ export class Vault {
   // Set once the bank lets the Vault object go, or it is deleted, or found deleted or made anew:
   // what every call refuses with from then on, 'vault_remade' for a vault made anew, else 'vault_gone'.
   #goneBy: (() => VaultError) | null = null
-  // The timer that drops the lease at askPassphraseAt. Null when none is held, or the one held
+  // The timer that drops the lease at ask_passphrase_at. Null when none is held, or the one held
   // lasts until lock().
   #expiry: ReturnType<typeof setTimeout> | null = null
 
@@ -959,7 +959,7 @@ export class Vault {
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
-      askPassphraseAt: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
+      ask_passphrase_at: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
       trouble:         this.#trouble,
       freshness:       this.#freshness(now),
     })

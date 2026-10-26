@@ -218,7 +218,7 @@ describe("putWayin, with a new passphrase", () => {
     const vault = await world.openUnlocked('first')
     world.advance(60_000)
     await TH.putWayin(vault, 'first', 'second')
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     const reloaded = await world.open()
     expect(reloaded.getSnapshot().state).to.eq('unlocked')
   })
@@ -379,12 +379,12 @@ describe("the vault's passkey", () => {
     expect(shown?.device_id).to.have.length.greaterThan(0)
   })
 
-  it("an unlock with a passkey grants this device a lease until askPassphraseAt, as a passphrase's does", async () => {
+  it("an unlock with a passkey grants this device a lease until ask_passphrase_at, as a passphrase's does", async () => {
     const { world, laptop } = await vaultWithPasskey()
     const deviceDB = memoryDeviceDB()
     const here = await world.open({ deviceDB })
     await TH.unlock(here, laptop)
-    expect(here.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(here.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     const reloaded = await world.open({ deviceDB })
     expect(reloaded.getSnapshot().state).to.eq('unlocked')
     world.advance(SevenDaysMillis)

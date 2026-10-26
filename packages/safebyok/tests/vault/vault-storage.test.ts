@@ -505,7 +505,7 @@ describe("when storage says the user is no longer signed in", () => {
       vi.spyOn(world.vaultDB, verb).mockResolvedValueOnce(bad(refusal))
       expect(await TH.expectRefusal(call(vault), 'identity_revoked')).to.eq(refusal)
       expect(vault.getSnapshot().state).to.eq('locked')
-      expect(vault.getSnapshot().askPassphraseAt).to.be.null
+      expect(vault.getSnapshot().ask_passphrase_at).to.be.null
       expect(await world.getLease()).to.be.null
       // An unlock's waiters hear the lock as it lands, while the read that met the refusal is still
       // unwinding: a call made before it has would share that read, and its refusal.

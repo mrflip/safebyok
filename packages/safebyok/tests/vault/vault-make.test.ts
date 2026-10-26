@@ -712,7 +712,7 @@ describe("the vault's fields, by the Contract", () => {
     const helloWrittenOver = vi.fn(() => Promise.resolve(vault))
     Object.defineProperties(vault, { hello: { value: helloWrittenOver } })
     await TH.unlock(vault, 'pw')
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
+    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(helloWrittenOver).not.toHaveBeenCalled()
   })

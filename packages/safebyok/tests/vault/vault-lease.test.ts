@@ -24,7 +24,7 @@ describe("unlock and lock", () => {
     await TH.unlock(vault, 'correct horse battery staple')
     const snapshot = vault.getSnapshot()
     expect(snapshot.state).to.eq('unlocked')
-    expect(snapshot.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(snapshot.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("a wrong passphrase is refused calmly, changing nothing, and quoting nothing", async () => {
@@ -129,7 +129,7 @@ describe("the lease", () => {
     const world = makeWorld()
     const twelveHoursMillis = 12 * HourMillis
     const vault = await world.openUnlocked('pw one', { leaseHours: 12 })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twelveHoursMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + twelveHoursMillis)
     world.advance(twelveHoursMillis - 1)
     expect(await world.stateOnOpen({ leaseHours: 12 })).to.eq('unlocked')
     world.advance(1)
@@ -141,10 +141,10 @@ describe("the lease", () => {
     const world = makeWorld()
     const quarterHour = await world.openUnlocked('pw one', { leaseHours: 0.25 })
     const fifteenMinutesMillis = 15 * 60 * 1000
-    expect(quarterHour.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + fifteenMinutesMillis)
+    expect(quarterHour.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + fifteenMinutesMillis)
     const oneThird = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB(), leaseHours: 1 / 3 })
     const twentyMinutesMillis = 20 * 60 * 1000
-    expect(oneThird.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twentyMinutesMillis)
+    expect(oneThird.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + twentyMinutesMillis)
   })
 
   it("refuses a leaseHours that is not a span of time above zero", async () => {
@@ -167,7 +167,7 @@ describe("the lease", () => {
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
       await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       expect(vault.getSnapshot().state).to.eq('unlocked')
-      expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
+      expect(vault.getSnapshot().ask_passphrase_at).to.eq(FarFuture)
       world.advance(200 * 365 * 24 * HourMillis)
       expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
       expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -182,7 +182,7 @@ describe("the lease", () => {
       world.advance(10 * 365 * 24 * HourMillis)
       const reopened = await world.open({ leaseHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('unlocked')
-      expect(reopened.getSnapshot().askPassphraseAt).to.eq(FarFuture)
+      expect(reopened.getSnapshot().ask_passphrase_at).to.eq(FarFuture)
       expect(await reopened.getWhisper('anthropic')).to.eq('sk-fake')
     })
 
@@ -191,7 +191,7 @@ describe("the lease", () => {
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
       await vault.lock()
       expect(vault.getSnapshot().state).to.eq('locked')
-      expect(vault.getSnapshot().askPassphraseAt).to.be.null
+      expect(vault.getSnapshot().ask_passphrase_at).to.be.null
       await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
       expect(await world.stateOnOpen({ leaseHours: Infinity })).to.eq('locked')
     })
@@ -201,7 +201,7 @@ describe("the lease", () => {
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
       await TH.putWayin(vault, 'pw one', 'pw two')
       expect(vault.getSnapshot().state).to.eq('unlocked')
-      expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
+      expect(vault.getSnapshot().ask_passphrase_at).to.eq(FarFuture)
       const lease = await world.getLease()
       expect(lease?.ask_passphrase_at).to.eq(FarFuture)
     })
@@ -225,17 +225,17 @@ describe("the lease", () => {
     })
   }
 
-  for (const [askPassphraseAt, blurb] of OutOfBoundsDeadlines) {
+  for (const [ask_passphrase_at, blurb] of OutOfBoundsDeadlines) {
     it(`reads a lease's deadline of ${blurb} as no lease, and discards it`, async () => {
       const world = makeWorld()
       await world.openUnlocked('pw one')
       const written = await world.getLease()
       if (written === null) { throw new Error('expected a lease on the device') }
-      await world.deviceDB.putLease({ ...written, ask_passphrase_at: askPassphraseAt })
+      await world.deviceDB.putLease({ ...written, ask_passphrase_at })
       // Under Infinity no window check refuses it: only the bounds can.
       const reopened = await world.open({ leaseHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('locked')
-      expect(reopened.getSnapshot().askPassphraseAt).to.be.null
+      expect(reopened.getSnapshot().ask_passphrase_at).to.be.null
       expect(await world.getLease()).to.be.null
     })
   }
@@ -258,7 +258,7 @@ describe("the lease", () => {
     const world = makeWorld()
     const fractionalClock = { now: () => world.clock.now() + 0.25 }
     const vault = await world.openUnlocked('pw one', { clock: fractionalClock })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     const lease = await world.getLease()
     expect(lease?.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await world.stateOnOpen({ clock: fractionalClock })).to.eq('unlocked')
@@ -267,7 +267,7 @@ describe("the lease", () => {
   it("takes the longest finite lease, MaxLeaseHours, exactly as asked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: MaxLeaseHours })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + (MaxLeaseHours * HourMillis))
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + (MaxLeaseHours * HourMillis))
   })
 })
 // --
@@ -289,7 +289,7 @@ describe("the lease, when the host changes leaseHours", () => {
     expect(lowered.getSnapshot().state).to.eq('locked')
     expect(await leaseDeadlineOf(world)).to.eq(FarFuture)
     await TH.unlock(lowered, 'pw one')
-    expect(lowered.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + HourMillis)
+    expect(lowered.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     expect(await world.stateOnOpen({ leaseHours: 1 })).to.eq('unlocked')
   })
 
@@ -323,7 +323,7 @@ describe("the lease, when the host changes leaseHours", () => {
     const given = world.clock.now() + (12 * HourMillis)
     world.advance(HourMillis)
     const raised = await world.open({ leaseHours: Infinity })
-    expect(raised.getSnapshot().askPassphraseAt).to.eq(given)
+    expect(raised.getSnapshot().ask_passphrase_at).to.eq(given)
     expect(await leaseDeadlineOf(world)).to.eq(given)
   })
 
@@ -334,7 +334,7 @@ describe("the lease, when the host changes leaseHours", () => {
     world.advance(11 * HourMillis)
     const lowered = await world.open({ leaseHours: 2 })
     expect(lowered.getSnapshot().state).to.eq('unlocked')
-    expect(lowered.getSnapshot().askPassphraseAt).to.eq(given)
+    expect(lowered.getSnapshot().ask_passphrase_at).to.eq(given)
     expect(await leaseDeadlineOf(world)).to.eq(given)
   })
 
@@ -374,10 +374,10 @@ describe("the vault's leaseMillis", () => {
     })
   }
 
-  it("is the window an unlock lasts: askPassphraseAt is the unlock's time plus it", async () => {
+  it("is the window an unlock lasts: ask_passphrase_at is the unlock's time plus it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 0.25 })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + vault.leaseMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + vault.leaseMillis)
   })
 
   it("stays the same for the handle's life, through unlock and lock", async () => {
@@ -395,12 +395,12 @@ describe("the vault's leaseMillis", () => {
   })
 })
 
-/** The minutes left before `vault` locks of itself, as `Vault.askPassphraseAt`'s example counts them; null while locked. */
+/** The minutes left before `vault` locks of itself, as `Vault.ask_passphrase_at`'s example counts them; null while locked. */
 const minutesLeftOf = (vault: Vault): number | null => (
-  vault.askPassphraseAt === null ? null : Math.ceil((vault.askPassphraseAt - vault.now()) / MinuteMillis)
+  vault.ask_passphrase_at === null ? null : Math.ceil((vault.ask_passphrase_at - vault.now()) / MinuteMillis)
 )
 
-describe("the vault's askPassphraseAt", () => {
+describe("the vault's ask_passphrase_at", () => {
   it("lets a UI say how many minutes are left before the vault locks of itself, as its example shows; null once locked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 0.25 })
@@ -446,7 +446,7 @@ describe("the lease, from a host's own DeviceDB", () => {
       const spoiled = [...device.rows.values()]
       const later = await world.open({ deviceDB: device.deviceDB })
       expect(later.getSnapshot().state).to.eq('locked')
-      expect(later.getSnapshot().askPassphraseAt).to.be.null
+      expect(later.getSnapshot().ask_passphrase_at).to.be.null
       expect([...device.rows.values()]).to.deep.equal(spoiled)
     })
   }
@@ -501,7 +501,7 @@ describe("natural expiry", () => {
   beforeEach(() => { fakeTheClock() })
   afterEach(() => { vi.useRealTimers() })
 
-  it("says 'locked' to subscribers at askPassphraseAt, dropping the vaultKey then, with no call made", async () => {
+  it("says 'locked' to subscribers at ask_passphrase_at, dropping the vaultKey then, with no call made", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     const listener = vi.fn()
@@ -513,11 +513,11 @@ describe("natural expiry", () => {
     expect(listener).toHaveBeenCalledTimes(1)
     expect(vi.getTimerCount()).to.eq(0)
     expect(vault.getSnapshot().state).to.eq('locked')
-    expect(vault.getSnapshot().askPassphraseAt).to.be.null
+    expect(vault.getSnapshot().ask_passphrase_at).to.be.null
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
   })
 
-  it("drops the lease from memory alone at askPassphraseAt, erasing nothing: another tab may hold one renewed under the scope", async () => {
+  it("drops the lease from memory alone at ask_passphrase_at, erasing nothing: another tab may hold one renewed under the scope", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     const erases = vi.spyOn(world.deviceDB, 'delLease')
@@ -539,7 +539,7 @@ describe("natural expiry", () => {
   it("arms no timer for a vault unlocked until lock()", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(FarFuture)
     expect(vi.getTimerCount()).to.eq(0)
   })
 
@@ -570,7 +570,7 @@ describe("natural expiry", () => {
     await TH.unlock(vault, 'pw one')
     world.pass(MinuteMillis)
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() - MinuteMillis + HourMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() - MinuteMillis + HourMillis)
   })
 
   it("leaves a putWayin() under way when it falls due unlocked, under the new passphrase, with a new deadline: a timer is no lock", async () => {
@@ -585,7 +585,7 @@ describe("natural expiry", () => {
     gate.release()
     await changing
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + HourMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
     expect(await leaseDeadlineOf(world)).to.eq(world.clock.now() + HourMillis)
   })
@@ -728,7 +728,7 @@ describe("the unlock window, renewed", () => {
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
     await TH.putWayin(vault, 'pw one', 'pw two')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await leaseDeadlineOf(world)).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
@@ -737,16 +737,16 @@ describe("the unlock window, renewed", () => {
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
     await TH.putWayin(vault, 'pw one', await TH.passkeyOf('laptop'))
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     world.advance(24 * HourMillis)
     await TH.delWayin(vault, 'pw one')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("never by a read, a store, a deletion, or a change pushed from storage", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    const deadline = vault.getSnapshot().askPassphraseAt
+    const deadline = vault.getSnapshot().ask_passphrase_at
     world.advance(HourMillis)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await vault.getWhisper('anthropic')
@@ -754,7 +754,7 @@ describe("the unlock window, renewed", () => {
     const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
     await there.putBox({ boxlabel: 'openai' }, 'sk-fake-too')
     await vi.waitFor(() => { expect(boxlabelsOf(vault)).to.deep.equal(['openai']) })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(deadline)
     expect(await leaseDeadlineOf(world)).to.eq(deadline)
   })
 })
@@ -928,7 +928,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     await vault.ensureUnlocked({ renewMinutes: 15 })
     expect(requestCleartext).toHaveBeenCalledOnce()
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('unlock_vault')
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
+    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     const renewed = await world.getLease()
     expect(renewed?.ask_passphrase_at).to.eq(world.clock.now() + HourMillis)
     expect(twilight?.ask_passphrase_at).to.be.below(world.clock.now() + HourMillis)
@@ -1019,13 +1019,13 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext, leaseHours: 1 })
     requestCleartext.mockClear()
-    const deadline = vault.askPassphraseAt
+    const deadline = vault.ask_passphrase_at
     world.advance(HourMillis - MinuteMillis)
     // Nothing scripted: the dialog closes unanswered.
     await TH.expectRefusal(vault.ensureUnlocked({ renewMinutes: 5 }), 'vault_locked')
     expect(requestCleartext).toHaveBeenCalledOnce()
     expect(vault.state).to.eq('unlocked')
-    expect(vault.askPassphraseAt).to.eq(deadline)
+    expect(vault.ask_passphrase_at).to.eq(deadline)
     expect(await vault.ensureUnlocked()).to.eq(vault)
   })
 
@@ -1255,7 +1255,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     world.advance(SevenDaysMillis - (30 * MinuteMillis))
     await vault.ensureUnlocked({ renewMinutes: 60 })
     expect(requestCleartext.mock.calls[0]?.[0].gatingkind).to.eq('unlock_vault')
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("refuses an event in place of options as bad_option, naming the wrap, and asks no one", async () => {
@@ -1335,7 +1335,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     reading.release()
     await TH.expectRefusal(ensuring, 'vault_gone')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.askPassphraseAt).to.be.null
+    expect(vault.ask_passphrase_at).to.be.null
     expect(await world.getLease()).to.not.be.null
   })
 
@@ -1405,7 +1405,7 @@ describe("a lock or a let-go landing while a box call waits to be unlocked (risk
         held.release()
         await TH.expectBad(calling, 'vault_gone')
         expect(requestCleartext).not.toHaveBeenCalled()
-        expect(vault.askPassphraseAt).to.be.null
+        expect(vault.ask_passphrase_at).to.be.null
         expect(await world.getLease()).to.deep.equal(leaseBefore)
         expect(storedRowOf(world, 'anthropic')).to.deep.equal(boxBefore)
       })

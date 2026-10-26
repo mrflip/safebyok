@@ -2,11 +2,11 @@
 export const ScopepathDelimiter = '^'
 
 /** The latest instant the package accepts, 2255-06-05T23:47:34.740Z: the last millisecond whose epoch microseconds fit a safe integer.
- * `askPassphraseAt` is near it when the vault asks again only after `lock()`, as under
+ * `ask_passphrase_at` is near it when the vault asks again only after `lock()`, as under
  * `leaseHours: Infinity`. Show "until locked" for any instant within a minute of it, not only one
  * equal to it.
  *
- * @example askPassphraseAt >= FarFuture - MinuteMillis ? 'until locked' : new Date(askPassphraseAt).toLocaleString()
+ * @example ask_passphrase_at >= FarFuture - MinuteMillis ? 'until locked' : new Date(ask_passphrase_at).toLocaleString()
  * @example new Date(FarFuture).toISOString()   // '2255-06-05T23:47:34.740Z'
  */
 export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER / 1000)
@@ -19,7 +19,7 @@ export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
 
 /** One minute, in milliseconds: the margin to leave when asking whether an instant is {@link FarFuture}, the vault's "never".
  *
- * @example askPassphraseAt >= FarFuture - MinuteMillis   // true while the vault stays unlocked until lock()
+ * @example ask_passphrase_at >= FarFuture - MinuteMillis   // true while the vault stays unlocked until lock()
  */
 export const MinuteMillis = 60_000
 

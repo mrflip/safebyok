@@ -749,7 +749,7 @@ describe("joining a gating, by kind", () => {
     await TH.expectGood(unlock.attemptPassphrase('pw'))
     await TH.expectGood(renewing)
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("has putWayin('passkey') on a novel vault refuse absent_vault while an initialize_gate stands, joining nothing: the first passphrase alone is no passkey", async () => {
@@ -795,7 +795,7 @@ describe("an unlock's consult of this device's store", () => {
     expect(await vault.ensureUnlocked()).to.eq(vault)
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(vault.state).to.eq('unlocked')
-    expect(vault.askPassphraseAt).to.eq(otherTab.askPassphraseAt)
+    expect(vault.ask_passphrase_at).to.eq(otherTab.ask_passphrase_at)
   })
 
   it("takes nothing up when a lock() lands during the consult, and refuses vault_locked without asking", async () => {

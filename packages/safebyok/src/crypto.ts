@@ -64,7 +64,7 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
  * open. It refuses 'bad_option' for a part that is undefined or null, or a record field set to
  * undefined: each would bind the same as some other ctx.
  *
- * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultTok, 1, askPassphraseAt, 'vault_key_lease_wrapped')
+ * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultTok, 1, ask_passphrase_at, 'vault_key_lease_wrapped')
  * @example cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultTok, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {

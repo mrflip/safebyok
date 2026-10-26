@@ -660,11 +660,11 @@ describe("vault.hello, by the Contract", () => {
     expect(locked.state).to.eq('locked')
     const born = await world.open()
     expect(born.state).to.eq('unlocked')
-    expect(born.askPassphraseAt).to.eq(leased.askPassphraseAt)
+    expect(born.ask_passphrase_at).to.eq(leased.ask_passphrase_at)
     world.advance(HourMillis)
     const lapsed = await world.open()
     expect(lapsed.state).to.eq('locked')
-    expect(lapsed.askPassphraseAt).to.be.null
+    expect(lapsed.ask_passphrase_at).to.be.null
   })
 
   it("settles the state from those reads and publishes the snapshot, telling each subscriber (Contract: vault.hello, Does 3)", async () => {
@@ -1062,14 +1062,14 @@ describe("a lease read a key change overtakes", () => {
     leaseRead.release()
     await hello
     expect(vault.state).to.eq('locked')
-    expect(vault.askPassphraseAt).to.be.null
+    expect(vault.ask_passphrase_at).to.be.null
     expect(await world.getLease()).to.be.null
   })
 
   it("keeps a fresher unlock's lease when a hello's read of the older one finishes after it", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw')
-    const older = vault.askPassphraseAt
+    const older = vault.ask_passphrase_at
     world.advance(StaleMinutes * MinuteMillis)
     const deriving = world.holdNextDerive()
     const unlocking = tryRenewing(vault)
@@ -1080,11 +1080,11 @@ describe("a lease read a key change overtakes", () => {
     await leaseRead.reached
     deriving.release()
     await TH.expectGood(unlocking)
-    const fresher = vault.askPassphraseAt
+    const fresher = vault.ask_passphrase_at
     expect(fresher).to.eq(world.clock.now() + SevenDaysMillis)
     leaseRead.release()
     await hello
-    expect(vault.askPassphraseAt).to.eq(fresher).and.to.not.eq(older)
+    expect(vault.ask_passphrase_at).to.eq(fresher).and.to.not.eq(older)
     const standing = await world.getLease()
     expect(standing?.ask_passphrase_at).to.eq(fresher)
   })
@@ -1109,7 +1109,7 @@ describe("a lease read a key change overtakes", () => {
     await unlocking
     expect(vault.state).to.eq('unlocked')
     const standing = await world.getLease()
-    expect(standing?.ask_passphrase_at).to.eq(vault.askPassphraseAt).and.to.eq(world.clock.now() + SevenDaysMillis)
+    expect(standing?.ask_passphrase_at).to.eq(vault.ask_passphrase_at).and.to.eq(world.clock.now() + SevenDaysMillis)
   })
 })
 
@@ -1247,7 +1247,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     release()
     await TH.expectBad(ensuring, 'vault_locked')
     expect(vault.state).to.eq('locked')
-    expect(vault.askPassphraseAt).to.be.null
+    expect(vault.ask_passphrase_at).to.be.null
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('locked')
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
@@ -1263,7 +1263,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     release()
     await TH.expectBad(ensuring, 'vault_gone')
     expect(vault.state).to.eq('locked')
-    expect(vault.askPassphraseAt).to.be.null
+    expect(vault.ask_passphrase_at).to.be.null
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'vault_gone')
     expect(await world.getLease()).to.not.be.null
   })

@@ -142,3 +142,4 @@ To be deleted at 1.0.0.
 | `TH.makeGate`                                          | `TH.makeLatch`: a gate is the vault's ways in       |
 | `userId` (a draft's field, `BankProvider`'s prop, `postgresVaultDB`'s option) | `user_id`, as stored |
 | `PasskeyAnswer`'s `credentialId`, `prfSaltB64`          | `credential_id`, `prf_salt_b64`, as the wayin stores them |
+| the snapshot's and `vault.askPassphraseAt`             | `ask_passphrase_at`, as the lease stores it             |

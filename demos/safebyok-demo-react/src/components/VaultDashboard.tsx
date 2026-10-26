@@ -154,7 +154,7 @@ export const VaultDashboard = () => {
     <section className="vault-dashboard">
       <div className="row spread">
         <h2>Vault dashboard <span className="quiet">vault “{snapshot.vaultlabel}”</span></h2>
-        <LockChip state={snapshot.state} askPassphraseAt={snapshot.askPassphraseAt} onLock={() => { void vault.lock() }} />
+        <LockChip state={snapshot.state} ask_passphrase_at={snapshot.ask_passphrase_at} onLock={() => { void vault.lock() }} />
       </div>
 
       <p className="quiet">
@@ -253,11 +253,11 @@ export const VaultDashboard = () => {
   )
 }
 
-const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassphraseAt: number | null, onLock: () => void }) => {
+const LockChip = ({ state, ask_passphrase_at, onLock }: { state: string, ask_passphrase_at: number | null, onLock: () => void }) => {
   if (state === 'unlocked') {
     return (
       <span className="row">
-        <span className="chip unlocked">🔓 unlocked{asksAgain(askPassphraseAt)}</span>
+        <span className="chip unlocked">🔓 unlocked{asksAgain(ask_passphrase_at)}</span>
         <button className="mini" onClick={onLock}>lock now</button>
       </span>
     )

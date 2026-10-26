@@ -34,7 +34,7 @@ export type MakeBankOpts = {
   /** How many hours a proof's lease keeps the vault unlocked on this device, across reloads. Default: {@link LeaseHours}, 168 (seven days).
    * Any number above zero up to {@link MaxLeaseHours}, 588 (24.5 days), fractions too: 0.25 is
    * fifteen minutes. No timer reaches further. `Infinity` means never ask again on this device:
-   * the vault stays unlocked until `lock()`, or the vault changes under it, and `askPassphraseAt`
+   * the vault stays unlocked until `lock()`, or the vault changes under it, and `ask_passphrase_at`
    * reads as {@link FarFuture}.
    *
    * Lowering it takes hold on each device at the vault's next birth: a lease ending further off

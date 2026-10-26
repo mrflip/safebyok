@@ -35,7 +35,7 @@ describe("BankProvider", () => {
 
     await TH.unlock(vault, 'correct horse battery staple')
     // One hour, 3,600,000 ms, after the clock's time.
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(ClockMillis + 3_600_000)
+    expect(vault.getSnapshot().ask_passphrase_at).to.eq(ClockMillis + 3_600_000)
     // 'sk-fake' is nine bytes of JSON, one over the limit given.
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake'), 'whisper_too_large')
     // One box fills the vault: a second is refused for room.

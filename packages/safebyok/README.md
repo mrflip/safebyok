@@ -73,7 +73,7 @@ the next. Once born, a vault's `hello()` within `staleMinutes` (five minutes, un
 or the call says otherwise) reads nothing anew; call `hello()` on `visibilitychange`, and
 `hello({ staleMinutes: 0 })` to read now. At sign-out, `bank.closeVaults()`.
 
-The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `askPassphraseAt`, `trouble`,
+The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `ask_passphrase_at`, `trouble`,
 `vault_tok` and the rest -- are live and read-only: read them in an event handler and they are
 current. React renders from `getSnapshot()`, the same fields frozen in one object.
 
@@ -117,7 +117,7 @@ code, the stored records and these docs all use its words.
   the like, but no spread or JSON shows it. While unlocked, the vault keeps the vaultKey in one
   place, wrapped in its `Lease`, which is the Vault object's own: no getter shows it. A box seals
   and opens under it (`Box.seal(vault, props, whisper)`, `box.extractWhisper()`), and locking
-  drops it; `vault.askPassphraseAt` is when it ends. Two devices that write at once
+  drops it; `vault.ask_passphrase_at` is when it ends. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to set the vault's first passphrase is
   `gate_made_elsewhere`.
@@ -411,15 +411,15 @@ asked.
 
 A gating that unlocks the vault grants this device a **lease**: the vault stays unlocked, across
 reloads, until the lease runs out (`leaseHours`, seven days by default, at most 588 hours: 24.5 days) or the host locks it. `Infinity` hours means never
-on this device, until a lock: `askPassphraseAt` is then the exported `FarFuture`, the latest
+on this device, until a lock: `ask_passphrase_at` is then the exported `FarFuture`, the latest
 instant the package accepts (in 2255). A finite number past 588 is refused, since no timer
-reaches further. Show "until locked" for any `askPassphraseAt >= FarFuture - MinuteMillis`;
+reaches further. Show "until locked" for any `ask_passphrase_at >= FarFuture - MinuteMillis`;
 never compare a time for equality. The vault reports the lease it was opened with as
 `vault.leaseMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
 reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
 told the option again.
 
-The deadline is the truth, and a timer enforces it. At `askPassphraseAt` a timer drops the key,
+The deadline is the truth, and a timer enforces it. At `ask_passphrase_at` a timer drops the key,
 with no call needed: the snapshot reads `locked`, and every call that needs the key throws
 `vault_locked`, work already under way included. A timer that runs late, as one may on a device
 that slept, is caught at the next call. The timer is `unref`'d, so it never holds a Node or Bun process open.
@@ -769,7 +769,7 @@ await vault.delWayin('passkey')                                // del_passkey: t
 
 * **A passkey is a way in like the passphrase.** Its wayin wraps the same vaultKey, under a key
   made from the passkey's answer by HKDF-SHA256; an unlock with it grants this device a lease
-  for `leaseHours`, and `askPassphraseAt` applies, as for the passphrase.
+  for `leaseHours`, and `ask_passphrase_at` applies, as for the passphrase.
 * **One passkey per vault.** Putting one replaces the passkey the vault had, if any: the snapshot's
   `passkey` says which it is, when it was added and from which device, so warn the user before
   asking ("this replaces the passkey added on 3 Oct from another device"). Putting the same

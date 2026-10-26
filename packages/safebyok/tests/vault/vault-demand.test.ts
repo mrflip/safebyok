@@ -264,7 +264,7 @@ describe("the refresh's judgment", () => {
   it("keeps its own lease when another tab's renewal writes one ending later: it never shows 'locked' for it, and takes the renewed one up, unasked, once its own ends", async () => {
     const world = makeWorld()
     const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), leaseHours: 1 })
-    const own = thisTab.askPassphraseAt
+    const own = thisTab.ask_passphrase_at
     if (own === null) { throw new Error("The unlock left this tab no lease") }
     world.advance(30 * MinuteMillis)
     const otherTab = await world.open({ leaseHours: 1 })
@@ -275,10 +275,10 @@ describe("the refresh's judgment", () => {
     expect(renewed?.ask_passphrase_at).to.be.above(own)
     await thisTab.refresh()
     expect(thisTab.state).to.eq('unlocked')
-    expect(thisTab.askPassphraseAt).to.eq(own)
+    expect(thisTab.ask_passphrase_at).to.eq(own)
     world.advance(own - world.clock.now())
     await thisTab.ensureUnlocked()
-    expect(thisTab.askPassphraseAt).to.eq(renewed?.ask_passphrase_at)
+    expect(thisTab.ask_passphrase_at).to.eq(renewed?.ask_passphrase_at)
   })
 
   it("keeps its own lease when another tab's lock and unlock both land before it reads: the store holds a lease under the same gate", async () => {
@@ -376,7 +376,7 @@ describe("vault.lock, at once", () => {
     const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
     const locking = vault.lock()
     expect(vault.state).to.eq('locked')
-    expect(vault.askPassphraseAt).to.be.null
+    expect(vault.ask_passphrase_at).to.be.null
     expect(heard).to.deep.equal(['locked'])
     await erasing.reached
     expect(await world.getLease()).to.not.be.null
