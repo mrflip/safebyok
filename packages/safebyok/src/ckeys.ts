@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import type { VaultScope } from './types'
+import type { VaultScope } from './types/types'
 
 /** The ckeys safebyok's key-value adapters file rows under, for an adapter of your own over a key-value store too.
  * A ckey is the row's kind, the scope, and for a box its boxlabel, joined on `^`:

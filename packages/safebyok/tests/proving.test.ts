@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { GatedVaultProps, type PasskeyAnswer } from '../src/types'
+import { GatedVaultProps, type PasskeyAnswer } from '../src/types/types'
+import { passphraseCleartext } from '../src/types/type-aliases'
 import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
@@ -78,7 +79,7 @@ describe("PassphraseProving.seal", () => {
     const header = headerOf(props.passphrase)
     await TH.expectRefusal(PassphraseProving.seal(vault, header, '  ', { gating: StandingGating }), 'wrong_passphrase')
     await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, key_deriver_label: 'other' }, 'pw', { gating: StandingGating }), 'unknown_key_deriver')
-    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, salt_b64: 'c2hvcnQ' }, 'pw', { gating: StandingGating }), 'damaged_wayin')
+    await TH.expectRefusal(PassphraseProving.seal(vault, { ...header, salt_b64: 'c2hvcnQ' as never }, 'pw', { gating: StandingGating }), 'damaged_wayin')
     expect(derive).not.toHaveBeenCalled()
   })
 
@@ -280,7 +281,7 @@ describe("proving.grantLease", () => {
 
 describe("passphraseKeyOf", () => {
   it("makes the non-extractable passphraseKey, as its example shows", async () => {
-    const wayinKey = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16).fill(7), TH.spyLogger().logger)
+    const wayinKey = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), new Uint8Array(16).fill(7), TH.spyLogger().logger)
     expect(wayinKey.extractable).to.be.false
     expect(wayinKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
   })
@@ -339,7 +340,7 @@ const keepingDeriver = () => {
 }
 
 /** The passphraseKey of 'pw' over {@link saltBytes}, by `keyDeriver`. */
-const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, 'pw', saltBytes, TH.spyLogger().logger)
+const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
 
 /** A key deriver handing back `handed` whatever it is asked. */
 const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as Uint8Array) })
@@ -347,7 +348,7 @@ const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriv
 describe("passphraseKeyOf, deriving", () => {
   it("is the key deriver's bytes over the passphrase and salt, derived once: the same two make the same key", async () => {
     const { keyDeriver, derivations } = countingDeriver()
-    const wayinKey = await passphraseKeyOf(keyDeriver, 'pw', saltBytes, TH.spyLogger().logger)
+    const wayinKey = await passphraseKeyOf(keyDeriver, passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
     expect(derivations).toHaveBeenCalledOnce()
     expect(derivations.mock.calls[0]?.[0]).to.eq('pw')
     expect([...derivations.mock.calls[0]?.[1] ?? []]).to.deep.equal(bytesOf(7, 16))
@@ -356,9 +357,9 @@ describe("passphraseKeyOf, deriving", () => {
 
   it("makes another key of another passphrase, or another salt", async () => {
     const wayinKey = await keyBy(TH.testDeriver)
-    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, 'pW', saltBytes, TH.spyLogger().logger)
+    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pW'), saltBytes, TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherPassphrase)).rejects.toThrow()
-    const otherSalt = await passphraseKeyOf(TH.testDeriver, 'pw', new Uint8Array(16), TH.spyLogger().logger)
+    const otherSalt = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), new Uint8Array(16), TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherSalt)).rejects.toThrow()
   })
 
@@ -391,7 +392,7 @@ describe("passphraseKeyOf, when its key deriver throws", () => {
   for (const [thrown, kind, loggedKind, blurb] of DeriverThrowCases) {
     it(`${blurb}, keeping nothing of the throw: no cause, text or property, and nothing in the log`, async () => {
       const spy = TH.spyLogger()
-      const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, 'pw-the-passphrase', saltBytes, spy.logger), kind)
+      const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, passphraseCleartext.parse('pw-the-passphrase'), saltBytes, spy.logger), kind)
       expect(err).to.not.eq(thrown)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined

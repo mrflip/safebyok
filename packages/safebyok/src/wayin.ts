@@ -1,7 +1,8 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
 import { VaultError } from './errors'
-import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types'
+import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
 import type { KeyDeriver } from './key-deriver'
+import type { PrfSalt } from './types/type-aliases'
 import type { Vault } from './vault'
 
 /** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
@@ -163,7 +164,7 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
   readonly credential_id: string
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
-  readonly prf_salt_b64: string
+  readonly prf_salt_b64: PrfSalt
 
   /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
   constructor(vault: WayinVault, vaultTok: string, record: PasskeyWayinRecord) {

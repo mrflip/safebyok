@@ -1,6 +1,6 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
 import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
-import type { VaultScope } from './types'
+import type { VaultScope } from './types/types'
 
 /** The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked.
  * NIST SP 800-63B asks for length, and against composition rules, which make passphrases harder to

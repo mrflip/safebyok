@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { FarFuture, FarPast, LeaseHours, MaxLeaseHours, MinuteMillis, ForeverMillis, StaleMinutes } from '../../src/types'
+import { LeaseHours, MaxLeaseHours, StaleMinutes } from '../../src/types/types'
+import { FarFuture, FarPast, MinuteMillis, ForeverMillis } from '../../src/consts'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'

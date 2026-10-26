@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
+import * as Primitives from '../../src/checks/primitives'
 import { Kit, Validator, sayable } from '../../src/checks/validator'
 import { VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
@@ -215,5 +216,10 @@ describe("Kit", () => {
     expect(Kit.lazy(() => Kit.str).safeParse('text').success).to.be.true
     expect(Kit.applabel).to.eq(Kit.label)
     expect(Kit.user_id.safeParse('auth0|x').success).to.be.true
+  })
+
+  it("hands out epochMillis, the instant every time is, as the same object the package exports", () => {
+    expect(Kit.epochMillis).to.eq(Primitives.EpochMillis)
+    expect(Kit.epochMillis.safeParse(1_792_022_400).success).to.be.false
   })
 })

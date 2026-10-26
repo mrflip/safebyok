@@ -1,13 +1,14 @@
 import { deepFreeze } from 'es-toolkit'
 import type * as Z from 'zod'
 import { decorate } from './adorn'
-import { Ciphered, randomId } from './crypto'
+import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { type BoxSummary, type DamagedBox, EpochMillis, type ListedSummary, Sidecar, type Stamp, Whisper } from './types'
+import { type BoxSummary, type DamagedBox, type ListedSummary, Sidecar, type Stamp, Whisper } from './types/types'
+import { box_key_wrapped, revision_tok, whisper_ciphered } from './types/type-aliases'
 import type { Vault } from './vault'
 import { Validator } from './checks/validator'
 
@@ -32,15 +33,15 @@ export const BoxFormat = 'safebyok-box-v8'
  *
  * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
  */
-export const { BoxRecord } = Validator('bad_record', ({ obj, str, lit, boxlabel }) => ({
+export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
   BoxRecord: obj({
     format:                 lit(BoxFormat),
     boxlabel,
-    revision_tok:           str.min(1),
+    revision_tok,
     /** This box's boxKey, wrapped under the vaultKey. */
-    box_key_wrapped:        Ciphered,
+    box_key_wrapped,
     /** The whisper, ciphered under this box's boxKey. */
-    whisper_ciphered:       Ciphered,
+    whisper_ciphered,
     /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
     whisper_codec:          lit('json_v1'),
     /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
@@ -51,9 +52,9 @@ export const { BoxRecord } = Validator('bad_record', ({ obj, str, lit, boxlabel 
      */
     sidecar:                Sidecar,
     /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
-    registered_at:          EpochMillis,
+    registered_at:          epochMillis,
     /** When this revision was written, an {@link EpochMillis}: a store of the same whisper moves it too. */
-    written_at:             EpochMillis,
+    written_at:             epochMillis,
   }).strict(),
 }))
 export type BoxRecord = Z.infer<typeof BoxRecord>
@@ -346,8 +347,8 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 }
 
 /** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; and what a {@link Stamp} must show, the scope, the `vault_tok`, and both epochs. */
-const { BaseShape, StampShape } = Validator('bad_option', ({ obj, str, uint }) => ({
-  BaseShape:  obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: EpochMillis.optional() }).loose().nullable(),
+const { BaseShape, StampShape } = Validator('bad_option', ({ obj, str, uint, epochMillis }) => ({
+  BaseShape:  obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
   StampShape: obj({ applabel: str, user_id: str, vaultlabel: str, vault_tok: str.min(1), vault_epoch: uint, gate_epoch: uint }),
 }))
 

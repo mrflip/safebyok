@@ -1,5 +1,5 @@
 import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
+import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types/types'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:

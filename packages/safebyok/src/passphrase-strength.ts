@@ -1,6 +1,6 @@
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
-import type { VaultScope } from './types'
+import type { VaultScope } from './types/types'
 
 /** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
  * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the

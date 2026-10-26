@@ -1,5 +1,5 @@
 import { VaultError, type RefusalMeta } from './errors'
-import type { Capacity } from './types'
+import type { Capacity } from './types/types'
 
 /** The refusals a storage adapter throws, with the core's own messages: throw these rather than copying its words.
  * Import it whole: `import { Refusals } from 'safebyok'`, then `throw Refusals.vaultMismatch()`.

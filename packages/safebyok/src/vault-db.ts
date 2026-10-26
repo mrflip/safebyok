@@ -1,6 +1,6 @@
 import type * as Z from 'zod'
 import { BoxRecord } from './box'
-import { Capacity, GatedVaultProps, GatelessVaultProps, Tombstone, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
+import { Capacity, GatedVaultProps, GatelessVaultProps, Tombstone, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types/types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './checks/core-checks'

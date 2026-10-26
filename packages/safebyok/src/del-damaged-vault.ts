@@ -3,7 +3,7 @@ import { VaultError } from './errors'
 import { valOf } from './outcome'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import { randomId } from './crypto'
-import { type VaultScope, DeviceRecordFormat } from './types'
+import { type VaultScope, DeviceRecordFormat } from './types/types'
 import type { VaultDB } from './vault-db'
 import { type MakeBankOpts, type VaultDraft, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 

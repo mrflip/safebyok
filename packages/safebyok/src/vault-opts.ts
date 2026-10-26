@@ -1,5 +1,6 @@
 import type * as Z from 'zod'
-import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, StaleMinutes, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
+import { type Clock, type VaultScope, MaxWhisperBytes, MaxLeaseHours, LeaseHours, StaleMinutes, wallClock, MaxBoxes } from './types/types'
+import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from './consts'
 import { VaultError, isVaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'

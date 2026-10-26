@@ -1,4 +1,4 @@
-import type { VaultScope } from './types'
+import type { VaultScope } from './types/types'
 
 /** True when `record` names `scope`: the same app, user and vault. */
 export const sameScope = (record: VaultScope, scope: VaultScope): boolean => (

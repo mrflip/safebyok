@@ -4,11 +4,11 @@ import * as Zod from 'zod'
 import type * as Z from 'zod'
 import { VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
-import { label, user_id } from './primitives'
+import { EpochMillis, label, user_id } from './primitives'
 
 // == [Kit]: Kit, KitWith
 
-/** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, and the names every scope is made of.
+/** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, the names every scope is made of, and `epochMillis`, the instant every time is.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
  * A maker the kit lacks comes in by a named import from `zod` beside the call: the whole of Zod
  * would carry every locale it ships into each host's bundle.
@@ -33,6 +33,7 @@ export const Kit = {
   uint:    Zod.int().nonnegative(),
   bool:    Zod.boolean(),
   label, applabel: label, vaultlabel: label, boxlabel: label, user_id,
+  epochMillis: EpochMillis,
 } as const
 
 /** The kit a builder gets: {@link Kit}, with the given modules' exports spread in beneath it. */

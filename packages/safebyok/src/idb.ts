@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import { DeviceRecord, LeaseRecord } from './types'
+import { DeviceRecord, LeaseRecord } from './types/types'
 import * as Ckeys from './ckeys'
 import { type DeviceDB, deviceOutcomeOf, raisedDeviceRecord } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'

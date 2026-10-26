@@ -3,7 +3,7 @@ import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { GatedVaultProps, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, closeVault, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
+import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -108,7 +108,7 @@ export const bySubject: GetUserId = async (ctx) => {
  * a replacement weighs exactly `bytes` more or less only under a tag as long as the one it replaces.
  */
 export const heavyBox = (boxlabel: string, bytes: number, tag = boxlabel) => (
-  boxOf(boxlabel, tag, { whisper_ciphered: { cipher_iv_b64: 'iv', ciphertext_b64: 'c'.repeat(bytes) } })
+  boxOf(boxlabel, tag, { whisper_ciphered: { cipher_iv_b64: 'iv', ciphertext_b64: 'c'.repeat(bytes) } as FakeCiphered })
 )
 
 /** The whispers a real vault is made with: obvious fakes, never real keys. */

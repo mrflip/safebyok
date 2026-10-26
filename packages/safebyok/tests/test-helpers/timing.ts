@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { VaultScope } from '../../src/types'
+import type { VaultScope } from '../../src/types/types'
 import { type VaultDB } from '../../src/vault-db'
 
 

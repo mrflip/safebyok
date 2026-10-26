@@ -20,6 +20,30 @@ export const userIdTooLong = (maxChars: number): string => `A user_id is at most
 export const UserIdChars = "A user_id is ASCII letters, digits and - _ . ~ : @ + | %, and not dots alone: percent-encode (RFC 3986) any other character"
 // --
 
+// == [Tokens]: TokenMissing
+
+/** An empty token. */
+export const TokenMissing = "A token is minted by safebyok, so it can't be empty"
+// --
+
+// == [Instants]: InstantTooEarly, InstantTooLate, InstantNotWhole
+
+/** An instant before 1981. */
+export const InstantTooEarly = "An instant is epoch milliseconds no earlier than 1981; a smaller number is likely epoch seconds"
+
+/** An instant after 2255. */
+export const InstantTooLate = "An instant is epoch milliseconds no later than 2255; a larger number is likely epoch microseconds"
+
+/** An instant with a fraction of a millisecond. */
+export const InstantNotWhole = "An instant is whole epoch milliseconds"
+// --
+
+// == [Passphrases]: PassphraseNotText
+
+/** A passphrase handed over as anything but text. */
+export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
+// --
+
 // == [Refusals]: FailedItsCheck, UnsaidName, unknownFields, moreFailures
 
 /** A refused input whose check gave no sentence of its own. */

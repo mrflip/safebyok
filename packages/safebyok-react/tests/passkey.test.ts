@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type PasskeyWayinSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type PasskeyWayinSummary, type PrfSalt, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -28,7 +28,7 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
 /** The vault's passkey as its snapshot has it, for `proof`. */
 const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
   wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_tok: 'vault-tok-u1',
-  credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
+  credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64 as PrfSalt,
 })
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */

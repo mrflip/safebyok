@@ -112,7 +112,8 @@ describe("the Convex validators, field for field with the core's Zod records", (
     expectTypeOf<Infer<typeof GatelessVaultProps>>().toEqualTypeOf<Records.GatelessVaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
     // A box's sidecar is an object of any values to Convex, which the core holds to JSON values on every read.
-    expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'sidecar'>>()
+    // Convex holds what storage holds, a record as it goes into the core's check, before its ciphered fields are branded.
+    expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Zod.input<typeof Records.BoxRecord>, 'sidecar'>>()
     // A listing is the stored record less its ciphered fields, so it is the stored record's shape
     // a listing must meet.
     expectTypeOf<Omit<Infer<typeof ListedBox>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
@@ -188,7 +189,7 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },                              false,  true,   'an epoch of zero'],
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: 1.5 },                            false,  true,   'a fractional epoch'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 },               false,  true,   'a registered_at in epoch seconds, before 1981'],
-  [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { salt_b64: '' }) }, false, true, 'a passphrase with an empty salt'],
+  [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { salt_b64: '' as never }) }, false, true, 'a passphrase with an empty salt'],
   [{ ...TH.vaultPropsOf('u1'), passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) }, false, true, 'a passkey with an empty credential_id'],
 ] as const
 

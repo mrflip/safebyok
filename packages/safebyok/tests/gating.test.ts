@@ -8,7 +8,7 @@ import type { KeyDeriver } from '../src/key-deriver'
 import { heldLeaseOf } from '../src/held-lease'
 import type { Vault } from '../src/vault'
 import * as TH from './test-helpers'
-import { MinuteMillis } from '../src/types'
+import { MinuteMillis } from '../src/consts'
 import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultPropsOf, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: World, lockedVaultIn, weakIsWeak, deletingUnderThrowingDialog

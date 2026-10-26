@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { VaultError, isVaultError } from '../../src/errors'
-import type { DeviceRecord } from '../../src/types'
+import type { DeviceRecord } from '../../src/types/types'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { type Vault } from '../../src/vault'

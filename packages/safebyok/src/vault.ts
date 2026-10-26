@@ -1,4 +1,5 @@
-import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type GatedVaultProps, type VaultProps, type DeviceRecord, DeviceRecordFormat, type LeaseRecord, type WayinKind, isGated, MinuteMillis, FarFuture, FarPast } from './types'
+import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type GatedVaultProps, type VaultProps, type DeviceRecord, DeviceRecordFormat, type LeaseRecord, type WayinKind, isGated } from './types/types'
+import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
 import * as CX from './checks/core-checks'
 import { Validator } from './checks/validator'

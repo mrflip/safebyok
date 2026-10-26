@@ -1,6 +1,6 @@
 import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
-import { type GatedVaultProps, type VaultProps, isGated } from './types'
+import { type GatedVaultProps, type VaultProps, isGated } from './types/types'
 import type { Vault } from './vault'
 import { type PasskeyWayin, type PassphraseWayin, Wayin, type WayinVault } from './wayin'
 

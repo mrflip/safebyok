@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { VaultScope, StaleMinutes, MinuteMillis } from '../../src/types'
+import { VaultScope, StaleMinutes } from '../../src/types/types'
+import { MinuteMillis } from '../../src/consts'
 import { VaultError, isVaultError } from '../../src/errors'
 import { deviceTroubleAsConditions, memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'

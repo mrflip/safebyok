@@ -1,5 +1,5 @@
 import { BoxRecord } from './box'
-import type { GatelessVaultProps, VaultScope, VaultProps } from './types'
+import type { GatelessVaultProps, VaultScope, VaultProps } from './types/types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'

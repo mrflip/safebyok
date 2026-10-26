@@ -1,4 +1,4 @@
-import { DeviceRecord, LeaseRecord, type VaultScope } from './types'
+import { DeviceRecord, LeaseRecord, type VaultScope } from './types/types'
 import * as Ckeys from './ckeys'
 import { sameScope } from './names'
 import { VaultError } from './errors'

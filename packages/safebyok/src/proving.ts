@@ -1,4 +1,4 @@
-import { type Ciphered, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
+import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './key-deriver-spec'
@@ -6,8 +6,9 @@ import { type Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types'
+import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types/types'
 import { decorate } from './adorn'
+import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
 import { Validator } from './checks/validator'
 import type { Vault } from './vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
@@ -133,8 +134,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    *
    * @example const wrapped = await proving.wrappedWith(vaultKey, proving.header)
    */
-  async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<Ciphered> {
-    return await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault, this.vault_tok, visible))
+  async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<VaultKeyWayinWrapped> {
+    return vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault, this.vault_tok, visible)))
   }
 
   /** Check that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
@@ -223,14 +224,14 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   /** The wrap of the gate's wayin at this proving's slotlabel, as the vault holds it now; a gate with none there has moved past it. */
-  #currentWrap(): Ciphered {
+  #currentWrap(): VaultKeyWayinWrapped {
     const wayin = wayinRecordAt(insideOf(this.vault).vaultProps(), this.slotlabel)
     if (wayin === null) { throw gateMovedPast() }
     return wayin.vault_key_wayin_wrapped
   }
 
   /** The vaultKey out of `wrapped` under the wayinKey, bound to `visible`, with `usage`: {@link wrongProof} when it will not unwrap. A demand follows the wait. */
-  async #unwrap(wrapped: Ciphered, visible: WayinHeader, usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
+  async #unwrap(wrapped: VaultKeyWayinWrapped, visible: WayinHeader, usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
     let vaultKey: CryptoKey | null
     try {
       vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.vault, this.vault_tok, visible), usage)
@@ -268,13 +269,11 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })
    */
   static async seal(vault: ProvingVault, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
-    if (typeof passphrase !== 'string') {
-      throw new VaultError('bad_option', 'A passphrase is the text the user typed, as a string.')
-    }
+    const cleartext = passphraseCleartext.parse(passphrase)
     const { stamp } = vault
     const { keyDeriver } = vault
-    const sealing = 'slotlabel' in header ? mintedPassphraseHeader(vault, keyDeriver) : checkedPassphraseHeader(header, keyDeriver, passphrase)
-    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, passphrase, fromB64(sealing.salt_b64), vault.logger), unexpectedError)
+    const sealing = 'slotlabel' in header ? mintedPassphraseHeader(vault, keyDeriver) : checkedPassphraseHeader(header, keyDeriver, cleartext)
+    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, cleartext, fromB64(sealing.salt_b64), vault.logger), unexpectedError)
     if (! derived.ok) { demandAfterFailedSeal(vault, stamp, opts.gating) }
     const proving = new PassphraseProving(vault, stamp, sealing, opts.gating, valOf(derived))
     proving.demandSelf({ sealing: true })
@@ -381,13 +380,13 @@ const wayinRecordAt = (vaultProps: VaultProps, slotlabel: WayinKind): Passphrase
 const mintedPassphraseHeader = (vault: ProvingVault, keyDeriver: KeyDeriver): PassphraseWayinHeader => ({
   wayinkind:         'passphrase',
   key_deriver_label: keyDeriver.key_deriver_label,
-  salt_b64:          toB64(randomBytes(keyDeriver.salt_bytes)),
+  salt_b64:          salt_b64.parse(toB64(randomBytes(keyDeriver.salt_bytes))),
   device_id:         insideOf(vault).deviceId(),
   registered_at:     vault.now(),
 })
 
 /** `header`, a current passphrase wayin's, once its deriver is the vault's and its salt one that deriver makes, and the passphrase is not blank. */
-const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyDeriver, passphrase: string): PassphraseWayinHeader => {
+const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyDeriver, passphrase: PassphraseCleartext): PassphraseWayinHeader => {
   if (header.key_deriver_label !== keyDeriver.key_deriver_label) {
     throw new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made.')
   }
@@ -434,7 +433,7 @@ const mintedPasskeyHeader = (vault: ProvingVault, answer: PasskeyAnswer): Passke
   return {
     wayinkind:     'passkey',
     credential_id: answer.credentialId,
-    prf_salt_b64:  answer.prfSaltB64,
+    prf_salt_b64:  prf_salt_b64.parse(answer.prfSaltB64),
     device_id:     insideOf(vault).deviceId(),
     registered_at: vault.now(),
   }
@@ -513,9 +512,9 @@ const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => s
  * would make. Shared memory is refused untouched. What the deriver throws is refused as {@link
  * deriverThrewRefusal} says, through `logger`.
  *
- * @example const wayinKey = await passphraseKeyOf(vault.keyDeriver, typed, saltBytes, vault.logger)
+ * @example const wayinKey = await passphraseKeyOf(vault.keyDeriver, passphraseCleartext.parse(typed), saltBytes, vault.logger)
  */
-export const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array, logger: VaultLogger): Promise<CryptoKey> => {
+export const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: PassphraseCleartext, saltBytes: Uint8Array, logger: VaultLogger): Promise<CryptoKey> => {
   let handed: unknown
   try {
     handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)

@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import type { Gating, GatingKind, RequestCleartext } from '../../src/gating'
 import { type Outcome, good, valOf } from '../../src/outcome'
-import type { PasskeyAnswer, WayinSummary } from '../../src/types'
+import type { PasskeyAnswer, WayinSummary } from '../../src/types/types'
 import type { Vault } from '../../src/vault'
 import { eventually } from './timing'
 

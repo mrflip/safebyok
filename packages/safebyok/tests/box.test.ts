@@ -7,7 +7,9 @@ import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
-import { BoxSummary, FarFuture, type Stamp, type Whisper } from '../src/types'
+import { BoxSummary, type Stamp, type Whisper } from '../src/types/types'
+import { box_key_wrapped, whisper_ciphered } from '../src/types/type-aliases'
+import { FarFuture } from '../src/consts'
 import * as TH from './test-helpers'
 
 const OldIso = '2026-10-14T00:00:00.000Z'
@@ -108,8 +110,8 @@ const handSealedOf = async (vault: TH.LeasedSlice, vaultKey: CryptoKey, plainByt
   return {
     format,
     ...header,
-    box_key_wrapped:  await wrapKeyUnder(vaultKey, boxKey, ctxFor('box_key_wrapped')),
-    whisper_ciphered: await cipherBytes(boxKey, plainBytes, ctxFor('whisper_ciphered')),
+    box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, ctxFor('box_key_wrapped'))),
+    whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, plainBytes, ctxFor('whisper_ciphered'))),
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
-import { MinuteMillis } from '../../src/types'
+import { MinuteMillis } from '../../src/consts'
 import { VaultError } from '../../src/errors'
 import type { Vault } from '../../src/vault'
 import { memoryDeviceDB } from '../../src/device-db'

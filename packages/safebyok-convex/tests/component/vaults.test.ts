@@ -63,7 +63,7 @@ describe("getVault and ensureVault", () => {
 
 describe("putVaultProps", () => {
   const ThisVaultAtOne = { vault_tok: 'vault-tok-u1', gate_epoch: 1 }
-  const rewrapped = TH.vaultPropsOf('u1', { gate_epoch: 2, passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } }) })
+  const rewrapped = TH.vaultPropsOf('u1', { gate_epoch: 2, passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: TH.fakeCiphered('new') }) })
 
   it("lands vault props that keep the vault_tok and move gate_epoch forward", async () => {
     const CVX = await withVaultProps()
@@ -530,7 +530,7 @@ const wholeDocumentVaultProps = () => {
   const vaultProps = TH.vaultPropsOf('u1')
   const padding = 'a'.repeat(1_048_576 - getDocumentSize(vaultProps) - 64)
   const passphrase = TH.wayinOf('passphrase', { vault_key_wayin_wrapped: TH.fakeCiphered('vault-u1') })
-  return TH.vaultPropsOf('u1', { passphrase: { ...passphrase, salt_b64: passphrase.salt_b64 + padding } })
+  return TH.vaultPropsOf('u1', { passphrase: { ...passphrase, salt_b64: (passphrase.salt_b64 + padding) as never } })
 }
 
 /**
@@ -540,8 +540,8 @@ const wholeDocumentVaultProps = () => {
 const fillVault = async (count: number, whisperBytes: number, vaultProps = TH.vaultPropsOf('u1')) => {
   const CVX = TH.componentTest(true)
   await TH.ensureGatedIn(CVX, vaultProps)
-  const whisperCiphered = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'c'.repeat(Math.ceil((whisperBytes + 16) * 4 / 3)) }
-  const boxKeyWrapped = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'k'.repeat(64) }
+  const whisperCiphered = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'c'.repeat(Math.ceil((whisperBytes + 16) * 4 / 3)) } as TH.FakeCiphered
+  const boxKeyWrapped = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'k'.repeat(64) } as TH.FakeCiphered
   for (let ii = 0; ii < count; ii++) {
     const boxlabel = `b${String(ii).padStart(39, '0')}`
     const box = TH.boxOf(boxlabel, crypto.randomUUID(), { whisper_ciphered: whisperCiphered, box_key_wrapped: boxKeyWrapped })

@@ -1,4 +1,4 @@
-import { type DeviceRecord, type GatelessVaultProps, type VaultScope, DeviceRecordFormat } from './types'
+import { type DeviceRecord, type GatelessVaultProps, type VaultScope, DeviceRecordFormat } from './types/types'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { randomId } from './crypto'

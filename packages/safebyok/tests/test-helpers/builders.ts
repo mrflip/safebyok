@@ -4,7 +4,8 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceRecord, type LeaseRecord, type Stamp } from '../../src/types'
+import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type GatedVaultProps, type GatelessVaultProps, type VaultProps, type ListedSummary, type DamagedBox, type DeviceRecord, type LeaseRecord, type Stamp } from '../../src/types/types'
+import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
 import type { MakeBankOpts, VaultDraft } from '../../src/vault-opts'
@@ -206,15 +207,21 @@ export const closeVault = (vault: Vault): void => {
  */
 export const freshDbName = (): string => `safebyok_test_${crypto.randomUUID().slice(0, 8)}`
 
+/** A Ciphered that opens under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
+export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & VaultKeyWayinWrapped & VaultKeyLeaseWrapped
+
 /**
- * A shape-valid Ciphered that opens nothing: for storage-layer tests, which never decrypt.
+ * A shape-valid Ciphered that opens nothing, in any ciphered role: for storage-layer tests, which
+ * never decrypt. Opening under no key, it is no more one role's than another's, so it fills any
+ * ciphered field (a box's `whisper_ciphered`, a wayin's wrap) without a parse.
  *
  * @example fakeCiphered('a1')  // => { cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' }
+ * @example boxOf('anthropic', 'a1', { whisper_ciphered: fakeCiphered('SUPERSECRET') })
  */
-export const fakeCiphered = (tag: string): Ciphered => ({
-  cipher_iv_b64:  `iv-${tag}`,
-  ciphertext_b64: `ct-${tag}`,
-})
+export const fakeCiphered = (tag: string): FakeCiphered => {
+  const fake: Ciphered = { cipher_iv_b64: `iv-${tag}`, ciphertext_b64: `ct-${tag}` }
+  return fake as FakeCiphered
+}
 
 /**
  * The scope of `userId`'s vault in the `acme` app.
@@ -235,7 +242,7 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
   wayinkind:               'passphrase',
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
-  salt_b64:                'c2FsdHNhbHRzYWx0c2FsdA',
+  salt_b64:                salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
@@ -254,7 +261,7 @@ export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecor
   wayinkind:               'passkey',
   credential_id:           `cred-${tag}`,
   // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
-  prf_salt_b64:            'cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM',
+  prf_salt_b64:            prf_salt_b64.parse('cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM'),
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),

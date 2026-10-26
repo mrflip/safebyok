@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { type PasskeyAnswer, VaultProps, VaultScope } from '../../src/types'
+import { type PasskeyAnswer, VaultProps, VaultScope } from '../../src/types/types'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'

@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
-import { GatedVaultProps, VaultProps, type PasskeyAnswer, type PasskeyWayinRecord } from '../src/types'
+import { GatedVaultProps, VaultProps, type PasskeyAnswer, type PasskeyWayinRecord } from '../src/types/types'
+import { passphraseCleartext, prf_salt_b64 } from '../src/types/type-aliases'
 import type { Vault } from '../src/vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
@@ -74,7 +75,7 @@ const resealedPassphrase = async (vault: Vault, props: GatedVaultProps): Promise
 
 /** The passphraseKey the test deriver makes of `pw` over `saltB64`: the key a proving of `pw` over that salt holds. */
 const passphraseKeyOver = async (saltB64: string): Promise<CryptoKey> => (
-  await passphraseKeyOf(TH.testDeriver, 'pw', fromB64(saltB64), TH.spyLogger().logger)
+  await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), fromB64(saltB64), TH.spyLogger().logger)
 )
 
 /** The vaultKey's raw bytes, to compare two handles on it. */
@@ -211,11 +212,11 @@ describe("wayin.wayinCtx", () => {
 
 describe("wayin.isDamaged", () => {
   const DamagedCases = [
-    [TH.wayinOf('passphrase', { salt_b64: 'c2FsdA' }),            true,  'a passphrase whose salt is not the deriver\'s length'],
-    [TH.wayinOf('passphrase', { salt_b64: 'not base64!' }),       true,  'a passphrase whose salt is not base64url'],
-    [TH.wayinOf('passphrase', { key_deriver_label: 'elsewhere_v1', salt_b64: 'c2FsdA' }), false, "a passphrase another deriver made, whose salt is not this vault's to judge"],
+    [TH.wayinOf('passphrase', { salt_b64: 'c2FsdA' as never }),   true,  'a passphrase whose salt is not the deriver\'s length'],
+    [TH.wayinOf('passphrase', { salt_b64: 'not base64!' as never }), true,  'a passphrase whose salt is not base64url'],
+    [TH.wayinOf('passphrase', { key_deriver_label: 'elsewhere_v1', salt_b64: 'c2FsdA' as never }), false, "a passphrase another deriver made, whose salt is not this vault's to judge"],
     [TH.wayinOf('passphrase'),                                    false, 'a passphrase stored as this package writes it'],
-    [TH.passkeyWayinOf('laptop', { prf_salt_b64: 'c2FsdA' }),      true,  'a passkey whose salt is not 32 bytes'],
+    [TH.passkeyWayinOf('laptop', { prf_salt_b64: 'c2FsdA' as never }), true,  'a passkey whose salt is not 32 bytes'],
     [TH.passkeyWayinOf('laptop'),                                  false, 'a passkey stored as this package writes it'],
   ] as const
 
@@ -323,9 +324,9 @@ describe("a proving's refusals of a way in", () => {
   it("refuses damaged_wayin for a header in a form this package never writes, deriving nothing", async () => {
     const { vault, props, keyDeriver } = await lockedWorld({ passkey: true })
     const derivations = vi.spyOn(keyDeriver, 'deriveKeyBytes')
-    const passphrase = { ...headerOf(props.passphrase), salt_b64: 'c2FsdA' }
+    const passphrase = { ...headerOf(props.passphrase), salt_b64: 'c2FsdA' as never }
     await TH.expectRefusal(PassphraseProving.seal(vault, passphrase, 'pw', { gating: StandingGating }), 'damaged_wayin')
-    const passkey = { ...headerOf(passkeyRecordOf(props)), prf_salt_b64: 'c2FsdA' }
+    const passkey = { ...headerOf(passkeyRecordOf(props)), prf_salt_b64: 'c2FsdA' as never }
     await TH.expectRefusal(PasskeyProving.seal(vault, passkey, await TH.passkeyOf('laptop'), { gating: StandingGating }), 'damaged_wayin')
     expect(derivations).not.toHaveBeenCalled()
   })
@@ -456,7 +457,7 @@ describe("a passkey's way in's ctx", () => {
     const { vault, props } = await lockedWorld({ passkey: true })
     const laptop = await TH.passkeyOf('laptop')
     const { prfSaltB64: otherSalt } = await TH.passkeyOf('elsewhere')
-    const header = { ...headerOf(passkeyRecordOf(props)), prf_salt_b64: otherSalt }
+    const header = { ...headerOf(passkeyRecordOf(props)), prf_salt_b64: prf_salt_b64.parse(otherSalt) }
     const proving = await PasskeyProving.seal(vault, header, { ...laptop, prfSaltB64: otherSalt }, { gating: StandingGating })
     await TH.expectRefusal(proving.checkWayin(), 'wrong_passkey')
   })

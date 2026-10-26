@@ -1,6 +1,8 @@
-/** The names every scope is made of, as plain Zod schemas: labels and the user_id. Each failure says what is wrong in a sentence from {@link Phrases}, quoting nothing. */
+/** The names every scope is made of, and the instant every time is, as plain Zod schemas: labels, the user_id and EpochMillis. Each failure says what is wrong in a sentence from {@link Phrases}, quoting nothing. */
 
-import { string as str } from 'zod'
+import { number as num, string as str } from 'zod'
+import type * as Z from 'zod'
+import { FarFuture, FarPast } from '../consts'
 import * as Phrases from '../phrases'
 
 // == [Labels]: MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id
@@ -44,4 +46,23 @@ export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
  * @example user_id.safeParse('a/b').success                 // false: percent-encode it, 'a%2Fb'
  */
 export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(UserIdPattern, Phrases.UserIdChars)
+// --
+
+// == [Instants]: EpochMillis
+
+/** The check for an instant: whole UTC epoch milliseconds from {@link FarPast} to {@link FarFuture}, both included.
+ * Every time the package keeps is one, and a stored record holding anything else fails its check.
+ * The bounds catch epoch seconds and epoch microseconds passed by mistake. It is plain Zod, as
+ * {@link label} is: its `parse` throws a ZodError.
+ *
+ * @example EpochMillis.parse(Date.UTC(2026, 9, 15))                // 1792022400000
+ * @example EpochMillis.safeParse(1_792_022_400).success            // false: seconds, not ms
+ * @example EpochMillis.safeParse(1_792_022_400_000_000).success    // false: microseconds, not ms
+ * @example EpochMillis.safeParse(1_792_022_400_000.5).success      // false: whole milliseconds only
+ * @example EpochMillis.safeParse(Infinity).success                 // false: never a time
+ */
+export const EpochMillis = num().gte(FarPast, Phrases.InstantTooEarly).lte(FarFuture, Phrases.InstantTooLate).int(Phrases.InstantNotWhole)
+
+/** An instant, whole UTC epoch milliseconds, as `Date.now()` gives and {@link EpochMillis} checks: a plain number, since a host writes one by hand. */
+export type EpochMillis = Z.infer<typeof EpochMillis>
 // --

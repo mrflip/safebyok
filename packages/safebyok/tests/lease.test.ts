@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { BoxFormat, type BoxRecord } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { type BoxVisible, Lease, type LeaseStanding, leaseRecordOf, sealLeaseRecord } from '../src/lease'
-import { FarFuture, ForeverMillis, MinuteMillis, type LeaseRecord } from '../src/types'
+import { type LeaseRecord } from '../src/types/types'
+import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
 import * as TH from './test-helpers'
 
 const GrantedAt = TH.SliceNow

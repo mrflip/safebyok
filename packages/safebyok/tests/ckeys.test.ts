@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Ckeys from '../src/ckeys'
-import type { VaultScope } from '../src/types'
+import type { VaultScope } from '../src/types/types'
 import { memoryStore } from '../src/string-store'
 import * as TH from './test-helpers'
 

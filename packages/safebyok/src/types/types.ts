@@ -1,7 +1,6 @@
-import { number as num } from 'zod'
 import type * as Z from 'zod'
-import { Ciphered } from './crypto'
-import { Validator } from './checks/validator'
+import { Validator } from '../checks/validator'
+import { prf_salt_b64, revision_tok, salt_b64, vault_key_lease_wrapped, vault_key_wayin_wrapped, vault_tok } from './type-aliases'
 
 /** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
@@ -39,53 +38,6 @@ export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, 
   return { Whisper, whisperBag }
 })
 
-/** The latest instant the package accepts, 2255-06-05T23:47:34.740Z: the last millisecond whose epoch microseconds fit a safe integer.
- * `askPassphraseAt` is near it when the vault asks again only after `lock()`, as under
- * `leaseHours: Infinity`. Show "until locked" for any instant within a minute of it, not only one
- * equal to it.
- *
- * @example askPassphraseAt >= FarFuture - MinuteMillis ? 'until locked' : new Date(askPassphraseAt).toLocaleString()
- * @example new Date(FarFuture).toISOString()   // '2255-06-05T23:47:34.740Z'
- */
-export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER / 1000)
-
-/** The earliest instant the package accepts, 1981-01-01T00:00:00Z, as {@link EpochMillis} checks.
- *
- * @example new Date(FarPast).toISOString()   // '1981-01-01T00:00:00.000Z'
- */
-export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
-
-/** One minute, in milliseconds: the margin to leave when asking whether an instant is {@link FarFuture}, the vault's "never".
- *
- * @example askPassphraseAt >= FarFuture - MinuteMillis   // true while the vault stays unlocked until lock()
- */
-export const MinuteMillis = 60_000
-
-/** The lease a vault grants for "until `lock()`", in milliseconds: `leaseHours: Infinity` reads as this in a vault's `leaseMillis`.
- * It spans {@link FarPast} to {@link FarFuture}, so a lease granted at any instant the clock may
- * read ends at {@link FarFuture}.
- *
- * @example vault.leaseMillis >= ForeverMillis - MinuteMillis           // true when opened with leaseHours: Infinity
- * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
- */
-export const ForeverMillis = FarFuture - FarPast
-
-/** The check for an instant: whole UTC epoch milliseconds from {@link FarPast} to {@link FarFuture}, both included.
- * Every time the package keeps is one, and a stored record holding anything else fails its check.
- * The bounds catch epoch seconds and epoch microseconds passed by mistake. It is plain Zod, as
- * `label` is: its `parse` throws a ZodError.
- *
- * @example EpochMillis.parse(Date.UTC(2026, 9, 15))                // 1792022400000
- * @example EpochMillis.safeParse(1_792_022_400).success            // false: seconds, not ms
- * @example EpochMillis.safeParse(1_792_022_400_000_000).success    // false: microseconds, not ms
- * @example EpochMillis.safeParse(1_792_022_400_000.5).success      // false: whole milliseconds only
- * @example EpochMillis.safeParse(Infinity).success                 // false: never a time
- */
-export const EpochMillis = num()
-  .gte(FarPast, "An instant is epoch milliseconds no earlier than 1981; a smaller number is likely epoch seconds")
-  .lte(FarFuture, "An instant is epoch milliseconds no later than 2255; a larger number is likely epoch microseconds")
-  .int("An instant is whole epoch milliseconds")
-
 /** What names one vault: the app's label, the signed-in user's id, and the vault's own label. Its `parse` refuses 'bad_scope'.
  * Each label is a `label`, and the user's id a `user_id`. A scope carrying more fields passes,
  * the rest left out.
@@ -114,14 +66,14 @@ export type Sidecar = Z.infer<typeof Sidecar>
  *
  * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_tok }).damaged // false
  */
-export const { BoxSummary } = Validator('bad_record', ({ obj, str, lit, boxlabel }) => ({
+export const { BoxSummary } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
   BoxSummary: obj({
     boxlabel,
-    revision_tok:    str.min(1),
+    revision_tok,
     sidecar:         Sidecar,
-    registered_at:   EpochMillis,
-    written_at:      EpochMillis,
-    vault_tok:       str.min(1),
+    registered_at:   epochMillis,
+    written_at:      epochMillis,
+    vault_tok,
     damaged:         lit(false).default(false),
   }),
 }))
@@ -176,19 +128,19 @@ export const TombstoneFormat = 'safebyok-tombstone-v1'
  * Each is strict: a field this version does not know is damage, or a newer `format`. A VaultDB
  * reads each back through these, and refuses what fails as 'damaged_vault'.
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaultProps, GatelessVaultProps, VaultProps, Tombstone } = Validator('bad_record', ({ obj, str, uint, int, lit, union, discrim, applabel, user_id, vaultlabel }) => {
+export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaultProps, GatelessVaultProps, VaultProps, Tombstone } = Validator('bad_record', ({ obj, str, uint, int, lit, union, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
   const PassphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
     key_deriver_label:       str.min(1),
     /** This wayin's passphraseSalt: fresh for every passphrase the vault takes. */
-    salt_b64:                str.min(1),
+    salt_b64,
     /** The sealing device's random id for the vault, from its device mark: never drawn from the device itself. */
     device_id:               str.min(1),
     /** When this wayin was sealed: a new passphrase stamps it afresh. */
-    registered_at:           EpochMillis,
+    registered_at:           epochMillis,
     /** The vaultKey, wrapped under the passphraseKey: unwrapping it is the passphrase check. */
-    vault_key_wayin_wrapped: Ciphered,
+    vault_key_wayin_wrapped,
   }).strict()
 
   const PasskeyWayinRecord = obj({
@@ -196,13 +148,13 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaul
     /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
     credential_id:           str.min(1),
     /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
-    prf_salt_b64:            str.min(1),
+    prf_salt_b64,
     /** The adding device's random id for the vault, from its device mark: never drawn from the device itself. */
     device_id:               str.min(1),
     /** When this wayin was added. */
-    registered_at:           EpochMillis,
+    registered_at:           epochMillis,
     /** The vaultKey, wrapped under the passkeyKey: unwrapping it is the passkey check. */
-    vault_key_wayin_wrapped: Ciphered,
+    vault_key_wayin_wrapped,
   }).strict()
 
   const WayinRecord = discrim('wayinkind', [PassphraseWayinRecord, PasskeyWayinRecord])
@@ -214,7 +166,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaul
     user_id,
     vaultlabel,
     /** A random token minted when the vault is made, never changed, and bound into every encryption. */
-    vault_tok:           str.min(1),
+    vault_tok,
     /** A counter the store bumps on every write of the gate and on the vault's deletion, and carries on into a new life of the scope.
      * It only goes up; a device that has seen a higher one than storage shows knows storage was rolled back.
      * No box write moves it, and a writer's own value is ignored: the store decides.
@@ -230,7 +182,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaul
     /** The vault's passkey, or null when it has none: at most one. */
     passkey:             PasskeyWayinRecord.nullable(),
     /** When the vault was made; never changed. */
-    registered_at:       EpochMillis,
+    registered_at:       epochMillis,
   }).strict()
 
   const GatelessVaultProps = obj({
@@ -238,7 +190,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GatedVaul
     gate_epoch:          lit(0),
     passphrase:          lit(null),
     passkey:             lit(null),
-    registered_at:       EpochMillis,
+    registered_at:       epochMillis,
   }).strict()
 
   const VaultProps = union([GatedVaultProps, GatelessVaultProps])
@@ -358,21 +310,21 @@ export const isGated = (vaultProps: VaultProps): vaultProps is GatedVaultProps =
  * it ever goes to the backend. Its `parse` refuses 'bad_record'; it is strict, as every stored
  * record is.
  */
-export const { LeaseRecord } = Validator('bad_record', ({ obj, str, int, lit, custom, applabel, user_id, vaultlabel }) => ({
+export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
   LeaseRecord: obj({
     format:            lit('safebyok-lease-v1'),
     applabel,
     user_id,
     vaultlabel,
-    vault_tok:         str.min(1),
+    vault_tok,
     /** The vault props' `gate_epoch` when this lease was granted: a mismatch voids it. */
     gate_epoch:        int.positive(),
     /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable, usable only to unwrap what it wrapped. */
     lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, "a CryptoKey handle"),
     /** The vaultKey, wrapped under the leaseKey. */
-    vault_key_lease_wrapped: Ciphered,
+    vault_key_lease_wrapped,
     /** The instant from which the lease no longer counts, and the vault asks for a proof. */
-    ask_passphrase_at: EpochMillis,
+    ask_passphrase_at: epochMillis,
   }).strict(),
 }))
 export type LeaseRecord = Z.infer<typeof LeaseRecord>

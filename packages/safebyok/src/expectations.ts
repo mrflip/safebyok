@@ -1,7 +1,7 @@
 import { BoxRecord } from './box'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type GatelessVaultProps, type Tombstone, type VaultProps } from './types'
+import { TombstoneFormat, type GatelessVaultProps, type Tombstone, type VaultProps } from './types/types'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultPropsExpectation } from './vault-db'
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.

@@ -1,9 +1,9 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { BoxRecord } from '../src/box'
-import { DeviceRecord, Tombstone, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
-import * as TH from './test-helpers'
+import { BoxRecord } from '../../src/box'
+import { DeviceRecord, Tombstone, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../../src/types/types'
+import * as TH from '../test-helpers'
 
 const WhisperCases = [
   // every JSON shape a whisper may take:
@@ -108,8 +108,8 @@ const SlotCases = [
   [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, 'a wayinkind this version does not know'],
   [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'passkey' as never }) },     false, "a passphrase's fields under the passkey wayinkind"],
   [{ passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) },        false,  'a passkey with an empty credential_id'],
-  [{ passkey: TH.passkeyWayinOf('laptop', { prf_salt_b64: '' }) },         false,  'a passkey with an empty salt'],
-  [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' }) },             false,  'an empty salt'],
+  [{ passkey: TH.passkeyWayinOf('laptop', { prf_salt_b64: '' as never }) },         false,  'a passkey with an empty salt'],
+  [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' as never }) },             false,  'an empty salt'],
   [{ passphrase: TH.wayinOf('passphrase', { device_id: '' }) },            false,  'an empty device_id'],
   [{ passkey: TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 }) }, false, 'a registered_at in epoch seconds'],
 ] as const
@@ -212,91 +212,12 @@ describe("BoxSummary", () => {
   })
 })
 
-describe("FarFuture", () => {
-  it("is the microsecond epochalypse: the last millisecond whose epoch microseconds are a safe integer", () => {
-    expect(FarFuture).to.eq(Math.floor(Number.MAX_SAFE_INTEGER / 1000))
-    expect(Number.isSafeInteger(FarFuture * 1000)).to.be.true
-    expect(Number.isSafeInteger((FarFuture + 1) * 1000)).to.be.false
-  })
-
-  it("falls in 2255, a valid Date", () => {
-    expect(new Date(FarFuture).toISOString()).to.eq('2255-06-05T23:47:34.740Z')
-  })
-
-  it("lets a host show 'until locked' for a deadline equal to it, and a date for any other", () => {
-    const shown = (askPassphraseAt: number): string => (askPassphraseAt === FarFuture ? 'until locked' : new Date(askPassphraseAt).toISOString())
-    expect(shown(FarFuture)).to.eq('until locked')
-    expect(shown(Date.UTC(2026, 9, 22))).to.eq('2026-10-22T00:00:00.000Z')
-  })
-})
-
-describe("ForeverMillis", () => {
-  it("runs from FarPast to FarFuture, as its examples show", () => {
-    expect(ForeverMillis).to.eq(FarFuture - FarPast)
-    expect(FarPast + ForeverMillis).to.eq(FarFuture)
-  })
-})
-
 describe("LeaseRecord", () => {
   it("takes a user_id up to a hundred characters, and refuses a longer one or one that is not text", async () => {
     const lease = await TH.leaseOf('u'.repeat(100))
     expect(LeaseRecord.safeParse(lease).success).to.be.true
     expect(LeaseRecord.safeParse({ ...lease, user_id: 'u'.repeat(101) }).success).to.be.false
     expect(LeaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
-  })
-})
-
-describe("FarPast", () => {
-  it("is the first instant of 1981", () => {
-    expect(FarPast).to.eq(Date.UTC(1981, 0, 1))
-    expect(new Date(FarPast).toISOString()).to.eq('1981-01-01T00:00:00.000Z')
-  })
-})
-
-const NowMillis = Date.UTC(2026, 9, 15)
-
-const EpochMillisCases = [
-  // regular usage:
-  [NowMillis,                     true,   'today, in epoch milliseconds'],
-  [FarPast,                   true,   'the floor itself'],
-  [FarFuture,                 true,   'the ceiling itself'],
-  // unit mistakes:
-  [NowMillis / 1000,              false,  'epoch seconds, which land in January 1970'],
-  [NowMillis * 1000,              false,  'epoch microseconds, which land tens of thousands of years out'],
-  // edge cases:
-  [FarPast - 1,               false,  'one millisecond before 1981'],
-  [FarFuture + 1,             false,  'one millisecond past the ceiling'],
-  [8.64e15,                   false,  'the last instant a Date holds, far past the ceiling'],
-  [0,                         false,  'the epoch itself'],
-  [NowMillis + 0.5,               false,  'a fraction of a millisecond'],
-  [Infinity,                  false,  'a time that never comes'],
-  [NaN,                       false,  'not a number'],
-  ["1792022400000",           false,  'a time written as text'],
-  [null,                      false,  'null'],
-] as const
-
-describe("EpochMillis", () => {
-  for (const [candidate, expected, blurb] of EpochMillisCases) {
-    it(`${expected ? 'accepts' : 'refuses'} ${blurb}`, () => {
-      expect(EpochMillis.safeParse(candidate).success).to.eq(expected)
-    })
-  }
-
-  it("says which unit a refused number likely was", () => {
-    const tooSmall = EpochMillis.safeParse(NowMillis / 1000)
-    const tooLarge = EpochMillis.safeParse(NowMillis * 1000)
-    expect(tooSmall.error?.issues[0]?.message).to.match(/epoch seconds/)
-    expect(tooLarge.error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
-  })
-
-  it("passes a time through unchanged, as its examples show", () => {
-    expect(EpochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
-    expect(EpochMillis.safeParse(1_792_022_400).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
-    expect(EpochMillis.safeParse(Infinity).success).to.be.false
   })
 })
 

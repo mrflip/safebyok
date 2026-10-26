@@ -1,13 +1,15 @@
 import type * as Z from 'zod'
 import { BoxRecord } from './box'
-import { Ciphered, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
+import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { sameScope } from './names'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { FarFuture, LeaseRecord, type VaultProps } from './types'
+import { LeaseRecord, type VaultProps } from './types/types'
+import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './types/type-aliases'
+import { FarFuture } from './consts'
 import type { Vault } from './vault'
 
 /** Leases: what lets a vault open on this device without a proof, across page loads, until its `ask_passphrase_at`.
@@ -39,7 +41,7 @@ const LeaseFormat = 'safebyok-lease-v1'
 const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
   LeaseGrant:    LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
   VisibleShape:  BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
-  CipheredShape: obj({ box_key_wrapped: Ciphered, whisper_ciphered: Ciphered }),
+  CipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
 }))
 
 /** The fields of a lease its wrap is bound to: every field of its record but its format, the leaseKey and the wrap. */
@@ -165,8 +167,8 @@ export class Lease {
         const sealing = await outcomeOf(async () => {
           const boxKey = await makeBoxKey()
           return {
-            box_key_wrapped:  await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped')),
-            whisper_ciphered: await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered')),
+            box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped'))),
+            whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered'))),
           }
         }, unexpectedError)
         this.#demand()
@@ -289,7 +291,7 @@ export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user
   })
   const leaseKey = await makeLeaseKey()
   const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(granted))
-  return { format: LeaseFormat, ...granted, lease_key: leaseKey, vault_key_lease_wrapped: wrapped }
+  return { format: LeaseFormat, ...granted, lease_key: leaseKey, vault_key_lease_wrapped: vault_key_lease_wrapped.parse(wrapped) }
 }
 
 /** What an unwrapped boxKey may do: decipher, never be exported. */

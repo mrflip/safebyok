@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from '../src/zxcvbn-strength-checker'
-import type { VaultScope } from '../src/types'
+import type { VaultScope } from '../src/types/types'
 import * as TH from './test-helpers'
 
 /** The reason a verdict gives, or '' for a strong one. */

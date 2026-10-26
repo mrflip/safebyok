@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../src/gate'
 import { PassphraseProving, StandingGating } from '../src/proving'
-import { GatedVaultProps } from '../src/types'
+import { GatedVaultProps } from '../src/types/types'
 import * as TH from './test-helpers'
 import { makeWorld, storedVaultPropsOf } from './vault/world'
 

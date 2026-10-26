@@ -2,7 +2,8 @@ import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
-import { type GatedVaultProps, type PasskeyAnswer, type Stamped, type VaultProps, isGated } from './types'
+import { type GatedVaultProps, type PasskeyAnswer, type Stamped, type VaultProps, isGated } from './types/types'
+import { passphraseCleartext } from './types/type-aliases'
 import type { Vault } from './vault'
 
 /** Gatings: one request for cleartext, raised by a vault call that needs the user's passphrase or passkey, and the chain each attempt at it runs.
@@ -429,7 +430,7 @@ export class RaisedGating implements ProvingGating {
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it. */
 const checkText = (given: unknown): void => {
-  if (typeof given !== 'string') { throw new VaultError('bad_option', "A passphrase is the text the user typed, as a string.") }
+  passphraseCleartext.parse(given)
 }
 
 /** Refuse 'bad_option' unless both passphrases are text. */

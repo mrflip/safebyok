@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, expectTypeOf } from 'vitest'
-import { LeaseHours, FarFuture, ForeverMillis, MinuteMillis } from '../../src/types'
+import { LeaseHours } from '../../src/types/types'
+import { FarFuture, ForeverMillis, MinuteMillis } from '../../src/consts'
 import { MaxUserIdChars } from '../../src/checks/primitives'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'

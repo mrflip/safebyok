@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
-import { MinuteMillis } from '../../src/types'
+import { MinuteMillis } from '../../src/consts'
 import type { Vault } from '../../src/vault'
 import { heldLeaseOf } from '../../src/held-lease'
 import type { Gating } from '../../src/gating'
