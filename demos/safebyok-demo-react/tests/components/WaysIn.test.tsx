@@ -50,7 +50,7 @@ describe("WaysIn", () => {
     expect(document.querySelector('.gripe')).to.be.null
     const vault = await world.open()
     await TH.unlock(vault, 'a new passphrase entirely')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
   it("says nothing when the user cancels a change: the passphrase stands", async () => {

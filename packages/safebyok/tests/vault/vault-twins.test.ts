@@ -212,7 +212,7 @@ describe("vault.hello as an event handler", () => {
     window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(propsReads).toHaveBeenCalledOnce() })
-    expect(vault.snapshot.state).to.eq('novel')
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
     expect(vault.snapshot.trouble).to.be.null
   })
 

@@ -27,7 +27,7 @@ describe("Bank.make and bank.ensureVault", () => {
   it("births a vault 'novel' against an empty backend, prompting nobody", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     expect(vault.getSnapshot().boxes).to.have.lengthOf(0)
   })
 
@@ -125,10 +125,10 @@ describe("Bank.make and bank.ensureVault", () => {
     await TH.putWayin(vault, 'battery staple', await TH.passkeyOf('laptop'))
     await TH.delWayin(vault, 'battery staple')
     await vault.lock()
-    expect(getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(getSnapshot())).to.eq('locked')
     await TH.del(vault, 'battery staple')
     await TH.expectRefusal(vault.hello(), 'vault_gone')
-    expect(getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(getSnapshot())).to.eq('locked')
     expect(heard).toHaveBeenCalled()
     unsubscribe()
   })
@@ -236,7 +236,7 @@ describe("the host's clock", () => {
   it("takes a reading with a fraction of a millisecond, in bounds", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
   it("reads the clock rounded down to whole milliseconds: the time a box is written at and a lease is judged by", async () => {
@@ -257,7 +257,7 @@ describe("the host's clock", () => {
     const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
     reading /= 1000
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(await vault.ensureUnlocked()).to.eq(vault)
   })
 
@@ -372,7 +372,7 @@ describe("the key deriver seam", () => {
       const vault = await world.open({ keyDeriver: shortDeriver })
       await TH.expectRefusal(TH.unlock(vault, 'pw'), 'bad_option')
       expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ gate_epoch: 0, gate: null })
-      expect(vault.getSnapshot().state).to.eq('novel')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     }
   })
 
@@ -394,7 +394,7 @@ describe("the key deriver seam", () => {
     const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) }
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: zeroDeriver })
     await TH.expectRefusal(TH.unlock(fresh, 'pw'), 'bad_option')
-    expect(fresh.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(fresh.getSnapshot())).to.eq('locked')
   })
 
   it("refuses unexpected_error for a deriver that throws, a VaultError of misuse or bad news included, keeping nothing of what it threw, nor telling it as bad news, as it heard the passphrase", async () => {
@@ -407,7 +407,7 @@ describe("the key deriver seam", () => {
       expect(err.cause).to.be.undefined
       expect(TH.thrownText(err)).to.not.include('pw-the-passphrase')
       expect(TH.loggedText(world.logged)).to.not.include('pw-the-passphrase')
-      expect(vault.getSnapshot().state).to.eq('novel')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
       expect(told).to.have.lengthOf(0)
       expect(vault.getSnapshot().trouble).to.be.null
     }
@@ -429,14 +429,14 @@ describe("the key deriver seam", () => {
     const lastByteSet = new Uint8Array(32)
     lastByteSet[31] = 1
     const vault = await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(lastByteSet.slice()) } })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
   describe("a deriver that declares Argon2id", () => {
     it("opens, and unlocks, when its spec is one Argon2id can run", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw', { keyDeriver: handBuilt({ salt_bytes: 16 }) })
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })
 
     const Unrunnable = [
@@ -467,13 +467,13 @@ describe("the key deriver seam", () => {
     it("opens and unlocks, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
       const scrypt: CustomKeyDeriver = { ...TH.testDeriver, key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' }
       const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })
 
     it("opens and unlocks, declaring none, as the test deriver does", async () => {
       expect(TH.testDeriver).to.not.have.property('algorithm')
       const vault = await makeWorld().openUnlocked('pw')
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })
 
     it("is refused at open when its algorithm is not text", async () => {
@@ -501,7 +501,7 @@ describe("the key deriver seam", () => {
       const { heard, logger } = hearingEverything()
       const vault = await makeWorld().openUnlocked('pw', { logger })
       expect(heard).to.deep.equal([{ level: 'warn', message: TestDeriverNotice, story: { call: 'make' }, err: undefined }])
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })
 
     it("warns each time a bank is made, quoting no passphrase", async () => {
@@ -537,7 +537,7 @@ describe("the key deriver seam", () => {
     }
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { keyDeriver: new PrototypeDeriver() })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 })
 // --
@@ -593,7 +593,7 @@ describe("Bank.make, by the Contract", () => {
     expect(tally).to.deep.equal({ opened: 0, closed: 0 })
     const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
-    expect(vault.snapshot.state).to.eq('novel')
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
     await vault.hello({ staleMinutes: 0 })
     expect(tally.opened).to.eq(1)
   })
@@ -614,7 +614,7 @@ describe("Bank.make, by the Contract", () => {
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     expect(births).toHaveBeenCalledTimes(1)
     expect(propsReads).toHaveBeenCalledTimes(1)
-    expect(vault.snapshot.state).to.eq('novel')
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
   })
 
   it("ends the watch it started when the bank lets the vault go, and only once", async () => {
@@ -689,8 +689,9 @@ describe("the vault's fields, by the Contract", () => {
   it("hands its snapshot out through a getter, as its example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { state, boxes } = vault.snapshot
-    expect(state).to.eq('unlocked')
+    const { gate, ask_passphrase_at, boxes } = vault.snapshot
+    expect(gate?.passphrase.wayinkind).to.eq('passphrase')
+    expect(ask_passphrase_at).to.be.a('number')
     expect(boxes).to.deep.equal([])
     expect(vault.snapshot).to.eq(vault.getSnapshot())
   })
@@ -704,10 +705,10 @@ describe("the vault's fields, by the Contract", () => {
     // Each field of the snapshot is the Vault object's own, of its stamp, or none of its at all.
     const own = new Set(Object.keys(vault))
     const elsewhere = Object.keys(snapshot).filter((field) => ! own.has(field))
-    expect(elsewhere).to.include.members(['state', 'boxes', 'gate_epoch', 'ask_passphrase_at'])
+    expect(elsewhere).to.include.members(['gate', 'boxes', 'ask_passphrase_at', 'freshness'])
     expect(elsewhere.filter((field) => Reflect.has(vault, field))).to.deep.equal([])
     await vault.lock()
-    expect(vault.snapshot.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(vault.snapshot).to.not.eq(snapshot)
   })
 
@@ -716,10 +717,10 @@ describe("the vault's fields, by the Contract", () => {
     await elsewhere.lock()
     const vault = await world.open()
     const asked: unknown[] = []
-    const askForProof = (passkey: unknown) => { asked.push(passkey) }
-    if (vault.snapshot.state === 'locked') { askForProof(vault.snapshot.passkey) }
-    expect(vault.snapshot.passkey).to.not.be.null
-    expect(asked).to.deep.equal([vault.snapshot.passkey])
+    const offerUnlock = (passkey: unknown) => { asked.push(passkey) }
+    if (vault.snapshot.gate !== null && vault.snapshot.ask_passphrase_at === null) { offerUnlock(vault.snapshot.gate.passkey) }
+    expect(vault.snapshot.gate?.passkey).to.not.be.null
+    expect(asked).to.deep.equal([vault.snapshot.gate?.passkey])
   })
 
   it("lets no host write over a field: the Vault object is frozen, its getters have no setter, and the snapshot is frozen", async () => {
@@ -731,9 +732,9 @@ describe("the vault's fields, by the Contract", () => {
     for (const field of [...Object.keys(vault), 'snapshot', 'getSnapshot', 'subscribe', 'logger', 'hello', 'state']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
-    expect(vault.snapshot.state).to.eq('unlocked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     const { snapshot } = vault
-    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.passphrase, snapshot.passkey, snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
+    for (const part of [snapshot, snapshot.gate, snapshot.boxes, snapshot.boxes[0], snapshot.gate?.passphrase, snapshot.gate?.passkey, snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
       expect(Object.isFrozen(part)).to.be.true
     }
   })
@@ -772,3 +773,82 @@ describe("the vault's fields, by the Contract", () => {
   })
 })
 // --
+
+describe("the vault's snapshot, slice by slice (Contract: VaultSnapshot)", () => {
+  it("shows what a host renders and nothing more: its scope, format and vault_tok, never its epochs or registered_at", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(Object.keys(vault.snapshot)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'format', 'vault_tok', 'gate', 'boxes', 'damagedBoxes', 'capacity', 'ask_passphrase_at', 'freshness', 'trouble'])
+    expect(vault.snapshot).to.deep.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', format: vault.format, vault_tok: vault.vault_tok })
+  })
+
+  it("duck-types as the vault's scope, which a bank call takes, and is judged by demandConsistentWith", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const { snapshot } = vault
+    expect(TH.bankOf(vault).entryOf(snapshot)?.vault).to.eq(vault)
+    expect(() => { vault.demandConsistentWith(snapshot) }).to.not.throw()
+    TH.closeVault(vault)
+    expect(() => { vault.demandConsistentWith(snapshot) }).to.throw(VaultError)
+  })
+
+  it("chooses a host's screen from two fields, as its example shows: no gate, set a passphrase; no ask_passphrase_at, unlock; else the boxes", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    const screenOf = (snapshot: typeof vault.snapshot) => {
+      if (snapshot.gate === null) { return 'choose' }
+      if (snapshot.ask_passphrase_at === null) { return 'unlock' }
+      return 'boxes'
+    }
+    expect(screenOf(vault.snapshot)).to.eq('choose')
+    await TH.unlock(vault, 'pw')
+    expect(screenOf(vault.snapshot)).to.eq('boxes')
+    await vault.lock()
+    expect(screenOf(vault.snapshot)).to.eq('unlock')
+  })
+
+  it("keeps every slice the same object across a read of storage that finds nothing new", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await addLaptopPasskey(vault)
+    const before = vault.snapshot
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.snapshot).to.eq(before)
+    world.advance(HourMillis)
+    await vault.hello({ staleMinutes: 0 })
+    const after = vault.snapshot
+    for (const slice of ['gate', 'boxes', 'damagedBoxes', 'capacity'] as const) {
+      expect(after[slice], slice).to.eq(before[slice])
+    }
+  })
+
+  it("replaces only the slices that changed: a lock keeps the gate, the boxes and the room", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const before = vault.snapshot
+    await vault.lock()
+    expect(vault.snapshot).to.not.eq(before)
+    expect(vault.snapshot.ask_passphrase_at).to.be.null
+    for (const slice of ['gate', 'boxes', 'damagedBoxes', 'capacity'] as const) {
+      expect(vault.snapshot[slice], slice).to.eq(before[slice])
+    }
+  })
+
+  it("replaces the boxes and the room at a putBox, keeping the gate; and the gate at a new way in, keeping the boxes and the room", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const novelBoxes = vault.snapshot
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(vault.snapshot.boxes).to.not.eq(novelBoxes.boxes)
+    expect(vault.snapshot.capacity).to.not.eq(novelBoxes.capacity)
+    expect(vault.snapshot.gate).to.eq(novelBoxes.gate)
+    expect(vault.snapshot.damagedBoxes).to.eq(novelBoxes.damagedBoxes)
+    const boxed = vault.snapshot
+    await addLaptopPasskey(vault)
+    expect(vault.snapshot.gate).to.not.eq(boxed.gate)
+    expect(vault.snapshot.boxes).to.eq(boxed.boxes)
+    expect(vault.snapshot.capacity).to.eq(boxed.capacity)
+  })
+})

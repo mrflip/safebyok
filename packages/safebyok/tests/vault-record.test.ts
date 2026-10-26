@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, isGated, vaultSparseOf } from '../src/vault-record'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../src/vault-record'
 import * as TH from './test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -182,6 +182,26 @@ describe("vaultSparseOf", () => {
     expect(sparse).to.not.have.property('gate')
     expect(sparse).to.deep.equal(VaultSparse.parse(omit(record, ['gate'])))
     expect(Object.isFrozen(sparse)).to.be.true
+  })
+})
+
+describe("gateSparseOf", () => {
+  it("is the gate with each wayin's sparse shape, frozen through, with no salt, key deriver label or wrap, as its example shows", () => {
+    const gate = TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
+    const sparse = gateSparseOf(gate)
+    expect(sparse.passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: gate.passphrase.device_id, registered_at: gate.passphrase.registered_at })
+    expect(sparse).to.deep.equal(GateSparse.parse(sparse))
+    const laptop = TH.passkeyWayinOf('laptop')
+    expect(sparse.passkey).to.deep.equal(PasskeyWayinSparse.parse(omit(laptop, ['vault_key_wayin_wrapped'])))
+    for (const part of [sparse, sparse.passphrase, sparse.passkey]) {
+      expect(Object.isFrozen(part)).to.be.true
+    }
+  })
+
+  it("shows a gate with no passkey as a null passkey", () => {
+    const sparse = gateSparseOf(TH.gateOf('u1'))
+    expect(sparse.passkey).to.be.null
+    expect(Object.keys(sparse.passphrase)).to.have.members(['wayinkind', 'device_id', 'registered_at'])
   })
 })
 

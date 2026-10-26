@@ -9,7 +9,7 @@ import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
 import { BankProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { closeVault, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
+import { closeVault, memoryVaultOpts, settledVault, stateOf, unlock } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
@@ -147,7 +147,7 @@ export const VaultProbe = () => {
   return (
     <p>
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
-      <span data-testid="state">{snapshot?.state ?? 'none'}</span>
+      <span data-testid="state">{snapshot === null ? 'none' : stateOf(snapshot)}</span>
       <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
       <button onClick={() => { void vault?.tryGetWhisper('anthropic_api_key') }}>read</button>
       <button onClick={() => { void vault?.tryEnsureUnlocked() }}>unlock</button>
@@ -158,7 +158,7 @@ export const VaultProbe = () => {
 /**
  * Waits until the {@link VaultProbe} shows the vault in `state`, failing if it never does.
  *
- * @param state - The snapshot state to wait for: `novel`, `locked` or `unlocked`.
+ * @param state - The state to wait for, as `TH.stateOf` reads it from the snapshot: `novel`, `locked` or `unlocked`.
  *
  * @example await TH.expectProbeState('locked')
  */

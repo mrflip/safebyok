@@ -5,7 +5,7 @@ import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { Sidecar, Whisper } from 'safebyok'
+import type { Sidecar, Whisper, VaultSnapshot } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
@@ -155,7 +155,7 @@ export const VaultDashboard = () => {
     <section className="vault-dashboard">
       <div className="row spread">
         <h2>Vault dashboard <span className="quiet">vault “{snapshot.vaultlabel}”</span></h2>
-        <LockChip state={snapshot.state} ask_passphrase_at={snapshot.ask_passphrase_at} onLock={() => { void vault.lock() }} />
+        <LockChip snapshot={snapshot} onLock={() => { void vault.lock() }} />
       </div>
 
       <p className="quiet">
@@ -253,16 +253,14 @@ export const VaultDashboard = () => {
   )
 }
 
-const LockChip = ({ state, ask_passphrase_at, onLock }: { state: string, ask_passphrase_at: number | null, onLock: () => void }) => {
-  if (state === 'unlocked') {
-    return (
-      <span className="row">
-        <span className="chip unlocked">🔓 unlocked{asksAgain(ask_passphrase_at)}</span>
-        <button className="mini" onClick={onLock}>lock now</button>
-      </span>
-    )
-  }
-  if (state === 'locked') { return <span className="chip locked">🔒 locked</span> }
-  if (state === 'novel') { return <span className="chip">no vault yet</span> }
-  return <span className="chip">…</span>
+/** The vault's lock, as its snapshot shows it: no gate yet, a gate and no lease on this device, or unlocked until `ask_passphrase_at`. */
+const LockChip = ({ snapshot, onLock }: { snapshot: VaultSnapshot, onLock: () => void }) => {
+  if (snapshot.gate === null) { return <span className="chip">no vault yet</span> }
+  if (snapshot.ask_passphrase_at === null) { return <span className="chip locked">🔒 locked</span> }
+  return (
+    <span className="row">
+      <span className="chip unlocked">🔓 unlocked{asksAgain(snapshot.ask_passphrase_at)}</span>
+      <button className="mini" onClick={onLock}>lock now</button>
+    </span>
+  )
 }

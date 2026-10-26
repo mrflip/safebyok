@@ -194,11 +194,11 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const first = await opened()
     await TH.unlock(first, 'correct horse battery staple')
     await first.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    expect(await TH.putWayin(first, 'correct horse battery staple', laptop)).to.deep.equal(first.snapshot.passkey)
+    expect(await TH.putWayin(first, 'correct horse battery staple', laptop)).to.deep.equal(first.snapshot.gate?.passkey)
     TH.closeVault(first)
 
     const second = await opened()
-    expect(second.getSnapshot().passkey).to.deep.include({
+    expect(second.getSnapshot().gate?.passkey).to.deep.include({
       wayinkind: 'passkey', credential_id: laptop.credential_id, prf_salt_b64: laptop.prf_salt_b64,
     })
     await TH.unlock(second, await TH.passkeyOf('laptop'))

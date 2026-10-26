@@ -147,7 +147,7 @@ describe("BankProvider", () => {
       expect(latest().entry?.status).to.eq('starting')
       gate.release()
       const vault = await opened()
-      expect(vault.getSnapshot().state).to.eq('novel')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     })
 
     it("throws a birth refused as misuse to the error boundary, as the very VaultError", async () => {
@@ -217,7 +217,7 @@ describe("BankProvider", () => {
       expect(latest().vault).to.eq(shown)
       expect(latest().entry?.status).to.eq('timely')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
-      expect(shown?.snapshot.gate_epoch).to.eq(2)
+      expect(shown && TH.madeUnderOf(shown).gate_epoch).to.eq(2)
     })
 
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {

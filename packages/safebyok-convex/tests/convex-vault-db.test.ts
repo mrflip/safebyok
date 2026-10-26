@@ -201,7 +201,7 @@ describe("convexVaultDB, refusing", () => {
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     refusing.now = true
     await TH.expectRefusal(vault.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     refusing.now = false
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     TH.closeVault(vault)
@@ -487,7 +487,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await TH.unlock(vault, TH.RealPassphrase)
       await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
-      await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
+      await vi.waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
       // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')

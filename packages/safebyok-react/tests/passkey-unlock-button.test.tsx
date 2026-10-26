@@ -23,7 +23,7 @@ const lockedVaultWithPasskey = async () => {
 
 /** The `unlock_vault` gating of a stub vault with a passkey, `stubOpts` its own: by default its every attempt refused with `err`. */
 const stubUnlockGating = (credential_id: string, stubOpts: TH.GatingOfOpts & TH.StubVaultOpts): UnlockVaultGating => TH.asKind(TH.stubGating({
-  passkey: { ...TH.passkeyWayinOf('laptop', { credential_id }), vault_tok: 'vault-tok-u1' },
+  passkey: TH.passkeyWayinOf('laptop', { credential_id }),
   ...stubOpts,
 }), 'unlock_vault')
 
@@ -47,7 +47,7 @@ describe("PasskeyUnlockButton", () => {
     render(<PasskeyUnlockButton gating={gating} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={noop} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
   it("is not there in a browser without WebAuthn, nor for a vault with no passkey", async () => {
@@ -70,7 +70,7 @@ describe("PasskeyUnlockButton", () => {
     await waitFor(() => { expect(authenticator.calls.get).to.have.lengthOf(1) })
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Use a passkey' }).disabled).to.be.false })
     expect(heard).to.deep.equal(['null'])
-    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
   it("follows the vault's snapshot: a passkey added meanwhile brings the button", async () => {
@@ -119,7 +119,7 @@ describe("PasskeyUnlockButton", () => {
     render(<PasskeyUnlockButton gating={gatingRefusing(new VaultError('vault_locked', 'Locked meanwhile.'), credential_id)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={noop} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(heard).to.deep.equal(['declined']) })
-    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
   it("leaves an attempt under way to answer when pressed during it: attempt_in_flight reaches neither onDone nor onGripe's word", async () => {
@@ -161,7 +161,7 @@ describe("PasskeyUnlockButton", () => {
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.have.lengthOf(1)
     expect(isVaultError(reported[0], 'bad_option')).to.be.true
-    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
   it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, reported to React without what was thrown, its cause", async () => {
@@ -238,7 +238,7 @@ describe("PasskeyUnlockButton", () => {
         await TH.wakeupAtNextTick()
       })
       expect(attemptPasskey).not.toHaveBeenCalled()
-      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
       expect(updates.count()).to.eq(0)
       expect(gripes).to.deep.equal([null])
     })

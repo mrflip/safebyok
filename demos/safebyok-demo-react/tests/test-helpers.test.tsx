@@ -53,7 +53,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.openUnlocked()
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 })
@@ -64,7 +64,7 @@ describe("makeWorld's vaults opened from outside the page", () => {
 
   it("are handed out open, to a test that opens them", async () => {
     opened = await TH.makeWorld().open()
-    expect(opened.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(opened.getSnapshot())).to.eq('novel')
   })
 
   it("are let go once that test has ended", async () => {

@@ -18,10 +18,10 @@ export const WaysIn = () => {
   const snapshot = useVaultSnapshot('main')
   const [gripe, setGripe] = useState<string | null>(null)
 
-  if (vault === null || snapshot === null) { return null }
-  // Null until a read finds the vault: there is nothing to change yet.
-  const { passphrase, passkey } = snapshot
-  if (passphrase === null) { return null }
+  // No gate until the first passphrase is set: there is nothing to change yet.
+  const gate = snapshot?.gate ?? null
+  if (vault === null || gate === null) { return null }
+  const { passphrase, passkey } = gate
 
   /** Runs `change`; a refusal shows as the gripe, but for a dialog the user cancelled. */
   const press = async (change: () => Promise<unknown>) => {

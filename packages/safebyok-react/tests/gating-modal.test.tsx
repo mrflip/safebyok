@@ -111,14 +111,14 @@ describe("GatingModal, change_passphrase", () => {
     const vault = await vaultOf()
     const { gating } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     const { heard, onDone } = answersOf()
-    const before = vault.snapshot.passphrase
+    const before = vault.snapshot.gate?.passphrase
     render(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('current passphrase', 'not it')
     TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     submit()
     expect(await theGripe()).to.match(/didn't unlock the vault/)
     expect(heard).to.deep.equal([])
-    expect(vault.snapshot.passphrase).to.eq(before)
+    expect(vault.snapshot.gate?.passphrase).to.eq(before)
   })
 
   it("asks for another when the next is the current one again (same_passphrase), in place", async () => {
@@ -153,7 +153,7 @@ describe("GatingModal, change_passphrase", () => {
     const vault = await vaultOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }, true)
     const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     const { heard, onDone } = answersOf()
-    const before = vault.snapshot.passphrase
+    const before = vault.snapshot.gate?.passphrase
     const derivedBefore = deriveKeyBytes.mock.calls.length
     render(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('current passphrase', Passphrase)
@@ -167,8 +167,8 @@ describe("GatingModal, change_passphrase", () => {
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(deriveKeyBytes.mock.calls).to.have.lengthOf(derivedBefore)
     expect(heard).to.deep.equal([])
-    expect(vault.snapshot.passphrase).to.eq(before)
-    expect(vault.getSnapshot().passkey).to.not.be.null
+    expect(vault.snapshot.gate?.passphrase).to.eq(before)
+    expect(vault.getSnapshot().gate?.passkey).to.not.be.null
     expect(document.body.outerHTML).to.not.include('a new passprase')
     typeInto('confirm new passphrase', 'a new passphrase')
     expect(screen.getByRole('alert').textContent).to.eq('')
@@ -235,7 +235,7 @@ describe("GatingModal, put_passkey", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add passkey' }))
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
     await TH.expectGood(raising)
-    expect(vault.snapshot.passkey?.credential_id).to.eq(authenticator.credentialIds()[0])
+    expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(authenticator.credentialIds()[0])
     const made = authenticator.calls.create[0]?.publicKey
     expect(made?.rp).to.deep.equal({ name: 'acme' })
     expect(made?.user).to.include({ name: 'u1 (main vault)', displayName: 'u1 (main vault)' })
@@ -263,7 +263,7 @@ describe("GatingModal, put_passkey", () => {
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(heard).to.deep.equal([])
     expect(screen.getByRole('alert').textContent).to.eq('')
-    expect(vault.snapshot.passkey).to.be.null
+    expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
   it("shows a wrong passphrase in place, the passkey made for it unused, and makes another at the next submit", async () => {
@@ -275,12 +275,12 @@ describe("GatingModal, put_passkey", () => {
     typeInto('vault passphrase', 'not it')
     submit()
     expect(await theGripe()).to.match(/didn't unlock the vault/)
-    expect(vault.snapshot.passkey).to.be.null
+    expect(vault.snapshot.gate?.passkey).to.be.null
     typeInto('vault passphrase', Passphrase)
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
     expect(authenticator.credentialIds()).to.have.lengthOf(2)
-    expect(vault.snapshot.passkey?.credential_id).to.eq(authenticator.credentialIds()[1])
+    expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(authenticator.credentialIds()[1])
   })
 
   it("says in place that a browser without WebAuthn offers no passkeys", async () => {
@@ -318,7 +318,7 @@ describe("GatingModal, del_passkey", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove passkey' }))
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
     await TH.expectGood(raising)
-    expect(vault.snapshot.passkey).to.be.null
+    expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
   it("shows a wrong passphrase in place, and the passkey stays", async () => {
@@ -328,7 +328,7 @@ describe("GatingModal, del_passkey", () => {
     typeInto('vault passphrase', 'not it')
     submit()
     expect(await theGripe()).to.match(/didn't unlock the vault/)
-    expect(vault.snapshot.passkey).to.not.be.null
+    expect(vault.snapshot.gate?.passkey).to.not.be.null
   })
 })
 

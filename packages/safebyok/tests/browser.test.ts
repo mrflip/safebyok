@@ -52,7 +52,7 @@ describe("browserOpts", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }) })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     bank.closeVaults()
   })
 
@@ -61,7 +61,7 @@ describe("browserOpts", () => {
     const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', user_id: 'u1', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.unlock(vault, 'pw')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     bank.closeVaults()
   })
 
@@ -70,7 +70,7 @@ describe("browserOpts", () => {
     const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     bank.closeVaults()
   })
 
@@ -80,7 +80,7 @@ describe("browserOpts", () => {
     expect(opts.deviceDB).to.eq(deviceDB)
     const bank = Bank.make(opts)
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     const scope = TH.scopeOf('u1')
     expect(await TH.expectGood(deviceDB.getDeviceRecord(scope))).to.not.be.null
     bank.closeVaults()
@@ -98,9 +98,9 @@ describe("zxcvbnStrengthChecker, as Bank.make's strengthChecker", () => {
     const vault = await TH.settledVault({ ...TH.memoryVaultOpts(), strengthChecker: zxcvbnStrengthChecker })
     const err = await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
     expect(err.message).to.match(/commonly used password/)
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     await TH.unlock(vault, 'correct horse battery staple')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     TH.closeVault(vault)
   })
 })

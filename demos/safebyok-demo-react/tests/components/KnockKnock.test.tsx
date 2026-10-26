@@ -91,7 +91,7 @@ describe("KnockKnock", () => {
     expect(screen.getByRole('button', { name: 'replace it' })).to.not.be.null
     expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     const vault = await world.open()
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 

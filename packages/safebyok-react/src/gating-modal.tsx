@@ -107,7 +107,7 @@ const ChangePassphraseForm = ({ gating, done, passphraseUsername, passphraseAdvi
   return (
     <ModalForm
       title={Messages.changeTitle}
-      blurb={snapshot.passkey === null ? Messages.changeBlurb : `${Messages.changeBlurb} ${Messages.changeDropsPasskey}`}
+      blurb={(snapshot.gate?.passkey ?? null) === null ? Messages.changeBlurb : `${Messages.changeBlurb} ${Messages.changeDropsPasskey}`}
       submitWord={Messages.changeButton}
       gripe={gripe}
       gripeId={gripeId}
@@ -148,7 +148,7 @@ const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutP
   // One submit at a time: the browser asks for one passkey at a time, and a second submit while
   // one runs would make a second passkey.
   const submitting = useRef(false)
-  const replacing = snapshot.passkey !== null
+  const replacing = (snapshot.gate?.passkey ?? null) !== null
 
   const putPasskey = async () => {
     setGripe(null)

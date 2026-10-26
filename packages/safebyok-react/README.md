@@ -16,6 +16,10 @@ otherwise write itself.
   object's fields read live in an event handler; render from the snapshot.
 * `useVaultSnapshot(vaultlabel)` -- that vault's live snapshot, through
   `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while there is no Vault object.
+  Choose the screen from two of its fields: `gate === null`, no passphrase yet; `ask_passphrase_at
+  === null`, locked; otherwise the boxes (the `safebyok` README's *The snapshot*). Its `gate`,
+  `boxes`, `damagedBoxes` and `capacity` each keep their identity until they change, so a memoized
+  component handed one skips the others' changes.
 * `useBank()` -- the bank itself, to ask for a vault again (`bank.ensureVault`), or to take the
   ways past a refusal: `bank.delDamagedVault`, `bank.clearCachedVault` (*When opening fails*, below).
 * `GatingModal` -- the shipped `requestCleartext`'s dialog, handed one gating and answering it,
@@ -216,7 +220,7 @@ stands; `bad_option` means it reads sound now: ask for it again.
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
 the vault as storage refusing it, kind `identity_revoked`, and a vault already born locks itself
-(the `safebyok` README's *When the user signs out*). The snapshot reads `locked`; the next call
+(the `safebyok` README's *When the user signs out*). The snapshot's `ask_passphrase_at` turns null; the next call
 that needs the vault opens the passphrase dialog, whose unlock meets the same refusal and closes
 it, the call refused `vault_locked`. Once your auth says the
 user signed out, pass `user_id={null}`, which lets the vaults go.
@@ -488,7 +492,7 @@ if (answer !== null) { await gating.attempt(passphrase, answer) }   // null: the
 
 // Unlocking, inside an unlock_vault gating's dialog of your own: the browser asks the user to
 // touch the vault's passkey, and it answers.
-const passkey = await askPasskey(gating.vault.snapshot.passkey)
+const passkey = await askPasskey(gating.vault.snapshot.gate)
 if (passkey !== null) { const { ok } = await gating.attemptPasskey(passkey) }
 ```
 

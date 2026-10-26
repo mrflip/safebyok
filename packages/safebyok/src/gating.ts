@@ -63,7 +63,7 @@ export type UnlockVaultGating = GatingCommon & {
   readonly gatingkind: 'unlock_vault'
   /** Unlock with the passphrase. */
   attemptPassphrase:   (passphrase: string) => Promise<Outcome<Vault>>
-  /** Unlock with the passkey's answer, as `askPasskey(vault.snapshot.passkey)` gives it. */
+  /** Unlock with the passkey's answer, as `askPasskey(vault.snapshot.gate)` gives it. */
   attemptPasskey:      (passkey: PasskeyAnswer) => Promise<Outcome<Vault>>
 }
 /** `putWayin('passphrase')` asks for the current passphrase and the next: the next replaces it, and the passkey goes with it. */

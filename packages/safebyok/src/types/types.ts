@@ -88,21 +88,22 @@ export type WayinKind = typeof WayinKindVals[number]
  */
 export const PasskeySaltBytes = 32
 
-/** A vault's passphrase as its snapshot shows it, even while locked: its {@link PassphraseWayinSparse}, its kind and when and by which device it was sealed, and its `vault_tok`.
- * The `device_id` is one per device per vault, so it links nothing the vault does not already link.
+/** A vault's passphrase wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PassphraseWayinSparse}, its kind and when and by which device it was sealed, and its `vault_tok`.
+ * The `device_id` is one per device per vault, so it links nothing the vault does not already
+ * link. A snapshot's `gate` shows the sparse shape alone.
  *
- * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
  */
 export type PassphraseWayinSummary = PassphraseWayinSparse & Pick<VaultRecord, 'vault_tok'>
 
-/** A vault's passkey as its snapshot shows it, even while locked: its {@link PasskeyWayinSparse}, what to ask the authenticator with, and its `vault_tok`.
- * `safebyok-react`'s `askPasskey` takes it.
+/** A vault's passkey wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PasskeyWayinSparse}, what to ask the authenticator with, and its `vault_tok`.
+ * A snapshot's `gate` shows the sparse shape alone.
  *
- * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, vault_tok, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passkey', device_id, registered_at, vault_tok, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }
  */
 export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_tok'>
 
-/** A wayin of either kind as a snapshot shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
+/** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
 /** What a passkey answers when asked for a vault's PRF, to hand to the vault as proof: `safebyok-react`'s `askPasskey` makes one.
@@ -110,7 +111,7 @@ export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
  * as good as the passphrase for this vault: pass them to the vault, then drop them.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().passkey)   // null when the user dismissed it
+ *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
 export type PasskeyAnswer = {

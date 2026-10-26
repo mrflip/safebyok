@@ -224,7 +224,7 @@ const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
 describe("a vault shared between the two derivers", () => {
   it("is accepted by Bank.make under the supplied label", async () => {
     const vault = await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, strengthChecker: anyStrengthChecker })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     TH.closeVault(vault)
   })
 

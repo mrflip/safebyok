@@ -52,7 +52,8 @@ const bank = Bank.make({          // as the user signs in: a bank per user
 })
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
-vault.snapshot.state              // 'novel' | 'locked' | 'unlocked'
+vault.snapshot.gate               // null until the first passphrase is set
+vault.snapshot.ask_passphrase_at  // null while locked on this device
 await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...')   // locked or novel: asks through requestCleartext first
 
 const answer = await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
@@ -86,10 +87,42 @@ names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vault
 
 A Vault object's own fields are its stamp, fixed for its life: `format`, `applabel`, `user_id`,
 `vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a spread or a log line of it shows
-those alone. Everything that changes -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`,
-`ask_passphrase_at`, `trouble` and the rest -- is read through `vault.snapshot`, frozen in one
-object: read it in an event handler and it is current. React renders from `getSnapshot()`, the
-same object, and re-renders on `subscribe()`.
+those alone. Everything that changes -- its `gate`, `boxes`, `capacity`, `ask_passphrase_at`,
+`trouble` and the rest -- is read through `vault.snapshot`, frozen in one object: read it in an
+event handler and it is current. React renders from `getSnapshot()`, the same object, and
+re-renders on `subscribe()`.
+
+### The snapshot
+
+The snapshot carries what a host renders, and nothing more. It sits flat on the vault's scope
+(`applabel`, `user_id`, `vaultlabel`), so it may be handed to any bank call as it is, and carries
+the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it. Beside
+them:
+
+| field               | what it holds                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------------|
+| `gate`              | the ways in, `{ passphrase, passkey }`, each its sparse shape (`GateSparse`); null until the first passphrase is set |
+| `boxes`             | every sound box, sorted by boxlabel, each its `BoxSparse`: every field of its record but the ciphertext |
+| `damagedBoxes`      | every box stored damaged, sorted by boxlabel: `{ boxlabel, revision_tok, damage }` (see *Damaged boxes*) |
+| `capacity`          | the room the vault has, `{ boxes, bytes }`, each `{ used, max }`                                    |
+| `ask_passphrase_at` | when this device's unlock ends, in epoch ms; null while locked                                     |
+| `freshness`         | `timely`, `aged` or `refused`: how far to trust what it shows of storage                          |
+| `trouble`           | the latest bad news (see *Bad news: tell the user*), or null                                       |
+
+A host chooses its screen from two of them:
+
+```ts
+const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
+if (snapshot.gate === null) { return <ChoosePassphrase /> }               // novel: no passphrase yet
+if (snapshot.ask_passphrase_at === null) { return <Unlock gate={snapshot.gate} /> }   // locked
+return <BoxList boxes={snapshot.boxes} />                                 // unlocked
+```
+
+The snapshot is the same object until something changes, and so is each of `gate`, `boxes`,
+`damagedBoxes` and `capacity` until it changes itself: a memoized component handed `snapshot.boxes`
+skips a lock, an unlock or a change to the ways in. It holds none of the vault's epochs, nor
+anything an offline guess at a passphrase could start from: no salt, key deriver label or wrapped
+vaultKey. A passkey's credential id and PRF salt do show, as its authenticator is asked with them.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
 `Bank.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
@@ -125,8 +158,8 @@ code, the stored records and these docs all use its words.
   altered field, will not open.
 * A **bank** (`Bank.make(opts)`, which answers at once) holds the signed-in user's vaults, and
   `bank.ensureVault({ vaultlabel })` births a Vault object from what storage and this
-  device hold of the vault, storing it, with no passphrase yet, if none stands: the snapshot's
-  `state` is `novel`, `locked` or `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
+  device hold of the vault, storing it, with no passphrase yet, if none stands: novel (the
+  snapshot's `gate` null), locked (its `ask_passphrase_at` null) or unlocked. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
   whisper, refusing `absent_box` for none) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault, and the Vault object with it. A `Box` in hand
   opens with `box.extractWhisper()`, under the vault's lease, reading nothing.
   A `Box` is one revision of one box, every field it shows fixed for its life and frozen: its
@@ -464,7 +497,7 @@ reads as the exported `ForeverMillis`), so a dialog can say how long an unlock l
 being told the option again.
 
 The deadline is the truth, and a timer enforces it. At `ask_passphrase_at` a timer drops the key,
-with no call needed: the snapshot reads `locked`, and every call that needs the key throws
+with no call needed: its snapshot's `ask_passphrase_at` turns null, and every call that needs the key throws
 `vault_locked`, work already under way included. A timer that runs late, as one may on a device
 that slept, is caught at the next call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
@@ -576,7 +609,7 @@ adapter whose backend knows who is signed in refuses a vault whose user is no lo
 with kind `identity_revoked` (`safebyok-convex`, `safebyok-postgres` and `safebyok-graphql` do;
 `safebyok-indexeddb` and `localVaultDB` keep everything on the device, and never do). The vault
 then locks at once, as `lock()` does: it drops its vaultKey, this device revokes its lease, and
-the snapshot reads `locked`. It removes nothing stored. The call that met the refusal
+its snapshot's `ask_passphrase_at` turns null. It removes nothing stored. The call that met the refusal
 throws it, and the next unlock, once the user has signed in again, asks for the passphrase. A
 background refresh that meets it has nobody to throw to: it locks all the same, and tells the
 logger.
@@ -675,9 +708,10 @@ says these things:
 
 A vault has exactly one passphrase, and at most one passkey. Each wraps the same vaultKey under
 its own salt, no passphrase is ever stored, and changing either rewrites no box. The snapshot
-shows them, locked or not, as `passphrase` and `passkey` (null while the vault has none): each a
-`wayinkind`, and when it was set and by which device (`registered_at`, `device_id`); the
-passkey's carries its `credential_id` and `prf_salt_b64` too, for asking the authenticator.
+shows them, locked or not, as its `gate`'s `passphrase` and `passkey` (the gate null while the
+vault has no passphrase, the passkey null while it has none): each a `wayinkind`, and when it was
+set and by which device (`registered_at`, `device_id`); the passkey's carries its
+`credential_id` and `prf_salt_b64` too, for asking the authenticator.
 Neither holds the passphrase's salt or any
 wrapped vaultKey -- what an offline guess at a passphrase starts from -- so a snapshot in React
 state, devtools or an error report gives none away; the vault keeps the stored records to itself.
@@ -686,8 +720,8 @@ the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_way
 `meta.wayin_listed` naming it.
 
 ```ts
-vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
-vault.getSnapshot().passkey       // null, until one is put
+vault.getSnapshot().gate?.passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+vault.getSnapshot().gate?.passkey      // null, until one is put
 
 await vault.putWayin('passphrase')   // change_passphrase: the passphrase replaced, stamped afresh: this device, now; any passkey removed
 await vault.putWayin('passkey')      // put_passkey: the passkey put, replacing any (below)
@@ -696,7 +730,7 @@ await vault.delWayin('passkey')      // del_passkey: the passkey removed; delWay
 
 Each raises its gating, which your `requestCleartext` answers with the passphrase (and the next
 passphrase, or a new passkey's answer), and resolves the vault once the change is stored; the
-snapshot's `passphrase` or `passkey` shows it. Each leaves the vault unlocked, its lease
+snapshot's `gate` shows it. Each leaves the vault unlocked, its lease
 starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each
 refuses, changing nothing: `wrong_passphrase`
 for a `passphrase` that does not open the vault, or is blank; `weak_passphrase` for a new passphrase the
@@ -804,10 +838,10 @@ framework's host can use them).
 const made = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } })
 if (made !== null) { await gating.attempt(passphrase, made) }   // null if the user dismissed the prompt
 
-vault.getSnapshot().passkey       // { wayinkind: 'passkey', device_id, registered_at, credential_id, prf_salt_b64 }
+vault.getSnapshot().gate?.passkey   // { wayinkind: 'passkey', device_id, registered_at, credential_id, prf_salt_b64 }
 
 // In your unlock_vault dialog:
-const answer = await askPasskey(vault.getSnapshot().passkey)   // null if the user dismissed it
+const answer = await askPasskey(vault.getSnapshot().gate)   // null if the user dismissed it
 if (answer !== null) { await gating.attemptPasskey(answer) }   // no key derivation to wait for
 
 await vault.delWayin('passkey')                                // del_passkey: the passkey is gone
@@ -817,7 +851,7 @@ await vault.delWayin('passkey')                                // del_passkey: t
   made from the passkey's answer by HKDF-SHA256; an unlock with it grants this device a lease
   for `leaseHours`, and `ask_passphrase_at` applies, as for the passphrase.
 * **One passkey per vault.** Putting one replaces the passkey the vault had, if any: the snapshot's
-  `passkey` says which it is, when it was added and from which device, so warn the user before
+  `gate.passkey` says which it is, when it was added and from which device, so warn the user before
   asking ("this replaces the passkey added on 3 Oct from another device"). Putting the same
   passkey again mends one stored damaged. A new passphrase removes the passkey: it was matched to
   the old one, and the user adds it again under the new.
@@ -916,7 +950,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
 | `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()`, `putWayin('passkey')` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`) |
-| `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
+| `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `gate.passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a backend with small records meets it | Tell the user to store a smaller whisper or sidecar |
 | `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows. The backend's own refusal carries how full it reckons the vault as `meta.capacity` |

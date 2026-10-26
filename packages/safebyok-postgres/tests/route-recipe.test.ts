@@ -259,7 +259,7 @@ describe("the README route recipe", () => {
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     session.user_id = null
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
-    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
     session.user_id = 'u1'

@@ -51,7 +51,7 @@ describe("BankProvider", () => {
     const err = await TH.expectRefusal(TH.unlock(vault, 'acme acme acme acme'), 'weak_passphrase')
     expect(err.message).to.eq('Not the name of the app, please.')
     await TH.unlock(vault, 'correct horse battery staple')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
   it("opens without a strengthChecker, the advice and the vault alike then refusing every new passphrase as too weak", async () => {

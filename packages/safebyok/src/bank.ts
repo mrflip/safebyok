@@ -100,7 +100,7 @@ type LibsLoad =
  * @example
  *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })   // as the user signs in
  *   const vault = await bank.ensureVault({ vaultlabel: 'main' })
- *   vault.snapshot.state   // 'novel' | 'locked' | 'unlocked'
+ *   vault.snapshot.gate   // null while novel: set a passphrase
  * @example const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
  */
 export class Bank {

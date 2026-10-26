@@ -53,7 +53,7 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
-    return vault.getSnapshot().state
+    return TH.stateOf(vault.getSnapshot())
   }
   return { dbStore, vaultDB, deviceDB, clock, advance, logged, optsWith, open, openUnlocked, getLease, stateOnOpen, deafVaultDB }
 }

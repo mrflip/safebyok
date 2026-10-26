@@ -174,7 +174,7 @@ describe("BankProvider", () => {
       fireEvent.click(screen.getByText('Cancel'))
       const { ok } = await reading
       expect(ok).to.be.false
-      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     })
 
     it("keeps a dialog a call opens in the very commit that gave the provider its vault", async () => {
@@ -304,7 +304,7 @@ describe("BankProvider", () => {
       gate.release()
       const outcomes = await Promise.all(attempts)
       expect(outcomes.map((outcome) => (outcome.ok ? 'unlocked' : outcome.err.refusalkind))).to.deep.equal(['gating_landed'])
-      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(second.outcome).to.eq('pending')
       fireEvent.click(screen.getByText('Cancel'))
@@ -343,7 +343,7 @@ describe("BankProvider", () => {
       await TH.expectBad(reading, 'vault_locked')
       await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
       await TH.wakeupAtNextTick()
-      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     })
 
     it("leaves another user's dialog asking when the last user's cancelled attempt finishes late", async () => {
@@ -371,7 +371,7 @@ describe("BankProvider", () => {
       await screen.findByPlaceholderText('vault passphrase')
       gate.release()
       await TH.wakeupAtNextTick()
-      expect(vault2.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(vault2.getSnapshot())).to.eq('locked')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(second.outcome).to.eq('pending')
       fireEvent.click(screen.getByText('Cancel'))
@@ -386,7 +386,7 @@ describe("BankProvider", () => {
         const vault = await world.opened()
         await TH.expectBad(vault.tryGetWhisper('anthropic_api_key'), 'vault_locked')
         expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
-        expect(vault.getSnapshot().state).to.eq('locked')
+        expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
       } finally {
         Reflect.deleteProperty(navigator, 'userActivation')
       }
@@ -466,11 +466,11 @@ describe("BankProvider", () => {
       const world = await lockedWorld()
       render(<BankProvider {...world.props} user_id="u1"><UnlockButton /><world.Grab /></BankProvider>)
       const vault = await world.opened()
-      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
+      await waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('locked') })
       fireEvent.click(screen.getByText('Unlock ahead'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
-      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('unlocked') })
+      await waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked') })
     })
   })
   // --
@@ -489,7 +489,7 @@ describe("BankProvider", () => {
       fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
       await TH.expectGood(changing)
       await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-      expect(vault.snapshot.state).to.eq('unlocked')
+      expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
       await vault.lock()
       await TH.unlock(await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), user_id: 'u1', vaultlabel: 'main' }), 'pw two')
     })

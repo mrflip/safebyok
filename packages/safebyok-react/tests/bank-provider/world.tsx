@@ -47,7 +47,7 @@ export const Probe = () => {
 
   return (
     <div>
-      <span data-testid="state">{snapshot.state}</span>
+      <span data-testid="state">{TH.stateOf(snapshot)}</span>
       <span data-testid="boxcount">{snapshot.boxes.length}</span>
       <span data-testid="outcome">{outcome}</span>
       <button onClick={put}>put</button>

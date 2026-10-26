@@ -241,7 +241,7 @@ describe("proving.grantLease", () => {
     const { world, vault, stored } = await lockedWorld()
     const proving = await PassphraseProving.seal(vault, headerOf(stored.gate.passphrase), 'pw', { gating: StandingGating })
     const lease = await proving.grantLease()
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(heldLeaseOf(vault)).to.eq(lease)
     expect(leaseRecordOf(lease)).to.deep.eq(await world.getLease())
     expect(lease.gate_epoch).to.eq(stored.gate_epoch)
@@ -269,7 +269,7 @@ describe("proving.grantLease", () => {
     await TH.expectRefusal(granting, 'gating_landed')
     expect(heldLeaseOf(vault)).to.be.null
     expect(await world.getLease()).to.be.null
-    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
   it("refuses gating_landed before putLease for a gating that landed while the vaultKey was wrapped, storing nothing", async () => {

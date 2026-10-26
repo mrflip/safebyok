@@ -20,7 +20,7 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
-    expect(fresh.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(fresh.getSnapshot())).to.eq('novel')
     await TH.unlock(fresh, 'another pw')
     await fresh.putBox({ boxlabel: 'anthropic' }, 'sk-new-fake')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
@@ -176,7 +176,7 @@ describe("delDamagedVault", () => {
     expect(isVaultError(err, 'damaged_vault')).to.be.true
     await delDamagedVault({ ...bankOpts, vaultlabel })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     bank.closeVaults()
   })
 })

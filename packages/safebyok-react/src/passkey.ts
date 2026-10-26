@@ -1,4 +1,4 @@
-import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type PasskeyWayinSummary } from 'safebyok'
+import { PasskeySaltBytes, VaultError, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
@@ -103,23 +103,24 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
 }
 
 /**
- * The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes. `passkey`
- * is the snapshot's, as it stands (`vault.getSnapshot().passkey`); the browser asks the user to
- * touch it, and asks it for its answer over its own salt.
+ * The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes. `gate`
+ * is the snapshot's, as it stands (`vault.getSnapshot().gate`); the browser asks the user to
+ * touch its passkey, and asks it for its answer over its own salt.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out, or has not that passkey
- * at hand). Refuses with kind 'absent_wayin' when `passkey` is null, the vault having none;
+ * at hand). Refuses with kind 'absent_wayin' when the vault has no passkey (or no gate yet);
  * 'damaged_wayin' when it is stored damaged -- its `credential_id` or `prf_salt_b64` not
  * base64url, or its salt not `PasskeySaltBytes` long, which the vault would refuse;
  * 'passkey_unavailable' when the browser has no WebAuthn or the passkey gives no PRF answer; and
  * 'bad_option' when `opts.rpId` does not fit this page.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().passkey)
+ *   const passkey = await askPasskey(vault.getSnapshot().gate)
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }
  */
-export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
+export const askPasskey = async (gate: GateSparse | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   checkAvailable()
+  const passkey = gate?.passkey ?? null
   if (passkey === null) {
     throw new VaultError('absent_wayin', Messages.noPasskeyToAsk)
   }
@@ -149,7 +150,7 @@ export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskP
  * The vault's passkey, its credential id and salt as bytes for WebAuthn; null when either is
  * not base64url, or the salt is not `PasskeySaltBytes` long.
  */
-const askable = (passkey: PasskeyWayinSummary) => {
+const askable = (passkey: PasskeyWayinSparse) => {
   try {
     const saltBytes = fromB64(passkey.prf_salt_b64) as Uint8Array<ArrayBuffer>
     if (saltBytes.length !== PasskeySaltBytes) { return null }

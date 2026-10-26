@@ -51,9 +51,9 @@ type PasskeyUnlockButtonProps = {
   autoFocus?: boolean | undefined
 }
 
-/** Whether the button shows for a vault in this state: the browser offers WebAuthn, and the vault has a passkey. */
+/** Whether the button shows for a vault as `snapshot` shows it: the browser offers WebAuthn, and the vault's gate has a passkey. */
 export const offersPasskey = (snapshot: VaultSnapshot): boolean => (
-  passkeysAvailable() && snapshot.passkey !== null
+  passkeysAvailable() && (snapshot.gate?.passkey ?? null) !== null
 )
 
 /** The button itself, inside PasskeyUnlockButton's boundary. */
@@ -72,7 +72,7 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, autoFocus }: PasskeyUnloc
     setAsking(true)
     onGripe(null)
     try {
-      const passkey = await askPasskey(snapshot.passkey, { rpId })
+      const passkey = await askPasskey(snapshot.gate, { rpId })
       if (passkey === null || ! isMounted()) { return }
       const { ok, err } = await gating.attemptPasskey(passkey)
       if (! isMounted()) { return }

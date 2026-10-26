@@ -1,5 +1,5 @@
-import { type Capacity, type Clock, type VaultScope, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
-import { type GatedVaultRecord, type GateRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, isGated, vaultSparseOf } from './vault-record'
+import { type Capacity, type Clock, type VaultScope, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
+import { type GatedVaultRecord, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './vault-record'
 import { vault_tok } from './types/type-aliases'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, type BoxBase, type BoxDamaged, type BoxRecord, type BoxSparse, boxSparseOf, checkedSidecar, checkedWhisper, whisperBytesOf } from './box'
@@ -25,7 +25,7 @@ import { type PassphraseProving, Proving, registerProvingInside } from './provin
 import { Gate } from './gate'
 import { type GatingCall, type GatingInside, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
 
-// == [Public types]: VaultState, VaultFreshness, VaultSnapshot, bear, letGo, goneBy
+// == [Public types]: VaultFreshness, VaultSnapshot, bear, letGo, goneBy
 
 /** The name of the bank's one way to birth a Vault object, exported by no entry point. */
 export const bear = Symbol('Vault.bear')
@@ -36,13 +36,6 @@ export const letGo = Symbol('Vault.letGo')
 /** The name of the bank's one look at whether a Vault object went gone of itself, exported by no entry point. */
 export const goneBy = Symbol('Vault.goneBy')
 
-/** Where the vault stands, as a UI branches on it.
- *  * `novel`: stored, with no passphrase yet. The first gating, `initialize_gate`, sets it.
- *  * `locked`: has its passphrase; box summaries are readable, whispers not.
- *  * `unlocked`: whispers are readable until `ask_passphrase_at` or `lock()`.
- */
-export type VaultState = 'novel' | 'locked' | 'unlocked'
-
 /** How far to trust the vault's picture of storage, as a UI might say so.
  *  * `timely`: the last read of storage succeeded within `staleMinutes`.
  *  * `aged`: the last read succeeded `staleMinutes` ago or more; the next `hello()` reads again.
@@ -51,11 +44,23 @@ export type VaultState = 'novel' | 'locked' | 'unlocked'
  */
 export type VaultFreshness = 'timely' | 'aged' | 'refused'
 
-/** The vault's fields, frozen in one plain object for `useSyncExternalStore`, each as the vault shows it.
- * It is replaced whole when any field changes, and is otherwise the same object. It holds nothing
- * an offline guess at a passphrase could start from: ways in show as summaries, never a
- * passphrase's salt or a wrapped vaultKey. A passkey's PRF salt does show, as its authenticator
- * is asked with it. Box summaries show even while locked.
+/** What a host renders of a vault, frozen in one plain object for `useSyncExternalStore`: the same object until something changes.
+ * It sits flat on the vault's scope, so it goes to any bank call that takes a scope, and carries
+ * the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it. Each
+ * changing part (`gate`, `boxes`, `damagedBoxes`, `capacity`) is a slice that keeps its identity
+ * until it changes, so a memoized component handed one slice skips a change to the others.
+ *
+ * A host chooses its screen from two fields: `gate === null`, set a passphrase; `ask_passphrase_at
+ * === null`, unlock; otherwise, the boxes. It holds nothing an offline guess at a passphrase could
+ * start from: no passphrase's salt, key deriver or wrapped vaultKey, and none of the vault's epochs.
+ * A passkey's PRF salt does show, as its authenticator is asked with it. Box summaries show even
+ * while locked.
+ *
+ * @example
+ *   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
+ *   if (snapshot.gate === null) { return <ChoosePassphrase /> }
+ *   if (snapshot.ask_passphrase_at === null) { return <Unlock passkey={snapshot.gate.passkey} /> }
+ *   return <BoxList boxes={snapshot.boxes} />
  */
 export type VaultSnapshot = Readonly<{
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
@@ -64,43 +69,40 @@ export type VaultSnapshot = Readonly<{
   user_id:           string
   /** The vault's own label within the app. Fixed for the Vault object's life. */
   vaultlabel:        string
+  /** The vault record's format, `safebyok-vault-v6`. Fixed for the Vault object's life. */
+  format:            VaultSparse['format']
   /** The stored vault's token, minted when it was made: one life of the vault in its scope. Fixed for the Vault object's life. */
   vault_tok:         string
-  /** When the stored vault was made, in epoch milliseconds. */
-  registered_at:     number
-  /** Up by one on every change to the ways in, which sends every other device back to `locked`; 0 while `novel`. */
-  gate_epoch:        number
-  /** The vault's passphrase, as its {@link PassphraseWayinSummary}: when it was set, and from which device; null while `novel`. */
-  passphrase:        PassphraseWayinSummary | null
-  /** The vault's passkey, as its {@link PasskeyWayinSummary}; null while it has none.
+  /** The vault's ways in, each as its sparse shape ({@link GateSparse}): the passphrase's, and the passkey's or null; null while the vault has no passphrase yet.
    * It shows while locked, so a host can offer the passkey, ask its authenticator for an answer
-   * (`safebyok-react`'s `askPasskey` takes it), and say which passkey a new one would replace.
+   * (`safebyok-react`'s `askPasskey` takes the gate), and say which passkey a new one would
+   * replace. It is the same object until the ways in change.
    */
-  passkey:           PasskeyWayinSummary | null
-  /** Where the vault stands: see {@link VaultState}. */
-  state:             VaultState
+  gate:              GateSparse | null
   /** Every sound box, sorted by boxlabel, as its {@link BoxSparse}: every field of its record but the two ciphered ones.
    * The listing never opens a box's ciphertext, so ciphertext altered in storage shows only when
-   * the box is read. A box whose record does not read back is in `damagedBoxes`, never here.
+   * the box is read. A box whose record does not read back is in `damagedBoxes`, never here. The
+   * same array until a box changes.
    */
   boxes:             readonly BoxSparse[]
   /** Every box whose stored record does not read back, sorted by boxlabel, as its {@link BoxDamaged}: its boxlabel, the revision it names, and its `damage`.
    * Each holds room in the vault, and meets a `putBox()` under its boxlabel. Offer one only for
    * {@link Vault.delBox}, or a fresh `putBox()` while it names a revision; for a `damage` of
-   * `newer_format`, a box a newer safebyok wrote, offer to update the app instead.
+   * `newer_format`, a box a newer safebyok wrote, offer to update the app instead. The same array
+   * until a box changes.
    */
   damagedBoxes:      readonly BoxDamaged[]
   /** How much room the vault has, as this device reckons it from its last read.
    * It counts boxes against `maxBoxes`, and bytes against what storage holds of one vault. Each box
    * reserves room for a whisper and sidecar of `maxWhisperBytes`, its fixed fields and its names.
    * Storage checks again on every write, and its `vault_full` or `box_too_large` is the truth: read
-   * this only to warn the user ahead of time.
+   * this only to warn the user ahead of time. The same object until the room changes.
    *
    * @example const { boxes } = vault.snapshot.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
    */
   capacity:          Readonly<{ boxes: Readonly<Capacity['boxes']>, bytes: Readonly<Capacity['bytes']> }>
-  /** Epoch ms from which the vault asks for a proof again, while unlocked; null otherwise.
-   * It is `leaseHours` after a proof last unlocked the vault, or a passphrase last proved a change
+  /** Epoch ms from which the vault asks for a proof again, while unlocked on this device; null while it is locked, or has no passphrase yet.
+   * Null with a `gate` is the host's cue to offer an unlock. It is `leaseHours` after a proof last unlocked the vault, or a passphrase last proved a change
    * to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
    * compare with `>= FarFuture - MinuteMillis`, never for equality. To show it, format it in the
    * user's locale with `Intl`: `Intl.DateTimeFormat` for the deadline itself ("Tue, Oct 27, 3:00
@@ -110,6 +112,12 @@ export type VaultSnapshot = Readonly<{
    * @example const minutesLeft = snapshot.ask_passphrase_at === null ? null : Math.ceil((snapshot.ask_passphrase_at - Date.now()) / MinuteMillis)
    */
   ask_passphrase_at: number | null
+  /** How far to trust what the vault shows: see {@link VaultFreshness}.
+   * The vault keeps working whatever it says: every write still lands only where storage stands as
+   * this device last read it. It is reckoned when the snapshot is replaced, so `aged` shows at the
+   * next change, or the next `hello()`.
+   */
+  freshness:         VaultFreshness
   /** The latest bad news the vault has learned, or what its `onBadNews` handler threw; null when there is none.
    * Bad news is a refusal of the `bad_news` family: `damaged_vault` or `vault_behind`, say, or a box
    * listed damaged (`damaged_box`, its `meta.box_listed` the box), or a way in stored damaged
@@ -123,12 +131,6 @@ export type VaultSnapshot = Readonly<{
    *   if (trouble?.refusalkind === 'damaged_box') { offerToRemove(trouble.meta?.box_listed?.boxlabel) }
    */
   trouble:           VaultError | null
-  /** How far to trust what the vault shows: see {@link VaultFreshness}.
-   * The vault keeps working whatever it says: every write still lands only where storage stands as
-   * this device last read it. It is reckoned when the snapshot is replaced, so `aged` shows at the
-   * next change, or the next `hello()`.
-   */
-  freshness:         VaultFreshness
 }>
 // --
 
@@ -136,12 +138,12 @@ export type VaultSnapshot = Readonly<{
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
 /** One user's vault of boxes, one life of it in storage, for as long as the bank holds it: every read and write of a whisper goes through here.
- * `bank.ensureVault` births one from one read of storage: never absent, `novel` until its
+ * `bank.ensureVault` births one from one read of storage: never absent, with no gate until its
  * first passphrase is set, and holding one `vault_tok` for its life. Its own fields are its
  * {@link VaultStamp} (its format, scope, `vault_tok` and `registered_at`), fixed for its life and
- * frozen, so a spread or a log line of it shows those alone. Everything that changes (`state`,
- * `boxes`, `passkey`, `capacity`, `trouble` and the rest) is read through `vault.snapshot`, frozen
- * in one object: a UI renders from `getSnapshot()` and re-renders on `subscribe()`.
+ * frozen, so a spread or a log line of it shows those alone. Everything that changes (its `gate`,
+ * `boxes`, `ask_passphrase_at`, `capacity`, `trouble` and the rest) is read through `vault.snapshot`,
+ * frozen in one object: a UI renders from `getSnapshot()` and re-renders on `subscribe()`.
  *
  * A call that needs a whisper goes through {@link Vault.ensureUnlocked}: a vault that is not unlocked
  * raises a gating, handed to the host's `requestCleartext`, one at a time. Nothing prompts on open.
@@ -193,7 +195,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * wrap it to hand it on, as an event handler does: `() => vault.tryHello()`.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
- * @example if (vault.snapshot.state === 'locked') { askForProof(vault.snapshot.passkey) }
+ * @example if (vault.snapshot.gate !== null && vault.snapshot.ask_passphrase_at === null) { offerUnlock(vault.snapshot.gate.passkey) }
  * @example JSON.stringify(vault)   // its stamp alone: format, scope, vault_tok and registered_at
  * @example
  *   await vault.ensureUnlocked()   // asks through requestCleartext while locked
@@ -225,7 +227,7 @@ export class Vault implements VaultStamp {
 
   /** Everything about the vault that changes, frozen in one object: what {@link Vault.getSnapshot} returns. See {@link VaultSnapshot}.
    *
-   * @example const { state, boxes } = vault.snapshot
+   * @example const { gate, ask_passphrase_at, boxes } = vault.snapshot
    */
   get snapshot(): VaultSnapshot { return this.#snapshot }
 
@@ -247,7 +249,7 @@ export class Vault implements VaultStamp {
 
   // == [Vault: opening]: hello, refresh, ensureUnlocked
 
-  /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
+  /** Read storage and settle the vault as novel, locked or unlocked, resolving the vault.
    * Never prompts. Within `opts.staleMinutes` of the last read it re-settles without reading, unless
    * the last read failed or found storage it could not trust. A hello made while a read is under
    * way shares that read, whatever its `staleMinutes`, and starts none of its own. Reads
@@ -267,7 +269,7 @@ export class Vault implements VaultStamp {
    * 'vault_remade': either way this Vault object is gone for good, and the bank hands out the next.
    * A box or way in stored damaged refuses nothing: it lists damaged, and is told as bad news.
    *
-   * @example await vault.hello()   // vault.snapshot.state: 'novel' | 'locked' | 'unlocked'
+   * @example await vault.hello()   // vault.snapshot.gate: null while novel; vault.snapshot.ask_passphrase_at: null while locked
    * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.tryHello() } })
    * @example window.addEventListener('focus', () => vault.tryHello())   // wrapped: vault.hello itself would refuse the event as its options
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
@@ -824,7 +826,7 @@ export class Vault implements VaultStamp {
     this.#onGone = onGone
     this.#vaultRecord = frozenVaultRecord(born.vaultRecord)
     this.#deviceId = born.record.device_id
-    this.#snapshot = this.#picture()
+    this.#snapshot = this.#picture(null)
     registerLeaseReader(this, () => this.#lease)
     registerProvingInside(this, {
       vaultRecord: () => this.#vaultRecord,
@@ -884,10 +886,6 @@ export class Vault implements VaultStamp {
   #expiry: ReturnType<typeof setTimeout> | null = null
 
   readonly #listeners = new Set<() => void>()
-  #vaultState(now: number): VaultState {
-    if (! isGated(this.#vaultRecord)) { return 'novel' }
-    return this.#unlockStands(now) ? 'unlocked' : 'locked'
-  }
   #freshness(now: number): VaultFreshness {
     if (this.#readRefused) { return 'refused' }
     return now - this.#readAt >= this.#staleMillis ? 'aged' : 'timely'
@@ -925,30 +923,29 @@ export class Vault implements VaultStamp {
   // The latest bad news, or what the handler threw at it: the snapshot's trouble. See [Bad news].
   #trouble: VaultError | null = null
   #snapshot: VaultSnapshot
-  // The vault record the snapshot was last settled from, whose ways in it shows as summaries: the
-  // vault's alone, as their salts and wraps are what an offline guess at a passphrase needs.
+  // The vault record the snapshot was last settled from: news of a damaged way in is told once per
+  // way in it did not already show.
   #shownRecord: VaultRecord | null = null
 
-  /** The snapshot the private state makes at `now`, frozen: the clock read now, unless the caller knows the time without it. */
-  #picture(now = this.#clockNow()): VaultSnapshot {
-    const state = this.#vaultState(now)
-    const standing = this.#vaultRecord
-    const wayins = isGated(standing) ? this.#wayinsOf(standing) : null
-    const { boxes, bytes } = this.#capacity()
+  /** The snapshot the private state makes at `now`, frozen: the clock read now, unless the caller knows the time without it.
+   * Each slice of `shown`, the snapshot published before, is kept wherever the new one holds the
+   * same, so a slice keeps its identity until it changes.
+   */
+  #picture(shown: VaultSnapshot | null, now = this.#clockNow()): VaultSnapshot {
+    const { gate } = this.#vaultRecord
     return Object.freeze({
-      ...this.#scope,
-      vault_tok:         standing.vault_tok,
-      registered_at:     standing.registered_at,
-      gate_epoch:        standing.gate_epoch,
-      passphrase:        wayins === null ? null : Object.freeze(wayins.passphrase.toJSON()),
-      passkey:           wayins?.passkey ? Object.freeze(wayins.passkey.toJSON()) : null,
-      state,
-      boxes:             this.#boxes,
-      damagedBoxes:      this.#damagedBoxes,
-      capacity:          Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
-      ask_passphrase_at: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
-      trouble:           this.#trouble,
+      applabel:          this.applabel,
+      user_id:           this.user_id,
+      vaultlabel:        this.vaultlabel,
+      format:            this.format,
+      vault_tok:         this.vault_tok,
+      gate:              keptIfSame(shown?.gate, gate === null ? null : gateSparseOf(gate)),
+      boxes:             keptIfSame(shown?.boxes, this.#boxes),
+      damagedBoxes:      keptIfSame(shown?.damagedBoxes, this.#damagedBoxes),
+      capacity:          keptIfSame(shown?.capacity, this.#capacity()),
+      ask_passphrase_at: this.#unlockStands(now) ? this.#lease?.ask_passphrase_at ?? null : null,
       freshness:         this.#freshness(now),
+      trouble:           this.#trouble,
     })
   }
 
@@ -959,7 +956,7 @@ export class Vault implements VaultStamp {
    */
   #replaceSnapshot(now?: number) {
     this.#shownRecord = this.#vaultRecord
-    const next = this.#picture(now)
+    const next = this.#picture(this.#snapshot, now)
     // Trouble is told apart by identity, as two refusals of one kind read alike as JSON.
     if (next.trouble === this.#snapshot.trouble && stableJsonify({ ...next, trouble: null }) === stableJsonify({ ...this.#snapshot, trouble: null })) { return }
     this.#snapshot = next
@@ -1541,14 +1538,14 @@ export class Vault implements VaultStamp {
   /** Every box last listed, sound and damaged: each holds room in the vault. */
   #listed(): readonly (BoxSparse | BoxDamaged)[] { return [...this.#boxes, ...this.#damagedBoxes] }
 
-  /** The room the vault has, reckoned from the boxes last listed, sound and damaged, as `#checkRoomFor` reckons it. */
-  #capacity(): Capacity {
+  /** The room the vault has, frozen, reckoned from the boxes last listed, sound and damaged, as `#checkRoomFor` reckons it. */
+  #capacity(): VaultSnapshot['capacity'] {
     const listed = this.#listed()
     const bytesUsed = listed.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
-    return {
-      boxes: { used: listed.length, max: this.#maxBoxes },
-      bytes: { used: bytesUsed, max: this.#maxVaultBytes },
-    }
+    return Object.freeze({
+      boxes: Object.freeze({ used: listed.length, max: this.#maxBoxes }),
+      bytes: Object.freeze({ used: bytesUsed, max: this.#maxVaultBytes }),
+    })
   }
 
   /** Refuse 'whisper_too_large' for a whisper whose JSON, with the sidecar's beside it, is over `maxWhisperBytes`, quoting neither; the sidecar alone is weighed when the whisper is left out. */
@@ -1928,6 +1925,11 @@ const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
 const isOlderPicture = (inHand: VaultSparse, fresh: VaultSparse): boolean => (
   inHand.vault_tok === fresh.vault_tok
   && (fresh.vault_epoch < inHand.vault_epoch || fresh.gate_epoch < inHand.gate_epoch)
+)
+
+/** `next`, or `shown` when it holds the same: a snapshot's slice keeps its identity until what it holds changes. */
+const keptIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => (
+  shown !== undefined && stableJsonify(shown) === stableJsonify(next) ? shown : next
 )
 
 /** True when `lease` was granted under the vault and ways in `standing` holds. */

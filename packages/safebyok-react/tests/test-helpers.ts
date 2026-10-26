@@ -8,8 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSummary, type Vault, type VaultState } from 'safebyok'
-import { answering, asKind, heldDialog, scopeOf, settledVault, type BornVaultOpts } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok'
+import { answering, asKind, heldDialog, scopeOf, settledVault, stateOf, type BornVaultOpts } from 'safebyok/testing'
 import type { PassphraseGating } from '../src/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -35,8 +35,10 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 
 /** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
 export type StubVaultOpts = {
-  state?:            VaultState
-  passkey?:          PasskeyWayinSummary | null
+  /** Whether the vault has its passphrase yet: `novel` shows no gate. Default 'locked'. */
+  state?:            'novel' | 'locked'
+  /** The gate's passkey, when the vault has one. Default none. */
+  passkey?:          PasskeyWayinSparse | null
   tryCheckStrength?: Vault['tryCheckStrength']
   tryHello?:         Vault['tryHello']
 }
@@ -49,15 +51,18 @@ export const DefaultLeaseMillis = LeaseHours * 3_600_000
 
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
- * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
- * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
+ * never changes (locked, with a gate holding a passphrase and `passkey`, or novel, with no gate,
+ * as `state` says; the scope of `u1`'s `main` vault in the `acme` app, as `scopeOf` has it, its
+ * fields beside it), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
  * a `tryHello` settling at once unless the test hands it others. What it does when the user
  * answers is its gating's: see {@link gatingOf}.
  *
  * @example const vault = TH.stubVault({ state: 'novel' })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
-  const snapshot = { state: opts.state ?? 'locked', passkey: opts.passkey ?? null, ...scopeOf('u1') }
+  const passphrase = { wayinkind: 'passphrase', device_id: 'device-u1', registered_at: Date.UTC(2026, 9, 14) } as const
+  const gate = opts.state === 'novel' ? null : { passphrase, passkey: opts.passkey ?? null }
+  const snapshot: Pick<VaultSnapshot, 'applabel' | 'user_id' | 'vaultlabel' | 'gate' | 'ask_passphrase_at'> = { ...scopeOf('u1'), gate, ask_passphrase_at: null }
   const stub = {
     ...scopeOf('u1'),
     getSnapshot:      () => snapshot,
@@ -111,7 +116,7 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
     return ok ? { ok, val: vault } : { ok, err }
   }
   const common = { vault, leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }
-  const gatingkind = opts.gatingkind ?? (vault.getSnapshot().state === 'novel' ? 'initialize_gate' : 'unlock_vault')
+  const gatingkind = opts.gatingkind ?? (stateOf(vault.getSnapshot()) === 'novel' ? 'initialize_gate' : 'unlock_vault')
   const gating: PassphraseGating = gatingkind === 'initialize_gate'
     ? { ...common, gatingkind, attempt: tried }
     : { ...common, gatingkind, attemptPassphrase: tried, attemptPasskey: tried }

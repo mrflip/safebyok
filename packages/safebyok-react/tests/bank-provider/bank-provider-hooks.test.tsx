@@ -110,7 +110,7 @@ describe("BankProvider", () => {
       const { Grab, opened } = grabber()
       render(<StrictMode><BankProvider {...world.props} user_id="u1"><Grab /></BankProvider></StrictMode>)
       const vault = await opened()
-      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('novel') })
       await TH.wakeupAtNextTick()
       expect(counts()).to.deep.equal({ subscribe: 1, ensureVault: 1, getDeviceRecord: 1 })
     })
@@ -132,14 +132,14 @@ describe("BankProvider", () => {
       const first = await opened()
       const firstBank = latest().bank
       expect(firstBank?.user_id).to.eq('u1')
-      await waitFor(() => { expect(first.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(TH.stateOf(first.getSnapshot())).to.eq('novel') })
       rerender(tree(null))
       expect(latest().vault).to.be.null
       expect(latest().bank).to.be.null
       await TH.expectRefusal(first.hello(), 'vault_gone')
       rerender(tree('u2'))
       const second = await opened()
-      await waitFor(() => { expect(second.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(TH.stateOf(second.getSnapshot())).to.eq('novel') })
       expect(second.user_id).to.eq('u2')
       expect(latest().bank).to.not.eq(firstBank)
       expect(latest().bank?.user_id).to.eq('u2')
@@ -169,13 +169,13 @@ describe("BankProvider", () => {
       const tree = (mode: 'visible' | 'hidden') => <StrictMode><Activity mode={mode}><BankProvider {...world.props} user_id="u1"><Grab /></BankProvider></Activity></StrictMode>
       const { rerender } = render(tree('visible'))
       const first = await opened()
-      await waitFor(() => { expect(first.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(TH.stateOf(first.getSnapshot())).to.eq('novel') })
       rerender(tree('hidden'))
       await TH.expectRefusal(first.hello(), 'vault_gone')
       rerender(tree('visible'))
       await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
       const second = latest().vault
-      await waitFor(() => { expect(second?.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(second && TH.stateOf(second.getSnapshot())).to.eq('novel') })
     })
   })
 
@@ -192,7 +192,7 @@ describe("BankProvider", () => {
       )
       const { rerender } = render(tree(null))
       const vault = await opened()
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
       rerender(tree('first'))
       rerender(tree('second'))
       expect(latest().vault).to.eq(vault)
@@ -214,7 +214,7 @@ describe("BankProvider", () => {
       )
       const { rerender } = render(tree('u1'))
       const first = await opened()
-      expect(first.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(first.getSnapshot())).to.eq('unlocked')
       // A read under way on u1's vault as u2 signs in meets u1's damaged record after the switch.
       world.spoil()
       const hello = first.tryHello({ staleMinutes: 0 })
@@ -223,7 +223,7 @@ describe("BankProvider", () => {
       expect(ok).to.be.false
       const second = await opened()
       expect(second.user_id).to.eq('u2')
-      await waitFor(() => { expect(second.getSnapshot().state).to.eq('novel') })
+      await waitFor(() => { expect(TH.stateOf(second.getSnapshot())).to.eq('novel') })
       await TH.wakeupAtNextTick()
       expect(told).to.deep.equal([])
     })

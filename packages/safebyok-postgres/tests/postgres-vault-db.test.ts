@@ -218,7 +218,7 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
     TH.closeVault(owner)
     const reader = await opened(postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), user_id: 'u1' }))
     await TH.expectRefusal(reader.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
-    expect(reader.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(reader.getSnapshot())).to.eq('unlocked')
     expect(await reader.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     TH.closeVault(reader)
   })

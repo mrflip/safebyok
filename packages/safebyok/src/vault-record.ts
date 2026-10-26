@@ -212,4 +212,15 @@ export const vaultSparseOf = (record: VaultRecord): VaultSparse => {
   const { gate: _gate, ...sparse } = record
   return Object.freeze(sparse)
 }
+
+/** `gate` as a host may see it, frozen through: its {@link GateSparse}, each wayin without what a guess at the passphrase would start from or what opens the vault.
+ *
+ * @example gateSparseOf(record.gate).passphrase   // { wayinkind: 'passphrase', device_id, registered_at }: no salt, key deriver label or wrap
+ */
+export const gateSparseOf = (gate: GateRecord): GateSparse => {
+  const { key_deriver_label: _deriver, salt_b64: _salt, vault_key_wayin_wrapped: _passphraseWrap, ...passphrase } = gate.passphrase
+  if (gate.passkey === null) { return Object.freeze({ passphrase: Object.freeze(passphrase), passkey: null }) }
+  const { vault_key_wayin_wrapped: _passkeyWrap, ...passkey } = gate.passkey
+  return Object.freeze({ passphrase: Object.freeze(passphrase), passkey: Object.freeze(passkey) })
+}
 // --

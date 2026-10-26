@@ -247,7 +247,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await TH.unlock(vault, TH.RealPassphrase)
       await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
       deployment.signOut()
-      await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
+      await vi.waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
       // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
@@ -270,13 +270,13 @@ describe("a vault over convexVaultDB, on two devices", () => {
     const deployment = deploy()
     const laptop = await openOver(deployment.client('u1'), deployment.api.safebyok)
     const phone = await openOver(connectReact(deployment, 'u1'), deployment.api.safebyok)
-    expect(laptop.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(laptop.getSnapshot())).to.eq('novel')
 
     // The laptop makes the vault and stores a whisper; the phone hears of both.
     await TH.unlock(laptop, TH.RealPassphrase)
     await laptop.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, anthropicKey)
     await vi.waitFor(() => {
-      expect(phone.getSnapshot().state).to.eq('locked')
+      expect(TH.stateOf(phone.getSnapshot())).to.eq('locked')
       expect(phone.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     })
 
@@ -299,7 +299,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     // The laptop changes the passphrase: the phone is locked out of its old unlock, and only the
     // new passphrase opens it again.
     await TH.putWayin(laptop, TH.RealPassphrase, NewPassphrase)
-    await vi.waitFor(() => { expect(phone.getSnapshot().state).to.eq('locked') })
+    await vi.waitFor(() => { expect(TH.stateOf(phone.getSnapshot())).to.eq('locked') })
     await TH.expectRefusal(TH.unlock(phone, TH.RealPassphrase), 'wrong_passphrase')
     await TH.unlock(phone, NewPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)

@@ -88,7 +88,7 @@ const useEntry = (hookname: string, vaultlabel: string): VaultEntry | null => {
   return entry
 }
 
-/** The live snapshot of the signed-in user's vault under `vaultlabel` -- its state, the box listing, the ways in, when it next asks for the passphrase -- or null while there is no Vault object.
+/** The live snapshot of the signed-in user's vault under `vaultlabel` -- its gate (its ways in), the box listing, when it next asks for the passphrase -- or null while there is no Vault object.
  * It asks for the vault as {@link useVault} does, and reads its Vault object through
  * `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`, so the component renders again
  * whenever it changes, and only then.

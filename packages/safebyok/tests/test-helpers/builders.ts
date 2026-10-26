@@ -7,7 +7,7 @@ import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/box'
 import type { VaultScope, PasskeyAnswer, DeviceRecord, LeaseRecord } from '../../src/types/types'
 import { type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/vault-record'
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
-import type { Vault } from '../../src/vault'
+import type { Vault, VaultSnapshot } from '../../src/vault'
 import { Bank } from '../../src/bank'
 import type { MakeBankOpts } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/local-vault-db'
@@ -127,6 +127,15 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
  * @example Box.make(vault, record, TH.madeUnderOf(vault))
  */
 export const madeUnderOf = (vault: Vault): VaultSparse => vaultSparseOf(vaultRecordHeldBy(vault))
+
+/** Where a vault stands, as its snapshot's two fields tell it: `novel` with no gate, `locked` with a gate and no `ask_passphrase_at`, else `unlocked`. For a test that reads all three at once, as no snapshot names them.
+ *
+ * @example expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+ */
+export const stateOf = (snapshot: Pick<VaultSnapshot, 'gate' | 'ask_passphrase_at'>): 'novel' | 'locked' | 'unlocked' => {
+  if (snapshot.gate === null) { return 'novel' }
+  return snapshot.ask_passphrase_at === null ? 'locked' : 'unlocked'
+}
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
