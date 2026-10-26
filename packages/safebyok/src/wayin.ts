@@ -24,7 +24,6 @@ type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayi
 /** A wayin's visible header, every field but its wrap: what the wrap is bound to. */
 export type WayinHeader = HeaderOf<WayinRecord>
 
-
 /** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {
   passphrase: 'vault_key_passphrase_wrapped',
@@ -182,7 +181,6 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
     return fromB64OrNull(this.prf_salt_b64)?.length !== PasskeySaltBytes
   }
 }
-
 
 /** `record`, once it is a wayin's record: 'damaged_wayin' otherwise, its cause the schema's own 'bad_record', which names each failing field and quotes no value. */
 const damagedWayinUnless = (record: unknown): WayinRecord => {
