@@ -48,6 +48,10 @@ implementation.
   PGlite's interface; only `e2e/tests/postgres/` runs on the container. A PGlite-shaped wrapper over
   a `pg` pool would run them there too, so that "every Postgres test, one line" held.
 
+* **One sentence per refusal.** A value that fails several checks gets a sentence for each, which
+  can mislead: an empty `user_id` would also be told to percent-encode. The restyle (#274) stops
+  at the first failure there alone. The Coach (2026-10-26): do the simple thing and let it go.
+
 ## RAGEBAIT
 
 Things we are leaving as they are until they bite again. Each is filed so that the next person to
