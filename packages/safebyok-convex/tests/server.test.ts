@@ -20,24 +20,27 @@ const seeded = async (user_ids: readonly string[] = ['u1']) => {
 
 type Caller = ReturnType<ReturnType<typeof createTest>['withIdentity']>
 
-/** One call of each of the nine functions, on `user_id`'s vault, as `caller`. */
+/** One call of each of the nine functions, on `user_id`'s vault, as `caller`: each write but ensureVault one that lands on the vault `seeded` leaves. */
 const callsOn = (user_id: string): [string, (caller: Caller) => Promise<unknown>][] => {
   const scope = TH.scopeOf(user_id)
   const vault_tok = `vault-tok-${user_id}`
   return [
     ['getVault',         (caller) => caller.query(api.safebyok.getVault, { ...scope })],
     ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf(user_id, { vault_tok: 'vault-tok-late' }) })],
-    ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } })],
+    ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
     ['getBox',           (caller) => caller.query(api.safebyok.getBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok } })],
     ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { ...scope, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_tok, revision_tok: 'rev-a1' } })],
     ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { ...scope })],
-    ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok, revision_tok: 'rev-a2' } })],
-    ['delVault',         (caller) => caller.mutation(api.safebyok.delVault, { ...scope, expected: { vault_tok, gate_epoch: 1 } })],
+    ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok, revision_tok: 'rev-a1' } })],
+    ['delVault',         (caller) => caller.mutation(api.safebyok.delVault, { ...scope, expected: { vault_tok, gate_epoch: 0 } })],
     ['watchVault',       (caller) => caller.query(api.safebyok.watchVault, { ...scope })],
   ]
 }
 
 const EveryCall = callsOn('u1')
+
+/** The writes among {@link callsOn}'s calls that change the vault `seeded` leaves, when its own user makes them. */
+const LandingWrites: ReadonlySet<string> = new Set(['putVaultProps', 'putBox', 'delBox', 'delVault'])
 
 /** Each of the seven functions that take a scope, called as before the scope's names were flattened into its arguments: `{ scope, ... }`. */
 const NestedCalls: [string, (caller: Caller) => Promise<unknown>][] = [
@@ -120,14 +123,27 @@ describe("SafebyokComponent.api, for anyone else", () => {
     })
   }
 
-  it("leaves another user's vault as it was after every call naming it", async () => {
-    const CVX = await seeded(['u1', 'u2'])
-    const asU1 = CVX.withIdentity({ subject: 'u1' })
-    for (const [, call] of callsOn('u2')) { await TH.convexRefusalOf(call(asU1)) }
-    const left = await CVX.withIdentity({ subject: 'u2' }).query(api.safebyok.getVault, { ...TH.scopeOf('u2') })
-    expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u2'))
-    expect(left?.boxes.map((box) => box.revision_tok)).to.deep.equal(['rev-a1'])
-  })
+  for (const [fnName, call] of callsOn('u2')) {
+    it(`leaves another user's vault as it was after ${fnName} names it`, async () => {
+      const CVX = await seeded(['u1', 'u2'])
+      await TH.convexRefusalOf(call(CVX.withIdentity({ subject: 'u1' })))
+      const left = await CVX.withIdentity({ subject: 'u2' }).query(api.safebyok.getVault, { ...TH.scopeOf('u2') })
+      expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u2'))
+      expect(left?.boxes.map((box) => box.revision_tok)).to.deep.equal(['rev-a1'])
+    })
+  }
+
+  // Were these calls ones that could not land anyway, the vault left as it was would prove nothing.
+  for (const [fnName, call] of callsOn('u2')) {
+    if (! LandingWrites.has(fnName)) { continue }
+    it(`changes the vault when its own user makes the ${fnName} call another user is refused`, async () => {
+      const CVX = await seeded(['u1', 'u2'])
+      const asU2 = CVX.withIdentity({ subject: 'u2' })
+      await call(asU2)
+      const after = await asU2.query(api.safebyok.getVault, { ...TH.scopeOf('u2') })
+      expect({ vaultProps: after?.vaultProps, revs: after?.boxes.map((box) => box.revision_tok) }).to.not.deep.equal({ vaultProps: TH.gatelessOf('u2'), revs: ['rev-a1'] })
+    })
+  }
 
   it("leaves the vault as it was after another user's every attempt", async () => {
     const CVX = await seeded()
