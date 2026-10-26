@@ -686,9 +686,15 @@ describe("testDeriver", () => {
 })
 
 describe("the fixtures", () => {
-  it("fakeCiphered: a shape-valid Ciphered named by its tag", () => {
+  it("fakeCiphered: a shape-valid Ciphered named by its tag, as its first example shows", () => {
     expect(TH.fakeCiphered('a1')).to.deep.equal({ cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' })
     expect(Ciphered.safeParse(TH.fakeCiphered('a1')).success).to.be.true
+  })
+
+  it("fakeCiphered: fills a box's ciphered field without a parse, as its second example shows", () => {
+    const box = TH.boxOf('anthropic', 'a1', { whisper_ciphered: TH.fakeCiphered('SUPERSECRET') })
+    expect(box.whisper_ciphered).to.deep.equal({ cipher_iv_b64: 'iv-SUPERSECRET', ciphertext_b64: 'ct-SUPERSECRET' })
+    expect(BoxRecord.safeParse(box).success).to.be.true
   })
 
   it("scopeOf: the user's main vault in acme, or the one named", () => {
