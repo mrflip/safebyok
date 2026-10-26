@@ -16,7 +16,7 @@ const WayinFieldsOfOld = {
   vault_key_passphrase_wrapped: TH.fakeCiphered('old'),
 }
 /** A vault record as this format stored it before its gate was nested: the two wayins flat beside the vault's own fields. */
-const flatOf = (record: TH.GatedRecord) => ({ ...omit(record, ['gate']), passphrase: record.gate.passphrase, passkey: record.gate.passkey })
+const flatOf = (record: GatedVaultRecord) => ({ ...omit(record, ['gate']), passphrase: record.gate.passphrase, passkey: record.gate.passkey })
 
 // == [VaultRecord]: the record, the gate, the rule across them, earlier shapes
 

@@ -108,7 +108,7 @@ describe("BankProvider", () => {
       ["storage_unavailable", 'storage that cannot be reached'],
       ["identity_revoked",    'a user storage no longer serves, as when signed out of the backend'],
       ["not_permitted",       'a call storage refuses the signed-in user'],
-      ["damaged_vault",       'a vault whose stored props fail their checks'],
+      ["damaged_vault",       'a vault whose stored record fails its checks'],
     ] as const
 
     for (const [kind, blurb] of ConditionCases) {

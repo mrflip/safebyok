@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS safebyok_vault_tombstones (
 );
 
 -- One box per boxlabel, beside its vault's scope and vault_tok. A box stands only while
--- its vault's props do, under the same vault_tok: deleting the vault deletes its boxes with
+-- its vault record does, under the same vault_tok: deleting the vault deletes its boxes with
 -- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON object,
 -- {} for none, kept as jsonb, so a server can query it: the box binds it with its keys sorted, so
 -- jsonb's own order changes nothing.

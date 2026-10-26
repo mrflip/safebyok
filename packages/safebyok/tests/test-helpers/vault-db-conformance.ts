@@ -2,7 +2,7 @@ import { it, describe, expect, vi } from 'vitest'
 import type { BoxRecord, BoxSparse } from '../../src/box'
 import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
-import type { VaultRecord } from '../../src/vault-record'
+import type { VaultRecord, VaultDraft } from '../../src/vault-record'
 import { MaxLabelChars, MaxUserIdChars } from '../../src/checks/primitives'
 import { type VaultDB, type VaultDBOpts, type BoxDelExpectation, type VaultDelExpectation } from '../../src/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, raceOutcomeOf } from './racing'
@@ -971,7 +971,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultRecord()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'kept'))
       const unparsable = omitting(boxOf('anthropic', 'one'), 'sidecar')
-      await expectBad(vaultDB.ensureVault(vaultRecordOf('u1', { vault_tok: 'vault-tok-gated' }) as unknown as VaultRecord & { gate: null }), 'bad_record')
+      await expectBad(vaultDB.ensureVault(vaultRecordOf('u1', { vault_tok: 'vault-tok-gated' }) as unknown as VaultDraft), 'bad_record')
       await expectBad(vaultDB.ensureVault(gatelessOf('u1', { vault_epoch: 3 })), 'bad_record')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, unparsable), 'invalid_box')
       await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: '' }, boxOf('anthropic', 'one')), 'bad_record')

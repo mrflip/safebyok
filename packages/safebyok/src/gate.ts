@@ -15,8 +15,9 @@ export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | 
 
 /** A vault's ways in, frozen, at one `gate_epoch`, built on the gate at `base_epoch`, one below it.
  * Its demand ({@link Vault.demandConsistentWith} handed the gate) asks that the gate in hand is
- * its base, or is itself ({@link Gate.isHeldBy}), as once a read took it after it was stored. A spread, JSON or a log line shows its stamp and
- * its wayins' visible fields.
+ * its base, or is itself ({@link Gate.isHeldBy}), as once a read took it after it was stored. A
+ * spread, JSON or a log line shows what it was made under (the scope, `vault_tok` and its epochs)
+ * and its wayins' visible fields.
  *
  * @example const next = Gate.make(vault, { base: Gate.of(vault, vaultRecord, { keyDeriver }), passphrase: wayin, passkey: null })
  * @example next.gate_epoch === next.base_epoch + 1   // true

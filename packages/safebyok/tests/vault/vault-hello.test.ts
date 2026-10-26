@@ -753,7 +753,7 @@ describe("vault.hello, by the Contract", () => {
     })
   }
 
-  it("fills every field from the one read: the props, the ways in, the listing and the capacity agree (Contract: vault.hello, Guarantees)", async () => {
+  it("fills every field from the one read: the vault record, the ways in, the listing and the capacity agree (Contract: vault.hello, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
     const writer = await world.openUnlocked('pw')
@@ -837,7 +837,7 @@ describe("vault.hello, by the Contract", () => {
     expect(vault.snapshot.trouble).to.eq(refusal)
   })
 
-  it("refuses damaged_vault, props that fail their checks, told to onBadNews and returned, the vault standing as its last read left it (Contract: vault.hello, Refuses)", async () => {
+  it("refuses damaged_vault, a vault record that fails its checks, told to onBadNews and returned, the vault standing as its last read left it (Contract: vault.hello, Refuses)", async () => {
     const { told, onBadNews } = newsKeeper()
     const { vault } = await bornThenDamaged({ onBadNews })
     const err = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault')

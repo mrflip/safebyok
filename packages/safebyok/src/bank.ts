@@ -1,5 +1,5 @@
 import type { VaultScope } from './types/types'
-import { type VaultRecord, VaultFormat } from './vault-record'
+import { VaultFormat, type VaultDraft } from './vault-record'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { randomId } from './crypto'
@@ -621,7 +621,7 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
 }
 
 /** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
-const draftOf = (scope: VaultScope, now: number): VaultRecord & { gate: null } => {
+const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }

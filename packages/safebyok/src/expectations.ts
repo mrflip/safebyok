@@ -1,7 +1,7 @@
 import { BoxRecord } from './box'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type VaultRecord, type VaultTombstone } from './vault-record'
+import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './vault-record'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './vault-db'
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
@@ -89,7 +89,7 @@ export const vaultRecordPutOf = (vaultRecord: VaultRecord, standing: unknown): V
  *   const life = Expectations.newLifeOf(draft, standing)
  *   if (life) { write(life) }
  */
-export const newLifeOf = (draft: VaultRecord & { gate: null }, standing: unknown): (VaultRecord & { gate: null }) | null => {
+export const newLifeOf = (draft: VaultDraft, standing: unknown): (VaultDraft) | null => {
   if (standing === null || standing === undefined) { return draft }
   return isTombstone(standing) ? { ...draft, vault_epoch: epochOf(standing) } : null
 }

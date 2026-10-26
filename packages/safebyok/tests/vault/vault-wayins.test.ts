@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { type PasskeyAnswer, VaultScope } from '../../src/types/types'
-import { VaultRecord } from '../../src/vault-record'
+import { type GatedVaultRecord, VaultRecord } from '../../src/vault-record'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
@@ -965,7 +965,7 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
 
   it("makes its ways in from the vault record as storage holds it, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const stored = VaultRecord.parse(storedVaultRecordOf(world)) as TH.GatedRecord
+    const stored = VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
     const passphrase = Wayin.make(stored, stored.gate.passphrase, { keyDeriver: TH.testDeriver })
     const passkey = Wayin.make(stored, stored.gate.passkey ?? TH.passkeyWayinOf('none'), { keyDeriver: TH.testDeriver })
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])

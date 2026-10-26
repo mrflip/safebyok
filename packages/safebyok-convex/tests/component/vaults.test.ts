@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
-import { BoxSparse, memoryStore } from 'safebyok'
+import { BoxSparse, type GatedVaultRecord, memoryStore } from 'safebyok'
 import * as TH from '../test-helpers'
 import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 
@@ -257,7 +257,7 @@ describe("a real vault's records", () => {
   it("round-trip exactly, and still open to the passphrase that sealed them", async () => {
     const real = await TH.realRecords('u1')
     const CVX = TH.componentTest()
-    expect(await TH.ensureGatedIn(CVX, real.vaultRecord as TH.GatedRecord)).to.deep.equal(real.vaultRecord)
+    expect(await TH.ensureGatedIn(CVX, real.vaultRecord as GatedVaultRecord)).to.deep.equal(real.vaultRecord)
     for (const { box } of real.boxes) {
       expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box, expected: { vault_tok: real.vaultRecord.vault_tok, revision_tok: null } })).to.deep.equal({ landed: true, box_stored: box })
     }
@@ -282,7 +282,7 @@ describe("a real vault's records", () => {
   it("list what the core reads as the sound boxes it lists", async () => {
     const real = await TH.realRecords('u1')
     const CVX = TH.componentTest()
-    await TH.ensureGatedIn(CVX, real.vaultRecord as TH.GatedRecord)
+    await TH.ensureGatedIn(CVX, real.vaultRecord as GatedVaultRecord)
     for (const { box } of real.boxes) {
       await CVX.mutation(TH.vaults.putBox, { ...u1, box, expected: { vault_tok: real.vaultRecord.vault_tok, revision_tok: null } })
     }

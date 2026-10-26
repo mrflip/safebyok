@@ -9,7 +9,7 @@ import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import { type BoxRecord, BoxSparse } from '../src/box'
 import type { VaultScope } from '../src/types/types'
-import type { VaultRecord } from '../src/vault-record'
+import type { VaultRecord, VaultDraft } from '../src/vault-record'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
 import { MaxUserIdChars } from '../src/checks/primitives'
@@ -47,7 +47,7 @@ class MapVaultDB extends VaultDB {
     return Promise.resolve({ vault: (this.rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxes(scope)) })
   }
 
-  protected doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
+  protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     const life = Expectations.newLifeOf(draft, this.standingVaultRecord(draft))
     if (life) { this.rows.set(Scopepath.vault(draft), life) }
     return Promise.resolve({ vault: this.rows.get(Scopepath.vault(draft)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxes(draft)) })
@@ -450,8 +450,8 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate: { passphrase: UnwrappedPassphrase, passkey: null } } as VaultRecord, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'vault record whose passphrase is missing its wrapped vaultKey'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault({ ...TH.gatelessOf('u1'), applabel: 'Ac\u{7}me' }),                         'a draft whose applabel holds a control character, the record at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), user_id: 'u^1' }, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'an update of the vault record whose user_id holds a ^'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.vaultRecordOf('u1') as unknown as VaultRecord & { gate: null }), 'a gated draft handed to ensureVault: a vault is first stored gateless'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultRecords({ ...TH.gatelessOf('u1'), gate_epoch: 1 }), 'a draft at a gated epoch with no way in, handed to ensureVaultRecords'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.vaultRecordOf('u1') as unknown as VaultDraft), 'a gated draft handed to ensureVault: a vault is first stored gateless'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultRecords({ ...TH.gatelessOf('u1'), gate_epoch: 1 } as never), 'a draft at a gated epoch with no way in, handed to ensureVaultRecords'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.gatelessOf('u1', { vault_epoch: 3 })),                                       'a draft claiming a vault_epoch: the store sets the counter'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { when: new Date() } as never })), 'a box whose sidecar no read would accept'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('key\u{D83D}', 'one')),                  'a box whose boxlabel is half of an emoji, the box at fault though only its label failed'],
@@ -665,7 +665,7 @@ describe("the abstract VaultDB, on the way in", () => {
     const delBox = await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('')), 'bad_record')
     const delVault = await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), { vault_tok: '', gate_epoch: 1 }), 'bad_record')
     const putBox = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { revision_tok: '' })), 'invalid_box')
-    const fetchOrCreate = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), gate_epoch: 1 }), 'bad_record')
+    const fetchOrCreate = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), gate_epoch: 1 } as never), 'bad_record')
     expect(delBox.message).to.match(/^Nothing was removed: that delete expectation/)
     expect(delVault.message).to.match(/^Nothing was removed: that delete expectation/)
     expect(putBox.message).to.match(/^Nothing was written: that box /)
@@ -682,7 +682,7 @@ describe("the abstract VaultDB, on the way in", () => {
 
   it("hands its adapter only a record as this package writes it: one holding a field it does not know is refused 'bad_record', its adapter handed nothing", async () => {
     const vaultDB = new MapVaultDB()
-    const refusal = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), stray_field: 'x' } as VaultRecord & { gate: null }), 'bad_record')
+    const refusal = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), stray_field: 'x' } as VaultDraft), 'bad_record')
     expect((refusal.cause as VaultError).message).to.eq("There is no field stray_field: check its spelling, or leave it out")
     expect(vaultDB.rows.size).to.eq(0)
   })

@@ -5,7 +5,7 @@ import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-streng
 import { memoryStore } from '../../src/string-store'
 import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/box'
 import type { VaultScope, PasskeyAnswer, DeviceRecord, LeaseRecord } from '../../src/types/types'
-import { type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf } from '../../src/vault-record'
+import { type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/vault-record'
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
@@ -302,9 +302,6 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
   return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
 }
 
-/** A vault record whose gate is made: what {@link vaultRecordOf} makes. */
-export type GatedRecord = VaultRecord & { gate: GateRecord }
-
 /** A shape-valid gate for `user_id`'s `main` vault: its passphrase a {@link wayinOf} whose wrap is `vault-<user_id>`, and no passkey.
  * For storage-layer tests, which never decrypt. Any field as `overrides` says otherwise.
  *
@@ -323,7 +320,7 @@ export const gateOf = (user_id: string, overrides: Partial<GateRecord> = {}): Ga
  * @example vaultRecordOf('u1', { gate_epoch: 2 })
  * @example vaultRecordOf('u1', { gate: gateOf('u1', { passkey: passkeyWayinOf('laptop') }) })
  */
-export const vaultRecordOf = (user_id: string, overrides: Partial<GatedRecord> = {}): GatedRecord => ({
+export const vaultRecordOf = (user_id: string, overrides: Partial<GatedVaultRecord> = {}): GatedVaultRecord => ({
   format:              VaultFormat,
   ...scopeOf(user_id),
   vault_tok:           `vault-tok-${user_id}`,
@@ -342,10 +339,10 @@ export const vaultRecordOf = (user_id: string, overrides: Partial<GatedRecord> =
  * @example const stored = await ensureGated(vaultDB, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  * @example await ensureGated(vaultDB, vaultRecordOf('u1', { gate_epoch: 2 }))
  */
-export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultRecord'>, vaultRecord: GatedRecord): Promise<GatedRecord> => {
+export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultRecord'>, vaultRecord: GatedVaultRecord): Promise<GatedVaultRecord> => {
   const ensured = recordOfRead(valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })))
-  if (ensured.gate_epoch > 0) { return ensured as GatedRecord }
-  return valOf(await vaultDB.putVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedRecord
+  if (ensured.gate_epoch > 0) { return ensured as GatedVaultRecord }
+  return valOf(await vaultDB.putVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedVaultRecord
 }
 
 /** The vault record `scope` holds in `vaultDB`, as `getVault` reads it, or null for none. Throws the refusal of a read that is refused.
@@ -388,7 +385,7 @@ export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: 
  * @example vaultDB.ensureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
  */
-export const gatelessOf = (user_id: string, overrides: Partial<VaultRecord & { gate: null, gate_epoch: 0 }> = {}): VaultRecord & { gate: null, gate_epoch: 0 } => ({
+export const gatelessOf = (user_id: string, overrides: Partial<VaultDraft> = {}): VaultDraft => ({
   format:              VaultFormat,
   ...scopeOf(user_id),
   vault_tok:           `vault-tok-${user_id}`,

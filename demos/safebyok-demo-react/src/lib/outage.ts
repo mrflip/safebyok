@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -78,7 +78,7 @@ export class OutageVaultDB extends VaultDB {
     return storedVaultOf(valOf(await this.inner.getVaultRecords(scope)))
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     this.refuseWhileDown()
     return storedVaultOf(valOf(await this.inner.ensureVaultRecords(draft)))
   }

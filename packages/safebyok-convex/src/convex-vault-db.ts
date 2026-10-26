@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { GetBoxAnswer, ListedBox, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
@@ -109,7 +109,7 @@ class ConvexVaultDB extends VaultDB {
     return answer === null ? { vault: null, boxes: [], damagedBoxes: [] } : { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     const answer = await refusing(() => this.client.mutation(this.api.ensureVault, { draft }))
     return { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }

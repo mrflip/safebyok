@@ -1,5 +1,5 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord, VaultDraft } from 'safebyok'
 import * as Columns from './columns'
 import { VaultRowColumns, ListedBoxColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -328,7 +328,7 @@ class TablesVaultDB extends VaultDB {
     return rows.length === 0 ? { vault: null, boxes: [], damagedBoxes: [] } : storedVaultOf(rows[0])
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     this.mustReach(draft)
     const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(rowOfVaultRecord(draft), VaultRowColumns))
     return storedVaultOf(rows[0])

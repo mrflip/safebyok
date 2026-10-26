@@ -6,7 +6,7 @@ import { ScopepathDelimiter } from './consts'
 /** Where a store files what a scope names: the kind, then the scope's names in order, joined on `^`. A key-value adapter of your own files its rows under these.
  *
  *     bank^acme^u1               a bank
- *     vault^acme^u1^main         a vault's props
+ *     vault^acme^u1^main         a vault's record
  *     lease^acme^u1^main         a vault's lease, on a device
  *     device^acme^u1^main        a vault's device record, on a device
  *     box^acme^u1^main^openai    a box

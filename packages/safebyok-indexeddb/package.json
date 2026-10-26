@@ -2,7 +2,7 @@
   "name": "safebyok-indexeddb",
   "private": false,
   "version": "0.4.0",
-  "description": "IndexedDB storage for safebyok: a VaultDB that keeps vault props and boxes as ciphertext in this browser, each verb one IndexedDB transaction, and the template for a key-value backend of your own.",
+  "description": "IndexedDB storage for safebyok: a VaultDB that keeps vault records and boxes as ciphertext in this browser, each verb one IndexedDB transaction, and the template for a key-value backend of your own.",
   "keywords": [
     "safebyok",
     "indexeddb",

@@ -13,7 +13,7 @@ import { Box, BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
 import { PasskeySaltBytes, VaultScope, type Capacity, type DeviceRecord, type LeaseRecord } from '../src/types/types'
-import { VaultRecord } from '../src/vault-record'
+import { VaultRecord, type VaultDraft } from '../src/vault-record'
 import * as Refusals from '../src/refusals'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
@@ -1331,7 +1331,7 @@ class RoundTripVaultDB extends VaultDB {
   }
 
   // What it hands back is the vault as the step that checked, or that wrote, left it.
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     const vaultScopepath = Scopepath.vault(draft)
     const seen: { vault: VaultReadResponse } = { vault: { vault: null, boxes: [], damagedBoxes: [] } }
     const absent = (rows: Rows) => {

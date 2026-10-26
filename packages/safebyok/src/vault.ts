@@ -1610,9 +1610,9 @@ export class Vault implements VaultStamp {
   }
 
   /** The box under `boxlabel` as storage holds it in the vault `vaultTok`, or null when none stands; the box demanded after the read, then the lease.
-   * A box another device wrote is what storage holds, not drift. The read's stamp demand cannot see
-   * a lock, which moves no `vault_tok`, so the lease is demanded again before anything is handed
-   * back: a lock landing while storage is read refuses 'vault_locked', a box or none.
+   * A box another device wrote is what storage holds, not drift. The demand on what the read was
+   * made under cannot see a lock, which moves no `vault_tok`, so the lease is demanded again before
+   * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
    */
   async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
     const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }), unexpectedError)

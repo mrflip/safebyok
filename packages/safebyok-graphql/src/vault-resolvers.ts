@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError, isVaultError } from 'safebyok'
-import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope } from 'safebyok'
+import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, the ones handing on records in place of those handing back summaries.
@@ -130,7 +130,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
-      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultRecord & { gate: null }), relayedVault),
+      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultDraft), relayedVault),
       safebyokPutVaultRecord: served((vaultDB, args) => vaultDB.putVaultRecord(vaultRecordIn(args), vaultRecordExpectationIn(args)), (stored) => ({ landed: true, vault_stored: stored }), staleVaultRecordInBody),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),

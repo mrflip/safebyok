@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../src/gate'
 import { PassphraseProving, StandingGating } from '../src/proving'
-import { VaultRecord } from '../src/vault-record'
+import { type GatedVaultRecord, VaultRecord } from '../src/vault-record'
 import * as TH from './test-helpers'
 import { makeWorld, storedVaultRecordOf } from './vault/world'
 
@@ -9,7 +9,7 @@ import { makeWorld, storedVaultRecordOf } from './vault/world'
 const gatedWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  return { world, vault, props: VaultRecord.parse(storedVaultRecordOf(world)) as TH.GatedRecord }
+  return { world, vault, props: VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord }
 }
 
 describe("Gate.make", () => {

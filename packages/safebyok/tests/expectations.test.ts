@@ -122,7 +122,7 @@ describe("Expectations.tombstoneOf", () => {
     expect(Expectations.tombstoneOf(TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 7 }), scope, { vault_tok: 'vault-tok-u1', gate_epoch: 3 })).to.deep.include({ vault_epoch: 8 })
   })
 
-  it("misses a vault since made anew, none, props that name no vault, and a gate since changed", () => {
+  it("misses a vault since made anew, none, a record that names no vault, and a gate since changed", () => {
     expect(Expectations.tombstoneOf(VaultRecord, scope, { vault_tok: 'reborn', gate_epoch: 1 })).to.be.null
     expect(Expectations.tombstoneOf(VaultRecord, scope, { vault_tok: 'vault-tok-u1', gate_epoch: 0 })).to.be.null
     expect(Expectations.tombstoneOf(TH.vaultRecordOf('u1', { gate_epoch: 2 }), scope, gate1)).to.be.null

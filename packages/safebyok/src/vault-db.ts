@@ -1,7 +1,7 @@
 import type * as Z from 'zod'
 import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, type DamagedBoxRecord, boxSparseOf } from './box'
 import { Capacity, type VaultScope } from './types/types'
-import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone } from './vault-record'
+import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone, type VaultDraft } from './vault-record'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './checks/core-checks'
@@ -286,7 +286,7 @@ export abstract class VaultDB {
    *   const { ok, val } = await vaultDB.ensureVault(draft)
    *   if (ok && val.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
    */
-  ensureVault(draft: VaultRecord & { gate: null }): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
+  ensureVault(draft: VaultDraft): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
     return answering(() => this.ensuredVault(draft))
   }
 
@@ -307,7 +307,7 @@ export abstract class VaultDB {
   }
 
   /** The vault as {@link VaultDB.ensureVault} ensures it: what a server relays to a browser's VaultDB, as its `doEnsureVault` answers. */
-  ensureVaultRecords(draft: VaultRecord & { gate: null }): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
+  ensureVaultRecords(draft: VaultDraft): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
     return answering(() => this.ensuredVault(draft))
   }
 
@@ -349,7 +349,7 @@ export abstract class VaultDB {
   }
 
   /** The vault `doEnsureVault` ensures from `draft`, once the draft is checked, as {@link VaultDB.getVault} hands one back. */
-  private async ensuredVault(draft: VaultRecord & { gate: null }): Promise<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }> {
+  private async ensuredVault(draft: VaultDraft): Promise<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }> {
     const outgoing = checkDraft(draft)
     const asked = heldScope(this, outgoing)
     const read = await adapterAnswer('doEnsureVault', () => this.doEnsureVault(outgoing))
@@ -624,7 +624,7 @@ export abstract class VaultDB {
    * boxes are of the vault record it hands up. Two devices ensuring one scope at once settle on one
    * vault. `Expectations.newLifeOf` makes the record a key-value backend stores.
    */
-  protected abstract doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<VaultReadResponse>
+  protected abstract doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse>
   /** Replace the standing vault record with `vaultRecord` if, and only if, it has `expected.vault_tok` and `expected.gate_epoch`, resolving it as stored.
    * Store `vaultRecord`, its gate with it, with its `vault_epoch` set to the standing one plus one,
    * whatever it carries, and resolve the record as stored, read back in that same step: a key-value
@@ -962,7 +962,7 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unk
 /** A draft handed to `ensureVault`, once it is a novel vault's record, `gate_epoch` 0 and `gate` null, with `vault_epoch` 0: 'bad_record' otherwise, quoting none of it.
  * The counter is the store's to set, so a draft claims none.
  */
-const checkDraft = (draft: unknown): VaultRecord & { gate: null, gate_epoch: 0 } => {
+const checkDraft = (draft: unknown): VaultDraft => {
   const outgoing = checkOutgoing(VaultDraft, draft, 'novel vault record draft')
   if (outgoing.vault_epoch !== 0) {
     throw new VaultError('bad_record', "Nothing was written: a draft's vault_epoch is 0. The store sets the counter, and carries it on from a vault deleted in the scope.")

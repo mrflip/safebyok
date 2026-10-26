@@ -1,5 +1,5 @@
 import { Expectations, Refusals, Scopepath, VaultDB, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './box-range'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -53,7 +53,7 @@ class IdbVaultDB extends VaultDB {
   }
 
   // A tombstone in the vault record's row is no vault: a new life takes its place with the counter carried on.
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     const { ensured, created } = await inOneTransaction(this.shelf, async (store) => {
       const vaultScopepath = Scopepath.vault(draft)
       const life = Expectations.newLifeOf(draft, await rowAt(store, vaultScopepath))
@@ -64,7 +64,7 @@ class IdbVaultDB extends VaultDB {
     return ensured
   }
 
-  // The props stored are the row as the put left it, read in the same transaction; a write that
+  // The vault record stored is the row as the put left it, read in the same transaction; a write that
   // misses is refused from the row its transaction read, once that has ended.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {

@@ -1,6 +1,6 @@
 import { BoxRecord } from './box'
 import type { VaultScope } from './types/types'
-import type { VaultRecord } from './vault-record'
+import type { VaultRecord, VaultDraft } from './vault-record'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
@@ -85,7 +85,7 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
-  protected doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
+  protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
       const standing = readJson(this.store, vaultScopepath)

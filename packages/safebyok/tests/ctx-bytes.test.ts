@@ -7,7 +7,7 @@ import { LeaseStamp, boxCtxOf, leaseCtxOf } from '../src/lease'
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
-import { VaultFormat, VaultRecord, VaultStamp } from '../src/vault-record'
+import { type GatedVaultRecord, VaultFormat, VaultRecord, VaultStamp } from '../src/vault-record'
 import { passphraseCleartext } from '../src/types/type-aliases'
 import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
@@ -92,7 +92,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const whisperCtx = textBytes(`[${vaultText},${boxText},"whisper_ciphered"]`)
     const leaseCtx = textBytes(`[${vaultText},${leaseText},"vault_key_lease_wrapped"]`)
 
-    const { gate: { passphrase } } = VaultRecord.parse(vaultRecord) as TH.GatedRecord
+    const { gate: { passphrase } } = VaultRecord.parse(vaultRecord) as GatedVaultRecord
     const wayinKey = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), fromB64(passphrase.salt_b64), TH.spyLogger().logger)
     const wayinCtx = wayinCtxOf(vaultRecord, headerOf(passphrase))
     const vaultKey = await unwrapKeyUnder(wayinKey, passphrase.vault_key_wayin_wrapped, wayinCtx, { extractable: false, usage: ['unwrapKey'] })

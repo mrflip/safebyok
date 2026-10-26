@@ -2,8 +2,8 @@ import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { BoxRecord, VaultRecord, localVaultDB, memoryStore } from 'safebyok'
-import type { Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, closeVault, type FakeCiphered, type GatedRecord, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
+import type { GatedVaultRecord, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
+import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -28,7 +28,7 @@ export const componentTest = (transactionLimits = false) => convexTest({ schema,
  *
  * @example const stored = await ensureGatedIn(CVX, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  */
-export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedRecord) => {
+export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedVaultRecord) => {
   await CVX.mutation(vaults.ensureVault, { draft: { ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null } })
   const answer = await CVX.mutation(vaults.putVaultRecord, { vaultRecord: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
   if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }

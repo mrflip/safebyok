@@ -258,7 +258,7 @@ describe("bank.ensureVault", () => {
     expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1', 'work'))).to.be.null
   })
 
-  it("births 'novel' over empty storage, its gateless props stored, and its vault_tok fixed for the Vault object's life", async () => {
+  it("births 'novel' over empty storage, its gateless vault record stored, and its vault_tok fixed for the Vault object's life", async () => {
     const world = makeWorld()
     const vault = await bankIn(world).ensureVault(Main)
     expect(vault.getSnapshot()).to.deep.include({ state: 'novel', gate_epoch: 0, passphrase: null })
@@ -959,7 +959,7 @@ describe("a let-go landing mid-call", () => {
 // == [The first unlock]: a let-go while it derives, a gate made elsewhere
 
 describe("the first unlock of a novel vault", () => {
-  it("refuses 'vault_gone' when a let-go lands while the key deriver is held, and storage keeps the gateless props", async () => {
+  it("refuses 'vault_gone' when a let-go lands while the key deriver is held, and storage keeps the gateless vault record", async () => {
     const world = makeRacingWorld()
     const vault = await world.open()
     const deriving = world.holdNextDerive()

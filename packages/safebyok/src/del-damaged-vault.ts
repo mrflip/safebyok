@@ -17,15 +17,15 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'v
  * through `VaultDB.delDamagedVault`, then the DeviceDB's `delLease`, and raises this device's
  * record of the scope to the tombstone's `vault_epoch` with `raiseDeviceRecord`.
  *
- * Storage decides, by the checks it alone can make: `VaultDB.delDamagedVault` deletes only vault
- * props that fail their checks and still name their `vault_tok`. So no bank need have opened the
+ * Storage decides, by the checks it alone can make: `VaultDB.delDamagedVault` deletes only a vault
+ * record that fails its checks and still names its `vault_tok`. So no bank need have opened the
  * vault, or refused it, first, and nothing here asks for an unlock or a passphrase.
  *
  * Once it resolves, storage holds no vault in the scope and this device holds no lease of it. With
  * no vault stored it only clears the lease, so a call cut short can be made again.
  *
- * A sound vault refuses 'bad_option': delete it with `vault.del()`. Props too damaged to name
- * their vault refuse 'damaged_vault', which this cannot clear. A `format` this version does not
+ * A sound vault refuses 'bad_option': delete it with `vault.del()`. A record too damaged to name
+ * its vault refuses 'damaged_vault', which this cannot clear. A `format` this version does not
  * know refuses 'newer_format'. Each of those removes nothing. A vault replaced elsewhere meanwhile
  * refuses 'stale_write'. A device store that fails once the vault is gone refuses
  * 'storage_unavailable' or 'storage_blocked': call again to finish. With no Vault object to lock,
