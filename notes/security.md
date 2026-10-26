@@ -41,6 +41,20 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 2, branch `20261026-validator`, [#273](https://github.com/mrflip/safebyok/pull/273)): **a `Validator` factory
+  refuses without quoting its input, and classic Zod 4.6.7 is a peer.**
+  A failed `parse` of a `Validator` (`packages/safebyok/src/checks/validator.ts`) throws a `VaultError` of the call's kind. Its
+  message names each failing field's path and the check's sentence (up to eight, counting the rest), and `meta.fieldnames` lists
+  the paths. It never quotes an input value: Zod 4.6.7's own messages name a type, a limit or the allowed values, and an issue
+  carries `input` only under `reportInput`, which is never passed. Each parse passes Zod's English locale as a per-parse error
+  map, so a host's global `z.config({ customError })`, which could quote the input, never shapes our messages. A path step or
+  unknown key is repeated only when it is shaped like one of our field names (`/^[A-Za-z_]\w{0,63}$/`); any other key could be the
+  caller's data (a record's key, a pasted secret) and is said as "(a name not repeated here)". The refusal carries no `cause`,
+  since the `ZodError` holds the input. `safeParse` and `parseAsync` stay Zod's own and are not refusals, so a host calling them
+  gets Zod's errors as Zod makes them. Classic Zod `^4.6.7` is now a peer of `safebyok` and `safebyok-indexeddb` (the Coach's
+  ruling in the 2026-10-25 restyle session; it replaces the `^4.0.0` peer of 2026-10-14), and the core bundles classic beside
+  `zod/mini` for one thread (about 15 kB brotlied more on `Bank`), where the 2026-10-15 entry has the core's lint refuse classic
+  in `src/`. The kit leaves out the `zod` namespace object, which would carry every Zod locale.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **the put_passkey dialog makes the passkey before the passphrase is checked.**
   `GatingModal`'s `PutPasskeyForm` (`packages/safebyok-react/src/gating-modal.tsx`) calls `createPasskey()` at each submit, straight
   from the submit's user gesture as WebAuthn requires, then hands the passphrase and the new passkey's PRF answer to the
@@ -2555,6 +2569,20 @@ added or folded into through the subagent, and no other entry changes.
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   box's four-name primary key fits a btree entry) and the base class refuses a longer name.
+  Amended 2026-10-26 (validator, [#273](https://github.com/mrflip/safebyok/pull/273)): the host's `validators` option is gone
+  (`Bank.make`, `BankProvider`), with `safebyok/validators`, `NameFloor`, `DefaultValidators`, `AnyTextValidators` and
+  `checkValidators`; this supersedes what the 2026-10-15 and 2026-10-16 entries say of a host's checks, which describe the code
+  of their dates. The name rules are the package's own and hold at every layer: at a vault's entry (`Bank.make`'s applabel,
+  `bank.ensureVault`'s scope, the boxlabel of `putBox`, `getBox`, `getWhisper`, `useWhisper` and `delBox`), in every `VaultDB`
+  verb (so server side too: the Convex client, the Postgres route and the GraphQL resolvers go through the same verbs), and in
+  every record read back (vault props, box, lease, device record, tombstone). A label (applabel, vaultlabel, boxlabel) is
+  `^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$`, 2 to 40 characters. A user_id is 1 to 100 ASCII characters from `[A-Za-z0-9_.~:@+|%-]`,
+  never dots alone (`..` was accepted before and is refused now; `~` and `%` are new, for percent-encoding per RFC 3986). Each
+  check the floor made (no `^`, no control character, well-formed NFC text, at most 1 KiB) is implied by these, so none was
+  removed; they tightened. `maxNameBytes` still holds per adapter. A stored record holding a name outside the rules reads as
+  damaged, and a box row stored under such a name (possible before, under a host's wider validators) is skipped from listings
+  and unreachable by any verb; `vault.del()` or `delDamagedVault` still removes it. The refusal kind for a name that fails its
+  check is `bad_scope`, which replaces `bad_label` (the earlier entries' `bad_label` is this kind, by its old name).
 * 2026-10-16; 2026-10-18; 2026-10-19: **a box's sidecar is any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). Amended 2026-10-21 (trust_lines): the sidecar
   is stored as the JSON value itself, in the field `sidecar` (once the text `sidecar_json`), box
