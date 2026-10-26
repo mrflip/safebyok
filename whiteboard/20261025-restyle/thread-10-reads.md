@@ -1,7 +1,9 @@
 # Thread 10: reads (2026-10-26)
 
 Branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281), stacked on [#280](https://github.com/mrflip/safebyok/pull/280).
-Justify: see the PR's **Tests:** line. Core and every adapter done; nothing left for a 10b.
+Justify: green (core 3257 passed / 37 skipped, graphql 344, convex 350, postgres 322, react 308,
+indexeddb 165, fastkey 49, demo 227, e2e 107, root 265). Size: no line moved (`everything` 62.4 kB,
+budget 66; `Bank` 54.8, 58). Core and every adapter done; nothing left for a 10b.
 
 * **Built**:
   * **Renames** (thread 8's list): `putVaultProps` → `putVaultRecord` (`doPutVaultRecord`),
@@ -58,3 +60,9 @@ Justify: see the PR's **Tests:** line. Core and every adapter done; nothing left
   The old listing already listed a box with a malformed (present) ciphered field as damaged; the
   README said otherwise, now fixed.
 * **For the Coach**: see the PR's *Open questions*.
+  1. **Fold `getVaultRecords` into `getVault`?** They now resolve the same thing; the pair stays
+     as the preplan names it. Recommend folding it later.
+  2. **`getBox` on a newer-format box**: refuse `newer_format` (as a vault record does) rather than
+     `damaged_box`? Changes a caller's contract, so left as is. Recommend yes, with a ruling.
+  3. **`damaged_box` news for a `newer_format` box**: same kind, `meta.box_listed.damage` tells
+     them apart. Recommend keeping one kind.
