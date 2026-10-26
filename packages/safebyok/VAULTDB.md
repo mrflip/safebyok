@@ -207,7 +207,7 @@ serves a browser's VaultDB, whose own step is then that one request, and whose b
 each sound box again and parses the server's word on each damaged one.
 
 Postgres's `ensureVault` over a vault record another device created after its statement began
-finds them by its `ON CONFLICT`, which reads the row as it stands then, while its listing reads as
+finds it by its `ON CONFLICT`, which reads the row as it stands then, while its listing reads as
 of the statement's start, filtered to that record's `vault_tok`: in that race the listing may lag
 the record by the boxes written meanwhile, and never names another vault.
 
@@ -228,8 +228,8 @@ and asks `Expectations.vaultMeets`.
 
 **3.1. A vault record is created once.** `ensureVault` stores the vault record only where the scope
 holds none, and returns whichever vault record stands afterwards, with the listing beside it (line
-2.4): the draft's, or, when the vault already exists, the ones standing, exactly as stored and under
-their own `vault_tok` -- another device's, perhaps created in the same moment. Two devices
+2.4): the draft's, or, when the vault already exists, the one standing, exactly as stored and under
+its own `vault_tok` -- another device's, perhaps created in the same moment. Two devices
 creating at once settle on one vault, and get one `vault_tok` back. It takes one argument, a
 gateless draft (`gate_epoch` 0, no way in, `vault_epoch` 0), which names the scope itself; a draft
 of another shape, or claiming a counter, the base class refuses as `bad_record`.
@@ -243,7 +243,7 @@ on past a vault's deletion.
 writes only while the standing vault record has the expected `vault_tok` and `gate_epoch`, and
 refuses as `stale_write` otherwise, including where no vault record stands, or only a tombstone does:
 an update never creates, and never revives. It resolves the vault record as stored, read in the same
-atomic step as the write, and the store has set their `vault_epoch` to the standing one plus one,
+atomic step as the write, and the store has set its `vault_epoch` to the standing one plus one,
 whatever the writer sent: a counter that moves on every write of the gate, and only there. (No box
 write moves it, so a restored backup that rolls back boxes alone shows no sign of it; the README
 says what a host that restores one does.) The refusal carries what stands as
@@ -252,7 +252,7 @@ step: the winner's vault record, whole, or null for none, so the caller takes it
 read. The adapter throws `Refusals.staleVaultRecord(standing)` with the row exactly as stored, and
 a key-value store asks `Expectations.vaultRecordRefusalOf`; the base class checks what stands as
 `getVault` checks a record, so a vault record standing that fails that check refuses as a read of
-them does (`damaged_vault`, `newer_format`), and a stale write that names nothing standing is the
+it does (`damaged_vault`, `newer_format`), and a stale write that names nothing standing is the
 adapter's bug, `corrupt_record`. A landed write's answer is held to the same: a vault record of the
 scope, the same `vault_tok` at the `gate_epoch` written, else `corrupt_record`, saying the write
 may have landed. A vault's first gate is such an update: written over its

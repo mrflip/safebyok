@@ -1012,7 +1012,7 @@ deleted through its Vault object's `del()`. With no vault stored it erases only 
 lease, so a call cut short can be made again. It needs the stored record's `vault_tok`
 to aim the deletion, so a vault record too damaged to show one is refused as `damaged_vault`
 still, with nothing removed: the backend's own tools can clear it (`localVaultDB`'s vault record
-that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
+that is not JSON at all is one case). A record this version cannot read may instead have been written by a **newer**
 safebyok, which opens it; so one in a `format` this version does not know is refused with a kind of its
 own, `newer_format`, by `bank.ensureVault`, `hello()` and `delDamagedVault` alike, nothing removed, with a message
 telling the user to update the app: never offer to start over on it. That is all this version can tell from damage, which rests on a rule: **any change to
@@ -1020,7 +1020,7 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 `format`**, so an older build can tell "newer" from "damaged". Where it cannot
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
-clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault record.
+clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold a damaged vault record.
 A bank deletes one with its own stores, `bank.delDamagedVault({ vaultlabel })`, which
 `safebyok-react`'s `useBank()` reaches. Storage decides, by the checks only it can make, so the
 bank need not hold the vault, or have refused it, first, and nothing asks for an unlock. Once
@@ -1028,8 +1028,8 @@ storage deletes the vault, and on `stale_write` too, the bank lets go its entry 
 whichever stores that was born from, so the next `bank.ensureVault` births what stands; any other
 refusal leaves the entry as it was. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
-deletion aims at the stored `vault_tok` alone, so vault record rewritten under that same
-`vault_tok` between its read and the deletion go too: it is the same vault, the one the user
+deletion aims at the stored `vault_tok` alone, so a vault record rewritten under that same
+`vault_tok` between its read and the deletion goes too: it is the same vault, the one the user
 asked to delete.
 
 ### A deleted vault's tombstone, and restoring a backup

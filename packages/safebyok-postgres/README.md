@@ -35,7 +35,7 @@ the boxes too, or the new vaults table would stand without their foreign key -- 
 `VaultTablesSql` again; each user then makes their vault anew.
 
 **Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault record
-hold a `vault_epoch` now (the counter a gate write and a deletion move), and a deleted vault leaves
+holds a `vault_epoch` now (the counter a gate write and a deletion move), and a deleted vault leaves
 a row in the new table `safebyok_vault_tombstones`. No vault stored before is read (each reads as
 damaged, its boxes with it, and `VaultTablesSql` never adds a column to a table already there), so
 drop the tables and run `VaultTablesSql` again; each user then makes their vault anew.
@@ -84,7 +84,7 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
   transaction of your driver and no retry: a write lands only while what it expects still
   stands, and refuses with kind `stale_write` otherwise -- a box write with what stands under
   its boxlabel, read by that same statement, or with kind `vault_mismatch` when its vault record
-  no longer stand. A box read is one statement too, reading the vault row and the box together,
+  no longer stands. A box read is one statement too, reading the vault row and the box together,
   and refuses `vault_mismatch` likewise. A box write reads its vault row
   `FOR SHARE`, a shared lock: box writes never wait for each other on the vault row (two
   writes to one boxlabel still meet at that box's row), and an update of the vault record waits
@@ -112,8 +112,8 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
   write them, say. Opening a vault writes, even one that stands: its birth is `ensureVault`, one
-  statement that deletes the scope's tombstone and inserts the vault record or meets the ones
-  standing (`ON CONFLICT ... DO UPDATE`), and lists their boxes. So the role needs `SELECT`,
+  statement that deletes the scope's tombstone and inserts the vault record or meets the one
+  standing (`ON CONFLICT ... DO UPDATE`), and lists its boxes. So the role needs `SELECT`,
   `INSERT` and `UPDATE` on `safebyok_vaults`, `SELECT` and `DELETE` on
   `safebyok_vault_tombstones`, and `SELECT` on `safebyok_boxes`, to open a vault at all: a
   read-only role is refused `not_permitted` at the birth. A policy that hides rows
@@ -468,7 +468,7 @@ its error as the cause, nothing written.
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
   `vault_key_wayin_wrapped` inside the vault record's `passphrase`, and inside its `passkey` when
-  they have one).
+  it has one).
 * **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
   and schema version, the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
   salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and

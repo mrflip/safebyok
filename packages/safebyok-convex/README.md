@@ -70,8 +70,8 @@ mistake for the first request.
   (`putBox` and `delBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
   A `delBox` also carries the `revision_tok` its writer read, but only to say what it removed:
   within the expected vault it removes whatever stands.
-  An update of the vault record lands, too, only when the new vault record keep the vault's
-  `vault_tok` and move their `gate_epoch` forward, as every safebyok client's does.
+  An update of the vault record lands, too, only when the new vault record keeps the vault's
+  `vault_tok` and moves its `gate_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `putBox` refuses, writing nothing, a box
   that would take its vault past the component's own limits (see *How big a vault can be*): it
   resolves `{ landed: false, refusalkind: 'vault_full', capacity }`, how full the vault is as its
