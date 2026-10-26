@@ -1686,7 +1686,7 @@ const untilLive = async (watches: readonly ReturnType<typeof readingWatch>[], wr
   const allHeard = () => watches.every((watch) => watch.tally.calls > 0)
   for (let ii = 0; ii < LiveProbes && ! allHeard(); ii += 1) {
     const standing = await vaultRecordIn(writer, scopeOf('u1'))
-    if (! standing?.gate?.passphrase) { throw new Error('untilLive probes a vault that holds gated vault record, and found none.') }
+    if (! standing?.gate?.passphrase) { throw new Error('untilLive probes a vault that holds a gated vault record, and found none.') }
     await expectingGood(writer).putVaultRecord({ ...standing, gate_epoch: standing.gate_epoch + 1 }, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
     try {
       await vi.waitFor(() => { expect(allHeard()).to.be.true }, { timeout: ProbeWaitMillis, interval: 5 })
