@@ -1,6 +1,6 @@
 # Thread 3: Every schema in classic Zod (2026-10-26)
 
-Branch `20261026-zod_classic`, PR (draft, see below), stacked on
+Branch `20261026-zod_classic`, PR [#274](https://github.com/mrflip/safebyok/pull/274), stacked on
 [#273](https://github.com/mrflip/safebyok/pull/273). Justify: green (core 3124 passed, 37 skipped;
 every package and e2e green; size within the budgets this thread raised).
 
@@ -71,6 +71,10 @@ every package and e2e green; size within the budgets this thread raised).
     untouched by this thread, so left.
   - A union of strict objects (`VaultProps`) refuses as "Invalid input", naming no field: the
     damaged_vault cause says little for vault props. Thread 8's single record fixes it.
-* **For the Coach**: the mask and fastkey size jumps; the snapshot rewrite without a bump;
-  `Validator` not exported to the adapters; the clone change to thread 2's factory. Each is an
-  Open Matter in the PR.
+  - GitHub push protection refused a test fixture shaped like a Stripe key: credential-shaped
+    test keys are built at runtime (`` `sk_live_${'0Fake'.repeat(5)}` ``), never written whole.
+  - notes/security.md: a new 2026-10-26 entry and seven amendments, written by a sonnet subagent.
+* **For the Coach** (each an open question in #274, with a recommendation): the mask and fastkey
+  size jumps; the snapshot rewrite without a bump; `Validator` not exported to the adapters; the
+  clone change to thread 2's factory; tree-shaking per module, not per call; STYLE.md stale until
+  #272; `EpochMillis` outside the kit; a union's refusal naming no field.
