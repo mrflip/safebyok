@@ -271,9 +271,11 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
   }, [askByDialog])
   const requestOpt = requestCleartext === undefined || requestCleartext === null || typeof requestCleartext === 'function' ? askUser : requestCleartext
 
-  // The bank the provider holds now, the signed-in user's, made and let go by the effect below: the
-  // hooks never see one user's bank once another signs in.
+  // The bank the provider holds now, the signed-in user's, made and let go by the effect below.
   const [held, setHeld] = useState<Provided>(NoneHeld)
+  // Handed down only while it is the signed-in user's: in the render where the user_id changes or
+  // goes, before the effect lets the last bank go, the hooks see no bank rather than the last user's.
+  const provided = held.bank !== null && held.bank.user_id === user_id ? held : NoneHeld
 
   useEffect(() => {
     // Nobody signed in: no bank, so nothing is asked for and nothing refused.
@@ -320,7 +322,7 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
 
 
   return (
-    <BankContext.Provider value={held}>
+    <BankContext.Provider value={provided}>
       {children}
       {showing !== null && (
         <GatingModal

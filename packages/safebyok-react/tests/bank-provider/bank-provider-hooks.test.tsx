@@ -146,6 +146,23 @@ describe("BankProvider", () => {
       expect(counts()).to.deep.equal({ subscribe: 2, ensureVault: 2, getDeviceRecord: 2 })
     })
 
+    it("hands down no bank of the last user in any render once the user_id changes or goes, even before its effects run", async () => {
+      const world = makeWorld()
+      const seen: { signedIn: string | null, bankUser: string | null }[] = []
+      const Witness = ({ signedIn }: { signedIn: string | null }) => {
+        seen.push({ signedIn, bankUser: useBank()?.user_id ?? null })
+        return null
+      }
+      const tree = (user_id: string | null) => <BankProvider {...world.props} user_id={user_id}><Witness signedIn={user_id} /></BankProvider>
+      const { rerender } = render(tree('u1'))
+      await waitFor(() => { expect(seen.at(-1)?.bankUser).to.eq('u1') })
+      rerender(tree('u2'))
+      await waitFor(() => { expect(seen.at(-1)?.bankUser).to.eq('u2') })
+      rerender(tree(null))
+      expect(seen.at(-1)?.bankUser).to.be.null
+      expect(seen.filter((sight) => sight.bankUser !== null && sight.bankUser !== sight.signedIn)).to.deep.equal([])
+    })
+
     it("makes a fresh vault when a hidden <Activity> shows again, never using the one it closed", async () => {
       const world = makeWorld()
       const { Grab, opened, latest } = grabber()
