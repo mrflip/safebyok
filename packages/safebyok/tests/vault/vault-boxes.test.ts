@@ -666,7 +666,7 @@ const declaringBoxes = (vaultDB: VaultDB, maxBoxes: unknown): VaultDB => (
  * `sidecar` as its sidecar.
  */
 const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
-  const ctx = cipherCtx('a test ctx')
+  const ctx = cipherCtx({ test: 'heaviest_row' }, 'a test ctx')
   const boxKey = await makeBoxKey()
   return {
     applabel:               'a'.repeat(40),

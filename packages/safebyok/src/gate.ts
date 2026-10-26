@@ -1,6 +1,6 @@
 import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
-import { type GateRecord, type VaultRecord, isGated } from './vault-record'
+import { type GateRecord, type VaultRecord, type VaultStamp, isGated } from './vault-record'
 import type { Vault } from './vault'
 import { type PasskeyWayin, type PassphraseWayin, Wayin, type WayinVault } from './wayin'
 
@@ -11,7 +11,7 @@ import { type PasskeyWayin, type PassphraseWayin, Wayin, type WayinVault } from 
  */
 
 /** The slice of a {@link Vault} a gate reads: its scope, the `vault_tok` it is of, and what its wayins read. */
-export type GateVault = WayinVault & Pick<Vault, 'vault_tok'>
+export type GateVault = WayinVault & Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok'>
 
 /** The wayins a gate holds: the passphrase's, and the passkey's or none. */
 export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | null }
@@ -72,11 +72,11 @@ export class Gate {
    *
    * @example Gate.of(vault, vaultRecord).gate_epoch === vaultRecord.gate_epoch   // true
    */
-  static of(vault: GateVault, vaultRecord: Pick<VaultRecord, 'vault_tok' | 'gate_epoch'> & { gate: GateRecord }): Gate {
-    const { vault_tok: vaultTok, gate } = vaultRecord
-    return new Gate(vault, vaultTok, vaultRecord.gate_epoch - 1, {
-      passphrase: Wayin.make(vault, vaultTok, gate.passphrase),
-      passkey:    gate.passkey === null ? null : Wayin.make(vault, vaultTok, gate.passkey),
+  static of(vault: GateVault, vaultRecord: VaultStamp & Pick<VaultRecord, 'gate_epoch'> & { gate: GateRecord }): Gate {
+    const { gate } = vaultRecord
+    return new Gate(vault, vaultRecord.vault_tok, vaultRecord.gate_epoch - 1, {
+      passphrase: Wayin.make(vault, vaultRecord, gate.passphrase),
+      passkey:    gate.passkey === null ? null : Wayin.make(vault, vaultRecord, gate.passkey),
     })
   }
 

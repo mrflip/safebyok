@@ -116,9 +116,10 @@ code, the stored records and these docs all use its words.
 * A **lease** lets this device unlock again without asking for a while: when a gating unlocks the
   vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
   `leaseHours` run out. It never leaves the device.
-* Every encryption is bound to its **ctx**: the app, user and vault, the field, and every other
-  field of its record. Ciphertext moved to another record, or under an altered field, will not
-  open.
+* Every encryption is bound to its **ctx**: the **stamp** of what it seals, the fields fixed for
+  its life (a box's every visible field, beside its vault's scope, `vault_tok` and
+  `registered_at`), and which field it is. Ciphertext moved to another record, or under an
+  altered field, will not open.
 * A **bank** (`Bank.make(opts)`, which answers at once) holds the signed-in user's vaults, and
   `bank.ensureVault({ vaultlabel })` births a Vault object from what storage and this
   device hold of the vault, storing it, with no passphrase yet, if none stands: the snapshot's

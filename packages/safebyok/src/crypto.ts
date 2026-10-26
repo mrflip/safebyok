@@ -54,28 +54,31 @@ export const fromB64OrNull = (b64: string): Uint8Array | null => {
 const AesGcm = { name: 'AES-GCM', length: 256 } as const
 const IvBytes = 12
 
-/** One part of a {@link cipherCtx}: a string, a number, or a flat record of them such as a wayin's visible header.
- * A record is encoded with its keys sorted, and every field is bound.
- */
-export type CipherCtxPart = string | number | Readonly<Record<string, string | number>>
+/** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
+export type CipherCtxRecord = Readonly<Record<string, string | number>>
 
-/** The ctx an encryption is bound to, as AES-GCM additional data: a deterministic encoding of `parts`, whatever names the slot.
- * It is rebuilt rather than stored. If any part differs at decryption, the ciphertext refuses to
- * open. It refuses 'bad_option' for a part that is undefined or null, or a record field set to
- * undefined: each would bind the same as some other ctx.
+/** The ctx an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, the purpose its slot names, and its visible header.
+ * The stamp is one record, or a list of them where a thing binds the stamp of what it lies in
+ * beside its own: each keeps its own field names. The ctx is the UTF-8 JSON of the parts in order,
+ * each stamp, the purpose, then the header where there is one, each record's keys sorted. It is
+ * rebuilt rather than stored, so ciphertext refuses to open under any other. It refuses
+ * 'bad_option' for no stamp, or for a part or a record's field that is undefined or null: each
+ * would bind the same as some other ctx.
  *
- * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultTok, 1, ask_passphrase_at, 'vault_key_lease_wrapped')
- * @example cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultTok, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
+ * @example cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
+ * @example cipherCtx([vaultStampButFormat, leaseStamp], 'vault_key_lease_wrapped')
  */
-export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
-  if (parts.some((part) => isUnbound(part))) {
-    throw new VaultError('bad_option', "A cipher ctx was handed a part, or a field of one, that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
+export const cipherCtx = (stamp: CipherCtxRecord | readonly CipherCtxRecord[], purpose: string, ...header: [] | [CipherCtxRecord]): Uint8Array => {
+  const stamps: readonly CipherCtxRecord[] = Array.isArray(stamp) ? stamp : [stamp as CipherCtxRecord]
+  const parts = [...stamps, purpose, ...header]
+  if (stamps.length === 0 || parts.some((part) => isUnbound(part))) {
+    throw new VaultError('bad_option', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
   }
   return new TextEncoder().encode(stableJsonify(parts))
 }
 
 /** True when `part` is undefined or null, or a record with a field set to undefined: what its type forbids and a caller may still hand in. */
-const isUnbound = (part: CipherCtxPart | null | undefined): boolean => (
+const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean => (
   part === undefined || part === null
   || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined))
 )
@@ -112,7 +115,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * where, so the same bytes put to another use make another key. The bytes stay with the caller:
  * drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultTok, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])

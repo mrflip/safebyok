@@ -1,7 +1,8 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
 import { VaultError, isVaultError } from './errors'
 import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
-import { VaultFormat, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
+import { VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
+import { Validator } from './checks/validator'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './types/type-aliases'
 import type { Vault } from './vault'
@@ -10,14 +11,14 @@ import type { Vault } from './vault'
  * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one
  * (`src/proving.ts`).
  *
- * Each wrap is bound to its vault (the scope, and the `vault_tok` of the vault record whose gate
- * holds it, random and never reused), to its own visible header, and to a purpose its wayinkind
- * names. A passkey's key is made with that same ctx as its HKDF `info`. The record's `gate_epoch`
- * and the other wayin are not bound, so changing one wayin leaves the other open.
+ * Each wrap's ctx is the stamp of the vault record whose gate holds it (its format, scope,
+ * `vault_tok` and `registered_at`, each fixed for the vault's life), a purpose its wayinkind names,
+ * and its own visible header. A passkey's key is made with that same ctx as its HKDF `info`. The
+ * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
  */
 
-/** The slice of a {@link Vault} a wayin reads: the scope its wrap is bound to, the key deriver a passphrase wayin derives through, and the time a new one is stamped by. */
-export type WayinVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'keyDeriver' | 'now'>
+/** The slice of a {@link Vault} a wayin reads: the key deriver a passphrase wayin derives through, and the time a new one is made at. */
+export type WayinVault = Pick<Vault, 'keyDeriver' | 'now'>
 
 /** `RecordT` with every field but its wrap, member by member of a union. */
 type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayin_wrapped'> : never
@@ -30,12 +31,17 @@ const PurposeForWayinkind = {
   passkey:    'vault_key_passkey_wrapped',
 } as const satisfies Readonly<Record<WayinKind, string>>
 
-/** The ctx a wayin's wrap is bound to, and a passkey's key made with: the vault record's format, the vault it lets into (its scope and `vault_tok`), its purpose, and its whole visible header.
+/** A vault's {@link VaultStamp} picked from whatever carries it, a vault record or its sparse shape: its six fields alone. Refuses 'bad_record'. */
+const { VaultStampPicked } = Validator('bad_record', () => ({ VaultStampPicked: VaultStamp.strip() }))
+
+/** The ctx a wayin's wrap is bound to, and a passkey's key made with: the stamp of the vault record it lets into, its purpose, and its whole visible header.
+ * `vaultStamp` may be the whole vault record: only its six stamp fields are taken. It refuses
+ * 'bad_record' for one missing any of them.
  *
- * @example await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vault, vault.vault_tok, header))
+ * @example await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vaultRecord, header))
  */
-export const wayinCtxOf = (vault: Pick<WayinVault, 'applabel' | 'user_id' | 'vaultlabel'>, vaultTok: string, header: WayinHeader): Uint8Array => (
-  cipherCtx(VaultFormat, vault.applabel, vault.user_id, vault.vaultlabel, vaultTok, PurposeForWayinkind[header.wayinkind], header)
+export const wayinCtxOf = (vaultStamp: VaultStamp, header: WayinHeader): Uint8Array => (
+  cipherCtx(VaultStampPicked.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
 )
 
 /** `record` without its wrap. */
@@ -53,18 +59,20 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
 /** One way into a vault, a {@link PassphraseWayin} or a {@link PasskeyWayin}, told apart by `wayinkind`. Every field is read-only.
  * Its visible fields are its own: its wayinkind, the device and time that sealed it, a passkey's
  * credential and salt, which a host asks the passkey with, and the `vault_tok` of the vault record it
- * is one of, which its wrap is bound to. Its wrap, and a passphrase's salt and key deriver's label,
- * stay in its `record`. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
+ * is one of. Its wrap, and a passphrase's salt and key deriver's label, stay in its `record`; the
+ * stamp of its vault record, which its wrap's ctx holds, stays private. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
  * nothing else. The vault shows those, never the wayins, as its `passphrase` and `passkey`.
  *
- * @example Wayin.make(vault, vaultRecord.vault_tok, vaultRecord.gate.passphrase).wayinkind  // 'passphrase'
+ * @example Wayin.make(vault, vaultRecord, vaultRecord.gate.passphrase).wayinkind  // 'passphrase'
  * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
  */
 export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** The stored record, frozen, its wrap with it: the one source of every field. */
   readonly #record: RecordT
-  /** The vault it lets into: its scope, its key deriver and its clock. */
+  /** The vault it lets into: its key deriver and its clock. */
   readonly #vault: WayinVault
+  /** The stamp of the vault record it is one of, frozen: what its wrap's ctx begins with. */
+  readonly #vaultStamp: VaultStamp
 
   /** Which kind of proof opens it. */
   readonly wayinkind:     RecordT['wayinkind']
@@ -72,16 +80,17 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   readonly device_id:     string
   /** When the wayin was sealed. */
   readonly registered_at: number
-  /** The token of the vault record it is one of: bound into its wrap. */
+  /** The token of the vault record it is one of: in its wrap's ctx, with the rest of that record's stamp. */
   readonly vault_tok:     string
 
-  protected constructor(vault: WayinVault, vaultTok: string, record: RecordT) {
+  protected constructor(vault: WayinVault, vaultStamp: VaultStamp, record: RecordT) {
     this.#record = frozenRecord(record)
     this.#vault = vault
+    this.#vaultStamp = Object.freeze(VaultStampPicked.parse(vaultStamp))
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at
-    this.vault_tok = vaultTok
+    this.vault_tok = this.#vaultStamp.vault_tok
   }
 
   /** The stored record, frozen, its wrap with it: what the vault record's gate holds of this wayin. */
@@ -93,22 +102,23 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
    * The schema's 'bad_record' is the refusal's cause, naming each failing field and repeating no
    * key that is not shaped as one of ours.
    *
-   * @param vaultTok - The `vault_tok` of the vault record it is one of.
+   * @param vaultStamp - The stamp of the vault record it is one of: that record itself will do, as
+   *   only its six stamp fields are taken. One missing any of them refuses 'bad_record'.
    *
-   * @example Wayin.make(vault, vaultRecord.vault_tok, vaultRecord.gate.passphrase)  // a PassphraseWayin
-   * @example Wayin.make(vault, vaultRecord.vault_tok, { ...record, device_id: '' })  // throws 'damaged_wayin'
+   * @example Wayin.make(vault, vaultRecord, vaultRecord.gate.passphrase)  // a PassphraseWayin
+   * @example Wayin.make(vault, vaultRecord, { ...record, device_id: '' })  // throws 'damaged_wayin'
    */
-  static make(vault: WayinVault, vaultTok: string, record: PassphraseWayinRecord): PassphraseWayin
-  static make(vault: WayinVault, vaultTok: string, record: PasskeyWayinRecord): PasskeyWayin
-  static make(vault: WayinVault, vaultTok: string, record: unknown): PassphraseWayin | PasskeyWayin
-  static make(vault: WayinVault, vaultTok: string, record: unknown): PassphraseWayin | PasskeyWayin {
+  static make(vault: WayinVault, vaultStamp: VaultStamp, record: PassphraseWayinRecord): PassphraseWayin
+  static make(vault: WayinVault, vaultStamp: VaultStamp, record: PasskeyWayinRecord): PasskeyWayin
+  static make(vault: WayinVault, vaultStamp: VaultStamp, record: unknown): PassphraseWayin | PasskeyWayin
+  static make(vault: WayinVault, vaultStamp: VaultStamp, record: unknown): PassphraseWayin | PasskeyWayin {
     const checked = damagedWayinUnless(record)
-    return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vault, vaultTok, checked) : new PasskeyWayin(vault, vaultTok, checked)
+    return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vault, vaultStamp, checked) : new PasskeyWayin(vault, vaultStamp, checked)
   }
 
-  /** The ctx this wayin's wrap is bound to: its vault's scope, the `vault_tok` of the vault record it is one of, its purpose, and its whole header. */
+  /** The ctx this wayin's wrap is bound to: the stamp of the vault record it is one of, its purpose, and its whole header. */
   get wayinCtx(): Uint8Array {
-    return wayinCtxOf(this.#vault, this.vault_tok, headerOf(this.#record))
+    return wayinCtxOf(this.#vaultStamp, headerOf(this.#record))
   }
 
   /** The key deriver of its vault, which a passphrase wayin derives through. */
@@ -131,8 +141,8 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
  */
 export class PassphraseWayin extends Wayin<PassphraseWayinRecord> {
   /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
-  constructor(vault: WayinVault, vaultTok: string, record: PassphraseWayinRecord) {
-    super(vault, vaultTok, record)
+  constructor(vault: WayinVault, vaultStamp: VaultStamp, record: PassphraseWayinRecord) {
+    super(vault, vaultStamp, record)
     Object.freeze(this)
   }
 
@@ -163,8 +173,8 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   readonly prf_salt_b64: PrfSalt
 
   /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
-  constructor(vault: WayinVault, vaultTok: string, record: PasskeyWayinRecord) {
-    super(vault, vaultTok, record)
+  constructor(vault: WayinVault, vaultStamp: VaultStamp, record: PasskeyWayinRecord) {
+    super(vault, vaultStamp, record)
     this.credential_id = record.credential_id
     this.prf_salt_b64 = record.prf_salt_b64
     Object.freeze(this)

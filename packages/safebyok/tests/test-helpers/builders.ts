@@ -41,17 +41,19 @@ export const testDeriver: KeyDeriver = {
 
 /**
  * The slice of a vault a box, a way in or a lease reads, for a test that makes one with
- * no vault behind it: `user_id`'s `main` vault, as {@link scopeOf} has it, holding the vault props
- * `vault-tok-<user_id>`, deriving with `keyDeriver`, granting leases of seven days, and reading
- * {@link SliceNow} on its clock -- each as `overrides` does not say otherwise.
+ * no vault behind it: `user_id`'s `main` vault, as {@link scopeOf} has it, its `vault_tok`
+ * `vault-tok-<user_id>` and its `registered_at` 14 October 2026, as {@link vaultRecordOf} has them,
+ * deriving with `keyDeriver`, granting leases of seven days, and reading {@link SliceNow} on its
+ * clock -- each as `overrides` does not say otherwise.
  *
- * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'vault-tok-u1', TH.passkeyWayinOf('laptop'))
+ * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), TH.vaultRecordOf('u1'), TH.passkeyWayinOf('laptop'))
  * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
  */
 export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
   return {
     ...scopeOf(user_id),
     vault_tok:       `vault-tok-${user_id}`,
+    registered_at:   Date.UTC(2026, 9, 14),
     keyDeriver,
     leaseMillis:     7 * 24 * 60 * 60_000,
     now:             () => SliceNow,
@@ -63,7 +65,7 @@ export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriv
 export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a box, a way in and a lease read. */
-export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'leaseMillis' | 'now'>
+export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'registered_at' | 'keyDeriver' | 'leaseMillis' | 'now'>
 
 /** What {@link leasedSliceOf} makes: a {@link VaultSlice} that stands for a vault holding a lease, as a box and a lease read one. Its stamp, lease and goneness are the test's to change. */
 export type LeasedSlice = VaultSlice & {
@@ -79,7 +81,7 @@ export type LeasedSlice = VaultSlice & {
 
 /** A stand-in for `user_id`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
  * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
- * stamped with its scope and `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted
+ * stamped with its scope, `vault_tok` and `registered_at`, vault epoch 1 and gate epoch 1, holding a lease granted
  * at its clock's time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope
  * or `vault_tok`, `vault_remade`; another `gate_epoch`, `gate_moved`; lease-bound, no lease or one
  * ended by its clock, `vault_locked`. Its `tryLock` drops the lease and counts the call.
@@ -92,7 +94,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
   const vaultTok = base.vault_tok
   const slice: LeasedSlice = {
     ...base,
-    stamp: Object.freeze({ format: VaultFormat, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, registered_at: Date.UTC(2026, 9, 14), vault_epoch: 1, gate_epoch: 1 }),
+    stamp: Object.freeze({ format: VaultFormat, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: vaultTok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 }),
     lease: null,
     gone:  false,
     locks: 0,
@@ -110,7 +112,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
       return Promise.resolve(good(undefined))
     },
   }
-  slice.lease = Lease.make(slice, await sealLeaseRecord(slice, { vault_tok: vaultTok, gate_epoch: 1 }, vaultKey))
+  slice.lease = Lease.make(slice, await sealLeaseRecord(slice, slice.stamp, vaultKey))
   // A box and a lease read the lease the slice holds as they read a Vault object's.
   registerLeaseReader(slice, () => slice.lease)
   return slice

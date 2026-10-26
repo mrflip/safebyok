@@ -23,14 +23,13 @@ export const BoxFormat = 'safebyok-box-v8'
  * stored in the clear: storage, and a locked vault, can read them. A {@link Box} is made from one,
  * and hands it back as `box.record`.
  *
- * We sign all immutable fields: each that never changes once the box is first stored -- the scope
- * and `vault_tok` of its vault, its boxlabel and `registered_at`, and the format, codec and schema
- * version -- is bound into both encryptions, as AES-GCM's additional data. So is every field of
- * this revision but the two encrypted ones: `revision_tok`, minted fresh on every write, the
- * sidecar and `written_at`. So ciphertext moved between revisions, boxes or vaults refuses to
- * open, as does an altered sidecar or time. Its boxlabel is a label, as `label` checks. Its
- * `parse` refuses 'bad_record'. It is strict, as every stored record is: a field this version does
- * not know is damage.
+ * A box revision is never rewritten, so every field it shows is fixed for its life: they are its
+ * stamp ({@link BoxStamp}), with the `vault_tok` of its vault. Both encryptions bind that stamp,
+ * beside its vault's stamp but for the vault's format (the scope, `vault_tok` and `registered_at`),
+ * as AES-GCM's additional data. So ciphertext moved between revisions, boxes or vaults refuses to
+ * open, as does an altered sidecar or time; a new vault format leaves it open. Its boxlabel is a
+ * label, as `label` checks. Its `parse` refuses 'bad_record'. It is strict, as every stored record
+ * is: a field this version does not know is damage.
  *
  * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
  */
@@ -61,8 +60,8 @@ export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epoc
 export type BoxRecord = Z.infer<typeof BoxRecord>
 
 /** A box's stamp: every field of its record but the two ciphered ones, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
- * A box revision is never rewritten, so every field it shows is fixed for its life, and each is
- * bound into both its encryptions.
+ * A box revision is never rewritten, so every field it shows is fixed for its life. Both its
+ * encryptions bind its stamp, beside its vault's.
  *
  * @example BoxStamp.parse({ ...visible, vault_tok: box.vault_tok })   // visible: box.record but its two ciphered fields
  */
@@ -148,7 +147,7 @@ export class Box {
   declare readonly user_id:     string
   /** The label of the vault it lies in: of its stamp, which no spread or JSON shows. */
   declare readonly vaultlabel:  string
-  /** The token of the vault it lies in: bound into both its encryptions, and named by the write that puts it. Of its stamp, which no spread or JSON shows. */
+  /** The token of the vault it lies in: in both its encryptions' ctx, and named by the write that puts it. Of its stamp, which no spread or JSON shows. */
   declare readonly vault_tok:   string
   /** The vault's `vault_epoch` when this box was made: of its stamp, which no spread or JSON shows. */
   declare readonly vault_epoch: number
@@ -197,11 +196,11 @@ export class Box {
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
    * The whisper is serialized as its JSON with keys sorted, then ciphered by the vault's lease (`sealProps`)
-   * under a boxKey made fresh for this box alone, wrapped under the vaultKey. We sign all immutable
-   * fields: both are bound to the scope, the lease's `vault_tok`, the boxlabel and `registered_at`,
-   * and to every other visible field, the sidecar among them, so the record moved or altered
-   * anywhere will not open. Its `revision_tok` is fresh, and `written_at` is the
-   * vault's time now. `registered_at` is the base's when it gives one, else now; the base's revision
+   * under a boxKey made fresh for this box alone, wrapped under the vaultKey. Both bind the vault's
+   * stamp and the box's own: every visible field, the sidecar among them, and the lease's
+   * `vault_tok`, so the record moved or altered anywhere will not open. Its `revision_tok` is
+   * fresh, and `written_at` is the vault's time now. `registered_at` is the base's when it gives
+   * one, else now; the base's revision
    * is the box's `baseRevisionTok`. The sidecar is `{}` when left out: a seal carries nothing from
    * the base but its revision and `registered_at`.
    *

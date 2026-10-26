@@ -501,7 +501,7 @@ describe("PasskeyProving.seal, the key", () => {
     const { vault } = await lockedWorld()
     const { prfBytes } = await TH.passkeyOf('laptop')
     const proving = await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: StandingGating })
-    const ctx = wayinCtxOf(vault, vault.vault_tok, proving.header)
+    const ctx = wayinCtxOf(vault.stamp, proving.header)
     const wrapped = await proving.wrappedWith(await makeVaultKey(), proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)

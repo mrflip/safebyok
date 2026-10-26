@@ -52,7 +52,7 @@ describe("the branded fields", () => {
   })
 
   it("brand a key wrapped for its role where the record is made, as the second example shows", async () => {
-    const ctx = cipherCtx('a test of the brand')
+    const ctx = cipherCtx({ test: 'brand' }, 'a test of the brand')
     const wrapped = await wrapKeyUnder(await makeVaultKey(), await makeBoxKey(), ctx)
     const branded = box_key_wrapped.parse(wrapped)
     expectTypeOf(branded).toEqualTypeOf<BoxKeyWrapped>()

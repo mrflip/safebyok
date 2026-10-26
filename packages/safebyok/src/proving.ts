@@ -7,7 +7,7 @@ import type { VaultLogger } from './logger'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
-import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultRecord, type VaultSparse } from './vault-record'
+import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp } from './vault-record'
 import { decorate } from './adorn'
 import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
 import { Validator } from './checks/validator'
@@ -105,12 +105,14 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   declare readonly user_id: string
   /** The scope's vault label. Not enumerable. */
   declare readonly vaultlabel: string
-  /** The `vault_tok` it was sealed under, which its wraps are bound to. Not enumerable. */
+  /** The `vault_tok` it was sealed under, in each wrap's ctx with the rest of its vault record's stamp. Not enumerable. */
   declare readonly vault_tok: string
   /** The `gate_epoch` it was sealed under. Not enumerable. */
   declare readonly gate_epoch: number
   /** The wayinKey: non-extractable, never handed out. */
   readonly #wayinKey: CryptoKey
+  /** The stamp of the vault record it was sealed under, which each wrap's ctx begins with. */
+  readonly #vaultStamp: VaultStamp
 
   protected constructor(vault: ProvingVault, stamp: VaultSparse, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
     // The stamp is the vault's, for its demand to judge: readable, but no field a spread or JSON shows.
@@ -118,6 +120,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     decorate<Proving<HeaderT>>(this, { vault, header: Object.freeze({ ...header }), gating, applabel, user_id, vaultlabel, vault_tok, gate_epoch })
     this.slotlabel = header.wayinkind
     this.#wayinKey = wayinKey
+    this.#vaultStamp = stamp
+  }
+
+  /** The stamp of the vault record it was sealed under, for a subclass's wayins: never enumerable. */
+  protected get vaultStamp(): VaultStamp {
+    return this.#vaultStamp
   }
 
   /** True when `vaultRecord`'s wayin at this proving's slotlabel carries its header: the proving opens the gate it holds.
@@ -136,7 +144,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    * @example const wrapped = await proving.wrappedWith(vaultKey, proving.header)
    */
   async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<VaultKeyWayinWrapped> {
-    return vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault, this.vault_tok, visible)))
+    return vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.#vaultStamp, visible)))
   }
 
   /** Check that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
@@ -166,7 +174,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     this.#demand()
     newProving.#demand()
     const record: unknown = { ...newProving.header, vault_key_wayin_wrapped: wrapped }
-    return Wayin.make(this.vault, this.vault_tok, record)
+    return Wayin.make(this.vault, this.#vaultStamp, record)
   }
 
   /** Grant this device a lease on the vault, by the wayin this proving opens in the gate that stands, resolving the Lease as stored and held.
@@ -235,7 +243,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async #unwrap(wrapped: VaultKeyWayinWrapped, visible: WayinHeader, usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
     let vaultKey: CryptoKey | null
     try {
-      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.vault, this.vault_tok, visible), usage)
+      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.#vaultStamp, visible), usage)
     } catch {
       vaultKey = null
     }
@@ -293,8 +301,8 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     this.demandSelf({ sealing: true })
     if (passkeyProving !== undefined) { insideOf(this.vault).demand(passkeyProving, this.gating.call ?? 'demandConsistentWith', { firstGate: passkeyProving.gate_epoch === 0 }) }
     return {
-      passphrase: Wayin.make(this.vault, this.vault_tok, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }),
-      passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vault, this.vault_tok, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }),
+      passphrase: Wayin.make(this.vault, this.vaultStamp, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }),
+      passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vault, this.vaultStamp, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }),
     }
   }
 
@@ -343,7 +351,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     try {
       const { stamp } = vault
       const sealing = 'slotlabel' in header ? mintedPasskeyHeader(vault, checked) : checkedPasskeyHeader(header, checked)
-      const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(vault, stamp.vault_tok, sealing)), unexpectedError)
+      const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(stamp, sealing)), unexpectedError)
       if (! derived.ok) { demandAfterFailedSeal(vault, stamp, opts.gating) }
       const proving = new PasskeyProving(vault, stamp, sealing, opts.gating, valOf(derived))
       proving.demandSelf({ sealing: true })

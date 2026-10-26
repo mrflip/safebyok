@@ -41,6 +41,28 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (thread cipher_ctx, branch `20261026-cipher_ctx`): **every ctx is now `cipherCtx(stamp, purpose, header)`: it binds the
+  stamp of what is sealed, so a wayin, a box and a lease each bind their vault record's fields; no ciphertext written before opens.**
+  (1) The ctx is the AES-GCM additional data and, for a passkey wayin, also its HKDF-SHA256 `info`. A stamp is the fields of a record
+  fixed for its life; the purpose names the field sealed; the header is a wayin's visible header, and only a wayin has one. Where a thing
+  lies in another, the ctx takes a list of stamps, the container's and its own, each record keeping its own field names.
+  (2) A wayin's wrap, and a passkey's key, bind the vault record's VaultStamp: `format`, `applabel`, `user_id`, `vaultlabel`, `vault_tok`
+  and now `registered_at`, which was left out on purpose before. A box's two ciphered fields bind the vault's stamp without its `format`
+  (scope, `vault_tok`, `registered_at`) and the box's own BoxStamp: every field of the box record but its two ciphered ones (`format`,
+  `boxlabel`, `revision_tok`, `whisper_codec`, `whisper_schema_version`, `sidecar` as its JSON with keys sorted, `registered_at`,
+  `written_at`, `vault_tok`). A lease's wrap binds the vault's stamp without its `format` and the lease's LeaseStamp (`format`, scope,
+  `vault_tok`, `gate_epoch`, `ask_passphrase_at`). The vault's stamp is new in a box's and a lease's ctx: before, they bound only the
+  vault's scope and `vault_tok`.
+  (3) The vault's `format` is left out of a box's and a lease's ctx so that a future vault format bump does not make every box and lease
+  unreadable. Epochs are never bound into long-lived ciphertext, since they count: not `vault_epoch`, not the vault record's `gate_epoch`.
+  A lease's own `gate_epoch` is in its stamp because a lease is short-lived and granted under one value.
+  (4) The encoding is unchanged: UTF-8 of `stableJsonify` (`safe-stable-stringify`, keys sorted by code point) of the array of parts, the
+  stamps first, then the purpose, then the header where there is one. A part, or a record field, that is undefined or null is refused
+  `bad_option`, and so is an empty list of stamps. No new primitive, encoding or KDF step. Each stamp is taken from whatever carries it by
+  parsing with its schema (Zod; unknown fields stripped for the vault's and the lease's, strict for the box's), so a stamp missing a field
+  refuses `bad_record`, never binds less.
+  (5) No ciphertext written before this change opens: no format bump, pre-1.0, by the Coach's ruling. The same release already makes every
+  older stored vault read as damaged (the strict vault record, below), so a host sees no new damage.
 * 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
   an old flat vault reads as damaged under an unbumped format; a device record is strict, frozen and built from the scope's names alone.**
   (1) `VaultRecord` (`packages/safebyok/src/vault-record.ts`) is `{ format, applabel, user_id, vaultlabel, vault_tok, registered_at, vault_epoch,
@@ -630,7 +652,7 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-21 (trust_lines): `safebyok-vault-v6` now, v5 joining the older formats the same way).
   `MaxUnlocks`, `wayin_id`, `wayinlabel`, its validator and the refusals `last_wayin` and
   `too_many_wayins` are gone. (2) Each wrap's ctx is built as before (`cipherCtx(format, scope...,
-  vault_id, registered_at, purpose, header)`; amended 2026-10-21 (trust_lines): no longer the vault props' `registered_at`, only the scope and `vault_id` of the vault), its first part now `safebyok-vault-v5`; the header (every
+  vault_id, registered_at, purpose, header)`; amended 2026-10-21 (trust_lines): no longer the vault props' `registered_at`, only the scope and `vault_id` of the vault; amended 2026-10-26 (cipher_ctx): see the entry of that date), its first part now `safebyok-vault-v5`; the header (every
   field but the wrap, keys sorted) is `wayinkind`, `key_deriver_label` and `salt_b64` or `credential_id`
   and `prf_salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`. The passkey's HKDF info is that
   same ctx. The purpose (`vault_key_passphrase_wrapped`, `vault_key_passkey_wrapped`) keeps one slot's
@@ -739,7 +761,7 @@ added or folded into through the subagent, and no other entry changes.
   the lease or its record is that key; amended 2026-10-21 (trust_lines): a granted or opened lease
   keeps the pair's non-extractable session handle, the vaultKey, in an ES private field, and none of
   the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): not a getter; once `lease.props`; amended 2026-10-22 (lease_box review): `#grantLease` puts the record `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered, and no file in `src/` calls `leaseRecordOf`, which only `tests/lease.test.ts` uses)
-  through `deviceDB.putLease`. leaseCtx is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
+  through `deviceDB.putLease`. leaseCtx (amended 2026-10-26 (cipher_ctx): see the entry of that date) is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
   applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
   'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
   still open. `Lease.make(vault, record)` checks a record through the `LeaseRecord` Zod schema
@@ -959,7 +981,7 @@ added or folded into through the subagent, and no other entry changes.
   vault's scope (the vault's public applabel, user_id and vaultlabel getters) and the `vault_id` and
   `registered_at` of the `holder`, the vault props record it was made from, passed explicitly because the
   vault's public fields lag its private state until it publishes (amended 2026-10-21 (trust_lines): the scope and the `vault_id` alone, the
-  wayin holding that `vault_id` as a visible field of its own; the vault props' `registered_at` is no longer bound, so an
+  wayin holding that `vault_id` as a visible field of its own; the vault props' `registered_at` is no longer bound (amended 2026-10-26 (cipher_ctx): see the entry of that date), so an
   altered one no longer stops a wayin opening, and `VaultIdentity` and the `holder` are gone). 2026-10-20 (placement): the
   constructors of `PassphraseWayin` and `PasskeyWayin` are private; a wayin is made only by `Wayin.make`
   or `Wayin.seal`, which reach them through a static keyed by a module-private symbol (`madeFrom`), so
@@ -1668,7 +1690,7 @@ added or folded into through the subagent, and no other entry changes.
   for key wraps (since 2026-10-15, the lease's only: a wayin binds its own
   header instead, below) and boxlabel + revisionTok for boxes, encoded as a JSON array. Ciphertext
   moved between users, vaults, boxes or revisions refuses to open. (Widened 2026-10-15 to every
-  field each record writes: the sweep entry below.)
+  field each record writes: the sweep entry below; amended 2026-10-26 (cipher_ctx): see the entry of that date)
 * 2026-10-14: a wrong passphrase is learned from the vaultKey wayin's AEAD failure, never a
   comparison; there is no separate passphrase verifier field.
 * 2026-10-14: the leaseKey is a non-extractable WebCrypto key persisted only by structured
@@ -2218,7 +2240,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-19 (slots): vault props hold two slots, `passphrase` (required) and `passkey` (or null), each
   the one vaultKey wrapped under its own key (until slots, a list of one to `MaxUnlocks` (8), each with a
   `wayin_id` and a `wayinlabel`). The passphrase wayin has its own random `salt_b64`, and its wrap's
-  additional data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), a purpose per wayinkind
+  additional data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound; amended 2026-10-26 (cipher_ctx): see the entry of that date), a purpose per wayinkind
   (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
   `key_deriver_label`, `salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`) as key-sorted
   JSON. The
@@ -2251,7 +2273,7 @@ added or folded into through the subagent, and no other entry changes.
   passkeyKey is HKDF-SHA256 over the 32-byte PRF answer, with an empty salt and `info` =
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON when first written, under the older tag `safebyok-vault-v1` (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
-  data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), purpose `vault_key_passkey_wrapped` and the wayin's
+  data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound; amended 2026-10-26 (cipher_ctx): see the entry of that date), purpose `vault_key_passkey_wrapped` and the wayin's
   visible header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_wayin`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
@@ -2269,7 +2291,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-18; 2026-10-19; 2026-10-20: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
+  `registered_at` (amended 2026-10-21 (trust_lines): no longer bound; amended 2026-10-26 (cipher_ctx): see the entry of that date), purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
   `prf_salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`; until slots also `wayin_id` and
   `wayinlabel`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
@@ -2277,7 +2299,7 @@ added or folded into through the subagent, and no other entry changes.
   helper, and uses that one value both as a passkey's HKDF `info` and as the wrap's ctx; it was built
   twice from the same inputs. No bytes changed; the key derivation and the wrap are bound to the same ctx
   by construction, not by two calls agreeing.) (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
-  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at` (amended 2026-10-21 (trust_lines): it binds the vault's scope and `vault_id`, not the vault props' `registered_at`, which a backend can alter without stopping a wayin opening; the wayin's own `registered_at` stays in its header, bound). A box's two
+  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at` (amended 2026-10-21 (trust_lines): it binds the vault's scope and `vault_id`, not the vault props' `registered_at`, which a backend can alter without stopping a wayin opening; the wayin's own `registered_at` stays in its header, bound; amended 2026-10-26 (cipher_ctx): see the entry of that date). A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`
   (amended 2026-10-21 (trust_lines): `sidecar`, bound as its key-sorted JSON),
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
@@ -2305,7 +2327,7 @@ added or folded into through the subagent, and no other entry changes.
   (AEAD additional data; HKDF `info` for a passkey) to a ctx of the scope (`applabel`, `user_id`, `vaultlabel`),
   `vault_tok`, and each visible header field (`wayinkind`, `device_id`, `registered_at`, `key_deriver_label`,
   `salt_b64`, `credential_id`, `prf_salt_b64`), but not `gate_epoch`, which changes as the gate moves, nor the vault
-  props' own `registered_at`.
+  props' own `registered_at` (amended 2026-10-26 (cipher_ctx): see the entry of that date).
   (2026-10-18, with the rename of the device record to the "lease": the device record's context
   changed spelling, not construction. Its first part, the format, is now `safebyok-lease-v1`, and
   its last, the purpose, `vault_key_lease_wrapped`; the parts between and their order are as
@@ -2757,7 +2779,7 @@ added or folded into through the subagent, and no other entry changes.
   (`box_key_wrapped` under the vaultKey, `whisper_ciphered` under the boxKey) are bound, as additional data, to every
   field of a box that never changes once first stored (the vault's scope and `vault_tok`, the boxlabel,
   `registered_at`, the format, codec and schema version) and to every other visible field of the revision
-  (`revision_tok`, sidecar, `written_at`). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`); only
+  (`revision_tok`, sidecar, `written_at`). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`) (amended 2026-10-26 (cipher_ctx): see the entry of that date); only
   the doc blocks in `box.ts` now state the rule, and a later thread (8) applies it to wayins. The box's stamp (scope,
   `vault_tok`, `vault_epoch`, `gate_epoch`, as the vault stood when the box was read or sealed) is no part of the
   record and is not authenticated; it is non-enumerable on the Box object and read only for the vault's consistency

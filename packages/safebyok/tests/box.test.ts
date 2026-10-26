@@ -102,12 +102,15 @@ const sealedOf = async (whisper: Whisper = Secret, props: Partial<SealBoxProps> 
 
 /**
  * A box record holding `plainBytes` as its whisper, ciphered and wrapped by hand under the ctx a
- * box's ctx is documented to be: the format, the vault's scope, the vault's token, the purpose,
- * and every visible field, the sidecar as its JSON with keys sorted.
+ * box's ctx is documented to be: the vault's stamp but for its format, the box's own stamp (every
+ * field but the two ciphered ones, the sidecar as its JSON with keys sorted, and the vault's
+ * token), and the purpose.
  */
 const handSealedOf = async (vault: TH.LeasedSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
   const { format, box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...header } = TH.boxOf('anthropic_api_key', 'hand')
-  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_tok, purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
+  const { applabel, user_id, vaultlabel, vault_tok, registered_at } = vault
+  const vaultStamp = { applabel, user_id, vaultlabel, vault_tok, registered_at }
+  const ctxFor = (purpose: string) => cipherCtx([vaultStamp, { format, ...header, vault_tok, sidecar: stableJsonify(header.sidecar)! }], purpose)
   const boxKey = await makeBoxKey()
   return {
     format,

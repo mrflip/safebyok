@@ -193,8 +193,8 @@ export class Vault {
 
   // Each field reads the snapshot `#replaceSnapshot()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
-  // Its boxes, ways in and lease read back only what is fixed for the Vault object's life -- its scope, its
-  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault record it is bound to.
+  // Its boxes, ways in and lease read back only what is fixed for the Vault object's life -- its stamp, its
+  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault record it was made under.
 
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
   get applabel(): string { return this.#snapshot.applabel }
@@ -204,7 +204,7 @@ export class Vault {
   get vaultlabel(): string { return this.#snapshot.vaultlabel }
   /** The stored vault's token: the one life of it this Vault object holds. Fixed for the Vault object's life. */
   get vault_tok(): string { return this.#snapshot.vault_tok }
-  /** When the stored vault was made, in epoch milliseconds. */
+  /** When the stored vault was made, in epoch milliseconds: of its stamp, so fixed for the Vault object's life. */
   get registered_at(): number { return this.#snapshot.registered_at }
   /** Up by one on every change to the ways in, which sends every other device back to `locked`; 0 while `novel`. */
   get gate_epoch(): number { return this.#snapshot.gate_epoch }
@@ -923,8 +923,8 @@ export class Vault {
     const known = this.#modelled.get(gate)
     if (known !== undefined) { return known }
     const wayins = Object.freeze({
-      passphrase: Wayin.make(this, standing.vault_tok, gate.passphrase),
-      passkey:    gate.passkey === null ? null : Wayin.make(this, standing.vault_tok, gate.passkey),
+      passphrase: Wayin.make(this, standing, gate.passphrase),
+      passkey:    gate.passkey === null ? null : Wayin.make(this, standing, gate.passkey),
     })
     this.#modelled.set(gate, wayins)
     return wayins

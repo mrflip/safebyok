@@ -3,7 +3,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { BoxFormat, type BoxRecord } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { type BoxVisible, Lease, LeaseStamp, leaseRecordOf, sealLeaseRecord } from '../src/lease'
+import { type BoxVisible, Lease, LeaseStamp, type VaultStampButFormat, leaseRecordOf, sealLeaseRecord } from '../src/lease'
 import { type LeaseRecord } from '../src/types/types'
 import type { VaultSparse } from '../src/vault-record'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
@@ -14,8 +14,8 @@ const HourMillis = 60 * MinuteMillis
 const LeaseMillis = 7 * 24 * HourMillis
 const Deadline = GrantedAt + LeaseMillis
 
-/** The vault props every lease record here is sealed under: u1's `main` vault, at gate epoch 3. */
-const standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'> = { vault_tok: 'vault-tok-u1', gate_epoch: 3 }
+/** The vault record every lease record here is sealed under, as far as a seal reads it: u1's `main` vault, at gate epoch 3, its stamp a {@link TH.vaultSliceOf} slice's. */
+const standing: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'> = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, gate_epoch: 3 }
 
 /** A slice of u1's `main` vault whose clock reads what `clock.at` holds: GrantedAt, unless a test moves it. */
 const vaultAt = (clock?: { at: number }, overrides: Partial<TH.VaultSlice> = {}) => (
@@ -80,9 +80,11 @@ describe("sealLeaseRecord", () => {
     expect(one.vault_key_lease_wrapped).to.not.deep.equal(two.vault_key_lease_wrapped)
   })
 
-  it("binds its wrap to the scope, vault_tok, gate_epoch and deadline, under the lease's format and purpose", async () => {
+  it("binds its wrap to the vault's stamp but its format, and the lease's own stamp: its format, scope, vault_tok, gate_epoch and deadline", async () => {
     const { record } = await sealedRecord()
-    const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-tok-u1', 3, Deadline, 'vault_key_lease_wrapped')
+    const { gate_epoch: _gateEpoch, ...vaultStamp } = standing
+    const leaseStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline }
+    const leaseCtx = cipherCtx([vaultStamp, leaseStamp], 'vault_key_lease_wrapped')
     const unwrapped = await unwrapKeyUnder(record.lease_key, record.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
@@ -96,6 +98,7 @@ describe("sealLeaseRecord", () => {
     [{ ...standing, vault_tok: '' },             'vault props with an empty vault_tok'],
     [{ ...standing, gate_epoch: 0 },             'vault props at gate_epoch 0'],
     [TH.omitting(standing, 'gate_epoch'),        'vault props with no gate_epoch'],
+    [TH.omitting(standing, 'registered_at'),     'a vault record with no registered_at, whose stamp the wrap could not bind'],
   ] as const) {
     it(`refuses 'bad_record', as misuse, at ${blurb}: no lease record could hold them`, async () => {
       await TH.expectRefusal(sealLeaseRecord(vaultAt(), badStanding, await makeVaultKey()), 'bad_record')
@@ -112,7 +115,7 @@ describe("sealLeaseRecord", () => {
     })
   }
 
-  it("takes whole vault props, keeping only their vault_tok and gate_epoch", async () => {
+  it("takes a whole vault record, keeping only its stamp and gate_epoch", async () => {
     const whole = TH.vaultRecordOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 3 })
     const record = await sealLeaseRecord(vaultAt(), whole, await makeVaultKey())
     expect(record).to.deep.include({ vault_tok: 'vault-tok-u1', gate_epoch: 3 })
@@ -233,12 +236,12 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
     expect(new TextDecoder().decode(deciphered)).to.eq('"sk-fake"')
   })
 
-  it("wraps the boxKey under the vaultKey, bound to the box's ctx: the scope, the lease's vault_tok, the purpose and every visible field, the sidecar's JSON with keys sorted", async () => {
+  it("wraps the boxKey under the vaultKey, bound to the box's ctx: the vault's stamp but its format, the box's stamp (every visible field, the sidecar's JSON with keys sorted, and the lease's vault_tok), and the purpose", async () => {
     const { lease, vaultKey } = await leasedVault()
     const visible = visibleOf({ sidecar: { zeta: 1, alpha: 2 } })
     const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visible)
-    const { format, ...header } = visible
-    const boxCtx = cipherCtx(format, 'acme', 'u1', 'main', 'vault-tok-u1', 'box_key_wrapped', { ...header, sidecar: '{"alpha":2,"zeta":1}' })
+    const vaultStamp = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at }
+    const boxCtx = cipherCtx([vaultStamp, { ...visible, vault_tok: 'vault-tok-u1', sidecar: '{"alpha":2,"zeta":1}' }], 'box_key_wrapped')
     const boxKey = await unwrapKeyUnder(vaultKey, ciphered.box_key_wrapped, boxCtx, { extractable: false, usage: ['decrypt'] })
     expect(boxKey.usages).to.deep.equal(['decrypt'])
   })
@@ -436,9 +439,11 @@ describe("lease.endsBy", () => {
 })
 
 describe("the lease's wrap, by hand", () => {
-  it("opens a record wrapped by hand under the ctx a lease is documented to bind: its format, scope, vault_tok, gate_epoch, deadline and purpose", async () => {
+  it("opens a record wrapped by hand under the ctx a lease is documented to bind: its vault's stamp but the format, its own format, scope, vault_tok, gate_epoch and deadline, and the purpose", async () => {
     const { vault, vaultKey, lease } = await leasedVault()
-    const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-tok-u1', 1, Deadline, 'vault_key_lease_wrapped')
+    const vaultStamp = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: vault.registered_at }
+    const leaseStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 1, ask_passphrase_at: Deadline }
+    const leaseCtx = cipherCtx([vaultStamp, leaseStamp], 'vault_key_lease_wrapped')
     const byHand = { ...leaseRecordOf(lease), vault_key_lease_wrapped: await wrapKeyUnder(leaseRecordOf(lease).lease_key, vaultKey, leaseCtx) }
     vault.lease = Lease.make(vault, byHand)
     const ciphered = await vault.lease.cipheredWith(bytesOf('1'), visibleOf())

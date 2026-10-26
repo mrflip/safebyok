@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { BoxRecord } from './box'
+import { BoxRecord, BoxStamp } from './box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -8,24 +8,25 @@ import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { LeaseRecord } from './types/types'
-import type { VaultSparse } from './vault-record'
+import { type VaultSparse, VaultStamp } from './vault-record'
 import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './types/type-aliases'
 import { FarFuture } from './consts'
 import type { Vault } from './vault'
 
 /** Leases: what lets a vault open on this device without a proof, across page loads, until its `ask_passphrase_at`.
- * A lease's wrap is bound to the scope, the vault record's `vault_tok` and `gate_epoch` at the grant, and
- * the deadline. A lease holds the vaultKey only wrapped: each cipher and decipher unwraps it for
- * that call alone and keeps nothing. When to grant, when to ask, and the write to the device store
- * are the vault's.
+ * A lease's wrap and each box's two ciphered fields are bound to two stamps: the vault's, but for
+ * its format, and their own. A lease's own is its scope, the vault record's `vault_tok` and
+ * `gate_epoch` at the grant, and the deadline. A lease holds the vaultKey only wrapped: each cipher
+ * and decipher unwraps it for that call alone and keeps nothing. When to grant, when to ask, and
+ * the write to the device store are the vault's.
  */
 
-/** The slice of a {@link Vault} a lease reads: the scope every lease of it names, how long a grant lasts, its clock, its demand, and its lock. Whether it is the lease the vault holds, it asks inside the package, as no getter shows that one. */
-export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now' | 'demandConsistentWith' | 'tryLock'>
+/** The slice of a {@link Vault} a lease reads: the stamp every lease of it and every box binds, how long a grant lasts, its clock, its demand, and its lock. Whether it is the lease the vault holds, it asks inside the package, as no getter shows that one. */
+export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'registered_at' | 'leaseMillis' | 'now' | 'demandConsistentWith' | 'tryLock'>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
- * gate it was granted under.
+ * gate it was granted under. Its wrap's ctx holds the whole of it, beside its vault's stamp.
  *
  * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
  */
@@ -41,25 +42,42 @@ export type BoxVisible = Omit<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
 
-/** The ctx's first part: the lease record's format. */
+/** The `format` a lease record carries, in its stamp. */
 const LeaseFormat = 'safebyok-lease-v1'
 
-/** What {@link sealLeaseRecord} binds, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
-const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
-  LeaseGrant:    LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
-  VisibleShape:  BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
-  CipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
+/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; a box's two ciphered fields, as {@link BoxCiphered} has them; and the two stamps each ctx here takes, picked from whatever carries them. Each refuses 'bad_record'. */
+const { LeaseGrant, VisibleShape, CipheredShape, VaultStampButFormat, LeaseStampPicked } = Validator('bad_record', ({ obj }) => ({
+  LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
+  VisibleShape:        BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
+  CipheredShape:       obj({ box_key_wrapped, whisper_ciphered }),
+  VaultStampButFormat: VaultStamp.omit({ format: true }).strip(),
+  LeaseStampPicked:    LeaseStamp.strip(),
 }))
 
-/** The fields of a lease its wrap is bound to: every field of its record but its format, the leaseKey and the wrap. */
-type LeaseBinding = Z.infer<typeof LeaseGrant>
+/** A vault's stamp as what lies in it binds it: every field of its {@link VaultStamp} but the format, so a new vault format leaves each box and lease open. */
+export type VaultStampButFormat = Omit<VaultStamp, 'format'>
 
-/** The ctx a lease's wrap is bound to: every field of its record but the leaseKey and the wrap, and the purpose.
- * A lease is one; so is what {@link sealLeaseRecord} is about to make one of.
+/** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
+ * Each stamp may come whole, a Vault object or a lease record: only its stamp fields are taken.
+ * It refuses 'bad_record' for one missing any of them.
+ *
+ * @example await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(vaultRecord, leaseRecord))
  */
-const leaseCtxOf = (lease: LeaseBinding): Uint8Array => (
-  cipherCtx(LeaseFormat, lease.applabel, lease.user_id, lease.vaultlabel, lease.vault_tok, lease.gate_epoch, lease.ask_passphrase_at, 'vault_key_lease_wrapped')
+export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
+  cipherCtx([VaultStampButFormat.parse(vaultStamp), LeaseStampPicked.parse(leaseStamp)], 'vault_key_lease_wrapped')
 )
+
+/** The ctx one of a box's two ciphered fields is bound to: its vault's stamp but for the format, the box's own {@link BoxStamp}, and the purpose, which names the field.
+ * The box's sidecar is bound as its JSON with keys sorted. The vault's stamp may come whole, a
+ * Vault object or a vault record: only its stamp fields are taken. It refuses 'bad_record' for a
+ * stamp missing any field, or a box stamp holding any other.
+ *
+ * @example await cipherBytes(boxKey, whisperBytes, boxCtxOf(vault, { ...visible, vault_tok: vault.vault_tok }, 'whisper_ciphered'))
+ */
+export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
+  const { sidecar, ...stamp } = BoxStamp.parse(boxStamp)
+  return cipherCtx([VaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
+}
 
 /** Reads a lease's record from inside this module, for {@link leaseRecordOf}: set once, by the class's static block. */
 let recordOf: (lease: Lease) => LeaseRecord
@@ -252,7 +270,7 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
   /** The vaultKey, unwrapped under the leaseKey as a non-extractable handle that may only `usage`; null when it will not unwrap. */
   async #vaultKeyOrNull(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey | null> {
     try {
-      return await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, leaseCtxOf(this), { extractable: false, usage: [usage] })
+      return await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, leaseCtxOf(this.#vault, this.#record), { extractable: false, usage: [usage] })
     } catch {
       return null
     }
@@ -264,10 +282,9 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
     return damagedLease()
   }
 
-  /** The ctx a box's ciphered field is bound to: the box format, this lease's scope and `vault_tok`, the purpose, and every other visible field, the sidecar as its JSON with keys sorted. See VOCABULARY.md on ctx. */
+  /** The ctx a box's ciphered field is bound to, {@link boxCtxOf}'s: its vault's stamp, and the box's, `visible` and this lease's `vault_tok`. See VOCABULARY.md on ctx. */
   #boxCtxOf(visible: BoxVisible, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
-    const { format, ...header } = visible
-    return cipherCtx(format, this.applabel, this.user_id, this.vaultlabel, this.vault_tok, purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
+    return boxCtxOf(this.#vault, { ...visible, vault_tok: this.vault_tok }, purpose)
   }
 }
 
@@ -278,7 +295,7 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
  */
 export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
 
-/** A lease record for `vault`, under a new non-extractable leaseKey, around `vaultKey`, which a proof just opened against `standing`.
+/** A lease record for `vault`, under a new non-extractable leaseKey, around `vaultKey`, which a proof just opened against `standing`, the vault record whose stamp its wrap binds.
  * It ends the vault's `leaseMillis` from now, never past {@link FarFuture}, which is how
  * `leaseHours: Infinity` reads. It writes nothing: the vault puts the record in the device store,
  * and makes its Lease from what was stored. `vaultKey` must be extractable, to be wrapped: keep it
@@ -287,7 +304,7 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  *
  * @example const record = await sealLeaseRecord(vault, vaultRecord, vaultKey)   // record.ask_passphrase_at: leaseHours from now
  */
-export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now'>, standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, vaultKey: CryptoKey): Promise<LeaseRecord> => {
+export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now'>, standing: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey): Promise<LeaseRecord> => {
   const granted = LeaseGrant.parse({
     applabel:          vault.applabel,
     user_id:           vault.user_id,
@@ -296,9 +313,10 @@ export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user
     gate_epoch:        standing.gate_epoch,
     ask_passphrase_at: Math.min(vault.now() + vault.leaseMillis, FarFuture),
   })
+  const stamp = { format: LeaseFormat, ...granted } as const
   const leaseKey = await makeLeaseKey()
-  const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(granted))
-  return { format: LeaseFormat, ...granted, lease_key: leaseKey, vault_key_lease_wrapped: vault_key_lease_wrapped.parse(wrapped) }
+  const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(standing, stamp))
+  return { ...stamp, lease_key: leaseKey, vault_key_lease_wrapped: vault_key_lease_wrapped.parse(wrapped) }
 }
 
 /** What an unwrapped boxKey may do: decipher, never be exported. */

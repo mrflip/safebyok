@@ -707,10 +707,10 @@ describe("the fixtures", () => {
   it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
     const { now, ...rest } = TH.vaultSliceOf('u1')
     expect(now()).to.eq(TH.SliceNow)
-    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
+    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
     expect(slice.keyDeriver).to.eq(argon2idWebV1Deriver)
-    expect(Wayin.make(slice, 'vault-tok-u1', TH.passkeyWayinOf('laptop')).wayinkind).to.eq('passkey')
+    expect(Wayin.make(slice, TH.vaultRecordOf('u1'), TH.passkeyWayinOf('laptop')).wayinkind).to.eq('passkey')
   })
 
   it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
