@@ -1668,7 +1668,7 @@ const BoldLines = /\*\*(\d+\.\d+)\. ([^*]+?)\.\*\*/gu
 
 /** Each numbered line of the VaultDB contract in `markdown`, its title by its number. */
 const contractLinesIn = (markdown: string): Record<string, string> => Object.fromEntries(
-  Array.from(markdown.matchAll(BoldLines), ([, line = '', title = '']): [string, string] => [line, title.replaceAll(/\s+/gu, ' ')]),
+  Array.from(markdown.matchAll(BoldLines), ([_match, line = '', title = '']): [string, string] => [line, title.replaceAll(/\s+/gu, ' ')]),
 )
 
 describe("VaultDBContract", () => {

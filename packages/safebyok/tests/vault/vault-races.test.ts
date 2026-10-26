@@ -911,7 +911,7 @@ const stillClock = () => {
  * drop its key, which fall due a minute or more from when they are set.
  */
 const delaysAsked = (waits: ReturnType<typeof stillClock>) => (
-  waits.mock.calls.map(([, delay = 0]) => delay).filter((delay) => delay < MinuteMillis)
+  waits.mock.calls.map(([_callback, delay = 0]) => delay).filter((delay) => delay < MinuteMillis)
 )
 
 describe("versioned updates: two devices writing at once", () => {
