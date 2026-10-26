@@ -83,3 +83,29 @@ Who reads this: threads 4 and 8; any thread writing a validator.
 * **Size** (budgets raised): `idbDeviceDB` 28.1 kB, `browserOpts` 33.7, `mask` 25.2 (was ~6),
   `argon2idWasmDeriver` 34.7 (was ~16); `everything` 61.0 and `Bank` 53.7 barely moved (mini and
   classic share `zod/v4/core`).
+
+## From thread 4 (brands, #275)
+
+Who reads this: threads 5 to 13.
+
+* **Names**: `src/types/types.ts` (moved) and `src/types/type-aliases.ts`. Plain aliases (each
+  `Z.infer` of its validator, since lint refuses `type X = string`): `Applabel`, `Vaultlabel`,
+  `Boxlabel`, `UserId`, `VaultTok`, `RevisionTok`, `EpochMillis`. Brands: `PassphraseSalt`,
+  `PrfSalt`, `WhisperCiphered`, `BoxKeyWrapped`, `VaultKeyWayinWrapped`, `VaultKeyLeaseWrapped`,
+  `PassphraseCleartext`.
+* **Validators named for their field**: `vault_tok`, `revision_tok`, `salt_b64`, `prf_salt_b64`,
+  `whisper_ciphered`, `box_key_wrapped`, `vault_key_wayin_wrapped`, `vault_key_lease_wrapped`,
+  `passphraseCleartext`; a record writes `obj({ salt_b64, vault_tok, ... })`. `epochMillis` is in
+  the kit; `FarFuture`, `FarPast`, `ForeverMillis`, `MinuteMillis` are in `consts.ts`.
+* **Facets**: `Lifecycled<OT, LifecycleT = 'starting' | 'ready'>` (adds `readonly lifecycle`),
+  `Refused<OT>` (`lifecycle: 'refused'`, `err: VaultError`), `ConsistencyWith<OT>` (`OT &
+  Pick<Vault, 'demandConsistentWith'>`), with type tests of thread 13's bank union and a Vault as
+  `ConsistencyWith<VaultScope>`.
+* **For thread 10**: a brand is output-only; type what a host's adapter returns as the record's
+  `Z.input` (unbranded), and let the base class's parse brand it, so no host casts.
+  `DamagedVaultRecord` is left to thread 10's `VaultReadResponse`.
+* **A brand is minted only by a parse**, including where safebyok mints a salt or a wrap; the
+  passphrase is branded at `PassphraseProving.seal` and `passphraseKeyOf`, not the gating.
+  Tests plant damage `as never`; `TH.fakeCiphered` returns `FakeCiphered` (all four ciphered
+  brands, one cast inside).
+* **`gh pr ready` went through** for this thread; the refusal is not constant.
