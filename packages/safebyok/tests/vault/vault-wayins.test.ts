@@ -1149,7 +1149,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} changes nothing when storage holds vault record older than the ones in hand, and is refused`, async () => {
+    it(`${callTitle} changes nothing when storage holds a vault record older than the one in hand, and is refused`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const older = storedText(world) ?? ''
       await TH.putWayin(vault, 'pw', 'pw newer')

@@ -504,7 +504,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
 
   describe(lineTitle('3.2'), () => {
-    it("lands while the standing vault record is the ones proven against", async () => {
+    it("lands while the standing vault record is the one proven against", async () => {
       const vaultDB = await withVaultRecord()
       const next = { ...vaultRecordOf('u1'), gate_epoch: 2 }
       const stored = await expectingGood(vaultDB).putVaultRecord(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
@@ -1232,7 +1232,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'stale_write'])
             const winner = { ...rivals[outcomes.findIndex((outcome) => outcome.kind === 'landed')], vault_epoch: 2 }
-            expect(metaOf(outcomes.find((outcome) => outcome.kind === 'stale_write')), 'the stale write named other vault record than the ones that won').to.deep.equal({ vault_stored: winner })
+            expect(metaOf(outcomes.find((outcome) => outcome.kind === 'stale_write')), 'the stale write named another vault record than the one that won').to.deep.equal({ vault_stored: winner })
             expect(outcomes.find((outcome) => outcome.kind === 'landed')?.val, 'the update that landed resolved other vault record than it stored').to.deep.equal(winner)
             for (const racer of racers) { expect(await vaultRecordIn(racer, scopeOf('u1'))).to.deep.equal(winner) }
           },
@@ -1252,7 +1252,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'stale_write'])
             const winner = rivals[outcomes.findIndex((outcome) => outcome.kind === 'landed')]
-            expect(metaOf(outcomes.find((outcome) => outcome.kind === 'stale_write')), 'the stale write named other vault record than the ones that won').to.deep.equal({ vault_stored: winner })
+            expect(metaOf(outcomes.find((outcome) => outcome.kind === 'stale_write')), 'the stale write named another vault record than the one that won').to.deep.equal({ vault_stored: winner })
             expect(outcomes.find((outcome) => outcome.kind === 'landed')?.val, 'the first gate that landed resolved other vault record than it stored').to.deep.equal(winner)
             for (const racer of racers) { expect(await vaultRecordIn(racer, scopeOf('u1'))).to.deep.equal(winner) }
           },
