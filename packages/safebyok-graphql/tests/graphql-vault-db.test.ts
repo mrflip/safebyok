@@ -253,10 +253,18 @@ describe("graphqlVaultDB, its refusals", () => {
     expect(JSON.stringify(refusal)).to.not.include('vault_owner')
   })
 
-  it("refuses with storage_unavailable, urql's error its cause, when the server does not serve the vault's schema", async () => {
+  it("refuses with storage_unavailable, its cause saying so, when the server does not serve the vault's schema and answers without checking the operation", async () => {
     const schema = buildSchema('type Query { hello: String }')
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }) })
     const refusal = await TH.expectBad(vaultDB.getVault(u1), 'storage_unavailable')
+    expect(refusal.cause).to.be.instanceOf(Error).with.property('message').that.includes('is it serving safebyok-graphql?')
+  })
+
+  it("refuses with storage_unavailable, urql's error its cause, when the server checks the operation against a schema without the vault's", async () => {
+    const unknownField = new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [unknownField] }) }) }
+    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).getVault(u1), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(CombinedError)
   })
 
@@ -359,7 +367,7 @@ describe("graphqlVaultDB, its refusals", () => {
   })
 
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {
-    const misuse = new GraphQLError('Variable "$scope" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
+    const misuse = new GraphQLError('Variable "$user_id" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [misuse, revoked] }) }) }
     const both = { query: () => answered, mutation: () => answered, subscription: () => answered }
@@ -367,7 +375,7 @@ describe("graphqlVaultDB, its refusals", () => {
   })
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
-    const schema = buildSchema('type Query { safebyokGetVault(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
+    const schema = buildSchema('type Query { safebyokGetVault(applabel: String!, user_id: String!, vaultlabel: String!): Boolean }')
     const rootValue = { safebyokGetVault: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }) })
     await TH.expectBad(vaultDB.getVault(u1), 'storage_unavailable')

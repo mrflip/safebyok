@@ -47,13 +47,6 @@ type SafebyokVaultScope {
   vaultlabel: String!
 }
 
-"""Which vault: the app's label, the signed-in user, and the vault's own label."""
-input SafebyokVaultScopeInput {
-  applabel:   String!
-  user_id:    String!
-  vaultlabel: String!
-}
-
 """
 A vault's props, as stored: its scope, its vault_tok, its vault_epoch (a counter its storage moves),
 and its two ways in, each wrapping the
@@ -243,11 +236,11 @@ type SafebyokPutBoxAnswer {
 
 type Query {
   """The vault's props and every box, read in one step, or null when the vault has never been made."""
-  safebyokGetVault(scope: SafebyokVaultScopeInput!): SafebyokVault
+  safebyokGetVault(applabel: String!, user_id: String!, vaultlabel: String!): SafebyokVault
   """One box, or null when there is none under that boxlabel, read only while the vault is the one expected."""
-  safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxGetExpectationInput!): SafebyokBox
+  safebyokGetBox(applabel: String!, user_id: String!, vaultlabel: String!, boxlabel: String!, expected: SafebyokBoxGetExpectationInput!): SafebyokBox
   """How full the vault is, as its storage reckons it; nothing used for a vault never made."""
-  safebyokGetCapacity(scope: SafebyokVaultScopeInput!): SafebyokCapacity!
+  safebyokGetCapacity(applabel: String!, user_id: String!, vaultlabel: String!): SafebyokCapacity!
 }
 
 type Mutation {
@@ -256,15 +249,15 @@ type Mutation {
   """Replaces the vault props, only while those standing are the ones expected, and answers with the vault props as stored when it landed, or the vault props standing when it did not."""
   safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): SafebyokPutVaultPropsAnswer!
   """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
-  safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
+  safebyokPutBox(applabel: String!, user_id: String!, vaultlabel: String!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
-  safebyokDelBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
+  safebyokDelBox(applabel: String!, user_id: String!, vaultlabel: String!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
   """Deletes the vault, its props and every box, removing them for good, only while the vault is the one expected, and answers with the tombstone it leaves."""
-  safebyokDelVault(scope: SafebyokVaultScopeInput!, expected: SafebyokVaultDelExpectationInput!): SafebyokTombstone!
+  safebyokDelVault(applabel: String!, user_id: String!, vaultlabel: String!, expected: SafebyokVaultDelExpectationInput!): SafebyokTombstone!
 }
 
 type Subscription {
   """The vault's scope whenever the vault may have changed: after every write to it, from any server and any device."""
-  safebyokVaultChanged(scope: SafebyokVaultScopeInput!): SafebyokVaultScope!
+  safebyokVaultChanged(applabel: String!, user_id: String!, vaultlabel: String!): SafebyokVaultScope!
 }
 `

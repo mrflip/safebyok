@@ -11,7 +11,7 @@ describe("convexRefusalOf", () => {
 
   it("reads a refusal from the host's functions, as its @example has it", async () => {
     const { api, createTest } = TH.hostWith(TH.bySubject)
-    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyok.getVault, { scope: TH.scopeOf('u1') }))
+    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyok.getVault, { ...TH.scopeOf('u1') }))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 

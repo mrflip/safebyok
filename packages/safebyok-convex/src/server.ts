@@ -96,10 +96,10 @@ export class SafebyokComponent {
 
     return {
       getVault: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: v.nullable(VaultAnswer),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },
       }),
@@ -120,50 +120,50 @@ export class SafebyokComponent {
         },
       }),
       getBox: publicQuery({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxGetExpectation },
+        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
         returns: GetBoxAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getBox, args)
         },
       }),
       putBox: publicMutation({
-        args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
+        args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
         returns: PutBoxAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.putBox, args)
         },
       }),
       getCapacity: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: Capacity,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getCapacity, args)
         },
       }),
       delBox: publicMutation({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
         returns: v.nullable(BoxDeletion),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delBox, args)
         },
       }),
       delVault: publicMutation({
-        args:    { scope: VaultScope, expected: VaultDelExpectation },
+        args:    { ...VaultScope.fields, expected: VaultDelExpectation },
         returns: v.nullable(Tombstone),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       watchVault: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: VaultSignature,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.watchVault, args)
         },
       }),

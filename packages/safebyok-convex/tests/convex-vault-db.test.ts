@@ -215,7 +215,7 @@ describe("convexVaultDB, refusing", () => {
     await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
     const box = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
-    await client.mutation(deployment.api.safebyok.putBox, { scope: u1, box, expected: TH.noBoxYet })
+    await client.mutation(deployment.api.safebyok.putBox, { ...u1, box, expected: TH.noBoxYet })
     const listed = await TH.boxesOf(vaultDB, u1)
     expect(listed.map((summary) => [summary.boxlabel, summary.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
@@ -284,8 +284,8 @@ describe("a record the deployment refused", () => {
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
   const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, gate_epoch: 7, ...rivalWayins })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } }, rivalBox] }))
-  const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
+  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } }, rivalBox] }))
+  const perRecordLeaves = (record: unknown) => TH.leafTexts({ ...scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
     ['putVaultProps', nextVaultProps, (vaultDB) => vaultDB.putVaultProps(nextVaultProps, { vault_tok: standing.vault_tok, gate_epoch: 52_871 })],
@@ -326,7 +326,7 @@ describe("a record the deployment refused", () => {
     const client = deployment.client(subject)
     await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), standing)
     const expected = { vault_tok: standing.vault_tok, revision_tok: null }
-    const quotedArgs = withRevisionNotText({ scope, box, expected })
+    const quotedArgs = withRevisionNotText({ ...scope, box, expected })
     await expect(client.mutation(deployment.api.safebyok.putBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {
       query:    client.query.bind(client),
@@ -491,7 +491,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
       await TH.expectRefusal(TH.unlock(vault, TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
-      const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
+      const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })
       expect(stored?.boxes).to.have.lengthOf(1)
       TH.closeVault(vault)
     })

@@ -10,7 +10,7 @@ describe("register", () => {
     const CVX = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
     const vaultstore = register(CVX, 'vaultstore')
     await CVX.mutation(vaultstore.vaults.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await CVX.query(vaultstore.vaults.getVault, { scope: TH.scopeOf('u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await CVX.query(vaultstore.vaults.getVault, { ...TH.scopeOf('u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -20,6 +20,6 @@ describe("register", () => {
     })
     const CVX = createTest()
     await CVX.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await CVX.query(api.safebyok.getVault, { scope: TH.scopeOf('u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await CVX.query(api.safebyok.getVault, { ...TH.scopeOf('u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
   })
 })

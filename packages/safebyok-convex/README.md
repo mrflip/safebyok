@@ -225,19 +225,20 @@ the core's own records, scopes and expectations.
 
 | Function                  | Kind     | Arguments                                                                   | Resolves                                                                                   |
 | ------------------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `getVault`                | query    | `{ scope }`                                                                 | `{ vaultProps, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order; or null |
+| `getVault`                | query    | `{ ...scope }`                                                              | `{ vaultProps, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order; or null |
 | `ensureVault`             | mutation | `{ draft }`, gateless vault props                                           | `{ vaultProps, boxes }` standing afterwards: the draft, or another device's, with its boxes |
 | `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true, vault_props_stored }`, the vault props as stored (their `vault_epoch` one up) if written; else `{ landed: false, vault_props_stored }`, the vault props standing or null |
-| `getBox`                  | query    | `{ scope, boxlabel, expected: { vault_tok } }`                              | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault stands; else `{ read: false, refusalkind: 'vault_mismatch' }` |
-| `putBox`               | mutation | `{ scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
-| `getCapacity`             | query    | `{ scope }`                                                                 | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
-| `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_tok, revision_tok } }`                | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
-| `delVault`             | mutation | `{ scope, expected: { vault_tok, gate_epoch } }`                            | the tombstone left (`{ format, ...scope, vault_epoch }`) if deleted, null if not          |
-| `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_tok, gate_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
+| `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault stands; else `{ read: false, refusalkind: 'vault_mismatch' }` |
+| `putBox`               | mutation | `{ ...scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
+| `getCapacity`             | query    | `{ ...scope }`                                                              | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
+| `delBox`               | mutation | `{ ...scope, boxlabel, expected: { vault_tok, revision_tok } }`             | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
+| `delVault`             | mutation | `{ ...scope, expected: { vault_tok, gate_epoch } }`                         | the tombstone left (`{ format, ...scope, vault_epoch }`) if deleted, null if not          |
+| `watchVault`              | query    | `{ ...scope }`                                                              | `{ vault_tok, gate_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
-`scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no box there; in a
-`delBox`, it names a box listed with none, so a box it removes that holds a revision is
-`deleted_other`.
+`...scope` is the vault's three names, `applabel`, `user_id` and `vaultlabel`, as fields of the
+arguments themselves, never nested: the `user_id` a function holds to `getUserId` is the one the
+component reads. A `revision_tok` of null expects no box there; in a `delBox`, it names a box
+listed with none, so a box it removes that holds a revision is `deleted_other`.
 
 ## Testing your own functions
 

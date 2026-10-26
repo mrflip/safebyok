@@ -22,14 +22,16 @@ export type VaultResolversOpts<ContextT> = {
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
 
-/** A root field's arguments, as `VaultSchemaSdl` names them and GraphQL has coerced them. */
+/** A root field's arguments, as `VaultSchemaSdl` names them and GraphQL has coerced them: a vault's three names are arguments of their own. */
 export type VaultFieldArgs = {
-  scope?:    unknown
-  boxlabel?: unknown
+  applabel?:   unknown
+  user_id?:    unknown
+  vaultlabel?: unknown
+  boxlabel?:   unknown
   vaultProps?: unknown
-  draft?:    unknown
-  box?:      unknown
-  expected?: unknown
+  draft?:      unknown
+  box?:        unknown
+  expected?:   unknown
 }
 
 /** One query or mutation's resolver, as every GraphQL server calls it. */
@@ -157,7 +159,7 @@ const MisconfiguredMessage = "The vault's server could not serve this request: i
 
 // The arguments as the schema shapes them, rebuilt field by field as plain records: the
 // VaultDB checks them as it would any caller's.
-const scopeIn = (args: VaultFieldArgs) => recordOf(args.scope, ScopeFields) as VaultScope
+const scopeIn = (args: VaultFieldArgs) => recordOf(args, ScopeFields) as VaultScope
 const vaultPropsIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultPropsFields) as VaultProps
 
 const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation => {

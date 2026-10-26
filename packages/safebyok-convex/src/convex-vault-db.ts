@@ -104,7 +104,7 @@ class ConvexVaultDB extends VaultDB {
   }
 
   protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
-    const answer = await refusing(() => this.client.query(this.api.getVault, { scope }))
+    const answer = await refusing(() => this.client.query(this.api.getVault, { ...scope }))
     return answer === null ? { vaultProps: null, boxes: [] } : { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
   }
 
@@ -125,7 +125,7 @@ class ConvexVaultDB extends VaultDB {
   // The component answers a read whose vault props are not the ones expected from the query that
   // read the box: the vault props and the box are one snapshot.
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
-    const answer: unknown = await refusing(() => this.client.query(this.api.getBox, { scope, boxlabel, expected }))
+    const answer: unknown = await refusing(() => this.client.query(this.api.getBox, { ...scope, boxlabel, expected }))
     if (! isGetBoxAnswer(answer)) { throw new VaultError('corrupt_record', ReadOutOfDateMessage) }
     if (answer.read) { return answer.box_stored }
     throw Refusals.vaultMismatch()
@@ -134,7 +134,7 @@ class ConvexVaultDB extends VaultDB {
   // The component answers why a write did not land, from the transaction that refused it; what
   // each answer carries, the base class checks.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
-    const answer: unknown = await refusing(() => this.client.mutation(this.api.putBox, { scope, expected, box }))
+    const answer: unknown = await refusing(() => this.client.mutation(this.api.putBox, { ...scope, expected, box }))
     if (! isPutBoxAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
     if (answer.landed) { return answer.box_stored }
     if (answer.refusalkind === 'vault_mismatch') { throw Refusals.vaultMismatch() }
@@ -143,15 +143,15 @@ class ConvexVaultDB extends VaultDB {
   }
 
   protected doGetCapacity(scope: VaultScope): Promise<unknown> {
-    return refusing(() => this.client.query(this.api.getCapacity, { scope }))
+    return refusing(() => this.client.query(this.api.getCapacity, { ...scope }))
   }
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.delBox, { scope, boxlabel, expected }))
+    return refusing(() => this.client.mutation(this.api.delBox, { ...scope, boxlabel, expected }))
   }
 
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.delVault, { scope, expected }))
+    return refusing(() => this.client.mutation(this.api.delVault, { ...scope, expected }))
   }
 
   // Every result `watchVault` delivers calls `onChange`, the first included. The vault subscribes
@@ -163,7 +163,7 @@ class ConvexVaultDB extends VaultDB {
   // it is called: a second call would end another watch of the vault (the app's own, or another
   // vault handle's) on the same client. The base class's subscribe calls an unsubscribe once.
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
-    const args = { scope }
+    const args = { ...scope }
     if ('watchQuery' in this.client) {
       return this.client.watchQuery(this.api.watchVault, args).onUpdate(() => { onChange() })
     }

@@ -18,7 +18,6 @@ const EitherVaultProps = { shape: { ...GatedVaultProps.shape, passphrase: Gatele
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
   ['SafebyokVaultScope',         VaultScope,  []],
-  ['SafebyokVaultScopeInput',    VaultScope,  []],
   ['SafebyokVaultProps',         EitherVaultProps, []],
   ['SafebyokVaultPropsInput',    EitherVaultProps, []],
   ['SafebyokBox',                BoxRecord,   []],
@@ -81,6 +80,19 @@ describe("VaultSchemaSdl", () => {
       'safebyokEnsureVault', 'safebyokPutVaultProps', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
     ])
     expect(Object.keys(schema.getSubscriptionType()!.getFields())).to.have.members(['safebyokVaultChanged'])
+  })
+
+  it("takes a vault's three names as arguments of their own, each a String!, on every root field aimed at a vault, and nests no scope", () => {
+    const rootFields = [schema.getQueryType()!, schema.getMutationType()!, schema.getSubscriptionType()!].flatMap((rootType) => Object.values(rootType.getFields()))
+    const scoped = rootFields.filter((rootField) => rootField.args.some((arg) => arg.name === 'user_id'))
+    expect(scoped.map((rootField) => rootField.name)).to.have.members([
+      'safebyokGetVault', 'safebyokGetBox', 'safebyokGetCapacity', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault', 'safebyokVaultChanged',
+    ])
+    for (const rootField of scoped) {
+      const scopeArgs = rootField.args.filter((arg) => ['applabel', 'user_id', 'vaultlabel'].includes(arg.name))
+      expect(scopeArgs.map((arg) => String(arg.type)), rootField.name).to.deep.equal(['String!', 'String!', 'String!'])
+    }
+    expect(rootFields.flatMap((rootField) => rootField.args).filter((arg) => arg.name === 'scope')).to.deep.equal([])
   })
 
   it("adds nothing to a host's schema that is not named for safebyok, but its three root types", () => {

@@ -25,9 +25,9 @@ import {
 
 /** The vault props and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
 export const getVault = query({
-  args:    { scope: VaultScope },
+  args:    { ...VaultScope.fields },
   returns: v.nullable(VaultAnswer),
-  handler: async (ctx, { scope }) => {
+  handler: async (ctx, scope) => {
     const row = await findVaultPropsRow(ctx.db, scope)
     return row && { vaultProps: vaultPropsOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
   },
@@ -40,7 +40,7 @@ export const ensureVault = mutation({
   args:    { draft: GatelessVaultProps },
   returns: VaultAnswer,
   handler: async (ctx, { draft }) => {
-    const scope = scopeOfVaultProps(draft)
+    const scope = scopeOf(draft)
     const standing = await findVaultPropsRow(ctx.db, scope)
     const created = standing ? null : { ...draft, vault_epoch: await carriedEpoch(ctx.db, scope) }
     if (created) { await ctx.db.insert('safebyok_vaults', created) }
@@ -59,7 +59,7 @@ export const putVaultProps = mutation({
   args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
   returns: PutVaultPropsAnswer,
   handler: async (ctx, { vaultProps, expected }): Promise<Infer<typeof PutVaultPropsAnswer>> => {
-    const standing = await findVaultPropsRow(ctx.db, scopeOfVaultProps(vaultProps))
+    const standing = await findVaultPropsRow(ctx.db, scopeOf(vaultProps))
     const meetsExpectation = standing !== null
       && standing.vault_tok === expected.vault_tok
       && standing.gate_epoch === expected.gate_epoch
@@ -79,9 +79,9 @@ export const putVaultProps = mutation({
  * The vault props and the box are read from one query's snapshot.
  */
 export const getBox = query({
-  args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxGetExpectation },
+  args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
   returns: GetBoxAnswer,
-  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof GetBoxAnswer>> => {
+  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) {
       return { read: false, refusalkind: 'vault_mismatch' }
@@ -98,9 +98,9 @@ export const getBox = query({
  * reading it once.
  */
 export const putBox = mutation({
-  args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
+  args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
   returns: PutBoxAnswer,
-  handler: async (ctx, { scope, expected, box }): Promise<Infer<typeof PutBoxAnswer>> => {
+  handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof PutBoxAnswer>> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) {
       return { landed: false, refusalkind: 'vault_mismatch' }
@@ -137,9 +137,9 @@ export const putBox = mutation({
  * A vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
  */
 export const getCapacity = query({
-  args:    { scope: VaultScope },
+  args:    { ...VaultScope.fields },
   returns: Capacity,
-  handler: async (ctx, { scope }) => {
+  handler: async (ctx, scope) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
     const { tally } = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
@@ -149,9 +149,9 @@ export const getCapacity = query({
 
 /** Remove the box under `boxlabel` as `VaultDB`'s `doDelBox` does, and take it off the vault's tally. */
 export const delBox = mutation({
-  args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+  args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
   returns: v.nullable(BoxDeletion),
-  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof BoxDeletion> | null> => {
+  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof BoxDeletion> | null> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
@@ -171,9 +171,9 @@ export const delBox = mutation({
  * Null when the vault props do not meet the expectation, or none stand.
  */
 export const delVault = mutation({
-  args:    { scope: VaultScope, expected: VaultDelExpectation },
+  args:    { ...VaultScope.fields, expected: VaultDelExpectation },
   returns: v.nullable(Tombstone),
-  handler: async (ctx, { scope, expected }): Promise<Infer<typeof Tombstone> | null> => {
+  handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof Tombstone> | null> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
     if (expected.gate_epoch !== null && vaultProps.gate_epoch !== expected.gate_epoch) { return null }
@@ -192,9 +192,9 @@ export const delVault = mutation({
  * of a document's fields. The tallies' limits keep that within one query's reads.
  */
 export const watchVault = query({
-  args:    { scope: VaultScope },
+  args:    { ...VaultScope.fields },
   returns: VaultSignature,
-  handler: async (ctx, { scope }) => {
+  handler: async (ctx, scope) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     const boxes = await vaultBoxRows(ctx.db, scope)
     return {
@@ -211,7 +211,8 @@ type VaultScope = Infer<typeof VaultScope>
 type VaultProps = Infer<typeof VaultProps>
 type BoxRecord = Infer<typeof BoxRecord>
 
-const scopeOfVaultProps = ({ applabel, user_id, vaultlabel }: VaultProps): VaultScope => ({ applabel, user_id, vaultlabel })
+/** The scope vault props name: their three names picked out, and nothing else. */
+const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
 
 // `.unique()` throws on a second row: find-or-insert never makes one, so two would be damage,
 // and damage surfaces rather than being papered over.

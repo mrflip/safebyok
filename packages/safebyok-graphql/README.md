@@ -220,10 +220,11 @@ by, exactly as safebyok wrote it:
 | `SafebyokTombstone`  | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
-| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
+| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`, as a subscription sends it |
 
-Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
-of its own.
+Each record has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation
+one of its own. A vault's scope is no input type: a root field aimed at a vault takes its
+`applabel`, `user_id` and `vaultlabel` as three `String!` arguments of its own, beside the rest.
 
 * **Text is a `String`**, a count (`gate_epoch`, `vault_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.

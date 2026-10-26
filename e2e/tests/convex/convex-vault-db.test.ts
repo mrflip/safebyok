@@ -114,7 +114,7 @@ describe("convexVaultDB, refusing", () => {
     // The app's own watch of the same query, signed out: the client keeps its refusal, and
     // answers a one-shot query of it from there, synchronously.
     const watched = vi.fn()
-    reactClient.watchQuery(deployment.api.safebyok.getVault, { scope: u1 }).onUpdate(watched)
+    reactClient.watchQuery(deployment.api.safebyok.getVault, { ...u1 }).onUpdate(watched)
     await vi.waitFor(() => { expect(watched).toHaveBeenCalled() })
     await TH.expectBad(convexVaultDB({ client: reactClient, api: deployment.api.safebyok }).getVault(u1), 'identity_revoked')
   })
@@ -205,7 +205,7 @@ describe("convexVaultDB.subscribe", () => {
     const deployment = deploy()
     const reactClient = connectReact(deployment, 'u1')
     const watched = vi.fn()
-    reactClient.watchQuery(deployment.api.safebyok.watchVault, { scope: u1 }).onUpdate(watched)
+    reactClient.watchQuery(deployment.api.safebyok.watchVault, { ...u1 }).onUpdate(watched)
     await vi.waitFor(() => { expect(watched).toHaveBeenCalled() })
 
     const here = convexVaultDB({ client: reactClient, api: deployment.api.safebyok })
@@ -253,7 +253,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
       await TH.expectRefusal(TH.unlock(vault, TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
-      const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
+      const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })
       expect(stored?.boxes).to.have.lengthOf(1)
       TH.closeVault(vault)
     })
@@ -283,8 +283,8 @@ describe("a vault over convexVaultDB, on two devices", () => {
     // The phone unlocks and reads what the laptop wrote; what the deployment holds is ciphertext.
     await TH.unlock(phone, TH.RealPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
-    const standing = await deployment.as('u1').query(deployment.api.safebyok.getVault, { scope: u1 })
-    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vaultProps.vault_tok } })
+    const standing = await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })
+    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vaultProps.vault_tok } })
     expect(stored.read).to.be.true
     expect(JSON.stringify(stored)).to.not.include(anthropicKey)
     expect(JSON.stringify(stored)).to.not.include(TH.RealPassphrase)

@@ -38,13 +38,13 @@ export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vault
 
 /** The vault props a component test's CVX holds for `scope`, as `getVault` reads them, or null. */
 export const propsIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
-  const read = await CVX.query(vaults.getVault, { scope })
+  const read = await CVX.query(vaults.getVault, { ...scope })
   return read?.vaultProps ?? null
 }
 
 /** The listing a component test's CVX shows for `scope`, as `getVault` reads it: empty where no vault stands. */
 export const boxesIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
-  const read = await CVX.query(vaults.getVault, { scope })
+  const read = await CVX.query(vaults.getVault, { ...scope })
   return read?.boxes ?? []
 }
 
@@ -72,7 +72,7 @@ export const installedComponent = () => {
  * @returns The refusal's data, its `kind` and `message`.
  *
  * @example
- *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getVaultProps, { scope }))
+ *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getVaultProps, { ...scope }))
  *   expect(refusal.kind).to.eq('identity_revoked')
  */
 export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {
