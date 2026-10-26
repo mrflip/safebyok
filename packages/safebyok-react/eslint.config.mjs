@@ -203,9 +203,9 @@ export default defineConfig([
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', {
-        varsIgnorePattern:         '^_',
-        argsIgnorePattern:         '^_',
-        caughtErrorsIgnorePattern: '^_',
+        varsIgnorePattern:         '^_[a-zA-Z0-9]',
+        argsIgnorePattern:         '^_[a-zA-Z0-9]',
+        caughtErrorsIgnorePattern: '^_[a-zA-Z0-9]',
       }],
     },
   },

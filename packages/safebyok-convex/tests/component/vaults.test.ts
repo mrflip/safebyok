@@ -360,7 +360,7 @@ describe("a vault's tally", () => {
 
   it("stays true across writes and deletes running at once", async () => {
     const CVX = await withVaultRecord()
-    const boxlabels = Array.from({ length: 12 }, (_, ii) => `box_${String(ii)}`)
+    const boxlabels = Array.from({ length: 12 }, (_slot, ii) => `box_${String(ii)}`)
     await Promise.all(boxlabels.map((boxlabel) => CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf(boxlabel, boxlabel), expected: TH.noBoxYet })))
     await Promise.all(boxlabels.slice(0, 5).map((boxlabel) => CVX.mutation(TH.vaults.delBox, { ...u1, boxlabel, expected: TH.deleting(`rev-${boxlabel}`) })))
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
@@ -442,7 +442,7 @@ describe("getCapacity", () => {
     await TH.ensureGatedIn(CVX, TH.vaultRecordOf('u1'))
     await writeUntallied(CVX, [TH.boxOf('anthropic_api_key', 'a1')])
     expect(await CVX.query(TH.vaults.getCapacity, { ...u1 })).to.deep.equal(capacityOf(await weighedTally(CVX)))
-    await writeUntallied(CVX, Array.from({ length: 9 }, (_, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
+    await writeUntallied(CVX, Array.from({ length: 9 }, (_slot, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
     expect(await CVX.query(TH.vaults.getCapacity, { ...u1 })).to.deep.equal(capacityOf(null))
   })
 })
@@ -480,7 +480,7 @@ describe("a vault's weight limit", () => {
     const CVX = TH.componentTest(true)
     await TH.ensureGatedIn(CVX, TH.vaultRecordOf('u1'))
     // Nine of 900,000 bytes, written before tallies were kept: past the limit, still readable whole.
-    await writeUntallied(CVX, Array.from({ length: 9 }, (_, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
+    await writeUntallied(CVX, Array.from({ length: 9 }, (_slot, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
     expect(await answeredWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.include(VaultFull)
     const overgrown = TH.heavyBox('heavy_0', 900_001, 'grown_0')
     expect(await answeredWrite(CVX, overgrown, over('heavy_0'))).to.deep.include(VaultFull)
@@ -497,7 +497,7 @@ describe("a vault's weight limit", () => {
     await TH.ensureGatedIn(CVX, TH.vaultRecordOf('u1'))
     // Twenty of 900,000 bytes, more than one transaction may read: four writes, each within its limits.
     for (let batch = 0; batch < 4; batch++) {
-      await writeUntallied(CVX, Array.from({ length: 5 }, (_, ii) => TH.heavyBox(`heavy_${String((batch * 5) + ii)}`, 900_000)))
+      await writeUntallied(CVX, Array.from({ length: 5 }, (_slot, ii) => TH.heavyBox(`heavy_${String((batch * 5) + ii)}`, 900_000)))
     }
     await expect(CVX.query(TH.vaults.getVault, { ...u1 })).rejects.toThrow(/Read too much data/)
     expect(await answeredWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.include(VaultFull)
@@ -586,7 +586,7 @@ describe("a large vault, within Convex's per-transaction limits", () => {
   it("refuses a box past its count limit, never a replacement, and deletes the vault so filled", async () => {
     const CVX = TH.componentTest(true)
     await TH.ensureGatedIn(CVX, TH.vaultRecordOf('u1'))
-    await writeUntallied(CVX, Array.from({ length: MaxVaultBoxes }, (_, ii) => TH.boxOf(`b${String(ii).padStart(4, '0')}`, String(ii))))
+    await writeUntallied(CVX, Array.from({ length: MaxVaultBoxes }, (_slot, ii) => TH.boxOf(`b${String(ii).padStart(4, '0')}`, String(ii))))
     expect(await answeredWrite(CVX, TH.boxOf('one_too_many', 'x'), TH.noBoxYet)).to.deep.include(VaultFull)
     expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('b0000', 'replaced'), expected: over('0') })).to.deep.equal({ landed: true, box_stored: TH.boxOf('b0000', 'replaced') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
