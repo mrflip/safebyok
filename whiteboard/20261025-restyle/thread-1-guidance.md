@@ -1,6 +1,7 @@
 # Thread 1: Guidance (2026-10-26)
 
-Branch `20261026-guidance`, PR (opening), stacked on #267. Justify: green (core 3156 passed, 37
+Branch `20261026-guidance`, PR [#272](https://github.com/mrflip/safebyok/pull/272), stacked on
+#267. Its base is `20261024-contract_tab` for now, and should be `main`. Justify: green (core 3156 passed, 37
 skipped; every package and the root green; size budgets unchanged).
 
 * **Built**:
