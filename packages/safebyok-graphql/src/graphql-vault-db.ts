@@ -122,7 +122,7 @@ export const VaultOperations = {
   safebyokEnsureVault:      EnsureVaultDoc,
   safebyokGetBox:           GetBoxDoc,
   safebyokGetCapacity:      GetCapacityDoc,
-  safebyokPutVaultRecord:    PutVaultRecordDoc,
+  safebyokPutVaultRecord:   PutVaultRecordDoc,
   safebyokPutBox:           PutBoxDoc,
   safebyokDelBox:           DelBoxDoc,
   safebyokDelVault:         DelVaultDoc,
@@ -327,7 +327,7 @@ type WriteAnswer = {
   refusalkind?:        unknown
   message?:            unknown
   box_stored?:         unknown
-  vault_stored?: unknown
+  vault_stored?:       unknown
   capacity?:           unknown
 }
 

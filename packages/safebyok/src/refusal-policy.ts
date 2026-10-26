@@ -49,7 +49,7 @@ export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promi
   return {
     getVault:         (...args) => heeding(() => vaultDB.getVault(...args)),
     ensureVault:      (...args) => heeding(() => vaultDB.ensureVault(...args)),
-    putVaultRecord:    (...args) => heeding(() => vaultDB.putVaultRecord(...args)),
+    putVaultRecord:   (...args) => heeding(() => vaultDB.putVaultRecord(...args)),
     getBox:           (...args) => heeding(() => vaultDB.getBox(...args)),
     putBox:           (...args) => heeding(() => vaultDB.putBox(...args)),
     delBox:           (...args) => heeding(() => vaultDB.delBox(...args)),

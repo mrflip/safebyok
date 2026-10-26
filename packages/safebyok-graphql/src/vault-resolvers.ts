@@ -24,14 +24,14 @@ export type VaultResolversOpts<ContextT> = {
 
 /** A root field's arguments, as `VaultSchemaSdl` names them and GraphQL has coerced them: a vault's three names are arguments of their own. */
 export type VaultFieldArgs = {
-  applabel?:   unknown
-  user_id?:    unknown
-  vaultlabel?: unknown
-  boxlabel?:   unknown
+  applabel?:    unknown
+  user_id?:     unknown
+  vaultlabel?:  unknown
+  boxlabel?:    unknown
   vaultRecord?: unknown
-  draft?:      unknown
-  box?:        unknown
-  expected?:   unknown
+  draft?:       unknown
+  box?:         unknown
+  expected?:    unknown
 }
 
 /** One query or mutation's resolver, as every GraphQL server calls it. */
@@ -48,7 +48,7 @@ export type VaultResolvers<ContextT> = {
   }
   Mutation: {
     safebyokEnsureVault:      VaultFieldResolver<ContextT>
-    safebyokPutVaultRecord:    VaultFieldResolver<ContextT>
+    safebyokPutVaultRecord:   VaultFieldResolver<ContextT>
     safebyokPutBox:           VaultFieldResolver<ContextT>
     safebyokDelBox:           VaultFieldResolver<ContextT>
     safebyokDelVault:         VaultFieldResolver<ContextT>

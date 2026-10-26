@@ -1839,7 +1839,7 @@ export const perUser = (vaultDBFor: (user_id: string) => VaultDBVerbs): VaultDBV
     ensureVault:        (draft) => as(draft).ensureVault(draft),
     getVaultRecords:    (scope) => as(scope).getVaultRecords(scope),
     ensureVaultRecords: (draft) => as(draft).ensureVaultRecords(draft),
-    putVaultRecord:    (vaultRecord, expected) => as(vaultRecord).putVaultRecord(vaultRecord, expected),
+    putVaultRecord:   (vaultRecord, expected) => as(vaultRecord).putVaultRecord(vaultRecord, expected),
     getBox:           (scope, boxlabel, expected) => as(scope).getBox(scope, boxlabel, expected),
     putBox:           (scope, expected, box) => as(scope).putBox(scope, expected, box),
     getCapacity:      (scope) => as(scope).getCapacity(scope),

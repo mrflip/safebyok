@@ -36,7 +36,7 @@ const fakeServed = (answer: () => Promise<unknown>) => {
   const served: ServedVaultDB = {
     getVaultRecords:    answer as ServedVaultDB['getVaultRecords'],
     ensureVaultRecords: answer as ServedVaultDB['ensureVaultRecords'],
-    putVaultRecord:    answer as ServedVaultDB['putVaultRecord'],
+    putVaultRecord:   answer as ServedVaultDB['putVaultRecord'],
     getBox:           answer as ServedVaultDB['getBox'],
     putBox:           answer as ServedVaultDB['putBox'],
     getCapacity:      answer as ServedVaultDB['getCapacity'],

@@ -244,7 +244,7 @@ type SafebyokPutVaultRecordAnswer {
   landed:             Boolean!
   refusalkind:        String
   message:            String
-  vault_stored: SafebyokStoredRecord
+  vault_stored:       SafebyokStoredRecord
 }
 
 """

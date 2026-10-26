@@ -1100,7 +1100,7 @@ const servingOnly = (signedIn: string | null, store: StringStore): TH.VaultDBVer
     ensureVault:        (draft) => permitted(draft, () => shared.ensureVault(draft)),
     getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
     ensureVaultRecords: (draft) => permitted(draft, () => shared.ensureVaultRecords(draft)),
-    putVaultRecord:    (vaultRecord, expected) => permitted(vaultRecord, () => shared.putVaultRecord(vaultRecord, expected)),
+    putVaultRecord:   (vaultRecord, expected) => permitted(vaultRecord, () => shared.putVaultRecord(vaultRecord, expected)),
     getBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.getBox(scope, boxlabel, expected)),
     putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
     getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),

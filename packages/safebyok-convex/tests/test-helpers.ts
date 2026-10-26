@@ -139,7 +139,7 @@ export const realRecords = async (user_id = 'u1') => {
   return {
     vaultRecordCkey: vaultRecordRow.ckey,
     vaultRecord:     VaultRecord.parse(vaultRecordRow.record),
-    boxes:          rows.flatMap((row) => {
+    boxes:           rows.flatMap((row) => {
       const checked = BoxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []
     }),
