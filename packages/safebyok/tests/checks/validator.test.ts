@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { Kit, Validator } from '../../src/checks/validator'
+import { Kit, Validator, sayable } from '../../src/checks/validator'
 import { VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
 
@@ -187,6 +187,20 @@ describe("Validator", () => {
     try { vaultScope.parse(null) } catch (err) { caught = err }
     expect(caught).to.be.instanceOf(VaultError)
     expect(caught).to.not.be.instanceOf(Zod.ZodError)
+  })
+})
+
+describe("sayable", () => {
+  it("repeats a key shaped as one of our field names, as its first example shows", () => {
+    expect(sayable('staleMinute')).to.eq('staleMinute')
+  })
+
+  it("stands in for a key shaped as a credential, as its second example shows", () => {
+    expect(sayable(`sk_live_${'0Fake'.repeat(3)}`)).to.eq("(a name not repeated here)")
+  })
+
+  it("repeats an index as it is", () => {
+    expect(sayable(3)).to.eq('3')
   })
 })
 
