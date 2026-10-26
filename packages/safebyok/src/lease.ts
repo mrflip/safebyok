@@ -15,7 +15,7 @@ import type { Vault } from './vault'
 
 /** Leases: what lets a vault open on this device without a proof, across page loads, until its `ask_passphrase_at`.
  * A lease's wrap and each box's two ciphered fields are bound to two stamps: the vault's, but for
- * its format, and their own. A lease's own is its scope, the vault record's `vault_tok` and
+ * its format, and their own. A lease's own is its format, scope, the vault record's `vault_tok` and
  * `gate_epoch` at the grant, and the deadline. A lease holds the vaultKey only wrapped: each cipher
  * and decipher unwraps it for that call alone and keeps nothing. When to grant, when to ask, and
  * the write to the device store are the vault's.
@@ -106,7 +106,7 @@ let recordOf: (lease: Lease) => LeaseRecord
 export class Lease implements Omit<LeaseSparse, 'format'> {
   /** The stored record, frozen, its wrap with it: the one source of every field. */
   readonly #record: LeaseRecord
-  /** The vault it is a lease on: its scope, its clock, its demand and its lock. */
+  /** The vault it is a lease on: its stamp, which each ctx here binds, its clock, its demand and its lock. */
   readonly #vault: LeaseVault
 
   /** The app of the vault it is for. */
@@ -170,8 +170,8 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
   /** `serialized` ciphered under a fresh boxKey, that boxKey wrapped under the vaultKey, both bound to `visible`: a box's two ciphered fields.
    * It demands, lease-bound, that this lease is consistent with its vault before and after its
    * wait: a lock, a change of the ways in, or the vault deleted or made anew meanwhile refuses as
-   * `vault.demandConsistentWith` says. Each ctx is rebuilt from this lease's scope and `vault_tok`
-   * and every field of `visible`. Nothing of either key outlives the call, and `serialized` is
+   * `vault.demandConsistentWith` says. Each ctx is rebuilt from its vault's stamp (the scope,
+   * `vault_tok` and `registered_at`), every field of `visible` and this lease's `vault_tok`. Nothing of either key outlives the call, and `serialized` is
    * zeroed, ciphered or not. Refuses 'damaged_lease' when the vaultKey will not unwrap, dropping
    * the lease as `lock()` does. `Box.seal` is the call.
    *
