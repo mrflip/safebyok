@@ -157,8 +157,6 @@ const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'id
 /** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
 const MisconfiguredMessage = "The vault's server could not serve this request: its own setup is wrong, not the request. Retrying will not help until it is fixed; the server's logs say what is wrong."
 
-// The arguments as the schema shapes them, rebuilt field by field as plain records: the
-// VaultDB checks them as it would any caller's.
 /** A vault as the server's VaultDB read it, as `SafebyokVault` carries it: its record as `vault`, beside its sound boxes and its damaged ones; null for none. */
 const relayedVault = (val: unknown): unknown => {
   if (val === null) { return null }
@@ -166,6 +164,8 @@ const relayedVault = (val: unknown): unknown => {
   return { vault, boxes, damagedBoxes }
 }
 
+// The arguments as the schema shapes them, rebuilt field by field as plain records: the
+// VaultDB checks them as it would any caller's.
 const scopeIn = (args: VaultFieldArgs) => recordOf(args, ScopeFields) as VaultScope
 const vaultRecordIn = (args: VaultFieldArgs) => recordOf(args.vaultRecord, VaultRecordFields) as VaultRecord
 
