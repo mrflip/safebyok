@@ -1,5 +1,5 @@
 import { deepFreeze } from 'es-toolkit'
-import * as Z from 'zod/mini'
+import type * as Z from 'zod'
 import { decorate } from './adorn'
 import { Ciphered, randomId } from './crypto'
 import { VaultError } from './errors'
@@ -9,7 +9,6 @@ import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { type BoxSummary, type DamagedBox, EpochMillis, type ListedSummary, Sidecar, type Stamp, Whisper } from './types'
 import type { Vault } from './vault'
-import { label } from './checks/primitives'
 import { Validator } from './checks/validator'
 
 // == [The record]: BoxRecord, BoxFormat
@@ -27,32 +26,36 @@ export const BoxFormat = 'safebyok-box-v8'
  * version -- is bound into both encryptions, as AES-GCM's additional data. So is every field of
  * this revision but the two encrypted ones: `revision_tok`, minted fresh on every write, the
  * sidecar and `written_at`. So ciphertext moved between revisions, boxes or vaults refuses to
- * open, as does an altered sidecar or time. Its boxlabel is a label, as `label` checks.
+ * open, as does an altered sidecar or time. Its boxlabel is a label, as `label` checks. Its
+ * `parse` refuses 'bad_record'. It is strict, as every stored record is: a field this version does
+ * not know is damage.
  *
  * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
  */
-export const BoxRecord = Z.object({
-  format:                 Z.literal(BoxFormat),
-  boxlabel:               label,
-  revision_tok:           Z.string().check(Z.minLength(1)),
-  /** This box's boxKey, wrapped under the vaultKey. */
-  box_key_wrapped:        Ciphered,
-  /** The whisper, ciphered under this box's boxKey. */
-  whisper_ciphered:       Ciphered,
-  /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
-  whisper_codec:          Z.literal('json_v1'),
-  /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
-  whisper_schema_version: Z.literal(1),
-  /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
-   * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
-   * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
-   */
-  sidecar:                Sidecar,
-  /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
-  registered_at:          EpochMillis,
-  /** When this revision was written, an {@link EpochMillis}: a store of the same whisper moves it too. */
-  written_at:             EpochMillis,
-})
+export const { BoxRecord } = Validator('bad_record', ({ obj, str, lit, boxlabel }) => ({
+  BoxRecord: obj({
+    format:                 lit(BoxFormat),
+    boxlabel,
+    revision_tok:           str.min(1),
+    /** This box's boxKey, wrapped under the vaultKey. */
+    box_key_wrapped:        Ciphered,
+    /** The whisper, ciphered under this box's boxKey. */
+    whisper_ciphered:       Ciphered,
+    /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
+    whisper_codec:          lit('json_v1'),
+    /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
+    whisper_schema_version: lit(1),
+    /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
+     * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
+     * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
+     */
+    sidecar:                Sidecar,
+    /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
+    registered_at:          EpochMillis,
+    /** When this revision was written, an {@link EpochMillis}: a store of the same whisper moves it too. */
+    written_at:             EpochMillis,
+  }).strict(),
+}))
 export type BoxRecord = Z.infer<typeof BoxRecord>
 // --
 
@@ -78,7 +81,7 @@ export type SealBoxProps = {
 }
 
 /** What {@link Box.seal}'s props may hold, and nothing else. */
-const checkSealProps = optionsCheck({ boxlabel: Z.unknown(), sidecar: Z.optional(Z.unknown()), base: Z.optional(Z.unknown()) }, "Box.seal's props are `boxlabel`, `sidecar`, the box's own visible data, and `base`, the box it replaces: check their spelling, and leave out any other.")
+const checkSealProps = optionsCheck(({ unk }) => ({ boxlabel: unk, sidecar: unk.optional(), base: unk.optional() }), "Box.seal's props are `boxlabel`, `sidecar`, the box's own visible data, and `base`, the box it replaces.")
 
 /** The boxlabel a seal is handed, checked as a scope's names are: 'bad_scope' for one that is not a label. */
 const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBoxlabel: obj({ boxlabel }) }))
@@ -342,10 +345,10 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
   return checked.data
 }
 
-/** What a {@link BoxBase} must show: a revision, or null for none, and a `registered_at` where it gives one. */
-const BaseShape = Z.nullable(Z.looseObject({
-  revision_tok:  Z.nullable(BoxRecord.shape.revision_tok),
-  registered_at: Z.optional(EpochMillis),
+/** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; and what a {@link Stamp} must show, the scope, the `vault_tok`, and both epochs. */
+const { BaseShape, StampShape } = Validator('bad_option', ({ obj, str, uint }) => ({
+  BaseShape:  obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: EpochMillis.optional() }).loose().nullable(),
+  StampShape: obj({ applabel: str, user_id: str, vaultlabel: str, vault_tok: str.min(1), vault_epoch: uint, gate_epoch: uint }),
 }))
 
 /** `base`, once it is a {@link BoxBase} or none: 'bad_option' otherwise, quoting none of it. */
@@ -356,16 +359,6 @@ const checkedBase = (base: unknown): BoxBase | null => {
   }
   return checked.data
 }
-
-/** What a {@link Stamp} must show: the scope, the `vault_tok`, and both epochs. */
-const StampShape = Z.object({
-  applabel:    Z.string(),
-  user_id:     Z.string(),
-  vaultlabel:  Z.string(),
-  vault_tok:   Z.string().check(Z.minLength(1)),
-  vault_epoch: Z.int().check(Z.nonnegative()),
-  gate_epoch:  Z.int().check(Z.nonnegative()),
-})
 
 /** `stamp`, once it is a {@link Stamp}: 'bad_option' for anything else. */
 const checkedStamp = (stamp: unknown): Stamp => {

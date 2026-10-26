@@ -271,7 +271,7 @@ describe("a record the deployment refused", () => {
   const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
   const standing = TH.vaultPropsOf(subject, { ...scope, gate_epoch: 52_871, ...quotableWayins })
-  const nextVaultProps = { ...standing, gate_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
+  const nextVaultProps = { ...standing, gate_epoch: 52_872, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } }
   const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
@@ -284,7 +284,7 @@ describe("a record the deployment refused", () => {
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
   const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, gate_epoch: 7, ...rivalWayins })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
+  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
@@ -297,7 +297,7 @@ describe("a record the deployment refused", () => {
       const deployment = deploy()
       const client = deployment.client(subject)
       await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), standing)
-      // The core strips a field it does not know, so this one strays in on the wire, past it,
+      // The core refuses a field it does not know, so this one strays in on the wire, past it,
       // where Convex's validator refuses the call. convex-test's validator names the field; a
       // dev deployment's quotes the arguments too (notes/security.md). The refusal carries none of it.
       const straying: ConvexVaultClient = {

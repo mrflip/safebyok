@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
-import * as Z from 'zod/mini'
+import * as Zod from 'zod'
 import { BoxRecord } from '../src/box'
 import { DeviceRecord, Tombstone, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
 import * as TH from './test-helpers'
@@ -326,7 +326,7 @@ describe("DeviceRecord", () => {
 // changes moves its `format` on (VOCABULARY.md, *format*): each schema is rendered as JSON Schema
 // and kept as a snapshot under its own format literal, so a change made without a bump fails here.
 // After a bump, the new format's snapshot is written once (`vitest -u`), and the old one goes as
-// obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
+// obsolete: never update the snapshot of a format that stands. A refinement (a `.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
 // Each schema beside its format: the vault props are a union of two shapes under one format.
@@ -342,7 +342,7 @@ describe("Stored record formats", () => {
   for (const [formatSchema, schema] of StoredRecords) {
     const format = formatSchema.def.values.join(' | ')
     it(format, () => {
-      const rendered = Z.toJSONSchema(schema, { unrepresentable: 'any' })
+      const rendered = Zod.toJSONSchema(schema, { unrepresentable: 'any' })
       expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed, bump format, then write the new format's snapshot (vitest -u)`).toMatchSnapshot()
     })
   }

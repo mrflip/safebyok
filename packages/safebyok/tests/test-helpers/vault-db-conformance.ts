@@ -2,7 +2,7 @@ import { it, describe, expect, vi } from 'vitest'
 import type { BoxRecord } from '../../src/box'
 import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
-import type { GatedVaultProps, GatelessVaultProps } from '../../src/types'
+import type { GatelessVaultProps } from '../../src/types'
 import { MaxLabelChars, MaxUserIdChars } from '../../src/checks/primitives'
 import { type VaultDB, type VaultDBOpts, type BoxDelExpectation, type ListedVault, type VaultDelExpectation } from '../../src/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, raceOutcomeOf } from './racing'
@@ -235,13 +235,17 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(summaryOf(summary)?.sidecar).to.deep.equal(LiteralSidecar)
     })
 
-    it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
+    it("refuses a record holding a field safebyok never writes, writing nothing: a draft or vault props as bad_record, a box as invalid_box", async () => {
       const vaultDB = await makeVaultDB()
-      await ensureGated(vaultDB, { ...vaultPropsOf('u1'), stray_field: 'never stored' } as GatedVaultProps)
-      const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as BoxRecord)
-      expect(await propsOf(vaultDB, scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
-      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic', inThisVault)).to.deep.equal(boxOf('anthropic', 'one'))
-      expect(written).to.deep.equal(boxOf('anthropic', 'one'))
+      const stray = { stray_field: 'never stored' }
+      await expectBad(vaultDB.ensureVault({ ...gatelessOf('u1'), ...stray }), 'bad_record')
+      expect(await propsOf(vaultDB, scopeOf('u1'))).to.be.null
+      const { vaultProps: ensured } = await expectGood(vaultDB.ensureVault(gatelessOf('u1')))
+      await expectBad(vaultDB.putVaultProps({ ...vaultPropsOf('u1'), vault_tok: ensured.vault_tok, ...stray }, { vault_tok: ensured.vault_tok, gate_epoch: 0 }), 'bad_record')
+      expect(await propsOf(vaultDB, scopeOf('u1'))).to.deep.equal(ensured)
+      const expected = { vault_tok: ensured.vault_tok, revision_tok: null }
+      await expectBad(vaultDB.putBox(scopeOf('u1'), expected, { ...boxOf('anthropic', 'one'), ...stray }), 'invalid_box')
+      expect(await boxesOf(vaultDB, scopeOf('u1'))).to.deep.equal([])
     })
 
     it("hands back from a box write the record as stored, field for field the one written and the one a read then finds", async () => {

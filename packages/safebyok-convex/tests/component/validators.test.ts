@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { defineTestApp } from 'convex-test'
 import { defineSchema } from 'convex/server'
 import { v } from 'convex/values'
-import * as Z from 'zod/mini'
+import * as Zod from 'zod'
 import type { GenericValidator, Infer } from 'convex/values'
 import * as Records from 'safebyok'
 import type {
@@ -34,7 +34,8 @@ type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, s
 const zodShape = (schema: ZodLike): Shape => {
   const { def } = schema
   if (def.type === 'string' || def.type === 'number') { return { kind: def.type } }
-  if (def.type === 'null') { return { kind: 'null' } }
+  // Null, as Zod's null or as the literal null the core's kit makes it.
+  if (def.type === 'null' || (def.type === 'literal' && def.values?.length === 1 && def.values[0] === null)) { return { kind: 'null' } }
   if (def.type === 'literal') { return { kind: 'literal', values: (def.values ?? []).map(String).toSorted((one, two) => one.localeCompare(two)) } }
   if (def.type === 'object') {
     const fields = Object.entries(def.shape ?? {}).map(([ckey, field]) => {
@@ -84,11 +85,11 @@ const convexShape = (validator: GenericValidator): Shape => {
   }
 }
 
-const listedZod = Z.omit(Records.BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
+const listedZod = Records.BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true })
 
 // Convex holds both shapes of the core's vault props in one table: the gated shape, its passphrase
 // nullable as a gateless vault has it. The core alone tells the two apart.
-const eitherVaultPropsZod = Z.object({ ...Records.GatedVaultProps.shape, passphrase: Z.nullable(Records.PassphraseWayinRecord) })
+const eitherVaultPropsZod = Zod.object({ ...Records.GatedVaultProps.shape, passphrase: Records.PassphraseWayinRecord.nullable() })
 
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
@@ -180,8 +181,8 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), registered_at: null },                        false,  false,  'a null registered_at'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },  false,  false,  'a registered_at as an ISO string'],
   [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso },     false,  false,  'vault props from before their time was named registered_at'],
-  // Convex refuses, Zod strips: a field neither record has never reaches storage.
-  [{ ...TH.vaultPropsOf('u1'), passphrase_text: 'not-a-real-passphrase' },   true,   false,  'a field the record does not have'],
+  // Both refuse: a stored record is strict, so a field neither record has never reaches storage.
+  [{ ...TH.vaultPropsOf('u1'), passphrase_text: 'not-a-real-passphrase' },   false,  false,  'a field the record does not have'],
   // Zod refuses, Convex accepts -- the finer rules are the client's:
   [{ ...TH.vaultPropsOf('u1'), vault_tok: '' },                              false,  true,   'an empty vault_tok'],
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },                              false,  true,   'an epoch of zero'],

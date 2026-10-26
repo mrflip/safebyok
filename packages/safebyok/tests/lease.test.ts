@@ -1,7 +1,6 @@
 import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import * as Z from 'zod/mini'
 import { BoxFormat, type BoxRecord } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { type BoxVisible, Lease, type LeaseStanding, leaseRecordOf, sealLeaseRecord } from '../src/lease'
@@ -96,8 +95,8 @@ describe("sealLeaseRecord", () => {
     [{ ...standing, gate_epoch: 0 },             'vault props at gate_epoch 0'],
     [TH.omitting(standing, 'gate_epoch'),        'vault props with no gate_epoch'],
   ] as const) {
-    it(`throws, as misuse, at ${blurb}: no lease record could hold them`, async () => {
-      await expect(sealLeaseRecord(vaultAt(), badStanding as LeaseStanding, await makeVaultKey())).rejects.toThrow(Z.core.$ZodError)
+    it(`refuses 'bad_record', as misuse, at ${blurb}: no lease record could hold them`, async () => {
+      await TH.expectRefusal(sealLeaseRecord(vaultAt(), badStanding, await makeVaultKey()), 'bad_record')
     })
   }
 
@@ -106,8 +105,8 @@ describe("sealLeaseRecord", () => {
     [GrantedAt + 0.5,  'a clock read with a fraction of a millisecond'],
     [0,                'a clock reading before any lease could be granted'],
   ] as const) {
-    it(`throws, as misuse, at ${blurb}: no lease record could hold the deadline`, async () => {
-      await expect(sealLeaseRecord(vaultAt({ at }), standing, await makeVaultKey())).rejects.toThrow(Z.core.$ZodError)
+    it(`refuses 'bad_record', as misuse, at ${blurb}: no lease record could hold the deadline`, async () => {
+      await TH.expectRefusal(sealLeaseRecord(vaultAt({ at }), standing, await makeVaultKey()), 'bad_record')
     })
   }
 

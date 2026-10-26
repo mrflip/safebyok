@@ -222,18 +222,19 @@ export default defineConfig([
     },
   },
 
-  // Zod comes in as `zod`, or `zod/mini` until every schema in src/ is made in a Validator call.
-  // Classic is the larger library (the same five validators bundle to some 25 kB gzipped, against
-  // 7 kB in mini), a cost the Coach accepted for its ergonomics; named and star imports shake
-  // alike. `zod/v4` is the same classic under its version path, and `zod/v3` the classic before it.
+  // Zod comes in as `zod`, classic, the one flavour: every schema in src/ is made in a Validator
+  // call, which hands its builder Zod's makers. Classic is the larger library (the same five
+  // validators bundle to some 25 kB gzipped, against 7 kB in mini), a cost the Coach accepted for
+  // its ergonomics; named and star imports shake alike. `zod/mini` would bundle a second Zod beside
+  // it. `zod/v4` is the same classic under its version path, and `zod/v3` the classic before it.
   {
     name: 'safebyok/zod-paths',
     files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
-        paths: ['zod/v4', 'zod/v3'].map((versionPath) => ({
-          name:    versionPath,
-          message: "Import zod as `zod` (`import * as Zod from 'zod'`), or build in a Validator call, which hands its builder Zod's makers.",
+        paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
+          name:    otherPath,
+          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Validator call, which hands its builder Zod's makers: one Zod, classic, bundles.",
         })),
       }],
     },

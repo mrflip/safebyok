@@ -1,7 +1,7 @@
-import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type GatedVaultProps, type VaultProps, type DeviceRecord, DeviceRecordFormat, type LeaseRecord, type WayinKind, isGated, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
 import * as CX from './checks/core-checks'
+import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
@@ -1967,26 +1967,28 @@ const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initia
 const eventHint = (call: 'hello' | 'ensureUnlocked', tried: 'tryHello' | 'tryEnsureUnlocked') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
-const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.", eventHint('hello', 'tryHello'))
+const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage.", eventHint('hello', 'tryHello'))
 
 /** What `ensureUnlocked()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
-const checkEnsureUnlockedOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway: check its spelling, and leave out any other.", eventHint('ensureUnlocked', 'tryEnsureUnlocked'))
+const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway.", eventHint('ensureUnlocked', 'tryEnsureUnlocked'))
 
 /** The refusal of a `renewMinutes` as long as the lease or longer, under which every call would ask the user. */
 const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done.")
 
 /** What `demandConsistentWith()`'s options may hold: `leaseBound`, a boolean, and nothing else. */
-const checkDemandOpts = optionsCheck({ leaseBound: Z.optional(Z.boolean()) }, "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand: check its spelling, and leave out any other.")
+const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand.")
 
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
-const StampedShape = Z.looseObject({
-  vault_tok:   Z.string(),
-  applabel:    Z.optional(Z.string()),
-  user_id:     Z.optional(Z.string()),
-  vaultlabel:  Z.optional(Z.string()),
-  vault_epoch: Z.optional(Z.number()),
-  gate_epoch:  Z.optional(Z.number()),
-})
+const { StampedShape } = Validator('bad_option', ({ obj, str, num }) => ({
+  StampedShape: obj({
+    vault_tok:   str,
+    applabel:    str.optional(),
+    user_id:     str.optional(),
+    vaultlabel:  str.optional(),
+    vault_epoch: num.optional(),
+    gate_epoch:  num.optional(),
+  }).loose(),
+}))
 
 /** `thing`, as `demandConsistentWith()` was handed it, once it carries a `vault_tok`: 'bad_option' for anything else, quoting none of it. */
 const checkedStamped = (thing: unknown): Stamped => {
@@ -1998,7 +2000,7 @@ const checkedStamped = (thing: unknown): Stamped => {
 export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
 
 /** What `putBox()`'s props may hold: a boxlabel, a sidecar, and nothing else. */
-const checkPutBoxProps = optionsCheck({ boxlabel: Z.unknown(), sidecar: Z.optional(Z.unknown()) }, "putBox()'s props are `boxlabel`, and `sidecar`, the box's own visible data (it is authenticated but never encrypted): check their spelling, and leave out any other. A note is kept in the sidecar: { boxlabel, sidecar: { note } }.")
+const checkPutBoxProps = optionsCheck(({ unk }) => ({ boxlabel: unk, sidecar: unk.optional() }), "putBox()'s props are `boxlabel`, and `sidecar`, the box's own visible data (it is authenticated but never encrypted). A note is kept in the sidecar: { boxlabel, sidecar: { note } }.")
 
 /** The boxlabel and sidecar a `putBox()` was handed, the sidecar checked and undefined when left out.
  * Refuses 'bad_option' for props that are no object, a sidecar that is no JSON object, or a field

@@ -1,10 +1,10 @@
-import * as Z from 'zod/mini'
+import type * as Z from 'zod'
 import { BoxRecord } from './box'
 import { Capacity, GatedVaultProps, GatelessVaultProps, Tombstone, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
-import { InEnglish } from './options'
 import * as Names from './names'
 import * as CX from './checks/core-checks'
+import { Validator } from './checks/validator'
 import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
@@ -21,11 +21,6 @@ import { type Outcome, isOutcomeShaped, outcomeOf, unexpectedError } from './out
  */
 export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
 
-const VaultPropsExpectation = Z.object({
-  vault_tok:        GatedVaultProps.shape.vault_tok,
-  gate_epoch:       Z.int().check(Z.nonnegative()),
-})
-
 /** The vault a box read means to read in: it finds the box only while the standing vault props have this `vault_tok`.
  * Otherwise it refuses `vault_mismatch`, reading nothing more: none stand, a tombstone stands, or
  * the vault was deleted and made anew under another `vault_tok`. So a box from another life of the
@@ -35,10 +30,6 @@ const VaultPropsExpectation = Z.object({
  */
 export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
 
-const BoxGetExpectation = Z.object({
-  vault_tok:    GatedVaultProps.shape.vault_tok,
-})
-
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
  * The write lands only while the standing vault props have this `vault_tok` (else
  * `vault_mismatch`). It also needs the standing box at this `revision_tok`, or no box at all for
@@ -47,11 +38,6 @@ const BoxGetExpectation = Z.object({
  * @example { vault_tok: vaultProps.vault_tok, revision_tok: prev?.revision_tok ?? null }
  */
 export type BoxExpectation = Z.infer<typeof BoxExpectation>
-
-const BoxExpectation = Z.object({
-  vault_tok:    GatedVaultProps.shape.vault_tok,
-  revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
-})
 
 /** The vault a deletion means to remove whole: it lands only while the standing vault props have this `vault_tok` and `gate_epoch`.
  * So a delete proven against a gate another device has since changed refuses as stale: an old
@@ -63,13 +49,6 @@ const BoxExpectation = Z.object({
  */
 export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
 
-const NonnegativeInt = Z.int().check(Z.nonnegative())
-
-const VaultDelExpectation = Z.object({
-  vault_tok:        GatedVaultProps.shape.vault_tok,
-  gate_epoch:       Z.nullable(NonnegativeInt),
-})
-
 /** What a box deletion was aimed at: the vault, and the `revision_tok` the deleter read.
  * The `revision_tok` is null for a box listed as damaged with no revision a read could take.
  * The deletion lands only while the standing vault props have this `vault_tok`. It then removes
@@ -79,11 +58,6 @@ const VaultDelExpectation = Z.object({
  * @example { vault_tok: vaultProps.vault_tok, revision_tok: listed.revision_tok }
  */
 export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
-
-const BoxDelExpectation = Z.object({
-  vault_tok:    GatedVaultProps.shape.vault_tok,
-  revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
-})
 
 /** What a box deletion that landed found under its boxlabel, from the same atomic step as the removal.
  *
@@ -96,8 +70,18 @@ const BoxDelExpectation = Z.object({
  */
 export type BoxDeletion = Z.infer<typeof BoxDeletion>
 
-const BoxDeletion = Z.object({
-  outcome: Z.enum(['deleted', 'deleted_other', 'absent']),
+/** The checks for each expectation a verb is handed, and for the {@link BoxDeletion} a box deletion answers. Each refuses 'bad_record', which a verb re-throws as its own refusal. */
+const { VaultPropsExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
+  const { vault_tok } = GatedVaultProps.shape
+  const revision_tok = BoxRecord.shape.revision_tok.nullable()
+  return {
+    VaultPropsExpectation: obj({ vault_tok, gate_epoch: uint }),
+    BoxGetExpectation:     obj({ vault_tok }),
+    BoxExpectation:        obj({ vault_tok, revision_tok }),
+    VaultDelExpectation:   obj({ vault_tok, gate_epoch: uint.nullable() }),
+    BoxDelExpectation:     obj({ vault_tok, revision_tok }),
+    BoxDeletion:           obj({ outcome: oneof(['deleted', 'deleted_other', 'absent']) }),
+  }
 })
 
 /** One box as a VaultDB's `doGetVault` and `doEnsureVault` hand it up: the boxlabel it is stored under, and its record exactly as stored.
@@ -757,8 +741,11 @@ const withoutCiphered = (box: unknown): unknown => {
   return listed
 }
 
-/** A box as `doGetVault` may hand it up: every field but the two ciphered ones, so a projecting backend is checked as one handing whole records. */
-const ListedBox = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
+/** A box as `doGetVault` may hand it up, whole or with its two ciphered fields left out, so a projecting backend is checked as one handing whole records; and the one field of a damaged box the listing keeps, when the record holds it as text, what a write over it names. */
+const { ListedBox, StoredRevision } = Validator('bad_record', ({ obj }) => ({
+  ListedBox:      BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
+  StoredRevision: obj({ revision_tok: BoxRecord.shape.revision_tok }),
+}))
 
 /** True when a listed box is stored under a label, which a verb can reach. */
 const isNameable = (stored: StoredBox): boolean => CX.label.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
@@ -774,9 +761,6 @@ const listedOrDamaged = ({ boxlabel, box }: StoredBox): ListedSummary | DamagedB
 const damagedOf = (boxlabel: string, box: unknown): DamagedBox => (
   { boxlabel, damaged: true, revision_tok: StoredRevision.safeParse(box).data?.revision_tok ?? null }
 )
-
-/** The one field of a damaged box the listing keeps, when the record holds it as text: what a write over it names. */
-const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
 
 /** A listed box's summary: its visible fields, its sidecar the JSON value the record's check handed back. */
 const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
@@ -914,22 +898,25 @@ const checkListener = (onChange: unknown) => {
   }
 }
 
-/** `candidate` through `recordSchema`, or the refusal `refused` makes of Zod's error, which never quotes it.
- * Zod's issues name each failing field and what it expected, in English, never the value: Zod
- * leaves the input out of them unless asked for it, and nothing here asks.
+/** `candidate` through `recordSchema`, or the refusal `refused` makes, its cause the schema's own 'bad_record'.
+ * That cause names each failing field and what it expected, in its message and `meta.fieldnames`,
+ * never the value.
  */
-const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, refused: (opts: ErrorOptions) => VaultError): RecordT => {
-  const parsed = recordSchema.safeParse(candidate, InEnglish)
-  if (! parsed.success) { throw refused({ cause: parsed.error }) }
-  return parsed.data
+const checked = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unknown, refused: (opts: ErrorOptions) => VaultError): RecordT => {
+  try {
+    return recordSchema.parse(candidate)
+  } catch (err) {
+    if (isVaultError(err, 'bad_record')) { throw refused({ cause: err }) }
+    throw err
+  }
 }
 
-/** A record or expectation a verb was handed, once it is one this package builds: 'bad_record' otherwise.
+/** A record or expectation a verb was handed, once it is one this package builds: 'bad_record' otherwise, its cause the schema's own, naming each failing field.
  * The refusal leads with what was spared: nothing `written`, for a delete nothing `removed`, or for
  * a box read nothing `read`.
  */
-const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' | 'read' = 'written'): RecordT => checked(recordSchema, candidate, () => (
-  new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
+const checkOutgoing = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' | 'read' = 'written'): RecordT => checked(recordSchema, candidate, (opts) => (
+  new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`, opts)
 ))
 
 /** A draft handed to `ensureVault`, once it is gateless vault props with `vault_epoch` 0: 'bad_record' otherwise, quoting none of it.
@@ -1006,7 +993,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 }
 
 /** The one field of stored vault props a deletion needs, as the vault's own check has it. */
-const StoredVaultTok = Z.object({ vault_tok: GatedVaultProps.shape.vault_tok })
+const { StoredVaultTok } = Validator('bad_record', ({ obj }) => ({ StoredVaultTok: obj({ vault_tok: GatedVaultProps.shape.vault_tok }) }))
 // --
 
 // == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes
@@ -1031,8 +1018,8 @@ const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
   return box
 }
 
-/** An adapter's answer to `said` through `answerSchema`: one in another shape is the adapter's bug, `corrupt_record`, Zod's error its cause. */
-const checkAnswer = <AnswerT>(answerSchema: Z.ZodMiniType<AnswerT>, raw: unknown, said: string, landed?: 'landed'): AnswerT => (
+/** An adapter's answer to `said` through `answerSchema`: one in another shape is the adapter's bug, `corrupt_record`, its check's 'bad_record' the cause. */
+const checkAnswer = <AnswerT>(answerSchema: Z.ZodType<AnswerT>, raw: unknown, said: string, landed?: 'landed'): AnswerT => (
   checked(answerSchema, raw, (opts) => wrongAnswer(said, landed, opts))
 )
 

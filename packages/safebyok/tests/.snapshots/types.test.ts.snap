@@ -24,6 +24,7 @@ exports[`Stored record formats > safebyok-box-v8 1`] = `
           "type": "boolean",
         },
         {
+          "const": null,
           "type": "null",
         },
         {
@@ -482,9 +483,11 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "type": "number",
         },
         "passkey": {
+          "const": null,
           "type": "null",
         },
         "passphrase": {
+          "const": null,
           "type": "null",
         },
         "registered_at": {

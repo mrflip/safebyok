@@ -1,10 +1,11 @@
-import * as Z from 'zod/mini'
+import type * as Z from 'zod'
 import { BoxRecord } from './box'
 import { Ciphered, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { sameScope } from './names'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
+import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { FarFuture, LeaseRecord, type VaultProps } from './types'
 import type { Vault } from './vault'
@@ -34,8 +35,12 @@ export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'
 /** The ctx's first part: the lease record's format. */
 const LeaseFormat = 'safebyok-lease-v1'
 
-/** What {@link sealLeaseRecord} binds: the scope, the vault props it was proven against, and the deadline, held to what its record will hold. */
-const LeaseGrant = Z.pick(LeaseRecord, { applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true })
+/** What {@link sealLeaseRecord} binds, the scope, the vault props it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
+const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
+  LeaseGrant:    LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
+  VisibleShape:  BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
+  CipheredShape: obj({ box_key_wrapped: Ciphered, whisper_ciphered: Ciphered }),
+}))
 
 /** The fields of a lease its wrap is bound to: every field of its record but its format, the leaseKey and the wrap. */
 type LeaseBinding = Z.infer<typeof LeaseGrant>
@@ -268,8 +273,8 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  * It ends the vault's `leaseMillis` from now, never past {@link FarFuture}, which is how
  * `leaseHours: Infinity` reads. It writes nothing: the vault puts the record in the device store,
  * and makes its Lease from what was stored. `vaultKey` must be extractable, to be wrapped: keep it
- * only for this call. It throws a Zod error, as misuse, for vault props a {@link LeaseRecord} could
- * not hold.
+ * only for this call. It refuses 'bad_record', as misuse, for vault props a {@link LeaseRecord}
+ * could not hold.
  *
  * @example const record = await sealLeaseRecord(vault, vaultProps, vaultKey)   // record.ask_passphrase_at: leaseHours from now
  */
@@ -289,12 +294,6 @@ export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user
 
 /** What an unwrapped boxKey may do: decipher, never be exported. */
 const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
-
-/** A box record's visible fields, as {@link BoxVisible} has them. */
-const VisibleShape = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
-
-/** A box's two ciphered fields, as {@link BoxCiphered} has them. */
-const CipheredShape = Z.object({ box_key_wrapped: Ciphered, whisper_ciphered: Ciphered })
 
 /** `visible`, once it is a box record's visible fields: 'bad_record' otherwise, quoting none of it. */
 const checkedVisible = (visible: unknown): BoxVisible => {

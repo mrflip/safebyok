@@ -1,4 +1,3 @@
-import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
 import type { GatelessVaultProps, VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
@@ -6,6 +5,7 @@ import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
+import { Validator } from './checks/validator'
 import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
@@ -52,15 +52,10 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
-/** What localVaultDB must be handed: a store carrying a StringStore's five calls. Checked only. */
-const localVaultDBOptsShape = Z.object({
-  store: Z.object({
-    read:      Z.custom(isFunction),
-    write:     Z.custom(isFunction),
-    erase:     Z.custom(isFunction),
-    ckeys:     Z.custom(isFunction),
-    subscribe: Z.custom(isFunction),
-  }),
+/** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
+const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
+  const call = custom(isFunction)
+  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, ckeys: call, subscribe: call }) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {

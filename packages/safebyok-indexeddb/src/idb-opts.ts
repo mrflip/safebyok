@@ -1,4 +1,4 @@
-import * as Z from 'zod/mini'
+import { object as obj, string as str } from 'zod'
 import { VaultError, type VaultDBOpts } from 'safebyok'
 
 /** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
@@ -11,8 +11,8 @@ export type IdbVaultDBOpts = VaultDBOpts & {
 
 const DefaultDbName = 'safebyok'
 
-const dbName = Z.string().check(Z.minLength(1))
-const idbVaultDBOpts = Z.object({ dbName: Z._default(dbName, DefaultDbName) })
+/** What the options hold, `dbName` defaulted, as plain Zod: `parseDbName` refuses for it, in its own words. */
+const idbVaultDBOpts = obj({ dbName: str().min(1).default(DefaultDbName) })
 
 /** The database name a call was handed, or 'safebyok' without one.
  * Kind 'bad_option' for anything else, quoting none of it.

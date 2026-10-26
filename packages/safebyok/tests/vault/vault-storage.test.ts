@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-import * as Z from 'zod/mini'
 import { VaultError, isVaultError } from '../../src/errors'
 import type { DeviceRecord } from '../../src/types'
 import { memoryDeviceDB } from '../../src/device-db'
@@ -157,12 +156,12 @@ describe("tampering", () => {
     expect(err.message).to.include('the stored vault may be damaged')
   })
 
-  it("vault props that do not parse make the open itself refuse as damaged_vault, Zod's error its cause, deleting nothing", async () => {
+  it("vault props that do not parse make the open itself refuse as damaged_vault, their check's bad_record its cause, deleting nothing", async () => {
     const world = makeWorld()
     world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v6"}')
     const err = await TH.expectRefusal(world.open(), 'damaged_vault')
     expect(err.message).to.include("can't be opened")
-    expect(err.cause).to.be.instanceOf(Z.core.$ZodError)
+    expect(isVaultError(err.cause, 'bad_record')).to.be.true
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq('{"format":"safebyok-vault-v6"}')
   })
 

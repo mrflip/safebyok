@@ -1,5 +1,5 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { Validator } from './checks/validator'
 
 /** The options the IndexedDB device store and `browserOpts` share, and their parser. Only the type is public, through `safebyok/idb`. */
 
@@ -10,8 +10,8 @@ export type IdbOpts = {
 
 const DefaultDbName = 'safebyok'
 
-const dbName = Z.string().check(Z.minLength(1))
-const idbOpts = Z.object({ dbName: Z._default(dbName, DefaultDbName) })
+/** What the IndexedDB options hold, `dbName` defaulted, refusing 'bad_option'. */
+const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }) }))
 
 const badDbName = (said: string) => new VaultError('bad_option', `${said} takes an optional dbName, the name of the IndexedDB database to keep records in: non-empty text. Leave it out for '${DefaultDbName}'.`)
 

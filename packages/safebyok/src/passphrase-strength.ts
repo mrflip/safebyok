@@ -1,5 +1,5 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { Validator } from './checks/validator'
 import type { VaultScope } from './types'
 
 /** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
@@ -63,19 +63,19 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** What Bank.make's options schema holds `strengthChecker` to. */
-export const strengthChecker = Z.custom<StrengthChecker>(isStrengthChecker, {
-  error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
-})
+/** What Bank.make's options schema holds `strengthChecker` to, and what a checker must answer, a verdict: each refuses 'bad_option'. */
+export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
+  strengthChecker: custom<StrengthChecker>(isStrengthChecker, {
+    error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
+  }),
+  passphraseVerdict: union([
+    obj({ strong: lit(true) }),
+    obj({ strong: lit(false), reason: str.min(1) }),
+  ]),
+}))
 
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
-
-const reasonText = Z.string().check(Z.minLength(1))
-const passphraseVerdict = Z.union([
-  Z.object({ strong: Z.literal(true) }),
-  Z.object({ strong: Z.literal(false), reason: reasonText }),
-])
 
 /** `hostChecker` held to its contract and told `scope`: what `vault.checkStrength` asks, and the only caller of the host's checker.
  * So the vault and a dialog checking as the user types decide alike. A blank passphrase is weak

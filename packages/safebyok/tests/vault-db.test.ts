@@ -1,15 +1,14 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import * as Z from 'zod/mini'
 import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, type VaultPropsExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
-import { VaultError } from '../src/errors'
+import { VaultError, isVaultError } from '../src/errors'
 import { bad, good, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { BoxRecord } from '../src/box'
-import type { GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope } from '../src/types'
+import type { GatelessVaultProps, VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
 import { MaxUserIdChars } from '../src/checks/primitives'
@@ -275,7 +274,7 @@ describe("the abstract VaultDB, on the way back from a box deletion", () => {
       const refusal = await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'corrupt_record')
       expect(refusal.message).to.match(/deletion landed/)
       expect(refusal.message).to.match(/cannot read back/)
-      expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
+      expect(isVaultError(refusal.cause, 'bad_record')).to.be.true
       expect(TH.thrownText(refusal)).to.not.include('anthropic')
       // What the adapter removed stays removed: the refusal is about its answer, not its deletion.
       expect(vaultDB.rows.has(u1AnthropicBoxCkey)).to.be.false
@@ -307,7 +306,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
     vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), { format: 'safebyok-vault-v3' })
     const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(refusal).to.be.instanceOf(VaultError)
-    expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
+    expect(isVaultError(refusal.cause, 'bad_record')).to.be.true
     // Refused, never repaired or deleted: the record is still there for forensics.
     expect(vaultDB.rows.size).to.eq(1)
   })
@@ -646,10 +645,11 @@ describe("the abstract VaultDB, on the way in", () => {
     expect(refusal.message).to.not.include('anthropic')
   })
 
-  it("hands its adapter the record as this package writes it: a field it does not know stays behind", async () => {
+  it("hands its adapter only a record as this package writes it: one holding a field it does not know is refused 'bad_record', its adapter handed nothing", async () => {
     const vaultDB = new MapVaultDB()
-    await TH.ensureGated(vaultDB, { ...TH.vaultPropsOf('u1'), stray_field: 'x' } as GatedVaultProps)
-    expect(vaultDB.rows.get(u1VaultPropsCkey)).to.deep.equal(TH.vaultPropsOf('u1'))
+    const refusal = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), stray_field: 'x' } as GatelessVaultProps), 'bad_record')
+    expect((refusal.cause as VaultError).message).to.eq("There is no field stray_field: check its spelling, or leave it out")
+    expect(vaultDB.rows.size).to.eq(0)
   })
 
   it("lets a vault's own writes through untouched: a box with an empty sidecar, a box replaced, a deletion", async () => {
@@ -714,8 +714,8 @@ describe("the abstract VaultDB, on the way back from a box write", () => {
       expect(refusal.message).to.match(/landed/)
       expect(refusal.message).to.match(/cannot read back/)
       expect(refusal.message).to.match(/adapter needs a developer's look/)
-      // Zod's error is the cause where a check refused the box; a box naming another one has none.
-      expect(refusal.cause instanceof Z.core.$ZodError ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
+      // The check's bad_record is the cause where it refused the box; a box naming another one has none.
+      expect(isVaultError(refusal.cause, 'bad_record') ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
       // What the adapter stored stands: the refusal is about its answer, not its write.
       expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
     })
@@ -1120,8 +1120,8 @@ describe("the abstract VaultDB, reading a damaged box", () => {
       vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
       vaultDB.rows.set(u1AnthropicBoxCkey, stored)
       const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
-      // Zod's error is the cause where a check refused the box; a box naming another one has none.
-      expect(refusal.cause instanceof Z.core.$ZodError ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
+      // The check's bad_record is the cause where it refused the box; a box naming another one has none.
+      expect(isVaultError(refusal.cause, 'bad_record') ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
       const shown = [TH.thrownText(refusal), JSON.stringify(refusal), JSON.stringify(refusal.cause ?? null), String(refusal.cause)].join('\n')
       expect(shown).to.not.include('TELLTALE')
     })
@@ -1132,16 +1132,24 @@ describe("the abstract VaultDB, reading a damaged box", () => {
     vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
     vaultDB.rows.set(u1AnthropicBoxCkey, { ...telltaleBox, registered_at: 'when-TELLTALE' })
     const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
-    const { issues } = refusal.cause as Z.core.$ZodError
-    expect(issues.map((issue) => issue.path)).to.deep.equal([['registered_at']])
-    expect(issues[0]?.message).to.match(/expected number, received string/)
+    const cause = refusal.cause as VaultError
+    expect(cause.meta?.fieldnames).to.deep.equal(['registered_at'])
+    expect(cause.message).to.eq("registered_at: Invalid input: expected number, received string")
+  })
+
+  it("refuses a box stored with a field this version does not know as damaged_box: a stored record is strict", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
+    vaultDB.rows.set(u1AnthropicBoxCkey, { ...TH.boxOf('anthropic', 'one'), note: 'work account' })
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
+    expect((refusal.cause as VaultError).message).to.eq("There is no field note: check its spelling, or leave it out")
   })
 
   it("refuses standing vault props that fail their checks, met by ensureVault, as damaged_vault", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(u1VaultPropsCkey, { ...TH.vaultPropsOf('u1'), gate_epoch: 'one' })
     const refusal = await TH.expectBad(vaultDB.ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-drafted' })), 'damaged_vault')
-    expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
+    expect(isVaultError(refusal.cause, 'bad_record')).to.be.true
   })
 })
 // --

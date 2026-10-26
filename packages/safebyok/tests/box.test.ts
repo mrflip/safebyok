@@ -32,7 +32,7 @@ const BoxCases = [
   [{ ...wholeBox, sidecar: null },                         false,  'a sidecar of JSON null'],
   [{ ...wholeBox, sidecar: [{ note: 'work account' }] },   false,  'a sidecar that is an array'],
   [{ ...sidecarless, format: 'safebyok-box-v7', sidecar_json: '{}' }, false, 'a box from before the sidecar was a JSON value, holding sidecar_json'],
-  [{ ...wholeBox, note: 'work account' },                  true,   'an unknown field such as the old note is dropped, never kept'],
+  [{ ...wholeBox, note: 'work account' },                  false,  'an unknown field such as the old note, as damage: a stored record is strict'],
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],
   [{ ...wholeBox, whisper_schema_version: 2 },             false,  'a whisper schema version this version does not know'],
   [TH.omitting(wholeBox, 'whisper_codec'),                 false,  'a box missing its whisper codec'],
@@ -54,8 +54,9 @@ describe("BoxRecord", () => {
     it(blurb, () => { expect(BoxRecord.safeParse(candidate).success).to.eq(expected) })
   }
 
-  it("keeps none of a field it does not know, such as the note a box once had", () => {
-    expect(BoxRecord.parse({ ...wholeBox, note: 'work account' })).to.deep.equal(wholeBox)
+  it("refuses a field it does not know, such as the note a box once had, as 'bad_record', naming it", () => {
+    const err = TH.expectSyncRefusal(() => BoxRecord.parse({ ...wholeBox, note: 'work account' }), 'bad_record')
+    expect(err.message).to.eq("There is no field note: check its spelling, or leave it out")
   })
 
   it("tells a row that is no box from one that is, as its example shows", () => {

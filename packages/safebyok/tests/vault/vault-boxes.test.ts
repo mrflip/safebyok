@@ -814,8 +814,9 @@ describe("the box limit", () => {
     it(`counts room enough for a box of ${String(limitBytes)} whisper and sidecar bytes, its other fields at their largest`, async () => {
       for (const { whisperBytes, sidecar } of heaviestSplitsOf(limitBytes)) {
         const row = await heaviestRowOf(whisperBytes, sidecar)
-        expect(BoxRecord.safeParse(row).success).to.be.true
-        expect(VaultScope.safeParse(row).success).to.be.true
+        const { applabel, user_id, vaultlabel, ...box } = row
+        expect(BoxRecord.safeParse(box).success).to.be.true
+        expect(VaultScope.safeParse({ applabel, user_id, vaultlabel }).success).to.be.true
         const rowBytes = new TextEncoder().encode(JSON.stringify(row)).length
         expect(rowBytes).to.be.at.most((limitBytes * StoredBytesPerWhisperByte) + BoxFieldsBytes)
       }

@@ -1,4 +1,3 @@
-import * as Z from 'zod/mini'
 import { type Ciphered, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
@@ -9,6 +8,7 @@ import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type Stamp, type Stamped, type VaultProps, type WayinKind, isGated } from './types'
 import { decorate } from './adorn'
+import { Validator } from './checks/validator'
 import type { Vault } from './vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
 
@@ -307,11 +307,13 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 const PrfAnswerBytes = 32
 
 /** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
-const passkeyAnswerShape = Z.object({
-  credentialId: Z.string().check(Z.minLength(1)),
-  prfSaltB64:   Z.string().check(Z.minLength(1)),
-  prfBytes:     Z.custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
-})
+const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
+  passkeyAnswerShape: obj({
+    credentialId: str.min(1),
+    prfSaltB64:   str.min(1),
+    prfBytes:     custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
+  }),
+}))
 
 /** The proving of a passkey's answer: the passkeyKey HKDF makes of its PRF bytes, with the header's whole wayin ctx as its `info`.
  *
