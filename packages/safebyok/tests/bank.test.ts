@@ -315,6 +315,33 @@ describe("bank.ensureVault", () => {
     expect(births).not.toHaveBeenCalled()
   })
 
+  it("refuses a store's field in the bag, misspelt or not, 'bad_option', naming the field and the second bag, and births nothing", async () => {
+    const world = makeWorld()
+    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const bank = bankIn(world)
+    for (const [fieldname, store] of [['vaultDb', world.vaultDB], ['deviceDb', world.deviceDB]] as const) {
+      const err = await TH.expectRefusal(bank.ensureVault({ ...Main, [fieldname]: store }), 'bad_option')
+      expect(err.meta?.fieldnames).to.deep.equal([fieldname])
+      expect(err.message).to.include(`The field ${fieldname} names a store`).and.include('second bag')
+    }
+    // A name not shaped as one of ours is refused all the same, and not repeated.
+    await TH.expectRefusal(bank.ensureVault({ ...Main, VaultDB: world.vaultDB } as typeof Main), 'bad_option')
+    TH.expectSyncRefusal(() => { bank.closeVault({ ...Main, vaultDb: world.vaultDB } as typeof Main) }, 'bad_option')
+    expect(births).not.toHaveBeenCalled()
+  })
+
+  it("still takes a Vault object, its own functions and all, its snapshot and its record as the bag", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const vault = await bank.ensureVault(Main)
+    expect(Object.keys(vault)).to.include.members(['getSnapshot', 'subscribe'])
+    const record = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    if (record === null) { throw new Error('no vault was stored') }
+    for (const bag of [vault, vault.getSnapshot(), record]) {
+      expect(await bank.ensureVault(bag)).to.eq(vault)
+    }
+  })
+
   it("refuses options naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to options naming its own", async () => {
     const world = makeWorld()
     const bank = bankIn(world)

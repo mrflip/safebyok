@@ -13,6 +13,11 @@ describe("Phrases", () => {
     expect(Phrases.moreFailures(3)).to.eq("and 3 more failures")
   })
 
+  it("names one store's field in the singular, several in the plural, and the second bag either way", () => {
+    expect(Phrases.storesInBag(['vaultDb'])).to.match(/^The field vaultDb names a store/).and.include('second bag')
+    expect(Phrases.storesInBag(['vaultDb', 'deviceDb'])).to.match(/^The fields vaultDb, deviceDb name a store/)
+  })
+
   it("names each limit it is given", () => {
     expect(Phrases.labelTooLong(40)).to.include('40')
     expect(Phrases.userIdTooLong(100)).to.include('100')

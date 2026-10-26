@@ -49,8 +49,10 @@ added or folded into through the subagent, and no other entry changes.
   and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is. Sign-out is
   expected to call `bank.closeVaults()` and drop the bank; `safebyok-react`'s `BankProvider` does so when its `user_id` prop changes or goes
   null.
-  (2) A bag carrying `vaultDB` or `deviceDB` is refused `bad_option`, not ignored, since ignoring it would birth the vault in the bank's
-  default store. A vault's own stores go in a second, strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.)
+  (2) A field in the bag named as a store is refused `bad_option`: `vaultDB`, `deviceDB`, or any field whose name ends `db` in any case (a
+  misspelt `vaultDb` included). It is judged by name only, never by value, so a Vault object's own function fields still pass as a bag.
+  It is refused, not ignored, since ignoring it would birth the vault in the bank's default store. A vault's own stores go in a second,
+  strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.)
   (3) A `KeyDeriver` may carry an optional `load()`, as a strength checker can; each bank's `hello()` runs both before any vault is born.
   A failing deriver `load` refuses `unexpected_error` with what it threw kept as the error's `cause`, unlike `deriveKeyBytes`, whose throws
   are never kept: `load` is never handed a passphrase. `Bank.make` refuses a `load` that is not a function.
@@ -150,7 +152,7 @@ added or folded into through the subagent, and no other entry changes.
   failed leaves the vault showing locked and not unlocked under a lease from the previous gate.
 * 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **one vault, one place.** `bank.ensureVault(draft)` refuses `bad_option` when
   the draft names a `vaultDB` or `deviceDB` other than the stores the held (or being-born) Vault object was born from
-  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any `vaultDB` or `deviceDB` in it is refused `bad_option`; see the entry at the top)
+  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any field in it named as a store (`vaultDB`, `deviceDB`, or a name ending `db` in any case) is refused `bad_option`; see the entry at the top)
   (`packages/safebyok/src/bank.ts`), so a vault read from one store is never written to another. A Vault object found
   gone (deleted or remade) in the microtasks before its birth was filed is never handed out.
 * 2026-10-23 (primitives sprint, thread 9, gating): **cleartext has one door: a gating's attempt.** No vault call takes a

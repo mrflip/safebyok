@@ -6,7 +6,8 @@ import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
 import type { BankScope } from './checks/core-checks'
 import type * as Z from 'zod'
-import { Validator } from './checks/validator'
+import { Validator, sayable } from './checks/validator'
+import * as Phrases from './phrases'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
@@ -211,8 +212,8 @@ export class Bank {
    * objects, as stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_scope' for a bag of another app or user than the bank's, or a name that fails its
-   * check, and 'bad_option' for options amiss -- or a bag carrying a `vaultDB` or `deviceDB`, which
-   * go in `opts` -- each before storage is touched; and 'bad_option' for options naming another
+   * check, and 'bad_option' for options amiss -- or a bag carrying a `vaultDB`, a `deviceDB`, or any
+   * field named as a store (`vaultDb`), as stores go in `opts` -- each before storage is touched; and 'bad_option' for options naming another
    * `vaultDB` or `deviceDB` object than the vault held was born from, one made afresh over the same
    * storage among them. Refuses as storage refuses: 'damaged_vault' for vault props it cannot use
    * (`delDamagedVault` clears them), 'newer_format', 'identity_revoked', 'storage_unavailable'.
@@ -374,7 +375,7 @@ export class Bank {
     this.#listeners.forEach((listener) => { listener() })
   }
 
-  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise, and 'bad_option' for a bag carrying a vault's stores, which go in its options. */
+  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise, and 'bad_option' for a bag carrying a field named as a store, as a vault's stores go in its options. */
   #vaultScopeOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultScope {
     const { vaultlabel, ...names } = vaultBag.parse(bag)
     checkNoStoresIn(bag)
@@ -574,7 +575,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: vaultBag, bankBag, loadLibs, frozenEntry, checkNoStoresIn, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError, storesInBagError
+// == [Helpers]: vaultBag, bankBag, loadLibs, frozenEntry, StoreFieldnamePattern, checkNoStoresIn, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
 /** What names one of a bank's vaults as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`, and everything else the thing carries left out. Each refuses 'bad_scope'. */
 const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
@@ -594,9 +595,18 @@ const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
 /** An entry's view, frozen. */
 const frozenEntry = (scope: VaultScope, status: EntryStatus, vault: Vault | null, err: VaultError | null): VaultEntry => Object.freeze({ scope, status, vault, err })
 
-/** Refuse 'bad_option' for a bag naming a vault that carries a `vaultDB` or `deviceDB`: a vault's own stores go in its options, the second bag, and the bank's own would otherwise be used, quietly. */
+/** A field named as a store is, in any case: `vaultDB`, `vaultDb`, `deviceDB`. */
+const StoreFieldnamePattern = /db$/i
+
+/** Refuse 'bad_option' for a bag naming a vault that carries a field named as a store is -- ending `db` in any case, as `vaultDB`, `vaultDb` or `deviceDB` do -- its own or inherited: a vault's own stores go in its options, the second bag, and the bank's own would otherwise be used, quietly.
+ * Only names are judged, never values: a Vault object's own functions (`getSnapshot`,
+ * `subscribe`) pass, as it may be handed in as the bag.
+ */
 const checkNoStoresIn = (bag: object) => {
-  if ('vaultDB' in bag || 'deviceDB' in bag) { throw storesInBagError() }
+  // A store's own name is caught inherited too, as a getter on a class's prototype is no own key.
+  const inherited = [...('vaultDB' in bag ? ['vaultDB'] : []), ...('deviceDB' in bag ? ['deviceDB'] : [])]
+  const stores = [...new Set([...Object.keys(bag), ...inherited])].filter((ckey) => StoreFieldnamePattern.test(ckey))
+  if (stores.length > 0) { throw new VaultError('bad_option', `${Phrases.storesInBag(stores.map((ckey) => sayable(ckey)))}.`, { meta: { fieldnames: stores.map((ckey) => sayable(ckey)) } }) }
 }
 
 /** Refuse 'bad_option' unless `parts` names the stores `held` was born from, the same objects: one scope lives in one place, and a vault read from one store and written to another is no vault at all.
@@ -618,8 +628,6 @@ const otherStoresError = () => new VaultError('bad_option', "The bank already ho
 
 /** The refusal of a bag naming another app or user than the bank's, naming the fields that differ, never their values. */
 const otherScopeError = (fieldnames: readonly string[]) => new VaultError('bad_scope', `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`, { meta: { fieldnames } })
-
-const storesInBagError = () => new VaultError('bad_option', "A vault's own vaultDB and deviceDB go in the call's second bag, its options, not beside the vaultlabel: bank.ensureVault({ vaultlabel }, { vaultDB }). Left there, the bank's own stores would be used instead.")
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --

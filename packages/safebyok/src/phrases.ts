@@ -63,6 +63,15 @@ export const unknownFields = (fieldnames: readonly string[]): string => (
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
 // --
 
+// == [Bank calls]: storesInBag
+
+/** The bag naming a vault holds `fieldnames`, each named as a store is: a vault's own stores go in the call's second bag, its options. */
+export const storesInBag = (fieldnames: readonly string[]): string => {
+  const named = fieldnames.length === 1 ? `The field ${fieldnames[0]!} names` : `The fields ${fieldnames.join(', ')} name`
+  return `${named} a store beside the vaultlabel, where a vault's own vaultDB and deviceDB go in the call's second bag, its options: bank.ensureVault({ vaultlabel }, { vaultDB }). Left there, the bank's own stores would be used instead`
+}
+// --
+
 // == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, DeviceScopepathShape, BoxScopepathShape
 
 /** A bank's scopepath of the wrong shape. */
