@@ -157,7 +157,8 @@ that pass their checks and fit the adapter's declared limits they hold (*Names*,
 
 **1.3. Nothing is repaired, and nothing is dropped.** An adapter hands up every record as it is
 stored, damaged or not; the base class decides what is damaged, and the vault lists a damaged
-box so that the user can delete it. *Proven by the base class's own tests* (the core's
+box so that the user can delete it. Every record is strict: one holding a field this version does
+not write reads as damaged, and a verb handed one refuses it before the adapter sees it. *Proven by the base class's own tests* (the core's
 `vault-db.test.ts`), which can plant a damaged record; the battery cannot, through public verbs
 that refuse to write one.
 

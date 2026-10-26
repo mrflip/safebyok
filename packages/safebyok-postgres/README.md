@@ -99,10 +99,11 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   holds, as a best effort: see *A limit of the server's own*, below. Quotas are yours to set.
 * **`logger`**, when given, hears what the VaultDB has to say: a `listen` that failed to start, an
   unlisten that failed, a subscriber that threw. Left out, it is the console's.
-* **Names of up to 640 bytes** of UTF-8 each (`maxNameBytes`): a box's primary key is its
-  four names together, and Postgres holds a btree entry of at most 2704 bytes. A longer name is
-  refused with kind `bad_scope` before a statement runs. No character is reserved: each name is
-  a column of its own.
+* **Names are labels and user_ids**, checked by the package (`VAULTDB.md`, *Names*): an
+  applabel, vaultlabel or boxlabel a `label`, the user a `user_id`. One that fails its check is
+  refused with kind `bad_scope` before a statement runs. Each name is a column of its own, and a
+  box's primary key its four names together, well within the 2704 bytes of a Postgres btree
+  entry (`maxNameBytes`, 640, holds every name the checks pass).
 * **What the server checks** is who may reach which vault, that each write is atomic, and that
   each record has its shape and each name passes its check (`VAULTDB.md`, *Names*) and fits
   the limit above: the same checks every VaultDB's verbs make, and a browser's vault, on the

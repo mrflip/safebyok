@@ -183,8 +183,8 @@ through the recipe, that line included.
   an error may quote the variables. Anything else
   -- the network down, a server not serving this schema -- refuses with kind
   `storage_unavailable`, urql's own error as its `cause`.
-* **It holds a record to 1 MiB**, and a name to 640 bytes of UTF-8, as the Postgres VaultDB
-  behind it does, and a vault to no size of its own.
+* **It holds a record to 1 MiB**, as the Postgres VaultDB behind it does, and a vault to no size
+  of its own. Its names are labels and user_ids, checked by the package (`VAULTDB.md`, *Names*).
 * **The server checks** who may reach which vault, that each write is atomic, and that each
   record has its shape and each name passes its check and fits its storage's limits (the
   VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never what a box's sidecar holds.

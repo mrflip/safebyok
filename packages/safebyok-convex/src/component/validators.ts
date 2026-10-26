@@ -3,8 +3,8 @@ import { v } from 'convex/values'
 /** Convex validators for safebyok's stored records, field for field with the core's Zod records of the same names.
  * They check what Convex can: which fields, their types, which are optional, and each record's
  * `format`. Every name is any text here, and a box's sidecar any object Convex holds. The finer
- * rules, the name floor and a sidecar's values being JSON among them, are the client's, checked by the
- * core's records on every write and every read. The vault's own validators the server never sees.
+ * rules are the client's, checked by the core's records on every write and every read: each name
+ * a label or a user_id, checked by the package, and a sidecar's values JSON.
  *
  * A new record format widens its `format` union: an additive deploy, shipped with this package.
  */
