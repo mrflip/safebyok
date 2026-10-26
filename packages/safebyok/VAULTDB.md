@@ -30,8 +30,8 @@ Three layers share the work, and each guarantee below belongs to one of them.
   anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. Every verb resolves an
   `Outcome` and never rejects: `{ ok: true, val }`, or `{ ok: false, err }` with the refusal as
-  a `VaultError`, whether the base class refused or your code threw. It holds every name to the
-  floor and to what your adapter declares (*Names*, below), never to a host's own validators.
+  a `VaultError`, whether the base class refused or your code threw. It holds every name to its
+  check and to what your adapter declares (*Names*, below).
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
   runs once, however often the host calls it. It hands a vault's records on, whole but for their
