@@ -529,7 +529,7 @@ export abstract class VaultDB {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const read = await readStoredVault(() => adapterAnswer('doGetVault', () => this.doGetVault(asked)))
-      const raw: unknown = read.vault
+      const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
       if (raw === null || raw === undefined || isTombstone(raw)) { return null }
       if (mayBeNewer(raw)) { throw newerVaultRecord() }
       if (isSoundVaultRecord(raw, asked)) {

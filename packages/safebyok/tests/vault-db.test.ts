@@ -617,6 +617,12 @@ describe("the abstract VaultDB, deleting a vault whose vault record is damaged",
     await TH.expectBad(new DownVaultDB().delDamagedVault(TH.scopeOf('u1')), 'storage_unavailable')
     await TH.expectBad(new MapVaultDB().delDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_scope')
   })
+
+  it("refuses as corrupt_record, deleting nothing, an adapter whose read answers no object, as getVault does", async () => {
+    const refusal = await TH.expectBad(new RelayingVaultDB(null).delDamagedVault(TH.scopeOf('u1')), 'corrupt_record')
+    expect(refusal.message).to.match(/Storage answered a vault read in a shape this package does not know/)
+    await TH.expectBad(new RelayingVaultDB(null).getVault(TH.scopeOf('u1')), 'corrupt_record')
+  })
 })
 // --
 
