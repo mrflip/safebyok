@@ -219,18 +219,19 @@ export default defineConfig([
     },
   },
 
-  // And it costs the host only what it uses. src/ validates with zod/mini, whose builders a host's
-  // bundler drops when nothing reaches them; classic zod's it cannot, so one import of classic
-  // would put all of it in every host's bundle.
+  // And it costs the host little. Classic zod is the larger library: the same five validators
+  // bundle to some 25 kB gzipped in classic and 7 kB in zod/mini, and named and star imports shake
+  // alike. This package's src/ keeps to zod/mini until the core's schemas move to classic, made in
+  // its Validator calls.
   {
-    name: 'safebyok-graphql/tree-shaking',
+    name: 'safebyok-graphql/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
         paths: ['zod', 'zod/v4', 'zod/v3'].map((classicPath) => ({
           name:    classicPath,
-          message: "Import zod/mini (`import * as Z from 'zod/mini'`): classic zod does not tree-shake, and would ride along in every host's bundle.",
+          message: "Import zod/mini (`import * as Z from 'zod/mini'`): classic zod is the larger library, some 25 kB gzipped against mini's 7 for the same few validators.",
         })),
       }],
     },

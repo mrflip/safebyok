@@ -217,6 +217,8 @@ export type RefusalMeta = {
   box_listed?:   DamagedBox
   /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot shows it. */
   wayin_listed?: WayinSummary
+  /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
+  fieldnames?:   readonly string[]
 }
 
 /** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */
