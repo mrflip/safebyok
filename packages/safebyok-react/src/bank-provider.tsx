@@ -6,12 +6,12 @@ import type { PassphraseAdvice } from './modal'
 // == [Hooks]: useBank, useVault, useEntry, useVaultSnapshot
 
 /** What the provider hands down: its bank, and the signed-in user whose vaults the hooks ask it for. */
-type Provided = { bank: Bank | null, userId: string | null }
+type Provided = { bank: Bank | null, user_id: string | null }
 
 const BankContext = createContext<Provided | null>(null)
 
 /** What a provider hands down while it holds no bank: on the server, in the first render, and while it makes one anew. */
-const NoneHeld: Provided = Object.freeze({ bank: null, userId: null })
+const NoneHeld: Provided = Object.freeze({ bank: null, user_id: null })
 
 /** What the nearest BankProvider hands down, or a calm throw where there is none. */
 const useProvided = (hookname: string): Provided => {
@@ -31,8 +31,8 @@ const useProvided = (hookname: string): Provided => {
  *   const bank = useBank()
  *   const acceptRestore = async () => {
  *     if (bank === null) { return }
- *     await bank.clearCachedVault({ userId, vaultlabel: 'main' })
- *     await bank.ensureVault({ userId, vaultlabel: 'main' })
+ *     await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
+ *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
  *   }
  */
 export const useBank = (): Bank | null => useProvided('useBank').bank
@@ -72,16 +72,16 @@ export const useVault = (vaultlabel: string): VaultEntry | null => useEntry('use
 
 /** {@link useVault}'s work, for `hookname`: the entry, asked for when the bank holds none, and misuse thrown. */
 const useEntry = (hookname: string, vaultlabel: string): VaultEntry | null => {
-  const { bank, userId } = useProvided(hookname)
-  const readEntry = useCallback(() => (bank === null || userId === null ? null : bank.entryOf({ userId, vaultlabel })), [bank, userId, vaultlabel])
+  const { bank, user_id } = useProvided(hookname)
+  const readEntry = useCallback(() => (bank === null || user_id === null ? null : bank.entryOf({ user_id, vaultlabel })), [bank, user_id, vaultlabel])
   // The server renders with no bank, as the client's first render does: no entry on either.
   const entry = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, readEntry, getNothing)
-  const unasked = bank !== null && userId !== null && entry === null
+  const unasked = bank !== null && user_id !== null && entry === null
   useEffect(() => {
     if (! unasked) { return }
     // A refusal lands in the entry, and is rendered from there.
-    void bank.tryEnsureVault({ userId, vaultlabel })
-  }, [unasked, bank, userId, vaultlabel])
+    void bank.tryEnsureVault({ user_id, vaultlabel })
+  }, [unasked, bank, user_id, vaultlabel])
   // Thrown here, in render, so the nearest error boundary (or the dev overlay) shows it: every hook
   // has run by now, so the throw leaves the rules of hooks alone.
   if (entry?.status === 'refused' && entry.err?.family === 'misuse') { throw entry.err }
@@ -113,9 +113,9 @@ type Showing = { round: number, gating: Gating, close: () => void }
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** Every Bank.make option, passed through as given, beside the signed-in `userId`, and three for the provider's dialogs.
+/** Every Bank.make option, passed through as given, beside the signed-in `user_id`, and three for the provider's dialogs.
  * An option left out gets Bank.make's default, and one it does not take is refused, to the error
- * boundary. `userId` may be null, and `requestCleartext` left out means the provider's own
+ * boundary. `user_id` may be null, and `requestCleartext` left out means the provider's own
  * dialogs. Their three: whether they offer a forgetful user to start over (they offer nothing,
  * for now), what a password manager files the passphrase under, and the advice shown as the user
  * chooses one (`GatingModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
@@ -124,7 +124,7 @@ const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?
  */
 export type BankProviderProps = MakeBankOpts & {
   /** The signed-in user from the host's auth, or null when nobody is: then the hooks hand down no vault, and ask for none. */
-  userId:              string | null
+  user_id:              string | null
   /** What asks the user for a passphrase or passkey when a call needs one (Bank.make's `requestCleartext`).
    * Left out, the provider's own: `GatingModal`, the dialog for each gating's kind -- an unlock, a
    * first passphrase, a change to the ways in, a deletion -- one at a time, shown only while the
@@ -199,11 +199,11 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * -- reaches the nearest error boundary.
  *
  * @example
- *   <BankProvider {...browserOpts()} applabel="acme" userId={session?.userId ?? null} vaultDB={vaultDB}>
+ *   <BankProvider {...browserOpts()} applabel="acme" user_id={session?.user_id ?? null} vaultDB={vaultDB}>
  *     <App />
  *   </BankProvider>
  * @example
- *   <BankProvider {...browserOpts()} applabel="acme" userId={userId} vaultDB={vaultDB}
+ *   <BankProvider {...browserOpts()} applabel="acme" user_id={user_id} vaultDB={vaultDB}
  *     onBadNews={(news) => { telemetry.report(news.refusalkind) }}>
  *     <App />
  *   </BankProvider>
@@ -211,7 +211,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  *   const { ok, val: whisper } = await vault.tryGetWhisper('anthropic_api_key')   // asks through the dialog when locked
  *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
-export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: BankProviderProps) => {
+export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: BankProviderProps) => {
   const { applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, requestCleartext, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, strengthChecker, ...unlisted } = opts
   // Each prop Bank.make does not take, by name -- a misspelling, a deleted name, a `vaultlabel`,
   // which each hook names -- handed on to it, so it is refused, to the error boundary, rather than
@@ -276,7 +276,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
 
   useEffect(() => {
     // Nobody signed in: no bank, so nothing is asked for and nothing refused.
-    if (userId === null) { return }
+    if (user_id === null) { return }
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if a Bank.make
     // option is ever added and not passed through.
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
@@ -290,7 +290,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
     const made = Bank.make(bankOpts)
-    const holding = { bank: made, userId }
+    const holding = { bank: made, user_id }
     setHeld(holding) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
     return () => {
       kept.held = false
@@ -300,7 +300,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
       if (showingRef.current !== null) { endShowing(showingRef.current) }
       setHeld(NoneHeld)
     }
-  }, [userId, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, unlistedJson, tellBadNews, askUser, endShowing])
+  }, [user_id, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, unlistedJson, tellBadNews, askUser, endShowing])
 
   // A logger, clock or strength checker written inline in the props is new at every render, and
   // makes the bank anew each time: said once, the first time any changes.

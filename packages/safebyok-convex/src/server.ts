@@ -82,14 +82,14 @@ export class SafebyokComponent {
     const publicQuery: QueryBuilder<DataModel, 'public'> = queryGeneric
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
-    /** Refuses unless the caller is signed in as `userId`, the vault's own user. */
-    const mustBe = async (ctx: GenericQueryCtx<DataModel>, userId: string): Promise<void> => {
+    /** Refuses unless the caller is signed in as `user_id`, the vault's own user. */
+    const mustBe = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
       // Called as a method of the host's bag, so a getUserId that leans on `this` works.
       const callerId = await opts.getUserId(ctx)
       if (! callerId) {
         throw identityRevoked('No one is signed in, so this vault cannot be reached: sign in, then try again.')
       }
-      if (callerId !== userId) {
+      if (callerId !== user_id) {
         throw identityRevoked('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
       }
     }

@@ -41,7 +41,7 @@ export const VaultDashboard = () => {
   // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
   const refusal = entry?.err ?? null
   if (entry !== null && refusal !== null && bank !== null) {
-    const choice = { userId: entry.scope.user_id, vaultlabel: entry.scope.vaultlabel }
+    const choice = { user_id: entry.scope.user_id, vaultlabel: entry.scope.vaultlabel }
     const askAgain = () => { void bank.tryEnsureVault(choice) }
     // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
     // and start over, which asks first, as it takes every box in the vault with it.

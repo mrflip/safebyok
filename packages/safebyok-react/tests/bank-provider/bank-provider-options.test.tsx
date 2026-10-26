@@ -20,7 +20,7 @@ describe("BankProvider", () => {
     const told: VaultError[] = []
     const onBadNews = (news: VaultError) => { told.push(news) }
     render(
-      <BankProvider applabel="acme" userId="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
+      <BankProvider applabel="acme" user_id="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
         keyDeriver={TH.testDeriver} strengthChecker={TH.anyStrengthChecker} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
         staleMinutes={0} onBadNews={onBadNews} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
@@ -46,7 +46,7 @@ describe("BankProvider", () => {
   it("passes strengthChecker through: the vault it opens refuses a weak new passphrase with the checker's reason", async () => {
     const { Grab, opened } = grabber()
     const { props } = makeWorld()
-    render(<BankProvider {...props} userId="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>)
+    render(<BankProvider {...props} user_id="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>)
     const vault = await opened()
     const err = await TH.expectRefusal(TH.unlock(vault, 'acme acme acme acme'), 'weak_passphrase')
     expect(err.message).to.eq('Not the name of the app, please.')
@@ -57,7 +57,7 @@ describe("BankProvider", () => {
   it("opens without a strengthChecker, the advice and the vault alike then refusing every new passphrase as too weak", async () => {
     const { strengthChecker: _admitsAny, ...props } = makeWorld().props
     const lacking = props as BankProviderProps
-    render(<BankProvider {...lacking} userId="u1"><Probe /></BankProvider>)
+    render(<BankProvider {...lacking} user_id="u1"><Probe /></BankProvider>)
     fireEvent.click(await screen.findByText('put'))
     const field = await screen.findByPlaceholderText('vault passphrase')
     fireEvent.change(field, { target: { value: 'correct horse battery staple' } })
@@ -69,7 +69,7 @@ describe("BankProvider", () => {
     const caught: unknown[] = []
     const { props } = makeWorld()
     const misfit = { ...props, strengthChecker: 12 } as unknown as BankProviderProps
-    render(<CatchingBoundary caught={caught}><BankProvider {...misfit} userId="u1"><Probe /></BankProvider></CatchingBoundary>)
+    render(<CatchingBoundary caught={caught}><BankProvider {...misfit} user_id="u1"><Probe /></BankProvider></CatchingBoundary>)
     expect(shownState()).to.eq('boundary')
     expect(isVaultError(caught[0], 'bad_option')).to.be.true
     expect((caught[0] as Error).message).to.match(/^Bank\.make's strengthChecker: expected a function.*browserOpts/)
@@ -78,7 +78,7 @@ describe("BankProvider", () => {
   it("keeps its vault for a strengthChecker that keeps its identity, the vault running that checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
-    const tree = () => <BankProvider {...props} userId="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>
+    const tree = () => <BankProvider {...props} user_id="u1" strengthChecker={refuseAcme} requestCleartext={TH.scriptedRequestCleartext}><Grab /></BankProvider>
     const { rerender } = render(tree())
     const first = await opened()
     rerender(tree())
@@ -90,7 +90,7 @@ describe("BankProvider", () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
     const tree = (reason: string) => (
-      <BankProvider {...props} userId="u1" strengthChecker={(_typed) => ({ strong: false, reason })} requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...props} user_id="u1" strengthChecker={(_typed) => ({ strong: false, reason })} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
@@ -109,7 +109,7 @@ describe("BankProvider", () => {
     const { Grab, opened } = grabber()
     const { props, vaultDB } = makeWorld()
     render(
-      <BankProvider {...props} userId="u1" requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...props} user_id="u1" requestCleartext={TH.scriptedRequestCleartext}>
         <Probe />
         <Grab />
       </BankProvider>,
@@ -128,7 +128,7 @@ describe("BankProvider", () => {
     const vaultDB = localVaultDB({ store })
     const { Grab, opened } = grabber()
     render(
-      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" logger={spy.logger} requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...makeWorld().props} vaultDB={vaultDB} user_id="u1" logger={spy.logger} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>,
     )
@@ -148,7 +148,7 @@ describe("BankProvider", () => {
     const reading = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
     const providing = (clock: { now: () => number }) => (
-      <BankProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" clock={clock} requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...makeWorld().props} vaultDB={vaultDB} user_id="u1" clock={clock} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
@@ -167,7 +167,7 @@ describe("BankProvider", () => {
   it("passes passphraseUsername and passphraseAdvice to the dialog: what a password manager files it under, and what is said as the user chooses", async () => {
     const world = makeWorld()
     render(
-      <BankProvider {...world.props} userId="u1" passphraseUsername="margo@example.com (vault)" passphraseAdvice={twelveOrMore}>
+      <BankProvider {...world.props} user_id="u1" passphraseUsername="margo@example.com (vault)" passphraseAdvice={twelveOrMore}>
         <Probe />
       </BankProvider>,
     )
@@ -184,7 +184,7 @@ describe("BankProvider", () => {
   describe("advice, by default, from the strengthChecker", () => {
     it("says the checker's reason as the user chooses a weak passphrase, and nothing for one it admits", async () => {
       const world = makeWorld()
-      render(<BankProvider {...world.props} userId="u1" strengthChecker={refuseAcme}><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1" strengthChecker={refuseAcme}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       const field = await screen.findByPlaceholderText('vault passphrase')
       fireEvent.change(field, { target: { value: 'acme forever' } })
@@ -197,7 +197,7 @@ describe("BankProvider", () => {
     it("fails the dialog, reporting to React, for a checker that throws: the vault's refusal, unexpected_error, carrying nothing of the throw", async () => {
       const world = makeWorld()
       const flaky = vi.fn(refuseAcme).mockRejectedValueOnce(new Error('could not judge acme'))
-      const { reported } = TH.renderReporting(<BankProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></BankProvider>)
+      const { reported } = TH.renderReporting(<BankProvider {...world.props} user_id="u1" strengthChecker={flaky}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
       await waitFor(() => { expect(reported).to.have.lengthOf(1) })
@@ -210,7 +210,7 @@ describe("BankProvider", () => {
     it("fails the dialog, reporting to React, for a checker that answers no verdict: the vault's refusal, bad_option", async () => {
       const world = makeWorld()
       const misfit = (() => ({ strong: 'yes' })) as unknown as BankProviderProps['strengthChecker']
-      const { reported } = TH.renderReporting(<BankProvider {...world.props} userId="u1" strengthChecker={misfit}><Probe /></BankProvider>)
+      const { reported } = TH.renderReporting(<BankProvider {...world.props} user_id="u1" strengthChecker={misfit}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
       await waitFor(() => { expect(reported).to.have.lengthOf(1) })
@@ -221,7 +221,7 @@ describe("BankProvider", () => {
     it("says a blank passphrase is no passphrase, without the checker hearing it", async () => {
       const world = makeWorld()
       const heard = vi.fn(TH.anyStrengthChecker)
-      render(<BankProvider {...world.props} userId="u1" strengthChecker={heard}><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1" strengthChecker={heard}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: ' '.repeat(3) } })
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.match(/can't be empty or only spaces/) })
@@ -231,7 +231,7 @@ describe("BankProvider", () => {
     it("hands the checker the vault's scope, as the vault does", async () => {
       const world = makeWorld()
       const heard = vi.fn((_typed: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
-      render(<BankProvider {...world.props} userId="u1" strengthChecker={heard}><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1" strengthChecker={heard}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'some words' } })
       await waitFor(() => { expect(heard).toHaveBeenCalledWith('some words', TH.scopeOf('u1')) })
@@ -240,7 +240,7 @@ describe("BankProvider", () => {
     it("gives way to the host's own passphraseAdvice, which the checker never hears", async () => {
       const world = makeWorld()
       const heard = vi.fn(refuseAcme)
-      render(<BankProvider {...world.props} userId="u1" strengthChecker={heard} passphraseAdvice={twelveOrMore}><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1" strengthChecker={heard} passphraseAdvice={twelveOrMore}><Probe /></BankProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('Twelve characters or more, please.') })
@@ -250,7 +250,7 @@ describe("BankProvider", () => {
     it("asks nothing while unlocking: the test runs only on a passphrase being chosen", async () => {
       const world = await lockedWorld()
       const heard = vi.fn(TH.anyStrengthChecker)
-      render(<BankProvider {...world.props} userId="u1" strengthChecker={heard}><world.Grab /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1" strengthChecker={heard}><world.Grab /></BankProvider>)
       const vault = await world.opened()
       void vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })

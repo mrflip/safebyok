@@ -300,7 +300,7 @@ const remadeWorld = async () => {
   /** Delete and remake the vault from the second device, and have this one read the new life, which makes it gone as 'vault_remade'. */
   const remake = async () => {
     await TH.del(there, 'pw')
-    const reborn = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const reborn = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     await TH.unlock(reborn, 'pw two')
     await TH.expectBad(vault.tryHello({ staleMinutes: 0 }), 'vault_remade')
   }
@@ -934,7 +934,7 @@ describe("the vault's names", () => {
 
   it("never let a name hold ^, which a scopepath joins names on: refused at ensureVault and at putBox()", async () => {
     const world = makeWorld()
-    const err = await TH.expectRefusal(world.open({ userId: 'alice^admin' }), 'bad_scope')
+    const err = await TH.expectRefusal(world.open({ user_id: 'alice^admin' }), 'bad_scope')
     expect(err.message).to.match(/^user_id: A user_id is ASCII letters/)
     expect(TH.thrownText(err)).to.not.include('alice')
     await TH.expectRefusal(world.open({ vaultlabel: 'main^x' }), 'bad_scope')
@@ -946,17 +946,17 @@ describe("the vault's names", () => {
 
   it("refuse a user_id of 101 characters at ensureVault, and take one of 100", async () => {
     const world = makeWorld()
-    const err = await TH.expectRefusal(world.open({ userId: 'u'.repeat(MaxUserIdChars + 1) }), 'bad_scope')
+    const err = await TH.expectRefusal(world.open({ user_id: 'u'.repeat(MaxUserIdChars + 1) }), 'bad_scope')
     expect(err.message).to.include('at most 100 characters')
-    expect(await world.stateOnOpen({ userId: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
+    expect(await world.stateOnOpen({ user_id: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
   })
 
   it("take a user_id percent-encoded, an email address, or a provider's id, and refuse dots alone", async () => {
     const world = makeWorld()
-    for (const userId of ['alice%40example.com', 'alice+vault@example.com', 'auth0|5f7c8ec7', '~alice']) {
-      expect(await world.stateOnOpen({ userId }), userId).to.eq('novel')
+    for (const user_id of ['alice%40example.com', 'alice+vault@example.com', 'auth0|5f7c8ec7', '~alice']) {
+      expect(await world.stateOnOpen({ user_id }), user_id).to.eq('novel')
     }
-    await TH.expectRefusal(world.open({ userId: '..' }), 'bad_scope')
+    await TH.expectRefusal(world.open({ user_id: '..' }), 'bad_scope')
   })
 
   it("are the package's own: Bank.make refuses a validators option as 'bad_option', as it does any option it does not take", async () => {
@@ -982,7 +982,7 @@ describe("the vault's names", () => {
 // == [Weight, locked, useWhisper]: LongestNames, declaringRecordBytes, what a box weighs, while locked, useWhisper
 
 /** The longest names a vault takes: forty characters for each label, a hundred for the user_id. */
-const LongestNames = { applabel: 'a'.repeat(MaxLabelChars), userId: 'u'.repeat(MaxUserIdChars), vaultlabel: 'v'.repeat(MaxLabelChars) } as const
+const LongestNames = { applabel: 'a'.repeat(MaxLabelChars), user_id: 'u'.repeat(MaxUserIdChars), vaultlabel: 'v'.repeat(MaxLabelChars) } as const
 
 /** `vaultDB` declaring `maxRecordBytes` as given, and otherwise itself. */
 const declaringRecordBytes = (vaultDB: VaultDB, maxRecordBytes: number): VaultDB => (

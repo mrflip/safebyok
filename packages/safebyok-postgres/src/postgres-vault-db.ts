@@ -36,7 +36,7 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
   /** The signed-in user this request is for, as your server's own auth established it, never as the browser claims it.
    * Null, undefined or empty when no one is signed in. Only that user's vaults are reached.
    */
-  userId: string | null | undefined
+  user_id: string | null | undefined
   /** Where the VaultDB hears other writes, to call its subscribers; without it, it never calls them. */
   listen?: PostgresListen | undefined
   /** The most boxes one vault holds: a whole number above zero, or `Infinity`, the default, for no limit.
@@ -51,7 +51,7 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  * It runs on your server, as the vault itself runs in the browser. Your route layer calls its verbs
  * for the browser's vault (the README has the recipe), or a GraphQL server does (`safebyok-graphql`).
  *
- * * **Who may reach a vault**: only `userId`. A verb naming another user's scope, or any while no
+ * * **Who may reach a vault**: only `user_id`. A verb naming another user's scope, or any while no
  *   one is signed in, refuses with kind `identity_revoked` before the database is asked anything.
  * * **Every write is one statement**, atomic as Postgres makes every statement. An update of the
  *   vault props that does not move their `gate_epoch` forward refuses as `stale_write`.
@@ -73,18 +73,18 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   security policy (`42501`), refuses with kind `not_permitted`, the driver's error its `cause`.
  *
  * @example
- *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
- *   await vaultDB.getVault({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })  // { ok: true, val: null }, or the vault and its listing
+ *   const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
+ *   await vaultDB.getVault({ applabel: 'acme', user_id: session.user_id, vaultlabel: 'main' })  // { ok: true, val: null }, or the vault and its listing
  * @example
- *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId, maxBoxes: 250 })
+ *   const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id, maxBoxes: 250 })
  */
 export const postgresVaultDB = (opts: PostgresVaultDBOpts): VaultDB => {
-  const { client, userId, listen, maxBoxes = Infinity } = (opts as Partial<PostgresVaultDBOpts> | null | undefined) ?? {}
+  const { client, user_id, listen, maxBoxes = Infinity } = (opts as Partial<PostgresVaultDBOpts> | null | undefined) ?? {}
   if (! isPostgresClient(client)) {
     throw new VaultError('bad_option', 'postgresVaultDB needs a `client` with a `query(text, params)` method: a pg Pool or Client, a PGlite, or a wrapper around your driver.')
   }
-  if (userId !== null && userId !== undefined && typeof userId !== 'string') {
-    throw new VaultError('bad_option', "postgresVaultDB's `userId` is the signed-in user's id as text, or null when no one is signed in.")
+  if (user_id !== null && user_id !== undefined && typeof user_id !== 'string') {
+    throw new VaultError('bad_option', "postgresVaultDB's `user_id` is the signed-in user's id as text, or null when no one is signed in.")
   }
   if (listen !== undefined && typeof listen !== 'function') {
     throw new VaultError('bad_option', "postgresVaultDB's `listen`, when given, is a function: (channel, onNotify) => unlisten.")
@@ -92,7 +92,7 @@ export const postgresVaultDB = (opts: PostgresVaultDBOpts): VaultDB => {
   if (! isBoxCount(maxBoxes)) {
     throw new VaultError('bad_option', "postgresVaultDB's `maxBoxes`, when given, is a whole number above zero, or Infinity for no limit.")
   }
-  return new TablesVaultDB(client, userId === undefined || userId === '' ? null : userId, listen, maxBoxes, opts)
+  return new TablesVaultDB(client, user_id === undefined || user_id === '' ? null : user_id, listen, maxBoxes, opts)
 }
 
 // A safe integer, so it reaches Postgres as the bigint it reads; Infinity reaches it as null, no limit.
@@ -311,13 +311,13 @@ class TablesVaultDB extends VaultDB {
   readonly maxNameBytes = MaxNameBytes
 
   private readonly client: PostgresClient
-  private readonly userId: string | null
+  private readonly user_id: string | null
   private readonly listen: PostgresListen | undefined
 
-  constructor(client: PostgresClient, userId: string | null, listen: PostgresListen | undefined, maxBoxes: number, vaultDBOpts: VaultDBOpts) {
+  constructor(client: PostgresClient, user_id: string | null, listen: PostgresListen | undefined, maxBoxes: number, vaultDBOpts: VaultDBOpts) {
     super(vaultDBOpts)
     this.client = client
-    this.userId = userId
+    this.user_id = user_id
     this.listen = listen
     this.maxBoxes = maxBoxes
   }
@@ -448,10 +448,10 @@ class TablesVaultDB extends VaultDB {
 
   /** Refuses unless the signed-in user is the one `scope` names. */
   private mustReach(scope: Pick<VaultScope, 'user_id'>): void {
-    if (this.userId === null) {
+    if (this.user_id === null) {
       throw new VaultError('identity_revoked', 'No one is signed in, so this vault cannot be reached: sign in, then try again.')
     }
-    if (scope.user_id !== this.userId) {
+    if (scope.user_id !== this.user_id) {
       throw new VaultError('identity_revoked', 'This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
     }
   }

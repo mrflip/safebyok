@@ -1415,7 +1415,7 @@ describe("a lock or a let-go landing while a box call waits to be unlocked (risk
 
 /** The options `world` makes a bank with: its vault options, the vault's own names left out. */
 const bankOptsOf = (world: ReturnType<typeof makeWorld>, overrides: Partial<TH.BornVaultOpts>) => {
-  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return bankOpts
 }
 

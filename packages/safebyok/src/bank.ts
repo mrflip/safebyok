@@ -48,7 +48,7 @@ export type BankSnapshot = Readonly<{
 }>
 
 /** Which of the bank's vaults a call means: the user's, under its label. */
-export type VaultChoice = Pick<VaultDraft, 'userId' | 'vaultlabel'>
+export type VaultChoice = Pick<VaultDraft, 'user_id' | 'vaultlabel'>
 // --
 
 /** One entry as the bank keeps it: its view, and the birth under way, if any. */
@@ -77,7 +77,7 @@ type HeldEntry = {
  *
  * @example
  *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })   // once, at module level
- *   const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
+ *   const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
  *   vault.state   // 'novel' | 'locked' | 'unlocked'
  * @example const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
  */
@@ -106,7 +106,7 @@ export class Bank {
   /** The entry the snapshot holds for the vault `choice` names, or null for none: synchronous, and reading nothing.
    * Refuses 'bad_scope' for a name that fails its check.
    *
-   * @example bank.entryOf({ userId: 'u1', vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
+   * @example bank.entryOf({ user_id: 'u1', vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
    */
   entryOf(choice: VaultChoice): VaultEntry | null {
     return this.#snapshot.vaults[Scopepath.vault(this.#scopeOf(choice))] ?? null
@@ -118,12 +118,12 @@ export class Bank {
   /** Make a bank for the app: its options checked, and nothing else done. It reads nothing, starts nothing, and is `made`.
    * It throws its misuse at once, synchronously: 'insecure_context' first, for a page that is not a
    * secure context; 'bad_scope' for an `applabel` that fails its check; 'bad_option' for any other
-   * option, one it does not take among them (a misspelling, a retired name, or `userId` and
+   * option, one it does not take among them (a misspelling, a retired name, or `user_id` and
    * `vaultlabel`, which each vault's draft takes), a `vaultDB` or `deviceDB` short of a verb, or
    * limits the `vaultDB` might not honour.
    *
    * @example const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
-   * @example Bank.make({ ...opts, userId: 'u1' })   // throws 'bad_option': each vault's draft names its user
+   * @example Bank.make({ ...opts, user_id: 'u1' })   // throws 'bad_option': each vault's draft names its user
    */
   static make(opts: MakeBankOpts): Bank {
     return new Bank(opts)
@@ -179,8 +179,8 @@ export class Bank {
    * device's record, as the class says. The entry keeps the refusal; bad news among them is told
    * to `onBadNews`.
    *
-   * @example const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
-   * @example const vault = await bank.ensureVault({ userId, vaultlabel: 'work', vaultDB: workVaultDB })   // a vault stored elsewhere
+   * @example const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
+   * @example const vault = await bank.ensureVault({ user_id, vaultlabel: 'work', vaultDB: workVaultDB })   // a vault stored elsewhere
    */
   async ensureVault(draft: VaultDraft): Promise<Vault> { return valOf(await this.tryEnsureVault(draft)) }
 
@@ -195,7 +195,7 @@ export class Bank {
   /** Let the vault `draft` names go, and birth it anew: a Vault object of what storage holds now, as {@link Bank.ensureVault} says.
    * The Vault object let go is gone, as {@link Bank.closeVault} says.
    *
-   * @example const vault = await bank.reopenVault({ userId, vaultlabel: 'main' })   // after 'vault_gone', say
+   * @example const vault = await bank.reopenVault({ user_id, vaultlabel: 'main' })   // after 'vault_gone', say
    */
   async reopenVault(draft: VaultDraft): Promise<Vault> { return valOf(await this.tryReopenVault(draft)) }
 
@@ -216,7 +216,7 @@ export class Bank {
    * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_scope' for a name that
    * fails its check.
    *
-   * @example bank.closeVault({ userId, vaultlabel: 'main' })
+   * @example bank.closeVault({ user_id, vaultlabel: 'main' })
    */
   closeVault(choice: VaultChoice): void {
     this.#letGoOf(Scopepath.vault(this.#scopeOf(choice)))
@@ -250,8 +250,8 @@ export class Bank {
    *
    * @example
    *   if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
-   *     await bank.clearCachedVault({ userId, vaultlabel: 'main' })
-   *     await bank.ensureVault({ userId, vaultlabel: 'main' })
+   *     await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
+   *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
    *   }
    */
   async clearCachedVault(draft: VaultDraft): Promise<void> { valOf(await this.tryClearCachedVault(draft)) }
@@ -286,8 +286,8 @@ export class Bank {
    *
    * @example
    *   if (isVaultError(entry.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
-   *     await bank.delDamagedVault({ userId, vaultlabel: 'main' })
-   *     await bank.ensureVault({ userId, vaultlabel: 'main' })
+   *     await bank.delDamagedVault({ user_id, vaultlabel: 'main' })
+   *     await bank.ensureVault({ user_id, vaultlabel: 'main' })
    *   }
    */
   async delDamagedVault(draft: VaultDraft): Promise<void> { valOf(await this.tryDelDamagedVault(draft)) }
@@ -334,7 +334,7 @@ export class Bank {
 
   /** The scope `choice` names in the bank's app, its names checked: 'bad_scope' for one that fails. */
   #scopeOf(choice: VaultChoice): VaultScope {
-    return CX.vaultScope.parse({ applabel: this.#parts.applabel, user_id: choice.userId, vaultlabel: choice.vaultlabel })
+    return CX.vaultScope.parse({ applabel: this.#parts.applabel, user_id: choice.user_id, vaultlabel: choice.vaultlabel })
   }
   // --
 

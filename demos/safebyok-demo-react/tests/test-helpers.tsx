@@ -20,15 +20,15 @@ export const Passphrase = 'correct horse battery staple'
 
 /**
  * A fresh world in memory for the demo's components: the vault's two stores; a render that wraps
- * a component in a BankProvider over them, signed in as `userId` and deriving through the cheap
+ * a component in a BankProvider over them, signed in as `user_id` and deriving through the cheap
  * test deriver; an opener for a look at the vault from outside the page; and a seeder that fills
  * the vault beforehand from another device, so the page finds it locked. Its vaults are in the
  * `acme` app, as `scopeOf` has them.
  *
  * @param stores - `vaultDB`, to put the vault behind an adapter of the test's own. Default: a
  *   fresh `localVaultDB` in memory.
- * @returns `vaultDB` and `deviceDB`, `renderInVault(ui, userId?)`, `open(userId?)`,
- *   `openUnlocked(userId?)`, unlocked with {@link Passphrase}, and `seed(whispers, userId?)`. The
+ * @returns `vaultDB` and `deviceDB`, `renderInVault(ui, user_id?)`, `open(user_id?)`,
+ *   `openUnlocked(user_id?)`, unlocked with {@link Passphrase}, and `seed(whispers, user_id?)`. The
  *   user is `u1` unless named. Each vault `open` and `openUnlocked` hand out is let go when the
  *   test ends, by tests/setup.ts.
  *
@@ -41,22 +41,22 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
   const opts = memoryVaultOpts({ vaultDB })
   const { deviceDB } = opts
   // The provider shows its own dialog: the scripted requestCleartext is for the vaults open() hands out.
-  const { userId: _userId, vaultlabel: _vaultlabel, requestCleartext: _scripted, ...bankOpts } = opts
+  const { user_id: _user_id, vaultlabel: _vaultlabel, requestCleartext: _scripted, ...bankOpts } = opts
 
-  const renderInVault = (ui: ReactNode, userId: string | null = 'u1') => (
-    render(<BankProvider {...bankOpts} userId={userId}>{ui}</BankProvider>)
+  const renderInVault = (ui: ReactNode, user_id: string | null = 'u1') => (
+    render(<BankProvider {...bankOpts} user_id={user_id}>{ui}</BankProvider>)
   )
 
-  const open = async (userId = 'u1') => keepToClose(await settledVault({ ...opts, userId }))
+  const open = async (user_id = 'u1') => keepToClose(await settledVault({ ...opts, user_id }))
 
-  const openUnlocked = async (userId = 'u1') => {
-    const vault = await open(userId)
+  const openUnlocked = async (user_id = 'u1') => {
+    const vault = await open(user_id)
     await unlock(vault, Passphrase)
     return vault
   }
 
-  const seed = async (whispers: Record<string, Whisper>, userId = 'u1') => {
-    const vault = await settledVault({ ...opts, userId, deviceDB: memoryDeviceDB() })
+  const seed = async (whispers: Record<string, Whisper>, user_id = 'u1') => {
+    const vault = await settledVault({ ...opts, user_id, deviceDB: memoryDeviceDB() })
     try {
       await unlock(vault, Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {

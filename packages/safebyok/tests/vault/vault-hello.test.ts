@@ -15,11 +15,11 @@ import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultScopepath, u1BoxS
 // == [hello]: u1Main, bankIn, seedVault, unreachable, recordEpochIn, hello
 
 /** The vault every world here births: `u1`'s `main`. */
-const u1Main = { userId: 'u1', vaultlabel: 'main' } as const
+const u1Main = { user_id: 'u1', vaultlabel: 'main' } as const
 
 /** A bank of `world`'s options, `overrides` among them, for a test that asks it for a vault itself. */
 const bankIn = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>) => {
-  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return Bank.make(bankOpts)
 }
 

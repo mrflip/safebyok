@@ -15,9 +15,9 @@ import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../../src/key-de
 import * as TH from '../test-helpers'
 import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, vaultWithPasskey, addLaptopPasskey } from './world'
 
-/** `world`'s options for Bank.make, `overrides` in place: its vault's userId and vaultlabel left out, as each vault's draft takes them. */
+/** `world`'s options for Bank.make, `overrides` in place: its vault's user_id and vaultlabel left out, as each vault's draft takes them. */
 const bankOptsOf = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>): MakeBankOpts => {
-  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return bankOpts
 }
 
@@ -39,22 +39,22 @@ describe("Bank.make and bank.ensureVault", () => {
 
   it("refuses to open without a signed-in user", async () => {
     const world = makeWorld()
-    await TH.expectRefusal(world.open({ userId: '' }), 'bad_scope')
+    await TH.expectRefusal(world.open({ user_id: '' }), 'bad_scope')
   })
 
-  it("takes a userId of a hundred characters, and refuses a longer one, naming the bound and never the id", async () => {
+  it("takes a user_id of a hundred characters, and refuses a longer one, naming the bound and never the id", async () => {
     const world = makeWorld()
-    expect(await world.stateOnOpen({ userId: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
+    expect(await world.stateOnOpen({ user_id: 'u'.repeat(MaxUserIdChars) })).to.eq('novel')
     const overlong = `alice@example.com${'u'.repeat(MaxUserIdChars)}`
-    const err = await TH.expectRefusal(world.open({ userId: overlong }), 'bad_scope')
+    const err = await TH.expectRefusal(world.open({ user_id: overlong }), 'bad_scope')
     expect(err.message).to.include('at most 100 characters')
     expect(TH.thrownText(err)).to.not.include('alice')
   })
 
-  it("refuses a userId that is not text, as no signed-in user", async () => {
+  it("refuses a user_id that is not text, as no signed-in user", async () => {
     const world = makeWorld()
-    for (const userId of [42, null, undefined, { id: 'u1' }]) {
-      await TH.expectRefusal(world.open({ userId: userId as unknown as string }), 'bad_scope')
+    for (const user_id of [42, null, undefined, { id: 'u1' }]) {
+      await TH.expectRefusal(world.open({ user_id: user_id as unknown as string }), 'bad_scope')
     }
   })
 
@@ -589,7 +589,7 @@ describe("Bank.make, by the Contract", () => {
     const tally = TH.tallyWatches(world.vaultDB)
     const bank = Bank.make(bankOptsOf(world))
     expect(tally).to.deep.equal({ opened: 0, closed: 0 })
-    const vault = await bank.ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     expect(vault.state).to.eq('novel')
     await vault.hello({ staleMinutes: 0 })
@@ -651,7 +651,7 @@ describe("Bank.make, by the Contract", () => {
   it("has hello read at most once a minute, as StaleMinutes's example shows", async () => {
     const world = makeWorld()
     const bank = Bank.make({ ...bankOptsOf(world), staleMinutes: 1 })   // hello() reads at most once a minute
-    const vault = await bank.ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     world.advance(MinuteMillis - 1)
     await vault.hello()

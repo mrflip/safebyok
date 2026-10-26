@@ -78,7 +78,7 @@ const vaultRoute = (pool: PostgresClient, signedInUserId: (request: Request) => 
       return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} }, { status: 400 })
     }
     // Made per request, for the user your own auth signed in -- never one the request names.
-    const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
+    const vaultDB = postgresVaultDB({ client: pool, user_id: await signedInUserId(request) })
     return Response.json(answerOf(await serve(vaultDB, args)))
   }
 )
@@ -210,14 +210,14 @@ const byHeader = (request: Request) => {
 /** A POST of `body` to the route. */
 const postOf = (body: unknown) => new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: JSON.stringify(body) })
 
-/** A browser for `userId`: its fetch reaches `route` in-process, signed in as that user. */
-const browserFor = (route: (request: Request) => Promise<Response>, userId: string | null) => sessionedBrowser(route, { userId })
+/** A browser for `user_id`: its fetch reaches `route` in-process, signed in as that user. */
+const browserFor = (route: (request: Request) => Promise<Response>, user_id: string | null) => sessionedBrowser(route, { user_id })
 
-/** A browser whose fetch reaches `route` in-process, signed in as `session.userId` at each call: change it to sign in or out. */
-const sessionedBrowser = (route: (request: Request) => Promise<Response>, session: { userId: string | null }) => (
+/** A browser whose fetch reaches `route` in-process, signed in as `session.user_id` at each call: change it to sign in or out. */
+const sessionedBrowser = (route: (request: Request) => Promise<Response>, session: { user_id: string | null }) => (
   new RouteVaultDB((url, init) => {
     const headers = new Headers(init.headers)
-    if (session.userId !== null) { headers.set('x-test-user', encodeURIComponent(session.userId)) }
+    if (session.user_id !== null) { headers.set('x-test-user', encodeURIComponent(session.user_id)) }
     return route(new Request(`https://app.example.test${url}`, { ...init, headers }))
   })
 )
@@ -226,11 +226,11 @@ TH.bootDatabaseFirst()
 
 TH.describeVaultDB('the README route recipe, over postgresVaultDB', async () => {
   const route = await routeOver()
-  return TH.perUser((userId) => browserFor(route, userId))
+  return TH.perUser((user_id) => browserFor(route, user_id))
 }, {
   makeVaultDBFor: async () => {
     const route = await routeOver()
-    return (userId) => browserFor(route, userId)
+    return (user_id) => browserFor(route, user_id)
   },
 })
 
@@ -238,7 +238,7 @@ describe("the README route recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
     const vault = await TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     await TH.unlock(vault, 'correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
@@ -248,18 +248,18 @@ describe("the README route recipe", () => {
 
   it("locks the browser's vault at its next call once the session signs out, erasing nothing", async () => {
     const route = await routeOver()
-    const session: { userId: string | null } = { userId: 'u1' }
+    const session: { user_id: string | null } = { user_id: 'u1' }
     const deviceDB = memoryDeviceDB()
-    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger }
+    const opts = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger }
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'correct horse battery staple')
     await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    session.userId = null
+    session.user_id = null
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
-    session.userId = 'u1'
+    session.user_id = 'u1'
     await TH.unlock(vault, 'correct horse battery staple')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     TH.closeVault(vault)

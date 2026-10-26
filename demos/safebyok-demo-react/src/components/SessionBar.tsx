@@ -70,7 +70,7 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
 
   return (
     <div className="session-bar">
-      <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.userId})</code></span>
+      <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.user_id})</code></span>
       <button onClick={() => { void signOut() }}>Sign out</button>
       <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
       {gripe !== null && <span className="gripe">{gripe}</span>}

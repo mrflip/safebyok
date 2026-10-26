@@ -49,7 +49,7 @@ const bank = Bank.make({          // once, at module level
 })
 
 const vault = await bank.ensureVault({
-  userId:     session.userId,     // your auth's stable, opaque id for the user; never an email
+  user_id:     session.user_id,     // your auth's stable, opaque id for the user; never an email
   vaultlabel: 'main',
 })
 vault.state                       // 'novel' | 'locked' | 'unlocked'
@@ -107,7 +107,7 @@ code, the stored records and these docs all use its words.
   field of its record. Ciphertext moved to another record, or under an altered field, will not
   open.
 * A **bank** (`Bank.make(opts)`, which answers at once) holds the app's vaults, and
-  `bank.ensureVault({ userId, vaultlabel })` births a Vault object from what storage and this
+  `bank.ensureVault({ user_id, vaultlabel })` births a Vault object from what storage and this
   device hold of the vault, storing it, with no passphrase yet, if none stands: the snapshot's
   `state` is `novel`, `locked` or `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`, or null), `getWhisper` (its
   whisper, refusing `absent_box` for none) and `useWhisper`, and removed with `delBox`; `del()` removes the whole vault, and the Vault object with it. A `Box` in hand
@@ -520,7 +520,7 @@ TypeScript's DOM types do not carry `IdleDetector` yet; declare it, or take it f
 package, before this compiles.
 
 For a sign-out, call `lock()`, then `bank.closeVaults()` (in React, the provider lets the vault go
-as `userId` turns null: lock it first): the lock revokes the lease, and `closeVaults` lets every
+as `user_id` turns null: lock it first): the lock revokes the lease, and `closeVaults` lets every
 Vault object go.
 
 ### When the user signs out
@@ -595,7 +595,7 @@ to throw to through `this.logger`.
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
 (`{ call: 'refresh' }`); and, when there is one, the error behind it, a `VaultError` or your own
 (your clock's, your storage adapter's). The vault puts no whisper, passphrase, key, ciphertext or
-option's value in any of the three, not even the `userId` or the labels: a host with several
+option's value in any of the three, not even the `user_id` or the labels: a host with several
 vaults gives each its own logger, bound to whatever context it wants in its logs. An error of your
 own goes as your code made it, as itself or as a `VaultError`'s `cause`, so what it quotes (a
 storage client's error may quote the request it failed) is yours to keep clean. Today a vault
@@ -949,13 +949,13 @@ because storage cannot tell your app's other call from another device's.
 Stored vault props that fail their checks make `bank.ensureVault` (and a born vault's `hello()`)
 refuse with `damaged_vault`, and with no Vault object born there is no `del()` to call.
 `delDamagedVault` is the way to clear such a vault and start over. It takes the options
-`Bank.make` took beside the vault's `userId` and `vaultlabel` (only the vault's names and its two
+`Bank.make` took beside the vault's `user_id` and `vaultlabel` (only the vault's names and its two
 stores matter) and deletes that vault's stored props and boxes through the `VaultDB`, and this
 device's lease of it through the `DeviceDB`, raising its device record to the tombstone: what
 `del()` does, for this one case. Whatever the vault held is gone for good, so ask the user first.
 
 ```ts
-const choice = { userId: session.userId, vaultlabel: 'main' }
+const choice = { user_id: session.user_id, vaultlabel: 'main' }
 const { ok, val, err } = await bank.tryEnsureVault(choice)
 let vault = val
 if (! ok) {
@@ -979,7 +979,7 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
-A bank deletes one with its own stores, `bank.delDamagedVault({ userId, vaultlabel })`, which
+A bank deletes one with its own stores, `bank.delDamagedVault({ user_id, vaultlabel })`, which
 `safebyok-react`'s `useBank()` reaches. Storage decides, by the checks only it can make, so the
 bank need not hold the vault, or have refused it, first, and nothing asks for an unlock. Once
 storage deletes the vault, and on `stale_write` too, the bank lets go its entry for the scope,
@@ -1037,7 +1037,7 @@ same refusal, so a prompt asking "was your vault restored?" turns the check off 
 check is there to stop.
 
 ```ts
-const choice = { userId: session.userId, vaultlabel: 'main' }
+const choice = { user_id: session.user_id, vaultlabel: 'main' }
 const { ok, val, err } = await bank.tryEnsureVault(choice)
 let vault = val
 if (! ok) {

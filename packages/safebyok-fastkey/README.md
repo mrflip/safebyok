@@ -27,7 +27,7 @@ import { browserOpts } from 'safebyok/browser'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
 const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', vaultDB })
-const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
 ```
 
 A vault records only its deriver's label, and this deriver derives exactly what the core's does

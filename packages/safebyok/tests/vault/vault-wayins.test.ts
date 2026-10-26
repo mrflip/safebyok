@@ -21,10 +21,10 @@ import { makeWorld, storedVaultPropsOf, vaultWithPasskey,SevenDaysMillis, u1Vaul
 const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.ckeys().map((ckey) => [ckey, world.dbStore.read(ckey)]))
 
 /** `opts` without the vault's names: what Bank.make takes. */
-const bankOptsOf = ({ userId: _userId, vaultlabel: _vaultlabel, ...bankOpts }: TH.BornVaultOpts) => bankOpts
+const bankOptsOf = ({ user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts }: TH.BornVaultOpts) => bankOpts
 
 /** The draft of `u1`'s `main` vault, as a bank takes it. */
-const u1Main = { userId: 'u1', vaultlabel: 'main' } as const
+const u1Main = { user_id: 'u1', vaultlabel: 'main' } as const
 
 /** A testDeriver that counts its derivations, for an open that should spend few. */
 const countingDeriver = () => {
@@ -797,7 +797,7 @@ describe("a new passphrase's strength", () => {
     const vault = await bank.ensureVault(u1Main)
     expect(load).toHaveBeenCalledTimes(1)
     await vault.hello({ staleMinutes: 0 })
-    await bank.ensureVault({ userId: 'u2', vaultlabel: 'main' })
+    await bank.ensureVault({ user_id: 'u2', vaultlabel: 'main' })
     await bank.hello()
     expect(load).toHaveBeenCalledTimes(1)
   })

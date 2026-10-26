@@ -26,7 +26,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  *
  * @example
  *   const bank = Bank.make({ applabel: 'acme', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
- *   const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+ *   const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
  */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 

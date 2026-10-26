@@ -16,8 +16,8 @@ const renderBar = (requestCleartext?: RequestCleartext) => {
   if (requestCleartext === undefined) {
     world.renderInVault(ui)
   } else {
-    const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB: world.vaultDB, deviceDB: world.deviceDB })
-    render(<BankProvider {...bankOpts} requestCleartext={requestCleartext} userId="u1">{ui}</BankProvider>)
+    const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB: world.vaultDB, deviceDB: world.deviceDB })
+    render(<BankProvider {...bankOpts} requestCleartext={requestCleartext} user_id="u1">{ui}</BankProvider>)
   }
   return { world, auth, dbStore }
 }
@@ -38,7 +38,7 @@ describe("SessionBar", () => {
     signInAs('  margo ')
     await screen.findByText('margo')
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(screen.getByText(`(${auth.getSnapshot()?.userId ?? ''})`)).to.not.be.null
+    expect(screen.getByText(`(${auth.getSnapshot()?.user_id ?? ''})`)).to.not.be.null
   })
 
   it("signs in from the keyboard too", async () => {
@@ -97,7 +97,7 @@ describe("SessionBar", () => {
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     expect(dbStore.read('account:acme:margo')).to.be.null
-    // This provider's userId is not the auth's: it stays on u1, and still asks for nothing anew.
+    // This provider's user_id is not the auth's: it stays on u1, and still asks for nothing anew.
     await TH.expectProbeState('none')
     await new Promise((resolve) => { setTimeout(resolve, 50) })
     expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null

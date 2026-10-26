@@ -375,7 +375,7 @@ describe("settledVault", () => {
     const vault = await TH.settledVault(opts)
     expect(vault.getSnapshot().state).to.eq('novel')
     expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
-    expect(TH.bankOf(vault).entryOf({ userId: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
+    expect(TH.bankOf(vault).entryOf({ user_id: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
   })
 
   it("makes a bank of its own each call, so two calls over one deviceDB are two tabs of one device", async () => {
@@ -407,13 +407,13 @@ describe("settledVault", () => {
 describe("bankOf", () => {
   it("answers the bank a vault was born in, which can let it go, as its example shows", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
-    TH.bankOf(vault).closeVault({ userId: 'u1', vaultlabel: 'main' })
+    TH.bankOf(vault).closeVault({ user_id: 'u1', vaultlabel: 'main' })
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
   })
 
   it("throws for a vault settledVault did not hand out", async () => {
-    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts()
-    const vault = await Bank.make(bankOpts).ensureVault({ userId, vaultlabel })
+    const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts()
+    const vault = await Bank.make(bankOpts).ensureVault({ user_id, vaultlabel })
     expect(() => TH.bankOf(vault)).to.throw(/settledVault/)
   })
 })
@@ -466,9 +466,9 @@ describe("tallyWatches", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     vi.spyOn(vaultDB, 'ensureVault').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
     const tally = TH.tallyWatches(vaultDB)
-    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+    const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
     const bank = Bank.make(bankOpts)
-    await TH.expectRefusal(bank.ensureVault({ userId, vaultlabel }), 'not_permitted')
+    await TH.expectRefusal(bank.ensureVault({ user_id, vaultlabel }), 'not_permitted')
     bank.closeVaults()
     expect(tally.opened - tally.closed).to.eq(0)
   })
@@ -645,7 +645,7 @@ describe("raceEveryWay", () => {
 describe("memoryVaultOpts", () => {
   it("opens u1's main vault in acme over fresh stores, deriving through testDeriver", async () => {
     const opts = TH.memoryVaultOpts()
-    expect(opts).to.include({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver })
+    expect(opts).to.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver })
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
     expect(await TH.propsOf(opts.vaultDB, TH.scopeOf('u1'))).to.not.be.null
@@ -655,7 +655,7 @@ describe("memoryVaultOpts", () => {
   it("makes new stores for each call, and takes any option in place of its own", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     expect(TH.memoryVaultOpts().vaultDB).to.not.eq(TH.memoryVaultOpts().vaultDB)
-    expect(TH.memoryVaultOpts({ userId: 'u2', vaultDB })).to.include({ userId: 'u2', vaultDB })
+    expect(TH.memoryVaultOpts({ user_id: 'u2', vaultDB })).to.include({ user_id: 'u2', vaultDB })
   })
 })
 
@@ -1020,7 +1020,7 @@ describe("omitting", () => {
   it("leaves out the one field named, and keeps the rest", () => {
     const without = TH.omitting(opts, 'keyDeriver')
     expect(without).to.not.have.property('keyDeriver')
-    expect(Object.keys(without)).to.have.members(['applabel', 'userId', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker', 'requestCleartext'])
+    expect(Object.keys(without)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker', 'requestCleartext'])
     expect(opts.keyDeriver).to.eq(TH.testDeriver)
   })
 
@@ -1078,13 +1078,13 @@ TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () =>
 /**
  * A server's VaultDB for one signed-in user, over a store every user's vaults share: it refuses
  * any scope naming someone else, as a server's must, so the VaultDB suite reaches it only through
- * `perUser`. A blank or missing `userId` is no one signed in, as a real server reads it: it
+ * `perUser`. A blank or missing `user_id` is no one signed in, as a real server reads it: it
  * refuses everything.
  */
-const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs => {
+const servingOnly = (signedIn: string | null, store: StringStore): TH.VaultDBVerbs => {
   const shared = localVaultDB({ store })
   const refusalFor = ({ user_id }: { user_id: string }): VaultError | null => (
-    userId === null || userId === '' || user_id !== userId ? new VaultError('identity_revoked', "That vault belongs to someone other than the user signed in.") : null
+    signedIn === null || signedIn === '' || user_id !== signedIn ? new VaultError('identity_revoked', "That vault belongs to someone other than the user signed in.") : null
   )
   const permitted = async <ValT>(scope: { user_id: string }, call: () => Promise<Outcome<ValT>>): Promise<Outcome<ValT>> => {
     const refusal = refusalFor(scope)
@@ -1116,11 +1116,11 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
 
 TH.describeVaultDB('perUser, over a VaultDB serving one user', () => {
   const store = memoryStore()
-  return TH.perUser((userId) => servingOnly(userId, store))
+  return TH.perUser((user_id) => servingOnly(user_id, store))
 }, {
   makeVaultDBFor: () => {
     const store = memoryStore()
-    return (userId) => servingOnly(userId, store)
+    return (user_id) => servingOnly(user_id, store)
   },
 })
 
@@ -1128,7 +1128,7 @@ TH.describeVaultDB('perUser, over a VaultDB serving one user', () => {
 const counted = () => {
   const store = memoryStore()
   const askedFor: string[] = []
-  const vaultDB = TH.perUser((userId) => { askedFor.push(userId); return servingOnly(userId, store) })
+  const vaultDB = TH.perUser((user_id) => { askedFor.push(user_id); return servingOnly(user_id, store) })
   return { vaultDB, askedFor, store }
 }
 
@@ -1173,11 +1173,11 @@ describe("perUser", () => {
 
   it("has the limits of the VaultDB it made for anyone", () => {
     const store = memoryStore()
-    const limitedBy = (userId: string): TH.VaultDBVerbs => ({
-      ...servingOnly(userId, store),
-      maxRecordBytes: userId === 'anyone' ? 4096 : 1,
-      maxVaultBytes:  userId === 'anyone' ? 65_536 : 1,
-      maxBoxes:       userId === 'anyone' ? 250 : 1,
+    const limitedBy = (user_id: string): TH.VaultDBVerbs => ({
+      ...servingOnly(user_id, store),
+      maxRecordBytes: user_id === 'anyone' ? 4096 : 1,
+      maxVaultBytes:  user_id === 'anyone' ? 65_536 : 1,
+      maxBoxes:       user_id === 'anyone' ? 250 : 1,
     })
     expect(TH.perUser(limitedBy)).to.include({ maxRecordBytes: 4096, maxVaultBytes: 65_536, maxBoxes: 250 })
   })
@@ -1657,9 +1657,9 @@ describe("VaultDBContract", () => {
 
 describe("the gating helpers", () => {
   it("answer a bank's gatings as scripted, given scriptedRequestCleartext, as its example shows", async () => {
-    const { userId, vaultlabel, requestCleartext: _scripted, ...opts } = TH.memoryVaultOpts()
+    const { user_id, vaultlabel, requestCleartext: _scripted, ...opts } = TH.memoryVaultOpts()
     const bank = Bank.make({ ...opts, requestCleartext: TH.scriptedRequestCleartext })
-    const vault = await bank.ensureVault({ userId, vaultlabel })
+    const vault = await bank.ensureVault({ user_id, vaultlabel })
     await TH.unlock(vault, 'pw')
     expect(vault.state).to.eq('unlocked')
   })

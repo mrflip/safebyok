@@ -81,13 +81,13 @@ export type VaultResolvers<ContextT> = {
  *
  * @example
  *   const resolvers = vaultResolvers({
- *     vaultDBFor: (context: AppContext) => postgresVaultDB({ client: pool, userId: context.userId, listen }),
+ *     vaultDBFor: (context: AppContext) => postgresVaultDB({ client: pool, user_id: context.user_id, listen }),
  *   })
  */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
   const vaultDBFor = (opts as Partial<VaultResolversOpts<ContextT>> | null | undefined)?.vaultDBFor
   if (typeof vaultDBFor !== 'function') {
-    throw new VaultError('bad_option', "vaultResolvers needs a `vaultDBFor`: (context) => the VaultDB for that request's signed-in user, such as postgresVaultDB({ client, userId }).")
+    throw new VaultError('bad_option', "vaultResolvers needs a `vaultDBFor`: (context) => the VaultDB for that request's signed-in user, such as postgresVaultDB({ client, user_id }).")
   }
   // The server holds a name to its check and to its storage's limits, which every VaultDB verb
   // checks as a browser's vault does. The server's job is to keep each user to their own vault.

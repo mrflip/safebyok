@@ -119,16 +119,16 @@ export const RealWhispers: Record<string, { whisper: Whisper, sidecar?: Sidecar 
 
 export const RealPassphrase = 'correct horse battery staple'
 
-/** Opens a vault for `userId` over `store` the way an app does, deriving through the cheap test deriver. */
-export const openOver = (store: StringStore, userId = 'u1') => settledVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
+/** Opens a vault for `user_id` over `store` the way an app does, deriving through the cheap test deriver. */
+export const openOver = (store: StringStore, user_id = 'u1') => settledVault(memoryVaultOpts({ user_id, vaultDB: localVaultDB({ store }) }))
 
 /**
  * A real vault, made by the core's own code: vault props and a box per {@link RealWhispers}
  * entry, each record exactly as the core stores it, read back from its in-memory store by ckey.
  */
-export const realRecords = async (userId = 'u1') => {
+export const realRecords = async (user_id = 'u1') => {
   const store = memoryStore()
-  const vault = await openOver(store, userId)
+  const vault = await openOver(store, user_id)
   await unlock(vault, RealPassphrase)
   for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
     await vault.putBox({ boxlabel, sidecar }, whisper)

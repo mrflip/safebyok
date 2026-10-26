@@ -24,7 +24,7 @@ describe("DeviceDBInspectionPanel", () => {
   })
 
   it("shows the fake auth's session beside it", () => {
-    deviceStore.write('session:safebyok_demo', '{"userId":"user_0123456789abcdef","userlabel":"margo"}')
+    deviceStore.write('session:safebyok_demo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
     render(<DeviceDBInspectionPanel />)
     expect(screen.getByText(/"userlabel":"margo"/)).to.not.be.null
   })

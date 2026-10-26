@@ -38,7 +38,7 @@ describe("delDamagedVault", () => {
 
   it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
     const world = await damagedVaultWorld()
-    const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
+    const theirs = await world.openUnlocked('their pw', { user_id: 'u2' })
     await theirs.putBox({ boxlabel: 'anthropic' }, 'theirs')
     await delDamagedVault(world.optsWith())
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
@@ -122,7 +122,7 @@ describe("delDamagedVault", () => {
   it("checks the scope as Bank.make and bank.ensureVault do, handing the VaultDB's verb the scope alone", async () => {
     const world = await damagedVaultWorld()
     const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
-    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: 'alice smith' })), 'bad_scope')
+    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: 'alice smith' })), 'bad_scope')
     expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
     expect(verb).not.toHaveBeenCalled()
     await delDamagedVault(world.optsWith())
@@ -133,7 +133,7 @@ describe("delDamagedVault", () => {
   it("takes the options Bank.make took beside the vault's names, and refuses misuse before touching storage", async () => {
     const world = await damagedVaultWorld()
     await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_scope')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: '' })), 'bad_scope')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: '' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')
@@ -146,7 +146,7 @@ describe("delDamagedVault", () => {
 
   it("takes a user_id that is an email address, as Bank.make does", async () => {
     const world = makeWorld()
-    const opts = world.optsWith({ userId: 'u1@example' })
+    const opts = world.optsWith({ user_id: 'u1@example' })
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
     TH.closeVault(vault)
@@ -169,13 +169,13 @@ describe("delDamagedVault", () => {
 
   it("clears a vault its bank refused as damaged_vault, and the same bank then births a new life, novel, as its example shows", async () => {
     const world = await damagedVaultWorld()
-    const { userId, vaultlabel, ...bankOpts } = world.optsWith()
+    const { user_id, vaultlabel, ...bankOpts } = world.optsWith()
     const bank = Bank.make(bankOpts)
-    const { ok, err } = await bank.tryEnsureVault({ userId, vaultlabel: 'main' })
+    const { ok, err } = await bank.tryEnsureVault({ user_id, vaultlabel: 'main' })
     expect(ok).to.be.false
     expect(isVaultError(err, 'damaged_vault')).to.be.true
-    await delDamagedVault({ ...bankOpts, userId, vaultlabel })
-    const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+    await delDamagedVault({ ...bankOpts, user_id, vaultlabel })
+    const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
     expect(vault.getSnapshot().state).to.eq('novel')
     bank.closeVaults()
   })

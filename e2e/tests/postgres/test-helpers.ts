@@ -223,7 +223,7 @@ export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, d
       await turnstile.pass()
       return await listenHere(channel, onNotify)
     }
-  return (userId: string | null) => postgresVaultDB({ ...vaultDBOpts, client, userId, listen, maxBoxes })
+  return (user_id: string | null) => postgresVaultDB({ ...vaultDBOpts, client, user_id, listen, maxBoxes })
 }
 
 /**
@@ -237,7 +237,7 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
   await db.empty()
   return ({ maxBoxes }) => {
     const vaultDBFor = deviceOver(db, turnstile, { maxBoxes })
-    return perUser((userId) => vaultDBFor(userId))
+    return perUser((user_id) => vaultDBFor(user_id))
   }
 }
 

@@ -32,7 +32,7 @@ export default app
 
 Serve its functions to your clients, from a module of your own, `convex/safebyok.ts`. They call
 your `getUserId` first: say who is signed in, the same id your app passes to `bank.ensureVault`
-as `userId`.
+as `user_id`.
 
 ```ts
 import { SafebyokComponent } from 'safebyok-convex/server'
@@ -107,7 +107,7 @@ const bank = Bank.make({
   vaultDB:  convexVaultDB({ client: convex, api: api.safebyok }),
   ...browserOpts(), // the key deriver and device store a browser wants
 })
-const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
 ```
 
 In a React app, pass the `ConvexReactClient` you give `ConvexProvider`, so the vault shares its
@@ -116,7 +116,7 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
 `ConvexClient` watch that failed, once for each failing streak -- and left out, it is the one
 `Bank.make` is given, else the console.
 
-* **Sign in first.** `userId` is the id your `getUserId` answers for the signed-in user. Open
+* **Sign in first.** `user_id` is the id your `getUserId` answers for the signed-in user. Open
   the vault once the Convex client is authenticated (in React, once `useConvexAuth()` says so):
   a call made before then is refused with kind `identity_revoked`, which also makes a vault
   already open revoke its lease, so the user types their passphrase again. A `bank.ensureVault`
@@ -125,7 +125,7 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
 * **Signing out locks the vault.** Once the Convex client signs out (or signs in as someone
   else), the vault's live `watchVault` query is refused, the vault looks again, meets
   `identity_revoked`, and locks itself, as `lock()` does: an idle vault in another tab included.
-  Let the vault go (`bank.closeVaults()`) when your user signs out all the same: in React, pass `userId={null}` to the provider.
+  Let the vault go (`bank.closeVaults()`) when your user signs out all the same: in React, pass `user_id={null}` to the provider.
 * **Other devices' writes arrive live.** The vault watches `watchVault` and refreshes whenever
   it changes, so its snapshot (and a React render) follows writes from anywhere.
 * **Refusals** are `VaultError`s, each the `err` of the `Outcome` a call resolves, of the kinds in

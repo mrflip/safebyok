@@ -10,7 +10,8 @@ A name in the New column that also stands in the Old one was renamed again, by t
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
 The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 (better_paths,
 streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
-(`whiteboard/20261022-primitives/`).
+(`whiteboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
+(`whiteboard/20261025-restyle/`).
 
 To be deleted at 1.0.0.
 
@@ -139,3 +140,4 @@ To be deleted at 1.0.0.
 | `tryDemandConsistentWith`                              | `consistentWith` (the query) beside `demandConsistentWith` (throws) |
 | `VaultDB.getVaultProps`, `ensureVaultProps`, `listBoxes`, `listBoxRecords` | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords` |
 | `TH.makeGate`                                          | `TH.makeLatch`: a gate is the vault's ways in       |
+| `userId` (a draft's field, `BankProvider`'s prop, `postgresVaultDB`'s option) | `user_id`, as stored |

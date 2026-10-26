@@ -134,5 +134,5 @@ export const failingClient = (err: Error): PostgresClient => ({
   query: () => Promise.reject(err),
 })
 
-/** The postgresVaultDB a request for `userId` makes over `db`, listening there. */
-export const requestFor = (db: PGlite, userId: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, userId, listen: listenOn(db) })
+/** The postgresVaultDB a request for `user_id` makes over `db`, listening there. */
+export const requestFor = (db: PGlite, user_id: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, user_id, listen: listenOn(db) })

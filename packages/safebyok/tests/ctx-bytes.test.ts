@@ -69,7 +69,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const deviceDB = memoryDeviceDB()
     const vault = await TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock: { now: () => Date.parse('2026-10-14T12:00:00Z') },
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock: { now: () => Date.parse('2026-10-14T12:00:00Z') },
       keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger: TH.spyLogger().logger,
     })
     await TH.unlock(vault, 'pw')

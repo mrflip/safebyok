@@ -11,7 +11,7 @@ import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxScopepath } 
 const remakeElsewhere = async (world: ReturnType<typeof makeWorld>) => {
   const there = await world.open({ deviceDB: memoryDeviceDB() })
   await TH.del(there, 'pw')
-  const anew = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+  const anew = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(anew, 'pw two')
   return anew
 }
@@ -341,7 +341,7 @@ describe("the refresh's judgment", () => {
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_remade')
     const kept = await world.getLease()
     expect(kept?.vault_tok).to.eq(formerTok)
-    const reborn = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(reborn.vault_tok).to.eq(anew.vault_tok)
     expect(reborn.state).to.eq('locked')
     const stillKept = await world.getLease()

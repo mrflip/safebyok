@@ -20,23 +20,23 @@ const browsersOverPGlite: TH.MakeVaultDBDevices = async (turnstile) => {
   const db = await TH.emptyDatabase()
   return ({ maxBoxes }) => {
     const client = TH.throughTurnstile(turnstile, db, ['query', 'listen'])
-    const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client, userId, listen: (channel, onNotify) => client.listen(channel, onNotify), maxBoxes }))
-    return TH.perUser((userId) => graphqlVaultDB({ client: TH.urqlClientFor(schema, userId), maxBoxes }))
+    const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client, user_id, listen: (channel, onNotify) => client.listen(channel, onNotify), maxBoxes }))
+    return TH.perUser((user_id) => graphqlVaultDB({ client: TH.urqlClientFor(schema, user_id), maxBoxes }))
   }
 }
 
 TH.describeVaultDB('graphqlVaultDB, through vaultResolvers to postgresVaultDB over PGlite', async (vaultDBOpts) => {
   const schema = TH.schemaOver(await TH.emptyDatabase())
-  return TH.perUser((userId) => TH.browserFor(schema, userId, vaultDBOpts))
+  return TH.perUser((user_id) => TH.browserFor(schema, user_id, vaultDBOpts))
 }, {
   makeCappedVaultDB: async (maxBoxes) => {
     const db = await TH.emptyDatabase()
-    const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxBoxes }))
-    return TH.perUser((userId) => graphqlVaultDB({ client: TH.urqlClientFor(schema, userId), maxBoxes }))
+    const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id, maxBoxes }))
+    return TH.perUser((user_id) => graphqlVaultDB({ client: TH.urqlClientFor(schema, user_id), maxBoxes }))
   },
   makeVaultDBFor: async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    return (userId) => TH.browserFor(schema, userId)
+    return (user_id) => TH.browserFor(schema, user_id)
   },
   pushes:      true,
   makeDevices: browsersOverPGlite,
@@ -53,7 +53,7 @@ const thisVault = { vault_tok: 'vault-tok-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
 const vaultIn = (schema: GraphQLSchema) => TH.settledVault({
-  applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+  applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
 })
 
 /** A fetch with no network behind it. */
@@ -83,7 +83,7 @@ describe("graphqlVaultDB, its client", () => {
 
   it("declares by default the box limit the Postgres VaultDB holds by default", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] })
-    const server = postgresVaultDB({ client: { query: offline }, userId: 'u1' })
+    const server = postgresVaultDB({ client: { query: offline }, user_id: 'u1' })
     expect(graphqlVaultDB({ client }).maxBoxes).to.eq(server.maxBoxes)
   })
 
@@ -113,7 +113,7 @@ describe("graphqlVaultDB, its client", () => {
 describe("graphqlVaultDB, a server's box limit", () => {
   it("carries the server's vault_full refusal back as itself, kind, message and how full the vault is, naming no boxlabel", async () => {
     const db = await TH.emptyDatabase()
-    const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxBoxes: 1 }))
+    const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id, maxBoxes: 1 }))
     // A browser declaring more than its server holds: the server holds the line.
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: Infinity })
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
@@ -130,7 +130,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
 
   it("reads how full a vault is from the server's storage, a limit it does not keep the largest safe integer", async () => {
     const db = await TH.emptyDatabase()
-    const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId }))
+    const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id }))
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1') })
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
@@ -144,7 +144,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: 3 })
     const refusal = await TH.expectRefusal(TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, maxBoxes: 4,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, maxBoxes: 4,
     }), 'bad_option')
     expect(refusal.message).to.include('3 boxes')
   })
@@ -247,7 +247,7 @@ describe("graphqlVaultDB, its refusals", () => {
 
   it("refuses with storage_unavailable when the database is down, never saying what the driver said", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
-    const schema = TH.schemaOver(await TH.database(), ({ userId }) => postgresVaultDB({ client: TH.failingClient(dbDown), userId }))
+    const schema = TH.schemaOver(await TH.database(), ({ user_id }) => postgresVaultDB({ client: TH.failingClient(dbDown), user_id }))
     const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').getVault(u1), 'storage_unavailable')
     expect(refusal.message).to.not.include('vault_owner')
     expect(JSON.stringify(refusal)).to.not.include('vault_owner')

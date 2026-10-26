@@ -51,7 +51,7 @@ export const openTurnstile: Turnstile = { pass: () => Promise.resolve() }
  * @param verbs - Its methods that are round trips, each returning a promise.
  * @returns A stand-in for `target`, to hand the device's adapter in its place.
  *
- * @example postgresVaultDB({ client: TH.throughTurnstile(turnstile, pool, ['query']), userId })
+ * @example postgresVaultDB({ client: TH.throughTurnstile(turnstile, pool, ['query']), user_id })
  * @example convexVaultDB({ client: TH.throughTurnstile(turnstile, client, ['query', 'mutation']), api })
  */
 export const throughTurnstile = <Target extends object>(turnstile: Turnstile, target: Target, verbs: readonly (AsyncVerbOf<Target> & string)[]): Target => (
@@ -112,7 +112,7 @@ export type Race<DeviceT> = {
  *
  * @example
  *   await TH.raceEveryWay({
- *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), userId: 'u1' }),
+ *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), user_id: 'u1' }),
  *     setup:       (first) => first.ensureVaultProps(TH.vaultPropsOf('u1')),
  *     moves:       [(one) => one.delVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))],
  *     verdict:     async (outcomes, [one]) => { expect(await one.getVault(TH.scopeOf('u1'))).to.have.lengthOf(0) },

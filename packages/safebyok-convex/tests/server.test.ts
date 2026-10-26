@@ -210,9 +210,9 @@ describe("SafebyokComponent.api, at setup", () => {
 
 /** A getUserId bag whose method answers from the bag itself: it fails if called detached from it. */
 class SignedInAs {
-  private readonly userId: string
+  private readonly user_id: string
 
-  constructor(userId: string) { this.userId = userId }
+  constructor(user_id: string) { this.user_id = user_id }
 
-  getUserId() { return this.userId }
+  getUserId() { return this.user_id }
 }

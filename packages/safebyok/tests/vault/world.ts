@@ -41,7 +41,7 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<TH.BornVaultOpts>): TH.BornVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger, ...defaults, ...overrides }
+    { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<TH.BornVaultOpts>) => TH.settledVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<TH.BornVaultOpts>) => {
@@ -108,9 +108,9 @@ export const storedVaultPropsOf = (world: ReturnType<typeof makeWorld>): Record<
   JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as Record<string, unknown>
 )
 
-/** The ckeys of every row `userId`'s vault has in storage: its vault props and its boxes. */
-export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
-  world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(userId)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(userId))(ckey))
+/** The ckeys of every row `user_id`'s vault has in storage: its vault props and its boxes. */
+export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => (
+  world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
 )
 
 /** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */

@@ -26,7 +26,7 @@ describe("createAuth", () => {
     const { auth, dbStore } = makeWorld()
     const session = await auth.signIn('margo')
     expect(session.userlabel).to.eq('margo')
-    expect(session.userId).to.match(/^user_[0-9a-f]{16}$/)
+    expect(session.user_id).to.match(/^user_[0-9a-f]{16}$/)
     expect(auth.getSnapshot()).to.eq(session)
     expect(dbStore.read('account:acme:margo')).to.not.be.null
   })
@@ -34,7 +34,7 @@ describe("createAuth", () => {
   it("stamps a new account with the clock's time, in epoch milliseconds", async () => {
     const { auth, dbStore } = makeWorld()
     const session = await auth.signIn('margo')
-    expect(margosAccount(dbStore)).to.deep.equal({ user_id: session.userId, userlabel: 'margo', registered_at: Date.UTC(2026, 9, 15, 9, 30) })
+    expect(margosAccount(dbStore)).to.deep.equal({ user_id: session.user_id, userlabel: 'margo', registered_at: Date.UTC(2026, 9, 15, 9, 30) })
   })
 
   it("the same userlabel signs back into the same account, registered when it was made", async () => {
@@ -43,7 +43,7 @@ describe("createAuth", () => {
     auth.signOut()
     advance(24 * 60 * 60 * 1000)
     const again = await auth.signIn('margo')
-    expect(again.userId).to.eq(first.userId)
+    expect(again.user_id).to.eq(first.user_id)
     expect(margosAccount(dbStore)).to.have.property('registered_at', Date.UTC(2026, 9, 15, 9, 30))
   })
 
@@ -86,7 +86,7 @@ describe("createAuth", () => {
     const { auth } = makeWorld()
     const margo = await auth.signIn('margo')
     const nikos = await auth.signIn('nikos')
-    expect(nikos.userId).to.not.eq(margo.userId)
+    expect(nikos.user_id).to.not.eq(margo.user_id)
   })
 
   it("refuses a userlabel that is not a label", async () => {

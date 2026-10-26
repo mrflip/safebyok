@@ -24,7 +24,7 @@ export const Messages = {
   /** Said at a submit whose new passphrase and its confirmation differ: nothing is attempted. */
   passphrasesDiffer: "The new passphrase and its confirmation don't match: type the same one in both.",
   /** What a password manager files a vault's passphrase under, unless the host names it. */
-  passphraseUsername: (userId: string, vaultlabel: string) => `${userId} (${vaultlabel} vault)`,
+  passphraseUsername: (user_id: string, vaultlabel: string) => `${user_id} (${vaultlabel} vault)`,
   showPassphrase:    'Show',
   hidePassphrase:    'Hide',
   createButton:      'Create vault',

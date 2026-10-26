@@ -19,7 +19,7 @@ describe("BankProvider", () => {
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} applabel="Not A Label" userId="u1">
+          <BankProvider {...makeWorld().props} applabel="Not A Label" user_id="u1">
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -35,7 +35,7 @@ describe("BankProvider", () => {
       const validators = { boxlabel: label }
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId="u1" {...{ validators } as object}>
+          <BankProvider {...makeWorld().props} user_id="u1" {...{ validators } as object}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -51,7 +51,7 @@ describe("BankProvider", () => {
       const misfit = { strong: true } as unknown as BankProviderProps['strengthChecker']
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId="u1" strengthChecker={misfit}>
+          <BankProvider {...makeWorld().props} user_id="u1" strengthChecker={misfit}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -68,7 +68,7 @@ describe("BankProvider", () => {
       const checker = Object.assign(TH.anyStrengthChecker.bind(null), { load: () => Promise.reject(lost) })
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId="u1" strengthChecker={checker}>
+          <BankProvider {...makeWorld().props} user_id="u1" strengthChecker={checker}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -83,7 +83,7 @@ describe("BankProvider", () => {
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId="u1" maxBoxes={0}>
+          <BankProvider {...makeWorld().props} user_id="u1" maxBoxes={0}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -129,7 +129,7 @@ describe("BankProvider", () => {
       vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(refusal))
       const { Grab, latest } = grabber()
       render(
-        <BankProvider {...world.props} userId="u1">
+        <BankProvider {...world.props} user_id="u1">
           <Grab />
         </BankProvider>,
       )
@@ -141,7 +141,7 @@ describe("BankProvider", () => {
       const world = makeWorld()
       const gate = TH.holdNextCall(world.vaultDB, 'ensureVault')
       const { Grab, latest, opened } = grabber()
-      render(<BankProvider {...world.props} userId="u1"><Grab /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1"><Grab /></BankProvider>)
       await gate.reached
       expect(latest().vault).to.be.null
       expect(latest().entry?.status).to.eq('starting')
@@ -178,7 +178,7 @@ describe("BankProvider", () => {
       const deleted = { forcePassphraseReentryHours: 1 } as Partial<BankProviderProps>
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId="u1" {...deleted}>
+          <BankProvider {...makeWorld().props} user_id="u1" {...deleted}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -202,11 +202,11 @@ describe("BankProvider", () => {
       const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
       const older = world.store.read(vaultScopepath) ?? ''
       // This device changes the passphrase, so its record of the vault is newer than `older`.
-      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
+      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
       // Storage hands back the older copy; the vault's read refuses it, keeping the newer in hand.
       world.store.write(vaultScopepath, older)
@@ -224,13 +224,13 @@ describe("BankProvider", () => {
       const world = await madeWorld()
       const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
       const older = world.store.read(vaultScopepath) ?? ''
-      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
+      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       // Storage hands back the older copy before the provider's birth reads it.
       world.store.write(vaultScopepath, older)
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('refused: vault_behind')
       expect(latest().vault).to.be.null
       fireEvent.click(screen.getByText('Retry'))
@@ -244,10 +244,10 @@ describe("BankProvider", () => {
       // Deaf to the other tab's write, so that the vault first meets the newer copy as the older.
       const deafDB = localVaultDB({ store: { ...world.store, subscribe: neverRings } })
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} vaultDB={deafDB} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} vaultDB={deafDB} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
       // Another tab of this device changes the passphrase; storage then hands back the older copy.
-      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1' })
+      const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       world.store.write(vaultScopepath, older)
@@ -263,9 +263,9 @@ describe("BankProvider", () => {
       const world = await madeWorld()
       const reads = vi.spyOn(world.vaultDB, 'ensureVault')
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
-      const deleter = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1', deviceDB: memoryDeviceDB() })
+      const deleter = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1', deviceDB: memoryDeviceDB() })
       await TH.del(deleter, 'correct horse')
       const readsBefore = reads.mock.calls.length
       const shown = latest().vault
@@ -283,12 +283,12 @@ describe("BankProvider", () => {
     it("leaves a vault deleted and made anew elsewhere refused until the app asks again: then the one that stands", async () => {
       const world = await madeWorld()
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
-      const elsewhere = await TH.settledVault({ ...world.props, vaultlabel: 'main', userId: 'u1', deviceDB: memoryDeviceDB() })
+      const elsewhere = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1', deviceDB: memoryDeviceDB() })
       const shown = latest().vault
       await TH.del(elsewhere, 'correct horse')
-      const remade = await TH.bankOf(elsewhere).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+      const remade = await TH.bankOf(elsewhere).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
       await TH.unlock(remade, 'a new pw')
       // The provider's watch hears it all; however its reads fall, its Vault object is gone.
       await waitFor(() => { expect(shownState()).to.match(/^refused: vault_(gone|remade)$/) })
@@ -329,13 +329,13 @@ describe("BankProvider", () => {
       const world = makeWorld()
       const reads = vi.spyOn(world.vaultDB, 'ensureVault')
       const { Grab, latest } = grabber()
-      const { rerender } = render(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      const { rerender } = render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('novel')
       const first = latest().vault
-      rerender(<BankProvider {...world.props} userId="u1"><Grab /><Probe /></BankProvider>)
+      rerender(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await act(async () => { await TH.wakeupAtNextTick() })
       expect(reads).toHaveBeenCalledOnce()
-      act(() => { latest().bank?.closeVault({ userId: 'u1', vaultlabel: 'main' }) })
+      act(() => { latest().bank?.closeVault({ user_id: 'u1', vaultlabel: 'main' }) })
       await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
       expect(reads).toHaveBeenCalledTimes(2)
     })
@@ -343,11 +343,11 @@ describe("BankProvider", () => {
     it("opens a fresh vault, novel, once the host deletes a damaged one and asks again", async () => {
       const { store, deviceDB, props } = await damagedWorld()
       const { Grab, latest } = grabber()
-      render(<BankProvider {...props} userId="u1"><Grab /><Probe /></BankProvider>)
+      render(<BankProvider {...props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('refused: damaged_vault')
       await act(async () => {
-        await delDamagedVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: props.vaultDB, deviceDB })
-        await latest().bank?.ensureVault({ userId: 'u1', vaultlabel: 'main' })
+        await delDamagedVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: props.vaultDB, deviceDB })
+        await latest().bank?.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
       })
       await expectShown('novel')
       expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])
@@ -368,7 +368,7 @@ describe("BankProvider", () => {
       const world = makeWorld()
       vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       render(
-        <BankProvider {...world.props} userId="u1">
+        <BankProvider {...world.props} user_id="u1">
           <VaultExample />
         </BankProvider>,
       )
@@ -384,7 +384,7 @@ describe("BankProvider", () => {
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...world.props} userId="u1">
+          <BankProvider {...world.props} user_id="u1">
             <Probe />
           </BankProvider>
         </CatchingBoundary>,
@@ -400,9 +400,9 @@ describe("BankProvider", () => {
       let rejectRead: (err: unknown) => void = noop
       const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
       const caught: unknown[] = []
-      const tree = (userId: string | null) => (
+      const tree = (user_id: string | null) => (
         <CatchingBoundary caught={caught}>
-          <BankProvider {...world.props} userId={userId}>
+          <BankProvider {...world.props} user_id={user_id}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>
@@ -423,7 +423,7 @@ describe("BankProvider", () => {
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} applabel="Not A Label" userId={null}>
+          <BankProvider {...makeWorld().props} applabel="Not A Label" user_id={null}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,

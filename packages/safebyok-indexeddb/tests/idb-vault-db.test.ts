@@ -276,7 +276,7 @@ describe("idbVaultDB", () => {
 
   it("has hello() refuse as storage_blocked when the browser withholds the vault's storage", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
-    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
+    const opts = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
     const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
     try {
       await TH.expectRefusal(TH.settledVault(opts), 'storage_blocked')
@@ -308,7 +308,7 @@ describe("idbVaultDB", () => {
 
   it("serves Bank.make and ensureVault(): a vault born, stored in and born again over it", async () => {
     const dbName = TH.freshDbName()
-    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
+    const opts = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB() }
     const vault = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await TH.unlock(vault, 'correct horse')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-not-a-real-key')
@@ -437,7 +437,7 @@ describe("idbVaultDB's subscribe", () => {
 
   it("closes the bell's channel when its vault is let go", async () => {
     const dbName = TH.freshDbName()
-    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB(), vaultDB: idbVaultDB({ dbName }) })
+    const vault = await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, deviceDB: memoryDeviceDB(), vaultDB: idbVaultDB({ dbName }) })
     const closing = vi.spyOn(BroadcastChannel.prototype, 'close')
     try {
       TH.closeVault(vault)

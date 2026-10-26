@@ -34,7 +34,7 @@ const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
   const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
+  const open = async () => await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
   const vault = await open()
   await TH.unlock(vault, 'pw')
   return { vault, open }

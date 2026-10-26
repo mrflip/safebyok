@@ -193,10 +193,10 @@ describe("Scopepath.withinVaultScopepathPrefix and withinVaultScopepathPred", ()
 })
 
 /** A scope from a tuple, for the tables below. */
-const scopeFrom = ([applabel = '', userId = '', vaultlabel = '']: readonly string[]): VaultScope => ({ applabel, user_id: userId, vaultlabel })
+const scopeFrom = ([applabel = '', user_id = '', vaultlabel = '']: readonly string[]): VaultScope => ({ applabel, user_id, vaultlabel })
 
 /** True when every name of `address` (applabel, user_id, vaultlabel, boxlabel) passes its check, so a maker files it. */
-const isSound = ([applabel, userId, vaultlabel, boxlabel]: readonly string[]): boolean => CX.boxscope.safeParse({ applabel, user_id: userId, vaultlabel, boxlabel }).success
+const isSound = ([applabel, user_id, vaultlabel, boxlabel]: readonly string[]): boolean => CX.boxscope.safeParse({ applabel, user_id, vaultlabel, boxlabel }).success
 
 /**
  * Pairs of addresses -- applabel, user_id, vaultlabel, boxlabel -- that a join on a separator

@@ -32,7 +32,7 @@ export const Probe = () => {
   const [outcome, setOutcome] = useState('')
 
   if (entry?.err !== null && entry?.err !== undefined) {
-    const retry = () => { if (bank !== null) { void bank.tryEnsureVault({ userId: entry.scope.user_id, vaultlabel: 'main' }) } }
+    const retry = () => { if (bank !== null) { void bank.tryEnsureVault({ user_id: entry.scope.user_id, vaultlabel: 'main' }) } }
     return <p><span data-testid="state">{`refused: ${entry.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
   }
   const vault = entry?.vault ?? null
@@ -85,21 +85,21 @@ export const grabber = () => {
 }
 
 /**
- * A fresh world in memory: its two stores, the BankProvider props over them (all but `userId`),
+ * A fresh world in memory: its two stores, the BankProvider props over them (all but `user_id`),
  * and the Probe in a provider inside a boundary, as a tree or mounted.
  */
 export const makeWorld = () => {
   const vaultDB = localVaultDB({ store: memoryStore() })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
-  const tree = (userId: string | null, caught: unknown[] = []) => (
+  const tree = (user_id: string | null, caught: unknown[] = []) => (
     <CatchingBoundary caught={caught}>
-      <BankProvider {...props} userId={userId}>
+      <BankProvider {...props} user_id={user_id}>
         <Probe />
       </BankProvider>
     </CatchingBoundary>
   )
-  const mount = (userId: string | null, caught: unknown[] = []) => render(tree(userId, caught))
+  const mount = (user_id: string | null, caught: unknown[] = []) => render(tree(user_id, caught))
   return { vaultDB, deviceDB, props, tree, mount }
 }
 
@@ -109,7 +109,7 @@ export const madeWorld = async () => {
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
-  const made = await TH.settledVault({ ...props, userId: 'u1', vaultlabel: 'main' })
+  const made = await TH.settledVault({ ...props, user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(made, 'correct horse')
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(made)
@@ -170,13 +170,13 @@ export const hushConsole = () => vi.spyOn(console, 'error').mockImplementation((
  */
 export const lockedWorld = async () => {
   const world = makeWorld()
-  const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1', vaultlabel: 'main' })
+  const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(maker, 'pw')
   await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(maker)
   const grab = grabber()
-  const tree = (userId: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
-    <BankProvider {...world.props} keyDeriver={keyDeriver} userId={userId}><grab.Grab /></BankProvider>
+  const tree = (user_id: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
+    <BankProvider {...world.props} keyDeriver={keyDeriver} user_id={user_id}><grab.Grab /></BankProvider>
   )
   return { ...world, ...grab, tree }
 }
@@ -197,7 +197,7 @@ export const watched = <ResultT,>(promise: Promise<ResultT>) => {
 
 /** The provider over a world, with whatever logger and clock the render hands it. */
 export const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Partial<Pick<BankProviderProps, 'logger' | 'clock' | 'strengthChecker'>>) => (
-  <BankProvider {...world.props} userId="u1" {...sinks}><Probe /></BankProvider>
+  <BankProvider {...world.props} user_id="u1" {...sinks}><Probe /></BankProvider>
 )
 
 /** Advice on a passphrase being chosen: a word until it is twelve characters or more. */

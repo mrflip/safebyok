@@ -10,7 +10,7 @@ import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinOf, storedVaultProp
 
 
 /** The draft of `u1`'s `main` vault, as a bank takes it: what a test asks the bank for to get the vault's next life. */
-const u1Main = { userId: 'u1', vaultlabel: 'main' } as const
+const u1Main = { user_id: 'u1', vaultlabel: 'main' } as const
 
 // == [Lock against unlock and read]: a lock that lands while an unlock, read in flight
 
@@ -436,7 +436,7 @@ describe("a vault that moves elsewhere while an unlock is under way", () => {
     const unlocking = TH.expectRefusal(TH.unlock(vault, 'pw one'), 'vault_remade')
     await gate.reached
     await TH.del(there, 'pw one')
-    const reborn = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const reborn = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     await TH.unlock(reborn, 'pw two')
     await reborn.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-new')
     // A read begun after the writes above brings in the new vault.
@@ -446,7 +446,7 @@ describe("a vault that moves elsewhere while an unlock is under way", () => {
     expect(await world.getLease()).to.be.null
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-stale'), 'vault_remade')
     expect(await reborn.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
-    const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const next = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(next.getSnapshot().state).to.eq('locked')
     await TH.unlock(next, 'pw two')
     expect(await next.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
@@ -584,7 +584,7 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     await landed.reached
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.del(there, 'pw two')
-    const reborn = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const reborn = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     await TH.unlock(reborn, 'pw three')
     await TH.expectBad(vault.tryRefresh(), 'vault_remade')
     landed.release()
@@ -592,7 +592,7 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     await TH.expectRefusal(changing, 'vault_remade')
     expect(vault.state).to.not.eq('unlocked')
     await TH.expectRefusal(vault.hello(), 'vault_remade')
-    const next = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const next = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(next.vault_tok).to.eq(reborn.vault_tok)
     expect(next.state).to.eq('locked')
     await TH.expectRefusal(TH.unlock(next, 'pw two'), 'wrong_passphrase')

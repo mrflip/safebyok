@@ -17,9 +17,9 @@ import { makeWorld, boxlabelsOf, isU1Box, u1BoxScopepath, u1VaultScopepath, Seve
 describe("scoping", () => {
   it("two users each keep a box by the same label, unseen by the other", async () => {
     const world = makeWorld()
-    const one = await world.openUnlocked('pw one', { userId: 'u1' })
+    const one = await world.openUnlocked('pw one', { user_id: 'u1' })
     await one.putBox({ boxlabel: 'anthropic' }, 'u1-secret')
-    const two = await world.open({ userId: 'u2' })
+    const two = await world.open({ user_id: 'u2' })
     expect(two.getSnapshot().state).to.eq('novel')
     await TH.unlock(two, 'pw two')
     await two.putBox({ boxlabel: 'anthropic' }, 'u2-secret')
@@ -29,8 +29,8 @@ describe("scoping", () => {
 
   it("one user's lease opens nothing for another", async () => {
     const world = makeWorld()
-    await world.openUnlocked('pw one', { userId: 'u1' })
-    expect(await world.stateOnOpen({ userId: 'u2' })).to.eq('novel')
+    await world.openUnlocked('pw one', { user_id: 'u1' })
+    expect(await world.stateOnOpen({ user_id: 'u2' })).to.eq('novel')
   })
 })
 
@@ -477,11 +477,11 @@ describe("the logger", () => {
 // == [Signed out and the device record]: u1Main, bankIn, no longer signed in, recordIn, this device's record of the vault
 
 /** The vault every world here births: `u1`'s `main`. */
-const u1Main = { userId: 'u1', vaultlabel: 'main' } as const
+const u1Main = { user_id: 'u1', vaultlabel: 'main' } as const
 
 /** A bank of `world`'s options, `overrides` among them, for a test that asks it for a vault itself. */
 const bankIn = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>) => {
-  const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
+  const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = world.optsWith(overrides)
   return Bank.make(bankOpts)
 }
 

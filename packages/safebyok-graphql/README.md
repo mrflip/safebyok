@@ -50,18 +50,18 @@ import { listen } from './listen'   // safebyok-postgres's README: one pg connec
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 /** What each request's resolvers know of it: the user your own auth signed in, or null. */
-type VaultContext = { userId: string | null }
+type VaultContext = { user_id: string | null }
 
 const schema = createSchema<VaultContext>({
   typeDefs:  [appTypeDefs, VaultSchemaSdl],
-  resolvers: [appResolvers, vaultResolvers({ vaultDBFor: ({ userId }: VaultContext) => postgresVaultDB({ client: pool, userId, listen }) })],
+  resolvers: [appResolvers, vaultResolvers({ vaultDBFor: ({ user_id }: VaultContext) => postgresVaultDB({ client: pool, user_id, listen }) })],
 })
 
 const { handleRequest } = createYoga<object, VaultContext>({
   schema,
   graphqlEndpoint: '/api/graphql',
   // Made per request, for the user your own auth signed in -- never one the request names.
-  context:         async ({ request }) => ({ userId: await signedInUserId(request) }),
+  context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
   fetchAPI:        { Response },
 })
 
@@ -78,7 +78,7 @@ import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
 const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB: graphqlVaultDB({ client }) })
-const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ user_id, vaultlabel: 'main' })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is
@@ -96,7 +96,7 @@ Your app's own Client serves, cache exchange and all: every query the vault send
 ## The server half
 
 ```ts
-vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId: context.userId, listen }) })
+vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, user_id: context.user_id, listen }) })
 ```
 
 * **`vaultDBFor(context)`** makes the VaultDB for one request, from your server's context for it.

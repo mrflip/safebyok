@@ -68,10 +68,10 @@ does (`safebyok-graphql`).
 ```ts
 import { postgresVaultDB } from 'safebyok-postgres'
 
-const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
+const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
 ```
 
-* **`userId`** is the user your own auth signed in for this request -- from its verified session,
+* **`user_id`** is the user your own auth signed in for this request -- from its verified session,
   never from anything the browser sends -- or `null` when no one is. The VaultDB reaches only that
   user's vaults: a verb naming any other user's scope, or any at all while signed out, refuses
   with a `VaultError` of kind `identity_revoked` before the database is asked anything, and the
@@ -203,7 +203,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ refusal: { kind: 'bad_option', message: 'That is not a vault verb.' }, meta: {} }, { status: 400 })
   }
   // Made per request, for the user your own auth signed in -- never one the request names.
-  const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
+  const vaultDB = postgresVaultDB({ client: pool, user_id: await signedInUserId(request) })
   return Response.json(answerOf(await serve(vaultDB, args)))
 }
 ```
@@ -409,7 +409,7 @@ unlisten (or a promise for it). A PGlite's own `listen` is one, called on its PG
 bare, as `listen: pglite.listen`, it loses its `this`, and the VaultDB hears nothing:
 
 ```ts
-const vaultDB = postgresVaultDB({ client: pglite, userId, listen: (channel, onNotify) => pglite.listen(channel, onNotify) })
+const vaultDB = postgresVaultDB({ client: pglite, user_id, listen: (channel, onNotify) => pglite.listen(channel, onNotify) })
 ```
 
 With `pg`, one long-lived connection LISTENs for the whole server and hands its notifications to
@@ -484,7 +484,7 @@ its error as the cause, nothing written.
 
 Supabase is Postgres, so this package runs there as it stands: put `vault-tables.sql` in a
 migration (`supabase/migrations/`), and run `postgresVaultDB` on your server, or in an Edge
-Function, connected with your project's database connection string, its `userId` the one
+Function, connected with your project's database connection string, its `user_id` the one
 `supabase.auth.getUser()` verified on the server.
 
 * **Keep the tables out of the Data API.** Supabase serves every table in the `public` schema to

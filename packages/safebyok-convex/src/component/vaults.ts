@@ -257,7 +257,7 @@ const vaultPropsOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_va
 
 /** A box row as the record it holds: system fields and scope columns stripped. */
 const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
-  const { _id, _creationTime, applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, ...box } = row
+  const { _id, _creationTime, applabel: _applabel, user_id: _user_id, vaultlabel: _vaultlabel, ...box } = row
   return box
 }
 

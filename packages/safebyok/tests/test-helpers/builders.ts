@@ -40,17 +40,17 @@ export const testDeriver: KeyDeriver = {
 
 /**
  * The slice of a vault a box, a way in or a lease reads, for a test that makes one with
- * no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it, holding the vault props
- * `vault-tok-<userId>`, deriving with `keyDeriver`, granting leases of seven days, and reading
+ * no vault behind it: `user_id`'s `main` vault, as {@link scopeOf} has it, holding the vault props
+ * `vault-tok-<user_id>`, deriving with `keyDeriver`, granting leases of seven days, and reading
  * {@link SliceNow} on its clock -- each as `overrides` does not say otherwise.
  *
  * @example Wayin.make(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'vault-tok-u1', TH.passkeyWayinOf('laptop'))
  * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
  */
-export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
+export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
   return {
-    ...scopeOf(userId),
-    vault_tok:       `vault-tok-${userId}`,
+    ...scopeOf(user_id),
+    vault_tok:       `vault-tok-${user_id}`,
     keyDeriver,
     leaseMillis:     7 * 24 * 60 * 60_000,
     now:             () => SliceNow,
@@ -76,7 +76,7 @@ export type LeasedSlice = VaultSlice & {
   locks:                number
 }
 
-/** A stand-in for `userId`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
+/** A stand-in for `user_id`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
  * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
  * stamped with its scope and `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted
  * at its clock's time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope
@@ -86,8 +86,8 @@ export type LeasedSlice = VaultSlice & {
  * @example const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
  * @example const box = await Box.seal(vault, { boxlabel: 'anthropic' }, 'sk-fake')
  */
-export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
-  const base = vaultSliceOf(userId, testDeriver, overrides)
+export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
+  const base = vaultSliceOf(user_id, testDeriver, overrides)
   const vaultTok = base.vault_tok
   const slice: LeasedSlice = {
     ...base,
@@ -123,8 +123,8 @@ export const leasedSliceOf = async (userId: string, vaultKey: CryptoKey, overrid
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
-/** Everything a bank and one of its vaults need, in one bag: {@link Bank.make}'s options beside the vault's `userId` and `vaultlabel`. */
-export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'userId' | 'vaultlabel'>
+/** Everything a bank and one of its vaults need, in one bag: {@link Bank.make}'s options beside the vault's `user_id` and `vaultlabel`. */
+export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'user_id' | 'vaultlabel'>
 
 /** Everything a bank and its vault need, over stores in memory made fresh for each call.
  * That is `u1`'s `main` vault in the `acme` app (as {@link scopeOf} has it), deriving through
@@ -134,14 +134,14 @@ export type BornVaultOpts = MakeBankOpts & Pick<VaultDraft, 'userId' | 'vaultlab
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
- * @returns A complete bag for {@link settledVault}, or (`userId` and `vaultlabel` aside) for Bank.make.
+ * @returns A complete bag for {@link settledVault}, or (`user_id` and `vaultlabel` aside) for Bank.make.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
- * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ userId: 'u2', vaultDB: myVaultDB }))
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ user_id: 'u2', vaultDB: myVaultDB }))
  */
 export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVaultOpts => ({
   applabel:   'acme',
-  userId:     'u1',
+  user_id:     'u1',
   vaultlabel: 'main',
   vaultDB:    localVaultDB({ store: memoryStore() }),
   deviceDB:   memoryDeviceDB(),
@@ -154,7 +154,7 @@ export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVau
 // The bank each vault settledVault handed out was born of, so a test can let it go.
 const banksOf = new WeakMap<Vault, Bank>()
 
-/** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of `userId` and `vaultlabel`.
+/** A vault born of `opts` in a bank of its own: `Bank.make` of the bank's options, then `bank.ensureVault` of `user_id` and `vaultlabel`.
  * Its snapshot says `novel`, `locked` or `unlocked`. A bag naming no `requestCleartext` is given
  * {@link scriptedRequestCleartext}, so `TH.unlock` and its kin answer its gatings. A bank of its own each time, so two calls
  * over one deviceDB are two tabs of one device. Rejects as `Bank.make` throws for misuse, and as
@@ -170,11 +170,11 @@ const banksOf = new WeakMap<Vault, Bank>()
  *   const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
  */
 export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
-  const { userId, vaultlabel, ...given } = opts
+  const { user_id, vaultlabel, ...given } = opts
   // A bag that names no requestCleartext answers gatings as TH.unlock and its kin script them.
   const bankOpts = 'requestCleartext' in given ? given : { ...given, requestCleartext: scriptedRequestCleartext }
   const bank = Bank.make(bankOpts)
-  const vault = await bank.ensureVault({ userId, vaultlabel })
+  const vault = await bank.ensureVault({ user_id, vaultlabel })
   banksOf.set(vault, bank)
   return vault
 }
@@ -182,7 +182,7 @@ export const settledVault = async (opts: BornVaultOpts): Promise<Vault> => {
 /** The bank `vault` was born in, by {@link settledVault}: for a test that lets it go, reopens it, or clears what the device keeps of it.
  * Throws for a vault settledVault did not hand out.
  *
- * @example TH.bankOf(vault).closeVault({ userId: 'u1', vaultlabel: 'main' })
+ * @example TH.bankOf(vault).closeVault({ user_id: 'u1', vaultlabel: 'main' })
  */
 export const bankOf = (vault: Vault): Bank => {
   const bank = banksOf.get(vault)
@@ -196,7 +196,7 @@ export const bankOf = (vault: Vault): Bank => {
  * @example TH.closeVault(vault)   // the lease stays, for the next vault settled over this deviceDB
  */
 export const closeVault = (vault: Vault): void => {
-  bankOf(vault).closeVault({ userId: vault.user_id, vaultlabel: vault.vaultlabel })
+  bankOf(vault).closeVault({ user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 }
 
 /**
@@ -223,12 +223,12 @@ export const fakeCiphered = (tag: string): FakeCiphered => {
 }
 
 /**
- * The scope of `userId`'s vault in the `acme` app.
+ * The scope of `user_id`'s vault in the `acme` app.
  *
  * @example scopeOf('u1')           // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
  * @example scopeOf('u1', 'spare')  // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'spare' }
  */
-export const scopeOf = (userId: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id: userId, vaultlabel })
+export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id, vaultlabel })
 
 /**
  * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
@@ -289,20 +289,20 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
   return { credentialId, prfSaltB64: saltB64, prfBytes: await digestOf(`${credentialId}:${saltB64}`) }
 }
 
-/** Shape-valid gated vault props for `userId`'s `main` vault, its passphrase's wrap fake and no passkey.
- * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<userId>`, its
- * gate_epoch 1, and its passphrase a {@link wayinOf} whose wrap is `vault-<userId>`.
+/** Shape-valid gated vault props for `user_id`'s `main` vault, its passphrase's wrap fake and no passkey.
+ * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<user_id>`, its
+ * gate_epoch 1, and its passphrase a {@link wayinOf} whose wrap is `vault-<user_id>`.
  *
  * @example vaultPropsOf('u1', { gate_epoch: 2 })
  * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
-export const vaultPropsOf = (userId: string, overrides: Partial<GatedVaultProps> = {}): GatedVaultProps => ({
+export const vaultPropsOf = (user_id: string, overrides: Partial<GatedVaultProps> = {}): GatedVaultProps => ({
   format:              'safebyok-vault-v6',
-  ...scopeOf(userId),
-  vault_tok:           `vault-tok-${userId}`,
+  ...scopeOf(user_id),
+  vault_tok:           `vault-tok-${user_id}`,
   vault_epoch:         1,
   gate_epoch:          1,
-  passphrase:          wayinOf(`vault-${userId}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) }),
+  passphrase:          wayinOf(`vault-${user_id}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${user_id}`) }),
   passkey:             null,
   registered_at:       Date.UTC(2026, 9, 14),
   ...overrides,
@@ -339,16 +339,16 @@ export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultSc
   valOf(await vaultDB.getVault(scope))?.boxes ?? []
 )
 
-/** The gateless vault props a vault is first stored as, for `userId`'s `main` vault: `gate_epoch` 0 and no way in.
- * Otherwise as {@link vaultPropsOf} makes them, its vault_tok `vault-tok-<userId>`.
+/** The gateless vault props a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no way in.
+ * Otherwise as {@link vaultPropsOf} makes them, its vault_tok `vault-tok-<user_id>`.
  *
  * @example vaultDB.ensureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
  */
-export const gatelessOf = (userId: string, overrides: Partial<GatelessVaultProps> = {}): GatelessVaultProps => ({
+export const gatelessOf = (user_id: string, overrides: Partial<GatelessVaultProps> = {}): GatelessVaultProps => ({
   format:              'safebyok-vault-v6',
-  ...scopeOf(userId),
-  vault_tok:           `vault-tok-${userId}`,
+  ...scopeOf(user_id),
+  vault_tok:           `vault-tok-${user_id}`,
   vault_epoch:         0,
   gate_epoch:          0,
   passphrase:          null,
@@ -427,28 +427,28 @@ export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 
  */
 export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
 
-/** A shape-valid DeviceRecord for device-storage tests: `userId`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
+/** A shape-valid DeviceRecord for device-storage tests: `user_id`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
  * Any field as `overrides` says otherwise.
  *
  * @example await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
  * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
  */
-export const deviceRecordOf = (userId: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({
+export const deviceRecordOf = (user_id: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({
   format:              'safebyok-device-v1',
-  ...scopeOf(userId),
+  ...scopeOf(user_id),
   device_id:           'device-one',
   highest_vault_epoch: 1,
   ...overrides,
 })
 
 /** A real lease record for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
-export const leaseOf = async (userId: string, overrides: Partial<LeaseRecord> = {}): Promise<LeaseRecord> => ({
+export const leaseOf = async (user_id: string, overrides: Partial<LeaseRecord> = {}): Promise<LeaseRecord> => ({
   format:                  'safebyok-lease-v1',
-  ...scopeOf(userId),
-  vault_tok:               `vault-tok-${userId}`,
+  ...scopeOf(user_id),
+  vault_tok:               `vault-tok-${user_id}`,
   gate_epoch:              1,
   lease_key:               await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
-  vault_key_lease_wrapped: fakeCiphered(`lease-${userId}`),
+  vault_key_lease_wrapped: fakeCiphered(`lease-${user_id}`),
   ask_passphrase_at:       1_900_000_000_000,
   ...overrides,
 })

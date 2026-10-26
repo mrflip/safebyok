@@ -90,7 +90,7 @@ export type DescribeVaultDBOpts = {
    * signed out for null: for line 5.4, who may reach a vault; without it, that is skipped. An
    * adapter with no notion of identity has none to give.
    */
-  makeVaultDBFor?: (() => ((userId: string | null) => VaultDBVerbs) | Promise<(userId: string | null) => VaultDBVerbs>) | undefined
+  makeVaultDBFor?: (() => ((user_id: string | null) => VaultDBVerbs) | Promise<(user_id: string | null) => VaultDBVerbs>) | undefined
   /**
    * Whether the adapter `makeVaultDB` makes pushes: calls a subscriber after each write through
    * it, for line 6.1's push tests; without it, those are skipped. An adapter with no push (a
@@ -145,8 +145,8 @@ const CappedBoxes = 3
  *   describeVaultDB('localVaultDB', (vaultDBOpts) => localVaultDB({ ...vaultDBOpts, store: memoryStore() }), { pushes: true })
  * @example
  *   describeVaultDB('postgresVaultDB', makeRequest, {
- *     makeCappedVaultDB: (maxBoxes) => postgresVaultDB({ client, userId: 'u1', maxBoxes }),
- *     makeVaultDBFor:    () => (userId) => postgresVaultDB({ client, userId }),
+ *     makeCappedVaultDB: (maxBoxes) => postgresVaultDB({ client, user_id: 'u1', maxBoxes }),
+ *     makeVaultDBFor:    () => (user_id) => postgresVaultDB({ client, user_id }),
  *   })
  */
 export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, opts: DescribeVaultDBOpts = {}) => {
@@ -281,13 +281,13 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("keeps apart users whose ids differ only by a colon, a bar, a percent sign or its encoding, a dot, an at sign or a tilde", async () => {
       const vaultDB = await makeVaultDB()
       const userIds = ['u1', 'u1:', 'u1|', 'u1%', 'u1%3A', 'u1.', 'u1@', 'u1~']
-      for (const [ii, userId] of userIds.entries()) {
-        await ensureGated(vaultDB, vaultPropsOf(userId))
-        await expectingGood(vaultDB).putBox(scopeOf(userId), { vault_tok: `vault-tok-${userId}`, revision_tok: null }, boxOf('anthropic', `of-${String(ii)}`))
+      for (const [ii, user_id] of userIds.entries()) {
+        await ensureGated(vaultDB, vaultPropsOf(user_id))
+        await expectingGood(vaultDB).putBox(scopeOf(user_id), { vault_tok: `vault-tok-${user_id}`, revision_tok: null }, boxOf('anthropic', `of-${String(ii)}`))
       }
-      const listEach = () => Promise.all(userIds.map((userId) => boxesOf(vaultDB, scopeOf(userId))))
+      const listEach = () => Promise.all(userIds.map((user_id) => boxesOf(vaultDB, scopeOf(user_id))))
       const before = await listEach()
-      expect(before.map((listing) => listing.map((box) => summaryOf(box)?.revision_tok))).to.deep.equal(userIds.map((_userId, ii) => [`rev-of-${String(ii)}`]))
+      expect(before.map((listing) => listing.map((box) => summaryOf(box)?.revision_tok))).to.deep.equal(userIds.map((_user_id, ii) => [`rev-of-${String(ii)}`]))
       await expectingGood(vaultDB).delVault(scopeOf('u1'), thisVault)
       const after = await listEach()
       expect(after.map((listing) => listing.length)).to.deep.equal([0, 1, 1, 1, 1, 1, 1, 1])
@@ -295,9 +295,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("refuses a user id outside ASCII, a letter composed or decomposed alike, never normalizing it", async () => {
       const vaultDB = await makeVaultDB()
-      for (const userId of ['caf\u{E9}', 'cafe\u{301}']) {
-        await expectBad(vaultDB.ensureVault(gatelessOf(userId)), 'bad_record')
-        await expectBad(vaultDB.getVault(scopeOf(userId)), 'bad_scope')
+      for (const user_id of ['caf\u{E9}', 'cafe\u{301}']) {
+        await expectBad(vaultDB.ensureVault(gatelessOf(user_id)), 'bad_record')
+        await expectBad(vaultDB.getVault(scopeOf(user_id)), 'bad_scope')
       }
     })
 
@@ -1812,13 +1812,13 @@ const quotedOf = (refusal: unknown, box: BoxRecord): string[] => {
  * this sends each verb to the VaultDB `vaultDBFor` made for the user its scope or vault props name,
  * making each user's once and keeping it. Its limits are those of the one made for `anyone`.
  *
- * @param vaultDBFor - The VaultDB a request signed in as `userId` gets.
+ * @param vaultDBFor - The VaultDB a request signed in as `user_id` gets.
  * @returns The verbs of one adapter, each sent on to its user's VaultDB.
  *
  * @example
- *   describeVaultDB('postgresVaultDB', () => perUser((userId) => postgresVaultDB({ client, userId, listen: (channel, onNotify) => client.listen(channel, onNotify) })))
+ *   describeVaultDB('postgresVaultDB', () => perUser((user_id) => postgresVaultDB({ client, user_id, listen: (channel, onNotify) => client.listen(channel, onNotify) })))
  */
-export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVerbs => {
+export const perUser = (vaultDBFor: (user_id: string) => VaultDBVerbs): VaultDBVerbs => {
   const vaultDBs = new Map<string, VaultDBVerbs>()
   const as = ({ user_id }: { user_id: string }): VaultDBVerbs => {
     const known = vaultDBs.get(user_id)

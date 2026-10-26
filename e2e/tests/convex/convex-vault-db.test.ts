@@ -45,17 +45,17 @@ const ClientCases: [string, (deployment: Deployment, subject: string | null) => 
  */
 const devicesOver = (connect: (deployment: Deployment, subject: string | null) => ConvexVaultClient): TH.MakeVaultDBDevices => (turnstile) => {
   const deployment = deploy()
-  return () => TH.perUser((userId) => convexVaultDB({ client: TH.throughTurnstile(turnstile, connect(deployment, userId), ['query', 'mutation']), api: deployment.api.safebyok }))
+  return () => TH.perUser((user_id) => convexVaultDB({ client: TH.throughTurnstile(turnstile, connect(deployment, user_id), ['query', 'mutation']), api: deployment.api.safebyok }))
 }
 
 for (const [clientTitle, connect] of ClientCases) {
   TH.describeVaultDB(`convexVaultDB over a ${clientTitle}`, (vaultDBOpts) => {
     const deployment = deploy()
-    return TH.perUser((userId) => convexVaultDB({ ...vaultDBOpts, client: connect(deployment, userId === '' ? null : userId), api: deployment.api.safebyok }))
+    return TH.perUser((user_id) => convexVaultDB({ ...vaultDBOpts, client: connect(deployment, user_id === '' ? null : user_id), api: deployment.api.safebyok }))
   }, {
     makeVaultDBFor: () => {
       const deployment = deploy()
-      return (userId) => convexVaultDB({ client: connect(deployment, userId), api: deployment.api.safebyok })
+      return (user_id) => convexVaultDB({ client: connect(deployment, user_id), api: deployment.api.safebyok })
     },
     makeDevices: devicesOver(connect),
     pushes:      true,
@@ -226,11 +226,11 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
     it(`is refused as identity_revoked over a ${clientTitle}, its entry refused with no Vault object, and leaves no watch live on the deployment once let go`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-      const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
+      const { user_id, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
       const bank = Bank.make(bankOpts)
-      await TH.expectRefusal(bank.ensureVault({ userId, vaultlabel }), 'identity_revoked')
-      expect(bank.entryOf({ userId, vaultlabel })).to.deep.include({ status: 'refused', vault: null })
-      bank.closeVault({ userId, vaultlabel })
+      await TH.expectRefusal(bank.ensureVault({ user_id, vaultlabel }), 'identity_revoked')
+      expect(bank.entryOf({ user_id, vaultlabel })).to.deep.include({ status: 'refused', vault: null })
+      bank.closeVault({ user_id, vaultlabel })
       await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
     })
   }
@@ -306,7 +306,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The phone deletes the vault; the laptop hears it gone, and its bank hands out no Vault object for it.
     await TH.del(phone, NewPassphrase)
-    await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ userId: 'u1', vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
+    await vi.waitFor(() => { expect(TH.bankOf(laptop).entryOf({ user_id: 'u1', vaultlabel: 'main' })?.err?.refusalkind).to.eq('vault_gone') })
     TH.closeVault(laptop)
     TH.closeVault(phone)
   })

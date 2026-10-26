@@ -34,7 +34,7 @@ const bank = Bank.make({
   vaultDB:    idbVaultDB({ dbName: 'acme' }),
   ...browserOpts({ dbName: 'acme' }),   // the key deriver, and the device store beside the vault
 })
-const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ user_id: session.user_id, vaultlabel: 'main' })
 ```
 
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's

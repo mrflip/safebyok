@@ -4,7 +4,7 @@ The thin React binding for safebyok: no vault logic, only the React-shaped plumb
 otherwise write itself.
 
 * `BankProvider` -- makes the app's bank (`Bank.make`) from its props, for the signed-in user
-  (the `userId` prop from your auth); lets every vault in it go as the user signs out or changes
+  (the `user_id` prop from your auth); lets every vault in it go as the user signs out or changes
   (`bank.closeVaults()`). It is the vaults' `requestCleartext`, unless you pass one of your own:
   whenever a call on a vault needs the user -- `vault.getWhisper(...)`, `vault.putBox(...)` or
   `vault.ensureUnlocked()` on a vault locked, `vault.putWayin(...)`, `vault.delWayin('passkey')`,
@@ -65,12 +65,12 @@ core's *Where it runs*.
 import { browserOpts } from 'safebyok/browser'
 import { BankProvider } from 'safebyok-react'
 
-<BankProvider {...browserOpts()} applabel="acme" userId={session?.userId ?? null} vaultDB={vaultDB}>
+<BankProvider {...browserOpts()} applabel="acme" user_id={session?.user_id ?? null} vaultDB={vaultDB}>
   <App />
 </BankProvider>
 ```
 
-The provider takes every `Bank.make` option as a prop, beside the signed-in `userId`, and throws
+The provider takes every `Bank.make` option as a prop, beside the signed-in `user_id`, and throws
 one it does not take -- a misspelling, a name it no longer uses, or a `vaultlabel`, which each hook
 names -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
 browser app answers like any other, `keyDeriver`, `deviceDB` and `strengthChecker`;
@@ -92,7 +92,7 @@ A handler is the other exception: `onBadNews` and `requestCleartext` make no new
 they may be written inline. The vaults call whichever the last render passed:
 
 ```tsx
-<BankProvider {...browserOpts()} applabel="acme" userId={userId} vaultDB={vaultDB}
+<BankProvider {...browserOpts()} applabel="acme" user_id={user_id} vaultDB={vaultDB}
   onBadNews={(news) => { telemetry.report(news.refusalkind) }}>
   <App />
 </BankProvider>
@@ -156,17 +156,17 @@ the vault than this device has seen (`vault_behind`). (A damaged box never stops
 the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show
 it where the vault's UI would be. **A refused entry stays refused until the app asks again**:
-`useBank().ensureVault({ userId, vaultlabel: 'main' })` reads storage afresh, the entry `starting`
+`useBank().ensureVault({ user_id, vaultlabel: 'main' })` reads storage afresh, the entry `starting`
 while it reads, then `timely`, or `refused` with what it met. A browser that keeps the app from
 storing anything on this device (`storage_blocked`) is a condition too, but one asking again will
 not mend until the browser's settings or room change: say so, rather than offering a Retry.
 
 ```tsx
-const VaultPanel = ({ userId }: { userId: string }) => {
+const VaultPanel = ({ user_id }: { user_id: string }) => {
   const bank = useBank()
   const entry = useVault('main')
   if (entry?.err) {
-    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault({ userId, vaultlabel: 'main' }) }}>Retry</button></p>
+    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault({ user_id, vaultlabel: 'main' }) }}>Retry</button></p>
   }
   if (! entry?.vault) { return <p>Opening your vault…</p> }
   return <Boxes vault={entry.vault} />
@@ -196,13 +196,13 @@ lets the entry go, so `useVault` asks for the vault again:
 const bank = useBank()
 const acceptRestore = async () => {
   if (bank === null) { return }
-  await bank.clearCachedVault({ userId, vaultlabel: 'main' })
-  await bank.ensureVault({ userId, vaultlabel: 'main' })
+  await bank.clearCachedVault({ user_id, vaultlabel: 'main' })
+  await bank.ensureVault({ user_id, vaultlabel: 'main' })
 }
 ```
 
 **A damaged vault.** For a `damaged_vault`, the one way forward is to delete the vault and start
-over: `bank.delDamagedVault({ userId, vaultlabel: 'main' })` does that with the bank's own stores
+over: `bank.delDamagedVault({ user_id, vaultlabel: 'main' })` does that with the bank's own stores
 (the `safebyok` README's *A vault that cannot be opened*), and lets the entry go, so `useVault`
 asks for the vault again: a new one, `novel`, for the user to choose a passphrase for. The user's
 boxes in it are lost for good, so ask first. It refuses with storage's refusal (say,
@@ -215,7 +215,7 @@ the vault as storage refusing it, kind `identity_revoked`, and a vault already b
 (the `safebyok` README's *When the user signs out*). The snapshot reads `locked`; the next call
 that needs the vault opens the passphrase dialog, whose unlock meets the same refusal and closes
 it, the call refused `vault_locked`. Once your auth says the
-user signed out, pass `userId={null}`, which lets the vaults go.
+user signed out, pass `user_id={null}`, which lets the vaults go.
 
 **Misuse goes to your error boundary.** A bad label or option -- a bug in the app's code -- is
 thrown while rendering, as is a birth refused as misuse, or with anything that is not a
@@ -225,8 +225,8 @@ overlay or the boundary's fallback shows it and a different user (or a sign-out 
 a fresh attempt:
 
 ```tsx
-<ErrorBoundary key={userId ?? 'signed-out'} fallback={<VaultTroubleNotice />}>
-  <BankProvider {...browserOpts()} applabel="acme" userId={userId} vaultDB={vaultDB}>
+<ErrorBoundary key={user_id ?? 'signed-out'} fallback={<VaultTroubleNotice />}>
+  <BankProvider {...browserOpts()} applabel="acme" user_id={user_id} vaultDB={vaultDB}>
     <App />
   </BankProvider>
 </ErrorBoundary>
@@ -353,7 +353,7 @@ manager that saw a new password for their sign-in name would offer to overwrite 
 in with.
 
 ```tsx
-<BankProvider {...browserOpts()} applabel="acme" userId={userId} vaultDB={vaultDB}
+<BankProvider {...browserOpts()} applabel="acme" user_id={user_id} vaultDB={vaultDB}
   passphraseUsername={`${email} (vault)`}>
 ```
 

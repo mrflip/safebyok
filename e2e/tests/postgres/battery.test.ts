@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 
 const getDb = TH.useFileDatabase()
 
-/** A fresh, emptied database, and the postgresVaultDB a request signed in as `userId` gets over it: one pool, one listener, as a server has. */
+/** A fresh, emptied database, and the postgresVaultDB a request signed in as `user_id` gets over it: one pool, one listener, as a server has. */
 const freshServer = async (vaultDBOpts: VaultDBOpts = {}) => {
   const db = getDb()
   await db.endDevices()
@@ -20,18 +20,18 @@ const freshServer = async (vaultDBOpts: VaultDBOpts = {}) => {
 TH.describeOnPostgres('battery', "postgresVaultDB over a real Postgres", () => {
   TH.describeVaultDB('postgresVaultDB over a real Postgres', async (vaultDBOpts) => {
     const vaultDBFor = await freshServer(vaultDBOpts)
-    return TH.perUser((userId) => vaultDBFor(userId))
+    return TH.perUser((user_id) => vaultDBFor(user_id))
   }, {
     makeCappedVaultDB:     async (maxBoxes) => {
       const db = getDb()
       await db.endDevices()
       await db.empty()
       const vaultDBFor = TH.deviceOver(db, undefined, { maxBoxes })
-      return TH.perUser((userId) => vaultDBFor(userId))
+      return TH.perUser((user_id) => vaultDBFor(user_id))
     },
     makeVaultDBFor: async () => {
       const vaultDBFor = await freshServer()
-      return (userId) => vaultDBFor(userId)
+      return (user_id) => vaultDBFor(user_id)
     },
     pushes:      true,
     makeDevices: TH.devicesOver(getDb),
