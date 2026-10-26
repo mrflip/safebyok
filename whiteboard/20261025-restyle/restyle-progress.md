@@ -215,3 +215,23 @@ Who reads this: threads 10 to 13; the restack.
   `checkedStamp`; VOCABULARY calls that set "made under". Rename them as Box and Vault reshape.
 * **For the restack**: VOCABULARY's ctx, stamp, visible, unencrypted, sidecar, revisionTok,
   whisper codec and format rows are on this branch's text; apply them to #272's VOCABULARY.
+
+## From thread 10 (reads, #281)
+
+Who reads this: threads 11 to 13.
+
+* **Reads**: an adapter's half answers `{ vault, boxes, damagedBoxes }` via the exported
+  `splitStoredBoxes`; the base class re-checks the split (a server's too). `getVault`,
+  `ensureVault`, `getVaultRecords`, `ensureVaultRecords` resolve `VaultRecord & { boxes,
+  damagedBoxes }`, frozen. `BirthRead.listed` is `BirthRead.listing`. Convex's component answers
+  rows; its client splits.
+* **Renamed**: `putVaultRecord` (`doPutVaultRecord`), `meta.vault_stored`, `staleVaultRecord`,
+  `Expectations.vaultRecord*`. "Vault props" is gone from docs and test titles.
+* **For thread 11**: `BoxView` remains as a `Pick` of `BoxSparse`, for `class Box implements
+  Boxscope, BoxSparse`; `boxSparseOf(record)` in box.ts gives a frozen sparse box; a new
+  `vault.damagedBoxes` getter sits beside the per-field getters thread 11 removes.
+* **For thread 12**: the vault keeps `#boxes` and `#damagedBoxes` as frozen arrays replaced only
+  when a box changes, and the snapshot hands them out as they are: half the slices work is done.
+* Test helpers: `TH.recordOfRead`, `TH.damagedBoxesOf`; `TH.summaryOf` is gone.
+* **The demo typechecks against the built `dist`**: a stale build hides breaks there until
+  `pnpm justify` builds.
