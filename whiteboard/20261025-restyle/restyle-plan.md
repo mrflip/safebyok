@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 5 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#276](https://github.com/mrflip/safebyok/pull/276)); thread 6 built ([#277](https://github.com/mrflip/safebyok/pull/277)), in review.
+* **Status:** threads 1 to 6 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#277](https://github.com/mrflip/safebyok/pull/277)); thread 7 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -257,6 +257,17 @@ move: each one checked by a test that a call naming another user is refused), Gr
 Postgres. `VaultProps` → `VaultRecord` is thread 8's, with the record. **Depends on:** thread 5.
 **Look-ahead:** thread 7 builds the per-user bank on the flattened calls. **Size:** large but
 mechanical; the authorization moves are the part to review hard.
+
+*Review:* medium, `fixed`. Checked by hand: each of the nine Convex functions `mustBe`s the very
+`user_id` its component scopes by; GraphQL and the Postgres route recipe leave the check to the
+per-request VaultDB, unchanged; no tautology survived the rename. Fixed: three Convex
+"another user's vault is left as it was" tests used expectations that would not have landed even
+for the owner (now they land for the owner, and each call's test fails without its `mustBe`);
+columns realigned after the renames; the changeset's version-skew kinds. Left: `ask_passphrase_at`
+overruns the snapshot's column (thread 11 or 12); `postgresVaultDB({ userId })` from JS reads as
+signed out and fails safe; STYLE.md's `askPassphraseAt` example and camelCase rule (check against
+#272 at the restack); the missing-field refusal is `storage_unavailable`, as `answerOf`'s;
+`scopeOut` repeats the scope's names. Filed as [#277](https://github.com/mrflip/safebyok/pull/277).
 
 ### 7. A bank per signed-in user (Preplan Phase 3, the bank) -- `bank_per_user`
 
