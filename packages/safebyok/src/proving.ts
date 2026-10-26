@@ -4,6 +4,7 @@ import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './key-deriver-spec'
 import { type Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
+import type { Vault } from './vault'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
@@ -108,7 +109,7 @@ const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
  */
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The vault it proves for. Not enumerable. */
-  declare readonly vault: VaultStamp
+  declare readonly vault: Vault
   /** The header it was sealed over: the wayin it opens, or the one it will become. Not enumerable. */
   declare readonly header: HeaderT
   /** The gating it was made for. Not enumerable. */
@@ -130,7 +131,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The stamp of the vault record it was sealed under, which each wrap's ctx begins with. */
   readonly #vaultStamp: VaultStamp
 
-  protected constructor(vault: VaultStamp, madeUnder: VaultSparse, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
+  protected constructor(vault: Vault, madeUnder: VaultSparse, header: HeaderT, gating: ProvingGating, wayinKey: CryptoKey) {
     // What it was made under is the vault's, for its demand to judge: readable, but no field a spread or JSON shows.
     const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = madeUnder
     decorate<Proving<HeaderT>>(this, { vault, header: Object.freeze({ ...header }), gating, applabel, user_id, vaultlabel, vault_tok, gate_epoch })
@@ -275,7 +276,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
  * @example const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })   // a fresh header, its salt minted
  */
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
-  private constructor(vault: VaultStamp, madeUnder: VaultSparse, header: PassphraseWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
+  private constructor(vault: Vault, madeUnder: VaultSparse, header: PassphraseWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
     super(vault, madeUnder, header, gating, wayinKey)
     Object.freeze(this)
   }
@@ -293,7 +294,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })
    */
-  static async seal(vault: VaultStamp, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
+  static async seal(vault: Vault, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
     const cleartext = passphraseCleartext.parse(passphrase)
     const inside = insideOf(vault)
     const madeUnder = vaultSparseOf(inside.vaultRecord())
@@ -346,7 +347,7 @@ const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) =>
  * @example const proving = await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), answer, { gating })
  */
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
-  private constructor(vault: VaultStamp, madeUnder: VaultSparse, header: PasskeyWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
+  private constructor(vault: Vault, madeUnder: VaultSparse, header: PasskeyWayinHeader, gating: ProvingGating, wayinKey: CryptoKey) {
     super(vault, madeUnder, header, gating, wayinKey)
     Object.freeze(this)
   }
@@ -360,10 +361,10 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    *
    * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link StandingGating}.
    *
-   * @example await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), await askPasskey(vault.snapshot.passkey), { gating })
+   * @example await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), await askPasskey(vault.snapshot.gate), { gating })
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
    */
-  static async seal(vault: VaultStamp, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
+  static async seal(vault: Vault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
     const checked = checkedPasskeyAnswer(answer)
     const { prfBytes } = checked
     try {
@@ -430,7 +431,7 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
  * An answer already used, its bytes zeroed by the proving sealed of it, is refused 'bad_option'
  * too: sealed again, it would make a key anyone could rebuild.
  *
- * @example checkedPasskeyAnswer(await askPasskey(vault.snapshot.passkey))
+ * @example checkedPasskeyAnswer(await askPasskey(vault.snapshot.gate))
  * @example checkedPasskeyAnswer({ credential_id: 'abc' })   // throws 'bad_option'
  * @example checkedPasskeyAnswer(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
@@ -497,7 +498,7 @@ const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker chang
 /** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `madeUnder`, as it stood when the seal began, and `gating` not landed ('gating_landed').
  * A seal begun on a vault with no gate was for the first: a gate standing now was made elsewhere ('gate_made_elsewhere').
  */
-const demandAfterFailedSeal = (vault: VaultStamp, madeUnder: VaultSparse, gating: ProvingGating) => {
+const demandAfterFailedSeal = (vault: Vault, madeUnder: VaultSparse, gating: ProvingGating) => {
   insideOf(vault).demand(madeUnder, gating.call ?? 'demandConsistentWith', { firstGate: madeUnder.gate_epoch === 0 })
   if (gating.landed) { throw sealLandedError() }
 }
