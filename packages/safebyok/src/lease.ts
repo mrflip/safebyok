@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { BoxRecord, BoxStamp } from './box'
+import { BoxRecord, BoxSparse, BoxStamp } from './box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -36,19 +36,16 @@ export type LeaseStamp = Z.infer<typeof LeaseStamp>
 /** A lease's sparse shape: the same fields as its {@link LeaseStamp}, named for what a log line or a listing shows. A Lease shows them but for its format, which it keeps in its record. */
 export type LeaseSparse = Z.infer<typeof LeaseStamp>
 
-/** A box record's visible fields: every field but its two ciphered ones. What {@link Lease.cipheredWith} binds a whisper to, and its ctx is rebuilt from. */
-export type BoxVisible = Omit<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
-
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
 
 /** The `format` a lease record carries, in its stamp. */
 const LeaseFormat = 'safebyok-lease-v1'
 
-/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's visible fields, as {@link BoxVisible} has them; a box's two ciphered fields, as {@link BoxCiphered} has them; and the two stamps each ctx here takes, picked from whatever carries them. Each refuses 'bad_record'. */
+/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's sparse fields, as {@link BoxSparse} has them; a box's two ciphered fields, as {@link BoxCiphered} has them; and the two stamps each ctx here takes, picked from whatever carries them. Each refuses 'bad_record'. */
 const { LeaseGrant, VisibleShape, CipheredShape, VaultStampButFormat, LeaseStampPicked } = Validator('bad_record', ({ obj }) => ({
   LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
-  VisibleShape:        BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
+  VisibleShape:        BoxSparse.strip(),
   CipheredShape:       obj({ box_key_wrapped, whisper_ciphered }),
   VaultStampButFormat: VaultStamp.omit({ format: true }).strip(),
   LeaseStampPicked:    LeaseStamp.strip(),
@@ -177,10 +174,10 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
    *
    * @example const { box_key_wrapped, whisper_ciphered } = await lease.cipheredWith(whisperBytes, visible)
    */
-  async cipheredWith(serialized: Uint8Array, visible: BoxVisible): Promise<BoxCiphered> { return valOf(await this.tryCipheredWith(serialized, visible)) }
+  async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> { return valOf(await this.tryCipheredWith(serialized, visible)) }
 
   /** `serialized` ciphered and its boxKey wrapped, as an {@link Outcome}: the non-throwing form of {@link Lease.cipheredWith}. */
-  async tryCipheredWith(serialized: Uint8Array, visible: BoxVisible): Promise<Outcome<BoxCiphered>> {
+  async tryCipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<Outcome<BoxCiphered>> {
     return await outcomeOf(async () => {
       const bytes = checkedBytes(serialized)
       try {
@@ -213,10 +210,10 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
    *
    * @example const whisperBytes = await lease.decipherWith(ciphered, visible)
    */
-  async decipherWith(ciphered: BoxCiphered, visible: BoxVisible): Promise<Uint8Array> { return valOf(await this.tryDecipherWith(ciphered, visible)) }
+  async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> { return valOf(await this.tryDecipherWith(ciphered, visible)) }
 
   /** The bytes `ciphered` holds, as an {@link Outcome}: the non-throwing form of {@link Lease.decipherWith}. */
-  async tryDecipherWith(ciphered: BoxCiphered, visible: BoxVisible): Promise<Outcome<Uint8Array>> {
+  async tryDecipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Outcome<Uint8Array>> {
     return await outcomeOf(async () => {
       const sealed = checkedCiphered(ciphered)
       const header = checkedVisible(visible)
@@ -244,10 +241,10 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
    *
    * @example const record = await lease.sealProps(visible, { whisper: whisperBytes })
    */
-  async sealProps(visible: BoxVisible, props: { whisper: Uint8Array }): Promise<BoxRecord> { return valOf(await this.trySealProps(visible, props)) }
+  async sealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<BoxRecord> { return valOf(await this.trySealProps(visible, props)) }
 
   /** The record `visible` makes with its whisper sealed, as an {@link Outcome}: the non-throwing form of {@link Lease.sealProps}. */
-  async trySealProps(visible: BoxVisible, props: { whisper: Uint8Array }): Promise<Outcome<BoxRecord>> {
+  async trySealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<Outcome<BoxRecord>> {
     return await outcomeOf(async () => {
       const sealing = checkSealProps(props)
       const header = checkedVisible(visible)
@@ -283,7 +280,7 @@ export class Lease implements Omit<LeaseSparse, 'format'> {
   }
 
   /** The ctx a box's ciphered field is bound to, {@link boxCtxOf}'s: its vault's stamp, and the box's, `visible` and this lease's `vault_tok`. See VOCABULARY.md on ctx. */
-  #boxCtxOf(visible: BoxVisible, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
+  #boxCtxOf(visible: BoxSparse, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
     return boxCtxOf(this.#vault, { ...visible, vault_tok: this.vault_tok }, purpose)
   }
 }
@@ -323,7 +320,7 @@ export const sealLeaseRecord = async (vault: Pick<LeaseVault, 'applabel' | 'user
 const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
 /** `visible`, once it is a box record's visible fields: 'bad_record' otherwise, quoting none of it. */
-const checkedVisible = (visible: unknown): BoxVisible => {
+const checkedVisible = (visible: unknown): BoxSparse => {
   const checked = VisibleShape.safeParse(visible)
   if (! checked.success) {
     throw new VaultError('bad_record', "A lease ciphers and deciphers a box bound to that box's visible fields: every field of a box record but box_key_wrapped and whisper_ciphered, as Box.seal and box.extractWhisper hand them in.")

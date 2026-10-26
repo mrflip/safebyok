@@ -27,7 +27,7 @@ const callsOn = (user_id: string): [string, (caller: Caller) => Promise<unknown>
   return [
     ['getVault',         (caller) => caller.query(api.safebyok.getVault, { ...scope })],
     ['ensureVault',      (caller) => caller.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf(user_id, { vault_tok: 'vault-tok-late' }) })],
-    ['putVaultRecord',    (caller) => caller.mutation(api.safebyok.putVaultRecord, { vaultProps: TH.vaultRecordOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
+    ['putVaultRecord',    (caller) => caller.mutation(api.safebyok.putVaultRecord, { vaultRecord: TH.vaultRecordOf(user_id, { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 0 } })],
     ['getBox',           (caller) => caller.query(api.safebyok.getBox, { ...scope, boxlabel: 'anthropic_api_key', expected: { vault_tok } })],
     ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { ...scope, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_tok, revision_tok: 'rev-a1' } })],
     ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { ...scope })],
@@ -65,7 +65,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     const CVX = await seeded()
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     const listed = await asU1.query(api.safebyok.getVault, { ...u1 })
-    expect(listed?.vaultProps).to.deep.equal(TH.gatelessOf('u1'))
+    expect(listed?.vault).to.deep.equal(TH.gatelessOf('u1'))
     expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await asU1.query(api.safebyok.watchVault, { ...u1 })).to.deep.equal({
       vault_tok: 'vault-tok-u1', gate_epoch: 0, boxes: [['anthropic_api_key', 'rev-a1']],
@@ -128,7 +128,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
       const CVX = await seeded(['u1', 'u2'])
       await TH.convexRefusalOf(call(CVX.withIdentity({ subject: 'u1' })))
       const left = await CVX.withIdentity({ subject: 'u2' }).query(api.safebyok.getVault, { ...TH.scopeOf('u2') })
-      expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u2'))
+      expect(left?.vault).to.deep.equal(TH.gatelessOf('u2'))
       expect(left?.boxes.map((box) => box.revision_tok)).to.deep.equal(['rev-a1'])
     })
   }
@@ -141,7 +141,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
       const asU2 = CVX.withIdentity({ subject: 'u2' })
       await call(asU2)
       const after = await asU2.query(api.safebyok.getVault, { ...TH.scopeOf('u2') })
-      expect({ vaultProps: after?.vaultProps, revs: after?.boxes.map((box) => box.revision_tok) }).to.not.deep.equal({ vaultProps: TH.gatelessOf('u2'), revs: ['rev-a1'] })
+      expect({ vault: after?.vault, revs: after?.boxes.map((box) => box.revision_tok) }).to.not.deep.equal({ vault: TH.gatelessOf('u2'), revs: ['rev-a1'] })
     })
   }
 
@@ -151,7 +151,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
     for (const [, call] of EveryCall) { await TH.convexRefusalOf(call(asU2)) }
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     const left = await asU1.query(api.safebyok.getVault, { ...u1 })
-    expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u1'))
+    expect(left?.vault).to.deep.equal(TH.gatelessOf('u1'))
     expect(left?.boxes).to.have.lengthOf(1)
     expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
@@ -160,7 +160,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
     const CVX = await seeded()
     const asU2 = CVX.withIdentity({ subject: 'u2' })
     await asU2.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf('u2') })
-    expect(await asU2.query(api.safebyok.getVault, { ...TH.scopeOf('u2') })).to.deep.equal({ vaultProps: TH.gatelessOf('u2'), boxes: [] })
+    expect(await asU2.query(api.safebyok.getVault, { ...TH.scopeOf('u2') })).to.deep.equal({ vault: TH.gatelessOf('u2'), boxes: [] })
   })
 
   it("says what to do, calmly, and names no user in a refusal", async () => {
@@ -208,7 +208,7 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
     })
     const CVX = host.createTest().withIdentity({ subject: 'u1' })
     await CVX.mutation(host.api.safebyok.ensureVault, { draft: TH.gatelessOf('user|u1') })
-    expect(await CVX.query(host.api.safebyok.getVault, { ...TH.scopeOf('user|u1') })).to.deep.equal({ vaultProps: TH.gatelessOf('user|u1'), boxes: [] })
+    expect(await CVX.query(host.api.safebyok.getVault, { ...TH.scopeOf('user|u1') })).to.deep.equal({ vault: TH.gatelessOf('user|u1'), boxes: [] })
     const refusal = await TH.convexRefusalOf(CVX.query(host.api.safebyok.getVault, { ...u1 }))
     expect(refusal.kind).to.eq('identity_revoked')
   })
@@ -257,7 +257,7 @@ describe("SafebyokComponent.api, at setup", () => {
     const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
     const CVX = host.createTest()
     await CVX.mutation(host.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await CVX.query(host.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await CVX.query(host.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
   })
 })
 
@@ -290,7 +290,7 @@ describe("SafebyokComponent.api, with the scope nested as it was before the argu
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     for (const [, call] of NestedCalls) { await expect(call(asU1)).rejects.toThrow('Validator error') }
     const left = await asU1.query(api.safebyok.getVault, { ...u1 })
-    expect(left?.vaultProps).to.deep.equal(TH.gatelessOf('u1'))
+    expect(left?.vault).to.deep.equal(TH.gatelessOf('u1'))
     expect(left?.boxes.map((box) => box.revision_tok)).to.deep.equal(['rev-a1'])
   })
 })

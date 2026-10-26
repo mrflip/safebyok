@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import { BoxRecord } from '../../src/box'
-import { DeviceRecord, LeaseRecord, BoxSummary, Sidecar, VaultScope, Whisper } from '../../src/types/types'
+import { DeviceRecord, LeaseRecord, Sidecar, VaultScope, Whisper } from '../../src/types/types'
 import { VaultRecord, VaultTombstone } from '../../src/vault-record'
 import * as TH from '../test-helpers'
 
@@ -83,29 +83,6 @@ describe("Sidecar", () => {
     expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
     expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
     expect(Sidecar.safeParse('work account').success).to.be.false
-  })
-})
-
-const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), vault_tok: 'vault-tok-u1' }
-
-describe("BoxSummary", () => {
-  it("marks a summary undamaged, as its example shows", () => {
-    expect(BoxSummary.parse(wholeSummary).damaged).to.be.false
-  })
-
-  it("takes a sidecar that is a JSON object, and refuses a summary without one, or with one that is no object", () => {
-    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
-    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.false
-    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
-  })
-
-  it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
-    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {}, vault_tok: 'vault-tok-u1' })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok', 'damaged'])
-  })
-
-  it("refuses a summary with no vault_tok: it names the vault record the box lies under", () => {
-    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_tok')).success).to.be.false
   })
 })
 

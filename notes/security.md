@@ -41,6 +41,21 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
+  `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
+  (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
+  adapter adds one line and never judges. A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
+  `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
+  naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision
+  only when it holds one as text).
+  (2) The base class checks every read again, including what a server relays to a browser (GraphQL, a Postgres route). Each sound box is judged again
+  exactly as the split judges a row; one that fails is listed damaged under its own boxlabel. A server's word that a box is damaged is taken, but
+  each damaged entry is parsed strictly (boxlabel a label, `damage` one of the two values, revision a non-empty string or null, no other field), and an
+  entry that fails refuses the whole read as `corrupt_record`. The worst a lying server does with that word is offer the user to delete or overwrite a
+  box it could delete or overwrite anyway. The vault record is still refused `damaged_vault` when it names another scope than asked.
+  (3) The GraphQL browser adapter rebuilds each relayed record from its own fields, dropping GraphQL's `__typename`, before the strict parse.
+  (4) Names: a stale vault-record update's refusal now carries what stands as `meta.vault_stored` (was `meta.vault_props_stored`), and `putVaultProps` is
+  `putVaultRecord`; older entries that use the old names refer to these.
 * 2026-10-26 (thread cipher_ctx, branch `20261026-cipher_ctx`): **every ctx is now `cipherCtx(stamp, purpose, header)`: it binds the
   stamp of what is sealed, so a wayin, a box and a lease each bind their vault record's fields; no ciphertext written before opens.**
   (1) The ctx is the AES-GCM additional data and, for a passkey wayin, also its HKDF-SHA256 `info`. A stamp is the fields of a record

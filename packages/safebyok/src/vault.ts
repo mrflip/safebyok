@@ -1,8 +1,8 @@
-import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
+import { type Capacity, type Clock, type VaultScope, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
 import { type GateRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
 import { vault_tok } from './types/type-aliases'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
-import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
+import { Box, type BoxBase, type BoxDamaged, type BoxRecord, type BoxSparse, boxSparseOf, checkedSidecar, checkedWhisper, whisperBytesOf } from './box'
 import * as CX from './checks/core-checks'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
@@ -11,7 +11,7 @@ import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, v
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
-import { byCodeUnit, jsonBytes, type BoxExpectation, type ListedVault } from './vault-db'
+import { byCodeUnit, jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
@@ -79,12 +79,17 @@ export type VaultSnapshot = Readonly<{
   passkey:         PasskeyWayinSummary | null
   /** Where the vault stands: see {@link VaultState}. */
   state:           VaultState
-  /** Every box, sorted by boxlabel: a {@link BoxSummary} for each, or a {@link DamagedBox}.
-   * A box is damaged when its record does not read back, or is sealed under a vaultKey the vault
-   * does not hold; {@link Vault.delBox} removes one. The listing never opens a box's ciphertext,
-   * so ciphertext altered in storage shows only when the box is read.
+  /** Every sound box, sorted by boxlabel, as its {@link BoxSparse}: every field of its record but the two ciphered ones.
+   * The listing never opens a box's ciphertext, so ciphertext altered in storage shows only when
+   * the box is read. A box whose record does not read back is in `damagedBoxes`, never here.
    */
-  boxes:           readonly (BoxSummary | DamagedBox)[]
+  boxes:           readonly BoxSparse[]
+  /** Every box whose stored record does not read back, sorted by boxlabel, as its {@link BoxDamaged}: its boxlabel, the revision it names, and its `damage`.
+   * Each holds room in the vault, and meets a `putBox()` under its boxlabel. Offer one only for
+   * {@link Vault.delBox}, or a fresh `putBox()` while it names a revision; for a `damage` of
+   * `newer_format`, a box a newer safebyok wrote, offer to update the app instead.
+   */
+  damagedBoxes:    readonly BoxDamaged[]
   /** How much room the vault has, as this device reckons it from its last read.
    * It counts boxes against `maxBoxes`, and bytes against what storage holds of one vault. Each box
    * reserves room for a whisper and sidecar of `maxWhisperBytes`, its fixed fields and its names.
@@ -189,7 +194,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   if (! ok && err.refusalkind === 'vault_locked') { offerUnlock() }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, passphrase, passkey, state, boxes, capacity, trouble, freshness, snapshot, getSnapshot, subscribe, logger, keyDeriver, now
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, passphrase, passkey, state, boxes, damagedBoxes, capacity, trouble, freshness, snapshot, getSnapshot, subscribe, logger, keyDeriver, now
 
   // Each field reads the snapshot `#replaceSnapshot()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
@@ -214,8 +219,10 @@ export class Vault {
   get passkey(): PasskeyWayinSummary | null { return this.#snapshot.passkey }
   /** Where the vault stands: see {@link VaultState}. */
   get state(): VaultState { return this.#snapshot.state }
-  /** Every box, sound or damaged, sorted by boxlabel, no whisper among them. See {@link VaultSnapshot}. */
-  get boxes(): readonly (BoxSummary | DamagedBox)[] { return this.#snapshot.boxes }
+  /** Every sound box, sorted by boxlabel, no whisper among them. See {@link VaultSnapshot}. */
+  get boxes(): readonly BoxSparse[] { return this.#snapshot.boxes }
+  /** Every box whose stored record does not read back, sorted by boxlabel. See {@link VaultSnapshot}. */
+  get damagedBoxes(): readonly BoxDamaged[] { return this.#snapshot.damagedBoxes }
   /** How much room the vault has, as this device reckons it from its last read. See {@link VaultSnapshot}. */
   get capacity(): VaultSnapshot['capacity'] { return this.#snapshot.capacity }
   /** The latest bad news, or what the `onBadNews` handler threw; null when there is none. See {@link VaultSnapshot}. */
@@ -871,7 +878,7 @@ export class Vault {
       demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
       request:    this.#requestCleartext,
     }
-    this.#takePicture({ fresh: this.#vaultRecord, listed: born.listed, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
+    this.#takePicture({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
   }
@@ -886,7 +893,10 @@ export class Vault {
   #vaultRecord: VaultRecord
   // This device's id for the scope, from its device record: every way in it seals carries it.
   #deviceId: string
-  #boxes: readonly (BoxSummary | DamagedBox)[] = []
+  // The listing of the last read, as this device's own writes since have moved it: the sound boxes
+  // and the damaged apart, each sorted by boxlabel, each list frozen.
+  #boxes: readonly BoxSparse[] = Object.freeze([])
+  #damagedBoxes: readonly BoxDamaged[] = Object.freeze([])
   // The lease this Vault object holds, opened: the one place it keeps the vaultKey. Dropping it locks.
   #lease: Lease | null = null
   // How many leases this Vault object has held, the last of them the one in hand: a read of this
@@ -960,7 +970,8 @@ export class Vault {
       passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.toJSON()),
       passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.toJSON()) : null,
       state,
-      boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
+      boxes:           this.#boxes,
+      damagedBoxes:    this.#damagedBoxes,
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
       ask_passphrase_at: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
       trouble:         this.#trouble,
@@ -1020,8 +1031,9 @@ export class Vault {
       await this.#heedRefusal(refusal)
       throw refusal
     }
-    this.#takePicture({ fresh: frozenVaultRecord(verdict.vaultProps), listed: verdict.boxes, leaseKept: valOf(leaseKept), readAt, leasesSeen })
-    await this.#raiseRecordAfter(verdict.vaultProps.vault_epoch, 'refresh')
+    const { boxes, damagedBoxes, ...fresh } = verdict
+    this.#takePicture({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), readAt, leasesSeen })
+    await this.#raiseRecordAfter(fresh.vault_epoch, 'refresh')
   }
 
   /** Judge one read of storage against the picture in hand and `record`, this device's record as read before it, synchronously: the read to take, `ignore`, or `behind`.
@@ -1032,20 +1044,20 @@ export class Vault {
    * but not below the record (the same vault at a lower epoch: one served before this device's own
    * write, whose raise of the record came after the record was read) is ignored.
    */
-  #judgeRead(read: ListedVault | null, record: DeviceRecord | null): ListedVault | 'ignore' | 'behind' {
+  #judgeRead(read: (VaultRecord & Listing) | null, record: DeviceRecord | null): (VaultRecord & Listing) | 'ignore' | 'behind' {
     if (this.#goneBy !== null) { return 'ignore' }
     if (read === null) {
       const gone = goneError()
       this.#letGo(gone)
       throw gone
     }
-    if (read.vaultProps.vault_tok !== this.#vaultRecord.vault_tok) {
+    if (read.vault_tok !== this.#vaultRecord.vault_tok) {
       const remade = remadeError()
       this.#letGo(remade)
       throw remade
     }
-    if (record !== null && read.vaultProps.vault_epoch < record.highest_vault_epoch) { return 'behind' }
-    if (isOlderPicture(this.#vaultRecord, read.vaultProps)) { return 'ignore' }
+    if (record !== null && read.vault_epoch < record.highest_vault_epoch) { return 'behind' }
+    if (isOlderPicture(this.#vaultRecord, read)) { return 'ignore' }
     return read
   }
 
@@ -1056,18 +1068,19 @@ export class Vault {
    * lease, which changes nothing. A lease another tab's unlock or renewal wrote under the same gate
    * leaves it standing. None is taken up here. Bad news is told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultRecord, listed: readonly (ListedSummary | DamagedBox)[], leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
-    const { fresh } = found
-    const shown = this.#boxes
+  #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
+    const { fresh, listing } = found
+    const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
     this.#vaultRecord = fresh
-    this.#boxes = found.listed.map((box) => heldListing(box, fresh.vault_tok))
+    this.#boxes = Object.freeze([...listing.boxes])
+    this.#damagedBoxes = Object.freeze([...listing.damagedBoxes])
     this.#readRefused = false
     this.#readAt = found.readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
     // published before its news is told, so a handler reading the vault sees what it lists.
     const damagedWayins = this.#wayinListOf(fresh).filter((wayin) => wayin.isDamaged())
-    if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
+    if (this.#damagedBoxes.length === 0 && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
     const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! standsBeside(found.leaseKept, held)
@@ -1552,11 +1565,15 @@ export class Vault {
     return (this.#maxWhisperBytes * StoredBytesPerWhisperByte) + BoxFixedBytes + jsonBytes([this.#scope, boxlabel])
   }
 
-  /** The room the vault has, reckoned from the boxes last listed, as `#checkRoomFor` reckons it. */
+  /** Every box last listed, sound and damaged: each holds room in the vault. */
+  #listed(): readonly (BoxSparse | BoxDamaged)[] { return [...this.#boxes, ...this.#damagedBoxes] }
+
+  /** The room the vault has, reckoned from the boxes last listed, sound and damaged, as `#checkRoomFor` reckons it. */
   #capacity(): Capacity {
-    const bytesUsed = this.#boxes.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
+    const listed = this.#listed()
+    const bytesUsed = listed.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
     return {
-      boxes: { used: this.#boxes.length, max: this.#maxBoxes },
+      boxes: { used: listed.length, max: this.#maxBoxes },
       bytes: { used: bytesUsed, max: this.#maxVaultBytes },
     }
   }
@@ -1578,7 +1595,7 @@ export class Vault {
   #checkRoomFor(boxlabel: string, base: BoxBase | null) {
     // A replacement weighs what it replaces, so it never makes the vault fuller: it always lands.
     if (base !== null) { return }
-    const others = this.#boxes.filter((box) => box.boxlabel !== boxlabel)
+    const others = this.#listed().filter((box) => box.boxlabel !== boxlabel)
     if (others.length >= this.#maxBoxes) {
       throw new VaultError('vault_full', `This vault already holds its limit of ${String(this.#maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`)
     }
@@ -1595,16 +1612,19 @@ export class Vault {
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
    * store, never a record.
    */
-  #listedRevisionOf(boxlabel: string): string | null { return this.#boxes.find((box) => box.boxlabel === boxlabel)?.revision_tok ?? null }
+  #listedRevisionOf(boxlabel: string): string | null { return this.#listedOf(boxlabel)?.revision_tok ?? null }
+
+  /** The listing's entry for the box under `boxlabel`, sound or damaged, or undefined for none. */
+  #listedOf(boxlabel: string): BoxSparse | BoxDamaged | undefined { return this.#listed().find((box) => box.boxlabel === boxlabel) }
 
   /** `boxlabel`, once it is a label: 'bad_scope' otherwise, naming the field and quoting none of it. */
   #checkedBoxlabel(boxlabel: unknown): string { return CX.boxscope.parse({ ...this.#scope, boxlabel }).boxlabel }
 
   /** True when the snapshot's listing shows a box under `boxlabel`: what a locked vault can know before it asks for a proof. Reads nothing. */
-  #isListed(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel) }
+  #isListed(boxlabel: string): boolean { return this.#listedOf(boxlabel) !== undefined }
 
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
-  #isListedDamaged(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel && box.damaged) }
+  #isListedDamaged(boxlabel: string): boolean { return this.#damagedBoxes.some((box) => box.boxlabel === boxlabel) }
 
   /** The box under `boxlabel`, once the vault is unlocked for it; null when there is none, or when a locked vault's listing shows none, asking nobody. */
   async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<Box | null> {
@@ -1689,9 +1709,10 @@ export class Vault {
    * A box listed damaged gives its revision alone; one naming none refuses 'damaged_box'.
    */
   #listedBase(boxlabel: string): BoxBase | null {
-    const listed = this.#boxes.find((box) => box.boxlabel === boxlabel)
+    const sound = this.#boxes.find((box) => box.boxlabel === boxlabel)
+    if (sound !== undefined) { return { revision_tok: sound.revision_tok, registered_at: sound.registered_at } }
+    const listed = this.#damagedBoxes.find((box) => box.boxlabel === boxlabel)
     if (listed === undefined) { return null }
-    if (! listed.damaged) { return { revision_tok: listed.revision_tok, registered_at: listed.registered_at } }
     // A box listed damaged naming no revision could be cleared only by a delete before the store,
     // a second call another device's write could fall between and be lost: the user deletes it, then stores.
     if (listed.revision_tok === null) { throw damagedBeyondNaming() }
@@ -1757,9 +1778,9 @@ export class Vault {
   #updateBoxListingOf(stored: BoxRecord, vaultTok: string): Box {
     const box = this.#boxUnder(stored, vaultTok)
     this.#demand(box, { call: 'putBox' })
-    const { boxlabel, revision_tok, sidecar, registered_at, written_at } = stored
-    const entry = heldListing({ boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false }, vaultTok)
-    this.#boxes = [...this.#boxes.filter((listed) => listed.boxlabel !== boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+    const entry = boxSparseOf(stored)
+    this.#boxes = Object.freeze([...this.#boxes.filter((listed) => listed.boxlabel !== entry.boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel)))
+    this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((listed) => listed.boxlabel !== entry.boxlabel))
     this.#replaceSnapshot()
     return box
   }
@@ -1767,7 +1788,8 @@ export class Vault {
   /** Drop the box `deleted` names, which a delete just removed, from the listing, once it is demanded consistent: a lock meanwhile lets it land. Resolves it, frozen. */
   #dropBoxListingOf(deleted: DeletedBox): DeletedBox {
     this.#demand(deleted, { call: 'delBox' })
-    this.#boxes = this.#boxes.filter((box) => box.boxlabel !== deleted.boxlabel)
+    this.#boxes = Object.freeze(this.#boxes.filter((box) => box.boxlabel !== deleted.boxlabel))
+    this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((box) => box.boxlabel !== deleted.boxlabel))
     this.#replaceSnapshot()
     return Object.freeze({ ...deleted })
   }
@@ -1846,13 +1868,13 @@ export class Vault {
     }
   }
 
-  /** Tell each box the published listing shows damaged that `shown`, the listing before it, did not show damaged at the same revision.
+  /** Tell each box the published listing shows damaged that `shown`, the damaged boxes listed before it, did not show at the same revision.
    * Each gets one 'damaged_box' news, its `meta.box_listed` the box, and the trouble is published once
    * all are told. The read that lists them succeeds all the same.
    */
-  #tellListingNews(shown: readonly (BoxSummary | DamagedBox)[]) {
-    const wasShown = (box: DamagedBox) => shown.some((was) => was.damaged && was.boxlabel === box.boxlabel && was.revision_tok === box.revision_tok)
-    const news = this.#boxes.filter((box): box is DamagedBox => box.damaged && ! wasShown(box))
+  #tellListingNews(shown: readonly BoxDamaged[]) {
+    const wasShown = (box: BoxDamaged) => shown.some((was) => was.boxlabel === box.boxlabel && was.revision_tok === box.revision_tok)
+    const news = this.#damagedBoxes.filter((box) => ! wasShown(box))
     if (news.length === 0) { return }
     for (const box of news) {
       this.#tellBadNews(new VaultError('damaged_box', "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it.", { meta: { box_listed: box } }))
@@ -1903,14 +1925,17 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // == [Vocabulary]: BirthRead, frozenVaultRecord, stampOf, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
+/** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. */
+type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>
+
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it.
- * `vaultRecord` and `listed` are what `vaultDB.ensureVault` resolved; `leaseKept` what
+ * `vaultRecord` and `listing` are what `vaultDB.ensureVault` resolved; `leaseKept` what
  * `deviceDB.getLease` found; `record` this device's record of the scope as raised at birth; and
  * `readAt` when the read began, by the bank's clock.
  */
 export type BirthRead = Readonly<{
   vaultRecord: VaultRecord
-  listed:      readonly (ListedSummary | DamagedBox)[]
+  listing:     Listing
   leaseKept:   LeaseRecord | null
   record:      DeviceRecord
   readAt:      number

@@ -157,7 +157,7 @@ Vault object. Storage that cannot be reached (`storage_unavailable`), a user sto
 serves (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a
 vault whose stored record fails its checks (`damaged_vault`), or storage serving an older copy of
 the vault than this device has seen (`vault_behind`). (A damaged box never stops the birth:
-the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
+the snapshot lists it among its `damagedBoxes`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show
 it where the vault's UI would be. **A refused entry stays refused until the app asks again**:
 `useBank().ensureVault({ vaultlabel: 'main' })` reads storage afresh, the entry `starting`

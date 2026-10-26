@@ -74,7 +74,7 @@ describe("vaultResolvers, in a host's schema", () => {
         vaultResolvers({ vaultDBFor: ({ user_id }: TH.TestContext) => TH.requestFor(db, user_id) }),
       ],
     })
-    const result = await asked(schema, `query { greeting safebyokGetVault(applabel: "acme", user_id: "u1", vaultlabel: "main") { vaultProps { vault_tok } } }`, {})
+    const result = await asked(schema, `query { greeting safebyokGetVault(applabel: "acme", user_id: "u1", vaultlabel: "main") { vault { vault_tok } } }`, {})
     expect(result).to.deep.equal({ data: { greeting: 'hello', safebyokGetVault: null } })
   })
 
@@ -89,13 +89,13 @@ describe("vaultResolvers, in a host's schema", () => {
     expect(contexts).to.deep.equal([{ user_id: 'u1' }])
   })
 
-  it("answers a vault read with the records as stored, format and all, not a vault's summaries", async () => {
+  it("answers a vault read with its record, its sound boxes as stored but for their ciphertext, format and all, and its damaged boxes apart", async () => {
     const db = await TH.emptyDatabase()
     await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokGetVault, { ...u1 })
     const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('openai', 'r1')
-    expect(result.data).to.deep.equal({ safebyokGetVault: { vaultProps: TH.vaultRecordOf('u1'), boxes: [listed] } })
+    expect(result.data).to.deep.equal({ safebyokGetVault: { vault: TH.vaultRecordOf('u1'), boxes: [listed], damagedBoxes: [] } })
   })
 
   it("takes a box expectation that leaves out its null revision_tok as one that means it", async () => {
@@ -157,7 +157,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
 
   it("answers a stale update of the vault record landed false, with the winning record whole, and no error to log", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultRecord: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 1 } })
     expect(result.errors).to.be.undefined
     expect(result.data).to.deep.equal({ safebyokPutVaultRecord: {
       landed: false, refusalkind: 'stale_write', message: Refusals.StaleVaultRecordMessage, vault_stored: winner,
@@ -166,7 +166,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
 
   it("answers an update of the vault record that landed landed true, naming no refusal and carrying the vault record as stored, its vault_epoch moved", async () => {
     const schema = await staleOver()
-    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
+    const result = await asked(schema, VaultOperations.safebyokPutVaultRecord, { vaultRecord: TH.vaultRecordOf('u1', { gate_epoch: 3 }), expected: { vault_tok: 'vault-tok-u1', gate_epoch: 2 } })
     expect(result).to.deep.equal({ data: { safebyokPutVaultRecord: { landed: true, refusalkind: null, message: null, vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 2 }) } } })
   })
 
@@ -232,7 +232,7 @@ const OnU2Vault: [string, string, Record<string, unknown>][] = (() => {
   return [
     ['safebyokGetVault',      VaultOperations.safebyokGetVault,      { ...scope }],
     ['safebyokEnsureVault',   VaultOperations.safebyokEnsureVault,   { draft: TH.gatelessOf('u2', { vault_tok: 'vault-tok-late' }) }],
-    ['safebyokPutVaultRecord', VaultOperations.safebyokPutVaultRecord, { vaultProps: TH.vaultRecordOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
+    ['safebyokPutVaultRecord', VaultOperations.safebyokPutVaultRecord, { vaultRecord: TH.vaultRecordOf('u2', { gate_epoch: 2 }), expected: { vault_tok, gate_epoch: 1 } }],
     ['safebyokGetBox',        VaultOperations.safebyokGetBox,        { ...scope, boxlabel: 'openai', expected: { vault_tok } }],
     ['safebyokPutBox',        VaultOperations.safebyokPutBox,        { ...scope, box: TH.boxOf('openai', 'r2'), expected: { vault_tok, revision_tok: 'rev-r1' } }],
     ['safebyokGetCapacity',   VaultOperations.safebyokGetCapacity,   { ...scope }],
@@ -263,7 +263,7 @@ describe("vaultResolvers, for a request naming another user than its own", () =>
     const schema = TH.schemaOver(db)
     for (const [, document, variableValues] of OnU2Vault) { await asked(schema, document, variableValues) }
     const left = await TH.expectingGood(TH.requestFor(db, 'u2')).getVaultRecords(TH.scopeOf('u2'))
-    expect(left?.vaultProps).to.deep.include({ vault_tok: 'vault-tok-u2', gate_epoch: 1 })
+    expect(TH.recordOfRead(left!)).to.deep.include({ vault_tok: 'vault-tok-u2', gate_epoch: 1 })
     expect(left?.boxes).to.have.lengthOf(1).and.to.have.nested.property('[0].revision_tok', 'rev-r1')
   })
 })

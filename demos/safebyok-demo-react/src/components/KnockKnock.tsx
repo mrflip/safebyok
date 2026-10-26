@@ -31,8 +31,9 @@ export const KnockKnock = () => {
   // No Vault object until its birth has read storage, and with it the boxes it lists.
   if (vault === null || snapshot === null) { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
+  const damagedKeyBox = snapshot.damagedBoxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
-  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
+  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined
 
   const knock = async () => {
     setTelling(true)
@@ -70,7 +71,7 @@ export const KnockKnock = () => {
       {telling && <p className="quiet">Claude is clearing its throat…</p>}
       {joke !== null && <blockquote className="joke">{joke}</blockquote>}
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} replaceable={keyBox?.revision_tok !== null} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
+      <ApiKeySlot haveKeyBox={keyBox !== undefined || damagedKeyBox !== undefined} damaged={damagedKeyBox !== undefined} replaceable={damagedKeyBox?.revision_tok !== null} savedAt={keyBox?.written_at} />
     </section>
   )
 }

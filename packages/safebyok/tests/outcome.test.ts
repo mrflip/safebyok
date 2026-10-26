@@ -8,8 +8,8 @@ const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new 
 
 describe("good and bad", () => {
   it("makes a good outcome of a val, as good's example shows (Contract: Shapes)", () => {
-    const vaultProps = { vault_tok: 'vault-tok-u1' }
-    expect(good(vaultProps)).to.deep.equal({ ok: true, val: vaultProps })
+    const vaultRecord = { vault_tok: 'vault-tok-u1' }
+    expect(good(vaultRecord)).to.deep.equal({ ok: true, val: vaultRecord })
     expect(good(null)).to.deep.equal({ ok: true, val: null })
   })
 

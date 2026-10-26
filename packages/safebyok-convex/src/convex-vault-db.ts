@@ -1,8 +1,8 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
-import { Refusals, Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope } from 'safebyok'
+import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { GetBoxAnswer, ListedBox, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
@@ -103,20 +103,21 @@ class ConvexVaultDB extends VaultDB {
     this.api    = opts.api
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  // The component answers each box as its row holds it; the split judges each, as for any backend.
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     const answer = await refusing(() => this.client.query(this.api.getVault, { ...scope }))
-    return answer === null ? { vaultProps: null, boxes: [] } : { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
+    return answer === null ? { vault: null, boxes: [], damagedBoxes: [] } : { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null, gate_epoch: 0 }): Promise<VaultReadResponse> {
     const answer = await refusing(() => this.client.mutation(this.api.ensureVault, { draft }))
-    return { vaultProps: answer.vaultProps, boxes: storedBoxesOf(answer.boxes) }
+    return { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
   // The component answers the record as stored, or what stands when an update misses, from the
   // transaction that decided it: the base class checks it.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
-    const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultRecord, { vaultProps: vaultRecord, expected }))
+    const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultRecord, { vaultRecord, expected }))
     if (! isPutVaultRecordAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
     if (answer.landed) { return answer.vault_stored }
     throw Refusals.staleVaultRecord(answer.vault_stored)
@@ -184,7 +185,7 @@ const ConvexDocumentBytes = 1_048_576
 /** Convex's most for one function to read, in bytes: 16 MiB. */
 const ConvexTransactionReadBytes = 16_777_216
 
-/** Listed boxes as the VaultDB's half hands them up: each under its own boxlabel field, which is the column it is stored under. */
+/** Listed boxes as `splitStoredBoxes` takes them: each under its own boxlabel field, which is the column it is stored under. */
 const storedBoxesOf = (rows: readonly Infer<typeof ListedBox>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
 
 /** What a write answered in a shape this client does not know says: whose version to fix. */

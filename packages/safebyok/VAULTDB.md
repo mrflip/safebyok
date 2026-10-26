@@ -34,9 +34,10 @@ Three layers share the work, and each guarantee below belongs to one of them.
   check and to what your adapter declares (*Names*, below).
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
-  runs once, however often the host calls it. It hands a vault's records on, whole but for their
-  ciphertext, for a server to serve (`getVaultRecords`, `ensureVaultRecords`), from your
-  `doGetVault` and `doEnsureVault`. It keeps the `logger`, as `this.logger`:
+  runs once, however often the host calls it. It judges your boxes' damage: your `doGetVault` and
+  `doEnsureVault` hand their box rows to `splitStoredBoxes`, which lists each sound box apart from
+  each damaged one, and the base class checks that split again, as it checks what a server relays
+  (`getVaultRecords`, `ensureVaultRecords`). It keeps the `logger`, as `this.logger`:
   your adapter's own, else the one `Bank.make` hands it, else the console; and
   `this.watchTrouble(message)` warns once for each failing streak of a live watch.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
@@ -181,8 +182,10 @@ vault holds, however many it holds -- even a vault that racing writers took past
 4.2).
 
 **2.3. A listing is whole.** The listing `getVault` hands back holds every box in the vault: never a
-page, a sample, or the first so many. Asked twice with nothing written between, it gives the same
-listing, sorted by boxlabel. There is no limit to ask for; a listing that takes one would also say
+page, a sample, or the first so many. Each box whose record reads back is among its `boxes`, and
+each that does not among its `damagedBoxes`, never both; a row under a name that is no label is in
+neither. Asked twice with nothing written between, it gives the same listing, each list sorted by
+boxlabel. There is no limit to ask for; a listing that takes one would also say
 which boxes it keeps, and none does. Within the limits the adapter declares (section 7 and
 line 4.1) a listing succeeds; past them, a backend that cannot read so many boxes at once
 refuses the listing with an error rather than return part of it, and once deletions bring the vault
@@ -199,8 +202,9 @@ with the listing, nor does the vault, and an adapter neither repairs nor refuses
 it might find (line 1.3). The step is one statement (Postgres, whose listing is a subquery of
 the statement that reads or writes the vault row), one query or mutation (Convex, and over GraphQL
 the server's own step), one IndexedDB transaction, or one synchronous turn (`localVaultDB`).
-`getVaultRecords` and `ensureVaultRecords` read as these do, the boxes as stored but for their two
-ciphered fields: what a server serves a browser's VaultDB, whose own step is then that one request.
+`getVaultRecords` and `ensureVaultRecords` answer as these do, checked and split: what a server
+serves a browser's VaultDB, whose own step is then that one request, and whose base class checks
+each sound box again and parses the server's word on each damaged one.
 
 Postgres's `ensureVault` over a vault record another device created after its statement began
 finds them by its `ON CONFLICT`, which reads the row as it stands then, while its listing reads as
@@ -282,7 +286,7 @@ stored (or null for none), and a key-value store reads both rows in the step and
 `Expectations.boxRefusalOf` which. The base class checks what stands as `getBox` checks a
 record, and the refusal carries it as a read would hand it back: the box, whole -- its wrapped
 boxKey and ciphered whisper among it, so the caller can open it, or merge and write over it, with
-no second read -- a `DamagedBox` naming the revision it holds when it does not read back as a
+no second read -- a `BoxDamaged` naming the revision it holds when it does not read back as a
 box, or null. A write over it names that revision. A stale write that
 names nothing standing is the adapter's bug, refused as `corrupt_record`. The base class holds
 what a landed write hands back to the check a `getBox` makes, at the revision written, and
@@ -417,7 +421,7 @@ A record that fails its checks is named for who is at fault. One the caller hand
 `bad_record` (a box handed to `putBox`, `invalid_box`). One read from storage is damaged:
 `damaged_vault` for a vault record (from `getVault` and `ensureVault`,
 and a stale `putVaultRecord`'s `meta.vault_stored`), `damaged_box` for a
-box (from `getBox`; a listing shows it as a `DamagedBox` instead, and a stale write's
+box (from `getBox`; a listing shows it among its `damagedBoxes` instead, and a stale write's
 `meta.box_stored` likewise), Zod's own error its `cause` where a check failed. An answer the
 adapter owes in the protocol's shape that comes in another -- a box write's echo that fails a
 box's checks or holds another boxlabel or revision, a `Refusals.staleBox`, `Refusals.staleVaultRecord`

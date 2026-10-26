@@ -775,9 +775,10 @@ describe("vault.hello, by the Contract", () => {
     const vault = await world.open({ onBadNews, vaultDB: world.deafVaultDB() })
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
     expect(await vault.hello({ staleMinutes: 0 })).to.eq(vault)
-    expect(vault.boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: storedRowOf(world, 'anthropic')['revision_tok'] }])
+    expect(vault.boxes).to.deep.equal([])
+    expect(vault.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: storedRowOf(world, 'anthropic')['revision_tok'], damage: 'damaged' }])
     expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_box'])
-    expect(told[0]?.meta?.box_listed).to.eq(vault.boxes[0])
+    expect(told[0]?.meta?.box_listed).to.eq(vault.damagedBoxes[0])
     expect(vault.trouble).to.eq(told[0])
   })
 
@@ -1277,7 +1278,7 @@ describe("onBadNews, as it is told", () => {
     const world = makeWorld()
     await seedVault(world)
     const seen: string[][] = []
-    const vault: Vault = await world.open({ vaultDB: world.deafVaultDB(), onBadNews: () => { seen.push(boxlabelsOf(vault)) } })
+    const vault: Vault = await world.open({ vaultDB: world.deafVaultDB(), onBadNews: () => { seen.push(vault.damagedBoxes.map((box) => box.boxlabel)) } })
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
     await vault.hello({ staleMinutes: 0 })
     expect(seen).to.deep.equal([['anthropic']])

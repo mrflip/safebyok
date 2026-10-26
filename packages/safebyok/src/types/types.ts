@@ -2,7 +2,7 @@ import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
 import * as CX from '../checks/core-checks'
 import type { PasskeyWayinSparse, PassphraseWayinSparse, VaultRecord } from '../vault-record'
-import { revision_tok, vault_key_lease_wrapped, vault_tok } from './type-aliases'
+import { vault_key_lease_wrapped, vault_tok } from './type-aliases'
 
 /** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
@@ -61,42 +61,6 @@ export type VaultScope = CX.VaultScope
  */
 export const { Sidecar } = Validator('bad_option', () => ({ Sidecar: whisperBag }))
 export type Sidecar = Z.infer<typeof Sidecar>
-
-/** The visible fields of a sound box, readable while locked: what a vault's snapshot holds beside {@link DamagedBox}es.
- * They are a `Box`'s own fields, as `{ ...box }` holds them, and `vault_tok`, of the box's stamp,
- * and `damaged` false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
- * `getWhisper()` opens the box and so proves it unaltered.
- *
- * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_tok }).damaged // false
- */
-export const { BoxSummary } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
-  BoxSummary: obj({
-    boxlabel,
-    revision_tok,
-    sidecar:         Sidecar,
-    registered_at:   epochMillis,
-    written_at:      epochMillis,
-    vault_tok,
-    damaged:         lit(false).default(false),
-  }),
-}))
-export type BoxSummary = Z.infer<typeof BoxSummary>
-
-/** A box as a VaultDB's `getVault` lists it: a {@link BoxSummary} but for its `vault_tok`, which the vault adds from the vault record it read beside the listing. */
-export type ListedSummary = Omit<BoxSummary, 'vault_tok'>
-
-/** A box whose stored record does not read back as one, listed under its boxlabel among the {@link BoxSummary}s of a vault's snapshot.
- * That covers damage, tampering, another version's record, or a vaultKey the vault does not hold.
- * Nothing of it is trusted but its `revision_tok`, which only names the record to write over; null
- * when it holds none as text. `delBox()` removes it and `putBox()` writes a fresh box over it.
- * `getBox()`, `getWhisper()` and `useWhisper()` refuse it 'damaged_box'.
- *
- * @example
- *   for (const box of snapshot.boxes) {
- *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.sidecar) }
- *   }
- */
-export type DamagedBox = { boxlabel: string, damaged: true, revision_tok: string | null }
 
 /** How much room a vault has: boxes against the most it holds, and bytes against the most its storage holds of one vault.
  * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a

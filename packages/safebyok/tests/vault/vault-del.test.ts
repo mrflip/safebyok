@@ -46,7 +46,7 @@ describe("delBox and del()", () => {
       await vault.delBox('anthropic')
       expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
       expect(boxlabelsOf(vault)).to.deep.equal(['openai'])
-      expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
+      expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'work account' })
       expect(await vault.getWhisper('openai')).to.eq('sk-openai-fake')
     })
   }
@@ -160,13 +160,13 @@ const WriteVerbs = ['ensureVault', 'putVaultRecord', 'putBox', 'delBox', 'delVau
 
 /** Ways a stored box row can be spoiled that the listing sees, so that it lists as damaged. */
 const DamagedListings = [
-  [() => '{"not": json',                                                                          'that is not JSON at all'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, boxlabel: 'other_box' }),           'naming another boxlabel than the one it is stored under'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'whose written_at holds a fraction of a millisecond'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, sidecar: undefined }),              'whose sidecar is gone'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v9' }),   'written in a format this version does not know'],
-  [({ sidecar: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v7', sidecar_json: JSON.stringify(kept) }), 'written before the sidecar was a JSON value, as safebyok-box-v7 with its sidecar_json'],
-  [({ written_at: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v3', changed_at: kept }), 'written before written_at, as safebyok-box-v3 with its changed_at'],
+  [() => '{"not": json',                                                                          'damaged',      'that is not JSON at all'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, boxlabel: 'other_box' }),           'damaged',      'naming another boxlabel than the one it is stored under'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'damaged',      'whose written_at holds a fraction of a millisecond'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, sidecar: undefined }),              'damaged',      'whose sidecar is gone'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v9' }),       'newer_format', 'written in a format this version does not know, which a newer one may have written'],
+  [({ sidecar: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v7', sidecar_json: JSON.stringify(kept) }), 'damaged', 'written before the sidecar was a JSON value, as safebyok-box-v7 with its sidecar_json'],
+  [({ written_at: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v3', changed_at: kept }), 'damaged', 'written before written_at, as safebyok-box-v3 with its changed_at'],
 ] as const
 
 /** A world holding `anthropic`, spoiled by `spoil`, beside a sound `openai` with a sidecar; and the vault that stored them, unlocked. */
@@ -182,14 +182,16 @@ const worldWithDamagedBox = async (spoil: (row: Record<string, unknown>) => stri
 }
 
 describe("damaged boxes", () => {
-  for (const [spoil, blurb] of DamagedListings) {
-    it(`a vault with a box ${blurb} opens, listing it as damaged among the others`, async () => {
+  for (const [spoil, damage, blurb] of DamagedListings) {
+    it(`a vault with a box ${blurb} opens, listing it apart from the sound ones as ${damage}, holding room`, async () => {
       const { world } = await worldWithDamagedBox(spoil)
       const fresh = await world.open()
       expect(fresh.getSnapshot().state).to.eq('unlocked')
-      expect(fresh.getSnapshot().boxes).to.have.lengthOf(2)
-      expect(fresh.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
-      expect(fresh.getSnapshot().boxes[1]).to.deep.include({ boxlabel: 'openai', sidecar: { note: 'work account' }, damaged: false })
+      expect(fresh.getSnapshot().boxes).to.have.lengthOf(1)
+      expect(fresh.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'openai', sidecar: { note: 'work account' } })
+      expect(fresh.getSnapshot().damagedBoxes).to.have.lengthOf(1)
+      expect(fresh.getSnapshot().damagedBoxes[0]).to.deep.include({ boxlabel: 'anthropic', damage })
+      expect(fresh.getSnapshot().capacity.boxes.used).to.eq(2)
       expect(world.logged).to.have.lengthOf(0)
     })
 
@@ -204,13 +206,13 @@ describe("damaged boxes", () => {
   }
 
   // The first names no revision, so a store over it is refused (below).
-  for (const [spoil, blurb] of DamagedListings.slice(1)) {
+  for (const [spoil, , blurb] of DamagedListings.slice(1)) {
     it(`putBox over a box ${blurb} writes it afresh, carrying nothing from it`, async () => {
       const { world, vault } = await worldWithDamagedBox(spoil)
       world.advance(60_000)
       await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new')
       expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
-      const summary = TH.summaryOf(vault.getSnapshot().boxes[0])
+      const summary = vault.getSnapshot().boxes[0]
       expect(summary).to.deep.include({ boxlabel: 'anthropic', sidecar: {}, registered_at: world.clock.now(), written_at: world.clock.now() })
       expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
     })
@@ -225,14 +227,14 @@ describe("damaged boxes", () => {
     await TH.expectRefusal(vault.useWhisper('anthropic', callback), 'damaged_box')
     expect(callback).not.toHaveBeenCalled()
     expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(spoiled)
-    expect(vault.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
+    expect(vault.getSnapshot().damagedBoxes[0]).to.deep.include({ boxlabel: 'anthropic' })
   })
 
   it("a background refresh lists a box damaged elsewhere, warning nothing", async () => {
     const [spoil] = DamagedListings[0]
     const { world, vault } = await worldWithDamagedBox(spoil)
     await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
+    expect(vault.getSnapshot().damagedBoxes[0]).to.deep.include({ boxlabel: 'anthropic' })
     expect(world.logged).to.have.lengthOf(0)
   })
 
@@ -242,8 +244,9 @@ describe("damaged boxes", () => {
     await TH.wakeupAtNextTick()
     await vault.delBox('openai')
     expect(world.dbStore.read(u1BoxScopepath('openai'))).to.be.null
-    expect(vault.getSnapshot().boxes).to.have.lengthOf(1)
-    expect(vault.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
+    expect(vault.getSnapshot().boxes).to.have.lengthOf(0)
+    expect(vault.getSnapshot().damagedBoxes).to.have.lengthOf(1)
+    expect(vault.getSnapshot().damagedBoxes[0]).to.deep.include({ boxlabel: 'anthropic' })
   })
 
   it("putBox over a damaged box whose record names its revision is a single write to storage, over that revision", async () => {
@@ -251,7 +254,7 @@ describe("damaged boxes", () => {
     const { world, vault } = await worldWithDamagedBox(spoil)
     const revisionTok = storedRowOf(world, 'anthropic')['revision_tok']
     await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: revisionTok })
+    expect(vault.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: revisionTok, damage: 'damaged' }])
     const writes = WriteVerbs.map((verb) => [verb, vi.spyOn(world.vaultDB, verb)] as const)
     const putBox = vi.spyOn(world.vaultDB, 'putBox')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new')
@@ -266,7 +269,7 @@ describe("damaged boxes", () => {
     const [spoil] = DamagedListings[0]
     const { world, vault } = await worldWithDamagedBox(spoil)
     await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+    expect(vault.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     const spoiled = world.dbStore.read(u1BoxScopepath('anthropic'))
     const writes = WriteVerbs.map((verb) => vi.spyOn(world.vaultDB, verb))
     const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new'), 'damaged_box')
@@ -284,7 +287,7 @@ describe("damaged boxes", () => {
     const [spoil] = DamagedListings[3]
     const { vault } = await worldWithDamagedBox(spoil)
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'mended' } }, 'sk-ant-new')
-    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'mended' })
+    expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'mended' })
   })
 
   it("putBox over a damaged box in a full vault replaces it, never refused by maxBoxes", async () => {
@@ -297,11 +300,11 @@ describe("damaged boxes", () => {
 
   it("putBox over a box that lists soundly but will not open, missing its whisper, writes it afresh", async () => {
     const { world, vault } = await worldWithDamagedBox(({ whisper_ciphered: _gone, ...row }) => JSON.stringify(row))
-    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'personal account' })
+    expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'personal account' })
     world.advance(60_000)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
-    expect(TH.summaryOf(vault.getSnapshot().boxes[0])).to.deep.include({ sidecar: {}, registered_at: world.clock.now() })
+    expect(vault.getSnapshot().boxes[0]).to.deep.include({ sidecar: {}, registered_at: world.clock.now() })
   })
 
   it("putBox over a damaged box still needs the vault unlocked, and leaves it as it is", async () => {

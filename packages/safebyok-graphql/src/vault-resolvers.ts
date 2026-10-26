@@ -28,7 +28,7 @@ export type VaultFieldArgs = {
   user_id?:    unknown
   vaultlabel?: unknown
   boxlabel?:   unknown
-  vaultProps?: unknown
+  vaultRecord?: unknown
   draft?:      unknown
   box?:        unknown
   expected?:   unknown
@@ -124,13 +124,13 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   )
   return {
     Query: {
-      // As stored records, which the browser's VaultDB validates: not getVault's summaries.
-      safebyokGetVault:      served((vaultDB, args) => vaultDB.getVaultRecords(scopeIn(args))),
+      // Checked and split, as the browser's VaultDB answers from its half, which checks it again.
+      safebyokGetVault:      served((vaultDB, args) => vaultDB.getVaultRecords(scopeIn(args)), relayedVault),
       safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string, boxGetExpectationIn(args))),
       safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
-      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultRecord & { gate: null })),
+      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultRecord & { gate: null }), relayedVault),
       safebyokPutVaultRecord: served((vaultDB, args) => vaultDB.putVaultRecord(vaultRecordIn(args), vaultRecordExpectationIn(args)), (stored) => ({ landed: true, vault_stored: stored }), staleVaultRecordInBody),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
@@ -159,8 +159,15 @@ const MisconfiguredMessage = "The vault's server could not serve this request: i
 
 // The arguments as the schema shapes them, rebuilt field by field as plain records: the
 // VaultDB checks them as it would any caller's.
+/** A vault as the server's VaultDB read it, as `SafebyokVault` carries it: its record as `vault`, beside its sound boxes and its damaged ones; null for none. */
+const relayedVault = (val: unknown): unknown => {
+  if (val === null) { return null }
+  const { boxes, damagedBoxes, ...vault } = val as VaultRecord & { boxes: unknown, damagedBoxes: unknown }
+  return { vault, boxes, damagedBoxes }
+}
+
 const scopeIn = (args: VaultFieldArgs) => recordOf(args, ScopeFields) as VaultScope
-const vaultRecordIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultRecordFields) as VaultRecord
+const vaultRecordIn = (args: VaultFieldArgs) => recordOf(args.vaultRecord, VaultRecordFields) as VaultRecord
 
 const vaultRecordExpectationIn = (args: VaultFieldArgs): VaultRecordExpectation => {
   const { vault_tok, gate_epoch } = args.expected as VaultRecordExpectation

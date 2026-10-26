@@ -3,8 +3,8 @@ import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
-import type { BoxRecord } from '../../src/box'
-import type { VaultScope, PasskeyAnswer, ListedSummary, DamagedBox, DeviceRecord, LeaseRecord } from '../../src/types/types'
+import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/box'
+import type { VaultScope, PasskeyAnswer, DeviceRecord, LeaseRecord } from '../../src/types/types'
 import { type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, VaultFormat } from '../../src/vault-record'
 import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
 import type { Vault } from '../../src/vault'
@@ -333,7 +333,7 @@ export const vaultRecordOf = (user_id: string, overrides: Partial<GatedRecord> =
  * @example await ensureGated(vaultDB, vaultRecordOf('u1', { gate_epoch: 2 }))
  */
 export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultRecord'>, vaultRecord: GatedRecord): Promise<GatedRecord> => {
-  const ensured = valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })).vaultProps
+  const ensured = recordOfRead(valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })))
   if (ensured.gate_epoch > 0) { return ensured as GatedRecord }
   return valOf(await vaultDB.putVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedRecord
 }
@@ -342,16 +342,34 @@ export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVau
  *
  * @example expect(await vaultRecordIn(vaultDB, scopeOf('u1'))).to.deep.equal(vaultRecordOf('u1'))
  */
-export const vaultRecordIn = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<VaultRecord | null> => (
-  valOf(await vaultDB.getVault(scope))?.vaultProps ?? null
-)
+export const vaultRecordIn = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<VaultRecord | null> => {
+  const read = valOf(await vaultDB.getVault(scope))
+  return read === null ? null : recordOfRead(read)
+}
 
-/** The listing `scope`'s vault shows in `vaultDB`, as `getVault` reads it: empty where no vault stands. Throws the refusal of a read that is refused.
+/** A vault read's record alone, as `getVault` or `ensureVault` resolves it, its listing left out.
+ *
+ * @example expect(TH.recordOfRead(valOf(await vaultDB.ensureVault(draft)))).to.deep.equal(TH.gatelessOf('u1'))
+ */
+export const recordOfRead = (read: VaultRecord & { boxes: unknown, damagedBoxes: unknown }): VaultRecord => {
+  const { boxes: _boxes, damagedBoxes: _damagedBoxes, ...record } = read
+  return record
+}
+
+/** The sound boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault stands. Throws the refusal of a read that is refused.
  *
  * @example expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(2)
  */
-export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<(ListedSummary | DamagedBox)[]> => (
+export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<readonly BoxSparse[]> => (
   valOf(await vaultDB.getVault(scope))?.boxes ?? []
+)
+
+/** The damaged boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault stands. Throws the refusal of a read that is refused.
+ *
+ * @example expect(await damagedBoxesOf(vaultDB, scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
+ */
+export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<readonly BoxDamaged[]> => (
+  valOf(await vaultDB.getVault(scope))?.damagedBoxes ?? []
 )
 
 /** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
@@ -396,18 +414,6 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecor
 export const OddLabels = Object.freeze([
   'main', 'main_x', 'mainx', 'main_1', 'main1', 'ma_in', 'mai_n', 'm_ain',
 ] as const)
-
-/**
- * A listed box as the summary it should be: undefined stays undefined, and one listed as
- * damaged fails the test, naming its boxlabel. For a test reading a summary's fields out of a
- * listing or a snapshot, where TypeScript would otherwise have it ask after damage first.
- *
- * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
- */
-export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | DamagedBox | undefined): SummaryT | undefined => {
-  if (box?.damaged === true) { throw new Error(`The box '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
-  return box
-}
 
 /**
  * What a write into {@link vaultRecordOf}('u1')'s vault expects when its box is not there yet:

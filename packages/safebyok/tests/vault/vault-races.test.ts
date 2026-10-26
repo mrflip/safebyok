@@ -1000,7 +1000,7 @@ describe("versioned updates: two devices writing at once", () => {
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await TH.readAfresh(here)
-    expect(here.getSnapshot().boxes[0]?.damaged).to.be.true
+    expect(here.getSnapshot().damagedBoxes[0]?.boxlabel).to.eq('anthropic')
     const theirs = { revisionTok: '' }
     beforeNextWrite('putBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
@@ -1024,11 +1024,12 @@ describe("versioned updates: two devices writing at once", () => {
     const getVault = hereDB.getVault.bind(hereDB)
     const listBoxes = vi.spyOn(hereDB, 'getVault').mockImplementation(async (...args) => {
       const read = valOf(await getVault(...args))
-      return good(read === null ? null : { ...read, boxes: [] })
+      return good(read === null ? null : { ...read, boxes: [], damagedBoxes: [] })
     })
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await TH.readAfresh(here)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+    expect(here.getSnapshot().damagedBoxes).to.have.lengthOf(0)
     listBoxes.mockRestore()
     const damagedRevision = storedRowOf(world, 'anthropic')['revision_tok']
     const delBox = vi.spyOn(hereDB, 'delBox')
@@ -1037,7 +1038,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(putBox.mock.calls[0]?.[1].revision_tok).to.be.null
     await here.hello({ staleMinutes: 0 })
-    expect(here.getSnapshot().boxes[0]).to.deep.include({ damaged: true, revision_tok: damagedRevision })
+    expect(here.getSnapshot().damagedBoxes[0]).to.deep.include({ damage: 'damaged', revision_tok: damagedRevision })
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine')
     expect(delBox).not.toHaveBeenCalled()
     expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(damagedRevision)
@@ -1114,8 +1115,8 @@ describe("versioned updates: two devices writing at once", () => {
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     world.dbStore.write(u1BoxScopepath('anthropic'), '{"not": json')
     await Promise.all([TH.readAfresh(here), TH.readAfresh(there)])
-    expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
-    expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+    expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
+    expect(there.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     const theirs = { revisionTok: '' }
     TH.beforeNextCall(hereDB, 'delBox', async () => {
       // A store over a box damaged beyond naming is refused, so theirs deletes it first.
@@ -1142,8 +1143,8 @@ describe("versioned updates: two devices writing at once", () => {
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     const damagedRevision = String(storedRowOf(world, 'anthropic')['revision_tok'])
     await Promise.all([TH.readAfresh(here), TH.readAfresh(there)])
-    expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
-    expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
+    expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: damagedRevision, damage: 'damaged' }])
+    expect(there.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: damagedRevision, damage: 'damaged' }])
     const theirs = { revisionTok: '' }
     TH.beforeNextCall(hereDB, 'delBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
@@ -1184,7 +1185,7 @@ describe("the races the contract tests own, of a box write", () => {
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic', sidecar: { note: 'renamed' } }), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(await there.getWhisper('anthropic')).to.eq('sk-ant-fake-theirs')
-    expect(TH.summaryOf(there.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'mine' })
+    expect(there.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'mine' })
   })
 
   it("a renewal landing while a box write is in flight lets the write succeed, the listing taking the box", async () => {

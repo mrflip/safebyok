@@ -24,7 +24,7 @@ describe("localVaultDB", () => {
     await TH.expectingGood(vaultDB).putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
-    expect(read?.vaultProps).to.deep.equal(TH.vaultRecordOf('u1'))
+    expect(TH.recordOfRead(read!)).to.deep.equal(TH.vaultRecordOf('u1'))
     expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
   })
 
@@ -60,7 +60,7 @@ describe("localVaultDB", () => {
     store.write(u1BoxScopepath('openai'), emptiedRow)
     const vaultDB = localVaultDB({ store })
     const summaries = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
-    expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
+    expect(summaries.map((box) => box.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai', TH.inThisVault)
     expect(prev).to.deep.equal(emptied)
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: 'rev-two' }, emptied)
@@ -73,7 +73,7 @@ describe("localVaultDB", () => {
     store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u1')))
     store.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-box-v2', note: 'a test box' }))
     const vaultDB = localVaultDB({ store })
-    expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
+    expect(await TH.damagedBoxesOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
   })
 
   it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
@@ -82,9 +82,9 @@ describe("localVaultDB", () => {
     store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultRecordOf('u1')))
     store.write(Scopepath.box({ ...scope, boxlabel: 'openai' }), JSON.stringify(TH.boxOf('openai', 'two')))
     store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), '{"not": json')
-    const listed = await TH.boxesOf(localVaultDB({ store }), scope)
-    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
-    expect(listed[1]).to.include({ boxlabel: 'openai', revision_tok: 'rev-two', damaged: false })
+    const read = await TH.expectingGood(localVaultDB({ store })).getVault(scope)
+    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
+    expect(read?.boxes.map((box) => [box.boxlabel, box.revision_tok])).to.deep.equal([['openai', 'rev-two']])
     // Listed, never repaired: the row is still there for forensics.
     expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.eq('{"not": json')
   })
@@ -115,6 +115,7 @@ describe("localVaultDB", () => {
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'openai', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
     expect(await TH.boxesOf(vaultDB, scope)).to.have.lengthOf(0)
+    expect(await TH.damagedBoxesOf(vaultDB, scope)).to.have.lengthOf(0)
   })
 
   it("deletes a damaged row that holds a revision as another, for a deletion naming none", async () => {
@@ -124,7 +125,7 @@ describe("localVaultDB", () => {
     const sidecarless = TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar')
     store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), JSON.stringify(sidecarless))
     const vaultDB = localVaultDB({ store })
-    expect(await TH.boxesOf(vaultDB, scope)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
+    expect(await TH.damagedBoxesOf(vaultDB, scope)).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted_other' })
     expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.be.null
   })

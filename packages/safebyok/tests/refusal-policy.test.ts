@@ -38,7 +38,7 @@ describe("RefusalPolicy.heed", () => {
     expect(await heeded.getVault(scope)).to.be.null
     expect(getVault).toHaveBeenCalledWith(scope)
     const ensured = await heeded.ensureVault(TH.gatelessOf('u1'))
-    expect(ensured).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(ensured).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
     expect(await heeded.getVault(scope)).to.deep.equal(ensured)
   })
 

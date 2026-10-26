@@ -151,9 +151,9 @@ describe("idbVaultDB", () => {
     await set(Scopepath.vault(TH.scopeOf('u1')), TH.vaultRecordOf('u1'), rawShelf(dbName))
     await set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), 'not a box', rawShelf(dbName))
     await set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'openai' }), TH.boxOf('openai', 'two'), rawShelf(dbName))
-    const listed = await TH.boxesOf(idbVaultDB({ dbName }), TH.scopeOf('u1'))
-    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
-    expect(listed[1]).to.include({ boxlabel: 'openai', damaged: false })
+    const read = await TH.expectingGood(idbVaultDB({ dbName })).getVault(TH.scopeOf('u1'))
+    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
+    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
   })
 
   it("deletes a row that is no box, listed with no revision, as the one a deletion naming none means", async () => {
@@ -194,7 +194,7 @@ describe("idbVaultDB", () => {
     await TH.aWhile()
     expect(heard.count, 'an ensure that found the vault standing rang anyone').to.eq(rungOnMaking)
     unsubscribe()
-    expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
   })
 
   it("deletes a vault whose vault record is damaged -- delDamagedVault reads its vault_tok as stored -- and only that vault", async () => {

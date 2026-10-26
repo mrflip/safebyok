@@ -1,5 +1,5 @@
-import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredVault, VaultRecord } from 'safebyok'
+import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord } from 'safebyok'
 import * as Columns from './columns'
 import { VaultRowColumns, ListedBoxColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -322,13 +322,13 @@ class TablesVaultDB extends VaultDB {
     this.maxBoxes = maxBoxes
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     this.mustReach(scope)
     const { rows } = await this.sent(GetVaultSql, scopeParams(scope))
-    return rows.length === 0 ? { vaultProps: null, boxes: [] } : storedVaultOf(rows[0])
+    return rows.length === 0 ? { vault: null, boxes: [], damagedBoxes: [] } : storedVaultOf(rows[0])
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
     this.mustReach(draft)
     const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(rowOfVaultRecord(draft), VaultRowColumns))
     return storedVaultOf(rows[0])
@@ -479,12 +479,13 @@ const MaxNameBytes = 640
 
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
 
-/** A vault as a statement read it, its vault record's columns beside its boxes as JSON text: the vault record as stored, and each box under its own boxlabel column. */
-const storedVaultOf = (row: unknown): StoredVault => {
+/** A vault as a statement read it, its vault record's columns beside its boxes as JSON text: the vault record as stored, and its boxes split, each under its own boxlabel column. */
+const storedVaultOf = (row: unknown): VaultReadResponse => {
   const listed = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
   return {
-    vaultProps: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)),
-    boxes:      listed.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, ListedBoxColumns) })),
+    // A row goes up as stored, whatever its cells hold: the base class judges the record, and the split each box.
+    vault: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)) as VaultReadResponse['vault'],
+    ...splitStoredBoxes(listed.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, ListedBoxColumns) as StoredBox['box'] }))),
   }
 }
 

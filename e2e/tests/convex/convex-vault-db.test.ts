@@ -284,7 +284,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     await TH.unlock(phone, TH.RealPassphrase)
     expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
     const standing = await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })
-    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vaultProps.vault_tok } })
+    const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: standing!.vault.vault_tok } })
     expect(stored.read).to.be.true
     expect(JSON.stringify(stored)).to.not.include(anthropicKey)
     expect(JSON.stringify(stored)).to.not.include(TH.RealPassphrase)

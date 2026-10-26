@@ -149,7 +149,7 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
 
 const { vault_tok: _vaultTok, ...vaultRecordWithoutVaultTok } = TH.vaultRecordOf('u1')
 const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _vaultPropsTime, ...vaultRecordWithoutTime } = TH.vaultRecordOf('u1')
+const { registered_at: _vaultRecordTime, ...vaultRecordWithoutTime } = TH.vaultRecordOf('u1')
 const { gate: _gate, ...vaultRecordWithoutWayins } = TH.vaultRecordOf('u1')
 const { passkey: _noPasskey, ...gateWithoutPasskey } = TH.gateOf('u1')
 const vaultRecordWithoutPasskey = { ...TH.vaultRecordOf('u1'), gate: gateWithoutPasskey }

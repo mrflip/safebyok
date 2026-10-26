@@ -27,7 +27,7 @@ describe("fakeDeployment", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     await client.mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await client.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await client.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
   })
 
   it("connects a client of any other kind that its caller constructs, and closes it with the rest", async () => {
@@ -38,7 +38,7 @@ describe("fakeDeployment", () => {
       return { inner, close: async () => { closed(); await inner.close() } }
     })
     await made.inner.mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await made.inner.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await made.inner.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
     await deployment.close()
     expect(closed).toHaveBeenCalledOnce()
   })
@@ -55,7 +55,7 @@ describe("fakeDeployment", () => {
   it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {
     const deployment = deploy()
     await deployment.as('u1').mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
     const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyok.getVault, { ...u1 }))
     expect(refusal.kind).to.eq('identity_revoked')
   })

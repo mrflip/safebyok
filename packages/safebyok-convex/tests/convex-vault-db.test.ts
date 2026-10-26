@@ -216,9 +216,11 @@ describe("convexVaultDB, refusing", () => {
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
     const box = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
     await client.mutation(deployment.api.safebyok.putBox, { ...u1, box, expected: TH.noBoxYet })
-    const listed = await TH.boxesOf(vaultDB, u1)
-    expect(listed.map((summary) => [summary.boxlabel, summary.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])
+    const read = await TH.expectingGood(vaultDB).getVault(u1)
+    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
+    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
+    expect(await TH.damagedBoxesOf(vaultDB, u1)).to.have.lengthOf(0)
     expect(await TH.boxesOf(vaultDB, u1)).to.have.lengthOf(1)
   })
 
@@ -243,8 +245,8 @@ describe("convexVaultDB, refusing", () => {
     await TH.unlock(vault, TH.RealPassphrase)
     // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-    const vaultProps = await TH.vaultRecordIn(vaultDB, u1)
-    const vaultTok = vaultProps?.vault_tok ?? ''
+    const vaultRecord = await TH.vaultRecordIn(vaultDB, u1)
+    const vaultTok = vaultRecord?.vault_tok ?? ''
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
       await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }

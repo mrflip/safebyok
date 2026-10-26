@@ -164,7 +164,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     await TH.unlock(second, 'correct horse battery staple')
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
-    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
+    expect(second.getSnapshot().boxes.map((box) => box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     TH.closeVault(second)
@@ -212,6 +212,30 @@ const answering = (answer: unknown) => {
   const answered = { toPromise: () => Promise.resolve({ data: answer }) }
   return graphqlVaultDB({ client: { query: () => answered, mutation: () => answered, subscription: () => answered } as unknown as GraphqlVaultClient })
 }
+
+describe("graphqlVaultDB, reading a vault the server split", () => {
+  it("passes through the server's sound and damaged boxes, leaving GraphQL's __typename behind before the strict checks", async () => {
+    const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...sparse } = TH.boxOf('openai', 'r1')
+    const relayed = answering({ safebyokGetVault: {
+      __typename:   'SafebyokVault',
+      vault:        { ...TH.vaultRecordOf('u1'), __typename: 'SafebyokVaultRecord' },
+      boxes:        [{ ...sparse, __typename: 'SafebyokBoxSparse' }],
+      damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format', __typename: 'SafebyokBoxDamaged' }],
+    } })
+    expect(await TH.expectingGood(relayed).getVault(u1)).to.deep.equal({
+      ...TH.vaultRecordOf('u1'),
+      boxes:        [sparse],
+      damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format' }],
+    })
+  })
+
+  it("refuses as corrupt_record a server's damaged box that is no BoxDamaged, and judges again a sound box that is no box", async () => {
+    const lying = answering({ safebyokGetVault: { vault: TH.vaultRecordOf('u1'), boxes: [], damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'fine' }] } })
+    await TH.expectBad(lying.getVault(u1), 'corrupt_record')
+    const unsound = answering({ safebyokGetVault: { vault: TH.vaultRecordOf('u1'), boxes: [{ ...TH.boxOf('openai', 'r1'), sidecar: 'none' }], damagedBoxes: [] } })
+    expect(await TH.damagedBoxesOf(unsound, u1)).to.deep.equal([{ boxlabel: 'openai', revision_tok: 'rev-r1', damage: 'damaged' }])
+  })
+})
 
 describe("graphqlVaultDB, its refusals", () => {
   it("carries the server's refusal across as the same VaultError, kind and message, the GraphQL error it crossed as its cause", async () => {

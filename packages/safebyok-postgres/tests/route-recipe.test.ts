@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, DamagedBox, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary } from 'safebyok'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDamaged, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -18,12 +18,12 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 /**
  * The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
  * VaultDB, which refuses another user's vault, and holds each record to its shape and each name
- * to its check and the table's limits, as a browser's vault does. A listing goes as the stored records, which the browser's
- * VaultDB validates.
+ * to its check and the table's limits, as a browser's vault does. A vault goes checked and split, which the browser's
+ * VaultDB checks again.
  */
 const served = new Map<string, Served>([
-  ['getVault',         (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
-  ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null })],
+  ['getVault',         (vaultDB, [scope]) => relayed(vaultDB.getVaultRecords(scope as VaultScope))],
+  ['ensureVault',      (vaultDB, [draft]) => relayed(vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null }))],
   ['putVaultRecord',    (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
   ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
   ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
@@ -31,6 +31,15 @@ const served = new Map<string, Served>([
   ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
   ['delVault',         (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
+
+/** A vault as the VaultDB read it, as the browser's VaultDB answers from its half: its record as `vault`, null for none, beside its boxes, sound and damaged. */
+const relayed = async (reading: Promise<Outcome<(VaultRecord & { boxes: unknown, damagedBoxes: unknown }) | null>>): Promise<Outcome<unknown>> => {
+  const read = await reading
+  if (! read.ok) { return read }
+  if (read.val === null) { return { ok: true, val: { vault: null, boxes: [], damagedBoxes: [] } } }
+  const { boxes, damagedBoxes, ...vault } = read.val
+  return { ok: true, val: { vault, boxes, damagedBoxes } }
+}
 
 /** What a request posts: its verb and arguments, or nothing when its body is not a JSON object. */
 const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: unknown }> => {
@@ -59,7 +68,7 @@ const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
 }
 
 /** A listed damaged box, rebuilt from its three public fields. */
-const boxShown = ({ boxlabel, damaged, revision_tok }: DamagedBox) => ({ boxlabel, damaged, revision_tok })
+const boxShown = ({ boxlabel, revision_tok, damage }: BoxDamaged) => ({ boxlabel, revision_tok, damage })
 
 /** A listed wayin, rebuilt from the fields a snapshot shows while the vault is locked: none of its salt, its wrapped vaultKey or the rest. */
 const wayinShown = (wayin: WayinSummary) => {
@@ -104,8 +113,9 @@ class RouteVaultDB extends VaultDB {
     this.fetcher = fetcher
   }
 
-  protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  // A vault crosses as the server's VaultDB split it, which this VaultDB's base class checks again.
+  protected async doGetVault(scope: VaultScope) { return await this.call('getVault', scope) as VaultReadResponse }
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return await this.call('ensureVault', draft) as VaultReadResponse }
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultRecord', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
@@ -172,13 +182,6 @@ const misshapen = () => new Error('The vault route answered something that is no
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 
-// A vault as the route sends it -- its vault record, and its boxes as stored records -- or null for
-// none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
-const storedVaultOf = (sent: unknown): StoredVault => {
-  if (sent === null) { return { vaultProps: null, boxes: [] } }
-  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: { boxlabel: string }[] }
-  return { vaultProps, boxes: boxes.map((box) => ({ boxlabel: box.boxlabel, box })) }
-}
 
 // ------------------------------------------------------------------- the listen fan-out, for pg
 
@@ -304,7 +307,7 @@ describe("the README route recipe's answer, which every call makes in one shape"
   })
 
   it("carries what a stale write or a full vault learned in the main meta, and none of it in the refusal's own", async () => {
-    const boxStored = { boxlabel: 'a', damaged: true, revision_tok: 'rev1' } as const
+    const boxStored = { boxlabel: 'a', revision_tok: 'rev1', damage: 'damaged' } as const
     const stale = new VaultError('stale_write', 'Another device wrote first.', { meta: { box_stored: boxStored } })
     expect(await crossed(answerOf({ ok: false, err: stale }))).to.deep.equal({ refusal: { kind: 'stale_write', message: 'Another device wrote first.', meta: {} }, meta: { box_stored: boxStored } })
     // A null is a fact too: no vault record stands.
@@ -318,13 +321,13 @@ describe("the README route recipe's answer, which every call makes in one shape"
   })
 
   it("rebuilds a damaged record's listing without its wrapped vaultKey, salt or any other field a record holds", async () => {
-    const boxListed = { boxlabel: 'a', damaged: true, revision_tok: 'rev1', box_key_wrapped: 'wrapped-not-real', whisper_ciphered: 'ciphered-not-real' } as unknown as DamagedBox
+    const boxListed = { boxlabel: 'a', revision_tok: 'rev1', damage: 'damaged', box_key_wrapped: 'wrapped-not-real', whisper_ciphered: 'ciphered-not-real' } as unknown as BoxDamaged
     const err = new VaultError('damaged_wayin', 'x', { meta: { box_listed: boxListed, wayin_listed: fullWayin() } })
     const sent = await crossed(answerOf({ ok: false, err }))
     expect(sent).to.deep.equal({
       refusal: {
         kind: 'damaged_wayin', message: 'x',
-        meta: { box_listed: { boxlabel: 'a', damaged: true, revision_tok: 'rev1' }, wayin_listed: { wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1' } },
+        meta: { box_listed: { boxlabel: 'a', revision_tok: 'rev1', damage: 'damaged' }, wayin_listed: { wayinkind: 'passphrase', device_id: 'dev1', registered_at: 1_760_000_000_000, vault_tok: 'tok1' } },
       },
       meta: {},
     })

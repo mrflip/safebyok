@@ -151,8 +151,8 @@ describe("delDamagedVault", () => {
     await TH.unlock(vault, 'pw')
     TH.closeVault(vault)
     const vaultScopepath = Scopepath.vault({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
-    const vaultProps = JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null') as object
-    world.dbStore.write(vaultScopepath, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+    const vaultRecord = JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null') as object
+    world.dbStore.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
     await delDamagedVault(opts)
     expect(JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
   })

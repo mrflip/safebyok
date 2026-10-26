@@ -95,7 +95,7 @@ describe("the README Yoga recipe", () => {
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), undefined, () => Promise.resolve('u1'), true)
-    const document = 'query ($applabel: String!, $user_id: String!, $vaultlabel: String!) { safebyokGetVault(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) { vaultProps { vault_tok } } }'
+    const document = 'query ($applabel: String!, $user_id: String!, $vaultlabel: String!) { safebyokGetVault(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) { vault { vault_tok } } }'
     const variables = TH.scopeOf('u1')
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',

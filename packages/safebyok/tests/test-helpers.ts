@@ -10,8 +10,8 @@
  * deriver is worthless against a brute-forcer.
  */
 export { testDeriver, vaultSliceOf, leasedSliceOf, SliceNow, anyStrengthChecker, memoryVaultOpts, settledVault, bankOf, closeVault, freshDbName, fakeCiphered, scopeOf,
-  wayinOf, passkeyWayinOf, passkeyOf, gateOf, vaultRecordOf, gatelessOf, ensureGated, vaultRecordIn, boxesOf, boxOf, OddLabels,
-  summaryOf, noBoxYet, inThisVault, thisVault, deleting, deviceRecordOf, leaseOf, tweakB64 } from './test-helpers/builders'
+  wayinOf, passkeyWayinOf, passkeyOf, gateOf, vaultRecordOf, gatelessOf, ensureGated, vaultRecordIn, recordOfRead, boxesOf, damagedBoxesOf, boxOf, OddLabels,
+  noBoxYet, inThisVault, thisVault, deleting, deviceRecordOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { BornVaultOpts, FakeCiphered, GatedRecord, LeasedSlice, VaultSlice } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeLatch, beforeNextCall,
   holdNextCall, holdNextAnswer, readAfresh, tallyWatches } from './test-helpers/timing'

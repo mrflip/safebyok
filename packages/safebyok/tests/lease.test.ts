@@ -1,9 +1,9 @@
 import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { BoxFormat, type BoxRecord } from '../src/box'
+import { BoxFormat, type BoxRecord, type BoxSparse } from '../src/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { type BoxVisible, Lease, LeaseStamp, type VaultStampButFormat, leaseRecordOf, sealLeaseRecord } from '../src/lease'
+import { Lease, LeaseStamp, type VaultStampButFormat, leaseRecordOf, sealLeaseRecord } from '../src/lease'
 import { type LeaseRecord } from '../src/types/types'
 import type { VaultSparse } from '../src/vault-record'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
@@ -40,7 +40,7 @@ const leasedVault = async () => {
 }
 
 /** The visible fields of a box in u1's vault: what a lease binds a whisper to. */
-const visibleOf = (overrides: Partial<BoxVisible> = {}): BoxVisible => ({
+const visibleOf = (overrides: Partial<BoxSparse> = {}): BoxSparse => ({
   format:                 BoxFormat,
   boxlabel:               'anthropic_api_key',
   revision_tok:           'revision-one',
@@ -384,7 +384,7 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
   it("refuse visible fields that are no box's as 'bad_record', bytes that are no Uint8Array as 'bad_option', and ciphered fields that are no box's as 'bad_record', quoting none of it", async () => {
     const { lease } = await leasedVault()
     const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf())
-    await TH.expectRefusal(lease.cipheredWith(bytesOf('"sk-fake"'), { boxlabel: 'anthropic' } as unknown as BoxVisible), 'bad_record')
+    await TH.expectRefusal(lease.cipheredWith(bytesOf('"sk-fake"'), { boxlabel: 'anthropic' } as unknown as BoxSparse), 'bad_record')
     await TH.expectRefusal(lease.cipheredWith('"sk-fake"' as unknown as Uint8Array, visibleOf()), 'bad_option')
     const err = await TH.expectRefusal(lease.decipherWith({ box_key_wrapped: ciphered.box_key_wrapped } as unknown as BoxRecord, visibleOf()), 'bad_record')
     expect(err.message).to.not.include(ciphered.box_key_wrapped.ciphertext_b64)
@@ -417,7 +417,7 @@ describe("lease.sealProps", () => {
 
   it("keeps only the visible fields a box record holds, dropping what else it is handed", async () => {
     const { lease } = await leasedVault()
-    const record = await lease.sealProps({ ...visibleOf(), note: 'stray' } as BoxVisible, { whisper: bytesOf('1') })
+    const record = await lease.sealProps({ ...visibleOf(), note: 'stray' } as BoxSparse, { whisper: bytesOf('1') })
     expect(record).to.not.have.property('note')
   })
 })

@@ -102,8 +102,8 @@ const damagedWorld = async () => {
   const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
   const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-  const vaultProps = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
-  store.write(vaultScopepath, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+  const vaultRecord = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
+  store.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   return { store, world }
 }
 

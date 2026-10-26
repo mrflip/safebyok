@@ -133,8 +133,8 @@ input SafebyokBoxInput {
   written_at:             Float!
 }
 
-"""A box as a listing has it: every field but the two encrypted ones."""
-type SafebyokListedBox {
+"""A sound box as a listing has it: every field but the two encrypted ones."""
+type SafebyokBoxSparse {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
@@ -145,10 +145,25 @@ type SafebyokListedBox {
   written_at:             Float!
 }
 
-"""A vault as its storage read it in one step: its record, and every box as a listing has it."""
+"""
+A box whose stored record does not read back, as a listing has it: the boxlabel it is filed
+under, the revision it holds (null for none), and its damage: \`damaged\`, or \`newer_format\` for
+a record a newer safebyok may have written. Nothing else of it is trusted.
+"""
+type SafebyokBoxDamaged {
+  boxlabel:     String!
+  revision_tok: String
+  damage:       String!
+}
+
+"""
+A vault as its storage read it in one step: its record, its sound boxes as a listing has them,
+and apart from them each box whose record does not read back.
+"""
 type SafebyokVault {
-  vaultProps: SafebyokVaultRecord!
-  boxes:      [SafebyokListedBox!]!
+  vault:        SafebyokVaultRecord!
+  boxes:        [SafebyokBoxSparse!]!
+  damagedBoxes: [SafebyokBoxDamaged!]!
 }
 
 """What an update of the vault record was proven against: it lands only while the vault record standing has both."""
@@ -259,7 +274,7 @@ type Mutation {
   """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its record and every box, from one step: these, or another device's already standing. Over a tombstone it starts a new life, the counter carried on."""
   safebyokEnsureVault(draft: SafebyokVaultRecordInput!): SafebyokVault!
   """Replaces the vault record, its gate with it, only while the one standing is the one expected, and answers with the vault record as stored when it landed, or the one standing when it did not."""
-  safebyokPutVaultRecord(vaultProps: SafebyokVaultRecordInput!, expected: SafebyokVaultRecordExpectationInput!): SafebyokPutVaultRecordAnswer!
+  safebyokPutVaultRecord(vaultRecord: SafebyokVaultRecordInput!, expected: SafebyokVaultRecordExpectationInput!): SafebyokPutVaultRecordAnswer!
   """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
   safebyokPutBox(applabel: String!, user_id: String!, vaultlabel: String!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""

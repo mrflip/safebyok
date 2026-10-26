@@ -1,5 +1,5 @@
-import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, WayinSummary } from './types/types'
+import type { BoxDamaged, BoxRecord } from './box'
+import type { Capacity, WayinSummary } from './types/types'
 import type { VaultRecord } from './vault-record'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
@@ -38,7 +38,7 @@ import type { VaultRecord } from './vault-record'
  * * **A record that fails its checks** is named for who is at fault, by a VaultDB and a vault
  *   alike. One read from storage that fails them, or a box that will not open under the lease in
  *   hand, is damaged: `damaged_vault` for a vault record, `damaged_box` for a box (a listing shows it
- *   as a `DamagedBox` instead, and tells it as `damaged_box` news), Zod's own error its `cause`
+ *   among its `damagedBoxes` instead, and tells it as `damaged_box` news), Zod's own error its `cause`
  *   where a check failed. One the host hands in is `bad_record` (a box handed to a VaultDB's
  *   `putBox`, `invalid_box`). A storage adapter that answers in a shape its protocol does not
  *   allow -- a box write's echo, a stale or full refusal missing what it must carry, a deletion's
@@ -200,10 +200,10 @@ export const RefusalFamilyForKind = {
 export type RefusalMeta = {
   /** `stale_write` from a box write: what stands under the boxlabel, read in the step that refused.
    * It is the winning box's whole record, so the caller can open it or write over it with no second
-   * read. It is a {@link DamagedBox} when what stands does not read back as a box, and null when
+   * read. It is a {@link BoxDamaged} when what stands does not read back as a box, and null when
    * nothing stands there.
    */
-  box_stored?:   BoxRecord | DamagedBox | null
+  box_stored?:   BoxRecord | BoxDamaged | null
   /** `stale_write` from an update of the vault record: the vault record standing, read in the step that refused, or null when none stands.
    * They are the winner's whole record, checked as a read checks one, so the caller can take them
    * up with no second read.
@@ -214,8 +214,8 @@ export type RefusalMeta = {
    * `vault.capacity` before storage is asked.
    */
   capacity?:     Capacity
-  /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
-  box_listed?:   DamagedBox
+  /** `damaged_box` told of a listing: the box as the listing shows it among `damagedBoxes`, its boxlabel, the revision it names, and its `damage`. */
+  box_listed?:   BoxDamaged
   /** `damaged_wayin` told of a read of the vault record: the way in as the snapshot shows it. */
   wayin_listed?: WayinSummary
   /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */

@@ -163,29 +163,28 @@ export const VaultDashboard = () => {
         sees none of it, and clearing this site&apos;s data removes it.
       </p>
 
-      {snapshot.boxes.length === 0 && <p className="quiet">No boxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
+      {snapshot.boxes.length === 0 && snapshot.damagedBoxes.length === 0 && <p className="quiet">No boxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
 
-      {snapshot.boxes.length > 0 && (
+      {(snapshot.boxes.length > 0 || snapshot.damagedBoxes.length > 0) && (
         <table>
           <thead>
             <tr><th>label</th><th>whisper</th><th>note</th><th>written</th><th></th></tr>
           </thead>
           <tbody>
-            {snapshot.boxes.map((box) => {
+            {snapshot.damagedBoxes.map((box) => (
               // A damaged box can't be read, used or edited -- only removed, or stored over afresh
-              // while it names its revision: one damaged beyond naming putBox() refuses.
-              if (box.damaged) {
-                return (
-                  <tr key={box.boxlabel} className="damaged">
-                    <td><code>{box.boxlabel}</code></td>
-                    <td colSpan={3} className="gripe">{"damaged: its stored record can't be read"}</td>
-                    <td className="row">
-                      {box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
-                      <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
-                    </td>
-                  </tr>
-                )
-              }
+              // while it names its revision: one damaged beyond naming putBox() refuses. One a newer
+              // safebyok wrote is the app's to update, not the user's to remove.
+              <tr key={box.boxlabel} className="damaged">
+                <td><code>{box.boxlabel}</code></td>
+                <td colSpan={3} className="gripe">{box.damage === 'newer_format' ? "written by a newer version of this app: update the app to read it" : "damaged: its stored record can't be read"}</td>
+                <td className="row">
+                  {box.damage === 'damaged' && box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
+                  {box.damage === 'damaged' && <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>}
+                </td>
+              </tr>
+            ))}
+            {snapshot.boxes.map((box) => {
               const viewed = shown[box.boxlabel]
               return (
                 <tr key={box.boxlabel}>

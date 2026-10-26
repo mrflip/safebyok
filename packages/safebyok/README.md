@@ -200,7 +200,7 @@ await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work accou
 await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-new')                // keeps the sidecar it has
 await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'personal' } }) // keeps the whisper it has
 await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: {} }, 'sk-ant-new')   // and empties the sidecar
-vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, damaged: false, ... }
+vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, revision_tok, written_at, ... }
 ```
 
 * **It is never encrypted.** It is stored in the clear, so never put secret material in it: a key, a
@@ -270,6 +270,21 @@ other's boxes. Each maker checks its scope, refusing `bad_scope` as the public v
 scopepaths are part of the stored format: use these, not a join of your own, and every device finds
 your rows. A listing passes over a row under the vault's prefix that `isBox` rejects, rather than
 failing the read: no verb reaches it, so it holds no box.
+
+A read answers the vault as one atomic step read it: `doGetVault` and `doEnsureVault` resolve a
+`VaultReadResponse`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
+tombstone, or null) and the box rows split by `splitStoredBoxes`, which judges each row's damage
+so your adapter never does. Hand it each row as a `StoredBox`: the boxlabel it is filed under,
+from its scopepath or its column, beside the record exactly as stored.
+
+```ts
+import { splitStoredBoxes, type VaultReadResponse } from 'safebyok'
+
+protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  const { vaultRow, boxRows } = await this.readVaultRows(scope)   // one transaction
+  return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
+}
+```
 
 Your `do*` methods take any name the base class passed: every public verb holds each name to its
 check (`label`, or `user_id`) and to your adapter's declared `maxNameBytes`. So an adapter that hands its calls on to
@@ -857,8 +872,8 @@ The kinds fall into three families, told apart by who handles them.
 
 A record that fails its checks takes its kind from who is at fault, the same from a `VaultDB`
 as from a vault. One read from storage that fails them, or a box that will not open, is damaged:
-`damaged_vault` for the vault record, `damaged_box` for a box (a listing shows it as damaged
-instead, *Damaged boxes* below), Zod's own error its `cause` where a check failed. One your code
+`damaged_vault` for the vault record, `damaged_box` for a box (a listing shows it among its
+`damagedBoxes` instead, *Damaged boxes* below), Zod's own error its `cause` where a check failed. One your code
 handed in is `bad_record` (a box handed to a `VaultDB`'s `putBox`, `invalid_box`). A storage
 adapter that answers in a shape its protocol does not allow is `corrupt_record`: a bug in that
 adapter. None of them quotes the record, its ciphertext or its sidecar.
@@ -1092,23 +1107,28 @@ then on carry a different one than those it added before. A restore for a vault 
 
 A box whose stored record does not read back -- not JSON, a malformed time, a missing sidecar,
 a record naming another boxlabel than the one it is stored under, one from a newer
-safebyok or an older one -- is listed in the snapshot as damaged,
-`{ boxlabel, damaged: true, revision_tok }`, sorted among the sound ones, which carry
-`damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and
-null otherwise; nothing else of it is trusted. The rest of the vault opens and works
-as ever. `getBox()`, `getWhisper()` and `useWhisper()` refuse a damaged box with `damaged_box`; `delBox()` removes
-it by the name it is listed under, and `putBox()` writes a fresh box over one that names its
-revision. A damaged box's boxlabel is the name it is stored under, a label. A row stored under a
-name that is no label, which no call could reach, is not listed. Show a damaged box as removable:
+safebyok or an older one -- is listed in the snapshot's `damagedBoxes`, never among its `boxes`:
+`{ boxlabel, revision_tok, damage }`, each list sorted by boxlabel. Its `revision_tok` is the one its
+record holds, when it holds one as text, and null otherwise; nothing else of it is trusted. Its
+`damage` is `newer_format` for a record in a `format` this version does not know, which a newer
+safebyok may have written, and `damaged` for any other. The rest of the vault opens and works as
+ever. A damaged box holds room in the vault (`capacity` counts it). `getBox()`, `getWhisper()` and
+`useWhisper()` refuse it with `damaged_box`; `delBox()` removes it by the name it is listed under,
+and `putBox()` writes a fresh box over one that names its revision. A damaged box's boxlabel is
+the name it is stored under, a label. A row stored under a name that is no label, which no call
+could reach, is not listed. Show a damaged box as removable, and one of a newer format as a
+reason to update the app, not to delete what a newer version wrote:
 
 ```ts
-for (const box of vault.getSnapshot().boxes) {
-  if (box.damaged) { showDamaged(box.boxlabel) }   // offer delBox(box.boxlabel), or a fresh putBox() while box.revision_tok names one
-  else { showSummary(box.boxlabel, box.sidecar, box.written_at) }
+const { boxes, damagedBoxes } = vault.getSnapshot()
+for (const box of boxes) { showSummary(box.boxlabel, box.sidecar, box.written_at) }
+for (const box of damagedBoxes) {
+  if (box.damage === 'newer_format') { showUpdateTheApp(box.boxlabel) }   // a newer safebyok wrote it: updating opens it
+  else { showDamaged(box.boxlabel) }   // offer delBox(box.boxlabel), or a fresh putBox() while box.revision_tok names one
 }
 ```
 
-Damage the listing cannot see -- altered ciphertext, a missing or malformed ciphered field --
+Damage the listing cannot see -- altered ciphertext, a missing ciphered field --
 shows only when the box is read: the listing reads each record's shape and never opens its
 ciphertext, which would cost deciphering the whole vault at every refresh. Such a box lists
 as sound, `getWhisper()` refuses it with `damaged_box`, and `delBox()` removes it. The vault
@@ -1128,7 +1148,7 @@ refuses it with `damaged_box`, writing nothing: the user deletes it with `delBox
 stores again.
 A record that reads but will not decipher -- its ciphertext, sidecar or times altered -- is written
 over its revision, and carries nothing forward either: nothing vouches for its visible fields, so
-its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doGetVault` hands up each box as a
+its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doGetVault` hands each box row to `splitStoredBoxes` as a
 `StoredBox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
 

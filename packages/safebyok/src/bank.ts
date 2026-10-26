@@ -509,13 +509,13 @@ export class Bank {
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
     const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), deviceDB.getLease(scope)])
-    const { vaultProps: vaultRecord, boxes } = valOf(ensured)
+    const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
     const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.raiseDeviceRecord(raising))) ?? raising
-    const vault: Vault = Vault[bear](parts, { vaultRecord, listed: boxes, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 

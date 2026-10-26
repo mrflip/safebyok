@@ -7,7 +7,7 @@ import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { type BoxSummary, type DamagedBox, type ListedSummary, Sidecar, Whisper } from './types/types'
+import { Sidecar, Whisper } from './types/types'
 import { VaultSparse } from './vault-record'
 import { box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './types/type-aliases'
 import type { Vault } from './vault'
@@ -59,14 +59,49 @@ export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epoc
 }))
 export type BoxRecord = Z.infer<typeof BoxRecord>
 
-/** A box's stamp: every field of its record but the two ciphered ones, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
+/** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
+ * It holds nothing secret, and shows while the vault is locked: the sidecar is as storage holds it,
+ * and only opening the box proves it unaltered. A record that fails its check never lists as one:
+ * it is a {@link BoxDamaged}. Strict, as the record is.
+ *
+ * @example BoxSparse.parse(listed)   // { format, boxlabel, revision_tok, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at }
+ */
+export const { BoxSparse } = Validator('bad_record', () => ({
+  BoxSparse: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }),
+}))
+export type BoxSparse = Z.infer<typeof BoxSparse>
+
+/** A box record as storage may hold it, which may fail its check: to the compiler a {@link BoxRecord} as written, to a reader the outcome a damaged one is. */
+export type DamagedBoxRecord = Z.input<typeof BoxRecord>
+
+/** The ways a box stored may fail to read back: `damaged`, and `newer_format`, a record in a `format` this version does not know, which a newer safebyok may have written. */
+export const BoxDamageVals = ['damaged', 'newer_format'] as const
+
+/** A box whose stored record does not read back, as a vault's listing shows it, beside its sound boxes and never among them: the boxlabel it is filed under, the revision it holds, and its `damage`. Its `parse` refuses 'bad_record'.
+ * Nothing else of it is trusted. Its `revision_tok` is the one its record holds, when it holds one
+ * as text, and null otherwise: it only names the record a fresh `putBox()` writes over. It holds
+ * room in the vault. `delBox()` removes it; `getBox()`, `getWhisper()` and `useWhisper()` refuse it
+ * 'damaged_box'. A `damage` of `newer_format` is a box a newer safebyok wrote: offer to update the
+ * app, not to delete it.
+ *
+ * @example
+ *   for (const box of snapshot.damagedBoxes) {
+ *     if (box.damage === 'newer_format') { offerUpdate() } else { offerRemove(box.boxlabel) }
+ *   }
+ */
+export const { BoxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel }) => ({
+  BoxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(BoxDamageVals) }).strict(),
+}))
+export type BoxDamaged = Z.infer<typeof BoxDamaged>
+
+/** A box's stamp: every field of its record but the two ciphered ones, as {@link BoxSparse} holds them, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
  * A box revision is never rewritten, so every field it shows is fixed for its life. Both its
  * encryptions bind its stamp, beside its vault's.
  *
- * @example BoxStamp.parse({ ...visible, vault_tok: box.vault_tok })   // visible: box.record but its two ciphered fields
+ * @example BoxStamp.parse({ ...sparse, vault_tok: box.vault_tok })   // sparse: box.record but its two ciphered fields
  */
 export const { BoxStamp } = Validator('bad_record', () => ({
-  BoxStamp: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).extend({ vault_tok }),
+  BoxStamp: BoxSparse.extend({ vault_tok }),
 }))
 export type BoxStamp = Z.infer<typeof BoxStamp>
 // --
@@ -76,11 +111,11 @@ export type BoxStamp = Z.infer<typeof BoxStamp>
 /** The slice of a {@link Vault} a box reads: the stamp it is made under, its demand, and the time a seal stamps. The lease that seals and opens it the box reads inside the package, as no getter shows it. */
 export type BoxVault = Pick<Vault, 'stamp' | 'now' | 'demandConsistentWith'>
 
-/** A box's visible fields, each once: what `{ ...box }` and `box.toJSON()` hold, its stamp left out. A {@link BoxSummary} holds them and `vault_tok`. */
-export type BoxView = Omit<BoxSummary, 'damaged' | 'vault_tok'>
+/** A box's visible fields, each once: what `{ ...box }` and `box.toJSON()` hold, its stamp left out. A {@link BoxSparse} holds them, and its record's format, codec and schema version. */
+export type BoxView = Pick<BoxSparse, 'boxlabel' | 'revision_tok' | 'sidecar' | 'registered_at' | 'written_at'>
 
 /** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
- * A {@link Box} read from storage is one, as is a listing's {@link BoxSummary} or {@link DamagedBox}.
+ * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
  */
 export type BoxBase = { revision_tok: string | null, registered_at?: number | undefined }
 
@@ -300,19 +335,16 @@ export class Box {
 }
 // --
 
-// == [Listing]: heldListing
+// == [Listing]: boxSparseOf
 
-/** A listed box as a vault holds it and hands it out, lying under `vaultTok`, the vault record the listing was read beside.
- * A sound one is a box's visible fields and `vault_tok`, and `damaged: false`, frozen through. Its
- * sidecar is the one the listing's check made, frozen where it stands, never parsed again. A
- * damaged one keeps its boxlabel and revision alone.
+/** `record` as a listing shows a sound box, frozen through: every field but its two ciphered ones, which it may hold or not.
+ * Its sidecar is the record's own, frozen where it stands, never parsed again.
  *
- * @example vault.boxes[0].sidecar.note = 'changed'   // throws in strict code; the vault's own copy is untouched either way
+ * @example vault.getSnapshot().boxes[0].sidecar.note = 'changed'   // throws in strict code; the vault's own copy is untouched either way
  */
-export const heldListing = (listed: ListedSummary | DamagedBox, vaultTok: string): BoxSummary | DamagedBox => {
-  if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
-  const { boxlabel, revision_tok, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, sidecar: deepFreeze(listed.sidecar), registered_at, written_at, vault_tok: vaultTok, damaged: false })
+export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whisper_ciphered?: unknown }): BoxSparse => {
+  const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...sparse } = record
+  return deepFreeze(sparse)
 }
 // --
 

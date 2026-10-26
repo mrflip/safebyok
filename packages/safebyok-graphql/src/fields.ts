@@ -1,4 +1,4 @@
-import type { BoxRecord, VaultRecord, VaultScope, VaultTombstone } from 'safebyok'
+import type { BoxDamaged, BoxRecord, VaultRecord, VaultScope, VaultTombstone } from 'safebyok'
 
 /** How one field crosses the wire: `plain`, as it is; `ciphered`, a Ciphered sent as its own two fields; or `gate`, a vault record's gate sent as its two ways in.
  * A plain field is text, a number, or a way in, opaque JSON. A gate may be null, for a novel vault.
@@ -63,8 +63,15 @@ export const BoxFields = everyFieldOf<BoxRecord>()([
   ['written_at',             'plain'],
 ] as const)
 
-/** A box as a listing carries it, as `SafebyokListedBox` has it: every field but the two ciphered ones. */
-export const ListedBoxFields = BoxFields.filter(([_field, kind]) => kind !== 'ciphered')
+/** A sound box as a listing carries it, as `SafebyokBoxSparse` has it: every field but the two ciphered ones. */
+export const BoxSparseFields = BoxFields.filter(([_field, kind]) => kind !== 'ciphered')
+
+/** Every field of a BoxDamaged, as `SafebyokBoxDamaged` has them: a box whose record does not read back, as a listing carries it. */
+export const BoxDamagedFields = everyFieldOf<BoxDamaged>()([
+  ['boxlabel',     'plain'],
+  ['revision_tok', 'plain'],
+  ['damage',       'plain'],
+] as const)
 
 /** The parts each kind of field crosses as, by name: a Ciphered's two halves, as `SafebyokCiphered` has them, and a gate's two ways in, as `SafebyokGate` has them; none for a plain field. */
 const PartsOfKind = {

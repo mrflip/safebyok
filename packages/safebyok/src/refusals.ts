@@ -45,7 +45,7 @@ export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stal
 
 /** A `stale_write` refusal of a box write, carrying what stands under its boxlabel as `meta.box_stored`. Throw it from `doPutBox`.
  * The `VaultDB` base class checks `boxStored` as `getBox` checks a record, so a caller meets a
- * box, a `DamagedBox` or null. A `stale_write` from `doPutBox` carrying no `box_stored` is
+ * box, a `BoxDamaged` or null. A `stale_write` from `doPutBox` carrying no `box_stored` is
  * refused as `corrupt_record`.
  *
  * @param boxStored - The record under the boxlabel, exactly as stored and damaged or not, read in

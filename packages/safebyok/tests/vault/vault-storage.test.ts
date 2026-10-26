@@ -147,8 +147,8 @@ describe("tampering", () => {
   it("vault record whose vault_tok was altered open to no passphrase: it is bound into every way in", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const vaultProps = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as { vault_tok: string }
-    world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultProps, vault_tok: `${vaultProps.vault_tok}-moved` }))
+    const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as { vault_tok: string }
+    world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, vault_tok: `${vaultRecord.vault_tok}-moved` }))
     const vault = await world.open({ deviceDB: memoryDeviceDB() })
     const err = await TH.expectRefusal(TH.unlock(vault, 'pw'), 'wrong_passphrase')
     // The decryption fails as for a typo, so the message names both, and claims neither.
@@ -882,7 +882,7 @@ describe("older stored formats", () => {
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, format: 'safebyok-box-v6', vault_key_epoch: 1 }))
     await TH.readAfresh(vault)
-    expect(vault.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: row['revision_tok'] }])
+    expect(vault.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: row['revision_tok'], damage: 'damaged' }])
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-again')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-again')
   })

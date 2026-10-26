@@ -1,14 +1,14 @@
 import { inspect } from 'node:util'
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Box, BoxRecord, BoxStamp, type SealBoxProps } from '../src/box'
+import { Box, BoxDamaged, BoxRecord, BoxSparse, BoxStamp, type SealBoxProps, boxSparseOf } from '../src/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
-import { BoxSummary, type Whisper } from '../src/types/types'
+import type { Whisper } from '../src/types/types'
 import type { VaultSparse } from '../src/vault-record'
 import { box_key_wrapped, whisper_ciphered } from '../src/types/type-aliases'
 import { FarFuture } from '../src/consts'
@@ -128,6 +128,38 @@ const boxStampOf = (box: Box): Omit<VaultSparse, 'format' | 'registered_at'> => 
 
 afterEach(() => { vi.restoreAllMocks() })
 
+describe("BoxSparse", () => {
+  it("is every field of the box record but its two ciphered ones, as its example shows, and refuses a whole record or one missing a field", () => {
+    const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = TH.boxOf('anthropic_api_key', 'a1')
+    expect(BoxSparse.parse(listed)).to.deep.equal(listed)
+    expect(Object.keys(BoxSparse.shape)).to.have.members(Object.keys(listed))
+    expect(BoxSparse.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success, 'a sparse box holds no ciphertext').to.be.false
+    expect(BoxSparse.safeParse(TH.omitting(listed, 'sidecar')).success).to.be.false
+  })
+})
+
+describe("BoxDamaged", () => {
+  it("is a damaged box's boxlabel, revision and damage, as its example lists one, and nothing else", () => {
+    const damaged = { boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format' } as const
+    expect(BoxDamaged.parse(damaged)).to.deep.equal(damaged)
+    expect(BoxDamaged.safeParse({ ...damaged, revision_tok: 'rev-one', damage: 'damaged' }).success).to.be.true
+    expect(BoxDamaged.safeParse({ ...damaged, damage: 'broken' }).success, 'a damage no version names').to.be.false
+    expect(BoxDamaged.safeParse({ ...damaged, boxlabel: 'Anthropic' }).success, 'a boxlabel that is no label').to.be.false
+    expect(BoxDamaged.safeParse({ ...damaged, revision_tok: '' }).success, 'an empty revision').to.be.false
+    expect(BoxDamaged.safeParse({ ...damaged, sidecar: {} }).success, 'a field a damaged box never holds').to.be.false
+  })
+})
+
+describe("boxSparseOf", () => {
+  it("lists a record's sparse fields, frozen through, its sidecar the record's own, as its example shows", () => {
+    const record = TH.boxOf('anthropic_api_key', 'a1')
+    const sparse = boxSparseOf(record)
+    expect(sparse).to.deep.equal(omit(record, ['box_key_wrapped', 'whisper_ciphered']))
+    expect(sparse.sidecar).to.eq(record.sidecar)
+    expect(() => { (sparse.sidecar as { note: string }).note = 'changed' }).to.throw(TypeError)
+  })
+})
+
 describe("BoxStamp", () => {
   it("is every field of the box record but its two ciphered ones, and the vault_tok of its vault, as its example shows", () => {
     const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...visible } = TH.boxOf('anthropic_api_key', 'a1')
@@ -222,11 +254,10 @@ describe("Box.make", () => {
     expect(box.revision_tok).to.eq('rev-a1')
   })
 
-  it("holds, spread, the visible fields a BoxSummary holds but for damaged, which with its stamp's vault_tok are a summary (Contract: Box)", async () => {
+  it("holds, spread, the fields its BoxSparse holds but its record's format, codec and schema version (Contract: Box)", async () => {
     const box = Box.make(await vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
-    const summary = { ...TH.shownOf(box), vault_tok: box.vault_tok }
-    expect(BoxSummary.parse(summary)).to.deep.equal({ ...summary, damaged: false })
-    expect(Object.keys(BoxSummary.shape)).to.have.members([...Object.keys(summary), 'damaged'])
+    const { format: _format, whisper_codec: _codec, whisper_schema_version: _version, ...shown } = boxSparseOf(box.record)
+    expect(TH.shownOf(box)).to.deep.equal(shown)
   })
 
   it("makes a box from a record a VaultDB hands back, as its first example shows", async () => {

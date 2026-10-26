@@ -17,7 +17,7 @@ import { VaultRecord } from '../src/vault-record'
 import * as Refusals from '../src/refusals'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
-import { VaultDB, type VaultRecordExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type StoredVault, type VaultDBOpts } from '../src/vault-db'
+import { VaultDB, type VaultRecordExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultReadResponse, type VaultDBOpts, splitStoredBoxes } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
 
@@ -785,8 +785,8 @@ describe("the fixtures", () => {
   })
 
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
-    const vaultProps = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
-    expect(VaultRecord.safeParse(vaultProps).success).to.be.true
+    const vaultRecord = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
+    expect(VaultRecord.safeParse(vaultRecord).success).to.be.true
     expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', credential_id: 'cred-laptop' })
     expect(TH.passkeyWayinOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
   })
@@ -1100,7 +1100,7 @@ const servingOnly = (signedIn: string | null, store: StringStore): TH.VaultDBVer
     ensureVault:        (draft) => permitted(draft, () => shared.ensureVault(draft)),
     getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
     ensureVaultRecords: (draft) => permitted(draft, () => shared.ensureVaultRecords(draft)),
-    putVaultRecord:    (vaultProps, expected) => permitted(vaultProps, () => shared.putVaultRecord(vaultProps, expected)),
+    putVaultRecord:    (vaultRecord, expected) => permitted(vaultRecord, () => shared.putVaultRecord(vaultRecord, expected)),
     getBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.getBox(scope, boxlabel, expected)),
     putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
     getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),
@@ -1308,16 +1308,16 @@ class RoundTripVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes ?? Infinity
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     if (! this.opts.readsApart) { return await this.backend.atomically((rows) => vaultIn(rows, scope, this.opts.listsToLimit ? this.maxBoxes : Infinity)) }
-    const vaultProps = await this.backend.atomically((rows) => rows.get(Scopepath.vault(scope)) ?? null)
-    return { vaultProps, boxes: await this.backend.atomically((rows) => boxesIn(rows, scope)) }
+    const vault = await this.backend.atomically((rows) => (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'])
+    return { vault, ...splitStoredBoxes(await this.backend.atomically((rows) => boxesIn(rows, scope))) }
   }
 
   // What it hands back is the vault as the step that checked, or that wrote, left it.
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
     const vaultScopepath = Scopepath.vault(draft)
-    const seen: { vault: StoredVault } = { vault: { vaultProps: null, boxes: [] } }
+    const seen: { vault: VaultReadResponse } = { vault: { vault: null, boxes: [], damagedBoxes: [] } }
     const absent = (rows: Rows) => {
       seen.vault = vaultIn(rows, draft)
       return Expectations.newLifeOf(draft, rows.get(vaultScopepath)) !== null
@@ -1330,20 +1330,20 @@ class RoundTripVaultDB extends VaultDB {
     return seen.vault
   }
 
-  protected async doPutVaultRecord(vaultProps: VaultRecord, expected: VaultRecordExpectation) {
-    const vaultScopepath = Scopepath.vault(vaultProps)
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) {
+    const vaultScopepath = Scopepath.vault(vaultRecord)
     // The refusal a miss throws, from the row its check read.
     const missed: { refusal: VaultError | null } = { refusal: null }
     const meets = (rows: Rows) => {
       missed.refusal = Expectations.vaultRecordRefusalOf(rows.get(vaultScopepath), expected)
       return missed.refusal === null
     }
-    const stored: { vaultProps: unknown } = { vaultProps: null }
+    const stored: { vaultRecord: unknown } = { vaultRecord: null }
     const write = (rows: Rows) => {
-      stored.vaultProps = Expectations.vaultRecordPutOf(vaultProps, rows.get(vaultScopepath))
-      rows.set(vaultScopepath, stored.vaultProps)
+      stored.vaultRecord = Expectations.vaultRecordPutOf(vaultRecord, rows.get(vaultScopepath))
+      rows.set(vaultScopepath, stored.vaultRecord)
     }
-    if (await this.step({ check: meets, write })) { return stored.vaultProps }
+    if (await this.step({ check: meets, write })) { return stored.vaultRecord }
     throw missed.refusal ?? new Error('a write that did not land, with no refusal from its check')
   }
 
@@ -1441,12 +1441,14 @@ class RoundTripVaultDB extends VaultDB {
 const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string }) => Expectations.vaultMeets(rows.get(Scopepath.vault(scope)), expected)
 
 /** The vault of `scope` in `rows`: its vault record, or null, and its boxes. */
-const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): StoredVault => ({ vaultProps: rows.get(Scopepath.vault(scope)) ?? null, boxes: boxesIn(rows, scope).slice(0, listedUpTo) })
+const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): VaultReadResponse => (
+  { vault: (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
+)
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {
   const prefix = Scopepath.withinVaultScopepathPrefix(scope)
   const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box }))
+  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box: box as StoredBox['box'] }))
 }
 
 /** How full `scope` is in `rows`: its boxes counted, each weighed as its row's JSON, against `maxBoxes` and no limit on bytes. */

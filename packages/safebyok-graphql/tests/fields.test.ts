@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
-import { VaultRecordFields, ListedBoxFields, BoxFields, recordOf, selectionOf } from '../src/fields'
+import { VaultRecordFields, BoxSparseFields, BoxFields, recordOf, selectionOf } from '../src/fields'
 
 describe("selectionOf", () => {
   it("asks for each field, a ciphered one by its two halves", () => {
@@ -13,7 +13,7 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed box without either ciphered field", () => {
-    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar registered_at written_at')
+    expect(selectionOf(BoxSparseFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar registered_at written_at')
   })
 })
 

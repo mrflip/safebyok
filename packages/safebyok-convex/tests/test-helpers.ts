@@ -30,15 +30,15 @@ export const componentTest = (transactionLimits = false) => convexTest({ schema,
  */
 export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedRecord) => {
   await CVX.mutation(vaults.ensureVault, { draft: { ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null } })
-  const answer = await CVX.mutation(vaults.putVaultRecord, { vaultProps: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
+  const answer = await CVX.mutation(vaults.putVaultRecord, { vaultRecord: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
   if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }
   return answer.vault_stored
 }
 
 /** The vault record a component test's CVX holds for `scope`, as `getVault` reads it, or null. */
-export const propsIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
+export const storedVaultRecordIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
   const read = await CVX.query(vaults.getVault, { ...scope })
-  return read?.vaultProps ?? null
+  return read?.vault ?? null
 }
 
 /** The listing a component test's CVX shows for `scope`, as `getVault` reads it: empty where no vault stands. */
@@ -138,7 +138,7 @@ export const realRecords = async (user_id = 'u1') => {
   if (! vaultRecordRow) { throw new Error('the core stored no vault record') }
   return {
     vaultRecordCkey: vaultRecordRow.ckey,
-    vaultProps:     VaultRecord.parse(vaultRecordRow.record),
+    vaultRecord:     VaultRecord.parse(vaultRecordRow.record),
     boxes:          rows.flatMap((row) => {
       const checked = BoxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []

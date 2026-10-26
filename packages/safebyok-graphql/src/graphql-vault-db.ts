@@ -1,7 +1,7 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import { VaultRecordFields, ListedBoxFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
+import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 
 /** What graphqlVaultDB needs of an urql Client: its three ways to send an operation.
  * The Client your app already has is one, whatever its exchanges.
@@ -80,7 +80,7 @@ const ScopeVariables = '$applabel: String!, $user_id: String!, $vaultlabel: Stri
 const ScopeArgs = 'applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel'
 const VaultRecordSelection = selectionOf(VaultRecordFields)
 
-const VaultSelection = `vaultProps { ${VaultRecordSelection} } boxes { ${selectionOf(ListedBoxFields)} }`
+const VaultSelection = `vault { ${VaultRecordSelection} } boxes { ${selectionOf(BoxSparseFields)} } damagedBoxes { ${selectionOf(BoxDamagedFields)} }`
 
 const GetVaultDoc = `query SafebyokGetVault(${ScopeVariables}) {
   safebyokGetVault(${ScopeArgs}) { ${VaultSelection} }
@@ -94,8 +94,8 @@ const GetBoxDoc = `query SafebyokGetBox(${ScopeVariables}, $boxlabel: String!, $
 const GetCapacityDoc = `query SafebyokGetCapacity(${ScopeVariables}) {
   safebyokGetCapacity(${ScopeArgs}) { boxes { used max } bytes { used max } }
 }`
-const PutVaultRecordDoc = `mutation SafebyokPutVaultRecord($vaultProps: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
-  safebyokPutVaultRecord(vaultProps: $vaultProps, expected: $expected) { landed refusalkind message vault_stored }
+const PutVaultRecordDoc = `mutation SafebyokPutVaultRecord($vaultRecord: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
+  safebyokPutVaultRecord(vaultRecord: $vaultRecord, expected: $expected) { landed refusalkind message vault_stored }
 }`
 const PutBoxDoc = `mutation SafebyokPutBox(${ScopeVariables}, $box: SafebyokBoxInput!, $expected: SafebyokBoxExpectationInput!) {
   safebyokPutBox(${ScopeArgs}, box: $box, expected: $expected) { landed refusalkind message box_stored capacity { boxes { used max } bytes { used max } } }
@@ -151,15 +151,16 @@ class UrqlVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes
   }
 
-  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in one step.
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in
+  // one step, and splits its boxes, which this VaultDB's base class checks again.
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     const { safebyokGetVault } = await this.asked(GetVaultDoc, scopeOut(scope))
-    return storedVaultOf(safebyokGetVault)
+    return vaultReadOf(safebyokGetVault)
   }
 
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
     const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultRecordFields) })
-    return storedVaultOf(safebyokEnsureVault)
+    return vaultReadOf(safebyokEnsureVault)
   }
 
   // A write that lands answers with the vault record as the server's storage holds it; a stale
@@ -169,7 +170,7 @@ class UrqlVaultDB extends VaultDB {
     checkInts('vault record', vaultRecord)
     checkInts('vault record expectation', expected)
     const { vault_tok, gate_epoch } = expected
-    const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultProps: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
+    const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultRecord: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
     const answer = safebyokPutVaultRecord as WriteAnswer
     if (answer.landed) { return recordOf(answer.vault_stored, VaultRecordFields) }
     throw refusalOfAnswer(answer, 'vault_stored')
@@ -246,22 +247,25 @@ class UrqlVaultDB extends VaultDB {
 // The three names as the operations take them, each a variable of its own.
 const scopeOut = ({ applabel, user_id, vaultlabel }: VaultScope) => ({ applabel, user_id, vaultlabel })
 
-/** Listed boxes as the server sent them, rebuilt as the VaultDB's half hands them up: each under the boxlabel it carries. */
-const storedBoxesOf = (sent: unknown): StoredBox[] => (sent as unknown[]).map((listed) => {
-  const box = recordOf(listed, ListedBoxFields)
-  return { boxlabel: (box as { boxlabel: string }).boxlabel, box }
-})
-
-/** A vault as the server sent it, or null for none, rebuilt as the VaultDB's half hands it up: its vault record and its boxes.
+/** A vault as the server sent it, or null for none, passed through as the VaultDB's half answers: its vault record, its sound boxes and its damaged ones.
+ * Each record is rebuilt from its own fields alone, so GraphQL's `__typename` stays behind before
+ * the base class's strict checks; a list that is no list goes up as it came, for them to refuse.
  * A field the answer leaves out altogether is no answer, as from a server that does not serve
  * safebyok-graphql's schema and checks no operation against its own.
  */
-const storedVaultOf = (sent: unknown): StoredVault => {
+const vaultReadOf = (sent: unknown): VaultReadResponse => {
   if (sent === undefined) { throw new Error('The GraphQL server answered without the vault it was asked for: is it serving safebyok-graphql?') }
-  if (sent === null) { return { vaultProps: null, boxes: [] } }
-  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: unknown }
-  return { vaultProps: recordOf(vaultProps, VaultRecordFields), boxes: storedBoxesOf(boxes) }
+  if (sent === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
+  const { vault, boxes, damagedBoxes } = sent as Record<string, unknown>
+  return {
+    vault:        recordOf(vault, VaultRecordFields),
+    boxes:        recordsOf(boxes, BoxSparseFields),
+    damagedBoxes: recordsOf(damagedBoxes, BoxDamagedFields),
+  } as VaultReadResponse
 }
+
+/** Each record of `sent`, rebuilt from `fields` alone; `sent` as it came when it is no list. */
+const recordsOf = (sent: unknown, fields: Parameters<typeof recordOf>[1]): unknown => (Array.isArray(sent) ? sent.map((record) => recordOf(record, fields)) : sent)
 
 /** The most a GraphQL `Int` carries, a signed 32-bit integer, where the core takes any safe integer. */
 const GraphqlIntMax = 2_147_483_647

@@ -4,7 +4,7 @@ import * as TH from 'safebyok/testing'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 
 const scope = TH.scopeOf('u1')
-const vaultProps = TH.vaultRecordOf('u1')
+const vaultRecord = TH.vaultRecordOf('u1')
 
 /** An OutageVaultDB over a fresh in-memory adapter, with its switch. */
 const downOver = () => {
@@ -50,27 +50,27 @@ describe("OutageVaultDB, while up", () => {
     expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
   })
 
-  it("lists a box its inner adapter finds damaged as damaged, and the sound ones as they are", async () => {
+  it("lists a box its inner adapter finds damaged apart from the sound ones, as they are", async () => {
     const store = memoryStore()
     const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())
-    await TH.ensureGated(vaultDB, vaultProps)
+    await TH.ensureGated(vaultDB, vaultRecord)
     await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // a record that names its boxlabel but will not read back as a box
     store.write(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
-    const listed = await TH.boxesOf(vaultDB, scope)
-    const shown = listed.map((box) => [box.boxlabel, box.damaged])
-    expect(shown).to.deep.equal([['anthropic', true], ['openai', false]])
+    const read = await TH.expectingGood(vaultDB).getVault(scope)
+    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
+    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
   })
 })
 
-/** An outage-switched adapter over a store holding `u1`'s vault, its props damaged but for their vault_tok. */
+/** An outage-switched adapter over a store holding `u1`'s vault, its record damaged but for its vault_tok. */
 const damagedOver = async () => {
   const store = memoryStore()
   const outage = makeOutage()
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
-  await TH.ensureGated(vaultDB, vaultProps)
+  await TH.ensureGated(vaultDB, vaultRecord)
   await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
-  store.write(Scopepath.vault(scope), JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+  store.write(Scopepath.vault(scope), JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 
@@ -111,11 +111,11 @@ describe("OutageVaultDB, while down", () => {
 
   it("serves again once the switch is back up", async () => {
     const { outage, vaultDB } = downOver()
-    await TH.ensureGated(vaultDB, vaultProps)
+    await TH.ensureGated(vaultDB, vaultRecord)
     outage.setDown(true)
     expect(await TH.expectBad(vaultDB.getVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
-    expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(vaultProps)
+    expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(vaultRecord)
   })
 
   it("keeps watching through the outage", async () => {
@@ -124,7 +124,7 @@ describe("OutageVaultDB, while down", () => {
     outage.setDown(true)
     const unsubscribe = vaultDB.subscribe(scope, () => { heard += 1 })
     outage.setDown(false)
-    await TH.ensureGated(vaultDB, vaultProps)
+    await TH.ensureGated(vaultDB, vaultRecord)
     expect(heard).to.be.greaterThan(0)
     unsubscribe()
   })

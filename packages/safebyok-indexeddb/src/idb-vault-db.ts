@@ -1,5 +1,5 @@
-import { Expectations, Refusals, Scopepath, VaultDB } from 'safebyok'
-import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, VaultRecord, VaultScope } from 'safebyok'
+import { Expectations, Refusals, Scopepath, VaultDB, splitStoredBoxes } from 'safebyok'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './box-range'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -48,12 +48,12 @@ class IdbVaultDB extends VaultDB {
 
   // The vault record and the scope's boxes are read in one transaction: no other tab's write lands
   // between them.
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     return await this.shelf('readonly', (store) => vaultIn(store, scope))
   }
 
   // A tombstone in the vault record's row is no vault: a new life takes its place with the counter carried on.
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
     const { ensured, created } = await inOneTransaction(this.shelf, async (store) => {
       const vaultScopepath = Scopepath.vault(draft)
       const life = Expectations.newLifeOf(draft, await rowAt(store, vaultScopepath))
@@ -156,11 +156,11 @@ class IdbVaultDB extends VaultDB {
   }
 }
 
-/** The vault of `scope` as stored, its vault record (null for none) and every box, read in the transaction `store` belongs to. */
-const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<StoredVault> => {
+/** The vault of `scope` as stored, its vault record (null for none) and every box split by `splitStoredBoxes`, read in the transaction `store` belongs to. */
+const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<VaultReadResponse> => {
   const range = boxRange(scope)
   const [vaultRecord, ckeys, rows] = await Promise.all([rowAt(store, Scopepath.vault(scope)), settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))])
-  return { vaultProps: vaultRecord ?? null, boxes: storedBoxesOf(ckeys, rows) }
+  return { vault: (vaultRecord ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(storedBoxesOf(ckeys, rows)) }
 }
 
 /** The scope's boxes from the keys and rows of its key range, read together: each under the boxlabel its scopepath names.
@@ -170,7 +170,8 @@ const storedBoxesOf = (ckeys: IDBValidKey[], rows: unknown[]): StoredBox[] => (
   ckeys
     .map((ckey, idx) => ({ ckey, box: rows[idx] }))
     .filter((stored): stored is { ckey: Scopepath.BoxScopepath, box: unknown } => Scopepath.isBox(stored.ckey))
-    .map(({ ckey, box }) => ({ boxlabel: Scopepath.boxscope(ckey).boxlabel, box }))
+    // A row goes to the split as stored, whatever it holds: the split judges it.
+    .map(({ ckey, box }) => ({ boxlabel: Scopepath.boxscope(ckey).boxlabel, box: box as StoredBox['box'] }))
 )
 
 /** The row at `scopepath`, read in the transaction `store` belongs to, or undefined for none. */

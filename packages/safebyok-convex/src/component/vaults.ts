@@ -29,7 +29,7 @@ export const getVault = query({
   returns: v.nullable(VaultAnswer),
   handler: async (ctx, scope) => {
     const row = await findVaultRecordRow(ctx.db, scope)
-    return row && { vaultProps: vaultRecordOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    return row && { vault: vaultRecordOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
@@ -44,30 +44,30 @@ export const ensureVault = mutation({
     const standing = await findVaultRecordRow(ctx.db, scope)
     const created = standing ? null : { ...draft, vault_epoch: await carriedEpoch(ctx.db, scope) }
     if (created) { await ctx.db.insert('safebyok_vaults', created) }
-    return { vaultProps: standing ? vaultRecordOfRow(standing) : created!, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    return { vault: standing ? vaultRecordOfRow(standing) : created!, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
 // ------------------------------------------------------------------------------- the vault record
 
 /** Replace the vault record, only while the one standing has `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link PutVaultRecordAnswer}.
- * What lands is `vaultProps` with its `vault_epoch` the standing one plus one, whatever it carries.
+ * What lands is `vaultRecord` with its `vault_epoch` the standing one plus one, whatever it carries.
  * It also misses, writing nothing, for a vault record that names another vault or does not move
  * `gate_epoch` forward. A miss names the vault record standing, or null for none.
  */
 export const putVaultRecord = mutation({
-  args:    { vaultProps: VaultRecord, expected: VaultRecordExpectation },
+  args:    { vaultRecord: VaultRecord, expected: VaultRecordExpectation },
   returns: PutVaultRecordAnswer,
-  handler: async (ctx, { vaultProps, expected }): Promise<Infer<typeof PutVaultRecordAnswer>> => {
-    const standing = await findVaultRecordRow(ctx.db, scopeOf(vaultProps))
+  handler: async (ctx, { vaultRecord, expected }): Promise<Infer<typeof PutVaultRecordAnswer>> => {
+    const standing = await findVaultRecordRow(ctx.db, scopeOf(vaultRecord))
     const meetsExpectation = standing !== null
       && standing.vault_tok === expected.vault_tok
       && standing.gate_epoch === expected.gate_epoch
     const movesForward = standing !== null
-      && vaultProps.vault_tok === standing.vault_tok
-      && vaultProps.gate_epoch > standing.gate_epoch
+      && vaultRecord.vault_tok === standing.vault_tok
+      && vaultRecord.gate_epoch > standing.gate_epoch
     if (! (meetsExpectation && movesForward)) { return { landed: false, vault_stored: standing && vaultRecordOfRow(standing) } }
-    const stored = { ...vaultProps, vault_epoch: standing.vault_epoch + 1 }
+    const stored = { ...vaultRecord, vault_epoch: standing.vault_epoch + 1 }
     await ctx.db.replace('safebyok_vaults', standing._id, stored)
     return { landed: true, vault_stored: stored }
   },
@@ -82,8 +82,8 @@ export const getBox = query({
   args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
   returns: GetBoxAnswer,
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
-    if (vaultProps?.vault_tok !== expected.vault_tok) {
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
+    if (vaultRow?.vault_tok !== expected.vault_tok) {
       return { read: false, refusalkind: 'vault_mismatch' }
     }
     const row = await findBoxRow(ctx.db, scope, boxlabel)
@@ -101,8 +101,8 @@ export const putBox = mutation({
   args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
   returns: PutBoxAnswer,
   handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof PutBoxAnswer>> => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
-    if (vaultProps?.vault_tok !== expected.vault_tok) {
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
+    if (vaultRow?.vault_tok !== expected.vault_tok) {
       return { landed: false, refusalkind: 'vault_mismatch' }
     }
     const standing = await findBoxRow(ctx.db, scope, box.boxlabel)
@@ -112,7 +112,7 @@ export const putBox = mutation({
     }
     //
     const row = boxRowOf(scope, box)
-    const reckoning = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
+    const reckoning = await Tallies.reckon(ctx.db, vaultRow._id, vaultBoxQuery(ctx.db, scope))
     const standingBytes = standing === null ? 0 : Tallies.weigh(standing)
     // A new row is weighed with Convex's estimate of an `_id` until it has one.
     const growthAs = (rowId?: Id<'safebyok_boxes'>) => ({
@@ -125,7 +125,7 @@ export const putBox = mutation({
     const rowId = standing === null
       ? await ctx.db.insert('safebyok_boxes', row)
       : await replaceBoxRow(ctx.db, standing._id, row)
-    await Tallies.record(ctx.db, vaultProps._id, reckoning, growthAs(rowId))
+    await Tallies.record(ctx.db, vaultRow._id, reckoning, growthAs(rowId))
     // The row just written, which this transaction reads back as it left it.
     const stored = await ctx.db.get('safebyok_boxes', rowId)
     if (stored === null) { throw new Error('A box row this mutation wrote could not be read back in the same transaction.') }
@@ -140,9 +140,9 @@ export const getCapacity = query({
   args:    { ...VaultScope.fields },
   returns: Capacity,
   handler: async (ctx, scope) => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
-    if (vaultProps === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
-    const { tally } = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
+    if (vaultRow === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
+    const { tally } = await Tallies.reckon(ctx.db, vaultRow._id, vaultBoxQuery(ctx.db, scope))
     return Tallies.capacityOf(tally)
   },
 })
@@ -152,12 +152,12 @@ export const delBox = mutation({
   args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
   returns: v.nullable(BoxDeletion),
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof BoxDeletion> | null> => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
-    if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
+    if (vaultRow?.vault_tok !== expected.vault_tok) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
     if (! standing) { return { outcome: 'absent' } }
     await ctx.db.delete('safebyok_boxes', standing._id)
-    await Tallies.forget(ctx.db, vaultProps._id, standing)
+    await Tallies.forget(ctx.db, vaultRow._id, standing)
     // An empty revision reads as none, as the client lists a damaged box holding one.
     const standingRevision = standing.revision_tok === '' ? null : standing.revision_tok
     return { outcome: standingRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
@@ -174,14 +174,14 @@ export const delVault = mutation({
   args:    { ...VaultScope.fields, expected: VaultDelExpectation },
   returns: v.nullable(VaultTombstone),
   handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof VaultTombstone> | null> => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
-    if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
-    if (expected.gate_epoch !== null && vaultProps.gate_epoch !== expected.gate_epoch) { return null }
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
+    if (vaultRow?.vault_tok !== expected.vault_tok) { return null }
+    if (expected.gate_epoch !== null && vaultRow.gate_epoch !== expected.gate_epoch) { return null }
     const boxes = await vaultBoxRows(ctx.db, scope)
     await Promise.all(boxes.map((row) => ctx.db.delete('safebyok_boxes', row._id)))
-    await Tallies.drop(ctx.db, vaultProps._id)
-    await ctx.db.delete('safebyok_vaults', vaultProps._id)
-    const tombstone = { format: 'safebyok-tombstone-v1' as const, ...scope, vault_epoch: vaultProps.vault_epoch + 1 }
+    await Tallies.drop(ctx.db, vaultRow._id)
+    await ctx.db.delete('safebyok_vaults', vaultRow._id)
+    const tombstone = { format: 'safebyok-tombstone-v1' as const, ...scope, vault_epoch: vaultRow.vault_epoch + 1 }
     await ctx.db.insert('safebyok_vault_tombstones', tombstone)
     return tombstone
   },
@@ -195,11 +195,11 @@ export const watchVault = query({
   args:    { ...VaultScope.fields },
   returns: VaultSignature,
   handler: async (ctx, scope) => {
-    const vaultProps = await findVaultRecordRow(ctx.db, scope)
+    const vaultRow = await findVaultRecordRow(ctx.db, scope)
     const boxes = await vaultBoxRows(ctx.db, scope)
     return {
-      vault_tok:  vaultProps?.vault_tok ?? null,
-      gate_epoch: vaultProps?.gate_epoch ?? null,
+      vault_tok:  vaultRow?.vault_tok ?? null,
+      gate_epoch: vaultRow?.gate_epoch ?? null,
       boxes:      boxes.map((row) => [row.boxlabel, row.revision_tok]),
     }
   },
@@ -254,7 +254,7 @@ const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_boxes'>, ro
 }
 
 /** A vault row as the vault record it holds: Convex's system fields stripped. */
-const vaultRecordOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_vaults'>): VaultRecord => vaultProps
+const vaultRecordOfRow = ({ _id, _creationTime, ...vaultRecord }: Doc<'safebyok_vaults'>): VaultRecord => vaultRecord
 
 /** A box row as the record it holds: system fields and scope columns stripped. */
 const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {

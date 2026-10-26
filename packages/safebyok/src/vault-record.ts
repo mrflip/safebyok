@@ -134,6 +134,12 @@ export type GateRecord = Z.infer<typeof GateRecord>
  */
 export type VaultRecord = Z.infer<typeof VaultRecord>
 
+/** A vault record as storage may hold it, which may fail its check: to the compiler a {@link VaultRecord} as written, to a reader the outcome a damaged one is.
+ * It names what a VaultDB's `doGetVault` may hand up as `vault`, beside a sound record, a
+ * tombstone, and null: present, dead, broken, missing. The base class's check tells them apart.
+ */
+export type DamagedVaultRecord = Z.input<typeof VaultRecord>
+
 /** A vault record without its gate: its stamp and both epochs. What a log line, a refusal's meta, `demandConsistentWith` and `Box.make` take, wherever the gate is not needed.
  *
  * @example { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at, vault_epoch: 3, gate_epoch: 2 }

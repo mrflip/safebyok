@@ -124,7 +124,7 @@ describe("postgresVaultDB, as the README has it", () => {
     await TH.unlock(second, 'correct horse battery staple')
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
-    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
+    expect(second.getSnapshot().boxes.map((box) => box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     TH.closeVault(second)
@@ -380,7 +380,7 @@ describe("postgresVaultDB, what it stores", () => {
     await TH.expectingGood(vaultDB).putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
     const sidecar = { alpha: 'café', zeta: 1, be: [true, null] }
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar }))
-    expect(await TH.expectingGood(vaultDB).getVault(u1)).to.deep.equal({ vaultProps: TH.vaultRecordOf('u1'), boxes: await TH.boxesOf(vaultDB, u1) })
+    expect(await TH.expectingGood(vaultDB).getVault(u1)).to.deep.equal({ ...TH.vaultRecordOf('u1'), boxes: await TH.boxesOf(vaultDB, u1), damagedBoxes: [] })
   })
 
   it("names the vault record standing when an update misses, from its one statement: the winner's, or none", async () => {
@@ -628,19 +628,18 @@ describe("postgresVaultDB, getVaultRecords", () => {
     const records = await TH.expectingGood(vaultDB).getVaultRecords(u1)
     const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('anthropic', 'one')
     const { box_key_wrapped: _wrappedToo, whisper_ciphered: _cipheredToo, ...listedEmptied } = emptied
-    expect(records?.vaultProps).to.deep.equal(TH.vaultRecordOf('u1'))
+    expect(TH.recordOfRead(records!)).to.deep.equal(TH.vaultRecordOf('u1'))
     expect(records?.boxes).to.have.deep.members([listed, listedEmptied])
   })
 
-  it("is what a browser's VaultDB may hand back from its doGetVault, where getVault's summaries are not", async () => {
+  it("hands back what getVault does, each box with its format, for a server to relay to a browser's VaultDB", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     const records = await TH.expectingGood(vaultDB).getVaultRecords(u1)
     expect(records?.boxes[0]).to.have.property('format', 'safebyok-box-v8')
-    const [summary] = await TH.boxesOf(vaultDB, u1)
-    expect(summary).to.not.have.property('format')
+    expect(records).to.deep.equal(await TH.expectingGood(vaultDB).getVault(u1))
   })
 
   it("refuses a malformed scope with bad_scope, before the database is asked", async () => {
@@ -716,7 +715,7 @@ describe("postgresVaultDB, in trouble", () => {
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     await db.query(`UPDATE safebyok_boxes SET revision_tok = ''`)
-    expect(await TH.boxesOf(vaultDB, u1)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: null }])
+    expect(await TH.damagedBoxesOf(vaultDB, u1)).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
     expect(await TH.boxesOf(vaultDB, u1)).to.have.lengthOf(0)
   })

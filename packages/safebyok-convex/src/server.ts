@@ -112,10 +112,10 @@ export class SafebyokComponent {
         },
       }),
       putVaultRecord: publicMutation({
-        args:    { vaultProps: VaultRecord, expected: VaultRecordExpectation },
+        args:    { vaultRecord: VaultRecord, expected: VaultRecordExpectation },
         returns: PutVaultRecordAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.vaultProps.user_id)
+          await mustBe(ctx, args.vaultRecord.user_id)
           return await ctx.runMutation(vaults.putVaultRecord, args)
         },
       }),

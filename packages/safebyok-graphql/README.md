@@ -147,11 +147,13 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault's boxes as stored
-records, their two ciphered fields left out. A VaultDB's own `getVault` and `ensureVault` give
-summaries instead -- the shape a vault shows, without `format` -- which the browser's VaultDB may
-not hand back from its own listing. A
-vault read is one query, its record and its boxes from one step of the server's VaultDB.
+`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault checked and split:
+its record, its sound boxes without their two ciphered fields, and its damaged boxes apart. The
+resolvers carry it as `SafebyokVault`, `{ vault, boxes, damagedBoxes }`, the shape a VaultDB's half
+answers, so the browser's VaultDB passes it through (rebuilding each record from its own fields,
+which leaves GraphQL's `__typename` behind), and its base class checks each sound box again and
+parses the server's word on each damaged one. A vault read is one query, its record and its boxes
+from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
 Every stored field is non-null in the schema but the vault record's `gate`, null while a vault
@@ -219,7 +221,8 @@ by, exactly as safebyok wrote it:
 | `SafebyokGate`           | the vault's ways in: its `passphrase` and its `passkey` or null   |
 | `SafebyokBox`            | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
 | `SafebyokVaultTombstone` | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
-| `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
+| `SafebyokBoxSparse`  | a sound box as a listing has it: every field but the two encrypted ones |
+| `SafebyokBoxDamaged` | a box whose record does not read back, as a listing has it: its boxlabel, revision and `damage` |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`, as a subscription sends it |
 

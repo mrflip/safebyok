@@ -7,7 +7,7 @@ import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
-import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type VaultReadResponse, splitStoredBoxes, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -81,17 +81,17 @@ class StringStoreVaultDB extends VaultDB {
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
   // read of a vault reads its record and its boxes in one such step.
-  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
-    return soon(() => ({ vaultProps: readJson(this.store, Scopepath.vault(scope)), boxes: this.storedBoxesOf(scope) }))
+  protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
-  protected doEnsureVault(draft: VaultRecord & { gate: null }): Promise<StoredVault> {
+  protected doEnsureVault(draft: VaultRecord & { gate: null }): Promise<VaultReadResponse> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
       const standing = readJson(this.store, vaultScopepath)
       const life = Expectations.newLifeOf(draft, standing)
       if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
-      return { vaultProps: life ?? standing, boxes: this.storedBoxesOf(draft) }
+      return { vault: (life ?? standing) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 
@@ -122,7 +122,8 @@ class StringStoreVaultDB extends VaultDB {
       .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
-      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
+      // A row is handed to the split as stored, whatever it holds: the split judges it.
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) as StoredBox['box'] }))
   }
 
   // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.

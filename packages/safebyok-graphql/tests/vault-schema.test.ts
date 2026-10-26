@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, BoxRecord, GateRecord, VaultRecord, VaultScope } from 'safebyok'
+import { Ciphered, BoxDamaged, BoxRecord, GateRecord, VaultRecord, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -21,7 +21,8 @@ const RecordTypes = [
   ['SafebyokGateInput',          GateRecord,  []],
   ['SafebyokBox',                BoxRecord,   []],
   ['SafebyokBoxInput',           BoxRecord,   []],
-  ['SafebyokListedBox',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxSparse',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxDamaged',         BoxDamaged,  []],
   ['SafebyokCiphered',           Ciphered,    []],
   ['SafebyokCipheredInput',      Ciphered,    []],
 ] as const
