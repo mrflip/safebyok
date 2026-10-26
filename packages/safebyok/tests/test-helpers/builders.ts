@@ -210,10 +210,9 @@ export const freshDbName = (): string => `safebyok_test_${crypto.randomUUID().sl
 /** A Ciphered that opens under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
 export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & VaultKeyWayinWrapped & VaultKeyLeaseWrapped
 
-/**
- * A shape-valid Ciphered that opens nothing, in any ciphered role: for storage-layer tests, which
- * never decrypt. Opening under no key, it is no more one role's than another's, so it fills any
- * ciphered field (a box's `whisper_ciphered`, a wayin's wrap) without a parse.
+/** A shape-valid Ciphered that opens nothing, in any ciphered role: for storage-layer tests, which never decrypt.
+ * Opening under no key, it is no more one role's than another's, so it fills any ciphered field (a
+ * box's `whisper_ciphered`, a wayin's wrap) without a parse.
  *
  * @example fakeCiphered('a1')  // => { cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' }
  * @example boxOf('anthropic', 'a1', { whisper_ciphered: fakeCiphered('SUPERSECRET') })
