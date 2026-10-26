@@ -14,7 +14,9 @@ line moved.
     `try` forms) take `(bag, opts?: BankVaultOpts)`; `closeVault`, `entryOf` take `(bag)`. The bag
     type is written out, `Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>`. One validator,
     `vaultBag` (module-level, `bad_scope`, strips), then two checks after the parse:
-    `checkNoStoresIn` (a `vaultDB`/`deviceDB` in the first bag refuses `bad_option`) and
+    `checkNoStoresIn` (any field of the first bag named as a store is, ending `db` in any case --
+    `vaultDB`, a misspelt `vaultDb` -- refuses `bad_option`, `Phrases.storesInBag`; names only,
+    never values, so a Vault object's own `getSnapshot`/`subscribe` pass) and
     `#demandSameScope` (the comparison with `bank.scope`, `bad_scope`, `meta.fieldnames`, no
     values). Public `bank.demandConsistentWith(thing)` parses with `bankBag` and makes the same
     comparison. `VaultChoice` is gone; `VaultDraft` is `BankVaultOpts` (`{ vaultDB?, deviceDB? }`,
@@ -55,7 +57,12 @@ line moved.
 * **Deviations**:
   * `checkNoStoresIn` is a check beyond the preplan: without it, a host's old
     `ensureVault({ ..., vaultDB })` would be stripped and birth the vault in the bank's default
-    store. Two-way door; listed as an open matter.
+    store. Two-way door; listed as an open matter. Widened at review (the orchestrator's YOLO
+    call) from the two exact names to any field ending `db`, case-insensitively, so a misspelt
+    `vaultDb` refuses too.
+* **At review**: the reviewer fixed `BankProvider` handing the last user's bank down for one
+  render after `user_id` changed (7a13c2a0); four adapter `@example`s (convex, graphql,
+  indexeddb, fastkey) brought to `Bank.make({ ..., user_id })` and `ensureVault({ vaultlabel })`.
 * **Discoveries**:
   * TypeScript's excess-property check catches `{ ...bag, vaultDB }` at a literal call, not a
     spread variable or plain JS: hence the runtime check.
