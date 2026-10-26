@@ -443,19 +443,19 @@ export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof Declared
  *
  * @returns The most the adapter holds of one vault, in the finite form the vault keeps.
  */
-export const checkLimitsFit = (vaultDB: VaultDB, whisperByteLimit: number, boxLimit: number): number => {
+export const checkLimitsFit = (vaultDB: VaultDB, limits: { maxWhisperBytes: number, maxBoxes: number }): number => {
   const recordBytes = parseDeclared(vaultDB, 'maxRecordBytes')
-  if (whisperByteLimit * StoredBytesPerWhisperByte > recordBytes) {
+  if (limits.maxWhisperBytes * StoredBytesPerWhisperByte > recordBytes) {
     throw new VaultError('bad_option', `maxWhisperBytes is over half of the ${String(recordBytes)} bytes this storage adapter holds in one record, so a whisper that large might not store: pass a smaller maxWhisperBytes.`)
   }
   const vaultBytes = parseDeclared(vaultDB, 'maxVaultBytes')
-  const boxBytes = (whisperByteLimit * StoredBytesPerWhisperByte) + BoxFieldsBytes
-  if (boxLimit * boxBytes <= vaultBytes) { return vaultBytes }
+  const boxBytes = (limits.maxWhisperBytes * StoredBytesPerWhisperByte) + BoxFieldsBytes
+  if (limits.maxBoxes * boxBytes <= vaultBytes) { return vaultBytes }
   const fitting = Math.floor(vaultBytes / boxBytes)
   const outcome = fitting === 0
     ? 'At that maxWhisperBytes, not even one box fits: pass a smaller maxWhisperBytes.'
     : `At that maxWhisperBytes, at most ${String(fitting)} boxes fit: pass a smaller maxBoxes or maxWhisperBytes.`
-  throw new VaultError('bad_option', `${String(boxLimit)} boxes (maxBoxes) of up to ${String(whisperByteLimit)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
+  throw new VaultError('bad_option', `${String(limits.maxBoxes)} boxes (maxBoxes) of up to ${String(limits.maxWhisperBytes)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
 }
 
 /** Bank.make's options as {@link parseMakeBankOpts} hands them back: each checked, and read into the form the bank keeps for its vaults. */
@@ -472,7 +472,7 @@ export type ParsedBankOpts = {
   keyDeriver:       KeyDeriver
   /** The host's checker, checked: each vault guards it under its own scope. */
   strengthChecker:  StrengthChecker
-  whisperByteLimit: number
+  maxWhisperBytes:  number
   /** `maxBoxes` as given, held to each vault's vaultDB at its birth. */
   maxBoxes:         number | undefined
 }
@@ -503,18 +503,20 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const requestCleartext = parseRequestCleartext(opts.requestCleartext, logger)
   const clock = parseClock(opts.clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
-  const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
+  const limits = { maxWhisperBytes: parseMaxWhisperBytes(opts.maxWhisperBytes), maxBoxes: opts.maxBoxes }
   // Held to the default vaultDB now, so misuse is refused at Bank.make, not at the first birth.
-  limitsOf(vaultDB, whisperByteLimit, opts.maxBoxes)
-  return { applabel, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, whisperByteLimit, maxBoxes: opts.maxBoxes }
+  limitsOf(vaultDB, limits)
+  return { applabel, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, maxWhisperBytes: limits.maxWhisperBytes, maxBoxes: limits.maxBoxes }
 }
 
 /** What each vault is made of: the bank's parts, its own scope and stores, and its limits as held to its own vaultDB. */
 export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'strengthChecker' | 'maxBoxes'> & {
   scope:            VaultScope
   strengthChecker:  GuardedStrengthChecker
-  boxLimit:         number
-  vaultByteLimit:   number
+  /** The most boxes the vault holds: `maxBoxes` as given, or its default, held to the vaultDB's own. */
+  maxBoxes:         number
+  /** The most bytes the vaultDB holds of the vault, in the finite form the vault keeps. */
+  maxVaultBytes:    number
 }
 
 /** The parts of the vault `draft` names, under `bank`, checked before storage is touched: 'bad_scope' for a name that fails its check, 'bad_option' for anything else.
@@ -526,16 +528,15 @@ export const parseVaultDraft = (draft: VaultDraft, bank: ParsedBankOpts): VaultP
   const scope = CX.vaultScope.parse({ applabel: bank.applabel, user_id: checked.user_id, vaultlabel: checked.vaultlabel })
   const vaultDB = checked.vaultDB === undefined ? bank.vaultDB : parseVaultDB(checked.vaultDB)
   const deviceDB = checked.deviceDB === undefined ? bank.deviceDB : parseDeviceDB(checked.deviceDB)
-  const { boxLimit, vaultByteLimit } = limitsOf(vaultDB, bank.whisperByteLimit, bank.maxBoxes)
+  const limits = limitsOf(vaultDB, bank)
   const { applabel: _applabel, maxBoxes: _maxBoxes, ...shared } = bank
-  return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), boxLimit, vaultByteLimit }
+  return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), maxBoxes: limits.maxBoxes, maxVaultBytes: limits.maxVaultBytes }
 }
 
-/** The box and byte limits a vault keeps over `vaultDB`: `maxBoxes` given, or the default, held with `whisperByteLimit` to what the adapter declares. */
-const limitsOf = (vaultDB: VaultDB, whisperByteLimit: number, maxBoxesGiven: number | undefined) => {
-  const boxLimit = parseMaxBoxes(maxBoxesGiven, parseDeclared(vaultDB, 'maxBoxes'))
-  const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { boxLimit, vaultByteLimit }
+/** The box and byte limits a vault keeps over `vaultDB`: `given.maxBoxes`, or the default, held with `given.maxWhisperBytes` to what the adapter declares. */
+const limitsOf = (vaultDB: VaultDB, given: Pick<ParsedBankOpts, 'maxWhisperBytes' | 'maxBoxes'>): Pick<VaultParts, 'maxBoxes' | 'maxVaultBytes'> => {
+  const boxes = parseMaxBoxes(given.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
+  return { maxBoxes: boxes, maxVaultBytes: checkLimitsFit(vaultDB, { maxWhisperBytes: given.maxWhisperBytes, maxBoxes: boxes }) }
 }
 
 /** Refuse ('insecure_context') a page the platform says is not a secure context, where a browser withholds WebCrypto.

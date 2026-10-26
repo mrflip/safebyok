@@ -817,9 +817,9 @@ export class Vault {
   readonly #clock: Clock
   readonly #keyDeriver: KeyDeriver
   readonly #strengthChecker: GuardedStrengthChecker
-  readonly #whisperByteLimit: number
-  readonly #boxLimit: number
-  readonly #vaultByteLimit: number
+  readonly #maxWhisperBytes: number
+  readonly #maxBoxes: number
+  readonly #maxVaultBytes: number
   // The bank's ear for a Vault object that went gone of itself: deleted, or found deleted or made anew.
   readonly #onGone: (refusal: VaultError) => void
 
@@ -844,9 +844,9 @@ export class Vault {
     this.#clock = parts.clock
     this.#keyDeriver = parts.keyDeriver
     this.#strengthChecker = parts.strengthChecker
-    this.#whisperByteLimit = parts.whisperByteLimit
-    this.#boxLimit = parts.boxLimit
-    this.#vaultByteLimit = parts.vaultByteLimit
+    this.#maxWhisperBytes = parts.maxWhisperBytes
+    this.#maxBoxes = parts.maxBoxes
+    this.#maxVaultBytes = parts.maxVaultBytes
     this.#onGone = onGone
     this.#vaultProps = frozenVaultProps(born.vaultProps)
     this.#deviceId = born.record.device_id
@@ -1546,15 +1546,15 @@ export class Vault {
    * The whisper's room is {@link StoredBytesPerWhisperByte} bytes for each byte of `maxWhisperBytes`.
    */
   #boxWeight(boxlabel: string) {
-    return (this.#whisperByteLimit * StoredBytesPerWhisperByte) + BoxFixedBytes + jsonBytes([this.#scope, boxlabel])
+    return (this.#maxWhisperBytes * StoredBytesPerWhisperByte) + BoxFixedBytes + jsonBytes([this.#scope, boxlabel])
   }
 
   /** The room the vault has, reckoned from the boxes last listed, as `#checkRoomFor` reckons it. */
   #capacity(): Capacity {
     const bytesUsed = this.#boxes.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
     return {
-      boxes: { used: this.#boxes.length, max: this.#boxLimit },
-      bytes: { used: bytesUsed, max: this.#vaultByteLimit },
+      boxes: { used: this.#boxes.length, max: this.#maxBoxes },
+      bytes: { used: bytesUsed, max: this.#maxVaultBytes },
     }
   }
 
@@ -1563,8 +1563,8 @@ export class Vault {
     const whisperBytes = whisper === undefined ? new Uint8Array() : whisperBytesOf(whisper)
     const weight = whisperBytes.length + new TextEncoder().encode(stableJsonify(sidecar)).length
     whisperBytes.fill(0)
-    if (weight <= this.#whisperByteLimit) { return }
-    throw new VaultError('whisper_too_large', `That whisper and its box's sidecar are over this vault's limit of ${String(this.#whisperByteLimit)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`)
+    if (weight <= this.#maxWhisperBytes) { return }
+    throw new VaultError('whisper_too_large', `That whisper and its box's sidecar are over this vault's limit of ${String(this.#maxWhisperBytes)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`)
   }
 
   /** Refuse 'vault_full' for a new box while the vault holds `maxBoxes`, or one that would take it past `maxVaultBytes`.
@@ -1576,12 +1576,12 @@ export class Vault {
     // A replacement weighs what it replaces, so it never makes the vault fuller: it always lands.
     if (base !== null) { return }
     const others = this.#boxes.filter((box) => box.boxlabel !== boxlabel)
-    if (others.length >= this.#boxLimit) {
-      throw new VaultError('vault_full', `This vault already holds its limit of ${String(this.#boxLimit)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`)
+    if (others.length >= this.#maxBoxes) {
+      throw new VaultError('vault_full', `This vault already holds its limit of ${String(this.#maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`)
     }
     const othersWeight = others.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
-    if (othersWeight + this.#boxWeight(boxlabel) > this.#vaultByteLimit) {
-      throw new VaultError('vault_full', `This vault has no room for that box in the ${String(this.#vaultByteLimit)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`)
+    if (othersWeight + this.#boxWeight(boxlabel) > this.#maxVaultBytes) {
+      throw new VaultError('vault_full', `This vault has no room for that box in the ${String(this.#maxVaultBytes)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`)
     }
   }
   // --
