@@ -127,3 +127,23 @@ Who reads this: threads 6, 8, 10 and 13.
 * Every read-back site refuses a misnamed record as its own kind, pinned by a test (the Coach's
   TODO entry, settled); a lease stays `corrupt_record`.
 * `gh pr create` and `gh pr ready` both went through for this thread.
+
+## From thread 6 (names, #277)
+
+Who reads this: threads 7, 9, 11 and 12.
+
+* **Renamed**: `user_id` everywhere (a draft naming `userId` refuses `bad_option` naming
+  `user_id`); `PasskeyAnswer` is `{ credential_id, prf_salt_b64, prfBytes }`; `ask_passphrase_at`
+  on the snapshot and the Vault object's getter (thread 11 decides the getter); resolved limits
+  `maxWhisperBytes`, `maxBoxes`, `maxVaultBytes` (`VaultParts` has the last two, `ParsedBankOpts`
+  the first).
+* **Wire arguments are flat**: Convex's component and host wrapper, GraphQL's root fields and
+  client take `applabel`, `user_id`, `vaultlabel` as their own arguments; `SafebyokVaultScopeInput`
+  is gone. Seven Convex functions `mustBe(ctx, args.user_id)` and pass the same `args` on;
+  `ensureVault` and `putVaultProps` check the record's own `user_id` (they carry records). The
+  Postgres route recipe keeps positional `args: [scope, ...]`.
+* **For thread 7**: the bank's calls take `user_id` and `BankProvider`'s prop is `user_id`;
+  `Bank.make`'s doc block still says it refuses `user_id`, which the draft takes: thread 7 moves it.
+* **For thread 9**: the "stamp" wording was deferred to it (today's `Stamp` type holds the epochs).
+* **A blanket rename can collapse a comparison** (`user_id !== user_id` happened once;
+  `noUnusedLocals` caught it): grep for tautologies after any sweep.

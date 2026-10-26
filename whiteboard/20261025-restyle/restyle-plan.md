@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 5 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#276](https://github.com/mrflip/safebyok/pull/276)); thread 6 under way.
+* **Status:** threads 1 to 5 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#276](https://github.com/mrflip/safebyok/pull/276)); thread 6 built ([#277](https://github.com/mrflip/safebyok/pull/277)), in review.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -334,7 +334,9 @@ run long, they are a thread of their own (8b), the core's change first.
 bound (`[vaultStamp, boxStamp]`), the vault's stamp without its `format` in a box's and a lease's,
 `registered_at` bound (crypto.ts:65's example made true), the encoding kept (`stableJsonify`,
 undefined or null refused). VOCABULARY's `ctx`, **visible** and **unencrypted** rows are
-reworded in terms of stamps (*Orchestrator, from thread 1*). Every existing vault becomes unreadable: the changeset says so plainly
+reworded in terms of stamps (*Orchestrator, from thread 1*). The "stamp" wording in doc blocks for
+"bound", "authentics" and "binding" (*Preplan*, *Names*) is this thread's too, once today's
+`Stamp` type (which holds the epochs) is gone (*Orchestrator, from thread 6*). Every existing vault becomes unreadable: the changeset says so plainly
 (pre-1.0). The `notes/security.md` entry through a `sonnet` subagent, as CLAUDE.md says. This is
 cryptographic construction: follow what is in `src/` and the preplan, add no new primitive, and
 stop and report if the preplan's ctx seems to need one. **Depends on:** thread 8. **Look-ahead:**
