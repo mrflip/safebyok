@@ -158,7 +158,7 @@ export const withinVaultScopepathPrefix = (scope: VaultScope): string => {
  * It is a test of the prefix alone: a row under the vault's prefix that {@link isBox} rejects
  * passes it, so a vault's deletion erases that row too.
  *
- * @example store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))   // the scopepath of each box of the vault
+ * @example store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))   // each row under the vault's prefix: test each with isBox before boxscope
  */
 export const withinVaultScopepathPred = (scope: VaultScope): ScopepathPred => {
   const prefix = withinVaultScopepathPrefix(scope)

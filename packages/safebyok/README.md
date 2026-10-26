@@ -247,7 +247,7 @@ import { Scopepath } from 'safebyok'
 Scopepath.vault(scope)                          // 'vault^acme^u1^main'
 Scopepath.box({ ...scope, boxlabel: 'openai' }) // 'box^acme^u1^main^openai'
 Scopepath.withinVaultScopepathPrefix(scope)     // 'box^acme^u1^main^' -- every box of the vault, by prefix scan or key range
-store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))  // every box of the vault, from a list of every key
+store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))  // every row under the vault's prefix, from a list of every key
 Scopepath.isBox(row) ? Scopepath.boxscope(row).boxlabel : null  // a listed row's boxlabel; null for a row no box is filed under
 ```
 
