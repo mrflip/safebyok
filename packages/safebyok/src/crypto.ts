@@ -77,10 +77,10 @@ export const cipherCtx = (stamp: CipherCtxRecord | readonly CipherCtxRecord[], p
   return new TextEncoder().encode(stableJsonify(parts))
 }
 
-/** True when `part` is undefined or null, or a record with a field set to undefined: what its type forbids and a caller may still hand in. */
+/** True when `part` is undefined or null, or a record with a field set to undefined or null: what its type forbids and a caller may still hand in. */
 const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean => (
   part === undefined || part === null
-  || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined))
+  || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).some((val) => val === undefined || val === null))
 )
 
 /** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new vaultKey.

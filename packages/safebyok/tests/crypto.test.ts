@@ -80,6 +80,13 @@ describe("cipherCtx", () => {
     TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding), 'bad_option')
   })
 
+  it("refuses a record holding a field set to null as bad_option, as it does one set to undefined", () => {
+    const holding = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
+    TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'), 'bad_option')
+    TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'), 'bad_option')
+    TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord), 'bad_option')
+  })
+
   it("refuses a stamp, a purpose or a header that is undefined or null as bad_option, rather than treating it as null", () => {
     for (const missing of [undefined, null]) {
       const part = missing as unknown as CipherCtxRecord
