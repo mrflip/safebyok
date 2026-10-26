@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 4 filed ([#272](https://github.com/mrflip/safebyok/pull/272), [#273](https://github.com/mrflip/safebyok/pull/273), [#274](https://github.com/mrflip/safebyok/pull/274), [#275](https://github.com/mrflip/safebyok/pull/275)); thread 5 built ([#276](https://github.com/mrflip/safebyok/pull/276)), in review.
+* **Status:** threads 1 to 5 filed ([#272](https://github.com/mrflip/safebyok/pull/272), [#273](https://github.com/mrflip/safebyok/pull/273), [#274](https://github.com/mrflip/safebyok/pull/274), [#275](https://github.com/mrflip/safebyok/pull/275)), [#276](https://github.com/mrflip/safebyok/pull/276) for thread 5; thread 6 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -229,6 +229,14 @@ Exported from `index.ts`. The skip-a-malformed-row behaviour stays (a `safeParse
 site), and each read-back site's re-throw is named in the PR; the TODO entry is settled by this
 PR (the Coach's own TODO.md edit is theirs to drop). **Depends on:** thread 4. **Look-ahead:**
 thread 13's `bank.vaultOf` keys a map by scopepath. **Size:** medium.
+
+*Review:* medium, `fixed`. Fixed: `withinVaultScopepathPred`'s `@example` (and the README's line)
+now tests each row with `isBox` before `boxscope`; `localVaultDB` names a row `scopepath` until
+`isBox` passes it. Checked and holding: stored strings unchanged; the prefix ends in `^`; the
+device-shelf sweep can delete only rows no accepted scope could file. Left: capacity counts a row
+the listing skips (an Open Matter); double parses per row (legibility wins); `isU1Box` and two
+test locals named `isBox` for the prefix test; VOCABULARY's `ckey` row (#272); a blank line in
+`box-range.test.ts`. Filed as [#276](https://github.com/mrflip/safebyok/pull/276).
 
 ### 6. One name for one thing (Preplan Phase 3, names) -- `names`
 
