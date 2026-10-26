@@ -33,7 +33,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  */
 export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, rec, custom }) => {
   const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, whisperBag]))
-  const whisperBag = custom<Record<string, unknown>>(isPlainBag, 'a whisper object must be a plain object').pipe(rec(str, whisperJson))
+  const whisperBag = custom<Record<string, unknown>>(isPlainBag, "a whisper object must be a plain object").pipe(rec(str, whisperJson))
   const whisperArr = arr(whisperJson)
   const Whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, whisperBag])
   return { Whisper, whisperBag }
@@ -368,7 +368,7 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, str, int, lit, cu
     /** The vault props' `gate_epoch` when this lease was granted: a mismatch voids it. */
     gate_epoch:        int.positive(),
     /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable, usable only to unwrap what it wrapped. */
-    lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle'),
+    lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, "a CryptoKey handle"),
     /** The vaultKey, wrapped under the leaseKey. */
     vault_key_lease_wrapped: Ciphered,
     /** The instant from which the lease no longer counts, and the vault asks for a proof. */
