@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); threads 2 and 3 filed ([#273](https://github.com/mrflip/safebyok/pull/273), [#274](https://github.com/mrflip/safebyok/pull/274)); thread 4 built ([#275](https://github.com/mrflip/safebyok/pull/275)), in review.
+* **Status:** thread 1 filed ([#272](https://github.com/mrflip/safebyok/pull/272)); threads 2 to 4 filed ([#273](https://github.com/mrflip/safebyok/pull/273), [#274](https://github.com/mrflip/safebyok/pull/274)); thread 4 filed ([#275](https://github.com/mrflip/safebyok/pull/275)); thread 5 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -192,6 +192,14 @@ where a doc block can say what each is for, or leave each to its first user and 
 it with the aliases. Tree-shaking is per module, not per `Validator` call, so the folder split is
 where finer granularity comes, if a module boundary earns it; say what moved each size line.
 
+*Review:* medium, `fixed`. Fixed: fakeCiphered's doc block opening; a test for its second
+`@example`; the cleartext test now checks the refusal quotes nothing. Left: the passphrase
+refusal gained a `meta` and `safebyok/testing` gained `FakeCiphered`, neither in the changeset
+(wrap-up adds a clause each); `StampShape` and the `vault-db.ts` expectations still check
+`vault_tok` with `str.min(1)` (thread 8). Noticed and outside the thread: the `FarFuture` test
+covers only an exact deadline where its doc block says within a minute; `EpochMillisCases`' columns
+are out of line (wrap-up, or a TODO). Filed as [#275](https://github.com/mrflip/safebyok/pull/275).
+
 ### 5. Scopepath replaces Ckeys (Preplan Phase 2) -- `scopepath`
 
 > 2. **Scopepath replaces Ckeys.** `Scopepath` goes public (`Scopepath.Delimiter`). It gains
@@ -300,7 +308,9 @@ single record replaces `VaultProps`' union of two strict objects (whose refusal 
 render the stored-record format snapshots with `io: 'input'`, so strictness shows in the guard;
 write where the stored shapes are described that any new device-record field bumps `format` (a
 strict device record with an unknown field is discarded with its rollback watermark); move
-`Wayin.make`'s `damaged_wayin` cause from a raw ZodError to a re-thrown `bad_record`.
+`Wayin.make`'s `damaged_wayin` cause from a raw ZodError to a re-thrown `bad_record`. Every `vault_tok` check uses
+the `vault_tok` validator (`StampShape` in box.ts and the expectations in vault-db.ts still use
+`str.min(1)`; #275's review).
 **Depends on:** thread 7. **Look-ahead:** thread
 9 binds `VaultStamp`, `BoxStamp` and `LeaseStamp` into each ctx; thread 10's reads answer
 `VaultRecord`; thread 11's Vault object `implements VaultStamp`. **Size:** large; if the adapters
