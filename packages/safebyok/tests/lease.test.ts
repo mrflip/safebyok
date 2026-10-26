@@ -179,6 +179,7 @@ describe("Lease.make", () => {
     [{ format: 'safebyok-lease-v2' },              'a format this version does not write'],
     [{ gate_epoch: 0 },                            'a gate_epoch below one'],
     [{ vault_tok: '' },                            'an empty vault_tok'],
+    [{ vaultlabel: 'Main' },                       "a vaultlabel that fails its check, never as the check's bad_scope"],
   ] as const
 
   for (const [spoil, blurb] of MangledCases) {

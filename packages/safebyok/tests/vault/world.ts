@@ -4,15 +4,18 @@ import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
 import type { KeyDeriver } from '../../src/key-deriver'
-import * as Ckeys from '../../src/ckeys'
+import * as Scopepath from '../../src/scopepath'
 import * as TH from '../test-helpers'
 
 /** Where the vault each world opens, `u1`'s `main`, files its props and each of its boxes. */
-export const u1VaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
+export const u1VaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
 
-export const u1BoxCkey = (boxlabel: string) => Ckeys.box(TH.scopeOf('u1'), boxlabel)
+export const u1BoxScopepath = (boxlabel: string) => Scopepath.box({ ...TH.scopeOf('u1'), boxlabel })
 
-export const isU1Box = Ckeys.isBoxIn(TH.scopeOf('u1'))
+/** Where a row of `u1`'s `main` under `boxlabel` sits, unchecked: for planting a row under a name no maker would file. */
+export const u1PlantedScopepath = (boxlabel: string) => Scopepath.withinVaultScopepathPrefix(TH.scopeOf('u1')) + boxlabel
+
+export const isU1Box = Scopepath.withinVaultScopepathPred(TH.scopeOf('u1'))
 
 /** An unsubscribe with nothing to undo. */
 export const silence = (): void => undefined
@@ -97,23 +100,23 @@ export const uncheckingDeviceDB = () => {
 
 /** The stored row of the box `boxlabel`, as the backend holds it. */
 export const storedRowOf = (world: ReturnType<typeof makeWorld>, boxlabel: string): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1BoxCkey(boxlabel)) ?? 'null') as Record<string, unknown>
+  JSON.parse(world.dbStore.read(u1BoxScopepath(boxlabel)) ?? 'null') as Record<string, unknown>
 )
 
 /** The vault's stored props, as the backend holds them. */
 export const storedVaultPropsOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? 'null') as Record<string, unknown>
+  JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as Record<string, unknown>
 )
 
 /** The ckeys of every row `userId`'s vault has in storage: its vault props and its boxes. */
 export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
-  world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.vaultProps(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
+  world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(userId)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(userId))(ckey))
 )
 
 /** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */
 export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
-  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as Record<string, Record<string, unknown>>
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
+  const vaultProps = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as Record<string, Record<string, unknown>>
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
 }
 
 /** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
@@ -122,7 +125,7 @@ export const damagedVaultWorld = async () => {
   const vault = await world.openUnlocked('pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
 }
 
@@ -173,8 +176,8 @@ export const rolledBackWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await addLaptopPasskey(vault)
-  const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  const older = world.dbStore.read(u1VaultScopepath) ?? ''
   await TH.delWayin(vault, 'pw')
-  const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  const newer = world.dbStore.read(u1VaultScopepath) ?? ''
   return { world, vault, older, newer }
 }

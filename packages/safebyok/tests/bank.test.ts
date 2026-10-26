@@ -14,7 +14,7 @@ import { type MakeBankOpts, type VaultDraft, parseMakeBankOpts, parseVaultDraft 
 import type { Gating } from '../src/gating'
 import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
-import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
+import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: U1, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
 
@@ -313,7 +313,7 @@ const supportConfirmedTheRestore = () => true
 const behindWorld = async () => {
   const { world, vault, older } = await rolledBackWorld()
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultPropsCkey, older)
+  world.dbStore.write(u1VaultScopepath, older)
   return { world, olderEpoch: (JSON.parse(older) as { vault_epoch: number }).vault_epoch }
 }
 

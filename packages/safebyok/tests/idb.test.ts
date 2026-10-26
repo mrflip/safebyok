@@ -6,7 +6,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { idbDeviceDB, inspectIdbDeviceDB, type IdbOpts } from '../src/idb'
 import * as Entry from '../src/idb'
 import { VaultError } from '../src/errors'
-import * as Ckeys from '../src/ckeys'
+import * as Scopepath from '../src/scopepath'
 import * as TH from './test-helpers'
 
 /**
@@ -81,7 +81,7 @@ describe("idbDeviceDB, reading a lease it cannot read", () => {
   it("discards a row that will not read back as a lease, and answers none", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
-    await set(Ckeys.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
+    await set(Scopepath.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
     const found = await TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
     expect(found).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
@@ -91,7 +91,7 @@ describe("idbDeviceDB, reading a lease it cannot read", () => {
   it("never discards a lease written after the unreadable row it found: a putLease made as the read began stands", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
-    await set(Ckeys.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
+    await set(Scopepath.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
     const lease = await TH.leaseOf('u1')
     // The read is made first, so it finds the mangled row; the write is made at once after, and
     // lands after it: the discard the read follows with must not take the new lease with it.
@@ -223,7 +223,7 @@ describe("idbDeviceDB", () => {
     }
   })
 
-  it("sweeps a lease filed under an earlier version's ckey at the first read, never reading it", async () => {
+  it("sweeps a lease filed under an earlier version's key at the first read, never reading it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
@@ -235,14 +235,14 @@ describe("idbDeviceDB", () => {
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     try {
       expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
-      expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u1'))])
+      expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u1'))])
       expect(getAlls).to.have.callCount(0)
       expect(cursors).to.have.callCount(0)
     } finally {
       vi.restoreAllMocks()
     }
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("sweeps them at an erase too, keeping every lease it filed", async () => {
@@ -254,7 +254,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.delLease(TH.scopeOf('u3'))
     expect(await deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("discards a device's lease from before the rename, filed under unlock^, keeping its device record: the user proves once more", async () => {
@@ -262,7 +262,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
-    // Even a record that would read today is swept unread: its ckey is not one this version files.
+    // Even a record that would read today is swept unread: its key is not a scopepath this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
     expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
@@ -270,7 +270,7 @@ describe("idbDeviceDB", () => {
     expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal(TH.deviceRecordOf('u1'))
   })
 
-  it("keeps every device record through a sweep: a device record's ckey is one this version files", async () => {
+  it("keeps every device record through a sweep: a device record's scopepath is one this version files", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
@@ -278,7 +278,20 @@ describe("idbDeviceDB", () => {
     await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.deviceRecord(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
+  })
+
+  it("sweeps a lease or device record filed under a name no scope check passes, which no read would ever reach", async () => {
+    const dbName = TH.freshDbName()
+    const shelf = createStore(`${dbName}:device_db`, 'records')
+    await set('lease^acme^u1^Main', await TH.leaseOf('u1'), shelf)
+    await set('lease^acme^u1^main^extra', await TH.leaseOf('u1'), shelf)
+    await set('device^acme^u 1^main', TH.deviceRecordOf('u1'), shelf)
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putLease(await TH.leaseOf('u2'))
+    await deviceDB.getLease(TH.scopeOf('u1'))
+    const rows = await inspectIdbDeviceDB({ dbName }).rows()
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("sweeps a device mark an earlier version filed under mark^ at the first read, keeping the device record", async () => {
@@ -289,13 +302,13 @@ describe("idbDeviceDB", () => {
     await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.deviceRecord(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
   })
 
   it("reads a device record that does not pass its check as none, and drops it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    await set(Ckeys.deviceRecord(TH.scopeOf('u1')), { ...TH.deviceRecordOf('u1'), highest_vault_epoch: 'one' }, shelf)
+    await set(Scopepath.device(TH.scopeOf('u1')), { ...TH.deviceRecordOf('u1'), highest_vault_epoch: 'one' }, shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)

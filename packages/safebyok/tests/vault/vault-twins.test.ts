@@ -3,7 +3,7 @@ import { Vault } from '../../src/vault'
 import { VaultError, type RefusalKind } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, vaultWithPasskey, u1VaultPropsCkey, storedVaultPropsOf } from './world'
+import { makeWorld, vaultWithPasskey, u1VaultScopepath, storedVaultPropsOf } from './world'
 
 // == [The pairs]: TwinCases, each X over its tryX
 
@@ -70,7 +70,7 @@ const twinsOf = (vault: Vault, callname: TwinName) => {
 const damagedUnderfoot = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), ...overrides })
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return { world, vault }
 }
 

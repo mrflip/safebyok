@@ -12,7 +12,7 @@ describe("the package's entry point", () => {
       'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxRecord', 'BoxSummary', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'GatedVaultProps', 'GatelessVaultProps', 'Tombstone', 'TombstoneFormat', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
-      'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'raisedDeviceRecord',
+      'VaultDB', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'raisedDeviceRecord',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -24,8 +24,8 @@ describe("the package's entry point", () => {
     }
   })
 
-  it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'deviceRecord', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isDeviceRecord'])
+  it("exports the scopepaths an adapter over a key-value store files rows under, as one namespace", () => {
+    expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {

@@ -8,7 +8,7 @@ import { passphraseCleartext, prf_salt_b64 } from '../src/types/type-aliases'
 import type { Vault } from '../src/vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
-import { addLaptopPasskey, makeWorld, storedVaultPropsOf, u1VaultPropsCkey } from './vault/world'
+import { addLaptopPasskey, makeWorld, storedVaultPropsOf, u1VaultScopepath } from './vault/world'
 
 /** The slice of a vault every record-only way in here is made under: `u1`'s `main` vault, deriving with the test deriver. */
 const slice: TH.VaultSlice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) })
@@ -43,7 +43,7 @@ const lockedWorld = async (opts: { passkey?: boolean } = {}) => {
 
 /** `world`'s stored vault props with `changes` written over them, a Vault object opened on them afresh, and the props as stored. */
 const reopenedWith = async (world: ReturnType<typeof makeWorld>, changes: Record<string, unknown>) => {
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), ...changes }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultPropsOf(world), ...changes }))
   const vault = await world.open()
   return { vault, props: propsOf(world) }
 }

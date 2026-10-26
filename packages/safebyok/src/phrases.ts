@@ -63,13 +63,19 @@ export const unknownFields = (fieldnames: readonly string[]): string => (
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
 // --
 
-// == [Scopepaths]: BankScopepathShape, VaultScopepathShape, BoxScopepathShape
+// == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, DeviceScopepathShape, BoxScopepathShape
 
 /** A bank's scopepath of the wrong shape. */
 export const BankScopepathShape = `A bank's scopepath is 'bank', an applabel and a user_id, joined on ${ScopepathDelimiter}`
 
 /** A vault's scopepath of the wrong shape. */
 export const VaultScopepathShape = `A vault's scopepath is 'vault', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
+
+/** A lease's scopepath of the wrong shape. */
+export const LeaseScopepathShape = `A lease's scopepath is 'lease', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
+
+/** A device record's scopepath of the wrong shape. */
+export const DeviceScopepathShape = `A device record's scopepath is 'device', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
 
 /** A box's scopepath of the wrong shape. */
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`

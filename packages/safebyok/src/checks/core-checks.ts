@@ -24,7 +24,7 @@ export type VaultScopepathFieldname = typeof VaultScopepathFieldnameVals[number]
 export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
 // --
 
-// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, boxScopepath
+// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
 
 /** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
 const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
@@ -38,16 +38,18 @@ const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimi
  * @example CX.vaultScopepath.parse('vault^acme^auth0|x^main')           // ['vault', 'acme', 'auth0|x', 'main']
  * @example CX.vaultScopepath.parse('lease^acme^u1^main')                // throws 'bad_scope': a lease's
  */
-export const { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, boxScopepath } = Validator('bad_scope', ({ obj, str, tuple, lit, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath } = Validator('bad_scope', ({ obj, str, tuple, lit, applabel, user_id, vaultlabel, boxlabel }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
 
-  const bankScopepath  = str.transform(partsOf).pipe(tuple([lit('bank'), applabel, user_id], Phrases.BankScopepathShape))
-  const vaultScopepath = str.transform(partsOf).pipe(tuple([lit('vault'), applabel, user_id, vaultlabel], Phrases.VaultScopepathShape))
-  const boxScopepath   = str.transform(partsOf).pipe(tuple([lit('box'), applabel, user_id, vaultlabel, boxlabel], Phrases.BoxScopepathShape))
+  const bankScopepath   = str.transform(partsOf).pipe(tuple([lit('bank'),   applabel, user_id], Phrases.BankScopepathShape))
+  const vaultScopepath  = str.transform(partsOf).pipe(tuple([lit('vault'),  applabel, user_id, vaultlabel], Phrases.VaultScopepathShape))
+  const leaseScopepath  = str.transform(partsOf).pipe(tuple([lit('lease'),  applabel, user_id, vaultlabel], Phrases.LeaseScopepathShape))
+  const deviceScopepath = str.transform(partsOf).pipe(tuple([lit('device'), applabel, user_id, vaultlabel], Phrases.DeviceScopepathShape))
+  const boxScopepath    = str.transform(partsOf).pipe(tuple([lit('box'),    applabel, user_id, vaultlabel, boxlabel], Phrases.BoxScopepathShape))
 
-  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly(), bankScopepath, vaultScopepath, boxScopepath }
+  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly(), bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath }
 })
 
 /** What names a bank: the app's label and the signed-in user's id. */

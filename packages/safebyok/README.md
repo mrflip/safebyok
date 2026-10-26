@@ -238,21 +238,24 @@ contract's numbered lines. Give it `makeDevices` -- devices over one backend, ea
 through a turnstile -- and it races your writes from two devices, holding one before each round
 trip while the other moves ([Proving the races](VAULTDB.md#proving-the-races)). A backend with columns (Convex, SQL) keeps
 the applabel, user id, vaultlabel and boxlabel in columns of their own. A backend that holds rows
-under one string -- a key-value store, localStorage -- files them under `Ckeys`, as
-`localVaultDB` and `idbVaultDB` do, names joined on `^`:
+under one string -- a key-value store, localStorage -- files each under its `Scopepath`, as
+`localVaultDB` and `idbVaultDB` do: the row's kind, then its names, joined on `^`.
 
 ```ts
-import { Ckeys } from 'safebyok'
+import { Scopepath } from 'safebyok'
 
-Ckeys.vaultProps(scope)            // 'vault^acme^u1^main'
-Ckeys.box(scope, 'anthropic')  // 'box^acme^u1^main^anthropic'
-Ckeys.boxPrefix(scope)         // 'box^acme^u1^main^' -- every box of the vault, by prefix scan
-store.ckeys().filter(Ckeys.isBoxIn(scope))  // every box of the vault, from a list of every ckey
+Scopepath.vault(scope)                          // 'vault^acme^u1^main'
+Scopepath.box({ ...scope, boxlabel: 'openai' }) // 'box^acme^u1^main^openai'
+Scopepath.withinVaultScopepathPrefix(scope)     // 'box^acme^u1^main^' -- every box of the vault, by prefix scan or key range
+store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))  // every box of the vault, from a list of every key
+Scopepath.isBox(row) ? Scopepath.boxscope(row).boxlabel : null  // a listed row's boxlabel; null for a row no box is filed under
 ```
 
-No name holds `^` (no label or user_id may), so no two vaults ever share a ckey or list each other's
-boxes. The ckeys are part of the stored format: use these, not a join of your own, and every
-device finds your rows.
+No name holds `^` (no label or user_id may), so no two vaults ever share a scopepath or list each
+other's boxes. Each maker checks its scope, refusing `bad_scope` as the public verbs do. The
+scopepaths are part of the stored format: use these, not a join of your own, and every device finds
+your rows. A listing passes over a row under the vault's prefix that `isBox` rejects, rather than
+failing the read: no verb reaches it, so it holds no box.
 
 Your `do*` methods take any name the base class passed: every public verb holds each name to its
 check (`label`, or `user_id`) and to your adapter's declared `maxNameBytes`. So an adapter that hands its calls on to

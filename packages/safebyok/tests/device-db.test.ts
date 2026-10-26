@@ -83,6 +83,7 @@ describe("deviceRecordFor", () => {
     [{ ...record, device_id: undefined },          'one with no device_id'],
     [{ ...record, device_id: '' },                 'one with an empty device_id'],
     [{ ...record, highest_vault_epoch: -1 },       'one with a negative epoch'],
+    [{ ...record, user_id: 'u 1' },                "one whose user_id fails its check, never refused as the check's bad_scope"],
     [{ ...record, format: 'safebyok-device-v0' },  'one of another format'],
     [{ ...record, vaultlabel: 'work' },            "another vault's"],
     ['a string, not a record',                     'what is no record at all'],

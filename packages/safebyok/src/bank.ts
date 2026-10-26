@@ -2,7 +2,7 @@ import { type DeviceRecord, type GatelessVaultProps, type VaultScope, DeviceReco
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { randomId } from './crypto'
-import * as Ckeys from './ckeys'
+import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
@@ -109,7 +109,7 @@ export class Bank {
    * @example bank.entryOf({ userId: 'u1', vaultlabel: 'main' })?.status   // 'starting' | 'timely' | 'refused', or undefined
    */
   entryOf(choice: VaultChoice): VaultEntry | null {
-    return this.#snapshot.vaults[Ckeys.vaultProps(this.#scopeOf(choice))] ?? null
+    return this.#snapshot.vaults[Scopepath.vault(this.#scopeOf(choice))] ?? null
   }
   // --
 
@@ -203,7 +203,7 @@ export class Bank {
   async tryReopenVault(draft: VaultDraft): Promise<Outcome<Vault>> {
     try {
       const parts = parseVaultDraft(draft, this.#parts)
-      this.#letGoOf(Ckeys.vaultProps(parts.scope))
+      this.#letGoOf(Scopepath.vault(parts.scope))
       return good(await this.#ensureEntry(parts))
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -219,7 +219,7 @@ export class Bank {
    * @example bank.closeVault({ userId, vaultlabel: 'main' })
    */
   closeVault(choice: VaultChoice): void {
-    this.#letGoOf(Ckeys.vaultProps(this.#scopeOf(choice)))
+    this.#letGoOf(Scopepath.vault(this.#scopeOf(choice)))
   }
 
   /** Let every vault go, as {@link Bank.closeVault} does each: what an app does at sign-out.
@@ -228,7 +228,7 @@ export class Bank {
    */
   closeVaults(): void {
     // A Map's iteration carries on past an entry deleted under it.
-    for (const ckey of this.#entries.keys()) { this.#letGoOf(ckey) }
+    for (const vaultScopepath of this.#entries.keys()) { this.#letGoOf(vaultScopepath) }
   }
 
   /** Forget what this device keeps of the vault `draft` names -- its device record and its lease -- letting the vault go: the way out of 'vault_behind'.
@@ -265,7 +265,7 @@ export class Bank {
       valOf(await deviceDB.delLease(parts.scope))
       // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
       // reads neither.
-      this.#letGoOf(Ckeys.vaultProps(parts.scope))
+      this.#letGoOf(Scopepath.vault(parts.scope))
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -296,16 +296,16 @@ export class Bank {
   async tryDelDamagedVault(draft: VaultDraft): Promise<Outcome<void>> {
     try {
       const parts = parseVaultDraft(draft, this.#parts)
-      const ckey = Ckeys.vaultProps(parts.scope)
+      const vaultScopepath = Scopepath.vault(parts.scope)
       try {
         await delDamagedVaultIn(parts.scope, parts.vaultDB, parts.deviceDB)
       } catch (err) {
         // Made anew elsewhere meanwhile: the entry's refusal is out of date, so it goes, and the
         // next ask births the vault that stands. The caller still hears why nothing was deleted.
-        if (isVaultError(err, 'stale_write')) { this.#letGoOf(ckey) }
+        if (isVaultError(err, 'stale_write')) { this.#letGoOf(vaultScopepath) }
         throw err
       }
-      this.#letGoOf(ckey)
+      this.#letGoOf(vaultScopepath)
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -314,7 +314,7 @@ export class Bank {
   // == [Options and state]: parts, entries, listeners, snapshot, picture, publish, scopeOf
 
   readonly #parts: ParsedBankOpts
-  readonly #entries = new Map<string, HeldEntry>()
+  readonly #entries = new Map<Scopepath.VaultScopepath, HeldEntry>()
   readonly #listeners = new Set<() => void>()
   #status: BankStatus = 'made'
   #err: VaultError | null = null
@@ -322,7 +322,7 @@ export class Bank {
 
   /** The snapshot the private state makes now, frozen: each entry's view kept as it is. */
   #picture(): BankSnapshot {
-    const vaults = Object.fromEntries([...this.#entries].map(([ckey, entry]) => [ckey, entry.view]))
+    const vaults = Object.fromEntries([...this.#entries].map(([vaultScopepath, entry]) => [vaultScopepath, entry.view]))
     return Object.freeze({ status: this.#status, err: this.#err, vaults: Object.freeze(vaults) })
   }
 
@@ -373,8 +373,8 @@ export class Bank {
 
   /** The Vault object for `parts`' scope: the one held, the birth under way, or a birth begun now. A held one is handed out only to `parts` naming its stores: 'bad_option' otherwise. */
   #ensureEntry(parts: VaultParts): Promise<Vault> {
-    const ckey = Ckeys.vaultProps(parts.scope)
-    const held = this.#entries.get(ckey)
+    const vaultScopepath = Scopepath.vault(parts.scope)
+    const held = this.#entries.get(vaultScopepath)
     if (held?.birth !== null && held?.birth !== undefined) {
       checkSameStores(held, parts)
       return held.birth
@@ -383,14 +383,14 @@ export class Bank {
       checkSameStores(held, parts)
       return Promise.resolve(held.view.vault)
     }
-    return this.#bearEntry(ckey, parts)
+    return this.#bearEntry(vaultScopepath, parts)
   }
 
   /** Birth the Vault object for `parts`' scope into its entry, `starting` until it settles: `timely` holding it, or `refused`. */
-  #bearEntry(ckey: string, parts: VaultParts): Promise<Vault> {
+  #bearEntry(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
     const entry: HeldEntry = { view: frozenEntry(parts.scope, 'starting', null, null), birth: null, vaultDB: parts.vaultDB, deviceDB: parts.deviceDB }
-    this.#entries.set(ckey, entry)
-    entry.birth = this.#settleBirth(ckey, entry, parts)
+    this.#entries.set(vaultScopepath, entry)
+    entry.birth = this.#settleBirth(vaultScopepath, entry, parts)
     this.#publish()
     return entry.birth
   }
@@ -400,16 +400,16 @@ export class Bank {
    * microtasks since it was born -- is never handed out: the entry is `refused` as it would have
    * been a moment later, and the next ask births anew.
    */
-  async #settleBirth(ckey: string, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
+  async #settleBirth(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
     // Begun a microtask on, so the birth is held before anything is published -- the entry's
     // 'starting', or the bank's as the birth says hello: a listener asking for the vault as it
     // hears either joins this birth, rather than beginning another from inside this one.
     await Promise.resolve()
     // Let go in the task that asked for it -- a React StrictMode rehearsal, say: nothing is read.
-    if (this.#entries.get(ckey) !== entry) { throw goneError() }
-    const born = await outcomeOf(() => this.#bear(ckey, parts), unexpectedError)
+    if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
+    const born = await outcomeOf(() => this.#bear(vaultScopepath, parts), unexpectedError)
     // Let go while it was born: the Vault object goes with it, and the caller hears so.
-    if (this.#entries.get(ckey) !== entry) {
+    if (this.#entries.get(vaultScopepath) !== entry) {
       if (born.ok) { born.val[letGo]() }
       throw goneError()
     }
@@ -433,11 +433,11 @@ export class Bank {
    * refusal policy's `lock`) revokes this device's lease of the scope, as a lock does, so the next
    * birth asks for a proof.
    */
-  async #bear(ckey: string, parts: VaultParts): Promise<Vault> {
+  async #bear(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
     await this.#ensureLoaded()
     const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     try {
-      return await this.#bearFrom(ckey, parts, deviceDB)
+      return await this.#bearFrom(vaultScopepath, parts, deviceDB)
     } catch (err) {
       if (RefusalPolicy.decide(err) === 'lock') { await this.#revokeLease(parts, deviceDB) }
       throw err
@@ -450,7 +450,7 @@ export class Bank {
    * ({@link deviceRecordFor}): one that fails reads as none. Nothing is born below the record:
    * 'vault_behind'.
    */
-  async #bearFrom(ckey: string, parts: VaultParts, deviceDB: DeviceDB): Promise<Vault> {
+  async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts, deviceDB: DeviceDB): Promise<Vault> {
     const { scope } = parts
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
@@ -461,7 +461,7 @@ export class Bank {
     const raising: DeviceRecord = { format: DeviceRecordFormat, ...scope, device_id: recordBefore?.device_id ?? randomId(), highest_vault_epoch: vaultProps.vault_epoch }
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.raiseDeviceRecord(raising))) ?? raising
-    const vault: Vault = Vault[bear](parts, { vaultProps, listed: boxes, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(ckey, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultProps, listed: boxes, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 
@@ -472,18 +472,18 @@ export class Bank {
     parts.logger.warn("Storage could not be trusted with this vault as it was opened, but this device's lease of it could not be revoked: the next time the vault is opened on this device, as at the next page load, it may take it up.", { call: 'untrustedStorage' }, erased.err)
   }
 
-  /** `vault`, the Vault object in `ckey`'s entry, went gone of itself, as `refusal` says: the entry is `refused`, and the next ask births anew. */
-  #heardGone(ckey: string, vault: Vault, refusal: VaultError) {
-    const entry = this.#entries.get(ckey)
+  /** `vault`, the Vault object in `vaultScopepath`'s entry, went gone of itself, as `refusal` says: the entry is `refused`, and the next ask births anew. */
+  #heardGone(vaultScopepath: Scopepath.VaultScopepath, vault: Vault, refusal: VaultError) {
+    const entry = this.#entries.get(vaultScopepath)
     if (entry?.view.vault !== vault) { return }
     this.#setView(entry, frozenEntry(entry.view.scope, 'refused', null, refusal))
   }
 
-  /** Let `ckey`'s entry go: its Vault object gone, a birth under way refusing 'vault_gone', the entry out of the snapshot. Nothing for an entry the bank does not hold. */
-  #letGoOf(ckey: string) {
-    const entry = this.#entries.get(ckey)
+  /** Let `vaultScopepath`'s entry go: its Vault object gone, a birth under way refusing 'vault_gone', the entry out of the snapshot. Nothing for an entry the bank does not hold. */
+  #letGoOf(vaultScopepath: Scopepath.VaultScopepath) {
+    const entry = this.#entries.get(vaultScopepath)
     if (entry === undefined) { return }
-    this.#entries.delete(ckey)
+    this.#entries.delete(vaultScopepath)
     entry.view.vault?.[letGo]()
     this.#publish()
   }

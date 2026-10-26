@@ -4,7 +4,7 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, vi } from 'vitest'
-import { Ckeys, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
+import { Scopepath, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
 import * as TH from '../test-helpers'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { BankProvider, useBank, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
@@ -114,9 +114,9 @@ export const madeWorld = async () => {
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(made)
   const spoil = () => {
-    const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
-    const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-    store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+    const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
+    const vaultProps = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
+    store.write(vaultScopepath, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
   }
   return { store, vaultDB, deviceDB, props, spoil }
 }

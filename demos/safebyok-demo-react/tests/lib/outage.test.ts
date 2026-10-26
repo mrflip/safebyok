@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Ckeys, isVaultError, localVaultDB, memoryStore } from 'safebyok'
+import { Scopepath, isVaultError, localVaultDB, memoryStore } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 
@@ -56,7 +56,7 @@ describe("OutageVaultDB, while up", () => {
     await TH.ensureGated(vaultDB, vaultProps)
     await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // a record that names its boxlabel but will not read back as a box
-    store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
+    store.write(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
     const listed = await TH.boxesOf(vaultDB, scope)
     const shown = listed.map((box) => [box.boxlabel, box.damaged])
     expect(shown).to.deep.equal([['anthropic', true], ['openai', false]])
@@ -70,7 +70,7 @@ const damagedOver = async () => {
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await TH.ensureGated(vaultDB, vaultProps)
   await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
-  store.write(Ckeys.vaultProps(scope), JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+  store.write(Scopepath.vault(scope), JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 
@@ -79,7 +79,7 @@ describe("OutageVaultDB, deleting a damaged vault", () => {
     const { store, vaultDB } = await damagedOver()
     await TH.expectBad(vaultDB.getVault(scope), 'damaged_vault')
     await TH.expectingGood(vaultDB).delDamagedVault(scope)
-    expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal([Ckeys.vaultProps(scope)])
+    expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal([Scopepath.vault(scope)])
   })
 
   it("refuses while the pretend backend is down, deleting nothing", async () => {

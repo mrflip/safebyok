@@ -19,7 +19,7 @@ describe("Phrases", () => {
   })
 
   it("names the scopepath delimiter where a scopepath's shape is said", () => {
-    for (const said of [Phrases.BankScopepathShape, Phrases.VaultScopepathShape, Phrases.BoxScopepathShape]) {
+    for (const said of [Phrases.BankScopepathShape, Phrases.VaultScopepathShape, Phrases.LeaseScopepathShape, Phrases.DeviceScopepathShape, Phrases.BoxScopepathShape]) {
       expect(said).to.include(ScopepathDelimiter)
     }
   })

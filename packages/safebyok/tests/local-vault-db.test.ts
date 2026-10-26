@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
 import { VaultError } from '../src/errors'
-import * as Ckeys from '../src/ckeys'
+import * as Scopepath from '../src/scopepath'
 import * as TH from './test-helpers'
 
 
 // The ckeys u1's main vault is filed under, spelled out rather than computed: they are stored.
-const u1VaultPropsCkey = 'vault^acme^u1^main'
-const u1BoxCkey = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
+const u1VaultScopepath = 'vault^acme^u1^main'
+const u1BoxScopepath = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
 
 describe("localVaultDB", () => {
   it("resolves a vault never made as a good outcome holding null, as its first example shows", async () => {
@@ -20,7 +20,7 @@ describe("localVaultDB", () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
-    expect(store.read(u1VaultPropsCkey)).to.eq(JSON.stringify(TH.gatelessOf('u1')))
+    expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.gatelessOf('u1')))
     await TH.expectingGood(vaultDB).putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
@@ -55,23 +55,23 @@ describe("localVaultDB", () => {
     const emptied = TH.boxOf('openai', 'two', { sidecar: {} })
     const sidecarRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
     const emptiedRow = JSON.stringify(emptied)
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('anthropic'), sidecarRow)
-    store.write(u1BoxCkey('openai'), emptiedRow)
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), sidecarRow)
+    store.write(u1BoxScopepath('openai'), emptiedRow)
     const vaultDB = localVaultDB({ store })
     const summaries = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
     expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai', TH.inThisVault)
     expect(prev).to.deep.equal(emptied)
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: 'rev-two' }, emptied)
-    expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
+    expect(store.read(u1BoxScopepath('openai'))).to.eq(emptiedRow)
   })
 
   it("lists a box written before the sidecar, with a note, as damaged: no earlier record is read", async () => {
     const store = memoryStore()
     const { sidecar: _sidecar, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-box-v2', note: 'a test box' }))
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-box-v2', note: 'a test box' }))
     const vaultDB = localVaultDB({ store })
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
   })
@@ -79,22 +79,38 @@ describe("localVaultDB", () => {
   it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
-    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'openai' }), JSON.stringify(TH.boxOf('openai', 'two')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), '{"not": json')
     const listed = await TH.boxesOf(localVaultDB({ store }), scope)
     expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
     expect(listed[1]).to.include({ boxlabel: 'openai', revision_tok: 'rev-two', damaged: false })
     // Listed, never repaired: the row is still there for forensics.
-    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
+    expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.eq('{"not": json')
+  })
+
+  it("passes over a row under the vault's prefix that no box is filed under, listing the rest rather than failing the read, and erases it with the vault", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    const vaultDB = localVaultDB({ store })
+    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    const strays = ['Open AI', 'x^y', ''].map((tail) => Scopepath.withinVaultScopepathPrefix(scope) + tail)
+    for (const stray of strays) { store.write(stray, JSON.stringify(TH.boxOf('openai', 'two'))) }
+    const listed = await TH.boxesOf(vaultDB, scope)
+    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+    const capacity = await TH.expectingGood(vaultDB).getCapacity(scope)
+    expect(capacity.boxes.used).to.eq(4)
+    await TH.expectingGood(vaultDB).delVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+    expect(strays.map((stray) => store.read(stray))).to.deep.equal([null, null, null])
   })
 
   it("deletes a damaged row, JSON or not, holding no revision, as the one a deletion naming none means", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
-    store.write(Ckeys.box(scope, 'openai'), JSON.stringify({ boxlabel: 'openai', revision_tok: '' }))
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), '{"not": json')
+    store.write(Scopepath.box({ ...scope, boxlabel: 'openai' }), JSON.stringify({ boxlabel: 'openai', revision_tok: '' }))
     const vaultDB = localVaultDB({ store })
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'openai', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
@@ -104,13 +120,13 @@ describe("localVaultDB", () => {
   it("deletes a damaged row that holds a revision as another, for a deletion naming none", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultPropsOf('u1')))
     const sidecarless = TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar')
-    store.write(Ckeys.box(scope, 'anthropic'), JSON.stringify(sidecarless))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), JSON.stringify(sidecarless))
     const vaultDB = localVaultDB({ store })
     expect(await TH.boxesOf(vaultDB, scope)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted_other' })
-    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.be.null
+    expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.be.null
   })
 
   it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
@@ -118,15 +134,15 @@ describe("localVaultDB", () => {
     const vaultDB = localVaultDB({ store })
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
-    expect(store.read(u1VaultPropsCkey)).to.eq(JSON.stringify(TH.vaultPropsOf('u1')))
-    expect(store.read(u1BoxCkey('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
-    expect(store.ckeys()).to.have.members([u1VaultPropsCkey, u1BoxCkey('anthropic')])
+    expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.vaultPropsOf('u1')))
+    expect(store.read(u1BoxScopepath('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
+    expect(store.ckeys()).to.have.members([u1VaultScopepath, u1BoxScopepath('anthropic')])
   })
 
   it("refuses a mangled vault props row as damaged_vault, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
-    store.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
+    store.write(u1VaultScopepath, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
     const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
@@ -135,8 +151,8 @@ describe("localVaultDB", () => {
   it("hands a row that is not JSON up as its text, which reads back as damaged_box, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('anthropic'), 'SUPERSECRET{')
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), 'SUPERSECRET{')
     const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
     expect(refusal.message).to.match(/did not read back in a shape this package knows/)
     expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
@@ -145,7 +161,7 @@ describe("localVaultDB", () => {
   it("hands vault props that are not JSON up as their text, which reads back as damaged_vault", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
-    store.write(u1VaultPropsCkey, 'SUPERSECRET{')
+    store.write(u1VaultScopepath, 'SUPERSECRET{')
     const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
   })
@@ -154,11 +170,11 @@ describe("localVaultDB", () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     // u2's vault props smuggled into u1's slot, and a box row moved under another label.
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u2')))
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultPropsOf('u2')))
     const elsewhere = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(elsewhere.message).to.match(/different app, user or vault/)
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(u1BoxScopepath('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
     const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box', TH.inThisVault), 'damaged_box')
     expect(moved.message).to.match(/different boxlabel/)
   })

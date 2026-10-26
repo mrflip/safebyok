@@ -5,7 +5,7 @@ import type { Vault } from '../../src/vault'
 import { heldLeaseOf } from '../../src/held-lease'
 import type { Gating } from '../../src/gating'
 import * as TH from '../test-helpers'
-import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxCkey } from './world'
+import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxScopepath } from './world'
 
 /** Delete the vault from another device and make it anew there under 'pw two': a new life, of another vault_tok. */
 const remakeElsewhere = async (world: ReturnType<typeof makeWorld>) => {
@@ -453,7 +453,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     sealing.release()
     await TH.expectRefusal(putting, 'vault_locked')
-    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
@@ -481,7 +481,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     deleting.release()
     await removing
-    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 })

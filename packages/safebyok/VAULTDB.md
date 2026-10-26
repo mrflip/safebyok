@@ -128,8 +128,8 @@ within it. Every name a verb is handed passes, before the adapter sees it:
   letters and digits joined by single underscores, 2 to 40 characters), and a user id a `user_id`
   (1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone). Nothing turns them off. A
   stored record holding a name that fails reads back as damaged. Neither may hold `^`, which a
-  key-value store joins a row's names into one ckey on (`Ckeys`): a name holding it could make two
-  rows' ckeys one, another user's box under this one's name. Every store refuses it alike, whether
+  key-value store joins a row's names into one scopepath on (`Scopepath`): a name holding it could
+  make two rows' scopepaths one, another user's box under this one's name. Every store refuses it alike, whether
   it joins names or keeps each in a column of its own, so a name that one store holds every other
   does too.
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
