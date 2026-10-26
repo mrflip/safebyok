@@ -106,18 +106,17 @@ vault's: the vault gone (`vault_gone`), another life (`vault_remade`), another g
 
 ## Names, records and times
 
-How a vault is addressed, what the storage layer holds, and when. A label is, by default
-(`Label`), lowercase words of letters and digits joined by single underscores, such as
-`anthropic_api_key`; a host may check its labels and user ids with its own `validators`
-instead, which admit what they will above the **floor** every name is held to (`NameFloor`:
-well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
+How a vault is addressed, what the storage layer holds, and when. A label (`label`) is lowercase
+words of letters and digits joined by single underscores, 2 to 40 characters, such as
+`anthropic_api_key`. The name rules are the package's own: a name outside them is
+percent-encoded (RFC 3986), never checked by a host's own rule.
 
 | Name                            | What it is                                                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **applabel**                    | Your app's own label, so several apps can share one backend without colliding. Stored as `applabel`.                                                                        |
 | **vaultlabel**                  | The label of one of a user's vaults, such as `main`. Stored as `vaultlabel`.                                                                                                |
 | **boxlabel**                    | The label of a box within its vault: what you pass to `putBox`, `getBox`, `getWhisper`, `useWhisper` and `delBox`. Stored as `boxlabel`.                                            |
-| **userId**                      | The signed-in user's stable, opaque id from your own auth, the one name in a scope that is not a label: by default 1 to 100 ASCII letters, digits and `-_.:@+\|` (`UserId`). Never an email or a handle, which can change. Stored as `user_id`. |
+| **userId**                      | The signed-in user's stable, opaque id from your own auth, the one name in a scope that is not a label: 1 to 100 ASCII letters, digits and `-_.~:@+\|%`, never dots alone (`user_id`). Never an email or a handle, which can change. Stored as `user_id`. |
 | **scope**                       | An applabel, a userId and a vaultlabel together: it names one vault (`VaultScope`).                                                                                         |
 | **visible**                     | Said of a stored field that is both unencrypted and authenticated: bound into its record's ctx, so a change in storage makes the record refuse to open, and readable by anyone who can read the database. It covers a box's `boxlabel`, `revision_tok`, codec and schema version, times and sidecar, and each wayin's header (its `wayinkind`, `key_deriver_label` or `credential_id`, salt, `device_id` and `registered_at`): every field of those records but the ciphered ones. A visible field is never secret. Say "visible" only of a field that is authenticated, and "visible in storage" where a sentence could be read as screen visibility. |
 | **unencrypted**                 | Said of a stored field that is not encrypted, and nothing more: it may be authenticated or it may not. The vault props' `gate_epoch`, their `registered_at` and which wayins fill their two slots are unencrypted and bound into no ctx (each wayin's own fields, and the props' scope and `vault_tok`, are bound, and so visible). Say "unencrypted" of a record-general or backend-general sentence ("ciphertext and unencrypted fields"), and "visible" of a field known to be authenticated. |
@@ -144,7 +143,6 @@ well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
 | **strengthChecker**      | The `Bank.make` option that checks each new passphrase before it becomes a wayin: the one a vault is created with, and each one `putWayin` sets, never one typed to unlock. A function (`StrengthChecker`) from the passphrase and the vault's scope to a verdict (`PassphraseVerdict`), `{ strong: true }` or `{ strong: false, reason }`, never a throw; a weak one is refused as `weak_passphrase`, the reason its message. Optional: left out, every new passphrase is refused as too weak, the refusal's message saying that one must be chosen (the core's CUSTOMIZATION.md). `browserOpts()` supplies `zxcvbnStrengthChecker`, which asks for at least `MinPassphraseChars` (12) characters and a zxcvbn score of 3, turning away common passwords, patterns and the vault's own names. |
 | **EpochMillis**                 | Every time safebyok keeps: whole UTC milliseconds since 1970, from `FarPast` (1981) to `FarFuture` (2255). The bounds catch seconds and microseconds passed by mistake.      |
 | **format**                      | The tag at the head of every stored record (`safebyok-vault-v6`, `safebyok-box-v8`, `safebyok-lease-v1`, `safebyok-device-v1`, and a deleted vault's `safebyok-tombstone-v1`). It is also the first part of the ctx, and bound there once. Any change to what a record may hold moves its format on; a test keeps each format's schema and fails when one changes under the same format. |
-| **validators**                  | The `Bank.make` option holding a host's own checks for its labels and user id (`VaultValidators`), each replacing safebyok's default, run where a name enters the vault and never on what storage hands back. A check only checks: what passes is kept as given. |
 | **ckey**                        | Where a key-value store files a row: its kind and names joined on `^` (`box^acme^u1^main^anthropic`, from `Ckeys`), which no name may contain. |
 | **clock**, **logger**           | Two options your app may pass to `Bank.make`: a source of the time (`Clock`), and a place for the vault to say what it has no one to throw to (`VaultLogger`).          |
 

@@ -50,12 +50,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
-holds each record to its shape and each name to the floor and its storage's limits, through these
-same verbs. Nothing more: what text a name may be beyond that is each browser vault's own
-`validators`, checked where a name enters the vault, and a host whose clients run different
-validators has chosen that. A record a client's validators would refuse reads back as any other
-(the vault never takes a name it would not have written for damage); one below the floor is
-damage.
+holds each record to its shape and each name to its check and its storage's limits, through these
+same verbs: the same checks a browser's vault makes, as the name rules are the package's own. A
+stored record holding a name that fails its check is damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
 3.5), and the vault owns the read before it and the refusal after it. "The first write
@@ -127,18 +124,19 @@ Every adapter in this repository has an atomic step that spans a vault: a statem
 A vault is named by its scope -- applabel, user id and vaultlabel -- and a box by its boxlabel
 within it. Every name a verb is handed passes, before the adapter sees it:
 
-* **The floor** (`NameFloor`): one character to 1 KiB of UTF-8, well-formed Unicode, in its
-  composed form (NFC), with no control character and no `^`. Nothing turns it off, and no host's
-  validators widen it. A stored record holding a name below it reads back as damaged.
-  `^` is there because a key-value store joins a row's names into one ckey on it (`Ckeys`): a
-  name holding it could make two rows' ckeys one, another user's box under this one's name.
-  Every store refuses it alike, whether it joins names or keeps each in a column of its own, so a
-  name that one store holds every other does too.
+* **Its check**: an applabel, a vaultlabel and a boxlabel are each a `label` (lowercase words of
+  letters and digits joined by single underscores, 2 to 40 characters), and a user id a `user_id`
+  (1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone). Nothing turns them off. A
+  stored record holding a name that fails reads back as damaged. Neither may hold `^`, which a
+  key-value store joins a row's names into one ckey on (`Ckeys`): a name holding it could make two
+  rows' ckeys one, another user's box under this one's name. Every store refuses it alike, whether
+  it joins names or keeps each in a column of its own, so a name that one store holds every other
+  does too.
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
-A name handed to a verb on its own or in a scope, and a name the floor admits but over
+A name handed to a verb on its own or in a scope, and a name that passes its check but is over
 `maxNameBytes` wherever it is, is refused as `bad_scope`, naming which name and which rule, and
-quoting none of it. A name below the floor inside a record -- the vault props' scope, a box's
+quoting none of it. A name failing its check inside a record -- the vault props' scope, a box's
 boxlabel -- makes that record one this package does not build, refused whole as `bad_record`
 (a box, as `invalid_box`), naming the record and quoting none of it.
 
@@ -154,8 +152,8 @@ comes back as that object. Before anything is written, a read finds nothing: `nu
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
-colon, a quote, a bracket, a script), never share a record, a listing or a deletion, whatever names
-above the floor and within the adapter's declared limits they hold (*Names*, above).
+colon, an underscore, a digit), never share a record, a listing or a deletion, whatever names
+that pass their checks and fit the adapter's declared limits they hold (*Names*, above).
 
 **1.3. Nothing is repaired, and nothing is dropped.** An adapter hands up every record as it is
 stored, damaged or not; the base class decides what is damaged, and the vault lists a damaged
@@ -493,7 +491,7 @@ what the backend can still list and delete whole. A vault refuses to open when i
 boxes might not fit in it.
 
 **7.3. The most it holds in one name.** `maxNameBytes`, a whole number above zero, or `Infinity`
-for a backend that holds any name the floor admits: the bytes of UTF-8 its keys and indexes hold
+for a backend that holds any name the checks admit: the bytes of UTF-8 its keys and indexes hold
 of one name. Postgres, whose box key is a btree entry of four names together, declares 640.
 The base class refuses a longer name (`bad_scope`) before the adapter sees it, in every verb.
 

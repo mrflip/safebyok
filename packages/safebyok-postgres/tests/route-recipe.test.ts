@@ -18,8 +18,7 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 /**
  * The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
  * VaultDB, which refuses another user's vault, and holds each record to its shape and each name
- * to the floor and the table's limits; what text a name may be beyond that is each browser
- * vault's own validators' to say. A listing goes as the stored records, which the browser's
+ * to its check and the table's limits, as a browser's vault does. A listing goes as the stored records, which the browser's
  * VaultDB validates.
  */
 const served = new Map<string, Served>([

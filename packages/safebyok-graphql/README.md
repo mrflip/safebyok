@@ -186,9 +186,8 @@ through the recipe, that line included.
 * **It holds a record to 1 MiB**, and a name to 640 bytes of UTF-8, as the Postgres VaultDB
   behind it does, and a vault to no size of its own.
 * **The server checks** who may reach which vault, that each write is atomic, and that each
-  record has its shape and each name is above the floor and within its storage's limits (the
-  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
-  vault's own `validators`, nor what a box's sidecar holds.
+  record has its shape and each name passes its check and fits its storage's limits (the
+  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never what a box's sidecar holds.
 * **It declares the box limit your server holds a vault to**: none (`Infinity`), as the
   Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
   (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's

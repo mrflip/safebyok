@@ -85,8 +85,7 @@ record refuse to open. A vault stored in the format before (`safebyok-vault-v4`,
 | `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps` |
 | `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `BoxRecord`          |
 
-The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
-of every name, whatever a host's validators admit.
+The names are joined on `^` (the core's `Ckeys`), which no label or user id may hold.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.

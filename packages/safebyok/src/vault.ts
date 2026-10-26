@@ -1,7 +1,7 @@
 import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type ListedSummary, type Stamp, type Stamped, type PasskeyWayinSummary, type PassphraseWayinSummary, Whisper, Sidecar, type GatedVaultProps, type VaultProps, type DeviceRecord, DeviceRecordFormat, type LeaseRecord, type WayinKind, isGated, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxBase, type BoxRecord, checkedSidecar, checkedWhisper, heldListing, whisperBytesOf } from './box'
-import * as Names from './names'
+import * as CX from './checks/core-checks'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
@@ -616,8 +616,7 @@ export class Vault {
    * the box's first store. A box that will not read or open is written over as new, keeping neither
    * its sidecar nor its `registered_at`, when the whisper is given; a store keeping its whisper
    * refuses 'damaged_box'. One listed damaged with no revision refuses 'damaged_box', writing
-   * nothing: {@link Vault.delBox} it first. A boxlabel the vault's check refuses is refused
-   * 'bad_scope', even where a box stands under it: the check gates writes alone.
+   * nothing: {@link Vault.delBox} it first. A boxlabel that is not a label refuses 'bad_scope'.
    *
    * @param props - The box: its `boxlabel`, and its `sidecar`, your app's own JSON object beside the
    *   whisper, shown in the snapshot while locked, and never interpreted by the vault. Anything but a
@@ -637,8 +636,7 @@ export class Vault {
     try {
       this.#checkStanding()
       const { boxlabel, sidecar } = putBoxPropsOf(props)
-      // The host's check gates every name written; reads and deletes hold a name to the floor alone.
-      const label = Names.check(this.#rules, 'boxlabel', boxlabel)
+      const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
       const given = whisper === undefined ? undefined : checkedWhisper(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
@@ -662,8 +660,7 @@ export class Vault {
    * this Vault object is gone with it: ask the bank for the vault again (`bank.ensureVault`).
    * Deleted or made anew while storage is read, it refuses
    * 'vault_gone' or 'vault_remade', as when the bank lets the vault go; a lock landing then refuses
-   * 'vault_locked', handing back no box. The boxlabel is held to the floor alone, 'bad_scope'
-   * below it: the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
+   * 'vault_locked', handing back no box. A boxlabel that is not a label refuses 'bad_scope'.
    *
    * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
    */
@@ -732,7 +729,7 @@ export class Vault {
   async tryDelBox(boxlabel: string): Promise<Outcome<DeletedBox>> {
     try {
       this.#checkStanding()
-      const label = Names.checkFloor('boxlabel', boxlabel)
+      const label = this.#checkedBoxlabel(boxlabel)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
       if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { throw absentBox() }
       const lease = this.#demandLease('delBox')
@@ -804,7 +801,6 @@ export class Vault {
   // == [Options and setup]: bear, the constructor, scope, parsed options, limits, vaultDB, onBadNews, requestCleartext, onGone, clockNow
 
   readonly #scope: VaultScope
-  readonly #rules: Names.NameRules
   // Every storage refusal, whichever call met it, passes by the refusal policy on its way out.
   readonly #vaultDB: RefusalPolicy.HeededVaultDB
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
@@ -837,7 +833,6 @@ export class Vault {
   /** The Vault object {@link Vault[bear]} births. */
   private constructor(parts: VaultParts, born: BirthRead, onGone: (refusal: VaultError) => void) {
     this.#scope = parts.scope
-    this.#rules = parts.rules
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     this.#leaseMillis = parts.leaseMillis
@@ -1598,6 +1593,9 @@ export class Vault {
    */
   #listedRevisionOf(boxlabel: string): string | null { return this.#boxes.find((box) => box.boxlabel === boxlabel)?.revision_tok ?? null }
 
+  /** `boxlabel`, once it is a label: 'bad_scope' otherwise, naming the field and quoting none of it. */
+  #checkedBoxlabel(boxlabel: unknown): string { return CX.boxscope.parse({ ...this.#scope, boxlabel }).boxlabel }
+
   /** True when the snapshot's listing shows a box under `boxlabel`: what a locked vault can know before it asks for a proof. Reads nothing. */
   #isListed(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel) }
 
@@ -1607,7 +1605,7 @@ export class Vault {
   /** The box under `boxlabel`, once the vault is unlocked for it; null when there is none, or when a locked vault's listing shows none, asking nobody. */
   async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<Box | null> {
     this.#checkStanding()
-    const label = Names.checkFloor('boxlabel', boxlabel)
+    const label = this.#checkedBoxlabel(boxlabel)
     // Checked before the user is asked for anything: a box the listing does not show is none.
     if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { return null }
     const lease = this.#demandLease(call)
@@ -2027,7 +2025,7 @@ const checkSlotlabel = (given: unknown, call: 'putWayin' | 'delWayin'): void => 
 /** The refusal of `putWayin('passkey')` on a novel vault: a passkey is added under the passphrase, which it has none of yet. */
 const passkeyBeforePassphrase = () => new VaultError('absent_vault', "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey.")
 
-// The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
+// The refusal never quotes the boxlabel: a label may still be a key pasted by mistake.
 const absentBox = () => new VaultError('absent_box', 'No box stands under that boxlabel in this vault: its snapshot lists the ones it holds.')
 
 /** The refusal of a `putBox()` that left out the whisper, to keep the one stored, where none is stored. */

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AnyTextValidators, Ckeys, VaultError, delDamagedVault, isVaultError, localVaultDB, memoryDeviceDB, type VaultValidators } from 'safebyok'
+import { Ckeys, VaultError, delDamagedVault, isVaultError, label, localVaultDB, memoryDeviceDB } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, VaultExample, hushConsole, noop } from './world'
@@ -29,13 +29,13 @@ describe("BankProvider", () => {
       expect(isVaultError(caught[0], 'bad_scope')).to.be.true
     })
 
-    it("throws a validators bag with a misspelt field to the error boundary, rather than keep the default check unseen", async () => {
+    it("throws a validators prop to the error boundary, as Bank.make refuses an option it does not take: the name rules are the package's own", async () => {
       hushConsole()
       const caught: unknown[] = []
-      const misspelt = { boxLabel: AnyTextValidators.boxlabel } as unknown as VaultValidators
+      const validators = { boxlabel: label }
       render(
         <CatchingBoundary caught={caught}>
-          <BankProvider {...makeWorld().props} userId={null} validators={misspelt}>
+          <BankProvider {...makeWorld().props} userId="u1" {...{ validators } as object}>
             <Probe />
           </BankProvider>
         </CatchingBoundary>,

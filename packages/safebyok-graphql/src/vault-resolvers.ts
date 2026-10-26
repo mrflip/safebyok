@@ -89,9 +89,8 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   if (typeof vaultDBFor !== 'function') {
     throw new VaultError('bad_option', "vaultResolvers needs a `vaultDBFor`: (context) => the VaultDB for that request's signed-in user, such as postgresVaultDB({ client, userId }).")
   }
-  // The server holds a name only to the floor every name is held to and to its storage's limits,
-  // which every VaultDB verb checks: what text a name may be beyond that is each browser vault's
-  // own validators' to say, at its entry. The server's job is to keep each user to their own vault.
+  // The server holds a name to its check and to its storage's limits, which every VaultDB verb
+  // checks as a browser's vault does. The server's job is to keep each user to their own vault.
   /** The request's VaultDB, or the host's refusal of the request as it came, or a refusal saying the server could not make one. */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {

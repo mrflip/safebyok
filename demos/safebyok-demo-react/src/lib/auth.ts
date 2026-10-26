@@ -1,4 +1,4 @@
-import { EpochMillis, Label, wallClock, type Clock, type StringStore } from 'safebyok'
+import { EpochMillis, label, wallClock, type Clock, type StringStore } from 'safebyok'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
@@ -82,9 +82,9 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     },
 
     signIn: (userlabel) => {
-      const checked = Label.safeParse(userlabel)
+      const checked = label.safeParse(userlabel)
       if (! checked.success) {
-        return Promise.reject(new Error('A username is 2-64 letters, digits and underscores, starting with a letter.'))
+        return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }
       const ckey = accountCkey(checked.data)
       const existing = dbStore.read(ckey)

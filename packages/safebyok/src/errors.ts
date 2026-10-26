@@ -28,7 +28,7 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  * * `whisper_too_large`: the whisper with its sidecar over `maxWhisperBytes`. `box_too_large`: the
  *   whisper and sidecar together over what storage holds in one record.
  * * `bad_scope`: a name the app passed (an applabel, a user_id, a vaultlabel or a boxlabel) that
- *   fails its check. Check a name the user types first, with the same check (`Label` or `UserId` by default).
+ *   fails its check. Check a name the user types first, with `label` or `user_id`.
  * * `identity_revoked`: storage no longer serves the user this vault was opened for (signed out,
  *   or another user signed in). The vault locks as it refuses. The user signs in again, and the
  *   host opens the vault for whoever that is.

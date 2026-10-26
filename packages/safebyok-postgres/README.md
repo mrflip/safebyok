@@ -104,12 +104,9 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   refused with kind `bad_scope` before a statement runs. No character is reserved: each name is
   a column of its own.
 * **What the server checks** is who may reach which vault, that each write is atomic, and that
-  each record has its shape and each name is above the floor (`VAULTDB.md`, *Names*) and within
-  the limit above: the same checks every VaultDB's verbs make, on the server side of the wire.
-  It never holds a name to a label grammar, nor looks inside a box's sidecar: the one is
-  each browser vault's own `validators`, checked where a name enters it, the other the host's.
-  A host whose clients run different validators has chosen that, and a client reads a record
-  another's validators let through as any other, never as damage.
+  each record has its shape and each name passes its check (`VAULTDB.md`, *Names*) and fits
+  the limit above: the same checks every VaultDB's verbs make, and a browser's vault, on the
+  server side of the wire. It never looks inside a box's sidecar, which is the host's to check.
 * **Your database's own rules.** A statement your database refuses for want of a privilege, or
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
@@ -148,8 +145,7 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 
 // The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
 // VaultDB, which refuses another user's vault, and holds each record to its shape and each name
-// to the floor and the table's limits; what text a name may be beyond that is each browser
-// vault's own validators' to say. A listing goes as the stored records, which the browser's
+// to its check and the table's limits, as a browser's vault does. A listing goes as the stored records, which the browser's
 // VaultDB validates.
 const served = new Map<string, Served>([
   ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],

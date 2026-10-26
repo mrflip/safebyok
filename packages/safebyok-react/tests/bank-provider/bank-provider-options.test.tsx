@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { AnyTextValidators, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type VaultScope, type VaultValidators } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type VaultScope } from 'safebyok'
 import * as TH from '../test-helpers'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, refuseAcme, shownState, expectShown, CatchingBoundary, hushConsole, lockedWorld, providerOf, twelveOrMore } from './world'
 
 describe("BankProvider", () => {
-  // == [Options passed through]: keyDeriver, Bank.make options, validators, strengthChecker, logger, others
+  // == [Options passed through]: keyDeriver, Bank.make options, strengthChecker, logger, others
 
   it("asks for a keyDeriver outright, as Bank.make does", () => {
     expectTypeOf<Pick<BankProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
@@ -41,28 +41,6 @@ describe("BankProvider", () => {
     // One box fills the vault: a second is refused for room.
     await vault.putBox({ boxlabel: 'openai_api_key' }, 'sk')
     await TH.expectRefusal(vault.putBox({ boxlabel: 'mistral_api_key' }, 'sk'), 'vault_full')
-  })
-
-  it("passes the validators through, making the bank anew for a changed check but not for a bag rebuilt around the same ones", async () => {
-    const { Grab, latest, opened } = grabber()
-    const { props } = makeWorld()
-    // A bag written in the props, as a host might: new at every render, around the same schemas.
-    const tree = (boxlabelCheck: VaultValidators['boxlabel']) => (
-      <BankProvider {...props} userId="u1" validators={{ boxlabel: boxlabelCheck }} requestCleartext={TH.scriptedRequestCleartext}>
-        <Grab />
-      </BankProvider>
-    )
-    const { rerender } = render(tree(AnyTextValidators.boxlabel))
-    const first = await opened()
-    await TH.unlock(first, 'correct horse battery staple')
-    await first.putBox({ boxlabel: 'Anthropic API key' }, 'sk-fake')
-    rerender(tree(AnyTextValidators.boxlabel))
-    expect(latest().vault).to.eq(first)
-    // Another schema, a narrower one: a new check, so a new vault handle, which lists what is
-    // stored as it stands, the checks running at entry only.
-    rerender(tree(Label))
-    await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
-    expect(latest().vault?.getSnapshot().boxes.map((summary) => summary.boxlabel)).to.deep.equal(['Anthropic API key'])
   })
 
   it("passes strengthChecker through: the vault it opens refuses a weak new passphrase with the checker's reason", async () => {

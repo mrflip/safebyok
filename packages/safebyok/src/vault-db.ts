@@ -4,7 +4,7 @@ import { Capacity, GatedVaultProps, GatelessVaultProps, Tombstone, VaultProps, V
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import { InEnglish } from './options'
 import * as Names from './names'
-import { AnyTextValidators, NameFloor } from './validators'
+import * as CX from './checks/core-checks'
 import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
@@ -177,11 +177,9 @@ export type VaultDBOpts = {
  * For every public verb:
  *
  *  * It resolves an {@link Outcome} and never rejects. {@link VaultDB.subscribe} alone throws.
- *  * Each name handed to it, the scope's three and a boxlabel, is held to the floor (`NameFloor`)
- *    and to {@link VaultDB.maxNameBytes} before your `do*` method sees it: 'bad_scope' otherwise.
- *    A name inside a record below the floor refuses as that record does.
- *  * A host's own `validators` are never checked here: a server serving several clients takes any
- *    name above the floor.
+ *  * Each name handed to it, the scope's three and a boxlabel, is held to its check (`label`, or
+ *    `user_id`) and to {@link VaultDB.maxNameBytes} before your `do*` method sees it: 'bad_scope'
+ *    otherwise. A name inside a record that fails its check refuses as that record does.
  *  * Who is at fault names a record that fails its checks. One a caller hands in that this
  *    package would not build refuses 'bad_record' before storage sees it (a box handed to
  *    `putBox`, 'invalid_box'). One read from storage that fails is damaged: 'damaged_vault' for
@@ -234,7 +232,7 @@ export abstract class VaultDB {
    */
   abstract readonly maxBoxes: number
 
-  /** The most UTF-8 bytes this backend holds in one name, or `Infinity` for any name the floor admits (1 KiB).
+  /** The most UTF-8 bytes this backend holds in one name, or `Infinity` for any name the checks admit (a user_id's 100 at most).
    * Declare what the backend's keys and indexes hold. A store whose key holds every name of a box
    * together declares its share of the key's limit.
    */
@@ -270,7 +268,7 @@ export abstract class VaultDB {
   /** The scope's vault props and box listing, read in one atomic step, or null when no vault stands.
    * The listing is each box's summary, without ciphertext, sorted by boxlabel; a record that does
    * not read back as its box lists as a {@link DamagedBox} rather than refusing, and a row stored
-   * under a name below the floor is left out, as no verb could reach it. No write lands between the
+   * under a name that is not a label is left out, as no verb could reach it. No write lands between the
    * two reads, so the two agree as they are handed back. Nothing compares them, here or in the
    * vault. A scope holding only a tombstone, the mark of a vault deleted, has no vault. Vault props
    * it cannot use refuse 'damaged_vault', or 'newer_format' for a format a later version may write.
@@ -380,7 +378,7 @@ export abstract class VaultDB {
   getBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<Outcome<BoxRecord | null>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const label = heldBoxlabel(this, boxlabel)
+      const label = heldBoxlabel(this, asked, boxlabel)
       const expectation = checkOutgoing(BoxGetExpectation, expected, 'box read expectation', 'read')
       const raw = await adapterAnswer('doGetBox', () => this.doGetBox(asked, label, expectation))
       if (raw === null || raw === undefined) { return null }
@@ -420,7 +418,7 @@ export abstract class VaultDB {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const outgoing = checked(BoxRecord, box, invalidBox)
-      heldBoxlabel(this, outgoing.boxlabel)
+      heldBoxlabel(this, asked, outgoing.boxlabel)
       const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
       const recordBytes = jsonBytes({ ...asked, ...outgoing })
       if (recordBytes > this.maxRecordBytes) {
@@ -470,7 +468,7 @@ export abstract class VaultDB {
   delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const label = heldBoxlabel(this, boxlabel)
+      const label = heldBoxlabel(this, asked, boxlabel)
       const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
       const deletion = await adapterAnswer('doDelBox', () => this.doDelBox(asked, label, expectation))
       if (deletion === null) { throw Refusals.staleWrite('del') }
@@ -762,8 +760,8 @@ const withoutCiphered = (box: unknown): unknown => {
 /** A box as `doGetVault` may hand it up: every field but the two ciphered ones, so a projecting backend is checked as one handing whole records. */
 const ListedBox = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
 
-/** True when a listed box is stored under a name above the floor, which a verb can reach. */
-const isNameable = (stored: StoredBox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
+/** True when a listed box is stored under a label, which a verb can reach. */
+const isNameable = (stored: StoredBox): boolean => CX.label.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
 /** One nameable stored box as the listing shows it: its summary, or a {@link DamagedBox} where `getBox` would refuse it. */
 const listedOrDamaged = ({ boxlabel, box }: StoredBox): ListedSummary | DamagedBox => {
@@ -793,25 +791,22 @@ export const byCodeUnit = (one: string, two: string): number => {
 }
 // --
 
-// == [Name checks]: FloorRules, heldScope, heldBoxlabel, heldName
-
-/** The checks a public verb runs on a name: the floor beneath every name, and nothing a host chose. */
-const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
+// == [Name checks]: heldScope, heldBoxlabel, heldName
 
 /** What a backend declares about the names it holds. */
 type NameFacts = Pick<VaultDB, 'maxNameBytes'>
 
-/** `scope`, once each name passes the floor and fits the backend: 'bad_scope' otherwise, quoting none of it. */
+/** `scope`, frozen, once each name passes its check and fits the backend: 'bad_scope' otherwise, quoting none of it. */
 const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
-  const asked = Names.checkScope(FloorRules, scope)
+  const asked = CX.vaultScope.parse(scope)
   heldName(facts, 'applabel', asked.applabel)
   heldName(facts, 'user_id', asked.user_id)
   heldName(facts, 'vaultlabel', asked.vaultlabel)
   return asked
 }
 
-/** `boxlabel`, once it passes the floor and fits the backend: 'bad_scope' otherwise. */
-const heldBoxlabel = (facts: NameFacts, boxlabel: unknown): string => heldName(facts, 'boxlabel', Names.checkFloor('boxlabel', boxlabel))
+/** `boxlabel`, once it is a label that fits the backend, beside `scope` already held: 'bad_scope' otherwise. */
+const heldBoxlabel = (facts: NameFacts, scope: VaultScope, boxlabel: unknown): string => heldName(facts, 'boxlabel', CX.boxscope.parse({ ...scope, boxlabel }).boxlabel)
 
 /** `part`, a name, once it fits the backend's `maxNameBytes`: 'bad_scope' otherwise, naming `said` and the limit. */
 const heldName = (facts: NameFacts, said: string, part: string): string => {
@@ -1025,7 +1020,7 @@ const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
 }
 
 /** A box read from storage that fails its checks, as `said` says how: 'damaged_box', quoting none of it.
- * It never quotes the boxlabel either: a host's validators may admit any text, a mistaken paste among it.
+ * It never quotes the boxlabel either: a label may still be a key pasted by mistake.
  */
 const damagedBox = (said: string, opts?: ErrorOptions) => new VaultError('damaged_box', `That box's stored record ${said}, so it can't be read. It was left as it is; remove it, or store its whisper again over it.`, opts)
 

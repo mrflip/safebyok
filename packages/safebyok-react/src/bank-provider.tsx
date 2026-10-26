@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Bank, type Gating, type RequestCleartext, checkValidators, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Bank, type Gating, type RequestCleartext, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
@@ -171,10 +171,9 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * out or changes, and when it unmounts. It makes the bank anew, letting the last one's vaults go,
  * when a prop that shapes it changes -- the scope (`applabel`), the stores (`vaultDB`,
  * `deviceDB`), the `keyDeriver`, `leaseHours`, `staleMinutes`, `maxWhisperBytes`, `maxBoxes`, the
- * `clock`, the `logger`, the `strengthChecker`, or a schema in `validators`. So build each of those
- * once -- at module level, or memoized -- never inline in the props; each schema in `validators`
- * likewise, though the bag around them may be built in render. A `logger`, `clock` or
- * `strengthChecker` that changes identity is warned of once, through the logger. A handler makes
+ * `clock`, the `logger` or the `strengthChecker`. So build each of those once -- at module level,
+ * or memoized -- never inline in the props. A `logger`, `clock` or `strengthChecker` that changes
+ * identity is warned of once, through the logger. A handler makes
  * no new bank: `onBadNews` and `requestCleartext` may be written inline, and the bank's vaults call
  * whichever the last render passed. Under React's StrictMode, whose rehearsal asks for a vault and
  * lets it go in development, the rehearsal reads nothing: only the vault kept is born.
@@ -213,18 +212,11 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
 export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: BankProviderProps) => {
-  const { applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, requestCleartext, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, strengthChecker, ...unlisted } = opts
+  const { applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, requestCleartext, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, strengthChecker, ...unlisted } = opts
   // Each prop Bank.make does not take, by name -- a misspelling, a deleted name, a `vaultlabel`,
   // which each hook names -- handed on to it, so it is refused, to the error boundary, rather than
   // dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
-  // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Bank.make refuses it.
-  checkValidators(validators)
-  // The bank is made anew when a check changes, never for a bag rebuilt in render around the same ones.
-  const applabelCheck = validators?.applabel
-  const vaultlabelCheck = validators?.vaultlabel
-  const boxlabelCheck = validators?.boxlabel
-  const userIdCheck = validators?.userId
   // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
   // reaches its own ask and no newer one's; the state renders it.
   const [showing, setShowing] = useState<Showing | null>(null)
@@ -287,7 +279,6 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     if (userId === null) { return }
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if a Bank.make
     // option is ever added and not passed through.
-    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck } satisfies Record<keyof VaultValidators, unknown>
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
     // Bad news a vault meets once the provider has let its bank go -- a read under way as the user
     // changed -- is told to no one: the handler now may be the next user's.
@@ -295,7 +286,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
     // Likewise, a vault let go asks no one: the requestCleartext now may be the next user's.
     const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
-    const bankOpts = { ...refusable, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, validators: checks, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
+    const bankOpts = { ...refusable, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
     const made = Bank.make(bankOpts)
@@ -309,7 +300,7 @@ export const BankProvider = ({ userId, allowStartOver, passphraseUsername, passp
       if (showingRef.current !== null) { endShowing(showingRef.current) }
       setHeld(NoneHeld)
     }
-  }, [userId, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askUser, endShowing])
+  }, [userId, applabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heldLogger, strengthChecker, unlistedJson, tellBadNews, askUser, endShowing])
 
   // A logger, clock or strength checker written inline in the props is new at every render, and
   // makes the bank anew each time: said once, the first time any changes.

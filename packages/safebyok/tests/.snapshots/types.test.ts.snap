@@ -60,8 +60,8 @@ exports[`Stored record formats > safebyok-box-v8 1`] = `
       "type": "object",
     },
     "boxlabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
     "format": {
@@ -134,8 +134,8 @@ exports[`Stored record formats > safebyok-device-v1 1`] = `
   "additionalProperties": false,
   "properties": {
     "applabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
     "device_id": {
@@ -152,13 +152,14 @@ exports[`Stored record formats > safebyok-device-v1 1`] = `
       "type": "integer",
     },
     "user_id": {
-      "maxLength": 1024,
+      "maxLength": 100,
       "minLength": 1,
+      "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
       "type": "string",
     },
     "vaultlabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
   },
@@ -180,8 +181,8 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
   "additionalProperties": false,
   "properties": {
     "applabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
     "ask_passphrase_at": {
@@ -200,8 +201,9 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
     },
     "lease_key": {},
     "user_id": {
-      "maxLength": 1024,
+      "maxLength": 100,
       "minLength": 1,
+      "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
       "type": "string",
     },
     "vault_key_lease_wrapped": {
@@ -227,8 +229,8 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
       "type": "string",
     },
     "vaultlabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
   },
@@ -253,8 +255,8 @@ exports[`Stored record formats > safebyok-tombstone-v1 1`] = `
   "additionalProperties": false,
   "properties": {
     "applabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
     "format": {
@@ -262,8 +264,9 @@ exports[`Stored record formats > safebyok-tombstone-v1 1`] = `
       "type": "string",
     },
     "user_id": {
-      "maxLength": 1024,
+      "maxLength": 100,
       "minLength": 1,
+      "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
       "type": "string",
     },
     "vault_epoch": {
@@ -272,8 +275,8 @@ exports[`Stored record formats > safebyok-tombstone-v1 1`] = `
       "type": "integer",
     },
     "vaultlabel": {
-      "maxLength": 1024,
-      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
       "type": "string",
     },
   },
@@ -296,8 +299,8 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
       "additionalProperties": false,
       "properties": {
         "applabel": {
-          "maxLength": 1024,
-          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
           "type": "string",
         },
         "format": {
@@ -428,8 +431,9 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "type": "integer",
         },
         "user_id": {
-          "maxLength": 1024,
+          "maxLength": 100,
           "minLength": 1,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
           "type": "string",
         },
         "vault_epoch": {
@@ -442,8 +446,8 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "type": "string",
         },
         "vaultlabel": {
-          "maxLength": 1024,
-          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
           "type": "string",
         },
       },
@@ -465,8 +469,8 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
       "additionalProperties": false,
       "properties": {
         "applabel": {
-          "maxLength": 1024,
-          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
           "type": "string",
         },
         "format": {
@@ -489,8 +493,9 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "type": "integer",
         },
         "user_id": {
-          "maxLength": 1024,
+          "maxLength": 100,
           "minLength": 1,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
           "type": "string",
         },
         "vault_epoch": {
@@ -503,8 +508,8 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "type": "string",
         },
         "vaultlabel": {
-          "maxLength": 1024,
-          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
           "type": "string",
         },
       },

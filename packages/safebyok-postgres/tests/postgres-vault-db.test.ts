@@ -650,7 +650,7 @@ describe("postgresVaultDB, getVaultRecords", () => {
     expect(spy.sent).to.have.lengthOf(0)
   })
 
-  it("refuses a scope below the floor, or with a name over 640 bytes, as every verb does, before the database is asked", async () => {
+  it("refuses a scope with a name that fails its check, as every verb does, before the database is asked", async () => {
     const db = await TH.emptyDatabase()
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
@@ -660,7 +660,7 @@ describe("postgresVaultDB, getVaultRecords", () => {
       expect(refusal.message).to.include('vaultlabel')
       expect(refusal.message).to.not.include(vaultlabel)
     }
-    expect(await TH.expectingGood(vaultDB).getVaultRecords({ ...u1, vaultlabel: 'n'.repeat(640) })).to.be.null
+    expect(await TH.expectingGood(vaultDB).getVaultRecords({ ...u1, vaultlabel: 'n'.repeat(40) })).to.be.null
     expect(spy.sent).to.have.lengthOf(1)
   })
 

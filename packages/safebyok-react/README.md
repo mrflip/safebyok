@@ -86,11 +86,7 @@ was made with for its life; one that is no function is thrown, as `Bank.make` re
 `bad_option`, to the nearest error boundary. Its `load`, if it carries one (`zxcvbnStrengthChecker`
 fetches its dictionary), runs at the bank's `hello()`, before a vault is born, and a load that
 fails is thrown, as `unexpected_error`, to the nearest error boundary. Leave it out and every new passphrase is refused as
-too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md). `validators` is the exception: the provider watches each schema in
-the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
-long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
-(`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Bank.make` would refuse
-it.
+too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md).
 
 A handler is the other exception: `onBadNews` and `requestCleartext` make no new bank as they change, so
 they may be written inline. The vaults call whichever the last render passed:

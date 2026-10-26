@@ -9,8 +9,8 @@ import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { type BoxSummary, type DamagedBox, EpochMillis, type ListedSummary, Sidecar, type Stamp, Whisper } from './types'
 import type { Vault } from './vault'
-import { NameFloor } from './validators'
-import * as Names from './names'
+import { label } from './checks/primitives'
+import { Validator } from './checks/validator'
 
 // == [The record]: BoxRecord, BoxFormat
 
@@ -27,14 +27,13 @@ export const BoxFormat = 'safebyok-box-v8'
  * version -- is bound into both encryptions, as AES-GCM's additional data. So is every field of
  * this revision but the two encrypted ones: `revision_tok`, minted fresh on every write, the
  * sidecar and `written_at`. So ciphertext moved between revisions, boxes or vaults refuses to
- * open, as does an altered sidecar or time. Its boxlabel is held here to the floor (`NameFloor`);
- * the vault's validators check it only where a host hands it in.
+ * open, as does an altered sidecar or time. Its boxlabel is a label, as `label` checks.
  *
  * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
  */
 export const BoxRecord = Z.object({
   format:                 Z.literal(BoxFormat),
-  boxlabel:               NameFloor,
+  boxlabel:               label,
   revision_tok:           Z.string().check(Z.minLength(1)),
   /** This box's boxKey, wrapped under the vaultKey. */
   box_key_wrapped:        Ciphered,
@@ -80,6 +79,9 @@ export type SealBoxProps = {
 
 /** What {@link Box.seal}'s props may hold, and nothing else. */
 const checkSealProps = optionsCheck({ boxlabel: Z.unknown(), sidecar: Z.optional(Z.unknown()), base: Z.optional(Z.unknown()) }, "Box.seal's props are `boxlabel`, `sidecar`, the box's own visible data, and `base`, the box it replaces: check their spelling, and leave out any other.")
+
+/** The boxlabel a seal is handed, checked as a scope's names are: 'bad_scope' for one that is not a label. */
+const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBoxlabel: obj({ boxlabel }) }))
 
 /** One box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and the stamp of the vault it was made under.
  * Its visible fields (boxlabel, revision, its sidecar, and times) are its own, and it carries its
@@ -187,8 +189,8 @@ export class Box {
    * is the box's `baseRevisionTok`. The sidecar is `{}` when left out: a seal carries nothing from
    * the base but its revision and `registered_at`.
    *
-   * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_scope' for a boxlabel below the
-   * floor, and 'bad_option' for a sidecar JSON cannot carry or a malformed base. Refuses
+   * Throws 'bad_whisper' for a whisper JSON cannot carry, 'bad_scope' for a boxlabel that is not
+   * a label, and 'bad_option' for a sidecar JSON cannot carry or a malformed base. Refuses
    * 'vault_locked' when the vault holds no lease, and
    * otherwise as `lease.cipheredWith` does.
    *
@@ -201,7 +203,7 @@ export class Box {
   static async trySeal(vault: BoxVault, props: SealBoxProps, whisper: Whisper): Promise<Outcome<Box>> {
     return await outcomeOf(async () => {
       checkSealProps(props)
-      const label = Names.checkFloor('boxlabel', props.boxlabel)
+      const { boxlabel } = sealBoxlabel.parse({ boxlabel: props.boxlabel })
       const sidecar = props.sidecar === undefined ? {} : checkedSidecar(props.sidecar)
       const base = checkedBase(props.base)
       const whisperBytes = whisperBytesOf(whisper)
@@ -212,7 +214,7 @@ export class Box {
         const now = vault.now()
         const record = await lease.sealProps({
           format:                 BoxFormat,
-          boxlabel:               label,
+          boxlabel,
           revision_tok:           randomId(),
           whisper_codec:          'json_v1',
           whisper_schema_version: 1,

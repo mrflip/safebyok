@@ -23,8 +23,8 @@ const BoxCases = [
   [{ ...wholeBox, sidecar: {} },                           true,   'a box with an empty sidecar'],
   [{ ...wholeBox, sidecar: { gone: null, list: [1, 'two'] } }, true, 'a sidecar of any JSON values'],
   [{ ...wholeBox, sidecar: { beta: [null, 1.5], alpha: 2 } }, true, 'a sidecar with its keys in any order, as a jsonb column may hand it back'],
-  [{ ...wholeBox, boxlabel: 'Ключ API: מפתח' },           true,   'a boxlabel of any text'],
   // refused, as a damaged or foreign record:
+  [{ ...wholeBox, boxlabel: 'Ключ API: מפתח' },           false,  'a boxlabel that is no label, as a damaged record'],
   [sidecarless,                                            false,  'a box with no sidecar: one is always written'],
   [{ ...wholeBox, sidecar: { when: new Date() } },         false,  'a sidecar holding what JSON cannot carry'],
   [{ ...wholeBox, sidecar: undefined },                    false,  'a sidecar left undefined'],

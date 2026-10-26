@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
 import * as safebyok from '../src/index'
-import * as Validators from '../src/validators'
+import * as Primitives from '../src/checks/primitives'
 
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
@@ -10,7 +10,7 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxRecord', 'BoxSummary', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'GatedVaultProps', 'GatelessVaultProps', 'Tombstone', 'TombstoneFormat', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
-      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'raisedDeviceRecord',
       'domStore', 'memoryStore',
@@ -18,8 +18,8 @@ describe("the package's entry point", () => {
     ])
   })
 
-  it("exports every check and bound safebyok/validators does, as the same objects", () => {
-    for (const [exportname, exported] of Object.entries(Validators)) {
+  it("exports each name check and its bounds, as the same objects the vault checks with", () => {
+    for (const [exportname, exported] of Object.entries(Primitives)) {
       expect(safebyok[exportname as keyof typeof safebyok], exportname).to.eq(exported)
     }
   })

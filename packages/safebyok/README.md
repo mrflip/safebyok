@@ -162,11 +162,6 @@ of the above supplies it.
 * `safebyok/idb` -- the IndexedDB device store, `idbDeviceDB`, and `inspectIdbDeviceDB`, a raw
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
-* `safebyok/validators` -- the checks for names (`Label`, `UserId`, `DefaultValidators`,
-  `AnyTextValidators`), the floor beneath them all (`NameFloor`), and their bounds
-  (`MaxLabelChars`, `LabelPattern`, `MaxUserIdChars`, `UserIdPattern`, `NameFloorBytes`), for a
-  form, a server or another library to check what the vault will, at a few kB. All are in the main entry too, with the record schemas (`Whisper`,
-  `EpochMillis` and the rest).
 
 `Bank.make` takes its `keyDeriver` and `deviceDB` from you, with no default behind them, and its
 `strengthChecker` too, with a default that refuses every passphrase until you choose one. A
@@ -211,72 +206,27 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
   sidecar's together, so a large sidecar leaves less room for the whisper. Its size shows in storage, as every
   visible field's does.
 
-## Names, and your own checks
+## Names
 
-By default a label (`applabel`, `vaultlabel`, `boxlabel`) is lowercase words of letters and digits joined by single underscores, 2 to 40
-characters (`Label`); and a `userId` is 1 to 100 ASCII letters, digits and `-_.:@+|` (`UserId`),
-which holds every stable id an auth provider issues -- a UUID, Auth0's `provider|id`, Clerk's
-`user_...`, a DID -- and pass your provider's stable, opaque id, never an email or a handle,
-which can change and would orphan the vault. That suits API keys. A host that wants more --
-labels in Hebrew, Arabic or Thai, its own auth's id shape -- passes its own Zod schemas as
-`validators`, and each **replaces** ours:
+Every name is the package's to check. A label -- an `applabel`, a `vaultlabel` or a `boxlabel` --
+is lowercase words of letters and digits joined by single underscores, starting with a letter, 2
+to 40 characters (`label`). A `user_id` is 1 to 100 ASCII letters, digits and `-_.~:@+|%`, never
+dots alone (`user_id`), opaque and compared byte for byte: pass your auth provider's stable id,
+which never changes, as a vault is found by it. Percent-encode (RFC 3986) a name outside these
+rules, the same way every time, as a name is bound into the ciphertext. A name that fails refuses
+`bad_scope`, naming each failing field (its `meta.fieldnames` lists them) and never quoting the
+name; check one a user types first, with `label.safeParse(typed)`, or `LabelPattern` and
+`MaxLabelChars` on a form's input. A pull request widening a rule is welcome where it keeps a name
+safe as a scopepath segment.
 
-```ts
-import * as z from 'zod'
-import { AnyTextValidators, UserId } from 'safebyok/validators'
-
-// Built once, at module level.
-const validators = {
-  ...AnyTextValidators,                                 // labels of any text above the floor
-  boxlabel: z.string().min(1).max(200),                 // ...but box names of 1 to 200 characters
-  userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/), // and Clerk's user ids
-}
-const bank = Bank.make({ applabel: 'acme', vaultDB, validators, ...browserOpts() })
-const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
-await vault.putBox({ boxlabel: 'מפתח OpenAI: עבודה', sidecar: { note: 'the team account, billed monthly' } }, 'sk-...')
-```
-
-* **The floor holds beneath every check.** Whatever your schemas admit, a name is one character
-  to 1 KiB of UTF-8, well-formed Unicode (no lone surrogate, half of a character), in Unicode's
-  composed form (NFC), and with no control character: `NameFloor`. A name holds no `^` either,
-  the character the key-value stores join a row's names on, so every store holds the same names:
-  a vault whose names suit Postgres today suits IndexedDB tomorrow. Below the floor is
-  `bad_scope`, and a stored record below it reads back as damaged. Your storage
-  may hold less: Postgres holds a name of at most 640 bytes (`VAULTDB.md`, *Names*).
-* **A check only checks.** What passes is kept exactly as you passed it, never what the schema
-  makes of it: a name is bound into the ciphertext and names its rows, so a schema that trims or
-  lowercases would otherwise send the same user to another vault. Nothing is normalized either:
-  text not in NFC is refused, never composed for you.
-* **Your checks gate writes; reads and deletes hold a name to the floor alone.** They run where
-  a name enters the vault: `bank.ensureVault` (the scope) and `putBox()` (the boxlabel). `getBox()`,
-  `getWhisper()`, `useWhisper()` and `delBox()` check a boxlabel against the floor only, so a box
-  already stored under a name your checks refuse -- by another client, or before you narrowed
-  them -- lists, reads and deletes as any other, and a name with nothing under it reads as none
-  (`getBox()` resolves null; `getWhisper()`, `useWhisper()` and `delBox()` refuse it
-  `absent_box`), whatever your checks say of it.
-* **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
-  does, and widen only once every client you serve runs the wider check: an older one refuses at
-  its door the names a newer one stores.
-* **The refusal is the vault's own**: kind `bad_scope`, naming the
-  field, never quoting the name or your schema's issues. Where one of our checks refused, it says
-  what was wrong (too long, a control character, not well-formed); your schema's, it names only.
-  A schema must check synchronously; one that is async or throws is refused as `bad_option`,
-  carrying nothing of what it threw. Each refusal names the first failure: a form checks its
-  fields with the exported schemas first, and the vault's refusal is the backstop.
-* **A misspelt field is refused**, as `bad_option`: `boxLabel` would otherwise leave the default
-  check quietly in place. `checkValidators(bag)` runs that check alone, for a binding or wrapper
-  that takes the bag apart (`BankProvider` does).
-* **Sizes follow the names.** Each `putBox()` weighs its box -- whisper, sidecar and names
-  -- and refuses one heavier than the backend holds in a record (`box_too_large`), or a new
-  one that would take the vault past what the backend holds of a vault (`vault_full`). The record
-  is weighed as its real serialized bytes; the vault's total is a conservative estimate made
-  before the box is sealed (each counted at twice `maxWhisperBytes` for its whisper and sidecar,
-  with its names as measured), so at a `maxVaultBytes` set exactly tight it may refuse a write
-  that would just fit. A replacement weighs what it replaces, and is never refused as full.
-  `maxWhisperBytes` is checked as a whisper is stored, never as one is read, so lowering it
-  strands nothing.
-* Labels of any text are shown to your users as written: mind what bidirectional and invisible
-  characters can make one look like.
+Each `putBox()` weighs its box -- whisper, sidecar and names -- and refuses one heavier than the
+backend holds in a record (`box_too_large`), or a new one that would take the vault past what the
+backend holds of a vault (`vault_full`). The record is weighed as its real serialized bytes; the
+vault's total is a conservative estimate made before the box is sealed (each counted at twice
+`maxWhisperBytes` for its whisper and sidecar, with its names as measured), so at a `maxVaultBytes`
+set exactly tight it may refuse a write that would just fit. A replacement weighs what it replaces,
+and is never refused as full. `maxWhisperBytes` is checked as a whisper is stored, never as one is
+read, so lowering it strands nothing.
 
 ## Your own storage adapter
 
@@ -300,13 +250,12 @@ Ckeys.boxPrefix(scope)         // 'box^acme^u1^main^' -- every box of the vault,
 store.ckeys().filter(Ckeys.isBoxIn(scope))  // every box of the vault, from a list of every ckey
 ```
 
-No name holds `^` (the floor refuses it), so no two vaults ever share a ckey or list each other's
+No name holds `^` (no label or user_id may), so no two vaults ever share a ckey or list each other's
 boxes. The ckeys are part of the stored format: use these, not a join of your own, and every
 device finds your rows.
 
-Your `do*` methods take any name the base class passed: every public verb holds each name to the
-floor and to your adapter's declared `maxNameBytes`, and takes no
-validators of the host's, which are the vault's own. So an adapter that hands its calls on to
+Your `do*` methods take any name the base class passed: every public verb holds each name to its
+check (`label`, or `user_id`) and to your adapter's declared `maxNameBytes`. So an adapter that hands its calls on to
 another VaultDB's public verbs passes each call through as it came.
 
 A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keeps two records per
@@ -893,11 +842,11 @@ boundary, and `useVault` throws a birth's misuse there; a condition lands in the
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `bad_scope`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
+| `bad_scope`           | a name in a scope -- an `applabel`, `vaultlabel` or `boxlabel` that is no `label`, or a `user_id` that fails `user_id` -- the message naming each failing field, as `meta.fieldnames` does | Pass labels the app chose; check a user-typed one first with `label`; percent-encode a user id outside the rules |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
 | `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's draft, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's draft naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
-| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
-| `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it below the floor, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
+| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them that fails its check included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name that passes its check but is longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it that fails its check, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_props_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
 | `unknown_key_deriver` | the vault names a key deriver this bank was not made with        | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Bank.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
@@ -920,7 +869,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `absent_vault`        | the vault is `novel`, with no passphrase yet, and the call needs one: `del()`, `putWayin('passkey')` | Set its passphrase first (`ensureUnlocked()` or `putWayin()`) |
 | `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
-| `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
+| `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a backend with small records meets it | Tell the user to store a smaller whisper or sidecar |
 | `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows. The backend's own refusal carries how full it reckons the vault as `meta.capacity` |
 | `stale_write`         | storage changed since this call read it, so the write was refused and nothing was written: another call, here or on another device, wrote, created or deleted the box a `putBox()` was writing; a `delBox()`, `putWayin()` or `del()` into a vault deleted, made anew, or with its ways in changed elsewhere | Nothing is read after the refusal and nothing is tried again by itself: `hello()` to see what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). A `putBox()`'s refusal carries the box that won as `meta.box_stored`, and a second `putBox()` reads the box afresh |
 | `vault_mismatch`      | a box write or read met vault props other than the ones it expected: the vault deleted, made anew under another `vault_tok`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` or `getBox` called directly, or a vault's box read that met it; nothing was written or read | The device that expected that vault is out of date: read the vault again (`hello()`), and unlock the vault that stands now before reading or writing a box |
@@ -1116,14 +1065,11 @@ a record naming another boxlabel than the one it is stored under, one from a new
 safebyok or an older one -- is listed in the snapshot as damaged,
 `{ boxlabel, damaged: true, revision_tok }`, sorted among the sound ones, which carry
 `damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and
-null otherwise; nothing else of it is trusted. (One stored under a name your `validators` refuse
-is not damaged: it lists and reads as any other.) The rest of the vault opens and works
+null otherwise; nothing else of it is trusted. The rest of the vault opens and works
 as ever. `getBox()`, `getWhisper()` and `useWhisper()` refuse a damaged box with `damaged_box`; `delBox()` removes
 it by the name it is listed under, and `putBox()` writes a fresh box over one that names its
-revision -- except under a name your boxlabel check refuses, which `putBox()` refuses with `bad_scope`, writing nothing. A
-damaged box's boxlabel is the name it is stored under, above the floor but perhaps one your
-boxlabel check refuses: show it as text, never as markup. A row stored under a name below the
-floor, which no call could reach, is not listed. Show it as removable:
+revision. A damaged box's boxlabel is the name it is stored under, a label. A row stored under a
+name that is no label, which no call could reach, is not listed. Show a damaged box as removable:
 
 ```ts
 for (const box of vault.getSnapshot().boxes) {

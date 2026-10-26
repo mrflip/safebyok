@@ -9,12 +9,11 @@ import { label, user_id } from './primitives'
 // == [Kit]: Kit, KitWith
 
 /** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, and the names every scope is made of.
- * `zod` is the whole of Zod, for what the kit does not alias: `zod.lazy`, `zod.null()`. An object
- * is strict or loose by its methods, `obj({ ... }).strict()`.
+ * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
+ * A maker the kit lacks comes in by a named import from `zod` beside the call: the whole of Zod
+ * would carry every locale it ships into each host's bundle.
  */
 export const Kit = {
-  /** The whole of Zod, for the rare thing the kit does not alias. */
-  zod:     Zod,
   obj:     Zod.object,
   arr:     Zod.array,
   tuple:   Zod.tuple,
@@ -23,6 +22,7 @@ export const Kit = {
   union:   Zod.union,
   discrim: Zod.discriminatedUnion,
   lit:     Zod.literal,
+  lazy:    Zod.lazy,
   /** A check Zod has no maker for, as a predicate: a function, a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
   unk:     Zod.unknown(),

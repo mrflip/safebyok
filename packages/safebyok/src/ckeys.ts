@@ -11,7 +11,7 @@ import type { VaultScope } from './types'
  *
  * No two rows share a ckey, and every ckey splits back into its names. A ckey is part of what is
  * stored: rows filed under these are where every other device's copy of the package looks.
- * Each maker refuses 'bad_scope' for a name holding `^`, which `NameFloor` refuses anyway.
+ * Each maker refuses 'bad_scope' for a name holding `^`, which `label` and `user_id` refuse anyway.
  */
 
 /** The character every ckey joins its parts on, which no name may hold: `^`. */

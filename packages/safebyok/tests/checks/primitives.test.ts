@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as Zod from 'zod'
 import { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/checks/primitives'
 
 const LabelCases = [
@@ -141,5 +142,16 @@ describe("UserIdPattern", () => {
 
   it("answers for millions of dots at once, refusing them", () => {
     expect(UserIdPattern.test('.'.repeat(12_000_000))).to.be.false
+  })
+})
+
+describe("label and user_id, inside a host's own Zod", () => {
+  // A host on classic Zod holds them in its own schemas, as a form checking a box might.
+  const BoxForm = Zod.object({ boxlabel: label, user_id: Zod.optional(user_id) })
+
+  it("compose into a host's schema and check as they do alone", () => {
+    expect(BoxForm.parse({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })).to.deep.equal({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })
+    expect(BoxForm.safeParse({ boxlabel: 'ANTHROPIC' }).success).to.be.false
+    expect(BoxForm.safeParse({ boxlabel: 'anthropic', user_id: 'u'.repeat(101) }).success).to.be.false
   })
 })

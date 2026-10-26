@@ -1,4 +1,4 @@
-import * as Names from './names'
+import * as CX from './checks/core-checks'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
@@ -8,7 +8,7 @@ import type { VaultDB } from './vault-db'
 import { type MakeBankOpts, type VaultDraft, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Bank.make's options and the vault's draft: which vault, and the two stores it lives in. */
-export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'deviceDB' | 'validators'> & Pick<VaultDraft, 'userId' | 'vaultlabel'>
+export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'deviceDB'> & Pick<VaultDraft, 'userId' | 'vaultlabel'>
 
 /** Delete a vault whose birth refuses it as `damaged_vault`: its vault props, every box, and this device's lease of it.
  * There is no Vault object to `del()` it with, so this is how to clear it and start over. It takes
@@ -40,8 +40,7 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'vaultDB' | 'd
  */
 export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> => {
   if (! isBag(opts)) { throw new VaultError('bad_option', 'delDamagedVault takes one bag of options: applabel, userId, vaultlabel, vaultDB and deviceDB, as Bank.make and bank.ensureVault took them.') }
-  const rules = Names.rulesOf(opts.validators)
-  const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
+  const scope = CX.vaultScope.parse({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const vaultDB = parseVaultDB(opts.vaultDB)
   await delDamagedVaultIn(scope, vaultDB, parseDeviceDB(opts.deviceDB))
 }

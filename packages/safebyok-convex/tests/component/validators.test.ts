@@ -163,7 +163,7 @@ const OldIso = '2026-10-14T00:00:00.000Z'
 const VaultPropsCases = [
   // both accept:
   [TH.vaultPropsOf('u1'),                                                    true,   true,   'whole vault props'],
-  // names are any text to both: the vault's validators check them, client side
+  // names are any text to Convex: the client's VaultDB checks them
   [{ ...TH.vaultPropsOf('u1'), passkey: TH.passkeyWayinOf('laptop') },     true,   true,   'vault props with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
@@ -196,7 +196,6 @@ const BoxCases = [
   [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole box'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} },                 true,   true,   'a box with an empty sidecar'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { list: ['a', 1, { beta: true }], gone: null } }, true, true, 'a box with a sidecar of any JSON values'],
-  [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    true,   true,   'a boxlabel of any text'],
   // both refuse:
   [boxWithoutSidecar,                                                        false,  false,  'a box with no sidecar: one is always written'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
@@ -211,6 +210,7 @@ const BoxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { note: undefined } }, false, true,   'a sidecar holding what JSON cannot carry'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' },             false,  true,   'an empty revision_tok'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: Infinity },         false,  true,   'a written_at that never comes'],
+  [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    false,  true,   'a boxlabel that is no label: the name rules are the client\'s'],
 ] as const
 
 describe("the Convex validators, against the core's Zod records, record by record", () => {

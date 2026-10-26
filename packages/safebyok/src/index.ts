@@ -1,7 +1,7 @@
 /** safebyok: an end-to-end encrypted vault for API keys and other small secrets, encrypted on the user's device under keys that never leave it.
  * Storage holds ciphertext only. Other entry points: `safebyok/idb` (the IndexedDB device store),
- * `safebyok/browser` (the browser's defaults for Bank.make), `safebyok/validators` (the name
- * checks, also here) and `safebyok/utils`. The IndexedDB vault store is `safebyok-indexeddb`.
+ * `safebyok/browser` (the browser's defaults for Bank.make) and `safebyok/utils`. The IndexedDB
+ * vault store is `safebyok-indexeddb`.
  */
 export { Argon2idWebV1, checkSaltFits, parseKeyDeriverSpec } from './key-deriver-spec'
 export type { KeyDeriverSpec } from './key-deriver-spec'
@@ -28,9 +28,7 @@ export { Lease } from './lease'
 export type { BoxCiphered, BoxVisible, LeaseStanding, LeaseVault, LeaseView } from './lease'
 export type { Proving, PassphraseProving, PasskeyProving, ProvingGating, ProvingVault, PassphraseWayinHeader, PasskeyWayinHeader } from './proving'
 export type { Gate, GateVault, GateWayins } from './gate'
-export { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from './validators'
-export type { NameValidator, VaultValidators } from './validators'
-export { checkValidators } from './names'
+export { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from './checks/primitives'
 export type { Capacity, Clock, DamagedBox, ListedSummary, PasskeyAnswer, PasskeyWayinSummary, PassphraseWayinSummary, Stamp, Stamped, WayinKind, WayinSummary, WhisperJson } from './types'
 export { Ciphered } from './crypto'
 export { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from './errors'

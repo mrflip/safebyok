@@ -67,7 +67,7 @@ describe("SessionBar", () => {
   it("says what a username is when one will not do, and stays signed out", async () => {
     const { auth } = renderBar()
     signInAs('not a label')
-    await screen.findByText(/A username is 2-64 letters/)
+    await screen.findByText(/A username is 2 to 40 lowercase letters/)
     expect(auth.getSnapshot()).to.be.null
   })
 

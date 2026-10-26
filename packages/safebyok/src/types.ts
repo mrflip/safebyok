@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { Ciphered } from './crypto'
-import { NameFloor } from './validators'
+import { label, user_id } from './checks/primitives'
 
 /** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
@@ -96,14 +96,13 @@ export const EpochMillis = Z.number().check(
   Z.int("An instant is whole epoch milliseconds"),
 )
 
-/** What names one vault: the app's label, the signed-in user's id, and the vault's own label.
- * It checks each name only against {@link NameFloor}. The vault's `validators` say what else a
- * name may be, where it enters (`Label` and `UserId` by default).
+/** What names one vault: the app's label, the signed-in user's id, and the vault's own label, as plain Zod.
+ * Each label is a `label`, and the user's id a `user_id`.
  */
 export const VaultScope = Z.object({
-  applabel:   NameFloor,
-  user_id:    NameFloor,
-  vaultlabel: NameFloor,
+  applabel:   label,
+  user_id:    user_id,
+  vaultlabel: label,
 })
 export type VaultScope = Z.infer<typeof VaultScope>
 
@@ -132,7 +131,7 @@ export type Sidecar = Z.infer<typeof Sidecar>
  * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_tok }).damaged // false
  */
 export const BoxSummary = Z.object({
-  boxlabel:        NameFloor,
+  boxlabel:        label,
   revision_tok:    Z.string().check(Z.minLength(1)),
   sidecar:         Sidecar,
   registered_at:   EpochMillis,
@@ -263,9 +262,9 @@ export type PasskeyAnswer = {
 /** The fields every vault props record opens with, gated or gateless: its format, its scope and its `vault_tok`. */
 const VaultPropsHead = {
   format:              Z.literal('safebyok-vault-v6'),
-  applabel:            NameFloor,
-  user_id:             NameFloor,
-  vaultlabel:          NameFloor,
+  applabel:            label,
+  user_id:             user_id,
+  vaultlabel:          label,
   /** A random token minted when the vault is made, never changed, and bound into every encryption. */
   vault_tok:           Z.string().check(Z.minLength(1)),
   /** A counter the store bumps on every write of the gate and on the vault's deletion, and carries on into a new life of the scope.
@@ -318,9 +317,9 @@ export const TombstoneFormat = 'safebyok-tombstone-v1'
  */
 export const Tombstone = Z.object({
   format:              Z.literal(TombstoneFormat),
-  applabel:            NameFloor,
-  user_id:             NameFloor,
-  vaultlabel:          NameFloor,
+  applabel:            label,
+  user_id:             user_id,
+  vaultlabel:          label,
   vault_epoch:         Z.int().check(Z.positive()),
 })
 export type Tombstone = Z.infer<typeof Tombstone>
@@ -362,9 +361,9 @@ export const isGated = (vaultProps: VaultProps): vaultProps is GatedVaultProps =
  */
 export const LeaseRecord = Z.object({
   format:            Z.literal('safebyok-lease-v1'),
-  applabel:          NameFloor,
-  user_id:           NameFloor,
-  vaultlabel:        NameFloor,
+  applabel:          label,
+  user_id:           user_id,
+  vaultlabel:        label,
   vault_tok:         Z.string().check(Z.minLength(1)),
   /** The vault props' `gate_epoch` when this lease was granted: a mismatch voids it. */
   gate_epoch:        Z.int().check(Z.positive()),
@@ -389,9 +388,9 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  */
 export const DeviceRecord = Z.object({
   format:              Z.literal(DeviceRecordFormat),
-  applabel:            NameFloor,
-  user_id:             NameFloor,
-  vaultlabel:          NameFloor,
+  applabel:            label,
+  user_id:             user_id,
+  vaultlabel:          label,
   /** This device's random id for the scope, minted the first time it births the vault there, and carried by every wayin it seals. */
   device_id:           Z.string().check(Z.minLength(1)),
   /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */

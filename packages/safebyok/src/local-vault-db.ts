@@ -71,7 +71,7 @@ class StringStoreVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   // Nor does it count boxes: the vault's own maxBoxes is the only limit.
   readonly maxBoxes = Infinity
-  // A ckey holds a name of any length the floor admits.
+  // A ckey holds a name of any length the checks admit.
   readonly maxNameBytes = Infinity
 
   private readonly store: StringStore

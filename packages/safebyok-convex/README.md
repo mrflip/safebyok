@@ -170,11 +170,9 @@ Three tables, inside the component, beside nothing of your app's:
   is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
   keeps it in its own backups; Convex's backups and exports keep what they keep.
 * `user_id` leads the vault and box indexes, so one user's rows are one range of each.
-* **Any text is a name** to the component: it never sees the vault's `validators`, which check
-  each name where it enters the vault, on the client. The floor beneath them, which the
-  client's VaultDB holds every name to whatever the validators say, refuses what Convex could
-  not store: a lone surrogate (half of a character, which Convex's documentation forbids in a
-  string), a control character, text not in NFC, a name over 1 KiB.
+* **Each name is a label or a user id** by the time the component sees it: the client's VaultDB
+  holds every name to its check (`label`, `user_id`), ASCII of at most 100 characters, which
+  Convex stores as it is.
 * **A vault's tally** counts its boxes and their bytes as Convex weighs them, kept in step
   by every box write and delete in the same transaction. A vault written before tallies
   were kept has none, and reads as ever: its next box write counts it, reading the vault

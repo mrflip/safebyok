@@ -89,7 +89,7 @@ describe("createAuth", () => {
     expect(nikos.userId).to.not.eq(margo.userId)
   })
 
-  it("refuses a userlabel that is not a Label", async () => {
+  it("refuses a userlabel that is not a label", async () => {
     const { auth } = makeWorld()
     await expect(auth.signIn('not a label')).rejects.toThrow()
     expect(auth.getSnapshot()).to.be.null

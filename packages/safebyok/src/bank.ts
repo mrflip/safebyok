@@ -3,7 +3,7 @@ import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Ckeys from './ckeys'
-import * as Names from './names'
+import * as CX from './checks/core-checks'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
@@ -334,7 +334,7 @@ export class Bank {
 
   /** The scope `choice` names in the bank's app, its names checked: 'bad_scope' for one that fails. */
   #scopeOf(choice: VaultChoice): VaultScope {
-    return Names.checkScope(this.#parts.rules, { applabel: this.#parts.applabel, user_id: choice.userId, vaultlabel: choice.vaultlabel })
+    return CX.vaultScope.parse({ applabel: this.#parts.applabel, user_id: choice.userId, vaultlabel: choice.vaultlabel })
   }
   // --
 

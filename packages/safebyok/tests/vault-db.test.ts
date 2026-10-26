@@ -12,7 +12,7 @@ import type { BoxRecord } from '../src/box'
 import type { GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
-import { NameFloorBytes } from '../src/validators'
+import { MaxUserIdChars } from '../src/checks/primitives'
 import * as TH from './test-helpers'
 
 // == [Test adapters]: MapVaultDB, TroubledVaultDB, RingingVaultDB, MisreportingVaultDB, MisreportedCases
@@ -294,11 +294,11 @@ const ListedRecordCases = [
   ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar'),  [["anthropic", true]],   'a record with no sidecar as damaged'],
   ["anthropic",  null,                                                       [["anthropic", true]],   'a null record as damaged'],
   ["anthropic",  'not a box',                                                [["anthropic", true]],   'a record that is not an object as damaged'],
-  // stored under a name a vault's validators would refuse at its entry, or with a sidecar no host meant: stored under other checks, and sound
-  ["Anthropic",  TH.boxOf('Anthropic', 'one'),                               [["Anthropic", false]],  'a record stored under a boxlabel the default check refuses as sound: a check is an alarm at entry, not a promise about storage'],
+  // with a sidecar no host meant: sound, as the sidecar is never interpreted
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: { note: 'beep\u{7}' } }, [["anthropic", false]], 'a record whose sidecar holds a control character as sound: the sidecar is never interpreted'],
-  // stored under a name below the floor, which no verb could reach: not listed at all
-  ["tab\there",  TH.boxOf('tab\there', 'one'),                               [],                      'nothing for a record stored under a boxlabel below the floor, which no verb could name'],
+  // stored under a name that is no label, which no verb could reach: not listed at all
+  ["Anthropic",  TH.boxOf('Anthropic', 'one'),                               [],                      'nothing for a record stored under a boxlabel that is no label, which no verb could name'],
+  ["tab\there",  TH.boxOf('tab\there', 'one'),                               [],                      'nothing for a record stored under a boxlabel holding a control character'],
 ] as const
 
 describe("the abstract VaultDB, around an adapter's half", () => {
@@ -400,7 +400,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
     expect((refusal as VaultError).cause).to.eq(outage)
   })
 
-  it("refuses to subscribe to a scope below the floor", () => {
+  it("refuses to subscribe to a scope with a name that fails its check", () => {
     const vaultDB = new MapVaultDB()
     expect(() => vaultDB.subscribe({ ...TH.scopeOf('u1'), applabel: '' }, unheard)).to.throw(VaultError, /applabel/).with.property('refusalkind', 'bad_scope')
   })
@@ -884,7 +884,7 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
     expect(JSON.stringify(capacity)).to.not.include('null')  // as Infinity would cross
   })
 
-  it("refuses a scope below the floor as bad_scope, before its adapter is asked", async () => {
+  it("refuses a scope with a name that fails its check as bad_scope, before its adapter is asked", async () => {
     const vaultDB = new CapacityAnsweringVaultDB(() => Promise.reject(new Error('never asked')))
     await TH.expectBad(vaultDB.getCapacity({ ...TH.scopeOf('u1'), vaultlabel: 'a^b' }), 'bad_scope')
   })
@@ -987,7 +987,7 @@ describe("the abstract VaultDB, listing", () => {
 })
 
 describe("the abstract VaultDB, reading a vault whole", () => {
-  it("hands back the vault props checked, and the listing as listBoxes makes it: a damaged box listed, a row below the floor left out, sorted", async () => {
+  it("hands back the vault props checked, and the listing as listBoxes makes it: a damaged box listed, a row under a name that is no label left out, sorted", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'))
     vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'))
@@ -1148,35 +1148,18 @@ describe("the abstract VaultDB, reading a damaged box", () => {
 
 // == [Names and sizes]: scriptScope, holding names, NarrowNamesVaultDB, SmallRecordVaultDB, weighing, jsonBytes
 
-/** A scope no default check admits, which every verb takes: names above the floor. */
-const scriptScope = { applabel: 'Acme: אקמה', user_id: 'u1', vaultlabel: 'ราก' } as const
-
-describe("the abstract VaultDB, holding names to the floor", () => {
-  it("takes any name above the floor in every verb, as a server serving several clients must: a vault's own validators are its own, at its entry", async () => {
-    const vaultDB = new MapVaultDB()
-    await TH.ensureGated(vaultDB, { ...TH.vaultPropsOf('u1'), ...scriptScope })
-    await TH.expectingGood(vaultDB).putBox(scriptScope, TH.noBoxYet, TH.boxOf('مفتاح العمل', 'one'))
-    const box = await TH.expectingGood(vaultDB).getBox(scriptScope, 'مفتاح العمل', TH.inThisVault)
-    expect(box?.revision_tok).to.eq('rev-one')
-    const summaries = await TH.boxesOf(vaultDB, scriptScope)
-    expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['مفتاح العمل'])
-    await TH.expectingGood(vaultDB).delBox(scriptScope, 'مفتاح العمل', TH.deleting('rev-one'))
-    vaultDB.subscribe(scriptScope, unheard)()
-    await TH.expectingGood(vaultDB).delVault(scriptScope, TH.thisVault)
-    expect(await TH.propsOf(vaultDB, scriptScope)).to.be.null
-  })
-
-  const BelowTheFloor = [
-    ["",                                'an empty name'],
-    ["tab\there",                       'a control character'],
-    ["cafe\u{301}",                     'a letter decomposed, not in NFC'],
-    ["key\u{D83D}",                     'half of an emoji'],
-    ["a^b",                             'a ^, which key-value stores join names on'],
-    ["n".repeat(NameFloorBytes + 1),    'more than a kibibyte'],
-    ["\u{E9}".repeat((NameFloorBytes / 2) + 1), 'more than a kibibyte of UTF-8, in fewer characters'],
+describe("the abstract VaultDB, holding names to their checks", () => {
+  const NotNames = [
+    ["",                                 'an empty name'],
+    ["tab\there",                        'a control character'],
+    ["caf\u{E9}",                        'a letter outside ASCII'],
+    ["key\u{D83D}",                      'half of an emoji'],
+    ["a^b",                              'a ^, which a scopepath joins names on'],
+    ["Anthropic",                        'a capital letter'],
+    ["n".repeat(MaxUserIdChars + 1),     'more characters than any name holds'],
   ] as const
 
-  for (const [candidate, blurb] of BelowTheFloor) {
+  for (const [candidate, blurb] of NotNames) {
     it(`refuses ${blurb} as bad_scope as a boxlabel and in a scope, as bad_record in vault props and invalid_box in a box, before its adapter's half sees it`, async () => {
       const vaultDB = new MapVaultDB()
       await TH.expectBad(vaultDB.getVault({ ...TH.scopeOf('u1'), vaultlabel: candidate }), 'bad_scope')
@@ -1207,11 +1190,11 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   it("lists boxes by code unit, never by a locale, so every device lists them in one order", async () => {
     const vaultDB = new MapVaultDB()
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
-    for (const boxlabel of ['b', 'a_b', 'B', 'a1', '\u{E9}', 'z']) {
+    for (const boxlabel of ['bb', 'a_b', 'ab', 'a1', 'a2z', 'zz']) {
       vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), boxlabel), TH.boxOf(boxlabel, boxlabel))
     }
     const listed = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
-    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['B', 'a1', 'a_b', 'b', 'z', '\u{E9}'])
+    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['a1', 'a2z', 'a_b', 'ab', 'bb', 'zz'])
   })
 })
 
@@ -1222,8 +1205,8 @@ class NarrowNamesVaultDB extends MapVaultDB {
 
 /** Names the narrow adapter refuses, each by one of its declared limits. */
 const NarrowRefusals = [
-  ["n".repeat(9),   '9 bytes',   'a name of nine bytes'],
-  ["\u{E9}".repeat(5), '10 bytes', 'a name of five characters but ten bytes of UTF-8'],
+  ["n".repeat(9),    '9 bytes',    'a name of nine bytes'],
+  ["n".repeat(12),   '12 bytes',   'a name of twelve bytes'],
 ] as const
 
 describe("the abstract VaultDB, holding names to what its adapter declares", () => {
@@ -1254,8 +1237,8 @@ describe("the abstract VaultDB, holding names to what its adapter declares", () 
   it("takes a name of exactly as many bytes as it declares", async () => {
     const vaultDB = new NarrowNamesVaultDB()
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('a:b|c.de', 'one'))
-    const box = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'a:b|c.de', TH.inThisVault)
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('a_b_c_de', 'one'))
+    const box = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'a_b_c_de', TH.inThisVault)
     expect(box?.revision_tok).to.eq('rev-one')
   })
 })
@@ -1518,7 +1501,7 @@ describe("VaultDB.getVaultRecords", () => {
     ])
   })
 
-  it("leaves out an entry filed under a name below the floor, which no verb could reach", async () => {
+  it("leaves out an entry filed under a name that is no label, which no verb could reach", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'))
     vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'tab\there'), TH.boxOf('tab\there', 'one'))
@@ -1526,7 +1509,7 @@ describe("VaultDB.getVaultRecords", () => {
     expect(records?.boxes).to.deep.equal([])
   })
 
-  it("refuses as getVault does: a scope below the floor as bad_scope, the adapter's failure as storage_unavailable", async () => {
+  it("refuses as getVault does: a scope with a name that fails its check as bad_scope, the adapter's failure as storage_unavailable", async () => {
     class DownVaultDB extends MapVaultDB {
       protected override doGetVault(): Promise<StoredVault> { return Promise.reject(new Error('connection reset')) }
     }

@@ -39,13 +39,13 @@ const ScopeCases = [
   // regular usage:
   [TH.scopeOf('u1'),                                  true,   'an applabel, a user_id and a vaultlabel'],
   [TH.scopeOf('user|2fJ8:google'),                    true,   'a user_id in whatever form the host app issues'],
-  [TH.scopeOf('u'.repeat(101)),                       true,   'a user_id longer than the default check admits: past the floor, what a name may be is the validators\' to say'],
-  [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  true,   'an applabel of any script'],
-  // refused, below the floor every name is held to:
+  [TH.scopeOf('u'.repeat(100)),                       true,   'a user_id of a hundred characters, the most it holds'],
+  // refused, a name failing its check:
+  [TH.scopeOf('u'.repeat(101)),                       false,  'a user_id over a hundred characters'],
+  [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  false,  'an applabel that is no label'],
   [{ ...TH.scopeOf('u1'), user_id: '' },              false,  'an empty user_id'],
   [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel holding a control character'],
-  [{ ...TH.scopeOf('u1'), applabel: 'cafe\u{301}' },  false,  'an applabel not in NFC'],
-  [TH.scopeOf('u'.repeat(1025)),                      false,  'a user_id over a kibibyte'],
+  [{ ...TH.scopeOf('u1'), applabel: 'cafe\u{301}' },  false,  'an applabel outside ASCII'],
   // refused:
   [{ ...TH.scopeOf('u1'), applabel: 42 },             false,  'an applabel that is not text'],
   [{ applabel: 'acme', user_id: 'u1' },              false,  'a scope missing its vaultlabel'],
@@ -83,7 +83,7 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },              false,  'an epoch starts at one'],
   [{ ...TH.vaultPropsOf('u1'), gate_epoch: 1.5 },            false,  'an epoch is a whole number'],
   [{ ...TH.vaultPropsOf('u1'), vault_tok: '' },              false,  'an empty vault_tok'],
-  [TH.vaultPropsOf('u'.repeat(101)),                        true,   'a user_id of any length: the validators check names, not the record'],
+  [TH.vaultPropsOf('u'.repeat(101)),                        false,  'a user_id over a hundred characters'],
   [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, 'a passphrase missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 }, false,  'a registered_at in epoch seconds'],
@@ -238,9 +238,10 @@ describe("ForeverMillis", () => {
 })
 
 describe("LeaseRecord", () => {
-  it("takes a user_id of any length, and refuses one that is not text", async () => {
-    const lease = await TH.leaseOf('u'.repeat(1000))
+  it("takes a user_id up to a hundred characters, and refuses a longer one or one that is not text", async () => {
+    const lease = await TH.leaseOf('u'.repeat(100))
     expect(LeaseRecord.safeParse(lease).success).to.be.true
+    expect(LeaseRecord.safeParse({ ...lease, user_id: 'u'.repeat(101) }).success).to.be.false
     expect(LeaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
   })
 })

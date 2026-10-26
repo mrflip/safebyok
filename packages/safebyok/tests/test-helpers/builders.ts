@@ -372,14 +372,9 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecor
   ...overrides,
 })
 
-/**
- * Labels the default grammar refuses and a host's validators may admit: ones differing only by a
- * colon, a quote, a backslash, a comma or a bracket, ones that would close a JSON string early,
- * and Hebrew, Arabic, Thai and mixed text.
- */
+/** Labels that differ only by an underscore, a digit or where an underscore falls: the nearest neighbours a store's keys might run together. */
 export const OddLabels = Object.freeze([
-  'main', 'main:', 'main"', String.raw`main\\`, 'main,', 'main[', 'main]', 'main","x',
-  'מפתח העבודה', 'مفتاح العمل', 'กุญแจงาน', 'Mixed: English, עברית, العربية, ไทย',
+  'main', 'main_x', 'mainx', 'main_1', 'main1', 'ma_in', 'mai_n', 'm_ain',
 ] as const)
 
 /**

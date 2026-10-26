@@ -1,10 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import * as ZClassic from 'zod'
-import * as Z from 'zod/mini'
 import { type DeviceDB } from '../src/device-db'
 import { type VaultDB } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
-import { type MakeBankOpts } from '../src/vault-opts'
 import { type DelDamagedVaultOpts } from '../src/del-damaged-vault'
 import { delDamagedVault } from '../src/del-damaged-vault'
 import { Bank } from '../src/bank'
@@ -122,15 +119,13 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks the scope with the vault's validators, handing the VaultDB's verb the scope alone, and refuses a misspelt bag as Bank.make does", async () => {
+  it("checks the scope as Bank.make and bank.ensureVault do, handing the VaultDB's verb the scope alone", async () => {
     const world = await damagedVaultWorld()
-    const longUserId = ZClassic.string().min(1).max(300)
     const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userID: longUserId } as unknown as MakeBankOpts['validators'] })), 'bad_option')
-    const narrowUserId = ZClassic.string().max(1)
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userId: narrowUserId } })), 'bad_scope')
+    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: 'alice smith' })), 'bad_scope')
+    expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
     expect(verb).not.toHaveBeenCalled()
-    await delDamagedVault(world.optsWith({ validators: { userId: longUserId } }))
+    await delDamagedVault(world.optsWith())
     expect(verb.mock.calls[0]).to.deep.equal([TH.scopeOf('u1')])
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
   })
@@ -149,9 +144,9 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks names with the host's validators, as Bank.make does", async () => {
+  it("takes a user_id that is an email address, as Bank.make does", async () => {
     const world = makeWorld()
-    const opts = world.optsWith({ userId: 'u1@example', validators: { userId: Z.string() } })
+    const opts = world.optsWith({ userId: 'u1@example' })
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
     TH.closeVault(vault)

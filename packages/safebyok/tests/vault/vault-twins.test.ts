@@ -142,7 +142,7 @@ const brokenStoreVault = async () => {
 describe("a throw that is no refusal (Contract: Shapes)", () => {
   it("resolves, from a try form, as 'unexpected_error', misuse, what was thrown its cause", async () => {
     const { vault, thrown } = await brokenStoreVault()
-    const err = await TH.expectBad(vault.tryGetBox('ANTHROPIC_API_KEY'), 'unexpected_error')
+    const err = await TH.expectBad(vault.tryGetBox('anthropic_api_key'), 'unexpected_error')
     expect(err.family).to.eq('misuse')
     expect(err.cause).to.eq(thrown)
   })
@@ -156,7 +156,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
 
   it("throws, from the throwing form, the same 'unexpected_error'", async () => {
     const { vault, thrown } = await brokenStoreVault()
-    const err = await TH.expectRefusal(vault.getBox('ANTHROPIC_API_KEY'), 'unexpected_error')
+    const err = await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
   })
 

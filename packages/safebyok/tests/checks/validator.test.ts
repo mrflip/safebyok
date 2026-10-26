@@ -171,6 +171,8 @@ describe("Kit", () => {
     expect(Kit.uint.safeParse(-1).success).to.be.false
     expect(Kit.uint.safeParse(1.5).success).to.be.false
     expect(Kit.custom((candidate) => typeof candidate === 'function').safeParse(() => null).success).to.be.true
+    expect(Kit.lit(null).safeParse(null).success).to.be.true
+    expect(Kit.lazy(() => Kit.str).safeParse('text').success).to.be.true
     expect(Kit.applabel).to.eq(Kit.label)
     expect(Kit.user_id.safeParse('auth0|x').success).to.be.true
   })

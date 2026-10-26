@@ -14,6 +14,13 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     expect(CX.boxscope.parse({ ...vault, boxlabel: 'openai' })).to.deep.equal({ ...scope, boxlabel: 'openai' })
   })
 
+  it("leave the scope handed in as it was, unfrozen, handing back a copy", () => {
+    const handed = { ...scope }
+    const parsed = CX.vaultScope.parse(handed)
+    expect(parsed).to.not.eq(handed)
+    expect(Object.isFrozen(handed)).to.be.false
+  })
+
   it("read a scope's names through a getter, as a Vault object holds them", () => {
     class Holder {
       readonly #applabel = 'acme'

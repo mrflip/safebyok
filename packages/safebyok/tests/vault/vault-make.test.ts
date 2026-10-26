@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, expectTypeOf } from 'vitest'
 import { LeaseHours, FarFuture, ForeverMillis, MinuteMillis } from '../../src/types'
-import { MaxUserIdChars } from '../../src/validators'
+import { MaxUserIdChars } from '../../src/checks/primitives'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
