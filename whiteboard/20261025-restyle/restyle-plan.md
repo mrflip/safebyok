@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** threads 1 to 8 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#279](https://github.com/mrflip/safebyok/pull/279)); thread 9 built ([#280](https://github.com/mrflip/safebyok/pull/280)), in review at high.
+* **Status:** threads 1 to 9 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#280](https://github.com/mrflip/safebyok/pull/280)); thread 10 under way.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -376,6 +376,19 @@ cryptographic construction: follow what is in `src/` and the preplan, add no new
 stop and report if the preplan's ctx seems to need one. **Depends on:** thread 8. **Look-ahead:**
 the box's own fields in thread 11 are what its stamp binds. **Size:** medium; review at `high`.
 
+*Review:* high, `fixed`. Checked and holding: the encoding is today's construction (one string,
+the purpose, between stamp records and the header, so the bytes decode to one input); the field
+lists match the preplan; no counting epoch bound into a wayin or a box; no write rewrites a bound
+field; wayins take their stamp from the standing record, never a snapshot getter; no secret in a
+ctx, error or log. Fixed: `cipherCtx` bound a null record field its doc block said it refused
+(now refused, no accepted ctx changes); stale lease.ts doc blocks; the changeset's account of a
+lease left on a device; the binding-test helper took any throw as "does not open" (now only
+AES-GCM's `OperationError`, or `bad_record` for the three literal fields); tests for
+`boxCtxOf`'s and `leaseCtxOf`'s examples. Left: `registered_at` drift (a backend changing it
+under the same `vault_tok` bricks the vault with misleading kinds; left unbound on 2026-10-21 in
+`132df4d3` for that resilience, the preplan reverses it; an Open Matter); the stamp pickers'
+home (thread 11); a parse per cipher. Filed as [#280](https://github.com/mrflip/safebyok/pull/280).
+
 ### 10. Reads (Preplan Phase 5) -- `reads`
 
 > 5. **Reads.** The responses above; `vaultProps` becomes `vault` in the adapters' half, typed as
@@ -413,7 +426,9 @@ returns a `VaultSparse` (rename or drop it); `Lease implements Omit<LeaseSparse,
 others. From #279's review: name what is written out at many sites (`GatedVaultRecord`, an
 exported `VaultDraft`, the `Stamped` parameter) if that reads better; derive `stampOf` by leaving
 out `gate` (`const { gate: _gate, ...sparse } = record`), not by listing fields; `MadeUnder` in
-box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`. From #280: rename the old-sense "stamp" (what a thing was made
+box.ts as `Z.infer<typeof StampShape>`; settle `LeaseSparse` beside `LeaseStamp`. From #280: move `VaultStampPicked` (wayin.ts),
+`VaultStampButFormat` and `LeaseStampPicked` (lease.ts) into vault-record.ts beside the other
+shapes; rename the old-sense "stamp" (what a thing was made
 under: scope, `vault_tok`, epochs) in Box's getters, `vault.stamp`, provings' `stamp` parameter,
 `StampedShape`, `checkedStamp`; VOCABULARY calls that set "made under". **Depends on:** thread
 10. **Look-ahead:** thread 12 removes what the per-field getters fed. **Size:** large.
