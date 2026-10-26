@@ -83,7 +83,8 @@ and the security reviewer reading the code.
   Log through the host's logger, never `console`. Errors must say what went wrong and what
   to do, calmly, for a non-expert, and carry a `kind` the caller can branch on.
 * Every new piece of code gets a proportional doc block and test suite (STYLE.md, *Tests*).
-* Validate at module entrypoints; write confident, paranoia-free code past that boundary.
+* Validate with Zod at each module entrypoint -- every export of a module -- and write confident,
+  paranoia-free code past it: a private helper trusts its exported caller.
 * Progress notes, development caveats and open questions go in `human/` or `whiteboard/` --
   never in doc blocks or code comments.
 * The core's `eslint.config.mjs` (`packages/safebyok/`) is the final authority on formatting.
@@ -159,8 +160,9 @@ The documents below are looked up by section, not read through.
   braces, quotes, doc blocks, and how tests are written. These conventions are specific and
   unguessable, and the linter enforces only some of them. *Conventions At A Glance*, below,
   covers a local name and a small edit. **Read the section you need before naming an export, a
-  module, a stored field or a new tag (*Naming*), and before writing a doc block, a test, or an
-  entrypoint that takes a caller's input (*Validation*).**
+  module, a stored field or a new tag (*Naming*), before writing a doc block, a test, or a
+  validator (*Validation*), and before shaping a type or a class that holds state (*Shapes and
+  duck typing*).**
 * `packages/safebyok/eslint.config.mjs` -- mechanically enforced style; the other packages' and
   the root's configs are cut from it. Where it and a prose document disagree, it is a bug -- flag
   it.
@@ -187,12 +189,16 @@ banned names. STYLE.md is the real source.
   `} else if (...) {`, `} catch (err) {`. Parenthesize and space every negation: `if (! approved)`.
 * `"` for prose, error messages, and `describe`/`it` titles. Otherwise use `'`.
 * No single-letter names, even in a lambda: `(row) => row.label`. `ii`, `jj` for a loop counter.
+  A binding unused on purpose says what it is (`_scopepathkind`): never a bare `_` or a hole.
 * The cast keeps VOCABULARY.md's names -- whisper, box, vault -- never `data` or `payload`. A
   cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
-  `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
-* Stored fields are underbar_case (`salt_bytes`); everything else camelCase. Use integer
-  UTC epoch milliseconds, not strings or `Date`s, for times.
+  `woodkind`, `scopepath`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
+* Stored fields are underbar_case (`salt_bytes`), and so is a host-facing field holding one
+  (`user_id`, never `userId`); everything else camelCase. Use integer UTC epoch milliseconds, not
+  strings or `Date`s, for times.
+* Take a part of a thing by parsing or destructuring, never by spreading it, and never hand host
+  code the thing itself: a spread drops its getters and copies its other fields.
 * A module of related verbs is star-imported under its Startcase name: `Names.checkFloor(...)`.
 * Every export has a doc block written for its caller. Each `@example` in it has a test whose
   title points back to it: `"refuses a misspelt field, as its second example shows"`.

@@ -98,11 +98,15 @@ thing for good and is what a record is found by (`device_id`, and the `credentia
 `_tok`, and changes on every life of what it marks: `revision_tok` turns on every write of a box,
 `vault_tok` on every life of a vault in its scope. In code they are `vaultTok` and `revisionTok`.
 
-**The stamp** is what a thing was made under: `{ applabel, user_id, vaultlabel, vault_tok,
-vault_epoch, gate_epoch }`, frozen (`Stamp`; `vault.stamp` is the vault's own, now). Every Box,
-Lease, Gate and Proving carries one, and `vault.demandConsistentWith(thing)` compares it with the
-vault's: the vault gone (`vault_gone`), another life (`vault_remade`), another gate
-(`gate_moved`).
+**The stamp** of a thing is what it was made under and keeps for its life: the fields bound into
+its cryptography (`VaultStamp`, `BoxStamp`, `LeaseStamp`; see *Shapes*). "Bound", "authenticated
+by the tag" and "binding" all say *stamp*. A counter that moves within the thing's life, such as
+an epoch, is never in its stamp; a short-lived thing made under one value of a counter keeps that
+value in its own, as a lease keeps the `gate_epoch` it was granted under. Every Box, Lease, Gate
+and Proving carries the vault's, and `vault.demandConsistentWith(thing)` compares what it carries
+with the vault's: the vault gone (`vault_gone`), another life (`vault_remade`), another gate
+(`gate_moved`). Today's `Stamp` type (`vault.stamp`) holds the scope, the `vault_tok` and both
+epochs: fields of a vault's sparse shape, under the name new code keeps for the fixed fields alone.
 
 ## Names, records and times
 
@@ -145,8 +149,27 @@ well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
 | **EpochMillis**                 | Every time safebyok keeps: whole UTC milliseconds since 1970, from `FarPast` (1981) to `FarFuture` (2255). The bounds catch seconds and microseconds passed by mistake.      |
 | **format**                      | The tag at the head of every stored record (`safebyok-vault-v6`, `safebyok-box-v8`, `safebyok-lease-v1`, `safebyok-device-v1`, and a deleted vault's `safebyok-tombstone-v1`). It is also the first part of the ctx, and bound there once. Any change to what a record may hold moves its format on; a test keeps each format's schema and fails when one changes under the same format. |
 | **validators**                  | The `Bank.make` option holding a host's own checks for its labels and user id (`VaultValidators`), each replacing safebyok's default, run where a name enters the vault and never on what storage hands back. A check only checks: what passes is kept as given. |
-| **ckey**                        | Where a key-value store files a row: its kind and names joined on `^` (`box^acme^u1^main^anthropic`, from `Ckeys`), which no name may contain. |
+| **scopepath**                   | Where a store files a scope's record: its kind, then the scope's names in order, joined on `^`, which no name may contain (`vault^acme^u1^main`, `box^acme^u1^main^anthropic`; `Scopepath`). A host's own key-value adapter files its rows by them. Code not yet converted builds them with `Ckeys`, and calls them ckeys. |
+| **ckey**                        | A generic map key: an entry's name in a map, or an index in an array. Never a storage address, which is a scopepath. |
 | **clock**, **logger**           | Two options your app may pass to `Bank.make`: a source of the time (`Clock`), and a place for the vault to say what it has no one to throw to (`VaultLogger`).          |
+
+## Shapes
+
+Each main type -- vault, box, lease and the rest -- has a small, fixed set of shapes, each named
+for its purpose and prefixed with the type (`VaultStamp`, `BoxSparse`; never a bare `Stamp`).
+Each is built from the record's own validator, so a reader learns one record and a handful of
+named subtractions. These are the names new code gives them (STYLE.md, *Shapes and duck typing*);
+code not yet converted keeps its older ones.
+
+| Shape         | What it is                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **record**    | The fields stored and sent over a wire, as one object (`VaultRecord`, `BoxRecord`).                                                                                         |
+| **sparse**    | A subset of the record's own fields, minus the heavy and sensitive ones, as a list or a log shows it (`VaultSparse`, `BoxSparse`): the shape wherever the whole record is not needed. An associate, such as a vault's gate or its boxes, is never in it. Never "listing" or "listed", which read as the list or what holds it. |
+| **stamp**     | The fields fixed for the record's life, which are exactly the fields bound into its cryptography (`VaultStamp`; see *The stamp*, above).                                   |
+| **scope**     | The composite id: the names its scopepath is made of (`VaultScope`, `BankScope`, and `Boxscope`, the one that smushes its two words).                                     |
+| **dna**       | What a caller sends to `make` or `ensureVault`: partial in the fields that have defaults, and without any field that must stay under safebyok's control (for a vault, its scope). |
+| **tombstone** | What a deletion leaves (`VaultTombstone`).                                                                                                                                  |
+| **snapshot**  | For a stateful thing, what a host renders: its sparse shape and what changes beside it, as frozen plain data that keeps its identity until something changes (`VaultSnapshot`). |
 
 ## Other credentials
 
@@ -158,7 +181,7 @@ well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
 ## Words safebyok does not use
 
 * **key, alone.** A key is always one of the five above, by name, or a wayinKey. An entry's name
-  in a map or a storage address is a `ckey`.
+  in a map is a `ckey`; a storage address is a scopepath.
 * **data, contents, payload.** The secret is a whisper; encrypted, it is a whisperCiphered.
 * **unlock, as a noun.** A way in is a wayin; what a device keeps is a lease. `ensureUnlocked()`
   is the verb, and `unlock_vault` the gating.

@@ -3,12 +3,21 @@
 Conventions for the `.ts` files in this package, for a human or an AI session working in it.
 CLAUDE.md's *Conventions At A Glance* covers a local name and a small edit. Read the section you
 need here when naming an export, a module, a stored field or a new tag, or when writing a doc
-block, a test, or an entrypoint that takes a caller's input. The naming vocabulary below is
-specific, and not guessable from general TypeScript habit.
+block, a test, a validator or an entrypoint that takes a caller's input, a type's shapes, or a
+class that holds state. The naming vocabulary below is specific, and not guessable from general
+TypeScript habit.
 
 The core's `eslint.config.mjs` (`packages/safebyok/`) is the source of truth for anything
 mechanically enforceable; where it and this document disagree, the linter wins and this document
 is a bug.
+
+This guide says how to write code from now on, and some of what it names is still being built
+into `src/`: the `Validator` factory (`src/checks/validator.ts`), the shared primitives
+(`src/checks/primitives.ts`), `Phrases` (`src/utils/phrases.ts`), `src/utils/consts.ts` and
+`Scopepath`. Until one lands, its worked example is the file of the same name in
+`whiteboard/20261025-restyle/good/`. A module not yet converted keeps its older form (`zod/mini`,
+`Ckeys`, a hand-written type beside its schema): leave it so unless your task is to convert it.
+While the linter still holds `src/` to `zod/mini`, so does new code.
 
 ## Imports
 
@@ -16,14 +25,22 @@ is a bug.
   them, as the wider ecosystem does.
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
 * **A module of related functions around one concern is imported whole**, under its Startcase
-  name: `import * as Names from './names'`, then `Names.check(...)`. Its functions are
-  vigorous verbs: `check`, not `namesCheck`.
+  name, where the namespace makes the call site clear: `import * as Scopepath from './scopepath'`,
+  then `Scopepath.vault(scope)`. Its exports take bare names, vigorous verbs or the noun they
+  make: `check`, not `namesCheck`; `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Box, BoxKinds } from './box'`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
-* Follow a library's own import conventions where it has one: `import * as Z from 'zod/mini'` is ours
-  (see *Validation*).
+* **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
+  its types come in under `Z`: `import type * as Z from 'zod'`. A module that builds outside a
+  `Validator` call (the kit's own primitives) imports the builders under the same short names.
+* Tree-shaking is no reason to choose either: named and star imports shake identically (esbuild
+  0.27, rolldown 1.2).
+* **Picking named fields needs no library**: destructure them from the parsed output. No
+  `es-toolkit/compat` in this library. Where a pick by a list of names is truly needed, write
+  `fieldnames.map((fieldname) => scope[fieldname])`: es-toolkit's core `pick` returns an object,
+  whose key order *Order comes from an explicit list* rules out.
 
 The test for a module between these rules: does the import put *one well-named noun* in scope,
 or several loose verbs? One noun is the goal.
@@ -52,10 +69,40 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 * a **map key** is a `ckey` (see *Tags*).
 
 **Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word**: `vaultlabel`,
-`boxlabel`, `woodkind` -- but not `fooCount` or `fooIter`.
+`boxlabel`, `woodkind`, `scopepath`, `scopepathkind`, `ScopepathDelimiter`, `Fieldname` -- but not
+`fooCount` or `fooIter`.
+
+**`Boxscope` is the one named exception** that smushes a noun into `scope`, there to show the
+rule. `VaultScope` and `BankScope` keep their two words. The exception stops at the scope: a box's
+scopepath is a `boxScopepath` (`BoxScopepath`), like every other `fooScopepath`.
 
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
-a menu choice is a `kind` or a `flavor`.
+a menu choice is a `kind` (`scopepathkind`) or a `flavor`. **`state` names nothing public**: a
+React app already means its own component state by it. Name a status for what it is about: a
+thing's stage in its life is its `lifecycle`.
+
+**`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
+`withinVaultScopepathPred(scope)`.
+
+**A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
+`vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
+`Input` appended** (`dragForceInput`).
+
+**Enumerations lead with their values, then the validator, then the type**, and a wider one
+spreads a narrower: `export const WayinKindVals = [...] as const`,
+`wayinkind = oneof(WayinKindVals)`, `export type WayinKind = typeof WayinKindVals[number]`.
+
+**A thing's shapes are named for their purpose, prefixed with the type**, from the fixed set in
+*Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
+`VaultTombstone`, `VaultSnapshot`; never a bare `Stamp`. A sparse thing is `-Sparse`
+(`BoxSparse`), never `-Listing`, which reads as the list or what holds it, nor `-Listed`: a sparse
+shape turns up well beyond listings. A response is named for the operation's family, not a
+moment: `VaultReadResponse`.
+
+**The stamp is the bound fields.** Say *stamp* for the fields a thing's cryptography is bound to,
+where you would write "the bound fields", "what the tag authenticates" or "the binding".
+`cipherCtx` keeps its name for the byte string AES-GCM and HKDF are given, which is the stamp, a
+purpose and a header: `cipherCtx(stamp, purpose, header)`.
 
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault(draft)`,
 `vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
@@ -89,9 +136,11 @@ key material, a model's verb resolves its summary: `vault.putWayin()` resolves t
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
 else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
 That holds wherever the object is the stored record, the facades a record passes through
-included: a key deriver's `key_deriver_label` is written into a wayin as it is. The tag
-smushing below is for a label that names a thing (`boxlabel`); `keyDeriverLabel` is the concept
-"the label of the key deriver", and stays camelCase.
+included: a key deriver's `key_deriver_label` is written into a wayin as it is. **A host-facing
+field that is a stored field takes its stored spelling**: one name for one thing, everywhere, so
+`user_id` in a host's options, a snapshot and storage alike, never `userId` for the same value.
+The tag smushing above is for a label that names a thing (`boxlabel`); `keyDeriverLabel` is the
+concept "the label of the key deriver", and stays camelCase.
 
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`,
 `askPassphraseAt`), in a stored record, a snapshot, a test fixture and the demo alike: never an
@@ -105,6 +154,9 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 ### Tags
 
 * `ckey` -- a collection key: a string for a map, an index for an array. `ckeys` for several.
+  Never a storage address, which is a scopepath.
+* `scopepath` -- where a store files a scope's record (*Scopepaths*); `vaultScopepath`,
+  `boxScopepath` for a particular kind.
 * `idx` -- an array index, known to be an integer.
 * `val` -- a truly generic value. `vv` and `kk` are second choices inside a lambda.
 * `kind`, `flavor` -- an identifier picked from a fixed menu. `label`, `handle` -- an identifier
@@ -137,6 +189,49 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * `return await` inside a `try` or `catch`, nowhere else -- unless you want the current function
   kept in the stack trace.
 
+## Build for maintenance
+
+* **Build for ease of maintenance, not ease of implementation.** A module's customer uses one
+  method; that method should read whole on its own, without tracing into a generic.
+* **Don't DRY short bodies through a generic.** Spelled out, a maker and its inverse read as
+  mirror images, each clear at a glance (`CX` is the core's checks, `checks/core-checks.ts`):
+
+  ```ts
+  export const box = (scope: Boxscope): BoxScopepath => {
+    const        { applabel, user_id, vaultlabel, boxlabel } = CX.boxscope.parse(scope)
+    return ['box', applabel, user_id, vaultlabel, boxlabel].join(ScopepathDelimiter)
+  }
+
+  export const boxscope = (boxScopepath: BoxScopepath): Boxscope => {
+    const [_scopepathkind, applabel, user_id, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
+    return               { applabel, user_id, vaultlabel, boxlabel }
+  }
+  ```
+
+  A field destructured but left out of the array is an unused name, which the linter flags; a
+  field-list helper gives no such check. A generic helper earns its place only when it is boring
+  and longer than the bodies it serves.
+* **Name what you ignore.** A binding left unused on purpose gets a name starting with `_` that
+  says what it is (`_scopepathkind`), never a hole (`[, applabel]`) and never a bare `_`. The name
+  records that the part exists, where it sits, and that skipping it is deliberate. The linter
+  passes only a named ignore: `_` and a letter or digit.
+* **Write the crucial detail where it shows.** A prefix of every box in a vault ends in the
+  delimiter; say so with `+ ScopepathDelimiter`, not with an empty last part that `join` turns
+  into one.
+* **Don't unwind what you will only rewind.** Holding a scopepath and needing a related one, work
+  on the text; don't parse it into a scope to join it again.
+* **Take one form of input.** A function taking a scope *or* its scopepath branches on its
+  argument and trusts one branch; take the scope.
+* **Constants shared across modules** (`ScopepathDelimiter`) live in `utils/consts.ts`, which
+  imports nothing, so any module can name them without a cycle.
+* **Familiar over cute.** When a function already spans lines, a named target and `===` beats an
+  equality-predicate factory: `const target = Scopepath.vault(thing)`, then
+  `scopepaths.some((scopepath) => scopepath === target)`.
+* **A predicate factory earns its place where it hides a detail that is easy to get wrong.** A
+  prefix test against a scopepath must end in the delimiter, or `vault^acme^u1^main` matches
+  `main2`'s rows. Never hand-write `.startsWith` against a scopepath: use the module's predicate.
+  The factory assesses its argument once, so the predicate itself only compares text.
+
 ## Braces and layout
 
 * Opening braces at the end of the line. Cuddle `} else if (...) {` and `} catch (err) {`.
@@ -156,8 +251,11 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   }
   ```
 
-* Align parallel construction into columns: values in an object literal, rows of an example
-  table.
+* **Parallel construction shows in the whitespace.** Align it into columns: values in an object
+  literal, rows of an example table. Where one line takes fields out and the next puts the same
+  fields back, pad so the field lists start in the same column (the example in *Build for
+  maintenance*): what was extracted and what is injected is obvious at a glance, and a field
+  dropped or swapped stands out.
 
 ## Strings
 
@@ -168,32 +266,256 @@ between columns lets the editor align them (see *Tests*).
 
 ## Validation
 
-* **Validate at the module entrypoint, with Zod**, then write confident code past it. An
-  entrypoint is generous: it accepts what a caller plausibly hands it and fills in defaults.
-  After it, no ambiguity and no undefined-checking paranoia.
-* A Zod schema is the first choice for defaults, coercion, limits and collapsing unions: one
-  schema, one message per limit, never a hand-written `if (n > 99) throw` beside it.
+A function's input rules are declared once, as a Zod schema, with a specific check beside it where
+one is warranted, and its TypeScript types come from that schema (`Z.infer`), so the signature and
+the checks cannot drift apart.
+
+**Always at a boundary**: what comes off the wire; records read back from storage, which is
+someone else's database and may hold a vault another version of this package wrote; a published
+package's exports; `Class.make` and any constructor taking outside input; a host's options; what a
+host's callback returns (a strength checker's verdict, a key deriver's output). A failure there is
+a refusal with a `kind` the caller can branch on.
+
+**For preconditions.** Check a function's input with Zod in general,
+`dragForceInput.parse({ thing, vel })`, above all where a validator is already written. A
+module-local variation is welcome, made directly or in a `Validator` call at module level, never
+in a call per function call. Where it is warranted (a rule Zod does not express naturally, a
+refusal that needs its own message), add a specific check or checks, inline or in a helper, and
+keep the Zod parse beside them wherever it still does useful work.
+
+* **A module's entrypoints are its exports.** An export assesses what its types cannot carry and
+  its sources have not already checked; a private helper trusts its exported caller. Past the
+  entrypoint, write confident code: no ambiguity and no undefined-checking paranoia.
+* **A boundary belongs to the export, not the caller.** `Scopepath.vault` is public, so it checks
+  its scope every time, and an internal caller holding a checked scope pays for a second check.
+  That cost is small, and one function with one behaviour beats a checked public twin and an
+  unchecked private one. Inside the package, don't re-check what was checked where it entered.
+* **An entrypoint is generous**: it accepts what a caller plausibly hands it and fills in
+  defaults. A Zod schema is the first choice for defaults, limits and collapsing unions.
 * **Clear intent at the door, clean data inside.** An entrypoint may take a host's plain way of
-  saying something -- `leaseHours: Infinity` for "never" -- and turns it into
-  the bounded form the code keeps, at the parse: `Infinity` hours becomes the longest finite
-  window. Past the entrypoint, and in every stored field, nothing is infinite.
-* **`src/` uses `zod/mini`**, never classic `zod` (the linter refuses it): mini's builders
-  tree-shake, so a host pays only for the validators its imports reach. Its schemas are plain
-  functions, its limits checks: `Z.optional(Z.string().check(Z.maxLength(256)))` where classic
-  reads `z.string().max(256).optional()`. A test playing a host may import classic, as a host
-  would.
-* Enumerations lead with their values, then the type: `export const BoxKindVals = [...] as
-  const`, `export type BoxKind = typeof BoxKindVals[number]`.
-* Name a schema after what it checks, in the same case: the field `salt_bytes` has the validator
-  `salt_bytes`.
-* **A refusal of a host's bag of options says what Zod found, in Zod's English**: parse with
-  `InEnglish` and say `issuesText(err)` first (`src/options.ts`; `optionsCheck` does both), then
-  what to do. zod/mini alone says only "Invalid input"; never `Z.config`, which is the host's Zod
-  too. Zod's English names a refused value's type, never the value.
-* **A validation error must never quote a secret.** Zod's issues can carry the input they
-  refused: a schema that sees secret material reports without it.
-* Records read back from storage are validated too: storage is someone else's database, and a
-  vault may have been written by another version of this package.
+  saying something -- `leaseHours: Infinity` for "never" -- and turns it into the bounded form the
+  code keeps, at the parse: `Infinity` hours becomes the longest finite window. Past the
+  entrypoint, and in every stored field, nothing is infinite.
+* **Not Zod's job**: rules about state ("the vault is locked"), which are control flow; rules
+  needing async I/O; properties Zod cannot see (whether a CryptoKey is usable). A rule relating
+  several arguments does fit: check one object built from them, with `.refine` across its fields.
+
+**Validators are made inside a `Validator(kind, kit => { ... }, sources?)` call**
+(`src/checks/validator.ts`). It hands the builder Zod's makers under short names (`obj`, `arr`,
+`tuple`, `rec`, `oneof`, `union`, `discrim`, `lit`), its scalars ready made (`str`, `num`, `int`,
+`uint`, `bool`, `unk`), the whole of Zod as `zod` for the rare rest, and the shared primitives
+(`label`, `user_id`, ...); and it wraps each schema it returns, so a failed `parse` throws a
+`VaultError` of the call's one `kind`, its message from `Phrases`.
+
+```ts
+export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
+  const vaultScope = obj({ applabel, user_id, vaultlabel })
+  const boxscope   = vaultScope.extend({ boxlabel })
+  return { vaultScope, boxscope }
+})
+```
+
+* **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one
+  schema a line, and nothing added per line, neither a wrapper call nor an annotation.
+* Modules of validators in `sources` (star imports, `[FooValidators]`) are spread into the kit
+  beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
+  bringing names into scope.
+* The primitives the kit hands out (`checks/primitives.ts`) are plain Zod, and so is a variation
+  made directly from a validator (`vaultRecord.pick(...)`): its `parse` throws a `ZodError`, so
+  use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
+* **One input, one validator.** A function checks what it is handed with one validator, never a
+  cascade of validators each taking a part of the input and refusing with its own kind. Checks
+  after the parse are fine: one Zod does not express, or a comparison with what the callee holds
+  (a record's scope against the one asked, a bag's `user_id` against the bank's). The scope
+  validators (`bankScope`, `vaultScope`, `boxscope`) are made in a `bad_scope` call, and anything
+  taking a scope's duck may parse it with one; a record's validator refuses with its own call's
+  kind, a bad name in it included.
+* **A method deep in a call leaves the kind to whoever knows.** It asserts with a schema, whose
+  refusal carries its `Validator` call's kind, and any check written beside it throws with a
+  sentence from `Phrases`. A public call that knows more about what the caller was doing re-throws
+  with the better kind: a name failing a check may be the host's typo (`bad_scope`), a damaged row
+  read back, or our own bug. No `ZodError` escapes the public call.
+* **Catch and re-throw as the more specific, or less leaky, refusal** where the caller knows more
+  than the schema did: a record read back from storage fails its `bad_record` schema, and the
+  read-back helper re-throws it as `damaged_*`.
+* **Assess once, then close over the result**: on a hot path (a predicate run per row, a lookup
+  per render), the factory assesses and the closure compares.
+
+**What a refusal says.**
+
+* **Every sentence a check says lives in `utils/phrases.ts`**, star-imported as `Phrases`, so
+  wording, tone and the rule that none quotes its input are reviewed in one place.
+* **A refusal is as informative as it can be without leaking**: every failing field, each with
+  where and what (`applabel: A label is ...; written_at: Too small: ...`), and the paths in
+  `meta.fieldnames`. A key repeats only when shaped as one of our field names; any other could be
+  the caller's data (`checks/validator.ts`, `sayable`).
+* **A message never carries the input.** Never pass `reportInput`; never interpolate the input
+  into a custom message. Zod's own English names a refused value's type, never the value (zod
+  4.6.7: an issue carries `input` only under `reportInput: true`). Never `Z.config`: Zod is a peer,
+  so its config is the host's too.
+
+**To sanitize shape.** Destructure the fields you need from the parsed output: `obj` strips the
+rest, so a vault record, a Vault object or a bank's listing handed in as a scope comes out as just
+the scope.
+
+* A bag a person typed gets `strictObject`: stripping would quietly drop a misspelt option. So
+  does a stored record (`.strict()`): a field this version does not know is damage, or a newer
+  `format`. A scope, taken out of whatever carries it, strips (`.strip()`).
+* **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is
+  bound into storage and crypto, so refuse instead. A structural transform is fine: a scopepath's
+  validator splits it into its parts before checking them.
+* A validator that hands out a scope others will hold freezes it: `obj({ ... }).readonly()` (zod
+  4.6.7: the output is frozen at runtime and typed `Readonly`).
+
+## Shapes and duck typing
+
+* **Duck typing is the design.** A thing that has a scope *is* one: it carries `applabel`,
+  `user_id` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy raises the
+  question of whether the thing and its scope agree; a duck-typed thing has one copy of each name,
+  and a function taking a scope takes the thing itself. The more things duck type, the more a
+  one-off case is plain `Pick`, `&` and `Omit` surgery.
+* **The shapes are there to cut the number of types, not to straiten what a function takes.**
+  Where a broader duck is harmless, a parameter accepts it, and one that reads a few fields says
+  so with an ad hoc `Pick` or `Partial` where it is declared. A function's behaviour never changes
+  to fit a named shape.
+* **A field a thing ducks as is frozen, or fixed for the thing's life.**
+* **Each main type (vault, box, lease, ...) has a small, fixed set of shapes**, each named for its
+  purpose and prefixed with the type (*Naming*; VOCABULARY.md, *Shapes*):
+  - *record*: the fields stored and sent over a wire, as one object schema;
+  - *sparse*: a subset of the record's own fields, minus the heavy and sensitive ones, as a list
+    or a log shows it, and the shape to reach for wherever the whole record is not needed. An
+    associate (a vault's gate, its boxes) is never in it: a shape that wants one adds it beside;
+  - *stamp*: the fields fixed for the record's life, which are exactly the fields bound into its
+    cryptography;
+  - *scope*: the composite id, the names its scopepath is made of;
+  - *dna*: what a caller sends to `make` or `ensureVault`, partial in fields with defaults, and
+    without any field that must stay under our control (for a vault, its scope);
+  - *tombstone*: what a deletion leaves;
+  - *snapshot*, for a stateful thing: its sparse shape and what changes beside it (*Stateful
+    objects and snapshots*).
+* **Each shape's validator is built from the record's** with `pick`, `omit`, `partial` and
+  `extend`, and its type is `Z.infer` of that, rather than a hand-written parallel type: a reader
+  learns one record and a handful of named subtractions. A record is one object schema, not a
+  union of variants (`pick` throws on a union, zod 4.6.7): an optional part is a nullable field.
+* **Use each shape's name for what it means, even where two are one type.** `LeaseSparse =
+  LeaseStamp` is fine; a log line or a listing takes a `LeaseSparse`, and a ctx a `LeaseStamp`.
+* **A part's shapes nest as the part does.** A record holding parts holds them in every shape: the
+  gate's sparse shape holds each wayin's sparse shape, never a flat pick of their fields.
+* **A class names the shapes it passes for**: `class Vault implements VaultStamp`, `class Box
+  implements Boxscope, BoxSparse`. The compiler then holds the class to its duck typing.
+  `implements` checks only that the fields exist with their types; the constructor and
+  `Object.freeze(this)` make them own and frozen.
+* **Freeze what we can**: each record handed out, each object's own fields, each snapshot.
+* **Name each outcome a reader must tell apart, even where the types overlap.**
+  `VaultRecord | VaultTombstone | DamagedVaultRecord | null` says present, dead, broken, missing;
+  `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
+* **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
+  validator yet waits in `types.ts`, and leaves it when one is written.
+* **Name the important primitives.** A value a host writes by hand gets a plain alias
+  (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
+  `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
+* **A facet a type gains is a generic named for the facet**: `Lifecycled<OT>`, `Refused<OT>`,
+  `ConsistencyWith<OT>`, where the alternative is a slice named for its one consumer
+  (`LeaseVault`).
+* **One name for one thing, everywhere** (*Naming*): a host-facing field takes its stored
+  spelling.
+
+**Records, stamps and what is bound.**
+
+* **Prescribe the logical record and the atomic unit, never the physical row.** What is read in
+  one step and written in one compare-and-write is the contract; how an adapter lays it out
+  (columns, jsonb, documents) is its own.
+* **Bind whatever is fixed for the thing's life**, and the stamps of what it lives in: a box binds
+  the vault's stamp and its own.
+* **Bind what is fixed; never bind what counts.** The stamp is bound into every ciphertext the
+  record owns; a counter that moves within the record's life (an epoch) is never bound into
+  long-lived ciphertext, which would have to be resealed at every move. A short-lived thing made
+  under one value of a counter has that value in its own stamp: a lease is granted under one
+  `gate_epoch`, so its stamp holds it.
+* **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
+  `gate_epoch` names the gate it was granted under, as a foreign key would.
+* **What one atomic step reads travels together**, its halves apart until checked, so damaged
+  data cannot collide with its own fields: `{ vault, boxes }` (`VaultReadResponse`). Checked, it
+  is the thing it describes, written out where it is used: a vault's record and its box listing
+  are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
+
+**Interfaces a host implements.**
+
+* **An interface a host implements is typed as what belongs there**, never `unknown`, with its doc
+  block saying what is checked and by whom. The check keeps damage out, not the type.
+* **A browser checks what a server relays.** A server is not trusted, so a browser checks each
+  record it is sent that it will use. A server's word that a record is damaged it may take: the
+  worst a lying server does with that is offer to delete what it could delete anyway. It still
+  parses the word itself (a damaged box's label, its kind of damage, its token).
+* **A wire sharpens an interface.** A VaultDB's half has the shape its GraphQL relay carries, so a
+  browser's adapter passes the server's answer through. Where the two would differ, change the
+  VaultDB.
+
+## Crossings, spreading and logging
+
+* **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
+  only own enumerable fields: a getter on the prototype is lost (`{ ...vault }` drops it while
+  TypeScript types it as present), and every other own field comes along.
+* **Strip before crossing into host code.** A host's store, callback or checker gets plain data
+  picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's store
+  the Vault object, `lock()` and all. Nothing that crosses needs a method.
+* **Build a stored record from a parsed part**, `{ format, ...CX.vaultScope.parse(thing), ... }`,
+  never from a spread of a holder, which would store its other fields.
+* **Spreading a thing is harmless.** Its own enumerable fields are what a log line, a spread or
+  `JSON.stringify` sees, so they hold nothing sensitive and nothing that garbages a log (large
+  values, or objects with behaviour). Where reasonable, they are a strict subset of its record.
+* **What a log should not see is private, elsewhere, or non-enumerable**: a `#field`, a separate
+  object reached by a method or accessor, or a getter on the prototype.
+
+## Stateful objects and snapshots
+
+* **A stateful object's own fields are its stamp**: enumerable, assigned in the constructor, and
+  `Object.freeze(this)` as the constructor's last line. Private `#fields` stay writable under a
+  freeze, so every changing value lives in one. A frozen instance cannot be spied on; a test spies
+  on a collaborator instead.
+* **A method handed out unbound is a getter on the prototype returning a private arrow**:
+  `get subscribe() { return this.#subscribe }`. It stays bound, keeps one identity (as
+  `useSyncExternalStore(vault.subscribe, vault.getSnapshot)` wants), and no spread sees it.
+* **What changes is read through one snapshot accessor**, never through a per-field getter that
+  duplicates it: two ways to read one value is a split personality, and per-field reads across an
+  await can mix two snapshots.
+* **A collaborator gets what it needs when it is made**, not through a public getter on the
+  object it serves.
+* **A snapshot is frozen plain data**, the same object until something changes
+  (`useSyncExternalStore`'s contract). No methods that act (a stale snapshot would act on the live
+  object); no cycles (its change check stringifies it).
+* **A snapshot carries what a host renders, and nothing it has no use for**, above all nothing we
+  would rather not share: a vault's snapshot has its scope, `format` and `vault_tok`, not its
+  epochs or a passphrase's salt. Its scope sits flat, so it duck-types as one.
+* **Changing structured parts are slices** that keep their own identity until they change, so a
+  memoized component or a selector given one slice skips the others' changes.
+* **No derived field the snapshot already implies.** A three-way status computed from two fields
+  present is a second copy that must agree with them.
+* **A snapshot is the one exception to "spreading is harmless"**: it is render state by contract,
+  and may hold an error object or a list.
+
+## Order comes from an explicit list
+
+Anything stored, hashed or bound into a ctx takes its order from an explicit list (the array a
+maker joins, the tuple its inverse checks) or from a canonical encoding that sorts keys
+(`stableJsonify`, as `cipherCtx` uses), not from an object's key order as it happens to fall. Zod
+4.6.7 builds its output in schema order, but that is undocumented, and JavaScript puts
+integer-like keys first.
+
+## Scopepaths
+
+A **scopepath** is where a store files a scope's record (VOCABULARY.md): the kind first, then the
+scope's names in order, joined on `ScopepathDelimiter` (`^`, from `utils/consts.ts`), such as
+`box^acme^u1^main^openai`. `Scopepath` is a public module: a host's own key-value adapter files
+rows with it.
+
+* The kind goes first: a kind suffix sorts each scope before its children only while every segment
+  is a lowercase label, and a user_id is not one.
+* **`ckey` is a generic map key**; a storage address is a scopepath.
+* **Lookups go by key** (`Map.get`, a store's read, an IndexedDB range), never by scanning. A
+  listing is for showing; a lookup goes through a keyed map beside it.
+* A prefix test goes through the module's predicate, never a hand-written `.startsWith` (*Build
+  for maintenance*).
 
 ## Control flow and refusals
 
@@ -223,6 +545,9 @@ between columns lets the editor align them (see *Tests*).
 * Lead with what the thing *is* or *returns*: `/** The fields written to storage: the visible
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
   that will be written to the database */`.
+* **Name the shape and say *stamp*.** A block says which shape it takes or hands back
+  (`VaultSparse`, `BoxStamp`) by its name, and calls the fields a ciphertext is bound to the
+  stamp (*Naming*). An interface a host implements says what is checked, and by whom.
 * **Each sentence tells the caller something they would otherwise get wrong**, given the
   signature, the names, what a capable developer already knows, and what is said once elsewhere
   (a class's own doc, `errors.ts`). Leave out what those already say.
@@ -335,13 +660,32 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
   The third slot is a sentence about the case, not a restatement of its inputs: it becomes the
   test's title.
 
+## Tree-shaking
+
+What a host's bundler can drop, measured on 30 validators of which 5 are used, with esbuild and
+rolldown, classic Zod and `zod/mini` alike:
+
+* An unannotated top-level validator is never dropped.
+* One `/* @__PURE__ */` before a chain is not enough. Annotate **every** call in the chain, or wrap
+  the whole expression once: `/* @__PURE__ */ (() => str().min(1).max(9))()`.
+* `sideEffects: false` drops a module nothing imports from; nothing inside an imported one.
+* The library is the real cost: the same five validators bundle to 24-27 KB gzipped with classic
+  and 6.7-6.9 KB with mini. The 25 unused validators cost 130-170 bytes.
+
+A `Validator` call keeps every schema it makes, used or not, and the Coach accepts that: the
+advice above is moot for validators, and holds for everything else.
+
 ## Mechanically enforced, and deliberately not
 
 The core's `eslint.config.mjs` is strict. These are **off on purpose**, so don't "fix" code for
 them: `camelcase` (`vaultlabel` is right), `no-use-before-define` (define helpers below their callers
 when that reads better), `@stylistic/quotes` (the convention above is kept by hand),
 `@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
-kept by hand), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
+kept by hand), `@stylistic/no-multi-spaces` (parallel construction is padded into columns, *Build
+for maintenance*), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
+
+**`@typescript-eslint/no-unused-vars` passes only a named ignore**: its ignore patterns are
+`^_[a-zA-Z0-9]`, so `_scopepathkind` passes and a bare `_` does not (*Build for maintenance*).
 
 **Safety hatches** -- `@ts-expect-error`, `any`, the non-null `!` -- are allowed, because
 forbidding them sends a fix into a tailspin when the problem is elsewhere. Use them with care,
