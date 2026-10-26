@@ -1061,6 +1061,11 @@ describe("bank.entryOf, bank.subscribe and bank.getSnapshot", () => {
     }
     const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
     expect(snapshot).to.eq(bank.snapshot)
+    // One identity each for the bank's life, as useSyncExternalStore asks, and no own field a spread shows.
+    expect(bank.subscribe).to.eq(bank.subscribe)
+    expect(bank.getSnapshot).to.eq(bank.getSnapshot)
+    expect(Object.keys(bank)).to.not.include('subscribe')
+    expect(Object.keys(bank)).to.not.include('getSnapshot')
     await bank.ensureVault(Main)
     expect(heard).toHaveBeenCalled()
   })
