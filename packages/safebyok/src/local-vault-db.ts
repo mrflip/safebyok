@@ -117,7 +117,7 @@ class StringStoreVaultDB extends VaultDB {
     return this.store.ckeys()
       .filter(Scopepath.withinVaultScopepathPred(scope))
       // A row under the vault's prefix that is no box's scopepath holds no box a verb can reach: it is passed over.
-      .filter((boxScopepath) => Scopepath.isBox(boxScopepath))
+      .filter((scopepath) => Scopepath.isBox(scopepath))
       .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
@@ -141,7 +141,7 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => {
       const texts = this.store.ckeys()
         .filter(Scopepath.withinVaultScopepathPred(scope))
-        .map((boxScopepath) => this.store.read(boxScopepath))
+        .map((scopepath) => this.store.read(scopepath))
         .filter((text): text is string => text !== null)
       const bytesUsed = texts.reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
       return { boxes: { used: texts.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
