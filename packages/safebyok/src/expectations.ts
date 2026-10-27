@@ -4,7 +4,7 @@ import * as Refusals from './refusals'
 import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './vault-record'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './vault-db'
 
-/** Whether what is stored is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
+/** The comparisons a key-value adapter makes inside its one atomic step: whether what is stored is what a write expects, and what to store or refuse.
  * Import it whole: `import { Expectations } from 'safebyok'`, then
  * `Expectations.vaultRecordMeets(stored, expected)`.
  *
@@ -33,7 +33,7 @@ const fieldOf = (stored: unknown, field: string): unknown => (
   typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>)[field] : undefined
 )
 
-/** True when the stored vault record is `expected`'s vault at its gate epoch: what an update of the vault record compares (VAULTDB.md, line 3.2).
+/** True when the stored vault record is `expected`'s vault at its gate epoch, as an update of the vault record needs (VAULTDB.md, line 3.2).
  *
  * @example Expectations.vaultRecordMeets(stored, { vault_tok: 'v1', gate_epoch: 2 })
  */
@@ -54,7 +54,7 @@ export const vaultRecordRefusalOf = (stored: unknown, expected: VaultRecordExpec
   vaultRecordMeets(stored, expected) ? null : Refusals.staleVaultRecord(liveRecordOf(stored))
 )
 
-/** True when the stored vault record is `expected`'s vault, at any epoch: what a box read, a box deletion, and a box write's vault half, compare.
+/** True when the stored vault record is `expected`'s vault, at any epoch, as a box read, a box deletion and a box write need.
  * A vault record that shows no `gate_epoch` fails.
  *
  * @example Expectations.vaultMeets(stored, { vault_tok: 'v1' })
@@ -72,7 +72,7 @@ const epochOf = (stored: unknown): number => {
   return typeof val === 'number' && Number.isSafeInteger(val) && val >= 0 ? val : 0
 }
 
-/** The vault record an update stores over `stored`, which it has met: `vaultRecord`, its gate with it, with `vault_epoch` the stored one plus one, whatever `vaultRecord` carries.
+/** The vault record an update stores over `stored`, once it has met it: `vaultRecord`, its `vault_epoch` the stored one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2). It hands back the type it
  * was handed, so a server holding the record in its own types (Convex's) keeps them.
  *
@@ -118,8 +118,8 @@ export const tombstoneOf = (stored: unknown, scope: Pick<VaultTombstone, 'applab
 
 /** The refusal a box write meets from the stored vault record and box, or null when it may land.
  * It is {@link Refusals.vaultMismatch} when the vault record is not `expected`'s vault. Else it is
- * {@link Refusals.staleBox} when the box is not at `expected.revision_tok`, or when any box is stored
- * and that is null (VAULTDB.md, line 3.3).
+ * {@link Refusals.staleBox} when the box is not at `expected.revision_tok`, or when a box is stored
+ * and `expected.revision_tok` is null (VAULTDB.md, line 3.3).
  *
  * @example
  *   const refusal = Expectations.boxRefusalOf(storedVaultRecord, storedBox, expected)
@@ -134,10 +134,10 @@ export const boxRefusalOf = (storedVaultRecord: unknown, storedBox: unknown, exp
   return boxMeets ? null : Refusals.staleBox(box)
 }
 
-/** What a box deletion reports of `storedBox`: `deleted` at `expected`'s revision, `deleted_other` for any other row, `absent` for none.
- * It only reports. A deletion in the right vault ({@link vaultMeets}) removes whatever is stored
- * (VAULTDB.md, line 3.4). A null `revision_tok` matches a row holding none that reads as one, as the
- * listing shows a damaged box.
+/** The report a box deletion makes of `storedBox`: `deleted` at `expected`'s revision, `deleted_other` for any other row, `absent` for none.
+ * It only reports: a deletion in the right vault ({@link vaultMeets}) removes whatever is stored
+ * (VAULTDB.md, line 3.4). A null `expected.revision_tok` matches a row holding no `revision_tok`
+ * that reads as one, as the listing shows such a damaged box.
  *
  * @example Expectations.deletionOf(storedBox, { vault_tok: 'v1', revision_tok: 'r7' })  // { outcome: 'deleted' } while r7 is stored
  */

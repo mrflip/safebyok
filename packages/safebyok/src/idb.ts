@@ -13,6 +13,9 @@ export * as ChangeBell from './change-bell'
  * Importing it is safe anywhere: it touches IndexedDB only when the store is used. It loads
  * `idb-keyval`, about 600 bytes. It also exports {@link ChangeBell}, which its writes ring. The
  * IndexedDB vault store is a package of its own, `safebyok-indexeddb`.
+ *
+ * Each maker refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does
+ * not take.
  */
 
 // One UseStore per dbName, shared by stores and inspectors alike: idb-keyval opens the
@@ -46,14 +49,9 @@ class NotSupportedError extends Error {
 const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
 /** A {@link DeviceDB} over this browser's IndexedDB, keeping the leaseKey as a handle by structured clone, never as bytes.
- * Each write rings its change bell, in this tab and every other. A record that will not read back
- * reads as null, and is discarded. A row under any scopepath but a lease's or a device record's, an
- * earlier version's among them, is deleted unread at the next read or erase of a lease. It files
- * rows under their {@link Scopepath}, and refuses 'bad_scope' alike for a scope whose names fail
- * their checks. It refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
- *
- * A failure of IndexedDB's own is a condition, as {@link DeviceDB} says. A context with no
- * IndexedDB meets 'storage_blocked' at first use.
+ * Each write rings its change bell, in this tab and every other. A row under any scopepath but a
+ * lease's or a device record's, an earlier version's among them, is deleted unread at the next
+ * read or erase of a lease. A context with no IndexedDB meets 'storage_blocked' at first use.
  *
  * @example
  *   const deviceDB = idbDeviceDB()
@@ -150,11 +148,8 @@ class IdbDeviceDB extends DeviceDB {
 export type IdbRow = { scopepath: string, row: unknown }
 
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
- * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. It refuses 'bad_option' for a
- * `dbName` that is not non-empty text or an option it does not take, and its `subscribe` for a
- * listener that is no function.
- * Unlike the store, its `rows()` and `wipe()` reject, with a `NotSupportedError` where there is no
- * IndexedDB.
+ * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. Unlike the store, its `rows()`
+ * and `wipe()` reject, with a `NotSupportedError` where there is no IndexedDB.
  *
  * @example
  *   const inspector = inspectIdbDeviceDB({ dbName: 'acme' })
@@ -172,12 +167,12 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
         .map(([scopepath, row]) => ({ scopepath, row }))
         .toSorted((one, two) => one.scopepath.localeCompare(two.scopepath))
     },
-    /** Call `listener` after any write to the shelf, in this tab or another; returns the unsubscribe. */
+    /** Call `listener` after any write to the shelf, in this tab or another, returning the unsubscribe. Throws 'bad_option' for a `listener` that is no function. */
     subscribe: (listener: () => void): (() => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
-    /** Remove every row on the shelf: every lease and device record in this database. */
+    /** Erase every row on the shelf: every lease and device record in this database. */
     wipe: async (): Promise<void> => {
       await clear(shelfStore(dbName))
       ChangeBell.ring(bellnameOf(dbName))
