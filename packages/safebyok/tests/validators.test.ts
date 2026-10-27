@@ -3,12 +3,30 @@ import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
+import { BaseShape, MadeShape, MadeUnderShape, sealBoxlabel } from '../src/box'
+import { CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape } from '../src/lease'
+import { VaultStampButFormat, VaultStampPicked } from '../src/vault-record'
+import { whisperBag } from '../src/types/types'
+import { passphraseCleartext } from '../src/types/type-aliases'
+import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/vault-db'
+import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/vault-opts'
+import { vaultMadeUnderShape } from '../src/vault'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
 import { parseKeyDeriverSpec } from '../src/key-deriver-spec'
 import { optionsCheck } from '../src/options'
 import * as TH from './test-helpers'
 import { makeWorld } from './vault/world'
+
+/** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
+const InPackage = {
+  BaseShape, MadeShape, MadeUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape, VaultStampButFormat, VaultStampPicked, whisperBag,
+  passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
+  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,
+}
+
+/** Every validator the package makes, the namespace's and its own. */
+const EveryValidator = { ...Validators, ...InPackage }
 
 /** What every input below carries, as a key and as a value: a refusal that holds it repeated its input. */
 const Marker = 'zqxMarkerKey7'
@@ -50,21 +68,26 @@ describe("Validators", () => {
     expect(Validators.vault_tok.safeParse('').success).to.be.false
   })
 
-  it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own", () => {
-    for (const [valname, validator] of Object.entries(Validators)) {
+  it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own, those the namespace leaves out included", () => {
+    for (const [valname, validator] of Object.entries(EveryValidator)) {
       const thrown = (() => { try { validator.parse(Symbol('nothing a validator takes')); return null } catch (err) { return err } })()
       expect(thrown, valname).to.be.instanceOf(Object.hasOwn(Primitives, valname) ? Zod.ZodError : VaultError)
     }
   })
 
-  it("holds every validator of a Validator call as the same object its module exports", () => {
+  it("holds every validator as the same object its module exports", () => {
     expect(Validators.label).to.eq(Primitives.label)
-    expect(Object.keys(Validators).length).to.be.greaterThan(90)
+  })
+
+  it("leaves out the validators the package builds others from or checks its own steps with", () => {
+    for (const valname of Object.keys(InPackage)) {
+      expect(Object.hasOwn(Validators, valname), valname).to.be.false
+    }
   })
 })
 
 describe("no refusal repeats its input", () => {
-  for (const [valname, validator] of Object.entries(Validators)) {
+  for (const [valname, validator] of Object.entries(EveryValidator)) {
     it(`${valname}: quotes no key or value it was handed`, () => {
       for (const input of markedInputsOf(validator)) {
         expect(refusalTextOf(() => validator.parse(input)), valname).to.not.include(Marker)
