@@ -585,6 +585,17 @@ sifts broken input to explain it.
 **Depends on:** thread 13: cut from its tip, stacked on #286. **Size:** medium to large; if the Convex import runs long, file what
 is done and say so: it becomes its own thread.
 
+*Review:* medium, `fixed`: filed as [#287](https://github.com/mrflip/safebyok/pull/287). Fixed: the
+whole-object whisper check handed back the host's own sidecar, which `Box` then deep-froze in
+place; a checked whisper or sidecar is a copy again (one top-level `structuredClone`). Left (to
+thread 15 unless ruled otherwise): the core's `idbOpts` still strips unknown fields where the
+adapter's check is strict (make it strict; one 'safebyok' default); `Validator`'s doc should warn
+that a host schema keyed by input (`record`, `.catchall()`) repeats those keys in refusals; doc
+blocks of `ensureVault` (store sentence), `StoredBox`, `key-deriver-spec-checks.ts`'s header and
+`Kit`; no type test for the generic `Expectations.vaultRecordPutOf`/`newLifeOf`. Kept as the
+core's behaviour: Convex's `ensureVault` takes the draft's `vault_epoch` on an empty scope; the
+event-handler hint in every options refusal of `hello`/`ensureUnlocked`.
+
 ### 15. Names and small rulings -- `tidy`
 
 *Orchestrator:* the rest of the Coach's rulings of 2026-10-26 and 2026-10-27, and the leftovers

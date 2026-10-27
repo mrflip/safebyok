@@ -12,7 +12,7 @@ restyle](https://claude.ai/artifact/4Hx2VL1fu4qUMQV9z6rJFz).
 | 1 guidance (reworked onto main) | [#272](https://github.com/mrflip/safebyok/pull/272) | filed, reviewed `fixed`; ready to merge |
 | 2 to 12 | #273 to #283 | merged |
 | 13 bank_listing | [#286](https://github.com/mrflip/safebyok/pull/286) | filed, reviewed `clean`; ready to merge |
-| 14 rulings | [#287](https://github.com/mrflip/safebyok/pull/287) | stacked on #286; see its review comment for state |
+| 14 rulings | [#287](https://github.com/mrflip/safebyok/pull/287) | filed, reviewed `fixed` (a host's sidecar was frozen in place; fixed); stacked on #286 |
 | cleanup: changeset clauses | [#288](https://github.com/mrflip/safebyok/pull/288) | filed; ready to merge |
 | cleanup: security notes | [#289](https://github.com/mrflip/safebyok/pull/289) | filed; ready to merge |
 | 15 tidy | none | not started |
@@ -33,6 +33,7 @@ line and of each other.
 
 ## Needs the Coach
 
+* #287's review left minor findings (in the plan's thread 14 *Review:* line, headed for thread 15); I did not add them as doc rows, to save usage.
 * Open Matters, `drafting`: the four rows from #287 (TOP: Convex's validators from the core's
   Zod, needing a yes for a converter or a dependency; `Validators` exporting internals; a store in
   the vault bag ignored; box rows typed `unknown`), the four from #272's review, three from #286,
