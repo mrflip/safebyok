@@ -22,15 +22,15 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
 
 /**
- * Store `vaultRecord` in a component test's CVX as a first unlock does: the vault ensured novel,
+ * Store `record` in a component test's CVX as a first unlock does: the vault ensured novel,
  * then its gate written over it expecting `gate_epoch` 0. Resolves the vault record as stored, its
  * `vault_epoch` the component's.
  *
  * @example const stored = await ensureGatedIn(CVX, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  */
-export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, vaultRecord: GatedVaultRecord) => {
-  await CVX.mutation(vaults.ensureVault, { draft: { ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null } })
-  const answer = await CVX.mutation(vaults.putVaultRecord, { vaultRecord: vaultRecord, expected: { vault_tok: vaultRecord.vault_tok, gate_epoch: 0 } })
+export const ensureGatedIn = async (CVX: ReturnType<typeof componentTest>, record: GatedVaultRecord) => {
+  await CVX.mutation(vaults.ensureVault, { draft: { ...record, vault_epoch: 0, gate_epoch: 0, gate: null } })
+  const answer = await CVX.mutation(vaults.putVaultRecord, { vaultRecord: record, expected: { vault_tok: record.vault_tok, gate_epoch: 0 } })
   if (! answer.landed) { throw new Error('The first gate of a new vault did not land.') }
   return answer.vault_stored
 }

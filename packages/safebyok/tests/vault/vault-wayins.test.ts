@@ -252,9 +252,9 @@ describe("putWayin, with a new passphrase", () => {
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     // `there` looks at the vault record before `here` writes, and writes after it.
     const realUpdate = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (record, expected) => {
       await TH.putWayin(here, 'pw', 'here pw')
-      return await realUpdate(vaultRecord, expected)
+      return await realUpdate(record, expected)
     })
     await TH.expectRefusal(TH.putWayin(there, 'pw', 'there pw'), 'gate_moved')
     spied.mockRestore()
@@ -540,9 +540,9 @@ describe("the vault's passkey", () => {
     const { world, vault } = await vaultWithPasskey()
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const realUpdate = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (record, expected) => {
       await TH.putWayin(elsewhere, 'pw', 'pw two')
-      return await realUpdate(vaultRecord, expected)
+      return await realUpdate(record, expected)
     })
     await TH.expectRefusal(TH.putWayin(vault, 'pw', await TH.passkeyOf('phone')), 'gate_moved')
     spied.mockRestore()
@@ -1102,10 +1102,10 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       let landed: string | null = null
       // `there` proves against the vault record before `here` writes, and writes after it.
       const realPut = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-      vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+      vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (record, expected) => {
         await TH.putWayin(here, 'pw', 'here pw')
         landed = storedText(world)
-        return await realPut(vaultRecord, expected)
+        return await realPut(record, expected)
       })
       const err = await TH.expectRefusal(change(there), 'gate_moved')
       expect(err.meta).to.be.undefined

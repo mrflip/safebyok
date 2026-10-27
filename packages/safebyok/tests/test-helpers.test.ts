@@ -1135,7 +1135,7 @@ const servingOnly = (signedIn: string | null, store: StringStore): TH.VaultDBVer
     ensureVault:        (draft) => permitted(draft, () => shared.ensureVault(draft)),
     getVaultRecords:    (scope) => permitted(scope, () => shared.getVaultRecords(scope)),
     ensureVaultRecords: (draft) => permitted(draft, () => shared.ensureVaultRecords(draft)),
-    putVaultRecord:   (vaultRecord, expected) => permitted(vaultRecord, () => shared.putVaultRecord(vaultRecord, expected)),
+    putVaultRecord:   (record, expected) => permitted(record, () => shared.putVaultRecord(record, expected)),
     getBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.getBox(scope, boxlabel, expected)),
     putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
     getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),
@@ -1365,8 +1365,8 @@ class RoundTripVaultDB extends VaultDB {
     return seen.vault
   }
 
-  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) {
-    const vaultScopepath = Scopepath.vault(vaultRecord)
+  protected async doPutVaultRecord(record: VaultRecord, expected: VaultRecordExpectation) {
+    const vaultScopepath = Scopepath.vault(record)
     // The refusal a miss throws, from the row its check read.
     const missed: { refusal: VaultError | null } = { refusal: null }
     const meets = (rows: Rows) => {
@@ -1375,7 +1375,7 @@ class RoundTripVaultDB extends VaultDB {
     }
     const stored: { vaultRecord: unknown } = { vaultRecord: null }
     const write = (rows: Rows) => {
-      stored.vaultRecord = Expectations.vaultRecordPutOf(vaultRecord, rows.get(vaultScopepath))
+      stored.vaultRecord = Expectations.vaultRecordPutOf(record, rows.get(vaultScopepath))
       rows.set(vaultScopepath, stored.vaultRecord)
     }
     if (await this.step({ check: meets, write })) { return stored.vaultRecord }
