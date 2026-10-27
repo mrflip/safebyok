@@ -1321,7 +1321,7 @@ export class Vault implements VaultStamp {
     const firstGate = gate.base_epoch === 0
     this.#demand(gate, { call, firstGate })
     const held = this.#vaultRecord
-    // `vault_epoch` is the one the store will set, the one in hand plus one; the store ignores what it is handed.
+    // `vault_epoch` is the one the store will set, the stored one plus one; the store ignores what it is handed.
     const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
     const written = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }))
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
