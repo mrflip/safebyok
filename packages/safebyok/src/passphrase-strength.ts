@@ -12,7 +12,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
  * tries first. The vault runs it on each new passphrase before any key derivation: the one an
  * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
- * It never runs on an unlock, and never hears a blank passphrase. One that throws refuses its call
+ * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws refuses its call
  * 'unexpected_error', and one that answers no verdict 'bad_option'.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never

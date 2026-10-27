@@ -3,7 +3,7 @@
  * (`src/proving.ts`).
  *
  * Each wrap's ctx is {@link wayinCtxOf}'s: the stamp of the vault record whose gate holds it, a
- * purpose its wayinkind names, and its own visible header. A passkey's key is made with that same ctx as its HKDF `info`. The
+ * purpose its wayinkind names, and its own visible header. A passkeyKey is made with that same ctx as its HKDF `info`. The
  * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
  */
 

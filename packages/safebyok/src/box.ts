@@ -288,7 +288,7 @@ export class Box implements Boxscope, BoxSparse {
    * It demands, lease-bound, that the box is consistent with its vault, before the decipher and
    * after: 'vault_locked' with no lease held, and 'vault_gone', 'vault_remade' or 'gate_moved' once
    * the vault moved on since the box was made. It refuses as `lease.decipherWith` does: 'damaged_box'
-   * for a box that will not open under the vault's key, 'damaged_lease' for a lease that will not.
+   * for a box that will not open under the vaultKey, 'damaged_lease' for a lease that will not.
    * A box that opens to something that is no whisper is 'damaged_box' too.
    *
    * @example const whisper = await box.extractWhisper()
