@@ -63,19 +63,23 @@ added or folded into through the subagent, and no other entry changes.
   `Kit` doc says so.
   (3) The bank's misuse hints are gone. `Bank.make`'s pre-parse key scan and renamed-option map (`RenamedMakeBankOpts`) are deleted; its options
   are a strict schema whose refusal counts unknown options and lists those it takes. `checkNoStoresIn` is deleted (see the bank_per_user entry
-  amended): a `vaultDB` or `deviceDB` in the bank's first bag is ignored, so the vault silently takes the bank's own stores. `optionsCheck`'s hint
+  amended): a `vaultDB` or `deviceDB` in the bank's first bag is ignored, so the vault silently takes the bank's own stores (amended 2026-10-27 (thread 17, validators_trim): the first bag is strict now, and a `vaultDB` or `deviceDB` in it is refused `bad_scope`; see the bank_per_user entry, thread 7, below). `optionsCheck`'s hint
   chosen by whether the input was a plain object is gone.
   (4) `parseKeyDeriverSpec` refuses in one fixed sentence listing every field's bounds, reading nothing of the failure (`SpecLimitForField` is
   gone). Its check `keyDeriverSpec` moved to `src/checks/key-deriver-spec-checks.ts`, a module of its own, so a bundle of `argon2idWebV1Deriver`
   alone still drops Zod.
   (5) `Wayin.make` refuses with its schema's own `bad_record`, no cause, no re-labelling (`damagedWayinUnless` deleted); a damaged wayin met on
   unlock is still `damaged_wayin`.
-  (6) Every validator is public: the main entry exports `Validators` (a namespace of every validator the package makes, about 95), `Validator` and
-  its `Kit`. A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
+  (6) Every validator a host or a storage adapter needs is public: the main entry exports `Validators` (a namespace of 66 validators, those a host or
+  a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
+  field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
+  its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
+  pieces, such as `BaseShape`, `LeaseGrant`, `ReadAnswer`, `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
+  `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
   `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
   options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
-  asserts no refusal's message, stack, meta or cause holds it.
+  asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not.)
   (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
   `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/idb-opts.ts`) is strict too, so
   `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
@@ -187,7 +191,7 @@ added or folded into through the subagent, and no other entry changes.
   (1) `Bank.make({ applabel, user_id, ... })`. Every bank call naming a vault (`ensureVault`, `reopenVault`, `closeVault`,
   `clearCachedVault`, `delDamagedVault`, `entryOf`) takes a bag whose `vaultlabel` is required. An `applabel` or `user_id` the bag carries
   must equal the bank's (`bank.demandConsistentWith`), else the call refuses `bad_scope`, naming the differing fields in `meta.fieldnames`
-  and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is. Sign-out is
+  and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is (amended 2026-10-27 (thread 17, validators_trim): the bag is strict, holding `vaultlabel` and optionally the bank's own `applabel` and `user_id` and nothing else, and any other field is refused `bad_scope` before storage is touched, the message counting the fields and never naming them or quoting their values; a Vault object, its snapshot, a `BankVault` or a vault record can no longer be handed in as the bag, and a host names the vault as `{ vaultlabel: vault.vaultlabel }`; this covers `ensureVault`, `reopenVault`, `clearCachedVault`, `delDamagedVault`, their `try` forms, `closeVault`, `vaultOf` and `bankVaultOf`; `bank.demandConsistentWith(thing)` is unchanged and still judges a thing carrying a scope, leaving out every other field). Sign-out is
   expected to call `bank.closeVaults()` and drop the bank; `safebyok-react`'s `BankProvider` does so when its `user_id` prop changes or goes
   null. Amended 2026-10-27 (security_notes), PR [#278](https://github.com/mrflip/safebyok/pull/278): the scope a call acts on is never the bag's.
   `#vaultScopeOf` (`bank.ts`) parses the bag, refuses an `applabel` or `user_id` other than the bank's, and then builds the scope from the bank's own
@@ -201,7 +205,7 @@ added or folded into through the subagent, and no other entry changes.
   strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.) amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): superseded; the refusal (`checkNoStoresIn`) is deleted.
   The bag is read for its scope alone and every other field is ignored, so a host that puts its `vaultDB` in the first bag rather than the second
   silently gets the bank's own stores, the vault born and filed in the default store; the Coach's ruling is that getting the store wrong is a
-  hard-to-miss error.
+  hard-to-miss error. amended 2026-10-27 (thread 17, validators_trim): a store in the first bag is no longer ignored. The bag is strict, and a `vaultDB`, `deviceDB` or any other field in it is refused `bad_scope` before storage is touched, so a vault is never born in the bank's default store because a host put its store in the wrong bag.
   (3) A `KeyDeriver` may carry an optional `load()`, as a strength checker can; each bank's `hello()` runs both before any vault is born.
   A failing deriver `load` refuses `unexpected_error` with what it threw kept as the error's `cause`, unlike `deriveKeyBytes`, whose throws
   are never kept: `load` is never handed a passphrase. `Bank.make` refuses a `load` that is not a function.
@@ -306,7 +310,7 @@ added or folded into through the subagent, and no other entry changes.
   failed leaves the vault showing locked and not unlocked under a lease from the previous gate.
 * 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **one vault, one place.** `bank.ensureVault(draft)` refuses `bad_option` when
   the draft names a `vaultDB` or `deviceDB` other than the stores the held (or being-born) Vault object was born from
-  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any field in it named as a store (`vaultDB`, `deviceDB`, or a name ending `db` in any case) is refused `bad_option`; see the entry at the top; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): that refusal is gone, the bag's store-named fields are ignored)
+  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any field in it named as a store (`vaultDB`, `deviceDB`, or a name ending `db` in any case) is refused `bad_option`; see the entry at the top; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): that refusal is gone, the bag's store-named fields are ignored; amended 2026-10-27 (thread 17, validators_trim): ignored no longer, the first bag is strict and any field in it beyond `vaultlabel`, `applabel` and `user_id`, a store among them, is refused `bad_scope`)
   (`packages/safebyok/src/bank.ts`), so a vault read from one store is never written to another. A Vault object found
   gone (deleted or remade) in the microtasks before its birth was filed is never handed out.
 * 2026-10-23 (primitives sprint, thread 9, gating): **cleartext has one door: a gating's attempt.** No vault call takes a
