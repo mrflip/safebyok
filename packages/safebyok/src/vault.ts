@@ -152,6 +152,8 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *  * A malformed argument or option refuses 'bad_option' ('bad_scope' for a boxlabel) before
  *    anything is read, asked for or written. Its message names the field, never the value.
  *  * A call refuses with what storage beneath it refuses, as it came.
+ *  * A call that reaches a box, a way in or the vault itself first runs a hello within
+ *    `staleMinutes`, and refuses as `hello()` does. `lock()` and `checkStrength()` read nothing.
  *  * Once the Vault object is gone -- the bank let it go, or the vault was deleted, or deleted and
  *    made anew, here or elsewhere -- every call but `subscribe()`, `getSnapshot()`,
  *    `checkStrength()` and `consistentWith()` refuses 'vault_gone', or 'vault_remade' for a vault
@@ -310,7 +312,7 @@ export class Vault implements VaultStamp {
 
   /** Have the vault unlocked, asking the user through `requestCleartext` only when it must, resolving the vault.
    * Once it resolves, the vault is unlocked under a lease in force. Call it to unlock ahead of time,
-   * on a button. It awaits a hello first. Under a lease of the ways in held that does not end
+   * on a button. Under a lease of the ways in held that does not end
    * within `renewMinutes` (0 left out), it resolves at once, with no prompt and no write.
    *
    * Otherwise it raises an `unlock_vault` gating (`initialize_gate` while the vault is `novel`), or
@@ -454,8 +456,8 @@ export class Vault implements VaultStamp {
    * raises `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's
    * passkey, replacing any; the snapshot's `gate.passkey` says which, so the host can warn the user
    * first. Only the passphrase proves a change to the ways in, never a passkey. Boxes are untouched,
-   * so the call costs the same however many there are. It awaits a hello first, and the gating's
-   * attempt writes with `VaultDB.putVaultRecord`.
+   * so the call costs the same however many there are. The gating's attempt writes with
+   * `VaultDB.putVaultRecord`.
    *
    * A pending gating of the same kind is joined; one of another kind is waited out first. Once it
    * resolves, the change is in storage. The gate epoch moves, so every other device locks, and asks
@@ -703,8 +705,8 @@ export class Vault implements VaultStamp {
    * hands out a new one, `novel`, when asked for the vault again. A device store that cannot erase
    * the lease is only logged: the vault is deleted all the same.
    *
-   * It awaits a hello first: a vault still `novel` then has no passphrase to prove it with, and
-   * refuses 'absent_vault'. A pending gating of another kind is waited out first. Refuses
+   * A vault still `novel` after its hello has no passphrase to prove it with, and refuses
+   * 'absent_vault'. A pending gating of another kind is waited out first. Refuses
    * 'vault_locked' when the user declines or a `lock()` lands while the gating is pending. Once the
    * attempt has sent its write, a lock, a decline or the bank letting go does not stop it: `del()`
    * resolves when the deletion lands. When storage refuses it, `del()` refuses as that landing
