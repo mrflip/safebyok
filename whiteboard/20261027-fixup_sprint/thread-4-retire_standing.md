@@ -59,4 +59,13 @@ The spec is `unstanding.md` in this folder, whole; its *Done when* grep is the c
     (what the writer holds, sent as what storage must still have); `#wayinListOf(fresh)` in
     `#takePicture` (a record just read, becoming the one in hand); convex's test fixture
     `storedVaultRecord`, which the test gates and then asserts is still stored.
-* **For the Coach**: see the PR's open questions.
+* **For the Coach** (the PR's open questions):
+  - **security.md pass**: accept it; one line (around 565) now says "the Vault object is not gone
+    after each wait", where the check may also include consistency. Worth a glance.
+  - **`OutsideGating` to the test helpers?** Only tests use it. Rec: move it in a later thread.
+  - **`fitsLease`'s `vaultRecord`**, not `held`: rec keep (see *Deviations*).
+  - **Convex `written`**: rec keep.
+  - **Empty changeset despite reworded refusal messages**: rec empty, as the brief says; `patch`
+    if a message's wording counts as a change.
+  - **`deviceOutcomeOf`**: nothing to change in code; the sprint's record should say it is only
+    off the exports.
