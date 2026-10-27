@@ -1,4 +1,4 @@
-/** Refusals to throw in place of a foreign error: one safebyok did not make, which may quote a key it was handed.
+/** Refusals to throw in place of a foreign error: one safebyok did not make, which may quote a secret it was handed.
  * Import it whole: `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
  */
 

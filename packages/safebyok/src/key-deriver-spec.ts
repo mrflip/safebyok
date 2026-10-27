@@ -100,7 +100,7 @@ const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algor
  *
  * It refuses 'bad_option' for a spec Argon2id cannot run, in one sentence saying what each field
  * must be: a salt under 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes,
- * no lanes, or a key other than 32 bytes. It refuses a label safebyok reserves as
+ * no lanes, or a passphraseKey other than 32 bytes. It refuses a label safebyok reserves as
  * {@link checkSuppliedSpecKept} does.
  *
  * @example
