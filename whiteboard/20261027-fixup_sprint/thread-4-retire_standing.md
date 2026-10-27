@@ -1,7 +1,8 @@
 # Thread 4: retire_standing (2026-10-27)
 
-Branch `20261027-retire_standing`, PR pending, stacked on #298 (line main → #297 → #299 → #298 →
-this). Justify: not yet run (single-file lint and per-package tests green while building).
+Branch `20261027-retire_standing`, PR #300, stacked on #298 (line main → #297 → #299 → #298 →
+this). Justify: green at 7dbce2c5: core 3403 passed (37 skipped), convex 350, graphql 344,
+postgres 322, react 309, demo 229, indexeddb 167, e2e 107, fastkey 49, scripts 266; size in budget.
 
 The spec is `unstanding.md` in this folder, whole; its *Done when* grep is the check.
 
@@ -23,6 +24,11 @@ The spec is `unstanding.md` in this folder, whole; its *Done when* grep is the c
   - gating.ts's `#freshGatedRecord` is `#freshenGated`, its `[Chains]` banner too (thread 2's
     review asked for it); `DeclinedWords`' `stands` field is `remains`.
   - `notes/old_vocabulary.md` has four rows for the retired names.
+  - `notes/security.md`: one `sonnet` subagent, as its header says, made about 78 rewordings in
+    one pass. In the same pass it corrected two entries on `deviceOutcomeOf` (see *Discoveries*),
+    said `isOutcomeShaped` has been removed, and trimmed thread 1's two `outcome_default`
+    amendments from 10 and 8 lines to 7 and 6, still a little longer than their neighbours. It
+    also dropped `standingPassphraseOf`, a name the code no longer has.
 * **Decisions taken**:
   - Ordinary English stays: "stands for" (represents), "stand-in", "stands in for", "stands down",
     "notwithstanding", "where the bank stands" (its lifecycle, as VOCABULARY.md's *lifecycle*
@@ -44,6 +50,10 @@ The spec is `unstanding.md` in this folder, whole; its *Done when* grep is the c
   - convex `vaults.ts`: beside the renamed `storedRow`, the row a write produced (was `stored`) is
     `written`, so the before-write and after-write rows do not read alike.
 * **Discoveries**:
+  - **`deviceOutcomeOf` is not gone.** It is off the exports, but it is still a module-private
+    helper in `device-db.ts` (line 267), which the seven DeviceDB verbs call. The handoff said
+    thread 3 removed it, and so does 599634c0's message. The security.md subagent checked the code
+    and wrote what is built: off the exports, still a private helper.
   - The pattern misses "stood"; a few "as it stood" remain where they are plain past tense.
   - Meanings 1 and 2 were hard to tell apart in three places: the expectation types' `@example`
     (what the writer holds, sent as what storage must still have); `#wayinListOf(fresh)` in
