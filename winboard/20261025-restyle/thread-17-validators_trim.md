@@ -1,6 +1,6 @@
 # Thread 17: Validators trim, strict vault bag (2026-10-27)
 
-Branch `20261027-validators_trim`, PR #PR, on main (cut from #291, since merged). Justify: green
+Branch `20261027-validators_trim`, PR [#293](https://github.com/mrflip/safebyok/pull/293), on main (cut from #291, since merged). Justify: green
 (core 3391 / 37 skipped, react 309, indexeddb 167, postgres 322, convex 350, graphql 344, demo
 229, e2e 107, fastkey 49, root 266; every size budget within its limit, none written).
 
