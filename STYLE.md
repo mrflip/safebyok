@@ -301,11 +301,13 @@ keep the Zod parse beside them wherever it still does useful work.
   several arguments does fit: check one object built from them, with `.refine` across its fields.
 
 **Validators are made inside a `Validator(kind, kit => { ... }, sources?)` call**
-(`src/checks/validator.ts`). It hands the builder Zod's makers under short names (`obj`, `arr`,
-`tuple`, `rec`, `oneof`, `union`, `discrim`, `lit`), its scalars ready made (`str`, `num`, `int`,
-`uint`, `bool`, `unk`), the whole of Zod as `zod` for the rare rest, and the shared primitives
-(`label`, `user_id`, ...); and it wraps each schema it returns, so a failed `parse` throws a
-`VaultError` of the call's one `kind`, its message from `Phrases`.
+(`checks/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
+(`obj`, `arr`, `tuple`, `rec`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
+ready made (`str`, `num`, `int`, `uint`, `bool`, `unk`), and the shared primitives (`label`,
+`user_id`, `epochMillis`, ...); and it wraps each schema it returns, so a failed `parse` throws a
+`VaultError` of the call's one `kind`, its message from `Phrases`. A maker the kit lacks comes in
+by a named import from `zod` beside the call, never the whole of Zod, which would carry every
+locale it ships into each host's bundle.
 
 ```ts
 export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
@@ -454,8 +456,10 @@ the scope.
 ## Crossings, spreading and logging
 
 * **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
-  only own enumerable fields: a getter on the prototype is lost (`{ ...vault }` drops it while
-  TypeScript types it as present), and every other own field comes along.
+  only own enumerable fields: a getter on the prototype is lost while TypeScript types it as
+  present, and every other own field comes along. The linter refuses a spread of a class instance
+  (`no-misused-spread`); where a caller wants a thing's fields as plain data, a getter hands out a
+  frozen shallow copy of its fields.
 * **Strip before crossing into host code.** A host's store, callback or checker gets plain data
   picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's store
   the Vault object, `lock()` and all. Nothing that crosses needs a method.
