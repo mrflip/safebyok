@@ -158,7 +158,7 @@ describe("PasskeyProving.seal", () => {
 })
 
 describe("provingTools", () => {
-  it("keys the Vault object's getter of what a seal reads, which no Object.keys, spread or JSON of the vault shows, as its doc block says: a symbol of the module's own, registered under no name", async () => {
+  it("keys the Vault object's getter of what a seal reads, which no Object.keys, spread or JSON of the vault shows, as its example shows: a symbol of the module's own, registered under no name", async () => {
     const { vault } = await lockedWorld()
     expect(vault[provingTools].vaultRecord().vault_tok).to.eq(vault.vault_tok)
     expect(Object.keys(vault)).to.not.include('provingTools')
