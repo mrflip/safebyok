@@ -12,6 +12,9 @@ coverage, which builds every package with its package checks, then the size budg
 newest Node, which reports. CodeQL scans the code and the workflows, and a finding shows on the
 PR.
 
+Both run again on each push to main, one push at a time: a run in progress finishes, and one
+still waiting is replaced by a newer push, so a run of merges holds no more runners than one run.
+
 ## Dependabot
 
 Dependabot opens grouped `deps:` PRs weekly; they get the same review as any other. One

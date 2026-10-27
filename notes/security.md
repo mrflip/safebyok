@@ -41,6 +41,12 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-27 (ci_pacing): in `ci.yml` and `codeql.yml`, pushes to main share one concurrency group
+  and run one at a time; a run waiting is replaced by a newer push, so a commit merged while
+  another waited gets no CI or CodeQL run of its own, and the next commit's run covers it. Pull
+  requests cancel their own run in progress. The group key holds the event name, so a fork pull
+  request from a branch named `main` cannot join or cancel main's group.
+
 * 2026-10-27 (restyle sprint, thread 14, PR [#287](https://github.com/mrflip/safebyok/pull/287); the Coach's rulings 2026-10-26/27: "Is someone sifting
   through all the keys to find out why a strict mode error was thrown? If so ... remove that. Beware complicated logic in a handler." and "Do not
   make fine grained decisions on broken data, especially in an exception handler."): **no refusal repeats a key or value from its input; every
@@ -1728,7 +1734,14 @@ added or folded into through the subagent, and no other entry changes.
   throws `bad_option` or `bad_whisper` without quoting its input.
 * 2026-10-14 (revised 2026-10-15 for the push-to-main workflow): the package is staged on npm by
   `.github/workflows/release.yml`, run on every push to main (when the Coach has merged the Version
-  PR, and a version npm lacks is waiting), authenticating by npm's trusted publishing (OIDC, no
+  PR, and a version npm lacks is waiting; amended 2026-10-27 (ci_pacing): it also runs on
+  `workflow_dispatch`, which anyone with write access can start, and on a nightly `schedule`
+  (09:41 UTC, on main); `publish` runs on a push or a dispatch, only when the mode is `publish`,
+  and never on the nightly run, so a staged version the Coach rejected on npm is not staged again
+  each night unattended; a dispatch from a branch other than main does
+  nothing, by an `if:` on `select-mode` that guards against a mistake, not a hostile branch, whose
+  own copy of the file runs, so what stops it is the `npm` environment and the trusted
+  publisher, bound to the file name), authenticating by npm's trusted publishing (OIDC, no
   stored token) from the `npm` environment, with provenance. The `pack` job runs `pnpm justify`
   (lint, typecheck, tests and the build) before `publish`, which runs no package's scripts. A
   maintainer's 2FA approval makes the staged version public; CI cannot give it.
@@ -2157,7 +2170,10 @@ added or folded into through the subagent, and no other entry changes.
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
   (Bound since: the sweep entry below.)
-* 2026-10-14: releases run from `.github/workflows/release.yml` on every push to main, in jobs
+* 2026-10-14: releases run from `.github/workflows/release.yml` on every push to main (amended
+  2026-10-27 (ci_pacing): and on `workflow_dispatch` and a nightly `schedule`; `pack`, and so
+  `publish`, the only job that can mint an npm token, does not run on the nightly run, see the entry
+  above), in jobs
   that each hold only what they need. Only `publish` (in the `npm` environment) may mint an npm
   OIDC token, and it runs no package's scripts (`pnpm install --ignore-scripts`): it stages the
   tarballs the `pack` job built, linted and tested without that token. The trusted publisher
@@ -2170,7 +2186,12 @@ added or folded into through the subagent, and no other entry changes.
   private key held as a secret of the `releasing` environment, which only `main` may deploy to.
   The token is narrowed to contents and pull requests (write) on this repository; the job's own
   GITHUB_TOKEN reads only. Its commits go through the GitHub API, signed by GitHub and attributed
-  to the App.
+  to the App. Amended 2026-10-27 (ci_pacing): the `version` job runs only when the event is not
+  a push (`github.event_name != 'push'`): on the nightly `schedule` and on `workflow_dispatch`,
+  never on a push to main, and anyone with write access can dispatch it. A scheduled run is always
+  main's copy of the file. What keeps that to main is the `releasing`
+  environment's rule that only main may use it, not the `if:` on `select-mode`: a dispatch from
+  another branch runs that branch's copy of the file and meets the environment's refusal.
 * 2026-10-15: the GitHub App's private key (`RELEASE_APP_PRIVATE_KEY`, with `RELEASE_APP_ID` as a
   variable) is a secret of the `releasing` environment, which only `main` may use
   (#27, eed83f0). Whoever holds the key can mint installation tokens for the App with every
@@ -3195,9 +3216,12 @@ added or folded into through the subagent, and no other entry changes.
   merge: whether the environment's secret reaches a run Dependabot started (if not, the key is
   added as a Dependabot secret too), and that the push re-runs CI.
 * 2026-10-16: **the Version PR is no longer put back in draft** (`pr-draft: create`, the Coach's
-  ruling). A push to main rebuilds a Version PR the Coach has marked ready and leaves it ready, so
-  new changesets can join a PR already read: the Coach rereads it before merging
-  (PROCESS.md, *Releases*).
+  ruling). A run of the `version` job rebuilds a Version PR the Coach has marked ready and leaves it
+  ready, so new changesets can join a PR already read: the Coach rereads it before merging
+  (PROCESS.md, *Releases*). Amended 2026-10-27 (ci_pacing): the rebuild now happens only on the nightly
+  run and when the workflow is dispatched, not on every push to main, so a Version PR stands as
+  built until the next of them, and may leave out what merged after it; the nightly run rebuilds a
+  ready Version PR the Coach has already read, unattended.
 * 2026-10-16: **the changeset skip trusts the release App by login.** CI skips *Require a
   changeset* only for a pull request on a `changeset-release/` branch opened by `safebyok[bot]`;
   the same branch name from anyone else is asked for a changeset like any other. The login is the
