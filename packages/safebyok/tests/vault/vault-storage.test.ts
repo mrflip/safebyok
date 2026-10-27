@@ -9,7 +9,7 @@ import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
 import { bad, valOf } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, boxlabelsOf, isU1Box, u1BoxScopepath, u1VaultScopepath, SevenDaysMillis, uncheckingDeviceDB, storedVaultRecordOf, storedWayinOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld, addLaptopPasskey } from './world'
+import { makeWorld, boxlabelsOf, isU1Box, u1BoxScopepath, u1VaultScopepath, SevenDaysMillis, spoilableDeviceDB, storedVaultRecordOf, storedWayinOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld, addLaptopPasskey } from './world'
 
 
 // == [Scoping, snapshot, tampering]: scoping, snapshot and subscribers, what the backend sees, SpoiledShells, tampering
@@ -353,9 +353,9 @@ describe("the logger", () => {
 
   it("warns once when a lease could not be read, telling nothing of the record", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: 'soon' }))
+    device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
     expect(world.logged).to.have.lengthOf(1)
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'hello' }, err: undefined })
@@ -364,7 +364,7 @@ describe("the logger", () => {
 
   it("takes up a lease whose wrap was altered, unopened, and refuses it 'damaged_lease' at its first use, erasing it and locking", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const vault = await world.openUnlocked('pw', { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     device.spoilRow((row) => {
@@ -380,11 +380,11 @@ describe("the logger", () => {
     expect(valOf(kept)).to.be.null
   })
 
-  it("leaves an unreadable lease where it lies at birth: no erase is tried, and the vault is born locked", async () => {
+  it("leaves a lease of another scope where it lies at birth: no erase is tried, and the vault is born locked", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: 'soon' }))
+    device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     const erasing = vi.spyOn(device.deviceDB, 'delLease')
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
     expect(erasing).not.toHaveBeenCalled()
@@ -414,13 +414,13 @@ describe("the logger", () => {
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
     expect(world.logged[0]?.story).to.deep.equal({ call: 'refresh' })
     expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('damaged_vault')
-    expect(vault.getSnapshot().boxes).to.have.lengthOf(1)  // the snapshot stands as it was
+    expect(vault.getSnapshot().boxes).to.have.lengthOf(1)  // the snapshot is as it was
   })
 
   it("never breaks a lock, a hello, a refresh or a refused hello when it throws", async () => {
     const world = makeWorld()
     const logger = throwingLogger()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const reading = world.clock.now()
     const clock = { now: () => reading }
     const vault = await world.openUnlocked('pw', { logger, deviceDB: device.deviceDB, clock })
@@ -436,7 +436,7 @@ describe("the logger", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     // a birth that warns of an unreadable lease
     await TH.unlock(vault, 'pw')
-    device.spoilRow(() => 'not a record')
+    device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')
     // a birth refused
     vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
@@ -445,17 +445,18 @@ describe("the logger", () => {
 
   it("is never handed a whisper, a passphrase, a ciphertext or a salt, whatever it hears", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const whisper = 'sk-FAKESECRET-whisper'
     const passphrase = 'FAKESECRET passphrase'
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'FAKESECRET note' } }, whisper)
     // every call site: a change whose record could not be raised (its error carrying the device
-    // store's as its cause), a lease unreadable, a background refresh refused
-    vi.spyOn(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
+    // store's as its cause), a lease that reads but is another scope's, its wrap and all, a
+    // background refresh refused
+    TH.spyOnDeviceHook(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await TH.putWayin(vault, passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: `${passphrase} ${whisper}` }))
+    device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     const reopened = await world.open({ deviceDB: device.deviceDB })
     TH.closeVault(reopened)
     world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), registered_at: whisper }))
@@ -557,7 +558,7 @@ describe("when storage says the user is no longer signed in", () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw one'))
     const stuck = new Error('the device store is read-only')
-    vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
     vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(world.open(), 'identity_revoked')
     expect(await world.getLease()).to.not.be.null
@@ -584,7 +585,7 @@ describe("when storage says the user is no longer signed in", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const stuck = new Error('the device store is read-only')
-    vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
@@ -765,7 +766,7 @@ describe("vault record behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
-  it("refuses an older copy at unlock as vault_behind, the newer in hand standing, so a removed way in stays removed on this device", async () => {
+  it("refuses an older copy at unlock as vault_behind, the newer in hand kept, so a removed way in stays removed on this device", async () => {
     const { world, vault, older } = await rolledBackWorld()
     await vault.lock()
     const deaf = await world.open({ vaultDB: world.deafVaultDB() })
@@ -777,7 +778,7 @@ describe("vault record behind this device's record", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("refuses an older copy met by a background refresh as vault_behind, taking nothing from it: the newer in hand stands, the vault locks, and a birth made anew refuses it too", async () => {
+  it("refuses an older copy met by a background refresh as vault_behind, taking nothing from it: the newer in hand is kept, the vault locks, and a birth made anew refuses it too", async () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultScopepath, older)
     await TH.expectRefusal(vault.refresh(), 'vault_behind')
@@ -819,7 +820,7 @@ describe("vault record behind this device's record", () => {
     expect(reopened.getSnapshot().gate?.passkey).to.be.null
   })
 
-  it("takes an older copy under a raised vault_epoch as it stands, its removed way in opening again", async () => {
+  it("takes an older copy under a raised vault_epoch as it is, its removed way in opening again", async () => {
     const { world, vault, older } = await rolledBackWorld()
     TH.closeVault(vault)
     world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...(JSON.parse(older) as object), vault_epoch: 9 }))
@@ -855,7 +856,7 @@ describe("vault record behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
-  it("is not caught on a device that never saw the newer copy, which takes the older as it stands", async () => {
+  it("is not caught on a device that never saw the newer copy, which takes the older as it is", async () => {
     const { world, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultScopepath, older)
     const stranger = await world.open({ deviceDB: memoryDeviceDB() })

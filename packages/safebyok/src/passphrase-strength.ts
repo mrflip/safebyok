@@ -10,20 +10,22 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
- * tries first. The vault runs it before any key derivation on each new passphrase: the one the
+ * tries first. The vault runs it on each new passphrase before any key derivation: the one an
  * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
- * It never runs on an unlock of a standing vault. One that throws refuses its call 'unexpected_error', and one
- * that answers no verdict 'bad_option'.
- *
- * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`. Make the checker once, before any bank, and hand the same one to each: each bank's
- * `hello()` runs its `load`, so make it cost nothing once it has succeeded, and forget a failure.
- * Call it early only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
- * vault that cannot check a new passphrase never opens.
+ * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws refuses
+ * its call 'unexpected_error', and one that answers no verdict 'bad_option'.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
- * quote it. `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to
- * replace it, or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
+ * quote it.
+ *
+ * A checker that needs something fetched or built first, such as a dictionary, carries it as
+ * `load`, which each bank's `hello()` runs. Make the checker once, before any bank, and hand the
+ * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
+ * `load` yourself only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
+ * vault that cannot check a new passphrase never opens.
+ *
+ * `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to replace it,
+ * or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
  * `vault.tryCheckStrength(typed)`.
  *
  * @example
@@ -46,7 +48,7 @@ export type GuardedStrengthChecker = {
 /** A verdict that admits, frozen so that a checker may share it. */
 export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 
-/** What {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
+/** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
   reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
@@ -64,7 +66,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** What Bank.make's options schema holds `strengthChecker` to, and what a checker must answer, a verdict: each refuses 'bad_option'. */
+/** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
 export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
   strengthChecker: custom<StrengthChecker>(isStrengthChecker, {
     error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
@@ -78,11 +80,11 @@ export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
-/** `hostChecker` held to its contract and told `scope`: what `vault.checkStrength` asks, and the only caller of the host's checker.
- * So the vault and a dialog checking as the user types decide alike. A blank passphrase is weak
- * before the host's checker hears it. It refuses 'bad_option' for an answer that is no verdict.
- * It refuses 'unexpected_error' for a throw, carrying nothing of it, as the checker heard the
- * passphrase. `load` refuses a failure 'unexpected_error', its cause the throw, as it heard nothing.
+/** `hostChecker` held to its contract and told `scope`. Ask the host's checker only through it, so the vault and a dialog checking as the user types decide alike.
+ * A blank passphrase is weak before the host's checker hears it. It refuses 'bad_option' for an
+ * answer that is no verdict, and 'unexpected_error' for a throw, carrying nothing of it, as the
+ * checker heard the passphrase. `load` refuses a failure 'unexpected_error', its cause the throw,
+ * as it heard nothing.
  *
  * @example guardStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
  * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
@@ -107,7 +109,7 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
   return Object.assign(check, { load: () => loadStrengthChecker(hostChecker) })
 }
 
-/** Run `hostChecker`'s `load`, if it has one: what `bank.hello()` does before any vault is born. Its failure is 'unexpected_error', what it threw the cause.
+/** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause.
  *
  * @example await loadStrengthChecker(zxcvbnStrengthChecker)   // the zxcvbn chunk fetched, or 'unexpected_error'
  */

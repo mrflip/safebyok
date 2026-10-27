@@ -175,7 +175,7 @@ describe("putBox, the box it seals and stores", () => {
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-fake')
   })
 
-  it("stores again what stands when both are left out: a fresh revision of the same whisper and sidecar", async () => {
+  it("stores the stored box again when both are left out: a fresh revision of the same whisper and sidecar", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const first = await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
@@ -185,7 +185,7 @@ describe("putBox, the box it seals and stores", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("refuses 'no_whisper' when the whisper is left out and no box stands, writing nothing", async () => {
+  it("refuses 'no_whisper' when the whisper is left out and no box is stored, writing nothing", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }), 'no_whisper')
@@ -225,7 +225,7 @@ describe("putBox, the box it seals and stores", () => {
     expect(writes.mock.calls[0]?.[1]).to.deep.equal({ vault_tok: vault.vault_tok, revision_tok: null })
   })
 
-  it("refuses a whole store over a listing a moment stale as 'stale_write', writing nothing: what another device wrote stands", async () => {
+  it("refuses a whole store over a listing a moment stale as 'stale_write', writing nothing: what another device wrote is kept", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-mine')
@@ -551,7 +551,7 @@ describe("the sidecar", () => {
     expect(vault.getSnapshot().boxes.map((box) => box.sidecar)).to.deep.equal(sidecars)
   })
 
-  it("leaving it out keeps the sidecar standing; {} empties it; another sidecar replaces it", async () => {
+  it("leaving it out keeps the stored sidecar; {} empties it; another sidecar replaces it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-one')
@@ -699,7 +699,7 @@ const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
 /**
  * The heaviest whisper and sidecar a vault of `limitBytes` (its `maxWhisperBytes`) stores, two
  * ways: all whisper, beside an empty sidecar; and a one-byte whisper beside a sidecar holding a
- * string of double quotes, each escaped in its JSON, so the string stands at twice its length
+ * string of double quotes, each escaped in its JSON, so the string runs to twice its length
  * there -- or beside `{}`, where the limit leaves no room for one.
  */
 const heaviestSplitsOf = (limitBytes: number) => {
@@ -1065,7 +1065,7 @@ describe("vault.getBox", () => {
     expect(await box.extractWhisper()).to.eq('sk-fake')
   })
 
-  it("resolves null where no box stands, as its example shows", async () => {
+  it("resolves null where no box is stored, as its example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(await vault.getBox('anthropic')).to.be.null
@@ -1366,7 +1366,7 @@ describe("what a vault hands its boxes", () => {
     expect(vault.snapshot.boxes[0]?.sidecar).to.deep.equal({ note: 'work account', tags: ['team'] })
   })
 
-  it("lists each sidecar as the listing's check made it, frozen where it stands, never serialized and parsed again", async () => {
+  it("lists each sidecar as the listing's check made it, frozen in place, never serialized and parsed again", async () => {
     const world = makeWorld()
     const writer = await world.openUnlocked('pw')
     await writer.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')

@@ -10,7 +10,7 @@ const Grabber = ({ grab }: { grab: (isMounted: () => boolean) => void }) => {
   return null
 }
 
-/** The useIsMounted @example: a button whose handler awaits `unlocking`, then tells `onDone` only while it stands. */
+/** The useIsMounted @example: a button whose handler awaits `unlocking`, then tells `onDone` only while it is mounted. */
 const Unlocker = ({ unlocking, onDone }: { unlocking: () => Promise<undefined>, onDone: (unlocked: boolean) => void }) => {
   const isMounted = useIsMounted()
   const submit = async () => {
@@ -41,7 +41,7 @@ describe("useIsMounted", () => {
     expect(grabbed.every((isMounted) => isMounted())).to.be.true
   })
 
-  it("answers true while a Suspense boundary hides the component, which still stands", async () => {
+  it("answers true while a Suspense boundary hides the component, which is still mounted", async () => {
     const grabbed: (() => boolean)[] = []
     const grab = (isMounted: () => boolean) => { grabbed.push(isMounted) }
     const hiding = TH.held()
@@ -75,7 +75,7 @@ describe("useIsMounted", () => {
     expect(grabbed[0]).to.equal(grabbed[1])
   })
 
-  it("lets a handler tell its host once its await settles, while the component stands", async () => {
+  it("lets a handler tell its host once its await settles, while the component is mounted", async () => {
     const unlocking = TH.held()
     const heard: boolean[] = []
     render(<Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} />)

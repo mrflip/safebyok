@@ -129,7 +129,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
  */
 export const cheatGetVaultEpoch = (vault: Vault): VaultSparse => vaultSparseOf(vaultRecordHeldBy(vault))
 
-/** Where a vault stands, as its snapshot's two fields tell it: `novel` with no gate, `locked` with a gate and no `ask_passphrase_at`, else `unlocked`. For a test that reads all three at once, as no snapshot names them.
+/** The state a vault is in, as its snapshot's two fields tell it: `novel` with no gate, `locked` with a gate and no `ask_passphrase_at`, else `unlocked`. For a test that reads all three at once, as no snapshot names them.
  *
  * @example expect(TH.stateOf(vault.snapshot)).to.eq('locked')
  */
@@ -343,7 +343,7 @@ export const vaultRecordOf = (user_id: string, overrides: Partial<GatedVaultReco
 
 /** Store `vaultRecord` in `vaultDB` as a first unlock does: the vault ensured novel, then its gate written over it expecting `gate_epoch` 0.
  * Resolves the vault record as stored, so with `vault_epoch` the store's: 1 after the first gate.
- * A vault record already standing gated is resolved as it stands, as `ensureVault` leaves it.
+ * A gated vault record already stored is resolved as stored, as `ensureVault` leaves it.
  * Throws the refusal of whichever step is refused. For setting a storage-layer test's scene.
  *
  * @example const stored = await ensureGated(vaultDB, vaultRecordOf('u1'))   // stored.vault_epoch is 1
@@ -373,7 +373,7 @@ export const recordOfRead = (read: VaultRecord & { boxes: unknown, damagedBoxes:
   return record
 }
 
-/** The sound boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault stands. Throws the refusal of a read that is refused.
+/** The sound boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault is stored. Throws the refusal of a read that is refused.
  *
  * @example expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(2)
  */
@@ -381,7 +381,7 @@ export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultSc
   valOf(await vaultDB.getVault(scope))?.boxes ?? []
 )
 
-/** The damaged boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault stands. Throws the refusal of a read that is refused.
+/** The damaged boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault is stored. Throws the refusal of a read that is refused.
  *
  * @example expect(await damagedBoxesOf(vaultDB, scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
  */

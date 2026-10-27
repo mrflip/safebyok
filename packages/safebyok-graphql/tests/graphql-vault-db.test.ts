@@ -370,7 +370,7 @@ describe("graphqlVaultDB, its refusals", () => {
     }
   })
 
-  it("reports a stale box write's standing box that is not one as the damaged box a read of it would name", async () => {
+  it("reports a stale box write's stored box that is not one as the damaged box a read of it would name", async () => {
     const stale = answering({ safebyokPutBox: { landed: false, refusalkind: 'stale_write', message: 'The box changed.', box_stored: 'not a box', capacity: null } })
     const refusal = await TH.expectBad(stale.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'stale_write')
     expect(refusal.meta?.box_stored).to.include({ boxlabel: 'openai' })

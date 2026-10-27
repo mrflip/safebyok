@@ -81,7 +81,8 @@ export type VaultKeyLeaseWrapped = Z.infer<typeof vault_key_lease_wrapped>
 
 // == [Cleartext]: passphraseCleartext, PassphraseCleartext
 
-/** The check for a passphrase's cleartext, the text the user typed: any string, blank included, since what a blank one means is the gating's to say. Its `parse` refuses 'bad_option', quoting none of it.
+/** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
+ * What a blank one means is the gating's to say.
  *
  * @example passphraseCleartext.parse(typed)   // a PassphraseCleartext, for the key deriver
  * @example passphraseCleartext.parse(42)      // throws 'bad_option', "A passphrase is the text the user typed, as a string"
@@ -110,7 +111,9 @@ export type Lifecycled<OT, LifecycleT extends string = 'starting' | 'ready'> = O
  */
 export type Refused<OT> = OT & { readonly lifecycle: 'refused', readonly err: VaultError }
 
-/** `OT`, and the vault's `demandConsistentWith`: what a collaborator of a Vault object takes, to demand at each of its junctions that the vault still stands where it did.
+/** `OT` with the vault's `demandConsistentWith`, as a Vault object's collaborator takes it.
+ * The collaborator demands at each of its junctions that it is still consistent with the vault
+ * record held.
  *
  * @example const make = (vault: ConsistencyWith<VaultScope>) => { vault.demandConsistentWith(thing) }
  */

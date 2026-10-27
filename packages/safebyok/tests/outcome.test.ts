@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
+import { type Outcome, bad, good, outcomeOf, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -58,74 +58,46 @@ describe("outcomeOf", () => {
     expect(rejected.err).to.eq(refusal)
   })
 
-  it("turns anything else thrown into storage_unavailable, the thrown value its cause, as its second example shows (Contract: Shapes)", async () => {
-    const socketClosed = new Error('socket closed')
-    const { ok, err } = await outcomeOf(() => { throw socketClosed })
+  it("turns anything else thrown into unexpected_error, the thrown value its cause, as its second example shows (Contract: Shapes)", async () => {
+    const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
+    const { ok, err } = await outcomeOf(() => parseImport('backup.json'))
     expect(ok).to.be.false
     expect(err).to.be.instanceOf(VaultError)
-    expect(err?.refusalkind).to.eq('storage_unavailable')
-    expect(err?.family).to.eq('condition')
-    expect(err?.cause).to.eq(socketClosed)
+    expect(err?.refusalkind).to.eq('unexpected_error')
+    expect(err?.family).to.eq('misuse')
+    expect(err?.cause).to.be.instanceOf(TypeError)
   })
 
-  it("turns a thrown string, or a rejection with nothing, into storage_unavailable with a cause that is never null", async () => {
-    const fromString = await outcomeOf(() => { throw 'down' })  // eslint-disable-line @typescript-eslint/only-throw-error -- a backend that throws a string is what this guards against
+  it("turns a thrown string, or a rejection with nothing, into unexpected_error with a cause that is never null", async () => {
+    const fromString = await outcomeOf(() => { throw 'down' })  // eslint-disable-line @typescript-eslint/only-throw-error -- a body that throws a string is what this guards against
     expect(fromString.err?.cause).to.eq('down')
     const fromNothing = await outcomeOf(() => Promise.reject(undefined))  // eslint-disable-line @typescript-eslint/prefer-promise-reject-errors -- likewise, a rejection with nothing
-    expect(fromNothing.err?.refusalkind).to.eq('storage_unavailable')
+    expect(fromNothing.err?.refusalkind).to.eq('unexpected_error')
     expect(fromNothing.err?.cause).to.be.instanceOf(Error)
   })
 
   it("never rejects: what an app wraps is one Outcome whatever happens, as its first example shows", async () => {
-    const { ok, val, err } = await outcomeOf(() => fetchBackup('main'))
+    const { ok, val, err } = await outcomeOf(() => fetchBackup('main'), Refusals.storageUnavailable)
     expect(ok).to.be.false
     expect(val).to.be.undefined
+    expect(err?.refusalkind).to.eq('storage_unavailable')
     expect(err?.message).to.not.include('main')
   })
 })
 
 describe("outcomeOf, told otherwise", () => {
   it("turns a throw that is no VaultError into what otherwise makes of it, as its third example shows", async () => {
-    const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
-    const { err } = await outcomeOf(() => parseImport('backup.json'), unexpectedError)
-    expect(err?.refusalkind).to.eq('unexpected_error')
-    expect(err?.family).to.eq('misuse')
-    expect(err?.cause).to.be.instanceOf(TypeError)
+    const socketClosed = new Error('socket closed')
+    const { err } = await outcomeOf(() => { throw socketClosed }, Refusals.storageUnavailable)
+    expect(err?.refusalkind).to.eq('storage_unavailable')
+    expect(err?.family).to.eq('condition')
+    expect(err?.cause).to.eq(socketClosed)
   })
 
   it("keeps a VaultError as it came, whatever otherwise would make", async () => {
     const refusal = new VaultError('absent_box', 'No box under that label.')
-    const kept = await outcomeOf(() => { throw refusal }, unexpectedError)
+    const kept = await outcomeOf(() => { throw refusal }, Refusals.storageUnavailable)
     expect(kept.err).to.eq(refusal)
-  })
-})
-
-describe("unexpectedError", () => {
-  it("makes a misuse refusal of a bug, the thrown value its cause, as its example shows", () => {
-    const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
-    const err = unexpectedError(thrown)
-    expect(err).to.include({ refusalkind: 'unexpected_error', family: 'misuse', cause: thrown })
-    expect(err.message).to.match(/did not expect/)
-  })
-
-  it("keeps a cause that is never null, for a throw of nothing", () => {
-    expect(unexpectedError(undefined).cause).to.be.instanceOf(Error)
-  })
-})
-
-describe("isOutcomeShaped", () => {
-  it("knows an answer handed up still wrapped, as its example shows", () => {
-    const answered = good({ vault_tok: 'vault-tok-u1' })
-    const refused = bad(Refusals.staleWrite('del'))
-    expect(isOutcomeShaped(answered)).to.be.true
-    expect(isOutcomeShaped(refused)).to.be.true
-  })
-
-  it("takes no record for one: a record, null, a boolean, a bag with ok alone", () => {
-    expect(isOutcomeShaped({ vault_tok: 'vault-tok-u1' })).to.be.false
-    expect(isOutcomeShaped(null)).to.be.false
-    expect(isOutcomeShaped(true)).to.be.false
-    expect(isOutcomeShaped({ ok: true })).to.be.false
   })
 })
 

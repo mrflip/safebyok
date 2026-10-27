@@ -38,7 +38,7 @@ export type VaultLogger = {
 export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
 export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 
-/** What a VaultLogger must carry, refusing 'bad_option'. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
+/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
 export const { loggerShape } = Validator('bad_option', ({ obj, custom }) => {
   const loggerCall = custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
   return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }) }
@@ -52,10 +52,10 @@ const guardedOnes = new WeakSet<object>()
 const guardedFor = new WeakMap<object, VaultLogger>()
 
 /** The host's logger made safe to call, dropping whatever it throws or rejects with; {@link DefaultLogger} for null or undefined.
- * A binding with something of its own to say, beside the vault it opens, says it through this.
- * Refuses 'bad_option' for anything without `log`, `warn` and `error` functions.
+ * A binding says what it has to say beside the vault through it. It refuses 'bad_option' for
+ * anything without `log`, `warn` and `error` functions.
  *
- * It keeps identity. A logger it made safe comes back as itself, and the same host logger always
+ * It keeps identity: a logger it made safe comes back as itself, and the same host logger always
  * comes back as the same safe one.
  *
  * @example parseLogger(props.logger).warn('BankProvider made its bank anew for a logger rebuilt in render', { call: 'BankProvider' })
@@ -96,7 +96,7 @@ const GuardedConsole = guarded(consoleLogger)
 /** Where the default logger says things now: the console, or what the host last handed setDefaultLogger. */
 const defaults: { target: VaultLogger } = { target: GuardedConsole }
 
-/** A logger that hands each call on to `defaults.target` as it stands when called; kept as guarded, its target being so. */
+/** A logger that hands each call on to `defaults.target` as it is when called; kept as guarded, its target being so. */
 const forwarding = (): VaultLogger => {
   const forwarder: VaultLogger = {
     log:   (message, story, err) => { defaults.target.log(message, story, err) },
@@ -107,10 +107,10 @@ const forwarding = (): VaultLogger => {
   return forwarder
 }
 
-/** The logger every storage adapter, vault, provider and store uses when it was given none of its own.
+/** The logger every storage adapter, vault, provider and store uses when given none of its own.
  * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
- * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to
- * have the vault use the default whatever its storage adapter was given.
+ * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to have
+ * the vault use the default whatever its storage adapter was given.
  *
  * @example Bank.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */

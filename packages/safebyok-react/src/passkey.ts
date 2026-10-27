@@ -103,7 +103,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
 }
 
 /** The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes.
- * `gate` is the snapshot's, as it stands (`vault.getSnapshot().gate`); the browser asks the user to
+ * `gate` is the snapshot's, as it is now (`vault.getSnapshot().gate`); the browser asks the user to
  * touch its passkey, and asks it for its answer over its own salt.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out, or has not that passkey

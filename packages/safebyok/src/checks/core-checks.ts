@@ -29,9 +29,9 @@ export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
 /** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
 const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
 
-/** A scope, frozen, or a scopepath split into its kind and names. A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object, passes as its scope.
- * A scope comes back a frozen copy, so no one it is handed to can change it for everyone else.
- * Each refuses 'bad_scope', naming each failing field.
+/** A scope as a frozen copy, or a scopepath split into its kind and names.
+ * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
+ * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
  *
  * @example CX.vaultScope.parse(vault)                                   // { applabel, user_id, vaultlabel }, frozen
  * @example CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' })          // throws 'bad_scope', "boxlabel: A label is ..."

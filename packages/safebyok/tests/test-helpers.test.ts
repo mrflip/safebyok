@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { Bank, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, raisedDeviceRecord, type DeviceDB, type StringStore } from '../src/index'
+import { Bank, DeviceDB, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
 import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good, valOf } from '../src/outcome'
@@ -375,7 +375,7 @@ describe("settledVault", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
-    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
+    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault is stored from birth').to.not.be.null
     expect(TH.bankOf(vault).vaultOf({ user_id: 'u1', vaultlabel: 'main' })).to.eq(vault)
   })
 
@@ -1073,34 +1073,43 @@ describe("raceOutcomeOf", () => {
 })
 // --
 
-// == [perUser]: perUser, ckeyOf, servingOnly, counted
-
-const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
+// == [perUser]: perUser, HostDeviceDB, servingOnly, counted
 
 /**
- * The smallest honest DeviceDB, as the README's recipe writes a host's own: two maps, each verb
- * answered through `deviceOutcomeOf`. Given `withheld`, every touch of its maps throws that, as a
+ * The smallest honest DeviceDB, as the README's recipe writes a host's own: a subclass over one
+ * map, each `do*` method its own step. Given `withheld`, every touch of the map throws that, as a
  * browser's store does when it withholds itself.
  */
-const hostDeviceDB = (withheld?: Error): DeviceDB => {
-  const rows = new Map<string, LeaseRecord>()
-  const records = new Map<string, DeviceRecord>()
-  const touch = () => { if (withheld !== undefined) { throw withheld } }
-  return {
-    getLease: (scope) => deviceOutcomeOf('getLease', () => { touch(); return rows.get(ckeyOf(scope)) ?? null }),
-    putLease: (record) => deviceOutcomeOf('putLease', () => { touch(); rows.set(ckeyOf(record), record); return record }),
-    delLease: (scope) => deviceOutcomeOf('delLease', () => { touch(); rows.delete(ckeyOf(scope)) }),
-    getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => { touch(); return records.get(ckeyOf(scope)) ?? null }),
-    raiseDeviceRecord: (record) => deviceOutcomeOf('raiseDeviceRecord', () => {
-      touch()
-      const raised = raisedDeviceRecord(records.get(ckeyOf(record)), record)
-      records.set(ckeyOf(record), raised)
-      return raised
-    }),
-    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', () => { touch(); records.delete(ckeyOf(scope)) }),
-    delAll:   () => deviceOutcomeOf('delAll', () => { touch(); rows.clear(); records.clear() }),
+class HostDeviceDB extends DeviceDB {
+  readonly #rows = new Map<string, unknown>()
+  readonly #withheld: Error | undefined
+
+  constructor(withheld?: Error) {
+    super()
+    this.#withheld = withheld
+  }
+
+  protected async doGetLease(leaseScopepath: string) { return await this.#touched(() => this.#rows.get(leaseScopepath)) }
+  protected async doPutLease(leaseScopepath: string, record: LeaseRecord) { await this.#touched(() => this.#rows.set(leaseScopepath, record)) }
+  protected async doDelLease(leaseScopepath: string) { await this.#touched(() => this.#rows.delete(leaseScopepath)) }
+  protected async doGetDeviceRecord(deviceScopepath: string) { return await this.#touched(() => this.#rows.get(deviceScopepath)) }
+  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
+    await this.#touched(() => this.#rows.set(deviceScopepath, raisedFrom(this.#rows.get(deviceScopepath))))
+  }
+  protected async doDelDeviceRecord(deviceScopepath: string) { await this.#touched(() => this.#rows.delete(deviceScopepath)) }
+  protected async doDelAll() { await this.#touched(() => { this.#rows.clear() }) }
+  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
+    await this.#touched(() => { if (! isReadable(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) } })
+  }
+
+  /** What `touch` does to the map, in one synchronous step, or the throw of a store withheld. */
+  #touched<ValT>(touch: () => ValT): Promise<ValT> {
+    if (this.#withheld !== undefined) { return Promise.reject(this.#withheld) }
+    return Promise.resolve(touch())
   }
 }
+
+const hostDeviceDB = (withheld?: Error): DeviceDB => new HostDeviceDB(withheld)
 
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => hostDeviceDB(), () => hostDeviceDB(new DOMException('The operation is insecure.', 'SecurityError')))
 
@@ -1246,7 +1255,7 @@ class RoundTripBackend {
   }
 }
 
-/** A write taken apart: its check of what stands, and the write itself, each on the rows. */
+/** A write taken apart: its check of what is stored, and the write itself, each on the rows. */
 type WritePlan = { check: (rows: Rows) => boolean, write: (rows: Rows) => void }
 
 /** How an adapter makes a write's check and the write itself: together, or not. */
@@ -1406,7 +1415,7 @@ class RoundTripVaultDB extends VaultDB {
 
   protected doGetCapacity(scope: VaultScope) { return this.backend.atomically((rows) => capacityIn(rows, scope, this.maxBoxes)) }
 
-  // What it removed is what the write found standing, in the same step.
+  // What it removed is what the doDelBox found stored, in the same step.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) {
     const boxScopepath = Scopepath.box({ ...scope, boxlabel })
     const removed: { box?: unknown } = {}

@@ -41,7 +41,7 @@ export const storedVaultRecordIn = async (CVX: ReturnType<typeof componentTest>,
   return read?.vault ?? null
 }
 
-/** The listing a component test's CVX shows for `scope`, as `getVault` reads it: empty where no vault stands. */
+/** The listing a component test's CVX shows for `scope`, as `getVault` reads it: empty where no vault is stored. */
 export const boxesIn = async (CVX: ReturnType<typeof componentTest>, scope: VaultScope) => {
   const read = await CVX.query(vaults.getVault, { ...scope })
   return read?.boxes ?? []

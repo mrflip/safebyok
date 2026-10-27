@@ -178,8 +178,8 @@ describe("idbVaultDB", () => {
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1' }, rawShelf(dbName))
     const next = TH.vaultRecordOf('u1', { gate_epoch: 2 })
     await TH.expectBad(idbVaultDB({ dbName }).putVaultRecord(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
-    const standing: unknown = await get(Scopepath.vault(TH.scopeOf('u1')), rawShelf(dbName))
-    expect(standing).to.deep.equal({ vault_tok: 'vault-tok-u1' })
+    const storedVaultRecord: unknown = await get(Scopepath.vault(TH.scopeOf('u1')), rawShelf(dbName))
+    expect(storedVaultRecord).to.deep.equal({ vault_tok: 'vault-tok-u1' })
   })
 
   it("reads a vault's props and every box in one transaction, and ensures a gateless one, ringing other tabs once it is made", async () => {
@@ -192,7 +192,7 @@ describe("idbVaultDB", () => {
     const rungOnMaking = heard.count
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }))
     await TH.aWhile()
-    expect(heard.count, 'an ensure that found the vault standing rang anyone').to.eq(rungOnMaking)
+    expect(heard.count, 'an ensure that found the vault already stored rang anyone').to.eq(rungOnMaking)
     unsubscribe()
     expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
   })

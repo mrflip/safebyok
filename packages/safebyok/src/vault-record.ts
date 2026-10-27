@@ -16,10 +16,10 @@ export const TombstoneFormat = 'safebyok-tombstone-v1'
 
 // == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft
 
-/** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves. Each `parse` refuses 'bad_record', quoting none of it.
+/** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves.
  * Each record is strict: a field this version does not know is damage. A VaultDB reads each back
  * through these, and refuses what fails as 'damaged_vault'. Each shape is the record's own fields,
- * picked or left out, never a parallel list; a part's shapes nest as the part does.
+ * picked or left out; a part's shapes nest as the part does.
  *
  * @example VaultRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
@@ -43,7 +43,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
     wayinkind:               lit('passkey'),
     /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
     credential_id:           str.min(1),
-    /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
+    /** The salt the passkey's PRF is evaluated over: `PasskeySaltBytes` random bytes, fresh for every wayin. */
     prf_salt_b64,
     /** The adding device's random id for the vault, from its device record: never drawn from the device itself. */
     device_id:               str.min(1),
@@ -117,33 +117,31 @@ export type WayinRecord = Z.infer<typeof WayinRecord>
 
 /** A vault's ways in as stored, its gate: the passphrase's wayin, and the passkey's or null.
  * The vault record holds it as its `gate`, null while the vault is novel. Each wayin wraps the one
- * vaultKey, and none opens without its proof.
+ * vaultKey, and none opens without its cleartext.
  *
  * @example { passphrase: passphraseWayinRecord, passkey: null }
  */
 export type GateRecord = Z.infer<typeof GateRecord>
 
-/** The one record per vault that every device syncs: its stamp, its two epochs, and its gate. None of it opens without a proof.
- * The stamp (`format`, the scope, `vault_tok`, `registered_at`) is fixed for the vault's life.
+/** The one record per vault that every device syncs: its {@link VaultStamp}, its two epochs, and its gate. None of it opens without a passphrase or passkey.
  * `vault_epoch` moves at every write of the record; `gate_epoch` at every write of the gate. A
  * novel vault, as `VaultDB.ensureVault` first stores it, has `gate_epoch` 0 and `gate` null; its
  * first gate is written over it at `gate_epoch` 1, expecting 0. The record's check holds
- * `gate_epoch` 0 exactly when `gate` is null. The gate rides in the record, though a shape that
- * wants no gate leaves it out ({@link VaultSparse}), since the record and its gate are written in
- * one compare-and-write.
+ * `gate_epoch` 0 exactly when `gate` is null. The record and its gate are written in one
+ * compare-and-write; a shape that wants no gate leaves it out ({@link VaultSparse}).
  *
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 0, gate_epoch: 0, gate: null }
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 3, gate_epoch: 2, gate: { passphrase, passkey: null } }
  */
 export type VaultRecord = Z.infer<typeof VaultRecord>
 
-/** A vault record as storage may hold it, which may fail its check: to the compiler a {@link VaultRecord} as written, to a reader the outcome a damaged one is.
+/** A vault record as storage may hold it: typed as a {@link VaultRecord} is written, though it may fail its check and read back damaged.
  * It names what a VaultDB's `doGetVault` may hand up as `vault`, beside a sound record, a
  * tombstone, and null: present, dead, broken, missing. The base class's check tells them apart.
  */
 export type DamagedVaultRecord = Z.input<typeof VaultRecord>
 
-/** A vault record without its gate: its stamp and both epochs. What a log line, a refusal's meta, `demandConsistentWith` and `Box.make` take, wherever the gate is not needed.
+/** A vault record without its gate: its stamp and both epochs, the shape wherever the gate is not needed.
  *
  * @example { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at, vault_epoch: 3, gate_epoch: 2 }
  */
@@ -209,7 +207,7 @@ export type GateSparse = Z.infer<typeof GateSparse>
  */
 export const isGated = <RecordT extends Pick<VaultRecord, 'gate'>>(record: RecordT): record is RecordT & { gate: GateRecord } => record.gate !== null
 
-/** `record` without its gate, frozen: its {@link VaultSparse}, every other field as it stands.
+/** `record` without its gate, frozen: its {@link VaultSparse}, every other field as it is.
  *
  * @example vaultSparseOf(record).gate_epoch === record.gate_epoch   // true, and no gate to read
  */

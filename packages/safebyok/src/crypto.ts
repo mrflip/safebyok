@@ -1,13 +1,13 @@
+/** The cryptography under the vault: AES-256-GCM encryption and key wrapping through WebCrypto, every primitive the platform's.
+ * Every encryption binds a {@link cipherCtx} as AES-GCM's additional data, so ciphertext copied
+ * anywhere else refuses to open. Key derivation from a passphrase is in key-deriver.ts.
+ */
+
 import { base64urlnopad } from '@scure/base'
 import type * as Z from 'zod'
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-
-/** The cryptography under the vault: AES-256-GCM encryption and key wrapping through WebCrypto, every primitive the platform's.
- * Every encryption binds a {@link cipherCtx} as AES-GCM's additional data, so ciphertext copied
- * anywhere else refuses to open. Key derivation from a passphrase is in key-deriver.ts.
- */
 
 /** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
 export const { Ciphered } = Validator('bad_record', ({ obj, str }) => ({
@@ -84,8 +84,9 @@ const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean =
 )
 
 /** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new vaultKey.
- * It is extractable, as a key must be to be wrapped. So keep it only inside the operation that
- * wraps it. The vaultKey a vault holds between operations is a separate, non-extractable unwrap.
+ * It is extractable, as a key must be to be wrapped, so keep it only inside the operation that
+ * wraps it. Between operations nothing holds a vaultKey unwrapped: each wayin and a lease keep it
+ * wrapped, and a lease unwraps it non-extractable, for one usage, at each cipher or decipher.
  */
 export const makeVaultKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, true, ['wrapKey', 'unwrapKey'])
@@ -141,7 +142,7 @@ export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, 
 
 /** The plain bytes back out of a {@link Ciphered}, verifying its tag and `ctx`.
  * It rejects with WebCrypto's DOMException when the key is wrong, the ctx differs, or the
- * ciphertext was altered. The caller turns that into its own calm refusal.
+ * ciphertext was altered: turn that into a calm refusal of your own.
  */
 export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ctx: Uint8Array): Promise<Uint8Array> => {
   const plain = await crypto.subtle.decrypt(
@@ -166,7 +167,8 @@ export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey
 
 /** The key back out of a wrapped key, verifying its tag and `ctx`.
  * It rejects with WebCrypto's DOMException on a wrong wrappingKey, a different ctx, or altered
- * ciphertext. For a wayin, that rejection is how a wrong proof is learned: there is no comparison.
+ * ciphertext. For a wayin, that rejection is how a wrong passphrase or passkey is learned: there is
+ * no comparison.
  *
  * @param usages - What the recovered key may do, and whether it is extractable. Unwrap
  *   non-extractable unless the operation is about to wrap the key again, and drop it after.

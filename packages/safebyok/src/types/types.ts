@@ -48,20 +48,19 @@ export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, 
   return { Whisper, whisperBag }
 })
 
-/** What names one vault: the app's label, the signed-in user's id, and the vault's own label, frozen once checked. Its `parse` refuses 'bad_scope'.
- * Each label is a `label`, and the user's id a `user_id`. A scope carrying more fields passes,
- * the rest left out: a vault record, or a Vault object, passes as its scope. It is
- * `CX.vaultScope`, under the name a host imports.
+/** The applabel, user_id and vaultlabel that name one vault. Its `parse` hands back a frozen copy, or refuses 'bad_scope'.
+ * Each label is a `label`, and the user_id a `user_id`. A scope carrying more fields passes, the
+ * rest left out: a vault record, or a Vault object, passes as its scope.
  */
 export const VaultScope = CX.vaultScope
 export type VaultScope = CX.VaultScope
 
 /** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, shown while the vault is locked. Never put secret material in it.
  * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
- * query), so anyone who can read the database can read it. It is bound into the box's encryption
- * as its JSON with keys sorted, so a sidecar altered in storage makes the box refuse to open, while
- * one whose keys storage reorders still opens. safebyok never looks inside it: check its shape
- * before `putBox()`. Its `parse` refuses 'bad_option', as `putBox()` does.
+ * query), so anyone who can read the database can read it. It is in the box's stamp as its JSON
+ * with keys sorted: a sidecar altered in storage makes the box refuse to open, while one whose
+ * keys storage reorders still opens. safebyok never looks inside it: check its shape before
+ * `putBox()`. Its `parse` refuses 'bad_option', as `putBox()` does.
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
@@ -96,7 +95,7 @@ export type WayinKind = typeof WayinKindVals[number]
  */
 export const PasskeySaltBytes = 32
 
-/** A vault's passphrase wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PassphraseWayinSparse}, its kind and when and by which device it was sealed, and its `vault_tok`.
+/** A vault's passphrase wayin as a log line or a `damaged_wayin` refusal's `meta.wayin_listed` shows it: its {@link PassphraseWayinSparse} and its `vault_tok`.
  * The `device_id` is one per device per vault, so it links nothing the vault does not already
  * link. A snapshot's `gate` shows the sparse shape alone.
  *
@@ -104,7 +103,7 @@ export const PasskeySaltBytes = 32
  */
 export type PassphraseWayinSummary = PassphraseWayinSparse & Pick<VaultRecord, 'vault_tok'>
 
-/** A vault's passkey wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PasskeyWayinSparse}, what to ask the authenticator with, and its `vault_tok`.
+/** A vault's passkey wayin as a log line or a `damaged_wayin` refusal's `meta.wayin_listed` shows it: its {@link PasskeyWayinSparse} and its `vault_tok`.
  * A snapshot's `gate` shows the sparse shape alone.
  *
  * @example err.meta?.wayin_listed   // { wayinkind: 'passkey', device_id, registered_at, vault_tok, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }
@@ -114,24 +113,25 @@ export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_
 /** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
-/** What a passkey answers when asked for a vault's PRF, to hand to the vault as proof: `safebyok-react`'s `askPasskey` makes one.
- * `credential_id` is base64url, as `PublicKeyCredential.id` gives it. `prfBytes`, 32 of them, are
- * as good as the passphrase for this vault: pass them to the vault, then drop them.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
+ * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
+ * it in `attempt`, beside the passphrase.
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
 export type PasskeyAnswer = {
+  /** Base64url, as `PublicKeyCredential.id` gives it. */
   credential_id: string
   prf_salt_b64:  string
+  /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
   prfBytes:      Uint8Array
 }
 
 /** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
- * it ever goes to the backend. Its `parse` refuses 'bad_record'; it is strict, as every stored
- * record is.
+ * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
  */
 export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
   LeaseRecord: obj({
@@ -146,7 +146,7 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, "a CryptoKey handle"),
     /** The vaultKey, wrapped under the leaseKey. */
     vault_key_lease_wrapped,
-    /** The instant from which the lease no longer counts, and the vault asks for a proof. */
+    /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
     ask_passphrase_at: epochMillis,
   }).strict(),
 }))
@@ -159,15 +159,14 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  * A vault served below `highest_vault_epoch` was rolled back, and the bank refuses it as
  * 'vault_behind'. The DeviceDB raises it, never lowers it: a write of a lower epoch keeps the
  * higher, and the first `device_id` stored stays. `bank.clearCachedVault` erases it. Its `parse`
- * refuses 'bad_record', and hands back the record frozen.
- *
- * It is strict, and a record that fails its check reads as none, so a field added to it bumps its
- * `format`: a device whose safebyok predates the field discards the record, and with it the
- * `highest_vault_epoch` that guards it against a rolled-back vault, until its next read raises it
- * again. `deviceRecordOf` builds one from a parsed scope.
+ * is strict, refuses 'bad_record', and hands back the record frozen. A record that fails it reads
+ * as none. `deviceRecordOf` builds one from a parsed scope.
  *
  * @example { format: 'safebyok-device-v1', ...scope, device_id: 'Zm9vYmFy', highest_vault_epoch: 3 }
  */
+// A field added here bumps the format: a device whose safebyok predates the field discards the
+// record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
+// its next read raises it again.
 export const { DeviceRecord } = Validator('bad_record', ({ obj, str, uint, lit, applabel, user_id, vaultlabel }) => ({
   DeviceRecord: obj({
     format:              lit(DeviceRecordFormat),
@@ -182,7 +181,7 @@ export const { DeviceRecord } = Validator('bad_record', ({ obj, str, uint, lit, 
 }))
 export type DeviceRecord = Z.infer<typeof DeviceRecord>
 
-/** The default `leaseHours`: how long a proof's unlock lasts on this device before the vault asks again. */
+/** The default `leaseHours`: how long a lease lasts on this device after a gating unlocks, before the vault asks again. */
 export const LeaseHours = 168 // seven days
 
 /** The default `staleMinutes`: how long a `hello()` trusts the last read of storage, so a burst of hellos costs one read.
@@ -206,8 +205,8 @@ export const MaxWhisperBytes = 40_444 // searchable: 40444
 export const MaxBoxes = 100
 
 /** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
- * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside {@link FarPast} to
- * {@link FarFuture}, or a throw. The vault takes every later reading as it comes.
+ * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside `FarPast` to
+ * `FarFuture`, or a throw. The vault takes every later reading as it comes.
  */
 export type Clock = { now(): number }
 

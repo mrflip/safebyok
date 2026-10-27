@@ -41,28 +41,28 @@ class MapVaultDB extends VaultDB {
     this.rows = rows
   }
 
-  private standingVaultRecord(scope: VaultScope) { return this.rows.get(Scopepath.vault(scope)) }
+  private storedVaultRecord(scope: VaultScope) { return this.rows.get(Scopepath.vault(scope)) }
 
   protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     return Promise.resolve({ vault: this.rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(this.storedBoxes(scope)) })
   }
 
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
-    const life = Expectations.newLifeOf(draft, this.standingVaultRecord(draft))
+    const life = Expectations.newLifeOf(draft, this.storedVaultRecord(draft))
     if (life) { this.rows.set(Scopepath.vault(draft), life) }
     return Promise.resolve({ vault: this.rows.get(Scopepath.vault(draft)), ...splitStoredBoxes(this.storedBoxes(draft)) })
   }
 
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) {
-    const standing = this.standingVaultRecord(vaultRecord)
-    const missed = Expectations.vaultRecordRefusalOf(standing, expected)
+    const stored = this.storedVaultRecord(vaultRecord)
+    const missed = Expectations.vaultRecordRefusalOf(stored, expected)
     if (missed) { return Promise.reject(missed) }
-    this.rows.set(Scopepath.vault(vaultRecord), Expectations.vaultRecordPutOf(vaultRecord, standing))
+    this.rows.set(Scopepath.vault(vaultRecord), Expectations.vaultRecordPutOf(vaultRecord, stored))
     return Promise.resolve(this.rows.get(Scopepath.vault(vaultRecord)))
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) {
-    if (! Expectations.vaultMeets(this.standingVaultRecord(scope), expected)) { return Promise.reject(Refusals.vaultMismatch()) }
+    if (! Expectations.vaultMeets(this.storedVaultRecord(scope), expected)) { return Promise.reject(Refusals.vaultMismatch()) }
     return Promise.resolve(this.rows.get(Scopepath.box({ ...scope, boxlabel })) ?? null)
   }
 
@@ -74,13 +74,13 @@ class MapVaultDB extends VaultDB {
   }
 
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) {
-    const standingBox = this.rows.get(Scopepath.box({ ...scope, boxlabel: box.boxlabel })) as BoxRecord | undefined
-    const standingVaultRecord = this.standingVaultRecord(scope)
-    const missed = Expectations.boxRefusalOf(standingVaultRecord, standingBox, expected)
+    const storedBox = this.rows.get(Scopepath.box({ ...scope, boxlabel: box.boxlabel })) as BoxRecord | undefined
+    const storedVaultRecord = this.storedVaultRecord(scope)
+    const missed = Expectations.boxRefusalOf(storedVaultRecord, storedBox, expected)
     if (missed) {
       return Promise.reject(missed)
     }
-    if (standingBox === undefined && this.boxCount(scope) >= this.maxBoxes) {
+    if (storedBox === undefined && this.boxCount(scope) >= this.maxBoxes) {
       return Promise.reject(Refusals.vaultFull(this.capacityOf(scope)))
     }
     this.rows.set(Scopepath.box({ ...scope, boxlabel: box.boxlabel }), box)
@@ -108,14 +108,14 @@ class MapVaultDB extends VaultDB {
   }
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
-    if (! Expectations.vaultMeets(this.standingVaultRecord(scope), expected)) { return Promise.resolve(null) }
+    if (! Expectations.vaultMeets(this.storedVaultRecord(scope), expected)) { return Promise.resolve(null) }
     const deletion = Expectations.deletionOf(this.rows.get(Scopepath.box({ ...scope, boxlabel })), expected)
     this.rows.delete(Scopepath.box({ ...scope, boxlabel }))
     return Promise.resolve(deletion)
   }
 
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
-    const tombstone = Expectations.tombstoneOf(this.standingVaultRecord(scope), scope, expected)
+    const tombstone = Expectations.tombstoneOf(this.storedVaultRecord(scope), scope, expected)
     if (tombstone === null) { return Promise.resolve(null) }
     const doomed = [...this.rows].map(([ckey]) => ckey).filter(Scopepath.withinVaultScopepathPred(scope))
     for (const ckey of doomed) { this.rows.delete(ckey) }
@@ -181,7 +181,7 @@ class RingingVaultDB extends MapVaultDB {
 
   ring() { for (const onChange of this.watches) { onChange() } }
 
-  /** The logger it says things through, as it stands. */
+  /** The logger it says things through, as it is now. */
   loggerNow() { return this.logger }
 
   /** Tries to put `logger` in place of it by assignment: true when that took. */
@@ -487,12 +487,12 @@ describe("the abstract VaultDB, deleting a vault whose vault record is damaged",
     const vaultDB = withDamagedVaultRecord()
     await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
     const tombstone = await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
-    // Their two rows stand, and in the place of ours a tombstone: the counter counted from zero, as damaged props show none.
+    // Their two rows are kept, and in the place of ours a tombstone: the counter counted from zero, as damaged props show none.
     expect(vaultDB.rows.size).to.eq(3)
     const left = { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 2 }
     expect(tombstone).to.deep.equal(left)
-    const standing = vaultDB.rows.get(Scopepath.vault(TH.scopeOf('u1')))
-    expect(standing).to.deep.equal(left)
+    const stored = vaultDB.rows.get(Scopepath.vault(TH.scopeOf('u1')))
+    expect(stored).to.deep.equal(left)
     const theirVaultRecord = Scopepath.vault(TH.scopeOf('u2'))
     const theirBox = Scopepath.box({ ...TH.scopeOf('u2'), boxlabel: 'anthropic' })
     expect(vaultDB.rows.has(theirVaultRecord)).to.eq(true)
@@ -507,7 +507,7 @@ describe("the abstract VaultDB, deleting a vault whose vault record is damaged",
     expect(vaultDB.rows.size, 'a tombstone alone').to.eq(1)
   })
 
-  it("refuses a vault record that stands sound as bad_option, deleting nothing", async () => {
+  it("refuses a sound stored vault record as bad_option, deleting nothing", async () => {
     const vaultDB = withDamagedVaultRecord((vaultRecord) => vaultRecord)
     const before = new Map(vaultDB.rows)
     const refusal = await TH.expectBad(vaultDB.delDamagedVault(TH.scopeOf('u1')), 'bad_option')
@@ -733,7 +733,7 @@ describe("the abstract VaultDB, on the way back from a box write", () => {
     expect(await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 
-  it("refuses as stale, resolving nothing, a write whose adapter throws what Refusals.staleBox makes of the box standing", async () => {
+  it("refuses as stale, resolving nothing, a write whose adapter throws what Refusals.staleBox makes of the box stored", async () => {
     const vaultDB = new MapVaultDB()
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
@@ -752,7 +752,7 @@ describe("the abstract VaultDB, on the way back from a box write", () => {
       expect(refusal.message).to.match(/adapter needs a developer's look/)
       // The check's bad_record is the cause where it refused the box; a box naming another one has none.
       expect(isVaultError(refusal.cause, 'bad_record') ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
-      // What the adapter stored stands: the refusal is about its answer, not its write.
+      // What the adapter stored is kept: the refusal is about its answer, not its write.
       expect(vaultDB.rows.get(u1AnthropicBoxScopepath)).to.deep.equal(TH.boxOf('anthropic', 'one'))
     })
   }
@@ -778,8 +778,8 @@ class RefusingVaultDB extends MapVaultDB {
   protected override doPutBox(): Promise<unknown> { return Promise.reject(this.refusal) }
 }
 
-/** What a stale box write's adapter may say stands under `anthropic`, and what the refusal then carries. */
-const StandingCases = [
+/** What a stale box write's adapter may say is stored under `anthropic`, and what the refusal then carries. */
+const StoredBoxCases = [
   [TH.boxOf('anthropic', 'one'),                                 TH.boxOf('anthropic', 'one'),                                       'the box as stored: the box, whole'],
   [null,                                                         null,                                                               'nothing: null'],
   [omit(TH.boxOf('anthropic', 'one'), ['box_key_wrapped', 'whisper_ciphered']), { boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }, 'a box missing its ciphered fields: damaged, with its revision'],
@@ -791,16 +791,16 @@ const StandingCases = [
 ] as const
 
 describe("the abstract VaultDB, on a box write that misses", () => {
-  for (const [standing, reported, blurb] of StandingCases) {
+  for (const [stored, reported, blurb] of StoredBoxCases) {
     it(`reports as meta.box_stored, from a stale write whose adapter names ${blurb} (Contract: VaultDB.putBox, Does)`, async () => {
-      const vaultDB = new RefusingVaultDB(Refusals.staleBox(standing))
+      const vaultDB = new RefusingVaultDB(Refusals.staleBox(stored))
       const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two')), 'stale_write')
       expect(refusal.meta).to.deep.equal({ box_stored: reported })
       expect(refusal.message).to.eq(Refusals.StaleBoxMessage)
     })
   }
 
-  it("refuses as corrupt_record a stale write whose adapter names nothing standing, saying nothing was written and the adapter needs a look", async () => {
+  it("refuses as corrupt_record a stale write whose adapter does not say what is stored, saying nothing was written and the adapter needs a look", async () => {
     const thrown = Refusals.staleWrite('del')
     const vaultDB = new RefusingVaultDB(thrown)
     const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two')), 'corrupt_record')
@@ -818,7 +818,7 @@ describe("the abstract VaultDB, on a box write that misses", () => {
     expect(vaultDB.rows.has(u1AnthropicBoxScopepath)).to.be.false
   })
 
-  it("hands on a stale write through a VaultDB that hands its call to another, what stands as the inner one reported it", async () => {
+  it("hands on a stale write through a VaultDB that hands its call to another, what is stored as the inner one reported it", async () => {
     const vaultDB = new ForwardingVaultDB()
     await TH.ensureGated(vaultDB.inner, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB.inner).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
@@ -945,12 +945,14 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
 
 /**
  * A MapVaultDB written as a VaultDB that hands each call on to another and forgets to unwrap the
- * answer: each hook hands back `good` of what it would answer, or, for a write, `bad` of a stale one.
+ * answer: each read hands back `good` of what it would answer, and each write `bad` of a stale one.
  */
 class ForgetfulVaultDB extends MapVaultDB {
   protected override async doGetVault(scope: VaultScope): Promise<VaultReadResponse> { return good(await super.doGetVault(scope)) as unknown as VaultReadResponse }
   protected override async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return good(await super.doGetBox(scope, boxlabel, expected)) }
   protected override doPutVaultRecord(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleVaultRecord(null))) }
+  protected override doPutBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleBox(null))) }
+  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
   protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
 }
 
@@ -977,21 +979,26 @@ describe("the abstract VaultDB, by what threw", () => {
     await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
   })
 
-  it("refuses an answer still wrapped as an Outcome as 'bad_option', saying to unwrap it with valOf, never reading it as a record", async () => {
+  it("refuses a read answered with an Outcome still wrapped as an answer in another shape, never reading it as a record: corrupt_record, or damaged_box for a box", async () => {
     const vaultDB = new ForgetfulVaultDB()
     vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
-    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'bad_option')
-    expect(refusal.message).to.match(/doGetVault answered with an Outcome/)
-    expect(refusal.message).to.match(/valOf/)
-    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'bad_option')
+    vaultDB.rows.set(u1AnthropicBoxScopepath, TH.boxOf('anthropic', 'one'))
+    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'corrupt_record')
+    expect(refusal.message).to.match(/answered a vault read in a shape this package does not know/)
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
   })
 
-  it("refuses a write answered with a refusal still wrapped, which reads as true, rather than taking it as landed", async () => {
+  it("refuses a write answered with a refusal still wrapped, which reads as true, as corrupt_record, saying it may have landed rather than taking it as landed", async () => {
     const vaultDB = new ForgetfulVaultDB()
     vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
     const expected = { vault_tok: 'vault-tok-u1', gate_epoch: 1 }
-    await TH.expectBad(vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 }, expected), 'bad_option')
-    await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault), 'bad_option')
+    const refusals = [
+      await TH.expectBad(vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 }, expected), 'corrupt_record'),
+      await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one')), 'corrupt_record'),
+      await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'corrupt_record'),
+      await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault), 'corrupt_record'),
+    ]
+    for (const refusal of refusals) { expect(refusal.message).to.match(/whether it did is not known/) }
   })
 
   it("says a throw in its own code, not the adapter's, as 'unexpected_error', never as storage_unavailable, which a host would retry", async () => {
@@ -1116,21 +1123,21 @@ describe("the abstract VaultDB, reading a vault whole", () => {
     expect([read?.boxes, read?.damagedBoxes, read?.boxes[0], read?.boxes[0]?.sidecar, read?.damagedBoxes[0]].every((part) => Object.isFrozen(part))).to.be.true
   })
 
-  it("refuses a vault record that fails its checks as damaged_vault, and one of a later format as newer_format, whatever boxes stand beside them", async () => {
+  it("refuses a vault record that fails its checks as damaged_vault, and one of a later format as newer_format, whatever boxes are stored beside them", async () => {
     await TH.expectBad(withDamagedVaultRecord().getVault(TH.scopeOf('u1')), 'damaged_vault')
     const misnamed = await TH.expectBad(withDamagedVaultRecord((vaultRecord) => ({ ...vaultRecord, vaultlabel: 'Main' })).getVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(isVaultError(misnamed.cause, 'bad_record')).to.be.true
     await TH.expectBad(withDamagedVaultRecord((vaultRecord) => ({ ...vaultRecord, format: 'safebyok-vault-v7' })).getVaultRecords(TH.scopeOf('u1')), 'newer_format')
   })
 
-  it("reads no vault where no vault record stands, boxes under the scope or not, and repairs nothing", async () => {
+  it("reads no vault where no vault record is stored, boxes under the scope or not, and repairs nothing", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), TH.boxOf('anthropic', 'one'))
     expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.be.null
     expect(vaultDB.rows.size).to.eq(1)
   })
 
-  it("hands back from ensureVault the vault record standing, gated or not, and its listing", async () => {
+  it("hands back from ensureVault the stored vault record, gated or not, and its listing", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(Scopepath.vault(TH.scopeOf('u1')), TH.vaultRecordOf('u1'))
     vaultDB.rows.set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), TH.boxOf('anthropic', 'one'))
@@ -1154,8 +1161,8 @@ class StalePropsVaultDB extends MapVaultDB {
   }
 }
 
-/** What a stale update's adapter may say stands, and the refusal and meta that then reach the caller. */
-const StandingPropsCases = [
+/** What a stale update's adapter may say is stored, and the refusal and meta that then reach the caller. */
+const StoredVaultRecordCases = [
   [TH.vaultRecordOf('u1', { gate_epoch: 2 }),                       'stale_write',   { vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 2 }) }, 'the winning vault record: stale_write, carrying it whole'],
   [TH.gatelessOf('u1'),                                            'stale_write',   { vault_stored: TH.gatelessOf('u1') },                     'gateless vault record: stale_write, carrying it'],
   [null,                                                           'stale_write',   { vault_stored: null },                                    'none: stale_write, carrying null'],
@@ -1166,15 +1173,15 @@ const StandingPropsCases = [
 ] as const
 
 describe("the abstract VaultDB, on an update of the vault record that misses", () => {
-  for (const [standing, kind, meta, blurb] of StandingPropsCases) {
-    it(`refuses an update whose adapter says there stands ${blurb}`, async () => {
-      const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleVaultRecord(standing) })
+  for (const [stored, kind, meta, blurb] of StoredVaultRecordCases) {
+    it(`refuses an update whose adapter names as stored ${blurb}`, async () => {
+      const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleVaultRecord(stored) })
       const refusal = await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), kind)
       expect(refusal.meta).to.deep.equal(meta)
     })
   }
 
-  it("refuses as corrupt_record a stale write naming nothing standing, saying nothing was written", async () => {
+  it("refuses as corrupt_record a stale write that does not say what is stored, saying nothing was written", async () => {
     const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleWrite('del') })
     const refusal = await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
@@ -1268,7 +1275,7 @@ describe("the abstract VaultDB, reading a damaged box", () => {
     expect((refusal.cause as VaultError).message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only format, boxlabel, /)
   })
 
-  it("refuses standing vault record that fails its checks, met by ensureVault, as damaged_vault", async () => {
+  it("refuses a stored vault record that fails its checks, met by ensureVault, as damaged_vault", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(u1VaultScopepath, { ...TH.vaultRecordOf('u1'), gate_epoch: 'one' })
     const refusal = await TH.expectBad(vaultDB.ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-drafted' })), 'damaged_vault')

@@ -84,7 +84,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     expect(await asU1.query(api.safebyok.getCapacity, { ...u1 })).to.deep.equal((answer as { capacity: unknown }).capacity)
   })
 
-  it("resolves a failed expectation as why it failed, with the box that stands, not as a refusal", async () => {
+  it("resolves a failed expectation as why it failed, with the stored box, not as a refusal", async () => {
     const CVX = await seeded()
     const stale = { vault_tok: 'vault-tok-u1', revision_tok: 'rev-a0' }
     const answer = await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })

@@ -202,8 +202,8 @@ describe("vaultResolvers, a write's answer in the body", () => {
   })
 
   it("crosses a stale_write from a verb that answers in no body as its kind alone, whatever meta a VaultDB hangs on it", async () => {
-    const standing = TH.vaultRecordOf('u1')
-    const stale = new VaultError('stale_write', 'The vault changed.', { meta: { vault_stored: standing, box_stored: TH.boxOf('openai', 'r1') } })
+    const storedVaultRecord = TH.vaultRecordOf('u1')
+    const stale = new VaultError('stale_write', 'The vault changed.', { meta: { vault_stored: storedVaultRecord, box_stored: TH.boxOf('openai', 'r1') } })
     const { served } = fakeServed(() => Promise.resolve({ ok: false, err: stale }))
     const schema = TH.schemaOver(await TH.database(), () => served)
     const results = [
@@ -216,7 +216,7 @@ describe("vaultResolvers, a write's answer in the body", () => {
     }
   })
 
-  it("crosses a write's refusal that carries nothing standing as its kind alone", async () => {
+  it("crosses a write's refusal that carries no stored record as its kind alone", async () => {
     const stale = new VaultError('stale_write', 'The vault changed.')
     const { served } = fakeServed(() => Promise.resolve({ ok: false, err: stale }))
     const schema = TH.schemaOver(await TH.database(), () => served)
@@ -241,7 +241,7 @@ const OnU2Vault: [string, string, Record<string, unknown>][] = (() => {
   ]
 })()
 
-/** A database where u2's vault stands, gated, holding one box, written as u2. */
+/** A database where u2's vault is stored, gated, holding one box, written as u2. */
 const withU2Vault = async () => {
   const db = await TH.emptyDatabase()
   const asU2 = TH.requestFor(db, 'u2')
@@ -252,7 +252,7 @@ const withU2Vault = async () => {
 
 describe("vaultResolvers, for a request naming another user than its own", () => {
   for (const [rootField, document, variableValues] of OnU2Vault) {
-    it(`refuses ${rootField} as identity_revoked, where that user's vault stands`, async () => {
+    it(`refuses ${rootField} as identity_revoked, where that user's vault is stored`, async () => {
       const result = await asked(TH.schemaOver(await withU2Vault()), document, variableValues)
       expect(result.errors!.map((err) => err.extensions)).to.deep.equal([{ kind: 'identity_revoked' }])
     })

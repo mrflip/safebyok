@@ -5,7 +5,7 @@ import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfV
 import { VaultChangeChannel } from './vault-tables'
 
 /** What this VaultDB needs of a Postgres driver: one statement, its parameters numbered `$1` on, and the rows it returns.
- * A `pg` Pool, Client or PoolClient is one as it stands, and so is a PGlite; postgres.js takes a
+ * A `pg` Pool, Client or PoolClient is one as it is, and so is a PGlite; postgres.js takes a
  * one-line wrapper. Every write is one statement, atomic on its own: no transaction is asked of the driver.
  *
  * @example new Pool({ connectionString })                                      // pg
@@ -123,14 +123,14 @@ const VaultBoxesJsonSql = (vaultRow: string) => `(SELECT COALESCE(json_agg(liste
 const GetVaultSql = `SELECT ${Columns.selected(VaultRowColumns)}, ${VaultBoxesJsonSql('vault')}
   FROM safebyok_vaults AS vault WHERE ${ScopeIs}`
 
-// A vault created where none stands, and the boxes of the vault record it returns. Its scope
+// A vault created where none is stored, and the boxes of the vault record it returns. Its scope
 // parameters are the vault record's first three columns, $1 to $3, as the listing's are. A tombstone
 // in the scope is deleted in the same statement, and its counter becomes the new vault's
 // `vault_epoch`, no lower than the draft's (which is 0): a new life with the counter carried on.
 // Another device doing the same waits on the tombstone's row, finds it gone, and meets the new
 // vault by its `ON CONFLICT`. The listing reads the statement's snapshot, filtered to the
 // vault_tok the insert returns: a vault record another device created after that snapshot is returned
-// as it stands, with the boxes the snapshot holds of it, and never another vault's.
+// as last committed, with the boxes the snapshot holds of it, and never another vault's.
 const EnsureVaultSql = `WITH carried AS (
     DELETE FROM safebyok_vault_tombstones WHERE ${ScopeIs} RETURNING vault_epoch
   ), ensured AS (
@@ -144,11 +144,11 @@ const EnsureVaultSql = `WITH carried AS (
 // The vault record written must name the vault it replaces, as a vault_tok never changes, and move
 // its gate_epoch forward, as every update does (line 3.2): a modified client cannot write a vault
 // record back over the one it read. The vault row is read FOR UPDATE first, which locks it and reads
-// it as it stands once locked, another writer's commit since the statement began included: what a
+// it as last committed once locked, another writer's commit since the statement began included: what a
 // miss reports is the winner. The UPDATE then writes only over that row, its vault_epoch the
-// standing one plus one whatever the client sent. One row back, either way: `landed`, `stands`
-// (whether a vault record stood), and its columns as written, or as locked on a miss.
-const PutVaultRecordSql = `WITH standing AS MATERIALIZED (
+// stored one plus one whatever the client sent. One row back, either way: `landed`, `found`
+// (whether a vault record was stored), and its columns as written, or as locked on a miss.
+const PutVaultRecordSql = `WITH prior AS MATERIALIZED (
     SELECT ${Columns.selected(VaultRowColumns)} FROM safebyok_vaults WHERE ${ScopeIs} FOR UPDATE
   ), written AS (
     UPDATE safebyok_vaults SET (${Columns.names(VaultRowColumns)}) = ROW(${Columns.placeholders(VaultRowColumns, 1, { vault_epoch: `vault_epoch + 1 + (${Columns.placeholderOf(VaultRowColumns, 'vault_epoch', 1)} * 0)` })})
@@ -156,41 +156,41 @@ const PutVaultRecordSql = `WITH standing AS MATERIALIZED (
       AND vault_tok = $${String(VaultRowParamCount + 1)}::text AND gate_epoch = $${String(VaultRowParamCount + 2)}::bigint
       AND vault_tok = ${Columns.placeholderOf(VaultRowColumns, 'vault_tok', 1)}
       AND gate_epoch < ${Columns.placeholderOf(VaultRowColumns, 'gate_epoch', 1)}
-      AND EXISTS (SELECT 1 FROM standing)
+      AND EXISTS (SELECT 1 FROM prior)
     RETURNING ${Columns.selected(VaultRowColumns)}
   )
-  SELECT EXISTS (SELECT 1 FROM written) AS landed, EXISTS (SELECT 1 FROM standing) AS stands, stored.*
+  SELECT EXISTS (SELECT 1 FROM written) AS landed, EXISTS (SELECT 1 FROM prior) AS found, stored.*
   FROM (SELECT 1) AS answer LEFT JOIN (
     SELECT * FROM written
     UNION ALL
-    SELECT * FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
+    SELECT * FROM prior WHERE NOT EXISTS (SELECT 1 FROM written)
   ) AS stored ON true`
 
 // The box under the boxlabel in $4, in the vault of the vault_tok in $5 (line 2.5), from one
-// snapshot: one row while a vault record of that vault_tok stands, its `stands` and box columns null
-// where no box does; no row where they do not -- none, a tombstone, or another vault's.
+// snapshot: one row while a vault record of that vault_tok is stored, its `found` and box columns null
+// where no box is; no row where it is not -- none, a tombstone, or another vault's.
 const GetBoxSql = `SELECT box.* FROM safebyok_vaults AS vault LEFT JOIN (
-    SELECT true AS stands, ${Columns.selected(BoxColumns)} FROM safebyok_boxes
+    SELECT true AS found, ${Columns.selected(BoxColumns)} FROM safebyok_boxes
     WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_tok = $5::text
   ) AS box ON true
   WHERE ${ScopeIs} AND vault.vault_tok = $5::text`
 
 // The vault row a box write lands beside: the vault's, of the expected vault_tok (line 3.3). It is
 // read FOR SHARE, so a deletion of the vault waits until the write's statement ends, or the write
-// waits for it, and then reads the vault row as it stands, never only as the statement's snapshot
+// waits for it, and then reads the vault row as last committed, never only as the statement's snapshot
 // had it. Box writers share the lock, so they never wait on each other for the vault row.
 const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_tok FROM safebyok_vaults
     WHERE ${ScopeIs} AND vault_tok = $4::text
     FOR SHARE`
 
-// The box standing under the boxlabel, beside the expected vault: what a box write compares, and
+// The box stored under the boxlabel, beside the expected vault: what a box write compares, and
 // reports when it misses. FOR UPDATE locks it without writing it -- two writes to one boxlabel meet
-// here, one after the other -- and reads it as it stands once locked, a box another writer
+// here, one after the other -- and reads it as last committed once locked, a box another writer
 // committed since this statement began included, never only as the snapshot had it. It is read
 // after the vault row, so a write takes its locks in the order a vault's deletion does. A box
 // first inserted since this statement began is not in its snapshot, so not here: only the insert's
 // ON CONFLICT meets it.
-const StandingBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes
+const StoredBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes
     WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
       AND EXISTS (SELECT 1 FROM vault)
     FOR UPDATE`
@@ -203,21 +203,21 @@ const BoxBytesSql = 'COALESCE(sum(octet_length(row_to_json(box)::text)), 0)::flo
 // How full the vault is, as of this statement: every box of the scope counted and weighed.
 const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS bytes_used ${VaultBoxesSql}`
 
-// Each box write answers one row, whether or not it landed: `vault_stands`, whether the vault record
-// it expects stood; `landed`, whether its own comparison passed and it wrote (null when no box
-// stands to report); `was_full`, a first write's vault at its limit, with its `box_count`, and its
-// `bytes_used` when the write is refused for it; and the box columns of what stands under the
-// boxlabel now -- the box written, as its RETURNING hands it back, or the one standing, as the FOR
+// Each box write answers one row, whether or not it landed: `vault_found`, whether the vault record
+// it expects was stored; `landed`, whether its own comparison passed and it wrote (null when there
+// is no box to report); `was_full`, a first write's vault at its limit, with its `box_count`, and its
+// `bytes_used` when the write is refused for it; and the box columns of what is stored under the
+// boxlabel now -- the box written, as its RETURNING hands it back, or the one stored, as the FOR
 // UPDATE read it -- null when none does. One statement, so one snapshot and one round trip: the
 // closing SELECT reads the CTEs' rows, and the boxes table again only to weigh a vault that refuses
 // the write as full.
 
 // A first box under its boxlabel: inserted only beside the vault record it expects, only where no
-// box stands, and only while the vault holds fewer than $5 boxes -- or, for a null $5, no limit,
+// box is stored, and only while the vault holds fewer than $5 boxes -- or, for a null $5, no limit,
 // when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the CASE
-// asks for it. A box standing in the snapshot is locked and reported, and nothing is inserted. A
+// asks for it. A box stored in the snapshot is locked and reported, and nothing is inserted. A
 // box another writer inserted since the statement began is met by the ON CONFLICT, whose no-op
-// DO UPDATE locks it and returns it as it now stands: then `xmax = 0` is false, since Postgres
+// DO UPDATE locks it and returns it as last committed: then `xmax = 0` is false, since Postgres
 // marks a row it locked, and only a row this statement inserted lands.
 //
 // Nothing is counted in advance: the limit is the count of the vault's boxes at the start of
@@ -226,56 +226,56 @@ const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS 
 // a few past its limit (by at most one less than the number of racers), which the contract allows,
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
 // vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
-// gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
+// gone, or by the foreign key, which reads the vault row as storage now holds it: that failure is caught as
 // the vault gone (see insertBox), and no box ever lands in a vault but its own. A write refused as
 // full weighs the vault's boxes for its capacity, in the same statement; no other write weighs them.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
-  ), standing AS MATERIALIZED (
-    ${StandingBoxSql}
+  ), prior AS MATERIALIZED (
+    ${StoredBoxSql}
   ), counted AS (
     SELECT CASE WHEN $5::bigint IS NULL THEN 0 ELSE (SELECT count(*) ${VaultBoxesSql}) END AS box_count
   ), written AS (
     INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_tok, ${Columns.names(BoxColumns)})
     SELECT applabel, user_id, vaultlabel, vault_tok, ${Columns.placeholders(BoxColumns, BoxParamsFrom)}
-    FROM vault, counted WHERE NOT EXISTS (SELECT 1 FROM standing) AND ($5::bigint IS NULL OR counted.box_count < $5::bigint)
+    FROM vault, counted WHERE NOT EXISTS (SELECT 1 FROM prior) AND ($5::bigint IS NULL OR counted.box_count < $5::bigint)
     ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO UPDATE SET format = safebyok_boxes.format
     RETURNING ${Columns.selected(BoxColumns)}, xmax = 0 AS landed
   )
-  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands,
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_found,
          COALESCE(counted.box_count >= $5::bigint, false) AS was_full,
          counted.box_count::float8 AS box_count,
-         CASE WHEN counted.box_count >= $5::bigint AND EXISTS (SELECT 1 FROM vault) AND NOT EXISTS (SELECT 1 FROM standing)
+         CASE WHEN counted.box_count >= $5::bigint AND EXISTS (SELECT 1 FROM vault) AND NOT EXISTS (SELECT 1 FROM prior)
            THEN (SELECT ${BoxBytesSql} ${VaultBoxesSql}) ELSE 0 END AS bytes_used,
          box.*
-  FROM counted LEFT JOIN (SELECT * FROM written UNION ALL SELECT *, false FROM standing) AS box ON true`
+  FROM counted LEFT JOIN (SELECT * FROM written UNION ALL SELECT *, false FROM prior) AS box ON true`
 
-// A box over the revision read, beside the vault record it expects: written only over the box
-// standing locked, and only while it is at that revision.
+// A box over the revision read, beside the vault record it expects: written only over the stored
+// box it locked, and only while it is at that revision.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
-  ), standing AS MATERIALIZED (
-    ${StandingBoxSql}
+  ), prior AS MATERIALIZED (
+    ${StoredBoxSql}
   ), written AS (
     UPDATE safebyok_boxes SET (${Columns.names(BoxColumns)}) = ROW(${Columns.placeholders(BoxColumns, BoxParamsFrom)})
     WHERE ${ScopeIs} AND vault_tok = $4::text
       AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
       AND revision_tok = $5::text
-      AND EXISTS (SELECT 1 FROM standing)
+      AND EXISTS (SELECT 1 FROM prior)
     RETURNING ${Columns.selected(BoxColumns)}
   )
-  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands, false AS was_full, box.*
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_found, false AS was_full, box.*
   FROM (SELECT 1) AS answer LEFT JOIN (
     SELECT *, true AS landed FROM written
     UNION ALL
-    SELECT *, false FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
+    SELECT *, false FROM prior WHERE NOT EXISTS (SELECT 1 FROM written)
   ) AS box ON true`
 
-// Lands while the vault record of that vault_tok stands, whether or not there was a box to delete,
+// Lands while the vault record of that vault_tok is stored, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
 // for none (the column is NOT NULL, so null is only ever no box). A box written meanwhile
-// is one the DELETE waited on and then removed as it stands, its revision the one returned. No row
-// when the vault record did not stand.
+// is one the DELETE waited on and then removed as last committed, its revision the one returned. No row
+// when the vault record was not stored.
 const DelBoxSql = `WITH deleted AS (
     DELETE FROM safebyok_boxes WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_tok = $5::text
       AND EXISTS (SELECT 1 FROM safebyok_vaults WHERE ${ScopeIs} AND vault_tok = $5::text)
@@ -286,7 +286,7 @@ const DelBoxSql = `WITH deleted AS (
 // The vault record is deleted only at the vault_tok in $4 and, unless $5 is null, the gate_epoch in
 // $5, and the tombstone takes its place in the same statement, its counter the vault's plus one.
 // The boxes go with the vault record, by the foreign key's cascade. No row back when nothing was
-// deleted, a tombstone standing alone included.
+// deleted, a tombstone stored alone included.
 const DelVaultSql = `WITH deleted AS (
     DELETE FROM safebyok_vaults WHERE ${ScopeIs} AND vault_tok = $4::text AND ($5::bigint IS NULL OR gate_epoch = $5::bigint)
     RETURNING vault_epoch
@@ -340,16 +340,16 @@ class TablesVaultDB extends VaultDB {
     this.mustReach(vaultRecord)
     const params = [...Columns.paramsOf(rowOfVaultRecord(vaultRecord), VaultRowColumns), expected.vault_tok, expected.gate_epoch]
     const { rows } = await this.sent(PutVaultRecordSql, params)
-    const answer = rows[0] as { landed: boolean, stands: boolean }
+    const answer = rows[0] as { landed: boolean, found: boolean }
     if (answer.landed) { return vaultRecordOfRow(Columns.recordOf(answer, VaultRowColumns)) }
-    throw Refusals.staleVaultRecord(answer.stands ? vaultRecordOfRow(Columns.recordOf(answer, VaultRowColumns)) : null)
+    throw Refusals.staleVaultRecord(answer.found ? vaultRecordOfRow(Columns.recordOf(answer, VaultRowColumns)) : null)
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     this.mustReach(scope)
     const { rows } = await this.sent(GetBoxSql, [...scopeParams(scope), boxlabel, expected.vault_tok])
     if (rows.length === 0) { throw Refusals.vaultMismatch() }
-    return (rows[0] as { stands: boolean | null }).stands ? Columns.recordOf(rows[0], BoxColumns) : null
+    return (rows[0] as { found: boolean | null }).found ? Columns.recordOf(rows[0], BoxColumns) : null
   }
 
   // The box handed back, and the one a stale write reports, is the row as the statement that
@@ -360,13 +360,13 @@ class TablesVaultDB extends VaultDB {
     const answer = expected.revision_tok === null
       ? await this.insertBox([...scopeParams(scope), expected.vault_tok, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
       : await this.replaceBox([...scopeParams(scope), expected.vault_tok, expected.revision_tok, ...boxParams])
-    if (! answer.vault_stands) { throw Refusals.vaultMismatch() }
-    const standing = answer.landed === null ? null : Columns.recordOf(answer, BoxColumns)
-    if (answer.landed) { return standing }
+    if (! answer.vault_found) { throw Refusals.vaultMismatch() }
+    const storedBox = answer.landed === null ? null : Columns.recordOf(answer, BoxColumns)
+    if (answer.landed) { return storedBox }
     // A full vault refuses a new box; a boxlabel already taken, even in a full vault, is a box
     // the writer missed, which it would replace, and which is never refused for the count.
-    if (standing === null && answer.was_full) { throw Refusals.vaultFull(this.capacityOf(answer)) }
-    throw Refusals.staleBox(standing)
+    if (storedBox === null && answer.was_full) { throw Refusals.vaultFull(this.capacityOf(answer)) }
+    throw Refusals.staleBox(storedBox)
   }
 
   // Counted and weighed in one statement, against this VaultDB's limits.
@@ -388,13 +388,13 @@ class TablesVaultDB extends VaultDB {
   }
 
   // Runs InsertBoxSql and reads its one row. A foreign key violation is the vault deleted between
-  // the statement's snapshot and the foreign key's check, which reads the vault row as it stands then.
+  // the statement's snapshot and the foreign key's check, which reads the vault row as storage holds it then.
   private async insertBox(params: unknown[]): Promise<BoxAnswer> {
     try {
       const { rows } = await this.sent(InsertBoxSql, params)
       return rows[0] as BoxAnswer
     } catch (err) {
-      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_stands: false, was_full: false, landed: null, box_count: 0, bytes_used: 0 } }
+      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_found: false, was_full: false, landed: null, box_count: 0, bytes_used: 0 } }
       throw err
     }
   }
@@ -460,11 +460,11 @@ class TablesVaultDB extends VaultDB {
 /** How many boxes a vault holds, and what they weigh, as a statement counted them. */
 type VaultTally = { box_count: number, bytes_used: number }
 
-/** The one row a box write answers, beside the columns of the box standing now, null where none does.
- * `landed` is null when no box stands to report. The tally is weighed only for a first write
+/** The one row a box write answers, beside the columns of the box stored now, null where none is.
+ * `landed` is null when there is no box to report. The tally is weighed only for a first write
  * that met a full vault, `was_full`.
  */
-type BoxAnswer = VaultTally & { vault_stands: boolean, was_full: boolean, landed: boolean | null }
+type BoxAnswer = VaultTally & { vault_found: boolean, was_full: boolean, landed: boolean | null }
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'

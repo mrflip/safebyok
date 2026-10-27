@@ -38,7 +38,7 @@ describe("RefusalKindVals", () => {
   it("puts the same kinds in each family as the doc block in errors.ts does", () => {
     expect(namedKinds(between(errorsSource, '* **Misuse**', '* **Condition**'))).to.have.members(MisuseKinds)
     expect(namedKinds(between(errorsSource, '* **Condition**', '* **Bad news**'))).to.have.members(ConditionKinds)
-    expect(namedKinds(between(errorsSource, '* **Bad news**', '* `vault_full` means'))).to.have.members(BadNewsKinds)
+    expect(namedKinds(between(errorsSource, '* **Bad news**', '\n *\n'))).to.have.members(BadNewsKinds)
   })
 })
 
@@ -152,7 +152,7 @@ const FamilyCases = [
   ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
   ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
-  ["no_whisper",          "condition", 'a store keeping a whisper where none stands is told to the caller, who hands one in'],
+  ["no_whisper",          "condition", 'a store keeping a whisper where none is stored is told to the caller, who hands one in'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
 ] as const

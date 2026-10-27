@@ -36,6 +36,19 @@ describe("Refusals.storageUnavailable", () => {
   })
 })
 
+describe("Refusals.unexpectedError", () => {
+  it("makes a misuse refusal of a bug, the thrown value its cause, as its example shows", () => {
+    const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
+    const err = Refusals.unexpectedError(thrown)
+    expect(err).to.include({ refusalkind: 'unexpected_error', family: 'misuse', cause: thrown })
+    expect(err.message).to.match(/did not expect/)
+  })
+
+  it("keeps a cause that is never null, for a throw of nothing", () => {
+    expect(Refusals.unexpectedError(undefined).cause).to.be.instanceOf(Error)
+  })
+})
+
 describe("Refusals.staleWrite", () => {
   for (const what of Refusals.StaleWriteVals) {
     it(`refuses a ${what} write as stale_write, saying to read again, with no cause`, () => {
@@ -52,32 +65,32 @@ describe("Refusals.staleWrite", () => {
 })
 
 describe("Refusals.staleVaultRecord", () => {
-  it("refuses an update of the vault record as stale_write, carrying what stands as meta.vault_stored, as its example shows", () => {
-    const standing = TH.vaultRecordOf('u1', { gate_epoch: 2 })
-    const refusal = Refusals.staleVaultRecord(standing)
+  it("refuses an update of the vault record as stale_write, carrying what is stored as meta.vault_stored, as its example shows", () => {
+    const storedVaultRecord = TH.vaultRecordOf('u1', { gate_epoch: 2 })
+    const refusal = Refusals.staleVaultRecord(storedVaultRecord)
     expect(refusal.refusalkind).to.eq('stale_write')
     expect(refusal.message).to.eq(Refusals.StaleVaultRecordMessage)
     expect(refusal.message).to.include('this change was refused')
-    expect(refusal.meta).to.deep.equal({ vault_stored: standing })
+    expect(refusal.meta).to.deep.equal({ vault_stored: storedVaultRecord })
     expect(refusal).to.not.have.property('cause')
   })
 
-  it("carries null for no vault record standing", () => {
+  it("carries null where no vault record is stored", () => {
     expect(Refusals.staleVaultRecord(null).meta).to.deep.equal({ vault_stored: null })
   })
 })
 
 describe("Refusals.staleBox", () => {
-  it("refuses a box write as stale_write, carrying what stands as meta.box_stored, as its example shows", () => {
-    const standing = { boxlabel: 'anthropic', revision_tok: 'rev-two' }
-    const refusal = Refusals.staleBox(standing)
+  it("refuses a box write as stale_write, carrying what is stored as meta.box_stored, as its example shows", () => {
+    const storedBox = { boxlabel: 'anthropic', revision_tok: 'rev-two' }
+    const refusal = Refusals.staleBox(storedBox)
     expect(refusal.refusalkind).to.eq('stale_write')
     expect(refusal.message).to.eq(Refusals.StaleBoxMessage)
-    expect(refusal.meta).to.deep.equal({ box_stored: standing })
+    expect(refusal.meta).to.deep.equal({ box_stored: storedBox })
     expect(refusal).to.not.have.property('cause')
   })
 
-  it("carries null when nothing stands under the boxlabel", () => {
+  it("carries null when nothing is stored under the boxlabel", () => {
     expect(Refusals.staleBox(null).meta).to.deep.equal({ box_stored: null })
   })
 })

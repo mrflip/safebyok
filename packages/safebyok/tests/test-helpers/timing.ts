@@ -138,7 +138,7 @@ export const beforeNextCall = <Target extends object>(target: Target, verb: Asyn
   }
   const original = originalOf.get(method) ?? method
   if (original === method && vi.isMockFunction(method)) {
-    // A mock of the test's own stands here: stand in front of it for one call, and call it
+    // A mock of the test's own is in place here: stand in front of it for one call, and call it
     // through, so it records that call once. A second spy on top of it would record it twice.
     const errands = [meanwhile]
     // The mock may live on a prototype: then the stand-in is an own property to remove after, not
@@ -227,7 +227,7 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
   return latch
 }
 
-/** Has `vault` read storage afresh, as it stands once this is called.
+/** Has `vault` read storage afresh, as storage holds it once this is called.
  * A read already under way may have begun before the test's last write, and a refresh asked for
  * meanwhile shares it, so this awaits that one, then asks for another.
  *

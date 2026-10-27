@@ -45,7 +45,7 @@ export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode
  * gives no error for (a transaction aborted from outside) rejects with null, which the VaultDB
  * base class says as `storage_unavailable`.
  *
- * @example const standing = await settle<unknown>(store.get(scopepath))
+ * @example const stored = await settle<unknown>(store.get(scopepath))
  */
 export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTransaction): Promise<ValT> => {
   const target: EventTarget = request
@@ -70,8 +70,8 @@ export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTr
  *
  * @example
  *   const landed = await inOneTransaction(shelfOf('acme'), async (store) => {
- *     const standing = await settle(store.get(scopepath))
- *     if (! meetsExpectation(standing)) { return false }
+ *     const stored = await settle(store.get(scopepath))
+ *     if (! meetsExpectation(stored)) { return false }
  *     store.put(record, scopepath)
  *     return true
  *   })

@@ -9,7 +9,7 @@ import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
 import { type GatedVaultRecord, VaultFormat, VaultRecord, VaultStamp } from '../src/vault-record'
 import { passphraseCleartext } from '../src/types/type-aliases'
-import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
+import { PasskeyProving, PassphraseProving, OutsideGating, headerOf, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
 import { makeWorld } from './vault/world'
@@ -32,8 +32,8 @@ const scope = TH.scopeOf('u1')
 /** The wayins a novel `u1` vault's provings seal: a passphrase's of 'pw' and, given `answer`, a passkey's; and the vault, whose stamp they bind. */
 const sealedWayins = async (answer?: Awaited<ReturnType<typeof TH.passkeyOf>>) => {
   const vault = await makeWorld().open()
-  const passphrase = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
-  const passkey = answer === undefined ? undefined : await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer, { gating: StandingGating })
+  const passphrase = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: OutsideGating })
+  const passkey = answer === undefined ? undefined : await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer, { gating: OutsideGating })
   return { vault, ...await passphrase.sealWayins(passkey) }
 }
 

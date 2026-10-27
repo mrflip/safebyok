@@ -63,14 +63,14 @@ export type Reckoning = {
  * @param rowId - The `_id` of a row not yet read back; without one, a row lacking its `_id` is
  *   weighed with Convex's estimate of one.
  *
- * @example weigh(standing)            // a row read from the table
+ * @example weigh(storedRow)           // a row read from the table
  * @example weigh(row, insertedId)     // a row just inserted
  */
 export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_boxes'>): number => (
   getDocumentSize(rowId === undefined ? row : { ...row, _id: rowId, _creationTime: 0 })
 )
 
-/** The vault's tally as it stands, for a box write to check: the one kept, or one counted afresh from `boxRows`.
+/** The vault's tally as it is now, for a box write to check: the one kept, or one counted afresh from `boxRows`.
  * Counting stops at the first row past a limit, so it never reads much more than a vault may hold.
  * The tally then comes back null, and the vault is refused anything that adds to it until deleted
  * boxes bring it back in.

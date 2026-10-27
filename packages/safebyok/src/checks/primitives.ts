@@ -1,4 +1,7 @@
-/** The names every scope is made of, and the instant every time is, as plain Zod schemas: labels, the user_id and EpochMillis. Each failure says what is wrong in a sentence from {@link Phrases}, quoting nothing. */
+/** The names every scope is made of, and the instant every time is: labels, the user_id and EpochMillis.
+ * Each is plain Zod: its `parse` throws a ZodError, not a VaultError. Each failure says what is
+ * wrong in a sentence from {@link Phrases}, quoting nothing.
+ */
 
 import { number as num, string as str } from 'zod'
 import type * as Z from 'zod'
@@ -11,15 +14,15 @@ import * as Phrases from '../phrases'
 export const MaxLabelChars = 40
 
 /** The pattern a label matches, two characters at least: its `source` suits an HTML input's `pattern` attribute.
- * It has no repeated group, so text of millions of characters is refused, not thrown at.
+ * It has no repeated group, so it refuses text of millions of characters without throwing.
  *
  * @example <input pattern={LabelPattern.source} maxLength={MaxLabelChars} />
  */
 export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
 /** An applabel, a vaultlabel or a boxlabel: lowercase words of letters and digits joined by single underscores, starting with a letter, two to {@link MaxLabelChars} characters.
- * It is plain Zod: its `parse` throws a ZodError. Check a label a user types with `safeParse`
- * before handing it to the vault, which refuses one that fails as 'bad_scope'.
+ * Check a label a user types with `safeParse` before handing it to the vault, which refuses one
+ * that fails as 'bad_scope'.
  *
  * @example label.safeParse('anthropic_api_key').success  // true
  * @example label.safeParse('ANTHROPIC_API_KEY').success  // false: lowercase only
@@ -38,7 +41,7 @@ export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
 /** A user_id: 1 to {@link MaxUserIdChars} of ASCII letters, digits and `-_.~:@+|%`, never dots alone, opaque, compared byte for byte.
  * Those cover an email address and the common identity providers' ids; percent-encode (RFC 3986)
  * one that holds anything else. Pass the provider's stable id: a vault is found by its user_id,
- * and one that changes orphans the vault. Plain Zod, as {@link label} is.
+ * and one that changes orphans the vault.
  *
  * @example user_id.safeParse('user_2abc.def+work').success  // true
  * @example user_id.safeParse('auth0|5f7c8ec7').success      // true
@@ -52,8 +55,7 @@ export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true 
 
 /** The check for an instant: whole UTC epoch milliseconds from {@link FarPast} to {@link FarFuture}, both included.
  * Every time the package keeps is one, and a stored record holding anything else fails its check.
- * The bounds catch epoch seconds and epoch microseconds passed by mistake. It is plain Zod, as
- * {@link label} is: its `parse` throws a ZodError.
+ * The bounds catch epoch seconds and epoch microseconds passed by mistake.
  *
  * @example EpochMillis.parse(Date.UTC(2026, 9, 15))                // 1792022400000
  * @example EpochMillis.safeParse(1_792_022_400).success            // false: seconds, not ms

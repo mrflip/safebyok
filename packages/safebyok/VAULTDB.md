@@ -17,13 +17,13 @@ Three layers share the work, and each guarantee below belongs to one of them.
   revision over the one it read or listed, and writes with an expectation of it. When storage
   refuses the write as stale, it refuses the store as `stale_write`, as it came, reading nothing
   after and never trying again; one storage refuses as `vault_mismatch` it refuses `stale_write`
-  too, as the vault it read is gone: what the other device wrote or deleted stands, and the host
+  too, as the vault it read is gone: what the other device wrote or deleted is kept, and the host
   hears that its write lost. A box read that storage refuses as `vault_mismatch` (line 2.5) is
   `vault_gone` to the host, and the Vault object goes with it. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
-  box deletion reports, what a stale box write or a stale update of the vault record says stands,
+  box deletion reports, what a stale box write or a stale update of the vault record says is stored,
   the tombstone a vault deletion leaves, and how full a `vault_full` says the vault is -- refuses what is malformed
   before your code sees it, turns a `false` from you (from a box deletion, a `null`) into
   `stale_write`, and turns
@@ -64,11 +64,11 @@ Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox
 meets someone else's is news the user must hear, refused once as `stale_write`, as storage
 answered it: the vault reads nothing after a refusal, and a gate write refused after this device
 heard of another device's change is `gate_moved`. It names a box that will not open `damaged_box`
-at once, reading nothing more: the host reads again (`hello()`) to see what stands. There is no conflict handler beyond this, and no hook for one: whatever landed first
-stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
+at once, reading nothing more: the host reads again (`hello()`) to see what is stored. There is no conflict handler beyond this, and no hook for one: whatever landed first
+is kept, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
 a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
 one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that
-storage says removed another revision than the one the vault showed stands too, as a deletion
+storage says removed another revision than the one the vault showed is kept too, as a deletion
 within its vault does (line 3.4): the vault warns through its logger, naming neither revision.
 
 The base class turns anything your code throws that is not a `VaultError` into
@@ -78,8 +78,9 @@ an adapter that means a kind throws a `VaultError` of it. Whatever your code thr
 caller as a bad `Outcome`'s `err`, never as a rejection. A throw from the base class's own code
 that is not a `VaultError` is a bug in safebyok, not an outage: `unexpected_error`, never to be
 retried. An adapter that hands its calls on to another VaultDB unwraps each answer with `valOf`,
-returning its `val` and throwing its `err`: an answer handed back still wrapped as an `Outcome` is
-refused as `bad_option`, never read as a record. `subscribe`, which answers at once with the
+returning its `val` and throwing its `err`. An answer handed back still wrapped as an `Outcome` is
+an answer in the wrong shape: `corrupt_record`, or `damaged_box` from `doGetBox`, never read as a
+record or a write landed. `subscribe`, which answers at once with the
 unsubscribe, is the one verb that throws its refusal rather than resolving it.
 
 ## The baseline
@@ -193,8 +194,8 @@ back within its limits, the listing is whole again.
 
 **2.4. A vault is read in one step, its record and listing together.** `getVault` hands back the
 scope's vault record and its box listing (line 2.3) of the vault that record names, read in one atomic
-step, or null where no vault record stands -- a scope holding only a tombstone (line 3.5) among them. `ensureVault` reads the
-same, in the same step that creates the vault where none stands (line 3.1). No write lands between
+step, or null where no vault record is stored -- a scope holding only a tombstone (line 3.5) among them. `ensureVault` reads the
+same, in the same step that creates the vault where none is stored (line 3.1). No write lands between
 the two reads, so what is handed back is the vault as it stood at one moment: never one vault's
 record beside another's boxes, never a box deleted beside the record of the write that followed.
 Nothing more is promised, and nothing more is checked: the base class does not compare the record
@@ -207,15 +208,15 @@ serves a browser's VaultDB, whose own step is then that one request, and whose b
 each sound box again and parses the server's word on each damaged one.
 
 Postgres's `ensureVault` over a vault record another device created after its statement began
-finds it by its `ON CONFLICT`, which reads the row as it stands then, while its listing reads as
+finds it by its `ON CONFLICT`, which reads the row as last committed, while its listing reads as
 of the statement's start, filtered to that record's `vault_tok`: in that race the listing may lag
 the record by the boxes written meanwhile, and never names another vault.
 
 **2.5. A box is read only in the vault it lies in.** `getBox` names the vault its reader holds a
-key for, by its `vault_tok`, and hands back the box under the boxlabel, or null where none stands,
-only while the scope's standing vault record has that `vault_tok`. Where it does not -- none stands,
-a tombstone does (line 3.5), or another `vault_tok`'s, the vault deleted and made anew -- it refuses
-as `vault_mismatch`, reading nothing more and carrying nothing of the vault record that stands. So a
+key for, by its `vault_tok`, and hands back the box under the boxlabel, or null where none is stored,
+only while the scope's stored vault record has that `vault_tok`. Where it does not -- none is stored,
+only a tombstone (line 3.5), or another `vault_tok`'s, the vault deleted and made anew -- it refuses
+as `vault_mismatch`, reading nothing more and carrying nothing of the stored vault record. So a
 box from another life of the scope never reaches a reader holding the key of this one, where it
 would fail to open and look damaged: the reader hears instead that its vault is gone. The vault
 record and the box are read in one atomic step, as a box write compares them (line 3.3): one
@@ -227,8 +228,8 @@ and asks `Expectations.vaultMeets`.
 ## 3. Versioned writes
 
 **3.1. A vault record is created once.** `ensureVault` stores the vault record only where the scope
-holds none, and returns whichever vault record stands afterwards, with the listing beside it (line
-2.4): the draft's, or, when the vault already exists, the one standing, exactly as stored and under
+holds none, and returns whichever vault record is stored afterwards, with the listing beside it (line
+2.4): the draft's, or, when the vault already exists, the one stored, exactly as stored and under
 its own `vault_tok` -- another device's, perhaps created in the same moment. Two devices
 creating at once settle on one vault, and get one `vault_tok` back. It takes one argument, a
 gateless draft (`gate_epoch` 0, no way in, `vault_epoch` 0), which names the scope itself; a draft
@@ -240,40 +241,40 @@ under the draft's own, fresh `vault_tok`, with its `vault_epoch` set to the tomb
 on past a vault's deletion.
 
 **3.2. An update of the vault record lands only over the record it read.** `putVaultRecord`
-writes only while the standing vault record has the expected `vault_tok` and `gate_epoch`, and
-refuses as `stale_write` otherwise, including where no vault record stands, or only a tombstone does:
+writes only while the stored vault record has the expected `vault_tok` and `gate_epoch`, and
+refuses as `stale_write` otherwise, including where no vault record is stored, or only a tombstone is:
 an update never creates, and never revives. It resolves the vault record as stored, read in the same
-atomic step as the write, and the store has set its `vault_epoch` to the standing one plus one,
+atomic step as the write, and the store has set its `vault_epoch` to the stored one plus one,
 whatever the writer sent: a counter that moves on every write of the gate, and only there. (No box
 write moves it, so a restored backup that rolls back boxes alone shows no sign of it; the README
-says what a host that restores one does.) The refusal carries what stands as
+says what a host that restores one does.) The refusal carries what is stored as
 `err.meta.vault_stored`, read in the same atomic
 step: the winner's vault record, whole, or null for none, so the caller takes it up with no second
-read. The adapter throws `Refusals.staleVaultRecord(standing)` with the row exactly as stored, and
-a key-value store asks `Expectations.vaultRecordRefusalOf`; the base class checks what stands as
-`getVault` checks a record, so a vault record standing that fails that check refuses as a read of
-it does (`damaged_vault`, `newer_format`), and a stale write that names nothing standing is the
+read. The adapter throws `Refusals.staleVaultRecord(stored)` with the row exactly as stored, and
+a key-value store asks `Expectations.vaultRecordRefusalOf`; the base class checks what is stored as
+`getVault` checks a record, so a stored vault record that fails that check refuses as a read of
+it does (`damaged_vault`, `newer_format`), and a stale write that does not say what is stored is the
 adapter's bug, `corrupt_record`. A landed write's answer is held to the same: a vault record of the
 scope, the same `vault_tok` at the `gate_epoch` written, else `corrupt_record`, saying the write
 may have landed. A vault's first gate is such an update: written over its
 a gateless record at `gate_epoch` 1, expecting 0, so of two devices setting it at once one lands and
 the other hears whose won. A server-side adapter, which a client of another version's may reach, also enforces what
-every update carries: it lands only a vault record that keeps the standing `vault_tok` and moves
+every update carries: it lands only a vault record that keeps the stored `vault_tok` and moves
 `gate_epoch` forward, and refuses any other as `stale_write` (Convex's component and Postgres
-do). The core always sends the standing
-`gate_epoch` plus one, so none of its own writes meets this refusal.
+do). The core always sends the
+`gate_epoch` it holds plus one, so none of its own writes meets this refusal.
 
 **3.3. A box write lands only over the box it read, in the vault it was sealed for.**
-`putBox` writes only while the scope's standing vault record has the expected `vault_tok` and the
-standing box has the expected `revision_tok` -- or, for a null revision, no box stands
-under that boxlabel. Where the vault record is not the expected one -- none stands, or another
-`vault_tok`'s, a vault deleted and made anew even where no box stands in either -- it refuses as
-`vault_mismatch`, carrying nothing of the vault record that stands. Where it is, and the box is
+`putBox` writes only while the scope's stored vault record has the expected `vault_tok` and the
+stored box has the expected `revision_tok` -- or, for a null revision, no box is stored
+under that boxlabel. Where the vault record is not the expected one -- none is stored, or another
+`vault_tok`'s, a vault deleted and made anew even where no box is stored in either -- it refuses as
+`vault_mismatch`, carrying nothing of the stored vault record. Where it is, and the box is
 not the one expected -- a revision it never read, a box since deleted, a box where it expected
-none -- it refuses as `stale_write`, with what stands under the boxlabel as `err.meta.box_stored`.
+none -- it refuses as `stale_write`, with what is stored under the boxlabel as `err.meta.box_stored`.
 A write sent again after it landed -- a retry after its answer was lost, say -- is no exception:
-what it expected no longer stands, so it refuses as `stale_write`, naming the box it wrote. A write
-lands, and says so, only where its own comparison passed, never because the box standing happens
+what it expected is no longer stored, so it refuses as `stale_write`, naming the box it wrote. A write
+lands, and says so, only where its own comparison passed, never because the stored box happens
 to be the one it sent.
 
 A write that lands resolves the box as storage now holds it, field for field the one written
@@ -281,14 +282,14 @@ A write that lands resolves the box as storage now holds it, field for field the
 (Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
 write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
 write that misses resolves no record, and the adapter reports why from that same step: it throws
-`Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)` with the record standing exactly as
+`Refusals.vaultMismatch()`, or `Refusals.staleBox(stored)` with the record exactly as
 stored (or null for none), and a key-value store reads both rows in the step and asks
-`Expectations.boxRefusalOf` which. The base class checks what stands as `getBox` checks a
+`Expectations.boxRefusalOf` which. The base class checks what is stored as `getBox` checks a
 record, and the refusal carries it as a read would hand it back: the box, whole -- its wrapped
 boxKey and ciphered whisper among it, so the caller can open it, or merge and write over it, with
 no second read -- a `BoxDamaged` naming the revision it holds when it does not read back as a
 box, or null. A write over it names that revision. A stale write that
-names nothing standing is the adapter's bug, refused as `corrupt_record`. The base class holds
+does not say what is stored is the adapter's bug, refused as `corrupt_record`. The base class holds
 what a landed write hands back to the check a `getBox` makes, at the revision written, and
 refuses one that fails it as `corrupt_record`, saying the write may have landed: the adapter
 wrote something it cannot read back.
@@ -298,13 +299,13 @@ tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a 
 the battery, through an adapter that keeps this line, cannot.
 
 **3.4. A deletion wins, within its vault, and says what it removed.** `delBox` removes the
-box under its boxlabel, whatever revision stands, while the scope's standing vault record has
+box under its boxlabel, whatever revision is stored, while the scope's stored vault record has
 the expected `vault_tok`, and resolves what it found there, reported from the same atomic step as
 the removal: `deleted` for the revision its expectation names (its `revision_tok`, the one the
 deleting device read; for null, which names a damaged box listed with none, a record holding
 none that reads as one), `deleted_other` for any other record -- one written over the revision
-named, or holding one where none was named -- and `absent` where no box stands. The revision
-only reports, and never refuses: a deletion naming another revision removes what stands all the
+named, or holding one where none was named -- and `absent` where no box is stored. The revision
+only reports, and never refuses: a deletion naming another revision removes what is stored all the
 same, and the vault decides what to tell its user. A write over a revision deleted meanwhile
 refuses, and the box stays gone. A deletion aimed at a vault since deleted and made anew
 refuses as `stale_write`, whatever revision it names -- its adapter resolves `null` -- and the new
@@ -321,7 +322,7 @@ core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter
 plant a damaged record; the battery, through public verbs that do neither, cannot.
 
 **3.5. A vault is deleted whole, and alone, and leaves a tombstone.** `delVault` removes the vault
-record and every box of its scope, and nothing of any other scope, while the standing vault record has
+record and every box of its scope, and nothing of any other scope, while the stored vault record has
 the expected `vault_tok` **and** `gate_epoch`; otherwise it refuses as `stale_write` and removes
 nothing, so a vault made anew survives a device that missed its predecessor's end, and a delete
 proven against a gate another device has since changed -- an old passphrase in a stale tab -- does
@@ -347,7 +348,7 @@ expects the `vault_tok` alone, and counts a counter it cannot read from zero. An
 battery cannot plant, and by the battery for a sound vault, which it refuses to delete.
 
 **3.6. A refused write wrote nothing.** Whatever the refusal -- `stale_write`, `vault_mismatch`,
-`vault_full`, `box_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
+`vault_full`, `box_too_large`, a malformed record -- the vault is stored afterwards exactly as it was before:
 its vault record, its boxes, its listing. When storage is unreachable or fails partway
 (`storage_unavailable`), an adapter's own atomic step decides: the write landed whole or not at
 all, and the vault's next read shows which.
@@ -412,8 +413,8 @@ the start of the write's statement, say, or its commit.
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
 `VaultError`: `stale_write` (by resolving `null` from a deletion of a box or a vault, the base
-class refusing with it; a box write throws `Refusals.staleBox(standing)`, and an update of the
-vault record `Refusals.staleVaultRecord(standing)`), `vault_mismatch`
+class refusing with it; a box write throws `Refusals.staleBox(stored)`, and an update of the
+vault record `Refusals.staleVaultRecord(stored)`), `vault_mismatch`
 (a box write or read, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
@@ -442,7 +443,7 @@ at the backend's default settings, there is none to report. Its test is line 3.7
 **5.3. A refusal quotes nothing it was handed.** No refusal's message or properties carry a
 record's ciphertext, a boxlabel or a sidecar it was handed: the base class never quotes what it
 refuses, and an adapter's own messages name the vault's limits, never its contents. A stale box
-write carries the box that stands under its boxlabel as `meta.box_stored`, whole, as a `getBox`
+write carries the box stored under its boxlabel as `meta.box_stored`, whole, as a `getBox`
 by the same user would hand it back: ciphertext under keys only the vault holds. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
 what the backend holds, which is ciphertext and unencrypted fields.
@@ -558,7 +559,7 @@ other files race what the battery's turnstile cannot hold: writers for a vault's
 turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault deleted while
 an insert waited on the foreign key. Of the one-statement writes -- a conditional `UPDATE`
 re-checking the row it waited on, `INSERT ... ON CONFLICT`, the foreign key read against the vault
-row that stands -- the races and that run show how they came out on that server and no other; which
+row as last committed -- the races and that run show how they came out on that server and no other; which
 suites run there is one list in `e2e/tests/postgres/test-helpers.ts`.
 Nor can the battery see a lock shared by devices whose turnstile is left unwired; and the devices of
 `localVaultDB` and `idbVaultDB`, in one page, share what two tabs would not (the store, the bell, a

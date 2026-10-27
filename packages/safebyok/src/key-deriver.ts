@@ -9,15 +9,15 @@ type KeyDeriverBase = {
   salt_bytes:        number
   /** 32 key bytes from the passphrase and its salt: deterministic, and slow by design.
    * Refuse a salt of another length than `salt_bytes` as 'bad_option', as the supplied derivers do.
-   * Nothing you throw reaches the caller, as you hear the passphrase: a condition-family VaultError
-   * keeps its kind under safebyok's own words, and anything else becomes 'unexpected_error', the
-   * logger hearing only the kind of a VaultError you threw.
+   * Nothing you throw reaches the caller, as you hear the passphrase. A condition-family VaultError
+   * keeps its kind under safebyok's own words. Anything else becomes 'unexpected_error', and the
+   * logger hears only the kind of a VaultError you threw.
    */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
-  /** Fetch or build what the deriver needs before it can derive, such as a WebAssembly module: each bank's `hello()` runs it, so call it early only to warm up.
-   * Make it cost nothing once it has succeeded, and forget a failure, so the next call tries
-   * again. One that fails refuses the hello 'unexpected_error', what it threw the cause, as it
-   * heard no passphrase.
+  /** Fetch or build what the deriver needs before it can derive, such as a WebAssembly module.
+   * Each bank's `hello()` runs it, so call it early only to warm up. Make it cost nothing once it
+   * has succeeded, and forget a failure, so the next call tries again. One that fails refuses the
+   * hello 'unexpected_error', what it threw the cause, as it heard no passphrase.
    */
   load?:             (() => void | Promise<void>) | undefined
 }

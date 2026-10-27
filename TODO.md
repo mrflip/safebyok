@@ -83,7 +83,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   top of it, folding `localVaultDB` and `idbVaultDB` into it. It needs a short promise chain we
   would hand-roll, so it waits for a later design; the shared expectation checks of the store base
   are built, and this builds on them (`whiteboard/20261016-push_to_100_a/store-base-design.md`,
-  while it stands).
+  while it lasts).
 
 * **A test that reads the Postgres README's route recipe.** From #252's review (the Coach took
   the Rec, 2026-10-22): the route recipe in `safebyok-postgres`'s README and the route its tests
@@ -160,7 +160,7 @@ stays a check or the labels alone identify the vault.
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
 saw vault props resolves `del()` without deleting anything, even if a vault has since appeared elsewhere, so
-"delete account" can report success while a vault stands. And after a refused `del()`, an
+"delete account" can report success while a vault is stored. And after a refused `del()`, an
 app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
 `packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
@@ -291,7 +291,7 @@ question. The fix, small: do not judge `outlived` against vault props this handl
 
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
 review): a device learns that another deleted the vault, or changed its ways in, only when it next
-reads, so until then it may stay unlocked on vault props that no longer stand (it fails safe at
+reads, so until then it may stay unlocked on vault props that are no longer stored (it fails safe at
 that read: the key is dropped and the lease erased). `a_sec2` closed the one window where that
 could outlast a read, a first unlock creating the vault as it is deleted. The Coach (2026-10-19):
 "cross device invalidation should be done by a proper mechanism that is coming, where each device
@@ -326,8 +326,8 @@ both are contracts a host's server and browser share.
 ### Whether `damaged_lease` calls `lock()`
 
 The Coach (2026-10-22): a lease that will not unwrap is dropped and erased as `lock()` drops and
-erases it, without calling `lock()`. Decide whether it calls `lock()` itself (ending a gating
-standing, settling `lockLanded`), taking care that the lock does not recurse into the call that
+erases it, without calling `lock()`. Decide whether it calls `lock()` itself (ending a pending
+gating, settling `lockLanded`), taking care that the lock does not recurse into the call that
 met the damage.
 
 ### "Whisper unchanged" in `putBox`
@@ -363,7 +363,7 @@ backwards". Settle one definition, say which mechanism guards which case, and na
 From the contract sprint's `a_sec2` ([#206](https://github.com/mrflip/safebyok/pull/206)): a
 read of the vault props that began before this device's first unlock made the vault can land after
 it, find no vault, and stand the new one down; the unlock then refuses `vault_locked`, though the
-vault it made stands, and the next read takes it up. The Coach (2026-10-21):
+vault it made is stored, and the next read takes it up. The Coach (2026-10-21):
 
 > So: hello, in parallel, asks for props from VaultDB and DeviceDB; this makes sense, as a lot of
 > normal conditions have both. There's a known situation -- very common, important and expected --

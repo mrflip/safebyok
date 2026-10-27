@@ -58,7 +58,7 @@ describe("putWayin, with a new passphrase", () => {
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("rewrites no box: each stands byte for byte as it was (Contract: putWayin, Guarantees)", async () => {
+  it("rewrites no box: each is stored byte for byte as it was (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -134,7 +134,7 @@ describe("putWayin, with a new passphrase", () => {
     await answering.reached
     const shown = vault.getSnapshot()
     await there.refresh()
-    // The change stands in storage, its answer held: there proves the deletion with the new passphrase.
+    // The change is stored, its answer held: there proves the deletion with the new passphrase.
     await TH.del(there, 'pw two')
     await TH.expectBad(vault.tryRefresh(), 'vault_gone')
     answering.release()
@@ -185,7 +185,7 @@ describe("putWayin, with a new passphrase", () => {
     expect(await theirLease()).to.deep.equal(outdated)
   })
 
-  it("takes only the standing passphrase as proof: a passkey's answer is refused as bad_option, changing nothing (Contract: putWayin, Guarantees)", async () => {
+  it("takes only the current passphrase as proof: a passkey's answer is refused as bad_option, changing nothing (Contract: putWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const err = await TH.expectRefusal(TH.putWayin(vault, laptop as unknown as string, 'a new passphrase'), 'bad_option')
@@ -462,7 +462,7 @@ describe("the vault's passkey", () => {
     expect(TH.stateOf(fresh.getSnapshot())).to.eq('unlocked')
   })
 
-  it("putWayin takes only the standing passphrase as proof of a new passkey: a passkey's answer is bad_option, a wrong passphrase wrong_passphrase, adding nothing (Contract: putWayin, Guarantees)", async () => {
+  it("putWayin takes only the current passphrase as proof of a new passkey: a passkey's answer is bad_option, a wrong passphrase wrong_passphrase, adding nothing (Contract: putWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const phone = await TH.passkeyOf('phone')
@@ -652,7 +652,7 @@ describe("a new passphrase's strength", () => {
     expect(world.logged).to.have.lengthOf(0)
   })
 
-  it("without a strengthChecker, refuses a new passphrase at putWayin too, while a vault that stands still opens", async () => {
+  it("without a strengthChecker, refuses a new passphrase at putWayin too, while a stored vault still opens", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
     const vault = await world.open({ strengthChecker: undefined, deviceDB: memoryDeviceDB() })
@@ -675,7 +675,7 @@ describe("a new passphrase's strength", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
-  it("never runs at unlock: a vault that stands opens with whatever passphrase made it", async () => {
+  it("never runs at unlock: a stored vault opens with whatever passphrase made it", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
     const strengthChecker = refusing('pw')
@@ -918,7 +918,7 @@ describe("a new passphrase's strength", () => {
 
 // == [Ways in as models]: passphrase, passkey, logger, clock, keyDeriver, damaged_wayin news
 
-/** A world whose `u1` vault stands with its passphrase and the passkey `laptop`, the passkey's salt spoiled in storage. */
+/** A world whose `u1` vault is stored with its passphrase and the passkey `laptop`, the passkey's salt spoiled in storage. */
 const damagedWayinWorld = async () => {
   const { world, vault } = await vaultWithPasskey()
   TH.closeVault(vault)
@@ -1096,7 +1096,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       expect(storedText(world)).to.eq(before)
     })
 
-    it(`${callTitle} refuses gate_moved when another device's change lands first and this device hears of it, leaving that change standing, and carrying no stored vault record`, async () => {
+    it(`${callTitle} refuses gate_moved when another device's change lands first and this device hears of it, leaving that change stored, and carrying no stored vault record`, async () => {
       const { world, vault: there } = await vaultWithPasskey()
       const here = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
       let landed: string | null = null
@@ -1231,7 +1231,7 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
   it("logs no passphrase, old or new, nor a passkey's answer, even when this device cannot keep its lease (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a memorable old passphrase')
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValue(new Error('device storage is full'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValue(new Error('device storage is full'))
     const phone = await TH.passkeyOf('phone')
     await TH.putWayin(vault, 'a memorable old passphrase', 'a memorable new passphrase')
     await TH.putWayin(vault, 'a memorable new passphrase', phone)

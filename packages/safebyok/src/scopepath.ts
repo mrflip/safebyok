@@ -1,8 +1,3 @@
-import type * as Z from 'zod'
-import * as CX from './checks/core-checks'
-import type { BankScope, Boxscope, VaultScope } from './checks/core-checks'
-import { ScopepathDelimiter } from './consts'
-
 /** Where a store files what a scope names: the kind, then the scope's names in order, joined on `^`. A key-value adapter of your own files its rows under these.
  *
  *     bank^acme^u1               a bank
@@ -12,11 +7,16 @@ import { ScopepathDelimiter } from './consts'
  *     box^acme^u1^main^openai    a box
  *
  * No two share a scopepath, and each splits back into its kind and names. A scopepath is part of
- * what is stored: rows filed under these are where every other device's copy of the package
- * looks, so file under these, never a join of your own. Each maker checks its scope, and each
- * inverse its scopepath, refusing 'bad_scope' for any name that fails its check, quoting none of
- * it; no name may hold `^`. Each kind test and predicate answers false, never throwing.
+ * what is stored: every other device's copy of the package looks under these, so never file under
+ * a join of your own. Each maker takes any record carrying its scope's fields, and checks them.
+ * Each maker and inverse refuses 'bad_scope' for a name that fails its check, quoting none of it;
+ * no name may hold `^`. Each kind test and predicate answers false, never throwing.
  */
+
+import type * as Z from 'zod'
+import * as CX from './checks/core-checks'
+import type { BankScope, Boxscope, VaultScope } from './checks/core-checks'
+import { ScopepathDelimiter } from './consts'
 
 /** The character a scopepath joins its parts on, which no name may hold: `^`. */
 export { ScopepathDelimiter as Delimiter } from './consts'
@@ -37,7 +37,7 @@ export type ScopepathPred = (candidate: unknown) => candidate is string
 
 // == [Makers]: bank, vault, lease, device, box
 
-/** The scopepath of the bank `scope` names: any record carrying its fields.
+/** The scopepath of the bank `scope` names.
  *
  * @example Scopepath.bank({ applabel: 'acme', user_id: 'u1' })  // 'bank^acme^u1'
  */
@@ -46,7 +46,7 @@ export const bank = (scope: BankScope): BankScopepath => {
   return ['bank', applabel, user_id].join(ScopepathDelimiter)
 }
 
-/** The scopepath of the vault record of the vault `scope` names: any record carrying its fields, vault record and leases among them.
+/** The scopepath of the vault record of the vault `scope` names.
  *
  * @example Scopepath.vault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // 'vault^acme^u1^main'
  * @example Scopepath.vault({ applabel: 'acme', user_id: 'u1^x', vaultlabel: 'main' })  // throws 'bad_scope': "user_id: A user_id is ASCII letters, ..."

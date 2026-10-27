@@ -44,7 +44,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a browser that withholds storage won't keep the vault, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.deviceDB, 'getDeviceRecord').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
+    TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/won't let the app keep your vault/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null

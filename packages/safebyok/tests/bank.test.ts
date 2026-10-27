@@ -15,7 +15,7 @@ import type { Gating } from '../src/gating'
 import type { KeyDeriver } from '../src/key-deriver'
 import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
-import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
+import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, DeviceDBVerbs, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: Main, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, storeSnapshotOf, stepsOf, checkerLoading, keptTombstones
 
@@ -112,7 +112,7 @@ describe("Bank.make", () => {
   it("touches nothing: the bank is 'made', its snapshot holds no vault, and no store verb or load is called", async () => {
     const world = makeWorld()
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
-    const deviceDBCalls = (Object.keys(world.deviceDB) as (keyof typeof world.deviceDB)[]).map((verb) => vi.spyOn(world.deviceDB, verb))
+    const deviceDBCalls = DeviceDBVerbs.map((verb) => vi.spyOn(world.deviceDB, verb))
     const strengthChecker = checkerLoading(() => undefined)
     const bank = bankIn(world, { strengthChecker })
     await TH.wakeupAtNextTick()
@@ -582,7 +582,7 @@ describe("bank.delDamagedVault", () => {
     expect(reopened && TH.stateOf(reopened.snapshot)).to.eq('novel')
   })
 
-  it("lets the entry go and still refuses 'stale_write' when the vault was made anew elsewhere as it deleted: the next ensureVault births the vault that stands", async () => {
+  it("lets the entry go and still refuses 'stale_write' when the vault was made anew elsewhere as it deleted: the next ensureVault births the vault now stored", async () => {
     const world = await damagedVaultWorld()
     const bank = bankIn(world)
     await TH.expectRefusal(bank.ensureVault(Main), 'damaged_vault')
@@ -595,9 +595,9 @@ describe("bank.delDamagedVault", () => {
     })
     await TH.expectRefusal(bank.delDamagedVault(Main), 'stale_write')
     expect(bank.bankVaultOf(Main)).to.be.null
-    const standing = await bank.ensureVault(Main)
-    expect(standing.vault_tok).to.eq(elsewhere.vaultOf(Main)?.vault_tok)
-    expect(TH.stateOf(standing.snapshot)).to.eq('novel')
+    const remade = await bank.ensureVault(Main)
+    expect(remade.vault_tok).to.eq(elsewhere.vaultOf(Main)?.vault_tok)
+    expect(TH.stateOf(remade.snapshot)).to.eq('novel')
   })
 
   it("keeps the refused entry when storage refuses the delete 'storage_unavailable': a second call deletes, and the next ensureVault births a new life, novel", async () => {
@@ -871,7 +871,7 @@ describe("bank.closeVault", () => {
     expect(bank.vaultOf(Main)).to.eq(vault)
   })
 
-  it("ends the gating standing: its lockLanded settles, and the call waiting on it refuses vault_gone", async () => {
+  it("ends the pending gating: its lockLanded settles, and the call waiting on it refuses vault_gone", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() }))
     const seen: { gating: Gating | null, landed: boolean } = { gating: null, landed: false }

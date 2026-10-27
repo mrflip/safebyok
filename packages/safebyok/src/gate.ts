@@ -1,21 +1,21 @@
-import { VaultError } from './errors'
-import { stableJsonify } from './stable-jsonify'
-import type { KeyDeriver } from './key-deriver'
-import { type GatedVaultRecord, type GateRecord, type VaultRecord, type VaultStamp, isGated } from './vault-record'
-import { type PasskeyWayin, type PassphraseWayin, Wayin } from './wayin'
-
 /** Gates: a vault's ways in as one frozen value, its passphrase wayin and its passkey wayin or none, at one `gate_epoch`.
  * A chain builds the next gate from the one it captured at its start, its base, and
  * `vault.putGate` stores it over that base alone. The vault record holds it as its `gate`, a
  * {@link GateRecord}, its `gate_epoch` beside it.
  */
 
+import { VaultError } from './errors'
+import { stableJsonify } from './stable-jsonify'
+import type { KeyDeriver } from './key-deriver'
+import { type GatedVaultRecord, type GateRecord, type VaultRecord, type VaultStamp, isGated } from './vault-record'
+import { type PasskeyWayin, type PassphraseWayin, Wayin } from './wayin'
+
 /** The wayins a gate holds: the passphrase's, and the passkey's or none. */
 export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | null }
 
 /** A vault's ways in, frozen, at one `gate_epoch`, built on the gate at `base_epoch`, one below it.
- * Its demand ({@link Vault.demandConsistentWith} handed the gate) asks that the gate in hand is
- * its base, or is itself ({@link Gate.isHeldBy}), as once a read took it after it was stored. A
+ * `vault.demandConsistentWith(gate)` asks that the gate the vault holds is this one's base, or,
+ * once a read has taken it in after it was stored, this one itself ({@link Gate.isHeldBy}). A
  * spread, JSON or a log line shows what it was made under (the scope, `vault_tok` and its epochs)
  * and its wayins' visible fields.
  *
@@ -52,8 +52,9 @@ export class Gate {
     Object.freeze(this)
   }
 
-  /** The gate a chain builds on `base`, the gate it captured at its start (null for a novel vault's first): one epoch past it, holding `wayins`, the base's with the chain's changes.
-   * It refuses 'bad_option' for wayins of another `vault_tok` than the base's, or the vault's.
+  /** The gate a chain builds on `base`, one epoch past it, holding `wayins`: the base's, with the chain's changes.
+   * `base` is the gate the chain captured at its start, null for a novel vault's first. It refuses
+   * 'bad_option' for wayins of another `vault_tok` than the base's, or the vault's.
    *
    * @example Gate.make(vault, { base: null, ...await passphraseProving.sealWayins() })   // gate_epoch 1
    * @example Gate.make(vault, { base, passphrase: base.passphrase, passkey: null })      // base.gate_epoch + 1

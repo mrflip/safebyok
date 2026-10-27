@@ -31,7 +31,7 @@ and run it again.
 **Upgrading from a release whose tables have a `vault_key_epoch` or `sidecar_json` column**: the
 vault record and boxes hold neither now, and a box's sidecar is the column `sidecar`, a `jsonb`.
 No vault stored before is read (each reads as damaged, its boxes with it), so drop both tables --
-the boxes too, or the new vaults table would stand without their foreign key -- and run
+the boxes too, or the new vaults table would be left without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
 
 **Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault record
@@ -55,7 +55,7 @@ That is tables, columns, keys and row-level security, and nothing more: no trigg
 extra table, nothing to keep in step. Push between devices is opt-in; see *Hearing other writes*.
 
 For your app's own tests, the same SQL on [PGlite](https://pglite.dev), in-process, is the whole
-backend: a PGlite is a `client` as it stands, so there is no fake to install, as there is for
+backend: a PGlite is a `client` as it is, so there is no fake to install, as there is for
 Convex (`safebyok-convex/testing`). This package's own tests run that way.
 
 ## Where it runs
@@ -78,18 +78,18 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
   browser's vault, opened for a user no longer signed in, locks itself. A refusal of your own for
   a user who is signed in but may not make a call is kind `not_permitted`, which locks nothing.
 * **`client`** is anything with `query(text, params)` resolving to `{ rows }`: a `pg` Pool,
-  Client or PoolClient, or a PGlite, as they stand. postgres.js takes a wrapper:
+  Client or PoolClient, or a PGlite, as they are. postgres.js takes a wrapper:
   `{ query: async (text, params) => ({ rows: await sql.unsafe(text, params) }) }`.
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
-  transaction of your driver and no retry: a write lands only while what it expects still
-  stands, and refuses with kind `stale_write` otherwise -- a box write with what stands under
+  transaction of your driver and no retry: a write lands only while what it expects is still
+  stored, and refuses with kind `stale_write` otherwise -- a box write with what is stored under
   its boxlabel, read by that same statement, or with kind `vault_mismatch` when its vault record
-  no longer stands. A box read is one statement too, reading the vault row and the box together,
+  is no longer stored. A box read is one statement too, reading the vault row and the box together,
   and refuses `vault_mismatch` likewise. A box write reads its vault row
   `FOR SHARE`, a shared lock: box writes never wait for each other on the vault row (two
   writes to one boxlabel still meet at that box's row), and an update of the vault record waits
   for the box writes under way (or they for it), so a box lands only under the vaultKey
-  that stands.
+  now stored.
 * **Isolation**: every guarantee here holds under READ COMMITTED, Postgres's default. Above it --
   a session default of REPEATABLE READ or SERIALIZABLE, or your own transaction around a call --
   some races fail with a serialization error (`40001`) instead, which refuses as
@@ -111,9 +111,9 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
 * **Your database's own rules.** A statement your database refuses for want of a privilege, or
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
-  write them, say. Opening a vault writes, even one that stands: its birth is `ensureVault`, one
+  write them, say. Opening a vault writes, even one already stored: its birth is `ensureVault`, one
   statement that deletes the scope's tombstone and inserts the vault record or meets the one
-  standing (`ON CONFLICT ... DO UPDATE`), and lists its boxes. So the role needs `SELECT`,
+  stored (`ON CONFLICT ... DO UPDATE`), and lists its boxes. So the role needs `SELECT`,
   `INSERT` and `UPDATE` on `safebyok_vaults`, `SELECT` and `DELETE` on
   `safebyok_vault_tombstones`, and `SELECT` on `safebyok_boxes`, to open a vault at all: a
   read-only role is refused `not_permitted` at the birth. A policy that hides rows
@@ -128,7 +128,7 @@ const vaultDB = postgresVaultDB({ client: pool, user_id: session.user_id })
 ## The route recipe
 
 One POST route serves every verb, and the browser's VaultDB posts to it. This is web-standard
-`Request` and `Response`, so it is a Next.js route handler as it stands, and a Hono, Bun or Deno
+`Request` and `Response`, so it is a Next.js route handler as it is, and a Hono, Bun or Deno
 handler with its export renamed. The package's tests run this recipe whole
 (`tests/route-recipe.test.ts`), against the same suite every VaultDB passes.
 
@@ -179,7 +179,7 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
 }
 
 /**
- * What a route answers, as JSON: `meta` always, the facts about what stands that a write's
+ * What a route answers, as JSON: `meta` always, the facts about what is stored that a write's
  * refusal learned (the record that won the race, how full the vault is) or nothing, and either
  * the `result` or a `refusal`. A refusal's own `meta` holds error information only (a damaged
  * record's listing), rebuilt from the fields a browser may see: no wrapped or ciphered field of
@@ -190,7 +190,7 @@ const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
   if (ok) { return { result: val, meta: {} } }
   const { box_stored, vault_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
   const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
-  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
+  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record is stored.
   return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_stored, capacity } }
 }
 
@@ -230,7 +230,7 @@ stored, and a deletion of the vault the tombstone it left: both go to the browse
 `{ refusal, meta }` when it was refused. Both carry the main `meta`, and a refusal's own
 `refusal.meta` beside it:
 
-* **The main `meta`** holds what a call learned about what stands, the facts that are not errors
+* **The main `meta`** holds what a call learned about what is stored, the facts that are not errors
   but the caller's next step: a stale box write's `box_stored`, a stale update's
   `vault_stored` (a record whole, as a read would send it, or null for none), and a full
   vault's `capacity`. A served call has none today, and sends `meta: {}`. Records here are
@@ -275,7 +275,7 @@ export class RouteVaultDB extends VaultDB {
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
+  // A stale write refuses on the server and crosses as its kind, with what is stored (a full vault,
   // with how full it is), so a write that answers landed: a box write answers with the box as the
   // server's storage holds it, and a box deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
@@ -286,7 +286,7 @@ export class RouteVaultDB extends VaultDB {
     })
     const answer = checkedAnswer(await response.json())
     if (answer.refusal) {
-      // What stands, or how full the vault is, from the main meta, beside the refusal's own: handed
+      // What is stored, or how full the vault is, from the main meta, beside the refusal's own: handed
       // on unchecked, for the VaultDB checks each.
       const meta = { ...answer.meta, ...answer.refusal.meta }
       throw new VaultError(answer.refusal.kind, answer.refusal.message, Object.keys(meta).length === 0 ? {} : { meta })
@@ -477,7 +477,7 @@ its error as the cause, nothing written.
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
-* **A box stands only beside its vault record**, under the same `vault_tok`: the foreign key
+* **A box is stored only beside its vault record**, under the same `vault_tok`: the foreign key
   deletes a vault's boxes with its record, in one statement, and refuses a box written for
   a vault since deleted and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
@@ -486,7 +486,7 @@ its error as the cause, nothing written.
 
 ## On Supabase
 
-Supabase is Postgres, so this package runs there as it stands: put `vault-tables.sql` in a
+Supabase is Postgres, so this package runs there as it is: put `vault-tables.sql` in a
 migration (`supabase/migrations/`), and run `postgresVaultDB` on your server, or in an Edge
 Function, connected with your project's database connection string, its `user_id` the one
 `supabase.auth.getUser()` verified on the server.
@@ -512,23 +512,23 @@ shape of table, copy it, and keep to what makes it right:
   labels and scope on the way in, validates every record and answer on the way out, and turns a
   `false` (from a box deletion, a `null`) into `stale_write` and anything you
   throw into `storage_unavailable`. A box write that misses throws instead, from the rows its
-  statement read: `Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)`.
+  statement read: `Refusals.vaultMismatch()`, or `Refusals.staleBox(storedBox)`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_tok = $ AND gate_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
   ...`): the box as stored, which the base class reads back as it would a read. It first locks
-  the box standing under the boxlabel with `SELECT ... FOR UPDATE`, which writes nothing and,
-  under READ COMMITTED, reads the row as it stands once locked, a winner that committed while it
+  the box stored under the boxlabel with `SELECT ... FOR UPDATE`, which writes nothing and,
+  under READ COMMITTED, reads the row as last committed once locked, a winner that committed while it
   waited included. The write is conditioned on that row (`UPDATE ... WHERE revision_tok = $read`,
-  or an `INSERT` only where none stands), and a miss reports the locked row instead. "Landed" is
+  or an `INSERT` only where none is stored), and a miss reports the locked row instead. "Landed" is
   the write's own condition passing -- a row back from the `UPDATE`, or the `INSERT`'s own row
-  (`xmax = 0`) -- never the standing revision matching the one sent, so a write sent again after
+  (`xmax = 0`) -- never the stored revision matching the one sent, so a write sent again after
   it landed is refused as stale. A box another writer first inserted after the statement began
   is in no snapshot, so no `SELECT` sees it: only the insert's `ON CONFLICT DO UPDATE` (a no-op
   update) meets it and returns it. A box
-  deletion deletes whatever stands within the expected vault and returns its `revision_tok`
+  deletion deletes whatever is stored within the expected vault and returns its `revision_tok`
   (`DELETE ... RETURNING revision_tok`), so it can say whether it removed the revision the device
-  named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
+  named, another, or none. A create returns the stored row with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The box's foreign key names its vault row down
   to the `vault_tok`, so a box cannot outlive its vault or land in one made anew, and deleting
@@ -546,14 +546,14 @@ shape of table, copy it, and keep to what makes it right:
   statement and checked in the next lets writes slip through between them; a `count(*)` inside
   the insert narrows that to writers whose statements overlap, which may each count room and
   all land. The contract allows that (line 4.2), and costs nothing. Have the insert answer, from
-  its one statement, why it missed -- the vault stood, a box already stands under the boxlabel
+  its one statement, why it missed -- the vault was stored, a box is already stored under the boxlabel
   (and which), the vault was full -- so that no second read is needed to tell a full vault from
   a stale writer. And map a foreign key violation (`23503`) on the insert to `vault_mismatch`: a
-  vault deleted after the statement's snapshot, before its foreign key check, no longer stands.
+  vault deleted after the statement's snapshot, before its foreign key check, is no longer stored.
 * **Read the vault row `FOR SHARE` in a box write, and know why.** A plain read takes the vault
   row from the statement's snapshot, so a deletion of the vault committed after it would go unseen
   until the foreign key's check. `FOR SHARE` makes the deletion wait for the write, or the write
-  for the deletion and then read the vault row as it stands, and it takes the write's locks in
+  for the deletion and then read the vault row as last committed, and it takes the write's locks in
   the order a deletion takes them (vault row, then box). It is a shared lock, so box writes never
   wait for each other on the vault row. A trigger of your own
   that locks the vault row anew -- `FOR UPDATE`, say -- turns two such writers into a deadlock:

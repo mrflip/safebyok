@@ -12,19 +12,18 @@ import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox,
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
 
-/** What {@link localVaultDB} is made with. */
+/** The options of {@link localVaultDB}. */
 export type LocalVaultDBOpts = VaultDBOpts & {
   /** Where the rows live: `domStore(localStorage, prefix)`, `memoryStore()`, or a StringStore of your own. */
   store: StringStore
 }
 
-/**
- * VaultDB over a {@link StringStore}: rows as JSON text under the scopepaths `Scopepath` gives, names
- * joined on `^`. A host backs one with localStorage, for a vault that lives on this device alone;
- * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
- * reach -- rows stay on this device instead of syncing through a shared database.
+/** A VaultDB over a {@link StringStore}, keeping rows as JSON text under the scopepaths `Scopepath` gives.
+ * A host backs one with localStorage, for a vault that lives on this device alone; tests back one
+ * with a Map. Every secret field in what it stores is ciphertext; what it lacks is reach -- rows
+ * stay on this device instead of syncing through a shared database.
  *
- * * **One tab.** Each write checks what stands and saves in one synchronous step, so nothing else
+ * * **One tab.** Each write checks what is stored and saves in one synchronous step, so nothing else
  *   in this tab runs in between: that is its atomic step. Two tabs sharing one localStorage are
  *   not held apart -- browsers do not lock it across tabs -- so a vault two tabs write at once may
  *   lose a write. For a vault several tabs keep, use `idbVaultDB` from `safebyok-indexeddb`, whose
@@ -34,9 +33,8 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   browser's own error (a `QuotaExceededError`) its cause, and nothing is written. Its
  *   `getCapacity` counts the vault's boxes and weighs each as its row's JSON text, in UTF-8 bytes.
  *
- * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
- *   not a StringStore, or a `logger` that is not a VaultLogger.
- * @returns The VaultDB, to hand `Bank.make`.
+ * Throws 'bad_option' for a `store` that is not a StringStore, or a `logger` that is not a
+ * VaultLogger.
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
@@ -53,7 +51,7 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
-/** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
+/** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
 export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
   const call = custom(isFunction)
   return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }) }) }
@@ -88,20 +86,20 @@ class StringStoreVaultDB extends VaultDB {
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
-      const standing = readJson(this.store, vaultScopepath)
-      const life = Expectations.newLifeOf(draft, standing)
+      const stored = readJson(this.store, vaultScopepath)
+      const life = Expectations.newLifeOf(draft, stored)
       if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
-      return { vault: life ?? standing, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
+      return { vault: life ?? stored, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
-      const standing = readJson(this.store, vaultScopepath)
-      const refusal = Expectations.vaultRecordRefusalOf(standing, expected)
+      const stored = readJson(this.store, vaultScopepath)
+      const refusal = Expectations.vaultRecordRefusalOf(stored, expected)
       if (refusal) { throw refusal }
-      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, standing)))
+      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, stored)))
       return readJson(this.store, vaultScopepath)
     })
   }
@@ -126,12 +124,12 @@ class StringStoreVaultDB extends VaultDB {
       .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
   }
 
-  // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
+  // A row that is not JSON is taken as its text, so a stale write names it, damaged, as the listing does.
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
       const boxScopepath = Scopepath.box({ ...scope, boxlabel: box.boxlabel })
-      const standingText = this.store.read(boxScopepath)
-      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), standingText === null ? null : jsonOrText(standingText), expected)
+      const storedText = this.store.read(boxScopepath)
+      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), storedText === null ? null : jsonOrText(storedText), expected)
       if (refusal) { throw refusal }
       this.store.write(boxScopepath, JSON.stringify(box))
       return readJson(this.store, boxScopepath)
@@ -185,7 +183,7 @@ class StringStoreVaultDB extends VaultDB {
   }
 }
 
-/** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, for the base class's checks to refuse or the listing to mark. */
+/** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, which the base class refuses or the listing marks. */
 const jsonOrText = (text: string): unknown => {
   try {
     return JSON.parse(text)

@@ -1,11 +1,9 @@
-/** The validators a host or a storage adapter calls or composes, under the name its module gives each: the main entry exports them as the `Validators` namespace.
- * They are what is stored or crosses the `VaultDB` and `DeviceDB` seams, the scopes and
- * scopepaths, each token and ciphered field, the options and objects a host passes, and what its
- * callbacks return. Each but the three primitives is made in a `Validator` call: its `parse`
- * throws a VaultError of its call's kind, naming each failing field and quoting no input, and
- * `safeParse` is Zod's own. `label`, `user_id` and `EpochMillis` are plain Zod, the names every
- * scope and time is made of. Every validator the main entry exports by name (`VaultRecord`,
- * `BoxRecord`, `Whisper`, `Sidecar`, ...) is here too, the same object.
+/** The validators a host or a storage adapter calls or composes, each under its module's name: the main entry exports them as the `Validators` namespace.
+ * They check what is stored or crosses the `VaultDB` and `DeviceDB` seams, the scopes and
+ * scopepaths, each token and ciphered field, the options a host passes, and what its callbacks
+ * return. Each is made in a `Validator` call, so its `parse` throws a VaultError of its call's
+ * kind, but for `label`, `user_id` and `EpochMillis`, which are plain Zod. Every validator the main
+ * entry exports by name (`VaultRecord`, `Whisper`, `Sidecar`, ...) is here too, the same object.
  *
  * @example Validators.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
  * @example Validators.vault_tok.safeParse('').success   // false: a vault_tok is non-empty text

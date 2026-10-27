@@ -1,4 +1,4 @@
-/** `Validator`, where every validator is made: it hands a builder Zod's makers under short names and the shared names, and makes each schema it gets back refuse with a VaultError. */
+/** `Validator`, where every validator is made, and the {@link Kit} its builders are handed. */
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
@@ -8,12 +8,11 @@ import { EpochMillis, label, user_id } from './primitives'
 
 // == [Kit]: Kit, KitWith
 
-/** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, the names every scope is made of, and `epochMillis`, the instant every time is.
+/** The makers a `Validator` builder is handed: Zod's under short names, its scalars ready made, the scope names, and `epochMillis`.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
- * Bring a maker the kit lacks in by a named import from `zod` beside the call, never the whole of
- * Zod, which would carry every locale it ships into each host's bundle. Judge an object keyed by
- * its input whole, with `custom`: the kit has no record maker, as a record's keys would stand in
- * a refusal's paths.
+ * Import a maker the kit lacks by name from `zod`, never the whole of Zod: that would carry every
+ * locale it ships into the host's bundle. The kit has no record maker, as a record's keys would
+ * stand in a refusal's paths; judge an object keyed by its input whole, with `custom`.
  */
 export const Kit = {
   obj:     Zod.object,
@@ -47,23 +46,22 @@ type Merged<SourcesT extends readonly object[]> =
 
 // == [Validator]: Validator
 
-/** Make validators: `build` gets the kit and returns its schemas by name, and each comes back refusing `kind` from `parse`.
- * A failed `parse` throws a VaultError of `kind`. Its message names every failing field by its
- * path, up to eight, counting the rest, each with its check's own sentence or Zod's English; its
- * `meta.fieldnames` lists the same fields. For fields an object does not take it says how many,
- * never which, and lists the fields the object takes. It quotes no input, and carries no `cause`.
+/** Make validators: `build` gets the kit and returns its schemas by name, and each comes back with a `parse` that throws a VaultError of `kind`.
+ * The message names each failing field by its path, up to eight, and counts the rest, each with
+ * its check's own sentence or Zod's English. `meta.fieldnames` lists the same fields. For fields
+ * an object does not take, it says how many, never which, and lists the fields it takes. It quotes
+ * no input and carries no `cause`.
  *
- * Only `parse` changes. `safeParse` and `parseAsync` are Zod's own, and so is any schema made
- * from a validator outside a `Validator` call (`VaultSparse.pick(...)`): its `parse` throws a
- * ZodError. Make such a slice in a call of its own where it should refuse. A validator nested in
- * another refuses with the outer one's kind.
+ * Only `parse` changes: `safeParse` and `parseAsync` are Zod's own. A schema sliced from a
+ * validator outside a `Validator` call (`VaultSparse.pick(...)`) throws a ZodError; make the slice
+ * in a call of its own where it should refuse. A validator nested in another refuses with the
+ * outer one's kind.
  *
  * A schema keyed by its input repeats those keys in a refusal: Zod's `record`, or an object's
- * `.catchall()`, puts each key that fails in the path the message and `meta.fieldnames` name.
- * Judge such an object whole with `custom`, as safebyok's own whisper check does.
+ * `.catchall()`, puts each failing key in the path. Judge such an object whole with `custom`.
  *
- * Modules of validators in `sources` (each a star import) are spread into the kit beneath it, so
- * a name the kit gives wins. A bundler keeps or drops a call whole.
+ * @param sources - Modules of validators, each a star import, spread into the kit beneath it: a
+ *   name the kit gives wins. A bundler keeps or drops a call whole.
  *
  * @example
  *   export const { bankScope, vaultScope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
@@ -95,12 +93,10 @@ export const Validator = <ValsT extends Record<string, Z.ZodType>, const Sources
 
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf
 
-/** `schema`, but for a `parse` that throws a VaultError of `kind` where Zod's would throw its own.
- * It is a clone, a schema of its own over the same definition: Zod binds each schema's own methods
- * to it, so a schema that only inherited them (`Object.create`) would render to JSON Schema as the
- * schema it came from, losing a pipe's or a lazy's place.
- */
+/** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own. */
 const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT): SchemaT => {
+  // A clone, not `Object.create`: Zod binds each schema's own methods to it, so a schema that only
+  // inherited them would render to JSON Schema as the one it came from, losing a pipe's or a lazy's place.
   const wrapped = schema.clone()
   wrapped.parse = (val: unknown): Z.output<SchemaT> => {
     const result = schema.safeParse(val, InEnglish)
@@ -110,7 +106,10 @@ const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT)
   return wrapped
 }
 
-/** Zod's own English for each failure, whatever error map the host set with `z.config`, which could quote the input; and for fields an object does not take, how many, and the fields it does. A sentence a check carries still wins. */
+/** The error map every `parse` runs under: Zod's own English, whatever map the host set with `z.config`, which could quote the input.
+ * For fields an object does not take, it says how many and lists the fields it takes. A sentence
+ * a check carries still wins.
+ */
 const InEnglish = {
   error: (issue: Z.core.$ZodRawIssue) => (issue.code === 'unrecognized_keys' ? Phrases.unknownFields(issue.keys.length, fieldnamesOf(issue.inst)) : English(issue)),
 }
@@ -133,7 +132,7 @@ const sentenceOf = (issue: Z.core.$ZodIssue): string => {
   return fieldname ? `${fieldname}: ${issue.message}` : issue.message
 }
 
-/** The refusal for a failed parse: the first {@link MaxFailuresSaid} failures, each where and what, joined, the rest counted, and the fields named in `meta.fieldnames`. */
+/** The VaultError of `kind` for a failed parse, its message and `meta.fieldnames` as {@link Validator} says. */
 const refusalOf = (kind: RefusalKind, err: Z.ZodError): VaultError => {
   const issues     = err.issues.slice(0, MaxFailuresSaid)
   const unsaid     = err.issues.length - issues.length

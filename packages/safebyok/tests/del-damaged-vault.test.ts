@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-import { type DeviceDB } from '../src/device-db'
 import { type VaultDB } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
 import { type DelDamagedVaultOpts } from '../src/del-damaged-vault'
@@ -29,7 +28,7 @@ describe("delDamagedVault", () => {
   it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already deleted", async () => {
     const world = await damagedVaultWorld()
     const trouble = new Error('device storage is unavailable')
-    vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/writing its record of this vault/)
     expect(err.cause).to.eq(trouble)
@@ -46,7 +45,7 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u2')).to.not.deep.equal([])
   })
 
-  it("refuses a vault that stands sound, removing nothing from storage or the device: that one is del()'s", async () => {
+  it("refuses a sound vault, removing nothing from storage or the device: that one is del()'s", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -84,19 +83,13 @@ describe("delDamagedVault", () => {
 
   it("with no vault stored, clears only a leftover lease, and a call cut short by the device can be made again", async () => {
     const world = await damagedVaultWorld()
-    let failures = 1
-    const flakyDevice: DeviceDB = {
-      ...world.deviceDB,
-      delLease: async (scope) => {
-        if (failures > 0) { failures -= 1; throw new Error('device store is busy') }
-        return await world.deviceDB.delLease(scope)
-      },
-    }
-    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')
+    // The device store fails its first erase, as a busy one may, and erases at the next.
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(new Error('device store is busy'))
+    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: world.deviceDB })), 'storage_unavailable')
     expect((err.cause as Error).message).to.include('busy')
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.not.be.null
-    await delDamagedVault(world.optsWith({ deviceDB: flakyDevice }))
+    await delDamagedVault(world.optsWith({ deviceDB: world.deviceDB }))
     expect(await world.getLease()).to.be.null
   })
 

@@ -120,7 +120,7 @@ const UnknownAnswers = [
   [null,                                                     'null'],
   [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
   [{ landed: 'yes', box_stored: null },                      'a landed flag that is no boolean'],
-  [{ landed: false, refusalkind: 'stale_write' },            'a stale write naming nothing standing'],
+  [{ landed: false, refusalkind: 'stale_write' },            'a stale write without its box_stored'],
   [{ landed: false, refusalkind: 'vault_full' },             'a full vault saying nothing of how full'],
   [{ landed: false, refusalkind: 'quota_exceeded' },         'a refusal of a kind this client does not know'],
 ] as const
@@ -272,8 +272,8 @@ describe("a record the deployment refused", () => {
   const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
   const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
-  const standing = TH.vaultRecordOf(subject, { ...scope, gate_epoch: 52_871, gate: quotableWayins })
-  const nextVaultRecord = { ...standing, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
+  const storedVaultRecord = TH.vaultRecordOf(subject, { ...scope, gate_epoch: 52_871, gate: quotableWayins })
+  const nextVaultRecord = { ...storedVaultRecord, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
   const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
@@ -290,15 +290,15 @@ describe("a record the deployment refused", () => {
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ ...scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
-    ['putVaultRecord', nextVaultRecord, (vaultDB) => vaultDB.putVaultRecord(nextVaultRecord, { vault_tok: standing.vault_tok, gate_epoch: 52_871 })],
-    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_tok: standing.vault_tok, revision_tok: null }, box)],
+    ['putVaultRecord', nextVaultRecord, (vaultDB) => vaultDB.putVaultRecord(nextVaultRecord, { vault_tok: storedVaultRecord.vault_tok, gate_epoch: 52_871 })],
+    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_tok: storedVaultRecord.vault_tok, revision_tok: null }, box)],
   ]
 
   for (const [verb, record, write] of RefusedWrites) {
     it(`is quoted nowhere in the refusal ${verb} resolves: message, properties or causes`, async () => {
       const deployment = deploy()
       const client = deployment.client(subject)
-      await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), standing)
+      await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), storedVaultRecord)
       // The core refuses a field it does not know, so this one strays in on the wire, past it,
       // where Convex's validator refuses the call. convex-test's validator names the field; a
       // dev deployment's quotes the arguments too (notes/security.md). The refusal carries none of it.
@@ -318,16 +318,16 @@ describe("a record the deployment refused", () => {
       for (const leaf of quotables) {
         expect(thrown).to.not.include(leaf)
       }
-      expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(standing)
-      expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: standing.vault_tok })).to.be.null
+      expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(storedVaultRecord)
+      expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: storedVaultRecord.vault_tok })).to.be.null
     })
   }
 
   it("is quoted nowhere in the refusal putBox resolves when Convex's validator quotes the refused argument", async () => {
     const deployment = deploy()
     const client = deployment.client(subject)
-    await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), standing)
-    const expected = { vault_tok: standing.vault_tok, revision_tok: null }
+    await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), storedVaultRecord)
+    const expected = { vault_tok: storedVaultRecord.vault_tok, revision_tok: null }
     const quotedArgs = withRevisionNotText({ ...scope, box, expected })
     await expect(client.mutation(deployment.api.safebyok.putBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {
@@ -339,7 +339,7 @@ describe("a record the deployment refused", () => {
     const refusal = await TH.expectBad(vaultDB.putBox(scope, expected, box), 'storage_unavailable')
     expect(refusal.cause).to.be.undefined
     expect(TH.thrownText(refusal)).to.not.include('quoted_by_convex')
-    expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: standing.vault_tok })).to.be.null
+    expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: storedVaultRecord.vault_tok })).to.be.null
   })
 })
 

@@ -1,5 +1,6 @@
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
+import { codePointsOf } from './text'
 
 /** How `mask` shows a whisper: how many characters to reveal, and how many stars to hide it behind. */
 export interface MaskOpts {
@@ -19,7 +20,7 @@ const Collapsed = '***...***'
 /** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
 const MaxShown = 1000
 
-/** What `mask` takes as options, each defaulted, refusing 'bad_option'. */
+/** The check of `mask`'s options, defaulting each, refusing 'bad_option'. */
 export const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) => {
   const shownCount = uint.lte(MaxShown)
   const resultLen  = union([lit(Infinity), uint])
@@ -41,7 +42,7 @@ const parseMaskOpts = (candidate: MaskOpts | undefined): Record<keyof MaskOpts, 
   return checked.data
 }
 
-/** What `plainLine` removes: combining marks, controls, invisibles, spaces, bidirectional controls, and symbols drawn blank or boxed.
+/** The characters `plainLine` removes: combining marks, controls, invisibles, spaces, bidirectional controls, and symbols drawn blank or boxed.
  * Right-to-left letters and numbers are kept.
  */
 const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\u{2800}\u{1D159}\u{FFFC}]/gu
@@ -53,10 +54,7 @@ const composeAndStrip = (text: string): string => text.normalize('NFC').replaceA
  */
 const plainLine = (text: string): string => composeAndStrip(composeAndStrip(text))
 
-/** `text` as a list of its code points, so that a surrogate pair is never parted. */
-const codePointsOf = (text: string): string[] => text.match(/./gsu) ?? []
-
-/** The cut itself: `chars`, already safe, reduced to head, stars and tail by the give-up rules. */
+/** `chars`, already safe, cut to head, stars and tail by the give-up rules `mask` states. */
 const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Record<keyof MaskOpts, number>): string => {
   // What may be shown at all is what is left once minStars are hidden: tail has first call on it.
   const showable = Math.max(0, chars.length - minStars)

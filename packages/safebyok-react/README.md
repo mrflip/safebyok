@@ -142,7 +142,7 @@ const VaultPanel = () => {
   return <button onClick={() => { void vault.lock() }}>Lock</button>
 }
 
-const VaultStanding = () => {
+const VaultLifecycle = () => {
   const bankVault = useListedVault('main')
   if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
   if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
@@ -225,8 +225,8 @@ over: `bank.delDamagedVault({ vaultlabel: 'main' })` does that with the bank's o
 asks for the vault again: a new one, `novel`, for the user to choose a passphrase for. The user's
 boxes in it are lost for good, so ask first. It refuses with storage's refusal (say,
 `storage_unavailable`) if deleting it fails, the vault left listed as it was; `stale_write` means the
-vault was made anew meanwhile, and lets it go too, so `useVault` asks for the one that
-stands; `bad_option` means it reads sound now: ask for it again.
+vault was made anew meanwhile, and lets it go too, so `useVault` asks for the one now
+stored; `bad_option` means it reads sound now: ask for it again.
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
 the vault as storage refusing it, kind `identity_revoked`, and a vault already born locks itself
@@ -281,10 +281,10 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
   passphrase yet), `vault.putWayin('passkey')` raises `put_passkey`, `vault.delWayin('passkey')`
   raises `del_passkey`, and `vault.del()` raises `del_vault`. The provider's dialog asks for each,
   proven by the passphrase; cancelled, the call refuses `vault_locked`, its message saying what
-  stands ("The passphrase is unchanged.", "Nothing was deleted."), and nothing was changed.
+  is unchanged ("The passphrase is unchanged.", "Nothing was deleted."), and nothing was changed.
   `vault.putWayin('passkey')` on a vault with no passphrase yet refuses `absent_vault`, asking
   nothing: a passkey is added under the passphrase.
-* **A call behind another kind's dialog waits.** One gating stands per vault. A call that needs
+* **A call behind another kind's dialog waits.** At most one gating is pending per vault. A call that needs
   the vault unlocked while a change's or a deletion's dialog is up waits for that dialog to close,
   and does not show in it. A change made leaves the vault unlocked, so the waiting call goes on
   unasked; a change cancelled lets the call ask for the passphrase in a dialog of its own, as
@@ -541,7 +541,7 @@ if (passkey !== null) { const { ok } = await gating.attemptPasskey(passkey) }
   typo, the next submit makes another passkey, and the first stays on the authenticator, unused.
 * **A passkey unlocks; only the passphrase changes things.** `vault.putWayin('passphrase')`,
   `vault.putWayin('passkey')` and `vault.delWayin('passkey')` each raise a gating whose attempt
-  takes the standing passphrase as proof, never a passkey's answer. A user who forgot the passphrase can still unlock
+  takes the current passphrase as proof, never a passkey's answer. A user who forgot the passphrase can still unlock
   with the passkey, but can set a new passphrase only by starting over (*Starting over*, above).
   A new passphrase removes the passkey, which was matched to the old one: offer to add it again,
   under the new passphrase, once the change lands.

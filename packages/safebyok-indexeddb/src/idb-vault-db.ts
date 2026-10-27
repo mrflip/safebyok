@@ -9,7 +9,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * It keeps on this device the rows a synced backend would hold, so whispers are encrypted at rest
  * all the same. Nothing syncs. Nothing is opened until the first read or write.
  *
- * * **Each verb is one IndexedDB transaction**: a write lands only while what it expects stands,
+ * * **Each verb is one IndexedDB transaction**: a write lands only while storage holds what it expects,
  *   even with another tab writing at the same moment, and `getVault` reads the vault record and
  *   every box with no write between.
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
@@ -69,10 +69,10 @@ class IdbVaultDB extends VaultDB {
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
-      const standing = await rowAt(store, vaultScopepath)
-      const missed = Expectations.vaultRecordRefusalOf(standing, expected)
+      const storedVaultRecord = await rowAt(store, vaultScopepath)
+      const missed = Expectations.vaultRecordRefusalOf(storedVaultRecord, expected)
       if (missed) { return { refusal: missed, stored: null } }
-      store.put(Expectations.vaultRecordPutOf(vaultRecord, standing), vaultScopepath)
+      store.put(Expectations.vaultRecordPutOf(vaultRecord, storedVaultRecord), vaultScopepath)
       return { refusal: null, stored: await rowAt(store, vaultScopepath) }
     })
     if (refusal) { throw refusal }
@@ -83,11 +83,11 @@ class IdbVaultDB extends VaultDB {
   // The vault record and the box are read in one transaction; a read whose vault record is not the
   // ones expected is refused from that transaction's rows, once it has ended.
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
-    const [standingVaultRecord, standingBox] = await this.shelf('readonly', (store) => (
+    const [storedVaultRecord, storedBox] = await this.shelf('readonly', (store) => (
       Promise.all([rowAt(store, Scopepath.vault(scope)), rowAt(store, Scopepath.box({ ...scope, boxlabel }))])
     ))
-    if (! Expectations.vaultMeets(standingVaultRecord, expected)) { throw Refusals.vaultMismatch() }
-    return standingBox ?? null
+    if (! Expectations.vaultMeets(storedVaultRecord, expected)) { throw Refusals.vaultMismatch() }
+    return storedBox ?? null
   }
 
   // The box handed back is the row as the put left it, read in the same transaction; a write that
@@ -95,8 +95,8 @@ class IdbVaultDB extends VaultDB {
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
       const boxScopepath = Scopepath.box({ ...scope, boxlabel: box.boxlabel })
-      const [standingVaultRecord, standingBox] = await Promise.all([rowAt(store, Scopepath.vault(scope)), rowAt(store, boxScopepath)])
-      const missed = Expectations.boxRefusalOf(standingVaultRecord, standingBox, expected)
+      const [storedVaultRecord, storedBox] = await Promise.all([rowAt(store, Scopepath.vault(scope)), rowAt(store, boxScopepath)])
+      const missed = Expectations.boxRefusalOf(storedVaultRecord, storedBox, expected)
       if (missed) { return { refusal: missed, stored: null } }
       store.put(box, boxScopepath)
       return { refusal: null, stored: await rowAt(store, boxScopepath) }
@@ -119,10 +119,10 @@ class IdbVaultDB extends VaultDB {
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion | null> {
     const deletion = await inOneTransaction(this.shelf, async (store) => {
       const boxScopepath = Scopepath.box({ ...scope, boxlabel })
-      const [standingVaultRecord, standingBox] = await Promise.all([rowAt(store, Scopepath.vault(scope)), rowAt(store, boxScopepath)])
-      if (! Expectations.vaultMeets(standingVaultRecord, expected)) { return null }
+      const [storedVaultRecord, storedBox] = await Promise.all([rowAt(store, Scopepath.vault(scope)), rowAt(store, boxScopepath)])
+      if (! Expectations.vaultMeets(storedVaultRecord, expected)) { return null }
       store.delete(boxScopepath)
-      return Expectations.deletionOf(standingBox, expected)
+      return Expectations.deletionOf(storedBox, expected)
     })
     if (deletion !== null && deletion.outcome !== 'absent') { this.ring() }
     return deletion

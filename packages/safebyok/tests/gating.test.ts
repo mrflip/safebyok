@@ -293,7 +293,7 @@ describe("a step of an attempt's chain failing", () => {
       return {}
     }, 'change', 'putVaultRecord refusing stale_write'],
     ['storage_unavailable', (world) => {
-      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+      TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
       return {}
     }, 'unlock', 'putLease failing'],
     ['unexpected_error', () => ({ strengthChecker: () => { throw new Error('checker broke on pw two') } }), 'change', 'the strength checker throwing'],
@@ -325,7 +325,7 @@ describe("a host function that hears the passphrase throwing, quoting it", () =>
     [(keyDeriver) => {
       vi.spyOn(keyDeriver, 'deriveKeyBytes').mockRejectedValueOnce(new Error('could not derive pw-the-passphrase'))
       return {}
-    }, 'unlock', 'the key deriver, proving the passphrase that stands'],
+    }, 'unlock', 'the key deriver, proving the current passphrase'],
     [(keyDeriver) => {
       vi.spyOn(keyDeriver, 'deriveKeyBytes').mockImplementation(async (passphrase, salt) => {
         if (passphrase === 'pw-the-passphrase') { throw new VaultError('bad_option', 'could not derive pw-the-passphrase') }
@@ -363,7 +363,7 @@ describe("a host function that hears the passphrase throwing, quoting it", () =>
 
 // == [Declining]: a declined gating's refusal, worded by kind
 
-/** Each kind of gating, the call that raises it on a vault made as `made` says, and what its decline's message says stands. */
+/** Each kind of gating, the call that raises it on a vault made as `made` says, and what its decline's message says is left as it was. */
 const DeclineCases = [
   ['initialize_gate',   'novel',   (vault: Vault) => vault.tryEnsureUnlocked(),         /first passphrase.*still has no passphrase/],
   ['unlock_vault',      'locked',  (vault: Vault) => vault.tryEnsureUnlocked(),         /unlock it.*stays locked/],
@@ -434,7 +434,7 @@ describe("a lock or a decline landing during an attempt", () => {
       const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
       const calling = flavor === 'unlock' ? vault.tryEnsureUnlocked() : vault.tryPutWayin('passphrase')
       const gating = await dialog.asked()
-      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+      TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
       const writing = TH.holdNextCall(world.deviceDB, 'putLease')
       const attempting = flavor === 'unlock' ? TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw') : TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw two')
       await writing.reached
@@ -686,7 +686,7 @@ describe("joining a gating, by kind", () => {
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("has putWayin('passkey') wait out an unlock_vault gating standing, then raise its own put_passkey", async () => {
+  it("has putWayin('passkey') wait out a pending unlock_vault gating, then raise its own put_passkey", async () => {
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
@@ -702,7 +702,7 @@ describe("joining a gating, by kind", () => {
     expect(vault.snapshot.gate?.passkey).to.not.be.null
   })
 
-  it("has ensureUnlocked() wait out a put_passkey gating standing, unlocked by its attempt and asking nothing more", async () => {
+  it("has ensureUnlocked() wait out a pending put_passkey gating, unlocked by its attempt and asking nothing more", async () => {
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
     const putting = vault.tryPutWayin('passkey')
@@ -752,7 +752,7 @@ describe("joining a gating, by kind", () => {
     expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
-  it("has putWayin('passkey') on a novel vault refuse absent_vault while an initialize_gate stands, joining nothing: the first passphrase alone is no passkey", async () => {
+  it("has putWayin('passkey') on a novel vault refuse absent_vault while an initialize_gate is pending, joining nothing: the first passphrase alone is no passkey", async () => {
     const dialog = TH.heldDialog()
     const vault = await makeWorld().open({ requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
@@ -763,7 +763,7 @@ describe("joining a gating, by kind", () => {
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("has del() wait out an unlock_vault gating standing, then raise its own del_vault", async () => {
+  it("has del() wait out a pending unlock_vault gating, then raise its own del_vault", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })

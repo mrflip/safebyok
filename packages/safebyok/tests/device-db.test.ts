@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deviceOutcomeOf, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
+import { DeviceDB, deviceRecordFor, deviceRecordOf, memoryDeviceDB, raisedDeviceRecord } from '../src/device-db'
 import { VaultError } from '../src/errors'
+import type { Outcome } from '../src/outcome'
+import * as Scopepath from '../src/scopepath'
 import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types/types'
 import * as TH from './test-helpers'
 
@@ -38,27 +40,27 @@ describe("memoryDeviceDB", () => {
 describe("raisedDeviceRecord", () => {
   const record: DeviceRecord = TH.deviceRecordOf('u1')
 
-  it("stores the record as it came where none stands, as its first example shows", () => {
+  it("stores the record as it came where none is stored, as its first example shows", () => {
     expect(raisedDeviceRecord(undefined, record)).to.eq(record)
   })
 
-  it("keeps the higher highest_vault_epoch where a record stands, as its second example shows", () => {
+  it("keeps the higher highest_vault_epoch where a record is stored, as its second example shows", () => {
     expect(raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch).to.eq(5)
   })
 
-  it("raises a standing record to a higher epoch, keeping its own device_id", () => {
-    const standing = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 })
-    expect(raisedDeviceRecord(standing, TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 4 })))
+  it("raises a stored record to a higher epoch, keeping its own device_id", () => {
+    const stored = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 })
+    expect(raisedDeviceRecord(stored, TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 4 })))
       .to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 4 }))
   })
 
   it("throws 'bad_record' rather than raise a stored record to an epoch that fails its check, as its doc block says: no record the core hands it carries one", () => {
-    const standing = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
-    TH.expectSyncRefusal(() => raisedDeviceRecord(standing, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
+    const stored = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
+    TH.expectSyncRefusal(() => raisedDeviceRecord(stored, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
   })
 
   const GivesWayCases = [
-    // what may stand under the ckey that is no device record of this scope:
+    // what may be stored under the ckey that is no device record of this scope:
     [null,                                                       'a null left by a store'],
     [{ format: 'safebyok-device-v0', highest_vault_epoch: 9 },  'a row that fails its check'],
     [TH.deviceRecordOf('u2', { highest_vault_epoch: 9 }),        "another scope's record, filed where it should not be"],
@@ -116,15 +118,107 @@ describe("deviceRecordFor", () => {
   }
 })
 
-describe("deviceOutcomeOf", () => {
-  it("answers what the body returns as a good Outcome, a record or null, as its first example shows", async () => {
-    expect(await deviceOutcomeOf('getDeviceRecord', () => TH.deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: TH.deviceRecordOf('u1') })
-    expect(await deviceOutcomeOf('getDeviceRecord', () => Promise.resolve(null))).to.deep.equal({ ok: true, val: null })
+/** A DeviceDB whose every `do*` method answers as `answer` says, synchronously, its name logged in `calls` as it is made: for the base class's own tests.
+ * A throw from `answer` is a store that throws before its promise.
+ */
+class ScriptedDeviceDB extends DeviceDB {
+  readonly calls: string[] = []
+  readonly #answer: (hookname: string, args: unknown[]) => unknown
+
+  constructor(answer: (hookname: string, args: unknown[]) => unknown = () => undefined) {
+    super()
+    this.#answer = answer
+  }
+
+  protected doGetLease(...args: unknown[]) { return this.#heard('doGetLease', args) }
+  protected doPutLease(...args: unknown[]) { return this.#heard('doPutLease', args) as Promise<void> }
+  protected doDelLease(...args: unknown[]) { return this.#heard('doDelLease', args) as Promise<void> }
+  protected doGetDeviceRecord(...args: unknown[]) { return this.#heard('doGetDeviceRecord', args) }
+  protected doRaiseDeviceRecord(...args: unknown[]) { return this.#heard('doRaiseDeviceRecord', args) as Promise<void> }
+  protected doDelDeviceRecord(...args: unknown[]) { return this.#heard('doDelDeviceRecord', args) as Promise<void> }
+  protected doDelAll(...args: unknown[]) { return this.#heard('doDelAll', args) as Promise<void> }
+  protected doDelUnreadable(...args: unknown[]) { return this.#heard('doDelUnreadable', args) as Promise<void> }
+
+  #heard(hookname: string, args: unknown[]): Promise<unknown> {
+    this.calls.push(hookname)
+    return Promise.resolve(this.#answer(hookname, args))
+  }
+}
+
+describe("DeviceDB, the base class", () => {
+  it("calls each verb's do* method before it awaits anything, so the store hears one scope's calls in the order they were made", async () => {
+    const deviceDB = new ScriptedDeviceDB()
+    const lease = await TH.leaseOf('u1')
+    const answers = [
+      deviceDB.getLease(TH.scopeOf('u1')), deviceDB.putLease(lease), deviceDB.delLease(TH.scopeOf('u1')),
+      deviceDB.getDeviceRecord(TH.scopeOf('u1')), deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')), deviceDB.delDeviceRecord(TH.scopeOf('u1')), deviceDB.delAll(),
+    ]
+    expect(deviceDB.calls).to.deep.equal(['doGetLease', 'doPutLease', 'doDelLease', 'doGetDeviceRecord', 'doRaiseDeviceRecord', 'doDelDeviceRecord', 'doDelAll'])
+    await Promise.all(answers)
   })
 
-  it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting, as its second example shows", async () => {
+  it("hands each do* method the row's scopepath, never the scope", async () => {
+    const heard: unknown[][] = []
+    const deviceDB = new ScriptedDeviceDB((_hookname, args) => { heard.push(args) })
+    await deviceDB.getLease(TH.scopeOf('u1'))
+    await deviceDB.delDeviceRecord(TH.scopeOf('u1'))
+    expect(heard).to.deep.equal([[Scopepath.lease(TH.scopeOf('u1'))], [Scopepath.device(TH.scopeOf('u1'))]])
+  })
+
+  it("refuses a scope whose names fail their checks as 'bad_scope', before the store hears of it", async () => {
+    const deviceDB = new ScriptedDeviceDB()
+    await TH.expectBad(deviceDB.getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
+    await TH.expectBad(deviceDB.raiseDeviceRecord({ ...TH.deviceRecordOf('u1'), vaultlabel: 'Main' }), 'bad_scope')
+    expect(deviceDB.calls).to.deep.equal([])
+  })
+
+  const UnreadableCases = [
+    ['getLease',        { format: 'safebyok-lease-v1', mangled: true }],
+    ['getDeviceRecord', { ...TH.deviceRecordOf('u1'), highest_vault_epoch: 'one' }],
+  ] as const
+
+  for (const [verb, row] of UnreadableCases) {
+    it(`reads a row that fails its check through ${verb} as none, and has the store discard it only while it still fails`, async () => {
+      let isReadable: ((candidate: unknown) => boolean) | undefined
+      const deviceDB = new ScriptedDeviceDB((hookname, args) => {
+        if (hookname === 'doDelUnreadable') { isReadable = args[1] as (candidate: unknown) => boolean }
+        return hookname === 'doDelUnreadable' ? undefined : row
+      })
+      const found: Promise<Outcome<unknown>> = verb === 'getLease' ? deviceDB.getLease(TH.scopeOf('u1')) : deviceDB.getDeviceRecord(TH.scopeOf('u1'))
+      expect(await TH.expectGood(found)).to.be.null
+      expect(deviceDB.calls.at(-1)).to.eq('doDelUnreadable')
+      expect(isReadable?.(row)).to.be.false
+      expect(isReadable?.(undefined)).to.be.false
+      expect(isReadable?.(verb === 'getLease' ? await TH.leaseOf('u1') : TH.deviceRecordOf('u1'))).to.be.true
+    })
+  }
+
+  it("discards nothing for no row, or a sound one", async () => {
+    const lease = await TH.leaseOf('u1')
+    const answers: Record<string, unknown> = { doGetLease: lease, doGetDeviceRecord: null }
+    const deviceDB = new ScriptedDeviceDB((hookname) => answers[hookname])
+    const scope = TH.scopeOf('u1')
+    expect(await TH.expectGood(deviceDB.getLease(scope))).to.deep.equal(lease)
+    expect(await TH.expectGood(deviceDB.getDeviceRecord(scope))).to.be.null
+    expect(deviceDB.calls).to.deep.equal(['doGetLease', 'doGetDeviceRecord'])
+  })
+
+  it("hands doRaiseDeviceRecord the raise as an updater, resolving what it returned", async () => {
+    let raisedFrom: ((stored: unknown) => DeviceRecord) | undefined
+    const stored = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 5 })
+    const deviceDB = new ScriptedDeviceDB((_hookname, args) => {
+      raisedFrom = args[1] as (stored: unknown) => DeviceRecord
+      raisedFrom(stored)
+    })
+    const raised = await TH.expectGood(deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 })))
+    expect(raised).to.deep.equal(stored)
+    expect(raisedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
+  })
+
+  it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
-    const err = await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => Promise.reject(blocked)), 'storage_blocked')
+    const deviceDB = new ScriptedDeviceDB(() => Promise.reject(blocked))
+    const err = await TH.expectBad(deviceDB.delDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.cause).to.eq(blocked)
     expect(err.message).to.match(/erasing its record of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
@@ -141,83 +235,28 @@ describe("deviceOutcomeOf", () => {
 
   for (const [thrown, refusalkind, blurb] of ThrownCases) {
     it(`says ${blurb} as '${refusalkind}', what was thrown its cause`, async () => {
-      const err = await TH.expectBad(deviceOutcomeOf('getLease', vi.fn<() => Promise<null>>().mockRejectedValue(thrown)), refusalkind)
+      const deviceDB = new ScriptedDeviceDB(vi.fn<() => Promise<never>>().mockRejectedValue(thrown))
+      const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), refusalkind)
       expect(err.cause).to.eq(thrown)
     })
   }
 
-  it("passes a VaultError through as it came", async () => {
-    const refusal = new VaultError('bad_scope', 'no such label')
-    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_scope')).to.eq(refusal)
-  })
-})
-
-describe("deviceTroubleAsConditions", () => {
-  it("passes a good Outcome through as it came", async () => {
-    const deviceDB = memoryDeviceDB()
-    await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
-    expect(await deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal({ ok: true, val: TH.deviceRecordOf('u1') })
-  })
-
-  it("passes a store's own refusal through as it came", async () => {
-    const deviceDB = memoryDeviceDB()
-    const refusal = new VaultError('storage_blocked', 'no room')
-    vi.spyOn(deviceDB, 'getLease').mockResolvedValueOnce(TH.bad(refusal))
-    const passed = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_blocked')
+  it("passes a VaultError the store throws through as it came", async () => {
+    const refusal = new VaultError('not_permitted', 'This device may not read its records.')
+    const deviceDB = new ScriptedDeviceDB(() => { throw refusal })
+    const passed = await TH.expectBad(deviceDB.delDeviceRecord(TH.scopeOf('u1')), 'not_permitted')
     expect(passed).to.eq(refusal)
   })
 
-  it("says a bad Outcome whose err is no VaultError as a condition, that err its cause", async () => {
-    const deviceDB = memoryDeviceDB()
-    const trouble = new Error('the disk said no')
-    vi.spyOn(deviceDB, 'delLease').mockResolvedValueOnce({ ok: false, err: trouble } as unknown as Awaited<ReturnType<DeviceDB['delLease']>>)
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).delLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(err.cause).to.eq(trouble)
-  })
-
-  const NotOutcomes = [
-    // what a store written before its verbs resolved Outcomes might answer:
-    [undefined,           'nothing at all'],
-    [null,                'a bare null, as a lease absent'],
-    [{ format: 'x' },     'a bare record'],
-  ] as const
-
-  for (const [answer, blurb] of NotOutcomes) {
-    it(`refuses an answer that is no Outcome -- ${blurb} -- as 'bad_option', naming the verb`, async () => {
-      const deviceDB = memoryDeviceDB()
-      vi.spyOn(deviceDB, 'getLease').mockResolvedValueOnce(answer as unknown as Awaited<ReturnType<DeviceDB['getLease']>>)
-      const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'bad_option')
-      expect(err.message).to.include('getLease')
-    })
-  }
-
   it("never rejects, even for a store that throws before its promise", async () => {
-    const deviceDB = memoryDeviceDB()
-    vi.spyOn(deviceDB, 'delAll').mockImplementationOnce(() => { throw new Error('thrown at once') })
-    await TH.expectBad(deviceTroubleAsConditions(deviceDB).delAll(), 'storage_unavailable')
-  })
-
-  it("says a failing store reading its device record as 'storage_unavailable', as its first example shows", async () => {
-    const deviceDB = memoryDeviceDB()
-    vi.spyOn(deviceDB, 'getDeviceRecord').mockRejectedValueOnce(new Error('the disk said no'))
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(err.message).to.match(/failed reading its record of this vault/)
-  })
-
-  it("says site data blocked as 'storage_blocked', the store's error its cause, as its second example shows", async () => {
-    const deviceDB = memoryDeviceDB()
-    const blocked = new DOMException('The operation is insecure.', 'SecurityError')
-    vi.spyOn(deviceDB, 'getDeviceRecord').mockImplementationOnce(() => { throw blocked })
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-    expect(err.cause).to.eq(blocked)
-    expect(err.message).to.match(/will not help until that changes/)
+    const deviceDB = new ScriptedDeviceDB(() => { throw new Error('thrown at once') })
+    await TH.expectBad(deviceDB.delAll(), 'storage_unavailable')
   })
 
   it("names no scope in what it says", async () => {
-    const deviceDB = memoryDeviceDB()
     const scope: VaultScope = { applabel: 'acme', user_id: 'distinctive_user', vaultlabel: 'main' }
-    vi.spyOn(deviceDB, 'getDeviceRecord').mockRejectedValueOnce(new Error('no'))
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getDeviceRecord(scope), 'storage_unavailable')
+    const deviceDB = new ScriptedDeviceDB(() => Promise.reject(new Error('no')))
+    const err = await TH.expectBad(deviceDB.getDeviceRecord(scope), 'storage_unavailable')
     expect(err.message).not.to.include('distinctive_user')
   })
 })

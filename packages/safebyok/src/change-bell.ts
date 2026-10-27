@@ -1,11 +1,11 @@
-import { DefaultLogger, asError } from './logger'
-import { reportToPlatform } from './report-error'
-
 /** The change bell: how a write to a store in this browser tells every listener, in this tab and every other tab of the origin.
  * Import it whole: `import { ChangeBell } from 'safebyok/idb'`. A bell carries nothing, so a
  * listener reads again. Each listener hears a ring once. A store of your own over IndexedDB rings
  * a bell of its own name. A bell never holds a Node or Bun process open.
  */
+
+import { DefaultLogger, asError } from './logger'
+import { reportToPlatform } from './report-error'
 
 const listenersByBell = new Map<string, Set<() => void>>()
 const channels = new Map<string, BroadcastChannel>()

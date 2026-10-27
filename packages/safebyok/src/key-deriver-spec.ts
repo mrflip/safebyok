@@ -68,7 +68,7 @@ export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown
   }
 }
 
-/** Run `keyDeriver`'s `load`, if it has one: what `bank.hello()` does before any vault is born. Its failure is 'unexpected_error', what it threw the cause, as a load hears no passphrase.
+/** Run `keyDeriver`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause, as a load hears no passphrase.
  *
  * @example await loadKeyDeriver(argon2idWebV1Deriver)   // resolves at once: it carries no load
  */
@@ -80,7 +80,7 @@ export const loadKeyDeriver = async (keyDeriver: Pick<KeyDeriver, 'load'>): Prom
   }
 }
 
-/** Refuse 'bad_option' for a passphraseSalt that is not `spec.salt_bytes` long, never quoting it: a deriver's check before it derives.
+/** Refuse 'bad_option' for a passphraseSalt that is not `spec.salt_bytes` long, never quoting it. Call it in a deriver before it derives.
  * So a damaged stored salt fails with a kind, not as the library's plain Error.
  *
  * @example checkSaltFits(Argon2idWebV1, randomBytes(16))  // returns
@@ -92,16 +92,16 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
   }
 }
 
-/** What a refusal of a spec says, whichever field failed: every field and what it must be, quoting nothing handed in. */
+/** The message of a spec's refusal, whichever field failed: every field and what it must be, quoting nothing handed in. */
 const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algorithm 'argon2id', the one key derivation function safebyok runs; key_deriver_label, a non-empty string of your own choosing; memory_kib, a whole number of KiB, at least 8 for each lane and at most 1048576 (1 GiB); iterations, a whole number of passes, at least 1 and below 2^32; parallelism, a whole number of lanes, at least 1; salt_bytes, a whole number of bytes from 8 to 65536; and output_bytes, 32, as the passphraseKey is a 256-bit key."
 
-/** `candidate` as a KeyDeriverSpec Argon2id can run, holding nothing but a spec's fields: the check for another Argon2id implementation to make.
- * `argon2idDeriver` makes it, and so does `Bank.make` of a deriver declaring `algorithm: 'argon2id'`.
+/** `candidate` as a KeyDeriverSpec Argon2id can run, holding nothing but a spec's fields. Check a spec through it in another Argon2id implementation.
  * Weak parameters that run are allowed: choosing them is the host's call.
  *
  * It refuses 'bad_option' for a spec Argon2id cannot run, in one sentence saying what each field
  * must be: a salt under 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes,
- * no lanes, or a key other than 32 bytes. It refuses as {@link checkSuppliedSpecKept} does a label safebyok reserves.
+ * no lanes, or a passphraseKey other than 32 bytes. It refuses a label safebyok reserves as
+ * {@link checkSuppliedSpecKept} does.
  *
  * @example
  *   const spec = parseKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
@@ -123,5 +123,5 @@ export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec =
 /** The label prefix that marks a deriver made cheap for tests, which no vault of real secrets should use. */
 export const TestLabelPrefix = 'test_'
 
-/** What `Bank.make` warns through the logger when the keyDeriver's label begins {@link TestLabelPrefix}. */
+/** The warning `Bank.make` logs when the keyDeriver's label begins {@link TestLabelPrefix}. */
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."

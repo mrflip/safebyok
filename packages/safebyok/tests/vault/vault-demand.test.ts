@@ -46,7 +46,7 @@ describe("what the vault makes things under", () => {
 // == [The demand]: vault.demandConsistentWith, vault.consistentWith
 
 describe("vault.demandConsistentWith", () => {
-  it("passes a box the vault handed out while the vault stands, as its first example shows", async () => {
+  it("passes a box the vault handed out while the vault has not moved on, as its first example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -148,7 +148,7 @@ describe("vault.demandConsistentWith", () => {
 })
 
 describe("vault.consistentWith", () => {
-  it("answers the demand's question without refusing: true while the thing stands, false once the vault moved on", async () => {
+  it("answers the demand's question without refusing: true while the thing is current, false once the vault moved on", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const madeUnder = TH.cheatGetVaultEpoch(vault)
@@ -383,7 +383,7 @@ describe("vault.lock, at once", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("lands on the gating standing before it returns: lockLanded settles, and every caller waiting refuses 'vault_locked'", async () => {
+  it("lands on the pending gating before it returns: lockLanded settles, and every caller waiting refuses 'vault_locked'", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
