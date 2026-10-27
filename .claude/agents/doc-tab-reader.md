@@ -1,6 +1,6 @@
 ---
 name: doc-tab-reader
-description: Fetches a tab of a Claude Doc, given its claude.ai/artifact URL, as a markdown file in the scratchpad, and reports the path, size and outline. Fetches only; the caller reads. For reading a doc, not editing it.
+description: Fetches a tab of a Claude Doc, given its claude.ai/artifact URL (the tab is the #fragment), as a markdown file in the scratchpad, and reports the path, byte count and outline. Fetches only, and reliably; the caller greps the file, reads only the lines it needs, and keeps questions about the content for itself (haiku misreads). The caller never `read`s the doc (its XML costs far more) or `export`s it (base64 to retype). The markdown drops diagrams, charts, highlights and comment anchors; the report says where. For reading a doc, not editing it: editing loads the docs skill.
 tools: Bash, ToolSearch, mcp__claude_ai_Claude_Docs__export, mcp__claude_ai_Claude_Docs__read
 model: haiku
 ---
