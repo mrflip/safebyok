@@ -538,6 +538,14 @@ is gone, and no longer catches a change to the ways in. Reuse `keptIfSame` (vaul
 `bank.snapshot.vaults`. `Bank`'s `getSnapshot`/`subscribe` are prototype getters already (thread
 11); the bank's status is `#libs.status` (`made | starting | timely | refused`, thread 7). **Depends on:** thread 12, merged: cut from `origin/main`. **Size:** medium.
 
+*Review:* medium, `clean`: filed as [#286](https://github.com/mrflip/safebyok/pull/286). The worker's
+`#relist` stands in for `keptIfSame` (exact by construction; JSON cannot tell two refusals of one
+kind apart), accepted. Left: `useVault`'s example and the README's first `VaultPanel` say
+"Opening your vault…" for `null`, which also means refused (to thread 15); `HeldEntry` keeps
+`vault` and `view.lifecycle` in step by convention; `frozenBankVault`/`refusedBankVault` repeat
+one body; three hooks for one vault mean three subscriptions; no VOCABULARY rows for `BankVault`,
+the listing or `lifecycle` (an Open Matter); `useListed` is named for a read but asks.
+
 ### 14. Refusals say less; validators go public -- `rulings`
 
 *Orchestrator:* no Coach text of its own. The Coach's rulings in the sprint doc on 2026-10-26
@@ -574,7 +582,7 @@ sifts broken input to explain it.
 * **Adapters' box rows unbranded.** What an adapter hands `splitStoredBoxes` is the unbranded
   input type, so no adapter casts.
 
-**Depends on:** thread 13. **Size:** medium to large; if the Convex import runs long, file what
+**Depends on:** thread 13: cut from its tip, stacked on #286. **Size:** medium to large; if the Convex import runs long, file what
 is done and say so: it becomes its own thread.
 
 ### 15. Names and small rulings -- `tidy`
@@ -609,7 +617,7 @@ on the sprint doc's Cleanup tab.
   simultaneous initialization or requests arriving in the same event loop", `export function
   nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }`. Use it for the
   `await Promise.resolve()` in `bank.ts` (about line 464), whose comment says why it waits.
-* **Small leftovers:** `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
+* **Small leftovers:** `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
   `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
