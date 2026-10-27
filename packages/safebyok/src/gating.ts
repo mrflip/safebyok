@@ -420,9 +420,9 @@ export class RaisedGating implements ProvingGating {
   /** Grant the lease by `proving` once a change to the ways in has landed.
    * For `putWayin` and `delWayin`, a grant the device store refuses is logged as a warning, never
    * thrown as though the change had not landed. For `ensureUnlocked`, whose promise is an unlocked
-   * vault, that refusal is thrown, saying the passphrase was set. A grant a lock or a decline
-   * stopped ('gating_landed'), or the vault moving on, throws for every call: the gating is over,
-   * and its waiters heard so already.
+   * vault, it refuses with that refusal's kind, saying the passphrase was set. A grant a lock or a
+   * decline stopped ('gating_landed'), or the vault moving on, throws for every call: the gating is
+   * over, and its waiters heard so already.
    */
   async #grantAfterChange(proving: Proving): Promise<void> {
     try {
