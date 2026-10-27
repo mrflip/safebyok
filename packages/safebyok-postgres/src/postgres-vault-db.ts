@@ -1,7 +1,7 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultReadResponse, VaultRecord, VaultDraft } from 'safebyok'
 import * as Columns from './columns'
-import { VaultRowColumns, ListedBoxColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
+import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
 
 /** What this VaultDB needs of a Postgres driver: one statement, its parameters numbered `$1` on, and the rows it returns.
@@ -116,7 +116,7 @@ const BoxParamsFrom = 6
 // statement here, and each box's columns are as `selected` reads them, but its bigints, which JSON
 // carries as exact whole numbers.
 const VaultBoxesJsonSql = (vaultRow: string) => `(SELECT COALESCE(json_agg(listed), '[]'::json)::text FROM (
-    SELECT ${Columns.jsonSelected(ListedBoxColumns)} FROM safebyok_boxes WHERE ${ScopeIs} AND vault_tok = ${vaultRow}.vault_tok
+    SELECT ${Columns.jsonSelected(BoxSparseColumns)} FROM safebyok_boxes WHERE ${ScopeIs} AND vault_tok = ${vaultRow}.vault_tok
   ) AS listed) AS boxes`
 
 // The vault record and its boxes, from one snapshot: no write lands between the two reads.
@@ -481,11 +481,11 @@ const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user
 
 /** A vault as a statement read it, its vault record's columns beside its boxes as JSON text: the vault record as stored, and its boxes split, each under its own boxlabel column. */
 const storedVaultOf = (row: unknown): VaultReadResponse => {
-  const listed = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
+  const sparseBoxes = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
   return {
     // A row goes up as stored, whatever its cells hold: the base class judges the record, and the split each box.
     vault: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)) as VaultReadResponse['vault'],
-    ...splitStoredBoxes(listed.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, ListedBoxColumns) }))),
+    ...splitStoredBoxes(sparseBoxes.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, BoxSparseColumns) }))),
   }
 }
 

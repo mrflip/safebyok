@@ -17,6 +17,7 @@ import { reportToPlatform } from './report-error'
 import { type BankVaultOpts, type MakeBankOpts, type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
+import { nextMicrotask } from './helpers'
 import { type VaultDB, byCodeUnit } from './vault-db'
 
 // == [Public types]: BankVault, BankSnapshot
@@ -483,7 +484,7 @@ export class Bank {
     // Begun a microtask on, so the birth is held before anything is published -- the entry's
     // 'starting', or the bank's as the birth says hello: a listener asking for the vault as it
     // hears either joins this birth, rather than beginning another from inside this one.
-    await Promise.resolve()
+    await nextMicrotask()
     // Let go in the task that asked for it -- a React StrictMode rehearsal, say: nothing is read.
     if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
     const born = await outcomeOf(() => this.#bear(vaultScopepath, parts), unexpectedError)

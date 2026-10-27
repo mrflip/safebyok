@@ -19,7 +19,7 @@ export type GateWayins = { passphrase: PassphraseWayin, passkey: PasskeyWayin | 
  * spread, JSON or a log line shows what it was made under (the scope, `vault_tok` and its epochs)
  * and its wayins' visible fields.
  *
- * @example const next = Gate.make(vault, { base: Gate.of(vault, vaultRecord, { keyDeriver }), passphrase: wayin, passkey: null })
+ * @example const next = Gate.make(vault, { base: Gate.of(vaultRecord, { keyDeriver }), passphrase: wayin, passkey: null })
  * @example next.gate_epoch === next.base_epoch + 1   // true
  */
 export class Gate {
@@ -58,21 +58,21 @@ export class Gate {
    * @example Gate.make(vault, { base: null, ...await passphraseProving.sealWayins() })   // gate_epoch 1
    * @example Gate.make(vault, { base, passphrase: base.passphrase, passkey: null })      // base.gate_epoch + 1
    */
-  static make(vault: VaultStamp, props: { base: Gate | null } & GateWayins): Gate {
-    const vaultTok = props.base?.vault_tok ?? vault.vault_tok
-    if (props.passphrase.vault_tok !== vaultTok || (props.passkey !== null && props.passkey.vault_tok !== vaultTok)) {
+  static make(vault: VaultStamp, given: { base: Gate | null } & GateWayins): Gate {
+    const vaultTok = given.base?.vault_tok ?? vault.vault_tok
+    if (given.passphrase.vault_tok !== vaultTok || (given.passkey !== null && given.passkey.vault_tok !== vaultTok)) {
       throw new VaultError('bad_option', "A gate's wayins are sealed for the vault it lets into: seal them under its vault_tok.")
     }
-    return new Gate(vault, vaultTok, props.base?.gate_epoch ?? 0, { passphrase: props.passphrase, passkey: props.passkey })
+    return new Gate(vault, vaultTok, given.base?.gate_epoch ?? 0, { passphrase: given.passphrase, passkey: given.passkey })
   }
 
-  /** The gate `vaultRecord` holds, as stored, of `vault`: its base one epoch below, its wayins judged by `kit.keyDeriver`, the vault's.
+  /** The gate `vaultRecord` holds, as stored: its scope and `vault_tok` the record's, its base one epoch below, its wayins judged by `kit.keyDeriver`, the vault's.
    *
-   * @example Gate.of(vault, vaultRecord, { keyDeriver }).gate_epoch === vaultRecord.gate_epoch   // true
+   * @example Gate.of(vaultRecord, { keyDeriver }).gate_epoch === vaultRecord.gate_epoch   // true
    */
-  static of(vault: VaultStamp, vaultRecord: GatedVaultRecord, kit: { keyDeriver: KeyDeriver }): Gate {
+  static of(vaultRecord: GatedVaultRecord, kit: { keyDeriver: KeyDeriver }): Gate {
     const { gate } = vaultRecord
-    return new Gate(vault, vaultRecord.vault_tok, vaultRecord.gate_epoch - 1, {
+    return new Gate(vaultRecord, vaultRecord.vault_tok, vaultRecord.gate_epoch - 1, {
       passphrase: Wayin.make(vaultRecord, gate.passphrase, kit),
       passkey:    gate.passkey === null ? null : Wayin.make(vaultRecord, gate.passkey, kit),
     })
@@ -80,7 +80,7 @@ export class Gate {
 
   /** True when `vaultRecord` holds this gate: its epoch, and each of its wayins' records.
    *
-   * @example Gate.of(vault, vaultRecord, { keyDeriver }).isHeldBy(vaultRecord)   // true
+   * @example Gate.of(vaultRecord, { keyDeriver }).isHeldBy(vaultRecord)   // true
    */
   isHeldBy(vaultRecord: Pick<VaultRecord, 'gate_epoch' | 'gate'>): boolean {
     if (! isGated(vaultRecord)) { return false }

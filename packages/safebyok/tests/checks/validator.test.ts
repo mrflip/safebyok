@@ -8,9 +8,9 @@ import * as TH from '../test-helpers'
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
 // kind, to show a validator nested in another refuses with the outer one's.
 const GateChecks = Validator('bad_option', ({ obj, str, uint }) => {
-  const passphraseWayinRecord = obj({ salt_b64: str.min(1), memory_kib: uint }).strict()
-  const gateRecord            = obj({ passphrase: passphraseWayinRecord }).strict()
-  return { passphraseWayinRecord, gateRecord }
+  const PassphraseWayinRecord = obj({ salt_b64: str.min(1), memory_kib: uint }).strict()
+  const GateRecord            = obj({ passphrase: PassphraseWayinRecord }).strict()
+  return { PassphraseWayinRecord, GateRecord }
 })
 
 const { bankScope, vaultScope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
@@ -19,15 +19,15 @@ const { bankScope, vaultScope } = Validator('bad_scope', ({ obj, applabel, user_
   return { bankScope, vaultScope }
 })
 
-const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
-  const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
-  const boxSparse = boxRecord.omit({ whisper_ciphered: true })
-  return { boxRecord, boxSparse }
+const { BoxRecord, BoxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
+  const BoxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
+  const BoxSparse = BoxRecord.omit({ whisper_ciphered: true })
+  return { BoxRecord, BoxSparse }
 })
 
-const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
-  const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
-  return { vaultRecord }
+const { VaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, GateRecord }) => {
+  const VaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: GateRecord.nullable() }).strict()
+  return { VaultRecord }
 }, [GateChecks])
 
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
@@ -48,26 +48,32 @@ describe("Validator", () => {
   })
 
   it("refuses an unknown field in a slice made in the call, as its second example shows", () => {
-    expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
-    const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
+    expect(BoxSparse.parse(sparse)).to.deep.equal(sparse)
+    const err = TH.expectSyncRefusal(() => BoxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
     expect(err.message).to.eq("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
-    TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
+    TH.expectSyncRefusal(() => BoxRecord.parse(sparse), 'bad_record')
   })
 
   it("spreads a module of validators into the kit, and a nested one refuses with the outer call's kind, as its third example shows", () => {
-    expect(vaultRecord.parse({ ...scope, gate_epoch: 1, gate })).to.deep.equal({ ...scope, gate_epoch: 1, gate })
-    expect(vaultRecord.parse({ ...scope, gate_epoch: 0, gate: null }).gate).to.be.null
-    const err = TH.expectSyncRefusal(() => vaultRecord.parse({ ...scope, gate_epoch: 1, gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
+    expect(VaultRecord.parse({ ...scope, gate_epoch: 1, gate })).to.deep.equal({ ...scope, gate_epoch: 1, gate })
+    expect(VaultRecord.parse({ ...scope, gate_epoch: 0, gate: null }).gate).to.be.null
+    const err = TH.expectSyncRefusal(() => VaultRecord.parse({ ...scope, gate_epoch: 1, gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
     expect(err.message).to.match(/^gate\.passphrase\.memory_kib: Too small/)
     expect(err.meta?.fieldnames).to.deep.equal(['gate.passphrase.memory_kib'])
   })
 
+  it("repeats the keys of a schema keyed by its input in the refusal, as its doc warns", () => {
+    const { Tagged } = Validator('bad_option', ({ label }) => ({ Tagged: Zod.record(Zod.string(), label) }))
+    const err = TH.expectSyncRefusal(() => Tagged.parse({ host_chosen_key: 'Not A Label' }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['host_chosen_key'])
+  })
+
   it("refuses a module's own validator with its own call's kind", () => {
-    TH.expectSyncRefusal(() => GateChecks.gateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_option')
+    TH.expectSyncRefusal(() => GateChecks.GateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_option')
   })
 
   it("names every failing field, each with its check's sentence, in the message and meta.fieldnames", () => {
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ applabel: 'Acme', user_id: 'a/b', vaultlabel: 'main', boxlabel: 'x', written_at: -1, whisper_ciphered: 'c' }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => BoxRecord.parse({ applabel: 'Acme', user_id: 'a/b', vaultlabel: 'main', boxlabel: 'x', written_at: -1, whisper_ciphered: 'c' }), 'bad_record')
     expect(err.message.split('; ').map((sentence) => sentence.split(':', 1)[0])).to.deep.equal(['applabel', 'user_id', 'boxlabel', 'written_at'])
     expect(err.meta?.fieldnames).to.deep.equal(['applabel', 'user_id', 'boxlabel', 'written_at'])
     expect(Object.isFrozen(err.meta?.fieldnames)).to.be.true
@@ -94,7 +100,7 @@ describe("Validator", () => {
 
   it("quotes no value it refuses, counts the fields it does not take, never naming one, and lists the fields it takes", () => {
     const secret = 'sk-live-0xSECRET'
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => BoxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
     expect(err.message).to.not.include('vault_key')
@@ -121,7 +127,7 @@ describe("Validator", () => {
 
   it("says Zod's English, never what a host's z.config error map would say, which could quote the input", () => {
     Zod.config({ customError: (issue) => `you sent ${String(issue.input)}` })
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, written_at: 'sk-live-0xSECRET', whisper_ciphered: 'c' }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => BoxRecord.parse({ ...sparse, written_at: 'sk-live-0xSECRET', whisper_ciphered: 'c' }), 'bad_record')
     expect(err.message).to.eq("written_at: Invalid input: expected number, received string")
   })
 
@@ -171,7 +177,7 @@ describe("Validator", () => {
   })
 
   it("leaves a slice made from a validator outside a call plain Zod, its parse throwing a ZodError", () => {
-    const outside = [bankScope.extend({ vaultlabel: Kit.vaultlabel }), boxRecord.pick({ applabel: true }), boxRecord.omit({ written_at: true }), vaultScope.strict(), vaultScope.optional()]
+    const outside = [bankScope.extend({ vaultlabel: Kit.vaultlabel }), BoxRecord.pick({ applabel: true }), BoxRecord.omit({ written_at: true }), vaultScope.strict(), vaultScope.optional()]
     for (const slice of outside) {
       expect(() => slice.parse({ applabel: 'Acme' })).to.throw(Zod.ZodError)
     }

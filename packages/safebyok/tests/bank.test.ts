@@ -268,7 +268,7 @@ describe("bank.ensureVault", () => {
     const world = makeWorld()
     const vault = await bankIn(world).ensureVault(Main)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(0)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(0)
     expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.include({ vault_tok: vault.vault_tok, gate_epoch: 0, gate: null })
     const bornAs = vault.vault_tok
     await TH.unlock(vault, 'pw')
@@ -281,7 +281,7 @@ describe("bank.ensureVault", () => {
     const maker = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const vault = await bankIn(world).ensureVault(Main)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(vault.getSnapshot()).to.deep.include({ vault_tok: maker.vault_tok })
   })
 
@@ -455,7 +455,7 @@ describe("a vault served behind this device's record", () => {
     await bank.clearCachedVault(Main)
     const vault = await bank.ensureVault(Main)
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
-    expect(TH.madeUnderOf(vault).vault_epoch).to.eq(olderEpoch)
+    expect(TH.cheatGetVaultEpoch(vault).vault_epoch).to.eq(olderEpoch)
     expect(await highestEpochOf(world)).to.eq(olderEpoch)
     expect(onBadNews).toHaveBeenCalledOnce()
   })
@@ -690,7 +690,7 @@ describe("this device's record of the vault", () => {
     for (const write of [() => TH.unlock(vault, 'pw'), async () => TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop')), () => TH.delWayin(vault, 'pw')]) {
       await write()
       seen.push(await highestEpochOf(world) ?? -1)
-      expect(seen.at(-1)).to.eq(TH.madeUnderOf(vault).vault_epoch)
+      expect(seen.at(-1)).to.eq(TH.cheatGetVaultEpoch(vault).vault_epoch)
     }
     expect(seen).to.deep.equal([1, 2, 3])
   })
@@ -729,7 +729,7 @@ describe("this device's record of the vault", () => {
     expect(await highestEpochOf(world)).to.eq(2)
     served.release()
     await TH.expectGood(refreshing)
-    expect(TH.madeUnderOf(otherTab).vault_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(otherTab).vault_epoch).to.eq(1)
     expect(await highestEpochOf(world)).to.eq(2)
   })
 })
@@ -757,7 +757,7 @@ describe("a vault deleted, and its next life", () => {
     expect(next).to.not.eq(vault)
     expect(TH.stateOf(next.snapshot)).to.eq('novel')
     expect(next.vault_tok).to.not.eq(vault.vault_tok)
-    expect(TH.madeUnderOf(next).vault_epoch).to.be.at.least(tombstoneEpoch)
+    expect(TH.cheatGetVaultEpoch(next).vault_epoch).to.be.at.least(tombstoneEpoch)
     expect(next.snapshot.boxes).to.have.lengthOf(0)
     expect(await highestEpochOf(world)).to.be.at.least(tombstoneEpoch)
   })

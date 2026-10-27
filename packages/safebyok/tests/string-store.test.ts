@@ -23,11 +23,11 @@ describe("memoryStore", () => {
     expect(store.read('greeting')).to.be.null
   })
 
-  it("lists every ckey it holds", () => {
+  it("lists every scopepath it holds", () => {
     const store = memoryStore()
     store.write('one', '1')
     store.write('two', '2')
-    expect(store.ckeys()).to.have.members(['one', 'two'])
+    expect(store.scopepaths()).to.have.members(['one', 'two'])
   })
 
   it("rings subscribers on write and erase, and unsubscribing silences them", () => {
@@ -64,7 +64,7 @@ const mapStorage = (): Storage => {
 }
 
 describe("domStore", () => {
-  it("files each ckey under its prefix, and sees only its own", () => {
+  it("files each scopepath under its prefix, and sees only its own", () => {
     const webStorage = mapStorage()
     const dbStore = domStore(webStorage, 'safebyok-demo:db:')
     const deviceStore = domStore(webStorage, 'safebyok-demo:device:')
@@ -72,10 +72,10 @@ describe("domStore", () => {
     deviceStore.write('other', 'there')
     expect(webStorage.getItem('safebyok-demo:db:greeting')).to.eq('hi')
     expect(dbStore.read('greeting')).to.eq('hi')
-    expect(dbStore.ckeys()).to.deep.equal(['greeting'])
+    expect(dbStore.scopepaths()).to.deep.equal(['greeting'])
     dbStore.erase('greeting')
     expect(webStorage.getItem('safebyok-demo:db:greeting')).to.be.null
-    expect(deviceStore.ckeys()).to.deep.equal(['other'])
+    expect(deviceStore.scopepaths()).to.deep.equal(['other'])
   })
 })
 

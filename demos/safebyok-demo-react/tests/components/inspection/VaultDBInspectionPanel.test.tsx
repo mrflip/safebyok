@@ -10,7 +10,7 @@ import * as TH from '../../test-helpers'
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
   outage.setDown(false)
-  for (const ckey of dbStore.ckeys()) { dbStore.erase(ckey) }
+  for (const ckey of dbStore.scopepaths()) { dbStore.erase(ckey) }
   await vaultDbInspector.wipe()
 })
 

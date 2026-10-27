@@ -332,7 +332,7 @@ import { Scopepath } from 'safebyok'
 Scopepath.vault(scope)                          // 'vault^acme^u1^main'
 Scopepath.box({ ...scope, boxlabel: 'openai' }) // 'box^acme^u1^main^openai'
 Scopepath.withinVaultScopepathPrefix(scope)     // 'box^acme^u1^main^' -- every box of the vault, by prefix scan or key range
-store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))  // every row under the vault's prefix, from a list of every key
+store.scopepaths().filter(Scopepath.withinVaultScopepathPred(scope))  // every row under the vault's prefix, from a list of every scopepath
 Scopepath.isBox(row) ? Scopepath.boxscope(row).boxlabel : null  // a listed row's boxlabel; null for a row no box is filed under
 ```
 
@@ -955,7 +955,7 @@ adapter. None of them quotes the record, its ciphertext or its sidecar.
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
 or the dev overlay (in React, `BankProvider` throws misuse from `Bank.make` to the nearest error
 boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's listing,
-which `useBankVault` hands down).
+which `useListedVault` hands down).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |

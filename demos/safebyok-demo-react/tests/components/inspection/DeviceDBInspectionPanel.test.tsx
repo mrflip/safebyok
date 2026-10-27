@@ -10,7 +10,7 @@ import * as TH from '../../test-helpers'
 
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
-  for (const ckey of deviceStore.ckeys()) { deviceStore.erase(ckey) }
+  for (const ckey of deviceStore.scopepaths()) { deviceStore.erase(ckey) }
   await deviceDbInspector.wipe()
 })
 
