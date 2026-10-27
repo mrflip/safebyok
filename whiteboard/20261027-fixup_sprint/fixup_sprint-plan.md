@@ -5,7 +5,8 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** threads 1 (#297) and 3 (#298) filed; thread 2 building, stacked on #297; threads 4 and 5 waiting.
+* **Status:** threads 1 to 3 filed and restacked into one line, main → #297 → #299 → #298 (top
+  `9b780d04`, justify green); thread 4 building on it; thread 5 waits for thread 4.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,

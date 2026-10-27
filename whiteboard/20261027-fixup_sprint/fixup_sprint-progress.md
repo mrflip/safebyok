@@ -54,8 +54,8 @@ alone writes this file.
   `parts.deviceDB`.
 * **For tests:** `safebyok/testing` has `TH.spyOnDeviceHook(deviceDB, verb)`. A DeviceDB's public
   verbs no longer reject, so a test that needs one to fail spies on its hook.
-* **`isOutcomeShaped` survives on #298,** because `adapterAnswer` still calls it on that branch.
-  The restack deletes it.
+* **`isOutcomeShaped` is gone:** the restack deleted it (`9b780d04`, on #298). notes/security.md
+  still named it; thread 4's sonnet subagent corrects that entry.
 * **This machine is slow:** a full `eslint src tests` hit a five-minute timeout, and attw once took
   21 minutes. While building, lint and test single files, and run `pnpm justify` once at the end.
 
@@ -78,3 +78,12 @@ alone writes this file.
     revised recommendation is no guard).
 * **The documentarian's `stash@{0}` is ignored.** Thread 5 is new: a documentarian run on the
   core's `src/`, split into three runs.
+
+## The restack, 2026-10-27
+
+*Orchestrator:*
+* **The line is main → #297 → #299 → #298.** Only #298 needed rebasing, onto #299, and it went
+  cleanly; one commit on top deletes `isOutcomeShaped`. `pnpm justify` is green at the top
+  (`9b780d04`: safebyok 3403 passed, 37 skipped). Pushed with a lease on the old tip.
+* **Thread 4 is cut from `9b780d04`.** Its handoff carries the security.md corrections (the
+  `deviceOutcomeOf` and `isOutcomeShaped` entries, and the length of thread 1's entry).
