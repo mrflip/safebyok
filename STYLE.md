@@ -304,12 +304,14 @@ keep the Zod parse beside them wherever it still does useful work.
 
 **Validators are made inside a `Validator(kind, kit => { ... }, sources?)` call**
 (`checks/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
-(`obj`, `arr`, `tuple`, `rec`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
+(`obj`, `arr`, `tuple`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
 ready made (`str`, `num`, `int`, `uint`, `bool`, `unk`), and the shared primitives (`label`,
 `user_id`, `epochMillis`, ...); and it wraps each schema it returns, so a failed `parse` throws a
 `VaultError` of the call's one `kind`, its message from `Phrases`. A maker the kit lacks comes in
 by a named import from `zod` beside the call, never the whole of Zod, which would carry every
-locale it ships into each host's bundle.
+locale it ships into each host's bundle. It has no record maker, on purpose: a refusal names a
+failing field by its path, and a record's keys in that path are the input's own. A value checked
+whole, as a CryptoKey or bytes of one length are, takes `custom`.
 
 ```ts
 export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
@@ -362,7 +364,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 rest, so a vault record, a Vault object or a bank's listing handed in as a scope comes out as just
 the scope.
 
-* A bag a person typed gets `strictObject`: stripping would quietly drop a misspelt option. So
+* A bag a person typed gets `obj({ ... }).strict()`: stripping would quietly drop a misspelt option. So
   does a stored record (`.strict()`): a field this version does not know is damage, or a newer
   `format`. A scope, taken out of whatever carries it, strips (`.strip()`).
 * **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is
@@ -419,8 +421,7 @@ the scope.
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
 * **A facet a type gains is a generic named for the facet**: `Lifecycled<OT>`, `Refused<OT>`,
-  `ConsistencyWith<OT>`, where the alternative is a slice named for its one consumer
-  (`LeaseVault`).
+  `ConsistencyWith<OT>`, where the alternative is a slice named for its one consumer.
 * **One name for one thing, everywhere** (*Naming*): a host-facing field takes its stored
   spelling.
 
@@ -673,7 +674,8 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
 ## Tree-shaking
 
 What a host's bundler can drop, measured on 30 validators of which 5 are used, with esbuild and
-rolldown, classic Zod and `zod/mini` alike:
+rolldown, classic Zod and `zod/mini` alike (measured when the choice was open; the core and the
+packages that use Zod are on classic Zod, as one host bundle holds one flavour):
 
 * An unannotated top-level validator is never dropped.
 * One `/* @__PURE__ */` before a chain is not enough. Annotate **every** call in the chain, or wrap
