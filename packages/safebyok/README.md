@@ -402,8 +402,8 @@ keep records by structured clone, never as JSON.
 import { openDB } from 'idb'
 import { Bank, DeviceDB, type DeviceRecord, type LeaseRecord } from 'safebyok'
 
-// The app's own database, with an object store set aside for safebyok's rows.
-const appDB = openDB('acme', 3, { upgrade: (db) => { db.createObjectStore('safebyok_device') } })
+// The app's own database, with an object store set aside for safebyok's rows from version 3 on.
+const appDB = openDB('acme', 3, { upgrade: (db, oldVersion) => { if (oldVersion < 3) { db.createObjectStore('safebyok_device') } } })
 
 class AcmeDeviceDB extends DeviceDB {
   protected async doGetLease(leaseScopepath: string) { return (await appDB).get('safebyok_device', leaseScopepath) }
