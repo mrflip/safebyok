@@ -857,7 +857,7 @@ export class Vault implements VaultStamp {
     if (this.#readRefused) { return 'refused' }
     return now - this.#readAt >= this.#staleMillis ? 'aged' : 'timely'
   }
-  /** The lease in hand while it has not ended by `now`, else null. Drops nothing: a call that finds it ended drops it. */
+  /** The lease in hand while it has not ended by `now`, else null. Drops nothing: an ended lease is dropped by its expiry, or by `#leaseRefusal` or `#ensureUnlocked` finding it. */
   #leaseInForce(now = this.#clockNow()): Lease | null {
     const held = this.#lease
     return held === null || held.endsBy(now) ? null : held
