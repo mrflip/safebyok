@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
 // --
 
-// == [Refusals]: unknownFields, moreFailures, WhisperBagShape
+// == [Refusals]: unknownFields, moreFailures, fieldsDisagree, BagNotObject, WhisperBagShape
 
 /** An object holding `count` fields it does not take, never named, as a name may be the caller's data, and the `fieldnames` it takes. */
 export const unknownFields = (count: number, fieldnames: readonly string[]): string => {
@@ -61,6 +61,12 @@ export const unknownFields = (count: number, fieldnames: readonly string[]): str
 
 /** How many more failures a refusal found than it names. */
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
+
+/** A bag holding `fieldnames` at other values than the bag it is checked against holds them. */
+export const fieldsDisagree = (fieldnames: readonly string[]): string => `This holds another ${fieldnames.join(' and ')} than what it is checked against: a field both hold must agree`
+
+/** A bag to check another against that is not an object. */
+export const BagNotObject = "What a bag is checked against is an object, holding the fields to compare"
 
 /** An object in a whisper or a sidecar that is not plain JSON. */
 export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map or a class's instance"

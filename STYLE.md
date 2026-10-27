@@ -380,9 +380,12 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   refusal only to prefix the call's name and say what to do (`optionsCheck`, `checkMakeBankOpts`).
   Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
   the value.
-* **A refusal never repeats its input: no value, and no key** (the Coach, 2026-10-26). A field an
-  object does not take is counted, and the refusal lists the fields it takes. No handler sifts
-  broken input to explain it: a catch only aligns the kind and attaches context.
+* **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
+  fields involved, in its message and `meta.fieldnames`: a field that failed its check, or that
+  disagrees with another bag (the Coach, 2026-10-27, loosening "no key" until the package is more
+  mature). A field an object does not take is still counted, not named, and the refusal lists the
+  fields it takes. No handler sifts broken input to explain it: a catch only aligns the kind and
+  attaches context.
 
 **To sanitize shape.** Destructure the fields you need from the parsed output: `obj` strips the
 rest, so a vault record, a Vault object or a bank's listing handed in as a scope comes out as just

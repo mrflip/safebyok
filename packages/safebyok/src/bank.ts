@@ -9,7 +9,7 @@ import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
 import type { BankScope } from './checks/core-checks'
 import type * as Z from 'zod'
-import { Validator } from './checks/validator'
+import { Validator, verifyConsistent } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
@@ -178,7 +178,7 @@ export class Bank {
    * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
    */
   demandConsistentWith(thing: Partial<BankScope>): void {
-    this.#demandSameScope(bankBag.parse(thing))
+    bankBag.parseConsistent(thing, this.#scope, { message: otherScopeSays })
   }
   // --
 
@@ -379,7 +379,7 @@ export class Bank {
   }
   // --
 
-  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, relist, vaultScopeOf, vaultPartsFor, demandSameScope
+  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, relist, vaultScopeOf, vaultPartsFor
 
   readonly #parts: ParsedBankOpts
   readonly #scope: BankScope
@@ -411,10 +411,9 @@ export class Bank {
     this.#publish()
   }
 
-  /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise. */
+  /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise, the comparison {@link Bank.demandConsistentWith} makes. */
   #vaultScopeOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultScope {
-    const { vaultlabel, ...names } = parseVaultBag(bag)
-    this.#demandSameScope(names)
+    const { vaultlabel } = verifyConsistent(parseVaultBag(bag), this.#scope, { kind: 'bad_scope', message: otherScopeSays })
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
 
@@ -423,11 +422,6 @@ export class Bank {
     return vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
   }
 
-  /** Refuse 'bad_scope' for `names`, already checked, holding an `applabel` or `user_id` other than the bank's: the one comparison of a bag's names with the bank's scope. */
-  #demandSameScope(names: Z.infer<typeof bankBag>) {
-    const others = CX.BankScopepathFieldnameVals.filter((fieldname) => names[fieldname] !== undefined && names[fieldname] !== this.#scope[fieldname])
-    if (others.length > 0) { throw otherScopeError(others) }
-  }
   // --
 
   // == [Starting]: initialize, loadThenSettle, setLibs
@@ -461,7 +455,7 @@ export class Bank {
   }
   // --
 
-  // == [Birth]: ensureEntry, bearEntry, settleBirth, bear, bearFrom, revokeLease, heardGone, letGoOf, setView
+  // == [Birth]: ensureEntry, bearEntry, settleBirth, bear, bearFrom, demandHeld, revokeLease, heardGone, letGoOf, setView
 
   /** The Vault object for `parts`' scope: the one held, the birth under way, or a birth begun now. A held one is handed out only to `parts` naming its stores: 'bad_option' otherwise. */
   #ensureEntry(parts: VaultParts): Promise<Vault> {
@@ -498,8 +492,8 @@ export class Bank {
     // hears either joins this birth, rather than beginning another from inside this one.
     await nextMicrotask()
     // Let go in the task that asked for it -- a React StrictMode rehearsal, say: nothing is read.
-    if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
-    const born = await outcomeOf(() => this.#bear(vaultScopepath, parts))
+    this.#demandHeld(vaultScopepath, entry)
+    const born = await outcomeOf(() => this.#bear(vaultScopepath, entry, parts))
     // Let go while it was born: the Vault object goes with it, and the caller hears so.
     if (this.#entries.get(vaultScopepath) !== entry) {
       if (born.ok) { born.val[letGo]() }
@@ -520,15 +514,17 @@ export class Bank {
     throw born.err
   }
 
-  /** One birth: the libraries loaded, one read of storage and this device's store, the judgment, the device record raised, and the Vault object born of it all.
+  /** One birth of `entry`: the libraries loaded, one read of storage and this device's store, the judgment, the device record raised, and the Vault object born of it all.
    * A birth refused for storage this device cannot trust ('identity_revoked', 'vault_behind': the
    * refusal policy's `lock`) revokes this device's lease of the scope, as a lock does, so the next
-   * birth asks for cleartext.
+   * birth asks for cleartext. After each wait it demands the entry is still held, so an entry let go
+   * meanwhile writes nothing more and is born no Vault object: 'vault_gone'.
    */
-  async #bear(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
+  async #bear(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
     valOf(await this.#initialize())
+    this.#demandHeld(vaultScopepath, entry)
     try {
-      return await this.#bearFrom(vaultScopepath, parts)
+      return await this.#bearFrom(vaultScopepath, entry, parts)
     } catch (err) {
       if (RefusalPolicy.decide(err) === 'lock') { await this.#revokeLease(parts) }
       throw err
@@ -541,21 +537,29 @@ export class Bank {
    * ({@link deviceRecordFor}): one that fails reads as none. Nothing is born below the record:
    * 'vault_behind'.
    */
-  async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
+  async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
     const { deviceDB } = parts
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
+    this.#demandHeld(vaultScopepath, entry)
     const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), deviceDB.getLease(scope)])
+    this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
     const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.raiseDeviceRecord(raising))) ?? raising
+    this.#demandHeld(vaultScopepath, entry)
     const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
+  }
+
+  /** Refuse 'vault_gone' once `entry` is no longer the one the bank holds for `vaultScopepath`: let go, or let go and asked for anew. What a birth asks after each wait. */
+  #demandHeld(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry) {
+    if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
   }
 
   /** Erase this device's lease of `parts`' scope, after a birth refused for storage it cannot trust: a device store that will not erase it is warned of, as the refusal is what the caller must hear. */
@@ -616,7 +620,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: vaultBag, bankBag, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
+// == [Helpers]: vaultBag, bankBag, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
 
 /** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
  * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
@@ -673,7 +677,7 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
 
 /** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault is stored, as a new life with a fresh `vault_tok`. */
 const draftOf = (scope: VaultScope, now: number): VaultDraft => {
-  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
+  const { applabel, user_id, vaultlabel } = scope
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 
@@ -681,8 +685,8 @@ const goneError = () => new VaultError('vault_gone', 'The app let this vault go 
 
 const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
 
-/** The refusal of a bag naming another app or user than the bank's, naming the fields that differ, never their values. */
-const otherScopeError = (fieldnames: readonly string[]) => new VaultError('bad_scope', `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`, { meta: { fieldnames } })
+/** What a bag naming another app or user than the bank's refuses 'bad_scope' saying, naming the fields that differ, never their values. */
+const otherScopeSays = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --

@@ -50,7 +50,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-27 (restyle sprint, thread 14, PR [#287](https://github.com/mrflip/safebyok/pull/287); the Coach's rulings 2026-10-26/27: "Is someone sifting
   through all the keys to find out why a strict mode error was thrown? If so ... remove that. Beware complicated logic in a handler." and "Do not
   make fine grained decisions on broken data, especially in an exception handler."): **no refusal repeats a key or value from its input; every
-  validator is public.**
+  validator is public.** (amended 2026-10-27 (parse_consistent): a refusal may now name fields, never values; see (9).)
   (1) A refusal made by a `Validator`-made schema (`packages/safebyok/src/checks/validator.ts`) names each failing field by its Zod issue path, with
   Zod's English sentence, forced through the parse's own error map whatever a host set with `z.config`. For fields an object does not take
   (`unrecognized_keys`), the error map says how many, and lists the fields the object *takes*, read from the schema's own shape (`issue.inst`),
@@ -84,6 +84,14 @@ added or folded into through the subagent, and no other entry changes.
   `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/idb-opts.ts`) is strict too, so
   `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
   `safebyok-indexeddb`'s options extend the core's.
+  (9) amended 2026-10-27 (parse_consistent, branch `20261027-parse_consistent`, stacked on PR #295; the Coach's loosening of STYLE.md's "a
+  refusal never repeats its input: no value, and no key" to "never a value", until the package is more mature): a refusal may now name the
+  fields involved, in its message and `meta.fieldnames`. A field an object does not take is still counted, not named. New: `verifyConsistent`,
+  `demandConsistent` and a validator's `parseConsistent` (`checks/validator.ts`) refuse naming the fields that disagree between two bags. This
+  applies to vault-db's checks of a stored vault record, a tombstone, a written vault record or box against the scope or write expected
+  (`damaged_vault`, `corrupt_record`), to `Lease.make`'s lease of another scope (`corrupt_record`), and to the bank's bag of another app or
+  user (`bad_scope`). The names compared are the parsed bag's own keys, which are schema field names where the first bag is a parse's
+  output; a caller handing an unparsed bag could put an input's own key into a refusal.
 * 2026-10-26 (restyle sprint, thread 11, branch `20261026-vault_object`, PR [#282](https://github.com/mrflip/safebyok/pull/282)): **a Vault object shows its
   stamp alone and is frozen; a Box shows more than it did; the key deriver is reachable through no Vault object.**
   (1) A Vault object's own enumerable fields are `format`, `applabel`, `user_id`, `vaultlabel`, `vault_tok` and `registered_at`, and the object is

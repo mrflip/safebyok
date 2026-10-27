@@ -87,7 +87,7 @@ export type LeasedSlice = VaultSlice & {
  * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
  * made under its stamp at vault epoch 1 and gate epoch 1, holding a lease granted at its clock's
  * time. Its demand is the vault's in small: `gone` is `vault_gone`; another scope or `vault_tok`
- * than its `madeUnder`'s, `vault_remade`; another `gate_epoch`, `gate_moved`; lease-bound, no
+ * than its `madeUnder`'s, `vault_remade`; another `gate_epoch`, or a `vault_epoch` ahead of it, `gate_moved`; lease-bound, no
  * lease or one ended by its clock, `vault_locked`. Its `tryLock` drops the lease and counts the call.
  *
  * @example const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
@@ -106,7 +106,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
       if (slice.gone) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
       const sameScope = (thing.applabel ?? madeUnder.applabel) === madeUnder.applabel && (thing.user_id ?? madeUnder.user_id) === madeUnder.user_id && (thing.vaultlabel ?? madeUnder.vaultlabel) === madeUnder.vaultlabel
       if (! sameScope || thing.vault_tok !== madeUnder.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
-      if ((thing.gate_epoch ?? madeUnder.gate_epoch) !== madeUnder.gate_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
+      if ((thing.gate_epoch ?? madeUnder.gate_epoch) !== madeUnder.gate_epoch || (thing.vault_epoch ?? madeUnder.vault_epoch) > madeUnder.vault_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
       if (opts?.leaseBound === true && (lease === null || lease.endsBy(slice.now()))) { throw new VaultError('vault_locked', 'The vault this test holds is locked.') }
     },
     tryLock: () => {
