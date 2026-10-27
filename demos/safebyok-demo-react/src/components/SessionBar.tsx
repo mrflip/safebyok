@@ -12,7 +12,7 @@ import { keepStorage } from '../lib/persist-storage'
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const vault = useVault('main')?.vault ?? null
+  const vault = useVault('main')
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 

@@ -834,7 +834,7 @@ describe("a new passphrase's strength", () => {
     const err = await TH.expectRefusal(bank.ensureVault(u1Main), 'unexpected_error')
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(err.cause).to.eq(lost)
-    expect(bank.status).to.eq('refused')
+    expect(bank.snapshot.lifecycle).to.eq('refused')
     const neverLoads = Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) })
     await TH.expectRefusal(world.open({ strengthChecker: neverLoads }), 'unexpected_error')
     const vault = await bank.ensureVault(u1Main)

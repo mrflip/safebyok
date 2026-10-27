@@ -809,7 +809,7 @@ export class Vault implements VaultStamp {
     this.vaultlabel = vaultlabel
     this.vault_tok = vaultTok
     this.registered_at = registered_at
-    this.#scope = parts.scope
+    this.#scope = CX.vaultScope.parse(parts)
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     this.#leaseMillis = parts.leaseMillis

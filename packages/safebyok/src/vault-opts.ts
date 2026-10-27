@@ -508,17 +508,19 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   return { applabel, user_id, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, maxWhisperBytes: limits.maxWhisperBytes, maxBoxes: limits.maxBoxes }
 }
 
-/** What each vault is made of: the bank's parts, its own scope and stores, and its limits as held to its own vaultDB. */
-export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'user_id' | 'strengthChecker' | 'maxBoxes'> & {
-  scope:            VaultScope
+/** What each vault is made of, frozen: the bank's parts, its own scope's names as fields of its own, its own stores, and its limits as held to its own vaultDB.
+ * It carries the scope flat, so it duck-types as one; a store is handed the scope picked out of it,
+ * never the parts.
+ */
+export type VaultParts = Readonly<Omit<ParsedBankOpts, 'strengthChecker' | 'maxBoxes'> & VaultScope & {
   strengthChecker:  GuardedStrengthChecker
   /** The most boxes the vault holds: `maxBoxes` as given, or its default, held to the vaultDB's own. */
   maxBoxes:         number
   /** The most bytes the vaultDB holds of the vault, in the finite form the vault keeps. */
   maxVaultBytes:    number
-}
+}>
 
-/** The parts of the vault in `scope`, a scope of `bank`'s checked by the bank, under `bank`, with its own options `opts` checked before storage is touched: 'bad_option' for anything amiss in them.
+/** The parts of the vault in `scope`, a scope of `bank`'s checked by the bank, under `bank`, frozen, with its own options `opts` checked before storage is touched: 'bad_option' for anything amiss in them.
  *
  * @example const { vaultDB } = vaultPartsOf(bank, scope, { vaultDB: workVaultDB })   // the work vault's own store, its limits held to it
  */
@@ -527,8 +529,8 @@ export const vaultPartsOf = (bank: ParsedBankOpts, scope: VaultScope, opts: Bank
   const vaultDB = checked.vaultDB === undefined ? bank.vaultDB : parseVaultDB(checked.vaultDB)
   const deviceDB = checked.deviceDB === undefined ? bank.deviceDB : parseDeviceDB(checked.deviceDB)
   const limits = limitsOf(vaultDB, bank)
-  const { applabel: _applabel, user_id: _user_id, maxBoxes: _maxBoxes, ...shared } = bank
-  return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), maxBoxes: limits.maxBoxes, maxVaultBytes: limits.maxVaultBytes }
+  const { applabel, user_id, vaultlabel } = scope
+  return Object.freeze({ ...bank, applabel, user_id, vaultlabel, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), maxBoxes: limits.maxBoxes, maxVaultBytes: limits.maxVaultBytes })
 }
 
 /** The box and byte limits a vault keeps over `vaultDB`: `given.maxBoxes`, or the default, held with `given.maxWhisperBytes` to what the adapter declares. */

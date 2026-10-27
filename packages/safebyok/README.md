@@ -81,7 +81,7 @@ or the call says otherwise) reads nothing anew; call `hello()` on `visibilitycha
 
 Each bank call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id`
 in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`);
-anything else in it is left out, so a Vault object, its snapshot or an entry's `scope` may be
+anything else in it is left out, so a Vault object, its snapshot or a vault the bank lists may be
 handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
 names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
 
@@ -92,12 +92,23 @@ those alone. Everything that changes -- its `gate`, `boxes`, `capacity`, `ask_pa
 event handler and it is current. React renders from `getSnapshot()`, the same object, and
 re-renders on `subscribe()`.
 
+The bank has a snapshot of its own, `bank.snapshot` (and `getSnapshot()`), frozen likewise. It
+sits flat on the bank's scope (`applabel`, `user_id`) beside its `lifecycle` -- `made`,
+`starting` while `hello()` loads, `ready`, or `refused` with its `err` -- and `vaults`, the
+listing: each vault asked for and not let go, sorted by `vaultlabel`, as its scope and its own
+`lifecycle` (`starting` while its birth reads storage, `ready`, or `refused` with its `err`). The
+listing holds no Vault object: `bank.vaultOf({ vaultlabel })` hands out the one the bank holds,
+null until it is `ready`, and `bank.bankVaultOf({ vaultlabel })` looks one vault's place in the
+listing up. The listing is the same array until a vault in it changes, and each of its elements
+the same object until it changes itself.
+
 ### The snapshot
 
 The snapshot carries what a host renders, and nothing more. It sits flat on the vault's scope
 (`applabel`, `user_id`, `vaultlabel`), so it may be handed to any bank call as it is, and carries
-the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it. Beside
-them:
+the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it: it
+checks the scope, the `vault_tok` and whether the Vault object is gone, and, as the snapshot holds
+no epochs, no longer catches a change to the ways in (`gate_moved`). Beside them:
 
 | field               | what it holds                                                                                      |
 |---------------------|----------------------------------------------------------------------------------------------------|
@@ -920,8 +931,8 @@ adapter. None of them quotes the record, its ciphertext or its sidecar.
 
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
 or the dev overlay (in React, `BankProvider` throws misuse from `Bank.make` to the nearest error
-boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's entry, which
-`useVault` hands down).
+boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's listing,
+which `useBankVault` hands down).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
@@ -997,7 +1008,8 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 `bank.ensureVault`, as it reads the vault from storage, can refuse with `storage_unavailable`,
 `not_permitted`, `identity_revoked`, `newer_format`, `vault_behind` or `damaged_vault` (a damaged
 box never stops it), and no Vault object is born: the refusal reaches its caller, the bad news
-among them `onBadNews` too, and the bank's entry for the vault keeps it (`bank.entryOf({ vaultlabel })`).
+among them `onBadNews` too, and the bank's listing keeps it: `bank.bankVaultOf({ vaultlabel })` is
+`refused`, the refusal its `err`.
 So can `storage_blocked`, from this device's own store or a vault store on it, which asking again
 will not mend. Ask with `bank.ensureVault` again to try again. Once born, a refused `hello()`
 leaves the Vault object as it was, its storage watch live, so the host calls `hello()` again, or

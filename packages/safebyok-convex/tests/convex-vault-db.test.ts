@@ -469,7 +469,8 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
       const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
       const bank = Bank.make(bankOpts)
       await TH.expectRefusal(bank.ensureVault({ vaultlabel }), 'identity_revoked')
-      expect(bank.entryOf({ vaultlabel })).to.deep.include({ status: 'refused', vault: null })
+      expect(bank.bankVaultOf({ vaultlabel })).to.deep.include({ lifecycle: 'refused' })
+      expect(bank.vaultOf({ vaultlabel })).to.be.null
       bank.closeVault({ vaultlabel })
       await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
     })

@@ -564,8 +564,8 @@ describe("Bank.make, by the Contract", () => {
 
   it("takes staleMinutes of zero, fractions and Infinity, and an onBadNews of null as none (Contract: Bank.make, Does 1)", () => {
     const world = makeWorld()
-    for (const staleMinutes of [0, 0.5, 30, Infinity]) { expect(Bank.make(bankOptsOf(world, { staleMinutes })).status).to.eq('made') }
-    expect(Bank.make(bankOptsOf(world, { onBadNews: null })).status).to.eq('made')
+    for (const staleMinutes of [0, 0.5, 30, Infinity]) { expect(Bank.make(bankOptsOf(world, { staleMinutes })).snapshot.lifecycle).to.eq('made') }
+    expect(Bank.make(bankOptsOf(world, { onBadNews: null })).snapshot.lifecycle).to.eq('made')
   })
 
   it("touches no storage, no device store, no timer and no prompt until a call asks (Contract: Bank.make, Guarantees)", async () => {
@@ -786,7 +786,7 @@ describe("the vault's snapshot, slice by slice (Contract: VaultSnapshot)", () =>
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const { snapshot } = vault
-    expect(TH.bankOf(vault).entryOf(snapshot)?.vault).to.eq(vault)
+    expect(TH.bankOf(vault).vaultOf(snapshot)).to.eq(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.not.throw()
     TH.closeVault(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.throw(VaultError)

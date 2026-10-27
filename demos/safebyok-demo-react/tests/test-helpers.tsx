@@ -142,7 +142,7 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
-  const vault = useVault('main')?.vault ?? null
+  const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   return (
     <p>

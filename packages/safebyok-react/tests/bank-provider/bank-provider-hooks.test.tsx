@@ -4,8 +4,8 @@ import { Bank, VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Activity, StrictMode, useLayoutEffect } from 'react'
 import { renderToString } from 'react-dom/server'
-import { BankProvider, useBank, useVault, useVaultSnapshot } from '../../src/bank-provider'
-import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, putThroughNewVault, unreachable, CatchingBoundary, hushConsole, VaultExample, BoxCount, countStoreCalls } from './world'
+import { BankProvider, useBank, useBankVault, useVault, useVaultSnapshot } from '../../src/bank-provider'
+import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, putThroughNewVault, unreachable, CatchingBoundary, hushConsole, VaultExample, BankVaultExample, BoxCount, countStoreCalls } from './world'
 
 /** Whether the provider above holds a bank. */
 const BankShown = () => <span>{useBank() === null ? 'no bank' : 'a bank'}</span>
@@ -14,7 +14,7 @@ describe("BankProvider", () => {
   // == [Hooks and lifecycle]: useBank, useVault, useVaultSnapshot, outside a provider, server render, StrictMode, onBadNews held
 
   describe("its hooks", () => {
-    it("hands down no entry while signed out, then the vault's, whose lock is a bare handler, as useVault's example shows", async () => {
+    it("hands down no Vault object while signed out, then the vault's, whose lock is a bare handler, as useVault's example shows", async () => {
       const world = makeWorld()
       const tree = (user_id: string | null) => <BankProvider {...world.props} user_id={user_id}><VaultExample /><Probe /></BankProvider>
       const { rerender } = render(tree(null))
@@ -25,6 +25,15 @@ describe("BankProvider", () => {
       expect(shownState()).to.eq('unlocked')
       fireEvent.click(screen.getByText('Lock'))
       await expectShown('locked')
+    })
+
+    it("hands down the vault as the bank lists it, none while signed out, then ready, as useBankVault's example shows", async () => {
+      const world = makeWorld()
+      const tree = (user_id: string | null) => <BankProvider {...world.props} user_id={user_id}><BankVaultExample /></BankProvider>
+      const { rerender } = render(tree(null))
+      expect(screen.getByText('Opening your vault…')).to.not.be.null
+      rerender(tree('u1'))
+      expect(await screen.findByText('Your vault is open.')).to.not.be.null
     })
 
     it("hands down no snapshot while signed out, then the vault's as it changes, as useVaultSnapshot's example shows", async () => {
@@ -38,13 +47,13 @@ describe("BankProvider", () => {
       expect(await screen.findByText('1 keys stored')).to.not.be.null
     })
 
-    it("hands down a damaged record as the entry's refusal, the very bad news told to onBadNews, and no vault; storage out of reach likewise", async () => {
+    it("hands down a damaged record as the listed vault's refusal, the very bad news told to onBadNews, and no vault; storage out of reach likewise", async () => {
       const damaged = await damagedWorld()
       const told: VaultError[] = []
       const grab = grabber()
       const { unmount } = render(<BankProvider {...damaged.props} user_id="u1" onBadNews={(news) => { told.push(news) }}><grab.Grab /></BankProvider>)
       await waitFor(() => { expect(grab.latest().err?.refusalkind).to.eq('damaged_vault') })
-      expect(grab.latest().entry?.status).to.eq('refused')
+      expect(grab.latest().bankVault?.lifecycle).to.eq('refused')
       expect(grab.latest().vault).to.be.null
       expect(told).to.deep.equal([grab.latest().err])
       unmount()
@@ -66,7 +75,7 @@ describe("BankProvider", () => {
       const { bank } = grab.latest()
       if (bank === null) { throw new Error('the provider held no bank') }
       expect(bank).to.be.an.instanceOf(Bank)
-      expect(bank.entryOf({ vaultlabel: 'main' })?.vault).to.eq(vault)
+      expect(bank.vaultOf({ vaultlabel: 'main' })).to.eq(vault)
       // The device has seen a later epoch than storage serves: a restore from an older copy.
       const scope = TH.scopeOf('u1')
       const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
@@ -86,7 +95,7 @@ describe("BankProvider", () => {
 
     it("each throws, rendered with no BankProvider above it, saying what it needs", () => {
       hushConsole()
-      const hooks = [['useBank', () => useBank()], ['useVault', () => useVault('main')], ['useVaultSnapshot', () => useVaultSnapshot('main')]] as const
+      const hooks = [['useBank', () => useBank()], ['useBankVault', () => useBankVault('main')], ['useVault', () => useVault('main')], ['useVaultSnapshot', () => useVaultSnapshot('main')]] as const
       for (const [hookname, useHook] of hooks) {
         const Lone = () => {
           useHook()
@@ -96,10 +105,10 @@ describe("BankProvider", () => {
       }
     })
 
-    it("renders on the server with no bank, no entry and no snapshot, as the client's first render has", () => {
-      const html = renderToString(<BankProvider {...makeWorld().props} user_id="u1"><BoxCount /><VaultExample /><BankShown /></BankProvider>)
+    it("renders on the server with no bank, no listed vault, no Vault object and no snapshot, as the client's first render has", () => {
+      const html = renderToString(<BankProvider {...makeWorld().props} user_id="u1"><BoxCount /><VaultExample /><BankVaultExample /><BankShown /></BankProvider>)
       expect(html).to.contain('no bank')
-      expect(html.match(/Opening your vault…/g)).to.have.lengthOf(2)
+      expect(html.match(/Opening your vault…/g)).to.have.lengthOf(3)
     })
   })
 

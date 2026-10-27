@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Scopepath, VaultError, delDamagedVault, isVaultError, label, localVaultDB, memoryDeviceDB } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
-import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, VaultExample, hushConsole, noop } from './world'
+import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, BankVaultExample, hushConsole, noop } from './world'
 
 /** What a store deaf to every write hands back for a subscribe: an unsubscribe from nothing. */
 const silence = () => { /* it never rang */ }
@@ -144,7 +144,7 @@ describe("BankProvider", () => {
       render(<BankProvider {...world.props} user_id="u1"><Grab /></BankProvider>)
       await gate.reached
       expect(latest().vault).to.be.null
-      expect(latest().entry?.status).to.eq('starting')
+      expect(latest().bankVault?.lifecycle).to.eq('starting')
       gate.release()
       const vault = await opened()
       expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
@@ -215,7 +215,7 @@ describe("BankProvider", () => {
       await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_behind') } })
       await expectShown('locked')
       expect(latest().vault).to.eq(shown)
-      expect(latest().entry?.status).to.eq('timely')
+      expect(latest().bankVault?.lifecycle).to.eq('ready')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
       expect(shown && TH.madeUnderOf(shown).gate_epoch).to.eq(2)
     })
@@ -255,7 +255,7 @@ describe("BankProvider", () => {
       await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_behind') } })
       await expectShown('locked')
       expect(latest().vault).to.eq(shown)
-      expect(latest().entry?.status).to.eq('timely')
+      expect(latest().bankVault?.lifecycle).to.eq('ready')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
     })
 
@@ -364,12 +364,12 @@ describe("BankProvider", () => {
       await expectShown('no vault')
     })
 
-    it("matches useVault's @example for a refusal: the refusal's message, in place", async () => {
+    it("matches useBankVault's @example for a refusal: the refusal's message, in place", async () => {
       const world = makeWorld()
       vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       render(
         <BankProvider {...world.props} user_id="u1">
-          <VaultExample />
+          <BankVaultExample />
         </BankProvider>,
       )
       const notice = await screen.findByText(/^Can't open your vault: /)
