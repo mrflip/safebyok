@@ -1,7 +1,6 @@
 import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag, vaultBag } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
-import { vaultScopeDuck } from './shapes/ducks'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, good, outcomeOf, valOf } from './outcome'
 import { randomId } from './crypto'
@@ -622,7 +621,7 @@ const parseVaultBag = (bag: unknown): VaultBag => {
     return vaultBag.parse(bag)
   } catch (err) {
     if (! isVaultError(err, 'bad_scope')) { throw err }
-    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like; a vault's own stores go in the second bag, its options. Name the vault of a Vault object or a BankVault by its label: { vaultlabel: vault.vaultlabel }.`, err.meta === undefined ? {} : { meta: err.meta })
+    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do.`, err.meta === undefined ? {} : { meta: err.meta })
   }
 }
 
@@ -657,7 +656,7 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
 
 /** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
 const draftOf = (scope: VaultScope, now: number): VaultDraft => {
-  const { applabel, user_id, vaultlabel } = vaultScopeDuck.parse(scope)
+  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 

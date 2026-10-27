@@ -1,6 +1,8 @@
+import 'fake-indexeddb/auto'
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
+import { LeaseStamp } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -116,7 +118,7 @@ describe("the vault record's shapes", () => {
   it("makes VaultSparse the record without its gate, as its example shows", () => {
     const sparse = VaultSparse.parse(omit(record, ['gate']))
     expect(Object.keys(sparse)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at', 'vault_epoch', 'gate_epoch'])
-    expect(VaultSparse.safeParse(record).success).to.be.false
+    expect(VaultSparse.parse(record), 'taken from the whole record, its gate left out').to.deep.equal(sparse)
   })
 
   it("makes VaultStamp the six fields fixed for the vault's life, never an epoch, as its example shows", () => {
@@ -237,3 +239,28 @@ describe("the named vault record types", () => {
   })
 })
 // --
+
+describe("the stamps, taken from whatever carries them", () => {
+  const record = TH.vaultRecordOf('u1')
+  const stamp = { format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at }
+
+  it("take a vault's stamp from its record, with and without its format, as VaultStampButFormat's example shows", () => {
+    expect(VaultStamp.parse(record)).to.deep.equal(stamp)
+    expect(VaultStampButFormat.parse(record)).to.deep.equal(omit(stamp, ['format']))
+  })
+
+  it("take a vault's stamp from a Vault object", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    expect(VaultStamp.parse(vault)).to.deep.equal(vault.stamp)
+    TH.closeVault(vault)
+  })
+
+  it("refuse 'bad_record' a stamp missing a field it binds", () => {
+    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
+  })
+
+  it("take a lease's stamp from its record, leaving out its key material", async () => {
+    const lease = await TH.leaseOf('u1')
+    expect(LeaseStamp.parse(lease)).to.deep.equal(omit(lease, ['lease_key', 'vault_key_lease_wrapped']))
+  })
+})

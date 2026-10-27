@@ -325,33 +325,43 @@ describe("bank.ensureVault", () => {
     const elsewhere = makeWorld()
     const births = [vi.spyOn(world.vaultDB, 'ensureVault'), vi.spyOn(elsewhere.vaultDB, 'ensureVault')]
     const bank = bankIn(world)
-    for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }, { ...Main, vaultDb: elsewhere.vaultDB }]) {
-      const refusal = await TH.expectRefusal(bank.ensureVault(bag), 'bad_scope')
-      expect(refusal.message).to.include("In the bag naming the vault: There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel")
-      expect(refusal.message).to.include("a vault's own stores go in the second bag").and.not.match(/vaultDB|deviceDB|vaultDb/u)
+    for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }]) {
+      const refusal = await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
+      expect(refusal.message).to.match(/^In the bag naming the vault: /u)
+      expect(refusal.message).to.include("A vault's stores go in the second bag, its options")
     }
     for (const birth of births) { expect(birth).not.toHaveBeenCalled() }
     expect(bank.vaults).to.deep.equal([])
   })
 
-  it("refuses 'bad_scope' a bag holding any field but its three names -- an option, a Vault object, its snapshot, its element of the bank's listing, its record -- the same from every call naming a vault", async () => {
+  it("names the vault by whatever carries its label -- a Vault object, its snapshot, its element of the bank's listing, its record, a bag with a stray field -- the same from every call naming a vault, as vaultBag's second example shows", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
     const [bankVault] = bank.vaults
     const record = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
-    const bags: unknown[] = [{ ...Main, leaseHours: 1 }, { ...Main, userId: 'u1' }, vault, vault.getSnapshot(), bankVault, record]
+    const bags: unknown[] = [vault, vault.getSnapshot(), bankVault, record, { ...Main, leaseHours: 1 }]
     for (const bag of bags) {
       const named = bag as typeof Main
-      await TH.expectRefusal(bank.ensureVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.reopenVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.clearCachedVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.delDamagedVault(named), 'bad_scope')
-      for (const lookup of [() => bank.vaultOf(named), () => bank.bankVaultOf(named), () => { bank.closeVault(named) }]) {
-        expect(lookup).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
-      }
+      expect(bank.vaultOf(named)).to.eq(vault)
+      expect(bank.bankVaultOf(named)).to.eq(bankVault)
+      expect(await bank.ensureVault(named)).to.eq(vault)
     }
-    expect(bank.vaultOf(Main)).to.eq(vault)
+    bank.closeVault(vault)
+    expect(bank.vaultOf(Main)).to.be.null
+  })
+
+  it("refuses 'bad_scope' a carrier naming another bank's user, from every call naming a vault", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const other = { ...TH.scopeOf('u2') }
+    await TH.expectRefusal(bank.ensureVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.reopenVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.clearCachedVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.delDamagedVault(other), 'bad_scope')
+    for (const lookup of [() => bank.vaultOf(other), () => bank.bankVaultOf(other), () => { bank.closeVault(other) }]) {
+      expect(lookup).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
+    }
   })
 
   it("refuses options naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to options naming its own", async () => {

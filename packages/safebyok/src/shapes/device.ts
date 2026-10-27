@@ -33,13 +33,13 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
 }))
 export type LeaseRecord = Z.infer<typeof LeaseRecord>
 
-/** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
+/** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
  * gate it was granted under. Its wrap's ctx holds the whole of it, beside its vault's stamp.
  *
  * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
  */
-export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }) }))
+export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }).strip() }))
 export type LeaseStamp = Z.infer<typeof LeaseStamp>
 
 /** A lease's sparse shape: the same fields as its {@link LeaseStamp}, as a lease is made once and never changed, named for what a log line or a listing shows. A Lease's own fields are these. */

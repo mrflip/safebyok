@@ -70,8 +70,8 @@ export type BoxDeletion = Z.infer<typeof BoxDeletion>
  * read for those fields alone.
  */
 export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
-  const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true }).strip()
-  const BoxGetExpectation = VaultSparse.pick({ vault_tok: true }).strip()
+  const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true })
+  const BoxGetExpectation = VaultSparse.pick({ vault_tok: true })
   return {
     VaultRecordExpectation,
     BoxGetExpectation,
@@ -144,6 +144,6 @@ export const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validato
 
 /** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */
 export const { StoredVaultTok } = Validator('bad_record', () => ({
-  StoredVaultTok: VaultSparse.pick({ vault_tok: true }).strip(),
+  StoredVaultTok: VaultSparse.pick({ vault_tok: true }),
 }))
 // --

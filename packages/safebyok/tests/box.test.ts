@@ -138,11 +138,11 @@ const OwnFields = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'vault_epoc
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("BoxSparse", () => {
-  it("is every field of the box record but its two ciphered ones, as its example shows, and refuses a whole record or one missing a field", () => {
+  it("is every field of the box record but its two ciphered ones, as its example shows, taken from a whole record, and refuses one missing a field", () => {
     const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = TH.boxOf('anthropic_api_key', 'a1')
     expect(BoxSparse.parse(listed)).to.deep.equal(listed)
     expect(Object.keys(BoxSparse.shape)).to.have.members(Object.keys(listed))
-    expect(BoxSparse.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success, 'a sparse box holds no ciphertext').to.be.false
+    expect(BoxSparse.parse(TH.boxOf('anthropic_api_key', 'a1')), 'taken from the record, its ciphertext left out').to.not.have.any.keys('box_key_wrapped', 'whisper_ciphered')
     expect(BoxSparse.safeParse(TH.omitting(listed, 'sidecar')).success).to.be.false
   })
 })

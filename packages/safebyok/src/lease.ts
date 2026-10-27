@@ -7,8 +7,7 @@ import { type Outcome, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { LeaseFormat, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
-import type { VaultSparse, VaultStamp } from './shapes/vault'
-import { type VaultStampButFormat, leaseStampDuck, vaultStampButFormatDuck } from './shapes/ducks'
+import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './shapes/fields'
 import { FarFuture } from './consts'
@@ -22,10 +21,9 @@ import type { Vault } from './vault'
  * the write to the device store are the vault's.
  */
 
-/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; and a box record's sparse fields, as {@link BoxSparse} has them. Each refuses 'bad_record'. */
-export const { LeaseGrant, VisibleShape } = Validator('bad_record', () => ({
-  LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
-  VisibleShape:        BoxSparse.strip(),
+/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold. It refuses 'bad_record'. */
+export const { LeaseGrant } = Validator('bad_record', () => ({
+  LeaseGrant: LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
 }))
 
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
@@ -35,7 +33,7 @@ export const { LeaseGrant, VisibleShape } = Validator('bad_record', () => ({
  * @example await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(vaultRecord, leaseRecord))
  */
 export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
-  cipherCtx([vaultStampButFormatDuck.parse(vaultStamp), leaseStampDuck.parse(leaseStamp)], 'vault_key_lease_wrapped')
+  cipherCtx([VaultStampButFormat.parse(vaultStamp), LeaseStamp.parse(leaseStamp)], 'vault_key_lease_wrapped')
 )
 
 /** The ctx one of a box's two ciphered fields is bound to: its vault's stamp but for the format, the box's own {@link BoxStamp}, and the purpose, which names the field.
@@ -47,7 +45,7 @@ export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseSta
  */
 export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
   const { sidecar, ...stamp } = BoxStamp.parse(boxStamp)
-  return cipherCtx([vaultStampButFormatDuck.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
+  return cipherCtx([VaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
 }
 
 /** Reads a lease's record from inside this module, for {@link leaseRecordOf}: set once, by the class's static block. */
@@ -160,7 +158,7 @@ export class Lease implements LeaseSparse {
     return await outcomeOf(async () => {
       const bytes = checkedBytes(serialized)
       try {
-        const header = checkedVisible(visible)
+        const header = BoxSparse.parse(visible)
         this.#demand()
         const vaultKey = await this.#vaultKeyOrNull('wrapKey')
         this.#demand()
@@ -195,7 +193,7 @@ export class Lease implements LeaseSparse {
   async tryDecipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Outcome<Uint8Array>> {
     return await outcomeOf(async () => {
       const sealed = checkedCiphered(ciphered)
-      const header = checkedVisible(visible)
+      const header = BoxSparse.parse(visible)
       this.#demand()
       const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
       this.#demand()
@@ -226,7 +224,7 @@ export class Lease implements LeaseSparse {
   async trySealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<Outcome<BoxRecord>> {
     return await outcomeOf(async () => {
       const sealing = checkSealProps(props)
-      const header = checkedVisible(visible)
+      const header = BoxSparse.parse(visible)
       const ciphered = valOf(await this.tryCipheredWith(sealing.whisper, header))
       return { ...header, ...ciphered }
     })
@@ -286,14 +284,6 @@ export const sealLeaseRecord = async (standing: VaultStampButFormat & Pick<Vault
 /** What an unwrapped boxKey may do: decipher, never be exported. */
 const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
-/** `visible`, once it is a box record's visible fields: 'bad_record' otherwise, quoting none of it. */
-const checkedVisible = (visible: unknown): BoxSparse => {
-  const checked = VisibleShape.safeParse(visible)
-  if (! checked.success) {
-    throw new VaultError('bad_record', "A lease ciphers and deciphers a box bound to that box's visible fields: every field of a box record but box_key_wrapped and whisper_ciphered, as Box.seal and box.extractWhisper hand them in.")
-  }
-  return checked.data
-}
 
 /** `ciphered`, once it is a box's two ciphered fields: 'bad_record' otherwise, quoting none of it. */
 const checkedCiphered = (ciphered: unknown): BoxCiphered => {

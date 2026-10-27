@@ -301,8 +301,8 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 
 /** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; what a box is made under must show, the vault's scope, the `vault_tok` and both epochs, every other field dropped unread; and what a seal is made with, the vault's epochs and the time. */
 export const { BaseShape, MadeUnderShape, SealedUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
-  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
-  const SealedUnderShape = VaultSparse.pick({ vault_epoch: true, gate_epoch: true }).strip()
+  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true })
+  const SealedUnderShape = VaultSparse.pick({ vault_epoch: true, gate_epoch: true })
   return {
     BaseShape: obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
     MadeUnderShape,

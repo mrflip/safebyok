@@ -4,10 +4,9 @@ import * as Zod from 'zod'
 import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
 import { BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel } from '../src/box'
-import { LeaseGrant, VisibleShape } from '../src/lease'
-import { PasskeyWayinHeader, PassphraseWayinHeader, passphraseCleartext, wayinkind } from '../src/shapes/vault'
+import { LeaseGrant } from '../src/lease'
+import { PasskeyWayinHeader, PassphraseWayinHeader, VaultStampButFormat, passphraseCleartext, wayinkind } from '../src/shapes/vault'
 import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
-import { VaultKin, bankScopeDuck, boxscopeDuck, leaseStampDuck, vaultScopeDuck, vaultStampButFormatDuck, vaultStampDuck } from '../src/shapes/ducks'
 import { CipheredShape, whisperBag } from '../src/shapes/box'
 import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
 import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
@@ -21,9 +20,8 @@ import { makeWorld } from './vault/world'
 
 /** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
 const InPackage = {
-  BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, VisibleShape, whisperBag,
+  BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, VaultStampButFormat, whisperBag,
   PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
-  VaultKin, bankScopeDuck, vaultScopeDuck, boxscopeDuck, vaultStampDuck, vaultStampButFormatDuck, leaseStampDuck,
   passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
   declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,
 }
@@ -107,7 +105,7 @@ describe("no refusal repeats its input", () => {
     const refusals = await Promise.all([
       bank.tryEnsureVault({ vaultlabel: Marker }),
       bank.tryEnsureVault({ vaultlabel: 'main', user_id: Marker }),
-      bank.tryEnsureVault({ vaultlabel: 'main', [Marker]: Marker } as { vaultlabel: string }),
+      bank.tryEnsureVault({ vaultlabel: 'main', vaultDB: Marker } as unknown as { vaultlabel: string }),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { [Marker]: Marker } as object),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { vaultDB: Marker } as unknown as object),
     ])

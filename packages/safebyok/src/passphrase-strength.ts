@@ -1,8 +1,7 @@
 import type * as Z from 'zod'
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
-import type { VaultScope } from './shapes/scopes'
-import { vaultScopeDuck } from './shapes/ducks'
+import { type VaultScope, vaultScope } from './shapes/scopes'
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
@@ -91,7 +90,7 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
  */
 export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
-  const told = vaultScopeDuck.parse(scope)
+  const told = vaultScope.parse(scope)
   const check = async (passphrase: string): Promise<PassphraseVerdict> => {
     if (! passphrase.trim()) { return BlankVerdict }
     let checked: ReturnType<typeof passphraseVerdict.safeParse>

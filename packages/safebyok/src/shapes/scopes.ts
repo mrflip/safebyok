@@ -4,6 +4,7 @@ import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
 import type { label, user_id } from '../checks/primitives'
+import { never } from 'zod'
 import { Validator } from '../checks/validator'
 
 export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from '../checks/primitives'
@@ -86,17 +87,19 @@ export const VaultScope = vaultScope
 // == [Bags]: vaultBag, bankBag, VaultBag, BankBag
 
 /** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
- * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
- * a store put there among them. `bankBag` judges a thing carrying a scope (a Vault object, a box,
- * an element of the bank's listing), so everything else the thing carries is left out.
+ * Each takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
+ * BankVault, and leaves the rest. A store in the bag naming the vault refuses: it belongs in the
+ * second bag, the options, and would be dropped unseen here.
  *
  * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
+ * @example vaultBag.parse(vault)                                           // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
  * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
  * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
  */
 export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
   const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
-  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }).strict() }
+  const store   = never(Phrases.StoreInVaultBag).optional()
+  return { bankBag, vaultBag: bankBag.extend({ vaultlabel, vaultDB: store, deviceDB: store }) }
 })
 
 /** The bag naming one of a bank's vaults, as {@link vaultBag} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.

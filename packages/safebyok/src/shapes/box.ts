@@ -114,12 +114,12 @@ export type BoxRecord = Z.infer<typeof BoxRecord>
 /** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
  * It holds nothing secret, and shows while the vault is locked: the sidecar is as storage holds it,
  * and only opening the box proves it unaltered. A record that fails its check never lists as one:
- * it is a {@link BoxDamaged}. Strict, as the record is.
+ * it is a {@link BoxDamaged}. Its `parse` takes it from a box or its record, leaving the rest.
  *
  * @example BoxSparse.parse(listed)   // { format, boxlabel, revision_tok, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at }
  */
 export const { BoxSparse } = Validator('bad_record', () => ({
-  BoxSparse: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }),
+  BoxSparse: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
 }))
 export type BoxSparse = Z.infer<typeof BoxSparse>
 
@@ -153,7 +153,8 @@ export type BoxDamaged = Z.infer<typeof BoxDamaged>
  * @example BoxStamp.parse({ ...sparse, vault_tok: box.vault_tok })   // sparse: box.record but its two ciphered fields
  */
 export const { BoxStamp } = Validator('bad_record', () => ({
-  BoxStamp: BoxSparse.extend({ vault_tok }),
+  // Strict: every field a box shows is bound, and one beside them would be shown but not bound.
+  BoxStamp: BoxSparse.extend({ vault_tok }).strict(),
 }))
 export type BoxStamp = Z.infer<typeof BoxStamp>
 

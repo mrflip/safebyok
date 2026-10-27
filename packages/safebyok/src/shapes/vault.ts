@@ -33,17 +33,19 @@ export type WayinKind = typeof WayinKindVals[number]
 export const PasskeySaltBytes = 32
 // --
 
-// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, headerOf, VaultDraft
+// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, headerOf, VaultDraft
 
 /** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves. Each `parse` refuses 'bad_record', quoting none of it.
  * Each record is strict: a field this version does not know is damage. A VaultDB reads each back
  * through these, and refuses what fails as 'damaged_vault'. Each shape is the record's own fields,
- * picked or left out, never a parallel list; a part's shapes nest as the part does.
+ * picked or left out, never a parallel list; a part's shapes nest as the part does. A shape taken
+ * out of whatever carries it strips the rest: a Vault object, its record or its snapshot passes as
+ * its stamp or its sparse shape.
  *
  * @example VaultRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
+export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
   const PassphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
@@ -105,8 +107,10 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
 
   const VaultRecord = vaultRecordFields.refine((record) => (record.gate === null) === (record.gate_epoch === 0), { error: Phrases.GateEpochAndGate, path: ['gate_epoch'] })
 
-  const VaultSparse = vaultRecordFields.omit({ gate: true })
-  const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true })
+  const VaultSparse = vaultRecordFields.omit({ gate: true }).strip()
+  const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true }).strip()
+  // Any format: a box and a lease bind their vault's stamp without it, so a new vault format leaves them open.
+  const VaultStampButFormat = VaultStamp.omit({ format: true })
   const VaultTombstone = vaultRecordFields.pick({ applabel: true, user_id: true, vaultlabel: true }).extend({ format: lit(TombstoneFormat), vault_epoch: int.positive() }).strict()
 
   const PassphraseWayinSparse = PassphraseWayinRecord.omit({ key_deriver_label: true, salt_b64: true, vault_key_wayin_wrapped: true })
@@ -116,7 +120,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
   const PassphraseWayinHeader = PassphraseWayinRecord.omit({ vault_key_wayin_wrapped: true })
   const PasskeyWayinHeader = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
 
-  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader }
+  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader }
 })
 
 /** A passphrase wayin as stored: the vaultKey wrapped under the passphraseKey the passphrase and this wayin's passphraseSalt make.
@@ -174,6 +178,12 @@ export type VaultSparse = Z.infer<typeof VaultSparse>
  */
 export type VaultStamp = Z.infer<typeof VaultStamp>
 
+/** A vault's stamp as what lies in it binds it: every field of its {@link VaultStamp} but the format, so a new vault format leaves each box and lease open.
+ *
+ * @example VaultStampButFormat.parse(vault)   // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
+ */
+export type VaultStampButFormat = Z.infer<typeof VaultStampButFormat>
+
 /** What a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: the vault's `vault_tok`, and whichever of its scope and epochs the thing carries.
  * A Box, a Lease, a Gate, a Proving, a snapshot and a vault record are each one. A field the
  * thing has of its own beside these, a box's `format` or `registered_at`, is no part of it.
@@ -187,7 +197,7 @@ export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
 
 /** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
 export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
-  VaultDraft: VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }),
+  VaultDraft: VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }).strict(),
 }))
 
 /** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, and `gate_epoch` 0.

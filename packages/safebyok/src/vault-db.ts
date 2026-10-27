@@ -7,7 +7,6 @@ import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone }
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './shapes/scopes'
-import { vaultScopeDuck } from './shapes/ducks'
 import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
@@ -712,7 +711,7 @@ type NameFacts = Pick<VaultDB, 'maxNameBytes'>
 
 /** `scope`, frozen, once each name passes its check and fits the backend: 'bad_scope' otherwise, quoting none of it. */
 const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
-  const asked = vaultScopeDuck.parse(scope)
+  const asked = CX.vaultScope.parse(scope)
   heldName(facts, 'applabel', asked.applabel)
   heldName(facts, 'user_id', asked.user_id)
   heldName(facts, 'vaultlabel', asked.vaultlabel)

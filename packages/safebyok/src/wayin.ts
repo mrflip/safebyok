@@ -1,8 +1,7 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
+import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './shapes/fields'
-import { vaultStampDuck } from './shapes/ducks'
 
 /** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
  * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one
@@ -27,7 +26,7 @@ const PurposeForWayinkind = {
  * @example await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vaultRecord, header))
  */
 export const wayinCtxOf = (vaultStamp: VaultStamp, header: WayinHeader): Uint8Array => (
-  cipherCtx(vaultStampDuck.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
+  cipherCtx(VaultStamp.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
 )
 
 /** A frozen copy of `record`, its wrap frozen with it: what a wayin holds as its `record`. */
@@ -67,7 +66,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   protected constructor(vaultStamp: VaultStamp, record: RecordT, kit: { keyDeriver: KeyDeriver }) {
     this.#record = frozenRecord(record)
     this.#keyDeriver = kit.keyDeriver
-    this.#vaultStamp = Object.freeze(vaultStampDuck.parse(vaultStamp))
+    this.#vaultStamp = Object.freeze(VaultStamp.parse(vaultStamp))
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at

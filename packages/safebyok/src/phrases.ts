@@ -44,6 +44,12 @@ export const InstantNotWhole = "An instant is whole epoch milliseconds"
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
 // --
 
+// == [Bags]: StoreInVaultBag
+
+/** Why a store in the bag naming a vault refuses: it goes in the second bag, the options. */
+export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
+// --
+
 // == [Passphrases]: PassphraseNotText
 
 /** A passphrase handed over as anything but text. */
