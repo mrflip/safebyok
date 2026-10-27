@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good, isOutcomeShaped, outcomeOf, valOf } from '../src/outcome'
+import { type Outcome, bad, good, outcomeOf, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -98,22 +98,6 @@ describe("outcomeOf, told otherwise", () => {
     const refusal = new VaultError('absent_box', 'No box under that label.')
     const kept = await outcomeOf(() => { throw refusal }, Refusals.storageUnavailable)
     expect(kept.err).to.eq(refusal)
-  })
-})
-
-describe("isOutcomeShaped", () => {
-  it("knows an answer handed up still wrapped, as its example shows", () => {
-    const answered = good({ vault_tok: 'vault-tok-u1' })
-    const refused = bad(Refusals.staleWrite('del'))
-    expect(isOutcomeShaped(answered)).to.be.true
-    expect(isOutcomeShaped(refused)).to.be.true
-  })
-
-  it("takes no record for one: a record, null, a boolean, a bag with ok alone", () => {
-    expect(isOutcomeShaped({ vault_tok: 'vault-tok-u1' })).to.be.false
-    expect(isOutcomeShaped(null)).to.be.false
-    expect(isOutcomeShaped(true)).to.be.false
-    expect(isOutcomeShaped({ ok: true })).to.be.false
   })
 })
 

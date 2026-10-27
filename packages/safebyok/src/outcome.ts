@@ -51,14 +51,6 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
   }
 }
 
-/** True for a value shaped as an {@link Outcome}: an answer handed up still wrapped, since a stored record never is one.
- *
- * @example isOutcomeShaped(await inner.getBox(scope, boxlabel, expected))  // true: the caller forgot valOf
- */
-export const isOutcomeShaped = (candidate: unknown): boolean => (
-  typeof candidate === 'object' && candidate !== null && typeof (candidate as { ok?: unknown }).ok === 'boolean' && ('val' in candidate || 'err' in candidate)
-)
-
 /** `outcome`'s `val`, or its `err` thrown: how a VaultDB that hands each call on to another unwraps each answer.
  *
  * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
