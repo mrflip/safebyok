@@ -58,3 +58,23 @@ alone writes this file.
   The restack deletes it.
 * **This machine is slow:** a full `eslint src tests` hit a five-minute timeout, and attw once took
   21 minutes. While building, lint and test single files, and run `pnpm justify` once at the end.
+
+## The Coach's rulings, 2026-10-27
+
+*Orchestrator:* the full record is the sprint doc's *Resolved* tab.
+* **The stance behind them:** the people who extend this code are friends, clever, not
+  adversaries or incompetent. Don't defend against a future programmer writing bad code by
+  writing bad code in a critical path. Where in-module defenses exist, rely on them.
+* **Thread 1:** `adapterAnswer`'s Outcome check stays removed. The defence is `describeVaultDB`.
+  `Refusals.unexpectedError` stays beside the top-level export: the Coach is "perfectly happy for
+  every refusal type to have a functional form".
+* **Thread 3:** all of #298's open questions are settled as built.
+  - The silent discard is accepted, and `raisedDeviceRecord` and `deviceOutcomeOf` stay off the
+    exports.
+  - The scopepath hooks stay, with no helper.
+  - `putLease` gets no new checks: `deviceRecordOf` and `sealLeaseRecord` already build and
+    check every record.
+  - Still in the doc, as explained rows: `spyOnDeviceHook`, and the overridden-verb guard (my
+    revised recommendation is no guard).
+* **The documentarian's `stash@{0}` is ignored.** Thread 5 is new: a documentarian run on the
+  core's `src/`, split into three runs.

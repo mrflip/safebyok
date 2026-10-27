@@ -5,7 +5,7 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** thread 3 filed (#298); thread 1 flagged, waiting on the Coach; threads 2 and 4 waiting.
+* **Status:** thread 3 filed (#298). Thread 1's flag ruled (check stays removed); it files once its worker confirms `describeVaultDB` catches a forgetful `doGetBox`. Threads 2, 4 and 5 waiting.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
@@ -195,11 +195,36 @@ test for it.
   - Leave notes/security.md to a `sonnet` subagent, as the brief says, and name it in the PR's
     open questions.
 
+### 5. `docblocks_core`: a documentarian run on the core's `src/`
+
+> Would you please add a thread to run it agains the core src/ directory?
+
+(The Coach, 2026-10-27, in the sprint doc, on the documentarian's earlier vault.ts run in
+`stash@{0}`: "the documentarian run was mostly for evaluating documentarian. Ignore it.")
+
+**Gloss.**
+* **Target:** `packages/safebyok/src/`, every doc block, by the `documentarian` agent
+  (`.claude/agents/documentarian.md`), not a thread-worker. Doc blocks only: behaviour, names and
+  the code of `@example`s stay.
+* **Split, by size:** about 11,000 lines in about 50 files is too long for one context. So it
+  runs as three documentarian runs on disjoint files, each its own PR and `human/` entry:
+  - **5a**, `vault.ts` alone, which is about 2,000 lines;
+  - **5b**, storage and refusals: `vault-db.ts`, `local-vault-db.ts`, `expectations.ts`,
+    `device-db.ts`, `idb.ts`, `idb-opts.ts`, `refusals.ts`, `errors.ts` and `outcome.ts`;
+  - **5c**, the rest of `src/` and `src/checks/`.
+* **Depends on:** every other thread. It runs last, over the code as the sprint leaves it, so no
+  rewritten doc block is churned by a later rename. The three runs touch disjoint files, so they
+  run side by side, each cut from the top of the restacked line once thread 4 files.
+* **Size:** large in total, mechanical in kind. Each run reports its doc-block line counts.
+* **Look-ahead:** thread 4's names (no "standing"), and thread 3's DeviceDB class doc, which the
+  thread 3 review found repeats its per-verb blocks.
+
 ## Order
 
 * Threads 1 and 3 run at once, from `origin/main`.
 * Thread 2 is cut from thread 1's tip once thread 1 files.
 * Thread 4 waits for the restack of threads 1 to 3.
+* Thread 5's three runs (5a, 5b, 5c) wait for thread 4, then run side by side.
 * The sprint PR joins the line last, on top.
 
 ## For the Coach
