@@ -23,7 +23,7 @@ specifics. User instructions override the defaults below.
 
 - Never merge a PR.
 - Force-push only with a **named** lease,
-  `--force-with-lease=<branch>:<expected origin SHA>`.
+  `--force-with-lease=<branch>:<SHA you rebased from>` (§5).
 - Do all checkouts and edits in the clone you create for this run (§2);
   leave every worktree of the repo, the main checkout included, alone.
 - Use only the rerere resolutions this run recorded (§2): none from the
@@ -227,17 +227,21 @@ it first so lower branches' CI doesn't compete with it for runners. Push
 the tip as soon as its tranche is green, and again as the stack grows.
 Once everything non-hairy is stacked and green, push the rest top-down.
 
-For each push, take the lease SHA from a fresh `git fetch origin <branch>`:
+The lease is the SHA you rebased from: the branch's prerestack tag, or,
+once you have pushed the branch this run, the SHA you pushed. Never a SHA
+read from origin after the rebase: a lease taken from a fresh fetch always
+matches, which makes it a plain `--force`. The server does the comparison,
+so no fetch is needed first.
 
 ```bash
 git -c credential.helper= -c "credential.helper=!gh auth git-credential" \
-  push --force-with-lease=<branch>:<fetched origin SHA> origin <branch>:<branch>
+  push --force-with-lease=refs/heads/<branch>:<SHA you rebased from> \
+  origin refs/heads/<branch>:refs/heads/<branch>
 ```
 
-(Or the repo's usual push auth.) If the fetched SHA isn't the one you
-rebased from, or the lease is rejected, someone pushed meanwhile: don't
-retake the lease over their work — fold their commits in or set the PR
-aside and report.
+(Or the repo's usual push auth.) If the lease is rejected, someone pushed
+meanwhile: don't retake the lease over their work — fold their commits
+in or set the PR aside and report.
 
 ## 6. PR bodies
 
