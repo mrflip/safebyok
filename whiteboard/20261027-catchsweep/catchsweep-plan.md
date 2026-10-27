@@ -1,0 +1,138 @@
+# Sprint catchsweep: error handling, flattened (2026-10-27)
+
+Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.ts` and
+`lease.ts`, two of the six files `notes/guarantees.md` names). Threads at once: 3. Issued by the
+Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
+orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
+
+**Status:** planning; waiting for PR #311's rebase onto main before the first threads are cut.
+
+**Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
+(`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
+are naturally run serially, or else just off 311 and we'll restack the git history later." So
+thread 2 is cut from thread 1's tip (same lines of `lease.ts`); threads 1, 3, 4 and 5 are cut from
+#311's tip and restacked into one line at the wrap-up.
+
+## Read first
+
+* CLAUDE.md whole; STYLE.md *Naming*, *Comments and doc blocks*, *Tests*; PROCESS.md *Threads*,
+  *Commit messages*, *Pull requests*, *Releases*.
+* `notes/guarantees.md`, *The guarantees* (G8 above all: nothing secret through a log line or an
+  error) and *Where the guarantees are kept*. Threads 1, 2 and 5 touch files it names.
+* `packages/safebyok/src/outcome.ts`: `outcomeOf`, `unexpectedError`, `good`, `bad`, `valOf`.
+* `packages/safebyok/src/vault-db.ts` l.700-720 and l.850-870: `answering`, `asStorageTrouble`,
+  `adapterAnswer`, `startedWatch`, `readStoredVault` (l.1020).
+
+## Ground rules
+
+* **Behaviour is kept** except where a thread's text says what changes, and then the changeset says
+  it. Refusal kinds, their order relative to each await, and every demand stay where they are.
+* **Catch exactly one foreign call.** A `try` around a `crypto.subtle` call, an adapter hook or a
+  host function holds that one call: the arguments are computed before the `try`, so a bug in
+  building them never reads as a wrong passphrase, a damaged box or storage trouble.
+* **One wrapper per edge, never nested.** `outcomeOf` is applied once, at a public method; inside,
+  plain `try`/`catch`. A prepared closure is one hop, `(x) => this.#method(x)`.
+* **No cause carrying secret material** reaches a host's logger or a thrown error. A device-store
+  record holds a key handle; the vault record and box records hold ciphertext and headers.
+* Each export's doc block is written for its caller; a changed refusal is named in it.
+* A `@ts-expect-error` or `eslint-disable-line` is reported in the PR and the thread file.
+
+## Threads
+
+### 1. trythrow: the body lives in the throwing method
+
+Coach: "would you have an agent find and migrate all cases where the body of an outcomeOf(blah)
+could be moved to the throwing version, with try wrapping it?"
+
+Gloss: today `tryX` holds the body inside `outcomeOf(async () => { ... })` and `X` is
+`valOf(await this.tryX())`. Flip each pair: `X` holds the body and throws; `tryX` is
+`try { return good(await this.X(...)) } catch (err) { return bad(<as the pair maps it today>) }`.
+The sites: `lease.ts` `tryCipheredWith`/`cipheredWith`, `tryDecipherWith`/`decipherWith`,
+`trySealProps`/`sealProps`; `box.ts` `trySeal`/`seal`, `tryExtractWhisper`/`extractWhisper`. The
+inner `outcomeOf` calls inside those bodies (the AEAD mapping) are thread 2's: leave them as they
+are, moved whole. `vault-db.ts`'s verbs return Outcomes with no throwing twin: not in scope.
+`vault.ts` and `bank.ts` pairs already keep the body in a hand `try`/`catch` whose `#badOutcome`
+also tells bad news to listeners; flipping them would skip that news for a caller of the throwing
+form unless the throwing form catches, tells and rethrows. **Report those, with a recommendation;
+do not flip them** unless the one-catch form keeps the news on both paths and the worker is sure.
+Doc blocks move with the body (STYLE.md: the doc block sits on the throwing one). Empty changeset
+unless a refusal changes. Size: small. Depends on: nothing beyond #311. Look-ahead: thread 2 edits
+the same methods right after; keep the inner `outcomeOf` calls intact so its diff is small.
+
+### 2. aead_narrow: catch the one call, and no cause from the device store
+
+Orchestrator's proposal, accepted by the Coach ("implement your other proposals").
+
+Gloss: (a) `proving.ts` `#unwrap`: compute `wayinCtxOf(...)` before the `try`; the `try` holds only
+`unwrapKeyUnder`. (b) `lease.ts`: `#vaultKeyOrNull`, and the inner `outcomeOf` calls in the cipher
+and decipher bodies, become plain `try`/`catch` around exactly the one `subtle`-backed call each
+(`wrapKeyUnder`, `cipherBytes`, `unwrapKeyUnder`, `decipherBytes`), ctx computed outside; the
+`damaged_box` and `unexpected_error` mappings stay as they are, per call. (c) `device-db.ts`
+`deviceTrouble`: the condition no longer carries the store's throw as `cause` (keep its
+`name` in the message or `meta` if that helps a host, never its message), since a custom
+`DeviceDB`'s throw may quote stored lease text and the logger hands the error to the host whole
+(`vault.ts` l.1098, l.1306, l.1415; `bank.ts` l.571; `gating.ts` l.424 on main). Check
+`Refusals.storageUnavailable`'s doc, which says causes hold only ciphertext: true of VaultDB
+adapters, not of the device store; say so there. (d) `notes/guarantees.md`: a sentence under G8
+saying a device-store failure's cause never crosses to the host, and *Where the guarantees are
+kept* if `device-db.ts` now keeps one. Changeset: patch, saying a device-store condition's `cause`
+is gone. Size: medium. Review `high`. Depends on: thread 1 (same lines of `lease.ts` and `box.ts`).
+
+### 3. db_hooks: the VaultDB's hooks adapted once
+
+Orchestrator's proposal, accepted by the Coach.
+
+Gloss: `vault-db.ts` wraps each subclass hook at every call,
+`readStoredVault(() => adapterAnswer('doGetVault', () => this.doGetVault(asked)))` three deep inside
+`answering`. Adapt the hooks once at construction into a private `#hooks` object (each entry
+`adapterAnswer` applied to one hook), so a verb reads `await this.#hooks.doGetVault(asked)`; drop
+`readStoredVault` (one caller, `delDamagedVault`) by making its message at the throw site. Export
+`asStorageTrouble` (from `vault-db.ts` or beside `unexpectedError` in `outcome.ts`; the worker
+decides and says why) and use it where `safebyok-graphql`'s `crossing` (`vault-resolvers.ts` l.241)
+hand-rolls the same line. `vault-resolvers.ts` `vaultDBOf` (l.98): a VaultError from the host's
+`vaultDBFor` passes through as today; anything else becomes `unexpected_error` with the cause kept
+server-side and no diagnosis, where today it is `bad_option` "its own setup is wrong, retrying will
+not help". Changeset: `safebyok-graphql` patch naming the kind change; `safebyok` patch if an
+export is added. `pnpm size:budget` may move `vault-db`'s line; follow the rule. Size: medium.
+Depends on: nothing beyond #311.
+
+### 4. where_prefix: one parse, said where
+
+Orchestrator's proposal, accepted by the Coach.
+
+Gloss: seven sites catch a `Validator` refusal and rethrow the same kind with a "where" prefix,
+dropping the cause: `bank.ts` `parseVaultBag` (`bad_scope`), `options.ts` `optionsCheck`,
+`vault-opts.ts` `checkMakeBankOpts` and `checkBankVaultOpts`, `idb-opts.ts` `parseDbName` in the
+core and its near-copy in `safebyok-indexeddb/src/idb-opts.ts` (all `bad_option`). Give `Validator`
+one way to say where (the worker proposes the shape in its thread file before building: an option
+on the `Validator` call, or a parse variant taking the place; STYLE.md *Validation* rules), and
+delete the seven catches; the duplicate `idb-opts.ts` becomes one file re-exported, if the
+packages' boundary allows, else say why not. Messages a host sees keep their wording. Empty
+changeset unless wording changes. Size: small. Depends on: nothing beyond #311.
+
+### 5. one_sanitizer: a host function threw and may have heard a secret
+
+Orchestrator's proposal, accepted by the Coach.
+
+Gloss: three core sites hand-roll "the host's function threw; drop what it threw, since it may
+have been handed a passphrase": `passphrase-strength.ts` l.99 (`guardStrengthChecker`),
+`vault-opts.ts` `requestThrewError` (l.348), `proving.ts` `deriverThrewRefusal`; and
+`Sanitizer.refusalFor` (`sanitizer.ts`) names the pattern but ignores its argument, used by
+`safebyok-react`'s `adviceFailed`, `forBoundary` and `safebyok-convex`'s `refusing`. Make one
+sanitizer of them, in `sanitizer.ts`, and call it from all six; `deriverThrewRefusal`'s branch on
+`listedKindOf` (a closed list) stays as its one allowed inspection. If `Sanitizer` is exported from
+an entry point and its shape must change, that is a contract question: syndicate it and keep the
+shape. Empty changeset otherwise. Size: small. Depends on: nothing beyond #311; touches
+`proving.ts` beside thread 2's `#unwrap`, different region, restacked at the wrap-up.
+
+## Not in this sprint
+
+* `safebyok-react` `askAuthenticator`'s `SecurityError` branch: the audit called it a guess; the
+  orchestrator read it as a spec'd WebAuthn error with the spec's meaning. Kept.
+* A `HeededVaultDB` returning Outcomes to remove the `heed` unwrap / `outcomeOf` rewrap round trip
+  in `vault.ts`: a design change for the Coach, not a cleanup.
+
+## For the Coach
+
+* Thread 1 will report, not flip, the `vault.ts` and `bank.ts` pairs (bad news told on both paths).
+* Thread 5's sanitizer shape, if `Sanitizer` is an exported type.
