@@ -11,14 +11,16 @@ import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrap
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { sameScope } from './names'
-import { type Outcome, outcomeOf, valOf } from './outcome'
+import { type Outcome, good, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseRecord } from './types/types'
+import { LeaseRecord, type VaultScope } from './types/types'
 import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './vault-record'
 import { type ConsistencyWith, box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './types/type-aliases'
 import { FarFuture } from './consts'
 import type { Vault } from './vault'
+import type { DeviceDB } from './device-db'
+import type { VaultLogger } from './logger'
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
@@ -263,6 +265,78 @@ export class Lease implements LeaseSparse {
   /** The ctx a box's ciphered field is bound to: {@link boxCtxOf}'s, for this lease's vault, `visible` and this lease's `vault_tok`. */
   #boxCtxOf(visible: BoxSparse, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
     return boxCtxOf(this.#vault, { ...visible, vault_tok: this.vault_tok }, purpose)
+  }
+}
+
+/** A lease as this device's store kept it, read but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.read} hands the bank's birth read and the vault's refresh and pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
+ * Its own fields are its {@link LeaseSparse}, which a revocation check compares; the leaseKey and
+ * the wrap stay inside, for the Lease that {@link KeptLease.leaseOn} makes once a Vault object takes
+ * it up. Frozen, and shown in a spread, JSON or a log line by its sparse fields alone.
+ *
+ * @example const kept = valOf(await KeptLease.read(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
+ * @example const lease = kept.leaseOn(vault)   // Lease.make, of the record kept inside
+ */
+export class KeptLease implements LeaseSparse {
+  /** The stored record, checked, its leaseKey and wrap among it: never shown. */
+  readonly #record: LeaseRecord
+
+  /** The lease record's format, `safebyok-lease-v1`. */
+  readonly format:            LeaseStamp['format']
+  /** The app of the vault it is for. */
+  readonly applabel:          string
+  /** The user of the vault it is for. */
+  readonly user_id:           string
+  /** The label of the vault it is for. */
+  readonly vaultlabel:        string
+  /** The token of the vault it was granted under. */
+  readonly vault_tok:         string
+  /** The vault record's `gate_epoch` when it was granted. */
+  readonly gate_epoch:        number
+  /** The instant from which the lease opens nothing. */
+  readonly ask_passphrase_at: number
+
+  private constructor(record: LeaseRecord) {
+    this.#record = record
+    this.format            = record.format
+    this.applabel          = record.applabel
+    this.user_id           = record.user_id
+    this.vaultlabel        = record.vaultlabel
+    this.vault_tok         = record.vault_tok
+    this.gate_epoch        = record.gate_epoch
+    this.ask_passphrase_at = record.ask_passphrase_at
+    Object.freeze(this)
+  }
+
+  /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.getLease`, its answer checked as a {@link LeaseRecord} of `scope`.
+   * What the store hands back that is no lease of this scope reads as none, left where it lies:
+   * another vault's, or a host store's mistake, which the next grant writes over. A read about to
+   * take the lease up passes `told`, and its logger is warned once under `told.call`, quoting
+   * nothing of the record; the refresh's read, which asks only whether the lease in hand still
+   * stands beside it, passes none and says nothing. The store's own refusal comes through as the
+   * outcome.
+   *
+   * @example const kept = valOf(await KeptLease.read(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
+   * @example const beside = valOf(await KeptLease.read(deviceDB, scope))   // the refresh's look, told to no one
+   */
+  static async read(deviceDB: Pick<DeviceDB, 'getLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
+    const kept = await deviceDB.getLease(scope)
+    if (! kept.ok) { return kept }
+    if (kept.val === null) { return good(null) }
+    const checked = LeaseRecord.safeParse(kept.val)
+    if (! checked.success || ! sameScope(checked.data, scope)) {
+      // Neither the record nor what it failed is told: the record may hold key material.
+      told?.logger.warn("This device's lease could not be read as a lease of this vault, so it counts as none and was left where it lies: the vault asks for the passphrase, and the next unlock writes over it.", { call: told.call })
+      return good(null)
+    }
+    return good(new KeptLease(checked.data))
+  }
+
+  /** The Lease this kept record stands for on `vault`: {@link Lease.make} of the record, which refuses 'corrupt_record' as that does.
+   *
+   * @example const lease = kept.leaseOn(vault)
+   */
+  leaseOn(vault: ConsistencyWith<VaultStamp & Pick<Vault, 'tryLock'>>): Lease {
+    return Lease.make(vault, this.#record)
   }
 }
 

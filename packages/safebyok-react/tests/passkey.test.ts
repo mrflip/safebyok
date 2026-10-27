@@ -72,6 +72,17 @@ describe("createPasskey", () => {
     expect(again?.credential_id).to.not.eq(passkey?.credential_id)
   })
 
+  it("zeroes the authenticator's own copy of the PRF answer once it is copied into the answer, so the answer's bytes are the one copy", async () => {
+    const fake = install()
+    const passkey = await createPasskey(passkeyOpts)
+    const [handed] = fake.answersHanded()
+    if (handed === undefined) { throw new Error('expected the fake to have handed a PRF answer') }
+    const left = new Uint8Array(ArrayBuffer.isView(handed) ? handed.buffer : handed)
+    expect(left).to.have.lengthOf(32)
+    expect(left.every((byte) => byte === 0)).to.be.true
+    expect(passkey?.prfBytes.some((byte) => byte !== 0)).to.be.true
+  })
+
   it("asks for user verification, under a random user handle, with the host's names", async () => {
     const fake = install()
     await createPasskey({ ...passkeyOpts, rp: { name: 'Acme', id: 'acme.example' }, timeout: 30_000 })

@@ -170,11 +170,14 @@ const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSo
   prfBytes:     bytesOf(answer),
 })
 
-/** A copy of `source`'s bytes, whichever kind of buffer the browser handed back. */
-const bytesOf = (source: BufferSource): Uint8Array => (
+/** A copy of `source`'s bytes, whichever kind of buffer the browser handed back, and `source` zeroed once copied: the answer's bytes are then the one copy, which the vault zeroes as it uses them. */
+const bytesOf = (source: BufferSource): Uint8Array => {
   // ArrayBuffer.isView, not instanceof, holds across realms (an iframe's buffers, say).
-  Uint8Array.from(ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source))
-)
+  const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
+  const copied = Uint8Array.from(handed)
+  handed.fill(0)
+  return copied
+}
 
 /** `{ [field]: val }`, or nothing when `val` is undefined: WebAuthn's options take a field left out, never one set to undefined. */
 const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefined): Partial<Record<FieldT, ValT>> => (
