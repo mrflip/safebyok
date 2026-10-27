@@ -146,26 +146,21 @@ describe("Bank.make's options", () => {
     TH.expectSyncRefusal(() => Bank.make(TH.omitting(bankOptsOf(world), 'vaultDB')), 'bad_option')
   })
 
-  it("refuses an option it does not take as 'bad_option', naming it, before storage is touched", () => {
+  it("refuses an option it does not take as 'bad_option', counting it and naming the options it takes, before storage is touched", () => {
     const world = makeWorld()
     const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
     const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), leaseHour: 1 } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.match(/does not take the option leaseHour: check the spelling/)
+    expect(err.message).to.match(/^In Bank\.make's options: There is a field it does not take \(its name is not repeated\): it takes only applabel, /)
     expect(err.message).to.include('leaseHours')
+    expect(err.message).to.not.include('leaseHour,')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
   })
 
-  it("refuses forcePassphraseReentryHours, naming leaseHours", () => {
+  it("counts every option it does not take, naming none, and never quotes a value", () => {
     const world = makeWorld()
-    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), forcePassphraseReentryHours: 1 } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.include('forcePassphraseReentryHours (called leaseHours now)')
-  })
-
-  it("names every option it refuses, and never quotes a value", () => {
-    const world = makeWorld()
-    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), note: 'FAKESECRET', colour: 'FAKESECRET' } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.match(/the options note, colour:/)
-    expect(TH.thrownText(err)).to.not.include('FAKESECRET')
+    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), note: 'FAKESECRET', colour: 'FAKESECRET', forcePassphraseReentryHours: 1 } as MakeBankOpts), 'bad_option')
+    expect(err.message).to.include('There are 3 fields it does not take')
+    for (const said of ['note', 'colour', 'forcePassphraseReentryHours', 'FAKESECRET']) { expect(TH.thrownText(err)).to.not.include(said) }
   })
 
   it("takes an option given as undefined as one left out", async () => {

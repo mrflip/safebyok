@@ -172,7 +172,7 @@ describe("BankProvider", () => {
       expect(caught[0]).to.eq(misuse)
     })
 
-    it("throws a prop Bank.make does not take to the error boundary, naming it and its new name, rather than drop it unseen", async () => {
+    it("throws a prop Bank.make does not take to the error boundary, counting it and naming the props it takes, rather than drop it unseen", async () => {
       hushConsole()
       const caught: unknown[] = []
       const deleted = { forcePassphraseReentryHours: 1 } as Partial<BankProviderProps>
@@ -185,7 +185,7 @@ describe("BankProvider", () => {
       )
       await expectShown('boundary')
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
-      expect((caught[0] as Error).message).to.include('forcePassphraseReentryHours (called leaseHours now)')
+      expect((caught[0] as Error).message).to.include('There is a field it does not take').and.include('leaseHours')
     })
 
     it("opens once the app asks again and storage relents, the refusal gone with the entry that held it", async () => {

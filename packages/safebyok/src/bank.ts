@@ -8,8 +8,7 @@ import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
 import type { BankScope } from './checks/core-checks'
 import type * as Z from 'zod'
-import { Validator, sayable } from './checks/validator'
-import * as Phrases from './phrases'
+import { Validator } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
@@ -227,10 +226,10 @@ export class Bank {
    * objects, as stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_scope' for a bag of another app or user than the bank's, or a name that fails its
-   * check, and 'bad_option' for options amiss -- or a bag carrying a `vaultDB`, a `deviceDB`, or any
-   * field named as a store (`vaultDb`), as stores go in `opts` -- each before storage is touched; and 'bad_option' for options naming another
-   * `vaultDB` or `deviceDB` object than the vault held was born from, one made afresh over the same
-   * storage among them. Refuses as storage refuses: 'damaged_vault' for a vault record it cannot use
+   * check, and 'bad_option' for options amiss, each before storage is touched; and 'bad_option' for
+   * options naming another `vaultDB` or `deviceDB` object than the vault held was born from, one
+   * made afresh over the same storage among them. The bag naming the vault is read for its scope
+   * alone: a store in it is not a vault's own, which go in `opts`. Refuses as storage refuses: 'damaged_vault' for a vault record it cannot use
    * (`delDamagedVault` clears it), 'newer_format', 'identity_revoked', 'storage_unavailable'.
    * Refuses 'vault_behind' for a vault below this device's record, as the class says. Its
    * BankVault keeps the refusal; bad news among them is told to `onBadNews`.
@@ -403,10 +402,9 @@ export class Bank {
     this.#publish()
   }
 
-  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise, and 'bad_option' for a bag carrying a field named as a store, as a vault's stores go in its options. */
+  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise. Every other field it carries is left out. */
   #vaultScopeOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultScope {
     const { vaultlabel, ...names } = vaultBag.parse(bag)
-    checkNoStoresIn(bag)
     this.#demandSameScope(names)
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
@@ -605,7 +603,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: vaultBag, bankBag, loadLibs, frozenBankVault, refusedBankVault, StoreFieldnamePattern, checkNoStoresIn, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
+// == [Helpers]: vaultBag, bankBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
 /** What names one of a bank's vaults as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`, and everything else the thing carries left out. Each refuses 'bad_scope'. */
 const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
@@ -632,19 +630,6 @@ const frozenBankVault = (scope: VaultScope, lifecycle: 'starting' | 'ready'): Ba
 const refusedBankVault = (scope: VaultScope, err: VaultError): BankVault => {
   const { applabel, user_id, vaultlabel } = scope
   return Object.freeze({ applabel, user_id, vaultlabel, lifecycle: 'refused', err })
-}
-
-/** A field named as a store is, in any case: `vaultDB`, `vaultDb`, `deviceDB`. */
-const StoreFieldnamePattern = /db$/i
-
-/** Refuse 'bad_option' for a bag naming a vault that carries a field named as a store is -- ending `db` in any case, as `vaultDB`, `vaultDb` or `deviceDB` do -- its own or inherited: a vault's own stores go in its options, the second bag, and the bank's own would otherwise be used, quietly.
- * Only names are judged, never values: a Vault object passes, as it may be handed in as the bag.
- */
-const checkNoStoresIn = (bag: object) => {
-  // A store's own name is caught inherited too, as a getter on a class's prototype is no own key.
-  const inherited = [...('vaultDB' in bag ? ['vaultDB'] : []), ...('deviceDB' in bag ? ['deviceDB'] : [])]
-  const stores = [...new Set([...Object.keys(bag), ...inherited])].filter((ckey) => StoreFieldnamePattern.test(ckey))
-  if (stores.length > 0) { throw new VaultError('bad_option', `${Phrases.storesInBag(stores.map((ckey) => sayable(ckey)))}.`, { meta: { fieldnames: stores.map((ckey) => sayable(ckey)) } }) }
 }
 
 /** Refuse 'bad_option' unless `parts` names the stores `held` was born from, the same objects: one scope lives in one place, and a vault read from one store and written to another is no vault at all.

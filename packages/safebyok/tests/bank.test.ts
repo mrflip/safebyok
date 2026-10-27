@@ -88,10 +88,11 @@ describe("Bank.make", () => {
     expect(bank.getSnapshot()).to.deep.equal({ applabel: 'acme', user_id: 'u1', lifecycle: 'made', vaults: [] })
   })
 
-  it("refuses vaultlabel as 'bad_option', naming it as a vault's own, as its second example shows", () => {
+  it("refuses vaultlabel as 'bad_option', counting it and naming the options it takes, as its second example shows", () => {
     const opts = bankOptsOf(makeWorld())
     const err = TH.expectSyncRefusal(() => Bank.make({ ...opts, vaultlabel: 'main' } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.include("vaultlabel (each vault's own: hand it to bank.ensureVault)")
+    expect(err.message).to.match(/^In Bank\.make's options: There is a field it does not take \(its name is not repeated\): it takes only applabel, user_id, /)
+    expect(err.message).to.not.include('vaultlabel')
   })
 
   it("refuses a user_id left out or failing its check as 'bad_scope', naming the field", () => {
@@ -306,16 +307,12 @@ describe("bank.ensureVault", () => {
     expect(bank.snapshot.vaults).to.deep.equal([])
   })
 
-  it("refuses a bag or options amiss before storage is touched: 'bad_scope' for no bag or a name that fails, 'bad_option' for stores in the bag or options it does not take", async () => {
+  it("refuses a bag or options amiss before storage is touched: 'bad_scope' for no bag or a name that fails, 'bad_option' for options it does not take", async () => {
     const world = makeWorld()
     const births = vi.spyOn(world.vaultDB, 'ensureVault')
     const bank = bankIn(world)
     for (const bag of [undefined, null, 'main', {}, { ...Main, user_id: '' }, { vaultlabel: 'not-a-label' }]) {
       await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
-    }
-    for (const bag of [{ ...Main, vaultDB: world.vaultDB }, { ...Main, deviceDB: world.deviceDB }]) {
-      const err = await TH.expectRefusal(bank.ensureVault(bag), 'bad_option')
-      expect(err.message).to.include('second bag')
     }
     for (const opts of [null, 'elsewhere', { leaseHours: 1 }, { vaultlabel: 'main' }, { vaultDB: 'elsewhere' }]) {
       await TH.expectRefusal(bank.ensureVault(Main, opts as unknown as BankVaultOpts), 'bad_option')
@@ -323,19 +320,15 @@ describe("bank.ensureVault", () => {
     expect(births).not.toHaveBeenCalled()
   })
 
-  it("refuses a store's field in the bag, misspelt or not, 'bad_option', naming the field and the second bag, and births nothing", async () => {
+  it("reads the bag for its scope alone: a store in it is left out, and the vault lives in the bank's own stores", async () => {
     const world = makeWorld()
-    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const elsewhere = makeWorld()
     const bank = bankIn(world)
-    for (const [fieldname, store] of [['vaultDb', world.vaultDB], ['deviceDb', world.deviceDB]] as const) {
-      const err = await TH.expectRefusal(bank.ensureVault({ ...Main, [fieldname]: store }), 'bad_option')
-      expect(err.meta?.fieldnames).to.deep.equal([fieldname])
-      expect(err.message).to.include(`The field ${fieldname} names a store`).and.include('second bag')
-    }
-    // A name not shaped as one of ours is refused all the same, and not repeated.
-    await TH.expectRefusal(bank.ensureVault({ ...Main, VaultDB: world.vaultDB } as typeof Main), 'bad_option')
-    TH.expectSyncRefusal(() => { bank.closeVault({ ...Main, vaultDb: world.vaultDB } as typeof Main) }, 'bad_option')
-    expect(births).not.toHaveBeenCalled()
+    const vault = await bank.ensureVault({ ...Main, vaultDB: elsewhere.vaultDB, deviceDb: elsewhere.deviceDB } as typeof Main)
+    expect(vault.vaultlabel).to.eq(Main.vaultlabel)
+    const [here, there] = await Promise.all([world.vaultDB.getVault(vault), elsewhere.vaultDB.getVault(vault)])
+    expect(here.val).to.not.be.null
+    expect(there.val).to.be.null
   })
 
   it("still takes a Vault object, its own stamp and all, its snapshot and its record as the bag", async () => {

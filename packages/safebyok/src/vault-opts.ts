@@ -9,7 +9,7 @@ import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
 import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthChecker, guardStrengthChecker, strengthChecker } from './passphrase-strength'
 import * as CX from './checks/core-checks'
-import { Validator, sayable } from './checks/validator'
+import { Validator } from './checks/validator'
 import type { Gating, RequestCleartext } from './gating'
 
 /** The type of {@link MakeBankOpts.onBadNews}: told each piece of bad news, and never awaited. */
@@ -18,8 +18,8 @@ export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 /** The options `Bank.make` takes: the app and the signed-in user, the stores their vaults live in by default, the libraries they share, and how they behave.
  * `Bank.make` refuses ('bad_option') an option it does not take, and one out of its range or of
  * the wrong type; `applabel` and `user_id` refuse 'bad_scope' instead. Each refusal names the
- * option, never its value. Each vault is then named by its `vaultlabel`, its own stores, if any,
- * in a {@link BankVaultOpts}.
+ * option it judged, never its value, and counts the options it does not take, never naming them.
+ * Each vault is then named by its `vaultlabel`, its own stores, if any, in a {@link BankVaultOpts}.
  */
 export type MakeBankOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
@@ -120,8 +120,8 @@ export type MakeBankOpts = {
 }
 
 /** A vault's own options, where they are not the bank's: the second bag `bank.ensureVault` and its siblings take, beside the one naming the vault.
- * Left out, the bank's own. It refuses 'bad_option' for anything amiss, a field it does not take
- * among them, naming the field, never its value.
+ * Left out, the bank's own. It refuses 'bad_option' for anything amiss, naming the field, never its
+ * value, and counting the fields it does not take, never naming them.
  *
  * @example await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })
  */
@@ -166,37 +166,20 @@ const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) =
   return { makeBankOpts, bankVaultOpts }
 })
 
-/** Each option Bank.make (or Vault.make, before it) once took under another name, and the name it takes now (notes/old_vocabulary.md). */
-const RenamedMakeBankOpts: ReadonlyMap<string, keyof MakeBankOpts> = new Map([
-  ['forcePassphraseReentryHours', 'leaseHours'],
-  ['passphraseStrengthTest', 'strengthChecker'],
-])
-
 /** Bank.make's options with `strengthChecker` checked, or the default in its place; every other option as handed in, for its own parse.
- * Refuses 'bad_option' for an option Bank.make does not take, naming each shaped as one of ours,
- * with the name a renamed one goes by now, or the place a moved one goes; and for a
- * `strengthChecker` that is not one.
+ * Refuses 'bad_option' for an option Bank.make does not take, counting them and naming the options
+ * it takes, and for a `strengthChecker` that is not one.
  */
 export const checkMakeBankOpts = (opts: object) => {
-  const unknownCkeys = Object.keys(opts).filter((ckey) => ! Object.hasOwn(makeBankOpts.shape, ckey))
-  if (unknownCkeys.length > 0) {
-    const named = unknownCkeys.map((ckey) => {
-      const renamed = RenamedMakeBankOpts.get(ckey)
-      if (renamed !== undefined) { return `${ckey} (called ${renamed} now)` }
-      return ckey === 'vaultlabel' ? `${ckey} (each vault's own: hand it to bank.ensureVault)` : sayable(ckey)
-    })
-    const takes = Object.keys(makeBankOpts.shape).join(', ')
-    throw new VaultError('bad_option', `Bank.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
-  }
   try {
     return makeBankOpts.parse(opts)
   } catch (err) {
     if (! isVaultError(err, 'bad_option')) { throw err }
-    throw new VaultError('bad_option', `Bank.make's ${err.message}`, err.meta === undefined ? {} : { meta: err.meta })
+    throw new VaultError('bad_option', `In Bank.make's options: ${err.message}.`, err.meta === undefined ? {} : { meta: err.meta })
   }
 }
 
-/** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise, naming the field where it is shaped as one of ours. Its stores are checked by {@link vaultPartsOf}. */
+/** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise. Its stores are checked by {@link vaultPartsOf}. */
 const checkBankVaultOpts = (opts: unknown): BankVaultOpts => {
   if (opts === undefined) { return {} }
   if (! isBag(opts)) { throw new VaultError('bad_option', "bank.ensureVault takes a vault's own options as a second bag, { vaultDB, deviceDB }, where they are not the bank's: leave it out for the bank's own.") }
@@ -205,7 +188,7 @@ const checkBankVaultOpts = (opts: unknown): BankVaultOpts => {
     return opts
   } catch (err) {
     if (! isVaultError(err, 'bad_option')) { throw err }
-    throw new VaultError('bad_option', `In bank.ensureVault's options: ${err.message}. They take vaultDB and deviceDB, and refuse any other rather than quietly ignore it: the vault's vaultlabel goes in the first bag.`, err.meta === undefined ? {} : { meta: err.meta })
+    throw new VaultError('bad_option', `In bank.ensureVault's options: ${err.message}.`, err.meta === undefined ? {} : { meta: err.meta })
   }
 }
 

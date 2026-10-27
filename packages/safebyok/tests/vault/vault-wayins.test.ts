@@ -745,7 +745,7 @@ describe("a new passphrase's strength", () => {
     const world = makeWorld()
     for (const misfit of [12, null, 'zxcvbn', { strong: true }, Object.assign(() => StrongVerdict, { load: 'soon' })]) {
       const err = TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world.optsWith({ strengthChecker: misfit as unknown as StrengthChecker }))), 'bad_option')
-      expect(err.message).to.match(/^Bank\.make's strengthChecker: expected a function .* browserOpts\(\)/)
+      expect(err.message).to.match(/^In Bank\.make's options: strengthChecker: expected a function .* browserOpts\(\)/)
     }
   })
 
@@ -852,10 +852,11 @@ describe("a new passphrase's strength", () => {
     vi.restoreAllMocks()
   })
 
-  it("refuses at Bank.make the option's old name, naming the new", async () => {
+  it("refuses at Bank.make the option's old name as any option it does not take, naming the options it takes", async () => {
     const world = makeWorld()
     const err = await TH.expectRefusal(world.open({ passphraseStrengthTest: TH.anyStrengthChecker } as unknown as Partial<TH.BornVaultOpts>), 'bad_option')
-    expect(err.message).to.include('passphraseStrengthTest (called strengthChecker now)')
+    expect(err.message).to.include('There is a field it does not take').and.include('strengthChecker')
+    expect(err.message).to.not.include('passphraseStrengthTest')
   })
 
   it("refuses a checker that answers no verdict as 'bad_option', as any refusal, from a first unlock too, writing nothing and telling no news", async () => {

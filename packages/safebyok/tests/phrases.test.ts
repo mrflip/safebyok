@@ -3,19 +3,15 @@ import * as Phrases from '../src/phrases'
 import { ScopepathDelimiter } from '../src/consts'
 
 describe("Phrases", () => {
-  it("says one unknown field in the singular, several in the plural", () => {
-    expect(Phrases.unknownFields(['note'])).to.eq("There is no field note: check its spelling, or leave it out")
-    expect(Phrases.unknownFields(['note', 'tag'])).to.eq("There are no fields note, tag: check their spelling, or leave them out")
+  it("counts one unknown field in the singular, several in the plural, naming none, and lists the fields taken", () => {
+    expect(Phrases.unknownFields(1, ['sidecar'])).to.eq("There is a field it does not take (its name is not repeated): it takes only sidecar. Check the spelling, or leave it out")
+    expect(Phrases.unknownFields(2, ['boxlabel', 'sidecar'])).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only boxlabel, sidecar. Check the spelling, or leave them out")
+    expect(Phrases.unknownFields(1, [])).to.include("it takes no fields")
   })
 
   it("counts one more failure in the singular, several in the plural", () => {
     expect(Phrases.moreFailures(1)).to.eq("and 1 more failure")
     expect(Phrases.moreFailures(3)).to.eq("and 3 more failures")
-  })
-
-  it("names one store's field in the singular, several in the plural, and the second bag either way", () => {
-    expect(Phrases.storesInBag(['vaultDb'])).to.match(/^The field vaultDb names a store/).and.include('second bag')
-    expect(Phrases.storesInBag(['vaultDb', 'deviceDb'])).to.match(/^The fields vaultDb, deviceDb name a store/)
   })
 
   it("names each limit it is given", () => {

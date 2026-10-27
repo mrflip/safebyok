@@ -72,7 +72,7 @@ describe("BankProvider", () => {
     render(<CatchingBoundary caught={caught}><BankProvider {...misfit} user_id="u1"><Probe /></BankProvider></CatchingBoundary>)
     expect(shownState()).to.eq('boundary')
     expect(isVaultError(caught[0], 'bad_option')).to.be.true
-    expect((caught[0] as Error).message).to.match(/^Bank\.make's strengthChecker: expected a function.*browserOpts/)
+    expect((caught[0] as Error).message).to.match(/^In Bank\.make's options: strengthChecker: expected a function.*browserOpts/)
   })
 
   it("keeps its vault for a strengthChecker that keeps its identity, the vault running that checker", async () => {

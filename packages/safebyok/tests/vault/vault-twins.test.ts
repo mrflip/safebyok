@@ -197,8 +197,8 @@ describe("vault.hello as an event handler", () => {
     const vault = await world.open()
     const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
-    expect(err.message).to.match(/^There (is no field|are no fields) [^:]*: check [^.]*\. hello\(\)'s only option is `staleMinutes`/)
-    expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
+    expect(err.message).to.match(/^There (is a field|are \d+ fields) it does not take [^:]*: it takes only staleMinutes\. [^.]*\. hello\(\)'s only option is `staleMinutes`/)
+    expect(err.message).to.include('Handed to addEventListener or onClick as the handler itself')
     expect(err.message).to.include('`() => vault.tryHello()`')
     expect(propsReads).not.toHaveBeenCalled()
   })
@@ -227,9 +227,9 @@ describe("vault.hello as an event handler", () => {
   it("still refuses a plain bag that misspells its option, and a value that is no object, with kind 'bad_option'", async () => {
     const vault = await makeWorld().open()
     const misspelt = await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
-    expect(misspelt.message).to.eq("There is no field staleMinute: check its spelling, or leave it out. hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage.")
+    expect(misspelt.message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only staleMinutes\. Check the spelling, or leave it out\. hello\(\)'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage\. /)
     const numbered = await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
-    expect(numbered.message).to.match(/^Invalid input: expected object, received number\. hello\(\)'s only option .* an event, most likely/)
+    expect(numbered.message).to.match(/^Invalid input: expected object, received number\. hello\(\)'s only option .* it is handed an event/)
   })
 
   it("takes a bag of options with no prototype, as a plain bag", async () => {

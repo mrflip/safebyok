@@ -124,24 +124,16 @@ const SpecChecks = /* @__PURE__ */ Validator('bad_option', ({ obj, str, int, lit
   }).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }),
 }))
 
-/** What each of a spec's fields must be, as a refusal says it: never quoting what was handed in. */
-const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
-  algorithm:         "algorithm is 'argon2id', the one key derivation function safebyok runs.",
-  key_deriver_label: 'key_deriver_label is a non-empty string of your own choosing, stored beside every vault made under the spec.',
-  memory_kib:        'memory_kib is a whole number of KiB, at least 8 for each lane (parallelism) and at most 1048576 (1 GiB), the most @noble/hashes allocates.',
-  iterations:        'iterations is a whole number of passes, at least 1 and below 2^32, the most Argon2 counts.',
-  parallelism:       'parallelism is a whole number of lanes, at least 1.',
-  salt_bytes:        "salt_bytes is a whole number of bytes, at least 8 (Argon2id's least) and at most 65536 (the most the platform's random source hands out at once).",
-  output_bytes:      'output_bytes is 32: the passphraseKey is a 256-bit key.',
-}
+/** What a refusal of a spec says, whichever field failed: every field and what it must be, quoting nothing handed in. */
+const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algorithm 'argon2id', the one key derivation function safebyok runs; key_deriver_label, a non-empty string of your own choosing; memory_kib, a whole number of KiB, at least 8 for each lane and at most 1048576 (1 GiB); iterations, a whole number of passes, at least 1 and below 2^32; parallelism, a whole number of lanes, at least 1; salt_bytes, a whole number of bytes from 8 to 65536; and output_bytes, 32, as the passphraseKey is a 256-bit key."
 
 /** `candidate` as a KeyDeriverSpec Argon2id can run, holding nothing but a spec's fields: the check for another Argon2id implementation to make.
  * `argon2idDeriver` makes it, and so does `Bank.make` of a deriver declaring `algorithm: 'argon2id'`.
  * Weak parameters that run are allowed: choosing them is the host's call.
  *
- * It refuses 'bad_option', naming the field, for a spec Argon2id cannot run. That is a salt under
- * 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, or a key
- * other than 32 bytes. It refuses as {@link checkSuppliedSpecKept} does a label safebyok reserves.
+ * It refuses 'bad_option' for a spec Argon2id cannot run, in one sentence saying what each field
+ * must be: a salt under 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes,
+ * no lanes, or a key other than 32 bytes. It refuses as {@link checkSuppliedSpecKept} does a label safebyok reserves.
  *
  * @example
  *   const spec = parseKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
@@ -155,13 +147,7 @@ const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
   const checked = SpecChecks.keyDeriverSpec.safeParse(candidate)
-  if (! checked.success) {
-    const field = checked.error.issues[0]?.path[0]
-    const limit = (typeof field === 'string' && Object.hasOwn(SpecLimitForField, field))
-      ? SpecLimitForField[field as keyof KeyDeriverSpec]
-      : 'It needs every field of a KeyDeriverSpec: algorithm, key_deriver_label, memory_kib, iterations, parallelism, salt_bytes and output_bytes.'
-    throw new VaultError('bad_option', `Argon2id cannot run that keyDeriverSpec. ${limit}`)
-  }
+  if (! checked.success) { throw new VaultError('bad_option', SpecRefused) }
   checkSuppliedSpecKept(checked.data)
   return checked.data
 }
