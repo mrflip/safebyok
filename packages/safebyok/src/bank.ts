@@ -3,7 +3,7 @@ import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './vault-record'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
-import { unexpectedError } from './refusals'
+import * as Refusals from './refusals'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
@@ -600,7 +600,7 @@ export class Bank {
 
   /** The refusal `thrown` makes, as the outcome a public `tryX` resolves: a throw that is no VaultError becomes 'unexpected_error'. */
   #badOutcome(thrown: unknown): BadOutcome {
-    return bad(isVaultError(thrown) ? thrown : unexpectedError(thrown))
+    return bad(isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown))
   }
 
   /** Hand `news`, a birth's refusal, to the host's `onBadNews` when it is bad news, never awaited: what it throws is logged and reported, as a Vault object's handler throw is. */

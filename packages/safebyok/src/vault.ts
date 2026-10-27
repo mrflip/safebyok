@@ -8,7 +8,7 @@ import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
-import { unexpectedError } from './refusals'
+import * as Refusals from './refusals'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -1804,7 +1804,7 @@ export class Vault implements VaultStamp {
    */
   #badOutcome(thrown: unknown): BadOutcome {
     // Never logged: a host's function that threw (a key deriver) may have been handed a passphrase.
-    const err = isVaultError(thrown) ? thrown : unexpectedError(thrown)
+    const err = isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown)
     this.#hearBadNews(err)
     return bad(err)
   }
