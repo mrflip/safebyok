@@ -77,13 +77,15 @@ added or folded into through the subagent, and no other entry changes.
   options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
   asserts no refusal's message, stack, meta or cause holds it.
   (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
-  `bad_option`, checked with the core's `Validator`.
+  `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/idb-opts.ts`) is strict too, so
+  `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
+  `safebyok-indexeddb`'s options extend the core's.
 * 2026-10-26 (restyle sprint, thread 11, branch `20261026-vault_object`, PR [#282](https://github.com/mrflip/safebyok/pull/282)): **a Vault object shows its
   stamp alone and is frozen; a Box shows more than it did; the key deriver is reachable through no Vault object.**
   (1) A Vault object's own enumerable fields are `format`, `applabel`, `user_id`, `vaultlabel`, `vault_tok` and `registered_at`, and the object is
   frozen (`Object.freeze(this)` ends its constructor), so a spread, `JSON.stringify` or log line of it shows those six and nothing else. Every
   changing value (the lease holding the wrapped vaultKey, the vault record with its gate, the listing) is in a private `#field`, read by the host
-  through `vault.snapshot`. The getters `keyDeriver`, `leaseMillis`, `now()` and `stamp` are gone. `getSnapshot` and `subscribe` are prototype
+  through `vault.snapshot`. The getters `keyDeriver`, `leaseMillis` and `now()` are gone; amended 2026-10-27 (tidy): `vault.stamp` is back, a frozen plain copy of those same six fields, so it shows nothing a spread does not. `getSnapshot` and `subscribe` are prototype
   getters returning private bound arrows.
   (2) Wayins, gates, leases, boxes and provings no longer read the key deriver, clock, lease length or epochs off the Vault object; each is handed
   what it uses when it is made (`Wayin.make(vaultStamp, record, { keyDeriver })`, `sealLeaseRecord(standing, vaultKey, { leaseMillis, now })`,
@@ -92,19 +94,23 @@ added or folded into through the subagent, and no other entry changes.
   in `madeUnder` unread; before, it took all of them from `madeUnder` without checking them against `vault`, and a mismatched box failed
   only at open, the ciphertext's ctx binding the lease's `vault_tok`; this changes the Box object's own visible fields and what
   `demandConsistentWith` judges). A proving reaches the key deriver, logger, lease
-  length, clock and the vault record in hand through `ProvingInside`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
-  exports.
+  length, clock and the vault record in hand through `ProvingTools`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
+  exports (amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
+  `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `putLease` and `holdLease`, the power to grant
+  a lease, and `GatingTools`, handed to each gating by its constructor, alone holds `putGate`, `delVault` and `takeUp`; a merged bundle would give
+  each the other's powers).
   (3) A Box now shows, as own enumerable frozen fields, its scope, the `vault_tok`, `vault_epoch` and `gate_epoch` it was made under, and every field of
   its record but the two ciphered ones; before, the scope, `vault_tok` and epochs were non-enumerable. A log line or JSON of a Box so carries the
   vault's `vault_tok` and two epochs, all stored unencrypted, with the scope being the vault's address; the ciphertext stays in the private
   `#record`. A Lease's `format` is likewise an own field; its leaseKey and wrapped vaultKey stay private. Older entries here that name
   `vault.leaseMillis`, `vault.now()` or `vault.keyDeriver` as public describe what stood before.
-  (4) `vaultRecordHeldBy(vault)` is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
+  (4) `vaultRecordHeldBy(vault)` (reading through the private `toolsOf`) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
   record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
-  adapter adds one line and never judges. A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
+  adapter adds one line and never judges (amended 2026-10-27 (tidy): `VaultReadResponse.vault` is typed `unknown`, as `StoredBox.box` is, so an
+  adapter hands rows up uncast; the base class checks them as before). A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
   `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
   naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision
   only when it holds one as text).
