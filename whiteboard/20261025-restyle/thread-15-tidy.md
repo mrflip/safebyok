@@ -1,7 +1,7 @@
 # Thread 15: Names and small rulings (2026-10-27)
 
 Branch `20261027-tidy`, PR [#291](https://github.com/mrflip/safebyok/pull/291), on main (#286 and
-#287 merged under it). Justify: green (core 3390 / 37 skipped, react 309, indexeddb 167, postgres
+#287 merged under it; rebased 2026-10-27 onto main with #272 in). Justify: green (core 3390 / 37 skipped, react 309, indexeddb 167, postgres
 322, convex 350, graphql 344, demo 229, e2e 107, fastkey 49, root 265; every size budget on the
 rule, none written).
 
@@ -56,8 +56,13 @@ rule, none written).
 * **Deviations**:
   * Scope validators keep camelCase in `validator.ts`'s first example (`bankScope`, `vaultScope`),
     as the code's `CX.vaultScope` does; only the record and sparse validators became PascalCase.
-  * NEWSTYLE lives in the sprint's worktree, which a thread does not write; STYLE.md on this branch
-    has no spread example yet. The name for #272 to use there: `vault.stamp`.
+  * Rebase onto main with #272 in (tag `20261027-tidy-prerebase`, local): one conflict, in
+    VOCABULARY.md's `scopepath` and `ckey` rows, resolved to #272's text with this thread's
+    `StringStore` and `IdbRow` named in the `scopepath` row; both lint changes
+    (`no-unused-vars` as `error`, `redundant-type-aliases` off) stand in the ten configs. STYLE.md's
+    spread example now names `vault.stamp`. None of #272's guidance cites a name this thread
+    renamed. Justify green, no new `no-unused-vars` error. #272's sentence says a shape's
+    validator takes its type's name, which `vaultScope`'s case still leaves to the Coach.
 * **Discoveries**:
   * "Listed" that is *not* the sparse shape, left: the core's `ListedBox` validator (a box whole
     *or* sparse, as an adapter may hand it up), `meta.box_listed` (a `BoxDamaged`) and
