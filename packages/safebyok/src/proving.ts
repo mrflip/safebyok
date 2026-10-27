@@ -1,3 +1,10 @@
+/** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
+ * A Proving is sealed over a wayin's header: the current wayin's, to prove the gate held, or a
+ * fresh one it mints, to become a new way in. The cleartext goes no further than `seal`; the
+ * wayinKey it makes is non-extractable and never leaves the Proving, and no method hands back a
+ * vaultKey. What crosses a method's boundary is a Proving, a Wayin, a Lease or a wrapped key.
+ */
+
 import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
@@ -13,13 +20,6 @@ import { decorate } from './helpers'
 import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
 import { Validator } from './checks/validator'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
-
-/** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
- * A Proving is sealed over a wayin's header: the current wayin's, to prove the gate in hand, or a
- * fresh one it mints, to become a new way in. The cleartext goes no further than `seal`; the
- * wayinKey it makes is non-extractable and never leaves the Proving, and no method hands back a
- * vaultKey. What crosses a method's boundary is a Proving, a Wayin, a Lease or a wrapped key.
- */
 
 /** A passphrase wayin's visible fields: its record but the wrap. */
 export type PassphraseWayinHeader = Omit<PassphraseWayinRecord, 'vault_key_wayin_wrapped'>
@@ -37,7 +37,7 @@ export type ProvingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del' | '
 /** The gating of a proving made outside any gating, which never lands: a test hands it to `seal`. Every vault call's proving is made for a real gating. */
 export const OutsideGating: ProvingGating = Object.freeze({ landed: false })
 
-/** What a Vault object hands its gatings and its provings inside the package, which no getter of the Vault object shows: the tools both use.
+/** The tools a Vault object hands its gatings and its provings inside the package, which no getter of the Vault object shows.
  * Each adds its own powers: a proving's ({@link ProvingTools}) store and hold the lease it grants,
  * and a gating's (`GatingTools`) read storage, store a gate and delete the vault. Neither is
  * handed the other's.
@@ -47,16 +47,16 @@ export type VaultPrivateTools = {
   keyDeriver:  KeyDeriver
   /** How long a lease the vault grants lasts, in whole milliseconds. */
   leaseMillis: number
-  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate in the vault record in hand is the first gate made elsewhere ('gate_made_elsewhere'). */
+  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate in the vault record held is the first gate made elsewhere ('gate_made_elsewhere'). */
   demand:      (thing: VaultMadeUnder, call: ProvingCall, opts?: { firstGate: boolean }) => void
 }
 
-/** What a proving reaches of its Vault object: the {@link VaultPrivateTools}, and what it reads and stores as it seals a wayin or grants a lease.
- * A proving is made under the vault record in hand as it is sealed: its scope, `vault_tok` and
+/** The tools a proving reaches of its Vault object: the {@link VaultPrivateTools}, and what it reads and stores as it seals a wayin or grants a lease.
+ * A proving is made under the vault record held as it is sealed: its scope, `vault_tok` and
  * epochs, as `vaultRecord()` shows them then.
  */
 export type ProvingTools = VaultPrivateTools & {
-  /** The vault record in hand: the gate whose wayins a proving opens, and the epochs a proving is made under. */
+  /** The vault record held: the gate whose wayins a proving opens, and the epochs a proving is made under. */
   vaultRecord: () => VaultRecord
   /** The vault's logger, which hears that a key deriver threw. */
   logger:      VaultLogger
@@ -64,7 +64,7 @@ export type ProvingTools = VaultPrivateTools & {
   now:         () => number
   /** This device's id for the vault, from the bank's device record: what a fresh header carries. */
   deviceId:    () => string
-  /** Store `record` as this device's lease, {@link DeviceDB.putLease}, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
+  /** Store `record` as this device's lease through the DeviceDB's `putLease`, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
   putLease:    (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
   /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
   holdLease:   (stored: LeaseRecord) => Lease
@@ -73,7 +73,7 @@ export type ProvingTools = VaultPrivateTools & {
 /** Each registered vault's proving tools: a weak map, so a vault let go is let go here too. */
 const registered = new WeakMap<object, ProvingTools>()
 
-/** Let this package's provings reach `vault`'s tools, once: what a Vault object's constructor calls.
+/** Let this package's provings reach `vault`'s tools, once. Call it in a Vault object's constructor.
  *
  * @example registerProvingTools(this, { ...tools, vaultRecord: () => this.#vaultRecord, ... })
  */
@@ -96,7 +96,7 @@ const toolsOf = (vault: object): ProvingTools => {
  */
 export const vaultRecordHeldBy = (vault: object): VaultRecord => toolsOf(vault).vaultRecord()
 
-/** What a header of `slotlabel` names when it names only the slot: the header `seal` mints. */
+/** A header that names only its slot, for `seal` to mint the rest. */
 type FreshHeader<SlotT extends WayinKind> = { slotlabel: SlotT }
 
 /** The vaultKey's usage when it is unwrapped to be wrapped again: extractable, as a wrap needs, and good for nothing else. */
@@ -105,12 +105,12 @@ const RewrapUsage = { extractable: true, usage: ['wrapKey'] } as const
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 /** A wayinKey made for one gating from a passphrase or a passkey's answer, over one wayin's header: a {@link PassphraseProving} or a {@link PasskeyProving}.
- * It holds its vault, its slotlabel, the header it was sealed over, what it was made under (the
- * vault record's scope, `vault_tok` and `gate_epoch` as it was sealed), the gating that made it,
- * and the wayinKey. Only its slotlabel shows in a spread, JSON or a log
- * line. Its demand, {@link Vault.demandConsistentWith} handed the proving, asks that the gate's
- * wayin at its slotlabel carries its header (or, for a fresh header no gate holds yet, that the
- * gate has not moved since it was sealed), and that its gating has not landed: 'gating_landed'.
+ * Only its slotlabel shows in a spread, JSON or a log line. Its vault, header, gating and what it
+ * was made under are readable but not enumerable; the wayinKey is private.
+ *
+ * {@link Vault.demandConsistentWith}, handed a proving, asks that the gate's wayin at its slotlabel
+ * carries its header, and that its gating has not landed ('gating_landed'). For a fresh header no
+ * gate holds yet, it asks instead that the gate has not moved since the proving was sealed.
  *
  * @example const proving = await PassphraseProving.seal(vault, wayin.header, passphrase, { gating })
  * @example JSON.stringify(proving)   // '{"slotlabel":"passphrase"}'
@@ -182,11 +182,10 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     await this.#unwrap(CheckUsage)
   }
 
-  /** A Wayin for `newProving`'s slotlabel: the vaultKey unwrapped from the gate's wayin at this proving's slotlabel and wrapped under `newProving`, bound to its header.
-   * The vaultKey is not kept. It demands on this proving before and after its waits, which is what
-   * refuses 'gate_moved' for a passphrase another device has since replaced, and on `newProving`
-   * after them. It refuses as
-   * {@link Proving.checkWayin} does for a proving that does not open its wayin.
+  /** A Wayin for `newProving`'s slot: the vaultKey from this proving's wayin, wrapped under `newProving` and bound to its header.
+   * The vaultKey is not kept. It demands on this proving before and after its waits, refusing
+   * 'gate_moved' for a passphrase another device has since replaced, and on `newProving` after
+   * them. It refuses as {@link Proving.checkWayin} does for a proving that does not open its wayin.
    *
    * @example const wayin = await currentProving.resealWayinFor(newProving)
    */
@@ -202,15 +201,15 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return Wayin.make(this.#vaultStamp, record, { keyDeriver: toolsOf(this.vault).keyDeriver })
   }
 
-  /** Grant this device a lease on the vault, by the wayin this proving opens in the gate in hand, resolving the Lease as stored and held.
-   * In order: a demand on the proving; the vaultKey unwrapped from its wayin; a fresh leaseKey,
-   * and the vaultKey wrapped under it ({@link sealLeaseRecord}); a demand on the proving and on the
-   * gate the lease names, with nothing awaited between it and the store, so a lock or a gating's
-   * end landing before it refuses here ('gating_landed'), and one landing after it erases the lease
-   * behind it in the device store's order; {@link DeviceDB.putLease}; a demand on the proving
-   * again, and on the stored record's `vault_tok` and `gate_epoch`, never asking it for a lease; then
-   * the lease is held, its expiry armed, and the snapshot replaced. A refusal at the last demand
-   * holds nothing.
+  /** Grant this device a lease on the vault, by the wayin this proving opens in the gate held, resolving the Lease as stored and held.
+   * It seals a lease record over the vaultKey ({@link sealLeaseRecord}) and stores it through the
+   * DeviceDB's `putLease`. Held, the lease's expiry is armed and the snapshot replaced.
+   *
+   * It demands on the proving, and on the gate the lease names, with nothing awaited before the
+   * store. A lock or a gating's end landing before then refuses ('gating_landed'); one landing
+   * after erases the lease behind it, in the device store's order. It demands again after the
+   * store, on the stored record's `vault_tok` and `gate_epoch`, never asking it for a lease. A
+   * refusal there holds nothing.
    *
    * @example const lease = await proving.grantLease()
    */
@@ -241,7 +240,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** The demand on this proving, through its vault, a refusal logged as its gating's call.
    * While it is `sealing`, before any gate is written to carry it, a proving made on a vault with no
-   * gate is for the first: a gate in the vault record in hand then was made elsewhere ('gate_made_elsewhere').
+   * gate is for the first: a gate in the vault record held then was made elsewhere
+   * ('gate_made_elsewhere').
    */
   #demand(opts?: { sealing: boolean }) {
     toolsOf(this.vault).demand(this, this.#call(), { firstGate: opts?.sealing === true && this.gate_epoch === 0 })
@@ -264,8 +264,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return wayin.vault_key_wayin_wrapped
   }
 
-  /** The vaultKey out of the gate's current wayin at this proving's slotlabel, under the wayinKey, bound to this proving's header, with `usage`: {@link wrongProof} when it will not unwrap.
-   * The wrap is read from the vault record in hand before the wait, and a demand follows the wait.
+  /** Unwrap the vaultKey from the gate's current wayin at this slot, with `usage`: `wrongProof()` when it will not.
+   * The wrap is read from the vault record held before the wait, and a demand follows the wait.
    */
   async #unwrap(usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
     const wrapped = this.#currentWrap()
@@ -292,7 +292,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     Object.freeze(this)
   }
 
-  /** The proving `passphrase` makes over `header`: the current passphrase wayin's visible fields, to prove the gate in hand, or `{ slotlabel: 'passphrase' }`, for a fresh header whose salt it mints.
+  /** The proving `passphrase` makes over `header`: the current passphrase wayin's visible fields, or `{ slotlabel: 'passphrase' }` for a fresh header whose salt it mints.
    * One key derivation, its bytes zeroed once imported. A fresh header names the vault's key
    * deriver, a fresh salt, this device's id, and the time now. Over a current header it refuses,
    * deriving nothing: 'unknown_key_deriver' for another deriver's wayin, 'damaged_wayin' for a salt
@@ -318,8 +318,9 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     return proving
   }
 
-  /** The wayins of a novel vault, the first gate's: a fresh vaultKey wrapped under this proving's header and, when given, `passkeyProving`'s, in one method so the vaultKey never crosses.
-   * The vaultKey is not kept. Both provings are fresh. It demands on both provings after its waits.
+  /** The first gate's wayins for a novel vault: a fresh vaultKey wrapped under this proving's header and, when given, `passkeyProving`'s.
+   * Both wraps are made in this one method, so the vaultKey never crosses a method's boundary, and
+   * it is not kept. Both provings are fresh. It demands on both provings after its waits.
    *
    * @example const { passphrase, passkey } = await passphraseProving.sealWayins(passkeyProving)
    */
@@ -344,7 +345,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 /** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
 const PrfAnswerBytes = 32
 
-/** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
+/** The shape of a passkey's answer, refusing 'bad_option' without quoting it: its bytes are secret. */
 export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
   passkeyAnswerShape: obj({
     credential_id: str.min(1),
@@ -363,7 +364,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     Object.freeze(this)
   }
 
-  /** The proving `answer` makes over `header`: the current passkey wayin's visible fields, or `{ slotlabel: 'passkey' }` for a fresh one, its credential and salt the answer's.
+  /** The proving `answer` makes over `header`: the current passkey wayin's visible fields, or `{ slotlabel: 'passkey' }` for a fresh one over the answer's credential and salt.
    * The answer's PRF bytes are zeroed once imported, whatever happens, so hand in an answer for
    * this one call. It refuses 'bad_option' for what is no passkey's answer, or one already used,
    * and, fresh, for a salt that is not {@link PasskeySaltBytes} bytes; over a current header,
@@ -399,7 +400,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 // == [Headers]: headerOf, wayinRecordAt, checkedPasskeyAnswer, checkFreshSalt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
 
-/** `record`'s visible fields: the header a proving of the wayin it is seals over.
+/** `record`'s visible fields: the header a proving of its wayin seals over.
  *
  * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
  */
@@ -506,8 +507,9 @@ const madeUnderOfLease = (record: LeaseRecord): VaultMadeUnder => ({
 /** The refusal of a proving whose slot the gate no longer fills. */
 const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
-/** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `madeUnder`, as it stood when the seal began, and `gating` not landed ('gating_landed').
- * A seal begun on a vault with no gate was for the first: a gate in the vault record in hand now was made elsewhere ('gate_made_elsewhere').
+/** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `madeUnder`, as it was when the seal began, and `gating` not landed ('gating_landed').
+ * A seal begun on a vault with no gate was for the first: a gate in the vault record held now was
+ * made elsewhere ('gate_made_elsewhere').
  */
 const demandAfterFailedSeal = (vault: Vault, madeUnder: VaultSparse, gating: ProvingGating) => {
   toolsOf(vault).demand(madeUnder, gating.call ?? 'demandConsistentWith', { firstGate: madeUnder.gate_epoch === 0 })
@@ -523,7 +525,7 @@ const sealLandedError = () => new VaultError('gating_landed', 'The prompt ended 
 /** The refusal for a key deriver's result that is not 32 bytes of a view. */
 const notKeyBytes = () => new VaultError('bad_option', 'keyDeriver handed back something other than 32 key bytes: a passphraseKey is a 256-bit key.')
 
-/** The refusal in place of what a key deriver threw, carrying nothing of it -- no `cause`, text or property -- as the deriver heard the passphrase, and a throw may quote it.
+/** The refusal in place of what a key deriver threw, carrying nothing of it: no `cause`, text or property, as a throw may quote the passphrase.
  * A condition-family VaultError keeps its kind, for the caller to show or retry, in safebyok's
  * words. Anything else refuses 'unexpected_error', and `logger` hears that the deriver threw, and
  * the refusalkind of a VaultError it threw, as {@link listedKindOf} tells it.

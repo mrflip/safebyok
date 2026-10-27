@@ -1,18 +1,17 @@
+/** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
+ * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one
+ * (`src/proving.ts`).
+ *
+ * Each wrap's ctx is {@link wayinCtxOf}'s: the stamp of the vault record whose gate holds it, a
+ * purpose its wayinkind names, and its own visible header. A passkey's key is made with that same ctx as its HKDF `info`. The
+ * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
+ */
+
 import { cipherCtx, fromB64OrNull } from './crypto'
 import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
 import { type VaultStamp, VaultStampPicked, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './types/type-aliases'
-
-/** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
- * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one
- * (`src/proving.ts`).
- *
- * Each wrap's ctx is the stamp of the vault record whose gate holds it (its format, scope,
- * `vault_tok` and `registered_at`, each fixed for the vault's life), a purpose its wayinkind names,
- * and its own visible header. A passkey's key is made with that same ctx as its HKDF `info`. The
- * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
- */
 
 /** `RecordT` with every field but its wrap, member by member of a union. */
 type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayin_wrapped'> : never
@@ -48,12 +47,10 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
 }
 
 /** One way into a vault, a {@link PassphraseWayin} or a {@link PasskeyWayin}, told apart by `wayinkind`. Every field is read-only.
- * Its visible fields are its own: its wayinkind, the device and time that sealed it, a passkey's
- * credential and salt, which a host asks the passkey with, and the `vault_tok` of the vault record it
- * is one of. Its wrap, and a passphrase's salt and key deriver's label, stay in its `record`; the
- * stamp of its vault record, which its wrap's ctx holds, stays private. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
- * nothing else. A vault's snapshot shows each, never the wayin, as its `gate`'s sparse shape:
- * those fields but the `vault_tok`.
+ * Its own fields are its {@link WayinSummary}, all visible: `{ ...wayin }`, `toJSON()` and a log
+ * line show each once, and nothing else. Its wrap, and a passphrase's salt and key deriver label,
+ * stay in its `record`; its vault's stamp stays private. A vault's snapshot shows each wayin as its
+ * `gate`'s sparse shape: those fields but the `vault_tok`.
  *
  * @example Wayin.make(vaultRecord, vaultRecord.gate.passphrase, { keyDeriver }).wayinkind  // 'passphrase'
  * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
@@ -66,7 +63,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** The stamp of the vault record it is one of, frozen: what its wrap's ctx begins with. */
   readonly #vaultStamp: VaultStamp
 
-  /** Which kind of proof opens it. */
+  /** Which kind of cleartext opens it: a passphrase, or a passkey's answer. */
   readonly wayinkind:     RecordT['wayinkind']
   /** This vault's id for the device that sealed the wayin. */
   readonly device_id:     string
@@ -90,7 +87,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
     return this.#record
   }
 
-  /** The wayin a stored record stands for, checked through its schema: 'bad_record', the schema's own refusal, for a record this package never writes.
+  /** The wayin a stored record makes, checked through its schema: 'bad_record' for a record this package never writes.
    *
    * @param vaultStamp - The stamp of the vault record it is one of: that record itself will do, or
    *   the Vault object, as only its six stamp fields are taken. One missing any refuses 'bad_record'.
@@ -131,13 +128,13 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
  * @example if (wayin.wayinkind === 'passphrase') { wayin.key_deriver_label }   // 'argon2id_web_v1'
  */
 export class PassphraseWayin extends Wayin<PassphraseWayinRecord> {
-  /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
+  /** The wayin of `record`, taken as checked: {@link Wayin.make} checks a record read from storage. */
   constructor(vaultStamp: VaultStamp, record: PassphraseWayinRecord, kit: { keyDeriver: KeyDeriver }) {
     super(vaultStamp, record, kit)
     Object.freeze(this)
   }
 
-  /** Its kind, and the device and time that sealed it, each once. */
+  /** Its own fields, each once: its {@link PassphraseWayinSummary}. */
   toJSON(): PassphraseWayinSummary {
     const { ...visible } = this
     return visible
@@ -163,7 +160,7 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
   readonly prf_salt_b64: PrfSalt
 
-  /** The wayin `record` stands for, taken as checked: {@link Wayin.make} checks a record read from storage. */
+  /** The wayin of `record`, taken as checked: {@link Wayin.make} checks a record read from storage. */
   constructor(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }) {
     super(vaultStamp, record, kit)
     this.credential_id = record.credential_id
@@ -171,7 +168,7 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
     Object.freeze(this)
   }
 
-  /** Its kind, the device and time that added it, and the credential and salt a host asks its authenticator with, each once. */
+  /** Its own fields, each once: its {@link PasskeyWayinSummary}, the credential and salt a host asks its authenticator with among them. */
   toJSON(): PasskeyWayinSummary {
     const { ...visible } = this
     return visible
