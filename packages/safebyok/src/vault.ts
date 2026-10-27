@@ -849,7 +849,7 @@ export class Vault implements VaultStamp {
       now:         () => this.#clockNow(),
       deviceId:    () => this.#deviceId,
       putLease:    (record) => this.#deviceDB.putLease(record),
-      holdLease:   (stored) => this.#holdLease(stored),
+      holdLease:   (stored) => this.#holdLease(Lease.make(this, stored)),
     })
     this.#gatingTools = {
       ...tools,
@@ -1463,9 +1463,8 @@ export class Vault implements VaultStamp {
 
   // == [Lease]: holdLease, takeUpFromPantry, takeUpAtBirth, fitsTakeUp
 
-  /** Hold `stored`, a lease record just written to this device's store, as the vault's lease: its expiry armed, the snapshot replaced. */
-  #holdLease(stored: LeaseRecord): Lease {
-    const lease = Lease.make(this, stored)
+  /** Hold `lease`, granted or taken up, as the vault's lease, resolving it: its expiry armed, the snapshot replaced. */
+  #holdLease(lease: Lease): Lease {
     this.#lease = lease
     this.#leasesHeld += 1
     this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
@@ -1495,10 +1494,7 @@ export class Vault implements VaultStamp {
       return false
     }
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
-    this.#lease = lease
-    this.#leasesHeld += 1
-    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
-    this.#replaceSnapshot()
+    this.#holdLease(lease)
     return true
   }
 
@@ -1518,10 +1514,7 @@ export class Vault implements VaultStamp {
       return
     }
     if (! this.#fitsTakeUp(lease, 0)) { return }
-    this.#lease = lease
-    this.#leasesHeld += 1
-    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
-    this.#replaceSnapshot()
+    this.#holdLease(lease)
   }
 
   /** True when `lease`, a stored lease about to be taken up, fits: of the gate in hand (its `vault_tok` and `gate_epoch`), ending past `renewMillis` from now, and no later than this vault's `leaseHours` from now.
