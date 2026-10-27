@@ -265,7 +265,6 @@ describe("the Convex validators, against the core's Zod records, record by recor
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
-
 })
 
 const CapacityCases = [
