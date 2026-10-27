@@ -102,7 +102,7 @@ type LibsLoad =
  * @example const snapshot = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
  */
 export class Bank {
-  // == [Bank: fields]: applabel, user_id, scope, snapshot, getSnapshot, subscribe, vaultOf, bankVaultOf, demandConsistentWith
+  // == [Bank: fields]: applabel, user_id, scope, lifecycle, vaults, snapshot, getSnapshot, subscribe, vaultOf, bankVaultOf, demandConsistentWith
 
   /** The app the bank's vaults belong to. */
   get applabel(): string { return this.#scope.applabel }
@@ -110,7 +110,21 @@ export class Bank {
   get user_id(): string { return this.#scope.user_id }
   /** The bank's scope, frozen: its app and its user, which {@link Bank.demandConsistentWith} holds a bag to. */
   get scope(): BankScope { return this.#scope }
-  /** Every field, frozen in one object: what {@link Bank.getSnapshot} returns. Where the bank stands is its `lifecycle`. */
+  /** Where the bank stands, as its snapshot says: `made`, `starting` while `hello()` loads, `ready`, or `refused` (the snapshot's `err` says why).
+   *
+   * @example if (bank.lifecycle !== 'ready') { await bank.hello() }
+   */
+  get lifecycle(): BankSnapshot['lifecycle'] { return this.#snapshot.lifecycle }
+
+  /** The bank's listing, as its snapshot holds it: one {@link BankVault} for each vault asked for and not let go, sorted by `vaultlabel`, frozen, and the same array until one of them changes.
+   * It is for showing: look one vault up with {@link Bank.bankVaultOf}. A React component reads it
+   * from the snapshot it renders (`useSyncExternalStore(bank.subscribe, bank.getSnapshot)`).
+   *
+   * @example const refused = bank.vaults.filter((bankVault) => bankVault.lifecycle === 'refused')
+   */
+  get vaults(): readonly BankVault[] { return this.#snapshot.vaults }
+
+  /** Every field, frozen in one object: what {@link Bank.getSnapshot} returns, for a render. Outside one, read {@link Bank.lifecycle} and {@link Bank.vaults}. */
   get snapshot(): BankSnapshot { return this.#snapshot }
 
   /** The current {@link BankSnapshot}, as a function bound to its bank, of one identity for the bank's life: the same object until something changes. */
@@ -142,7 +156,7 @@ export class Bank {
   }
 
   /** The element of the bank's listing for the vault `bag` names, or null for a vault never asked for or let go: synchronous, and reading nothing.
-   * It is the one `snapshot.vaults` holds, looked up by the vault's scope rather than found in the
+   * It is the one {@link Bank.vaults} holds, looked up by the vault's scope rather than found in the
    * list. Refuses 'bad_scope' for a name that fails its check, or a bag of another app or user than
    * the bank's.
    *
@@ -196,7 +210,7 @@ export class Bank {
    * checker's first, where both fail), leaves the bank `refused`, and the next hello loads again.
    * No vault is born until it succeeds: `ensureVault` says hello first.
    *
-   * @example await bank.hello()   // bank.snapshot.lifecycle: 'ready'
+   * @example await bank.hello()   // bank.lifecycle: 'ready'
    */
   async hello(): Promise<Bank> { return valOf(await this.tryHello()) }
 
