@@ -80,10 +80,12 @@ or the call says otherwise) reads nothing anew; call `hello()` on `visibilitycha
 `hello({ staleMinutes: 0 })` to read now. At sign-out, `bank.closeVaults()`, and drop the bank.
 
 Each bank call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id`
-in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`);
-anything else in it is left out, so a Vault object, its snapshot or a vault the bank lists may be
-handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
-names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
+in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`), and
+any other field refuses `bad_scope` too, so name the vault of a Vault object or a vault the bank
+lists by its label: `bank.closeVault({ vaultlabel: vault.vaultlabel })`. A vault stored elsewhere
+than the bank's stores names its own in a second bag:
+`bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`; put in the first, a store is
+refused, never ignored.
 
 A Vault object's own fields are its stamp, fixed for its life: `format`, `applabel`, `user_id`,
 `vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a log line of it shows those

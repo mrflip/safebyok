@@ -797,11 +797,11 @@ describe("the vault's snapshot, slice by slice (Contract: VaultSnapshot)", () =>
     expect(vault.snapshot).to.deep.include({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', format: vault.format, vault_tok: vault.vault_tok })
   })
 
-  it("duck-types as the vault's scope, which a bank call takes, and is judged by demandConsistentWith", async () => {
+  it("duck-types as the vault's scope, which demandConsistentWith judges; a bank call takes its vaultlabel", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const { snapshot } = vault
-    expect(TH.bankOf(vault).vaultOf(snapshot)).to.eq(vault)
+    expect(TH.bankOf(vault).vaultOf({ vaultlabel: snapshot.vaultlabel })).to.eq(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.not.throw()
     TH.closeVault(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.throw(VaultError)

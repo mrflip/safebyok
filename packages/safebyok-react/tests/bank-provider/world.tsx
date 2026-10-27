@@ -34,7 +34,7 @@ export const Probe = () => {
   const [outcome, setOutcome] = useState('')
 
   if (bankVault?.lifecycle === 'refused') {
-    const retry = () => { if (bank !== null) { void bank.tryEnsureVault(bankVault) } }
+    const retry = () => { if (bank !== null) { void bank.tryEnsureVault({ vaultlabel: bankVault.vaultlabel }) } }
     return <p><span data-testid="state">{`refused: ${bankVault.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
   }
   if (vault === null || snapshot === null) { return <span data-testid="state">no vault</span> }

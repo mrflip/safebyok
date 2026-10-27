@@ -104,6 +104,7 @@ describe("no refusal repeats its input", () => {
     const refusals = await Promise.all([
       bank.tryEnsureVault({ vaultlabel: Marker }),
       bank.tryEnsureVault({ vaultlabel: 'main', user_id: Marker }),
+      bank.tryEnsureVault({ vaultlabel: 'main', [Marker]: Marker } as { vaultlabel: string }),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { [Marker]: Marker } as object),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { vaultDB: Marker } as unknown as object),
     ])

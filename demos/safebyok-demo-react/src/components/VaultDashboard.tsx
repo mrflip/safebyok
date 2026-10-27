@@ -40,17 +40,18 @@ export const VaultDashboard = () => {
   // Why the bank has no vault to hand down -- storage unreachable, signed out of the backend -- is
   // shown here, in place, with a way to ask again. (Misuse would have gone to an error boundary.)
   // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
-  // The listed vault names itself to the bank as it is: the bank is this user's.
+  // Each call names the vault by its label alone: the bank is this user's.
   if (bank !== null && bankVault?.lifecycle === 'refused') {
     const refusal = bankVault.err
-    const askAgain = () => { void bank.tryEnsureVault(bankVault) }
+    const choice = { vaultlabel: bankVault.vaultlabel }
+    const askAgain = () => { void bank.tryEnsureVault(choice) }
     // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
     // and start over, which asks first, as it takes every box in the vault with it.
     if (refusal.refusalkind === 'damaged_vault') {
       const startOver = async () => {
         if (! globalThis.confirm("Remove this vault and start over? Every box in it is lost for good.")) { return }
         setGripe(null)
-        const deleted = await bank.tryDelDamagedVault(bankVault)
+        const deleted = await bank.tryDelDamagedVault(choice)
         if (! deleted.ok) { setGripe(deleted.err.message); return }
         askAgain()
       }
@@ -72,7 +73,7 @@ export const VaultDashboard = () => {
       const accept = async () => {
         if (! globalThis.confirm("Accept the older copy of this vault that storage holds now? Only do this if it was restored from a backup on purpose.")) { return }
         setGripe(null)
-        const cleared = await bank.tryClearCachedVault(bankVault)
+        const cleared = await bank.tryClearCachedVault(choice)
         if (! cleared.ok) { setGripe(cleared.err.message); return }
         askAgain()
       }

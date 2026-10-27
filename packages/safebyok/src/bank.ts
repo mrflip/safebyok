@@ -79,11 +79,11 @@ type LibsLoad =
  * read of storage and this device's store, or hands back the one it holds; two asks for one vault
  * at once get one Vault object. A UI renders from `getSnapshot()` and re-renders on `subscribe()`.
  *
- * Each call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id` the
- * bag carries must be the bank's ({@link Bank.demandConsistentWith}), and anything else it carries
- * is left out, so a Vault object, its snapshot, an element of the bank's listing or a box may be
- * handed in as it is. The vault's own stores, where not the bank's, go in a second bag
- * ({@link BankVaultOpts}).
+ * Each call naming a vault takes a bag whose `vaultlabel` names it, and that holds nothing else
+ * but the bank's own `applabel` and `user_id` ({@link Bank.demandConsistentWith}): any other field
+ * refuses 'bad_scope'. Name the vault of a Vault object or a {@link BankVault} by its label,
+ * `{ vaultlabel: vault.vaultlabel }`. The vault's own stores, where not the bank's, go in a second
+ * bag ({@link BankVaultOpts}).
  *
  * This device keeps a record of each vault it has seen (its device record): its own id for the
  * vault, and the highest `vault_epoch` it has seen there. A vault storage serves below it is
@@ -238,13 +238,14 @@ export class Bank {
    * or found deleted or made anew, during its birth or after: then its {@link BankVault} is
    * `refused`, and the next ask births anew.
    *
-   * A vault's own stores, where not the bank's, go in `opts`: the bag naming the vault is read for
-   * its scope alone, so a store in it is left out. One scope lives in one place: an ask for a vault
+   * A vault's own stores, where not the bank's, go in `opts`: a store in the bag naming the vault
+   * refuses 'bad_scope', as any field but its names does. One scope lives in one place: an ask for a vault
    * the bank holds, or is birthing, names in `opts` the stores it was born from (left out, the
    * bank's own): the same objects, as stores are compared by identity, so make each store once.
    *
-   * Refuses 'bad_scope' for a bag of another app or user than the bank's, or a name that fails its
-   * check, and 'bad_option' for options amiss, each before storage is touched; and 'bad_option' for
+   * Refuses 'bad_scope' for a bag of another app or user than the bank's, a name that fails its
+   * check, or a field it does not take, and 'bad_option' for options amiss, each before storage is
+   * touched; and 'bad_option' for
    * options naming another `vaultDB` or `deviceDB` object than the vault held was born from, one
    * made afresh over the same storage among them. Refuses as storage refuses: 'damaged_vault' for a
    * vault record it cannot use (`delDamagedVault` clears it), 'newer_format', 'identity_revoked',
@@ -289,7 +290,7 @@ export class Bank {
    * fails its check, or a bag of another app or user than the bank's.
    *
    * @example bank.closeVault({ vaultlabel: 'main' })
-   * @example bank.closeVault(vault)   // the vault a Vault object is of
+   * @example bank.closeVault({ vaultlabel: vault.vaultlabel })   // the vault a Vault object is of
    */
   closeVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): void {
     this.#letGoOf(Scopepath.vault(this.#vaultScopeOf(bag)))
@@ -361,8 +362,8 @@ export class Bank {
    * @example
    *   const bankVault = bank.bankVaultOf({ vaultlabel: 'main' })
    *   if (bankVault?.lifecycle === 'refused' && isVaultError(bankVault.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
-   *     await bank.delDamagedVault(bankVault)
-   *     await bank.ensureVault(bankVault)
+   *     await bank.delDamagedVault({ vaultlabel: 'main' })
+   *     await bank.ensureVault({ vaultlabel: 'main' })
    *   }
    */
   async delDamagedVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<void> { valOf(await this.tryDelDamagedVault(bag, opts)) }
@@ -419,9 +420,9 @@ export class Bank {
     this.#publish()
   }
 
-  /** The scope of the vault `bag` names, frozen, once its names pass their checks and it is of the bank's scope: 'bad_scope' otherwise. Every other field it carries is left out. */
+  /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise. */
   #vaultScopeOf(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>): VaultScope {
-    const { vaultlabel, ...names } = vaultBag.parse(bag)
+    const { vaultlabel, ...names } = parseVaultBag(bag)
     this.#demandSameScope(names)
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
@@ -620,13 +621,31 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: vaultBag, bankBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
+// == [Helpers]: vaultBag, bankBag, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
-/** What names one of a bank's vaults as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`, and everything else the thing carries left out. Each refuses 'bad_scope'. */
+/** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
+ * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
+ * a store put there among them. `bankBag` judges a thing carrying a scope (a Vault object, a box,
+ * an element of the bank's listing), so everything else the thing carries is left out.
+ *
+ * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
+ * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
+ * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
+ */
 export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
   const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
-  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }) }
+  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }).strict() }
 })
+
+/** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
+const parseVaultBag = (bag: unknown): Z.infer<typeof vaultBag> => {
+  try {
+    return vaultBag.parse(bag)
+  } catch (err) {
+    if (! isVaultError(err, 'bad_scope')) { throw err }
+    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like; a vault's own stores go in the second bag, its options. Name the vault of a Vault object or a BankVault by its label: { vaultlabel: vault.vaultlabel }.`, err.meta === undefined ? {} : { meta: err.meta })
+  }
+}
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
