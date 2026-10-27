@@ -1,7 +1,7 @@
 # Thread 20: validator case (2026-10-27)
 
-Branch `20261027-validator_case`, PR #TBD, stacked on #307 (on #301). Justify: see the PR's
-**Tests:** line.
+Branch `20261027-validator_case`, PR #310, stacked on #307 (on #301). Justify: green at the tip
+(core 3424 passed, every package and e2e green).
 
 The Coach's ruling: "unless it causes problems for the validator to be lowCamelCase and the type
 to be ModuleCase, it makes it less confusing: import { fooThing, fooThingVals, type FooThing }".
