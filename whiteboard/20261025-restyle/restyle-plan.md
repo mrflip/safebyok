@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **resumed 2026-10-27.** Threads 2 to 12 merged ([#273](https://github.com/mrflip/safebyok/pull/273) to [#283](https://github.com/mrflip/safebyok/pull/283)) with the primitives line; [#272](https://github.com/mrflip/safebyok/pull/272) (thread 1) open, reworked onto main beside thread 13; threads 13 to 15 cut from `origin/main`, serial. Workers may run `gh pr` commands but never merge or close a PR (the Coach, 2026-10-27).
+* **Status:** **paused at the Coach's request, 2026-10-27** (usage limit), after thread 14 ([#287](https://github.com/mrflip/safebyok/pull/287)). Threads 2 to 12 merged; #272 (thread 1), #286 (thread 13), #288 and #289 (cleanup) filed; threads 15 and 16 not started (`human/20261027-sprint_restyle_paused.md`). Thread 15 stands alone once #287 merges. Workers may run `gh pr` commands but never merge or close a PR (the Coach, 2026-10-27).
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
