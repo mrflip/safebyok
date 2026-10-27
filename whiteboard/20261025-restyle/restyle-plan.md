@@ -114,6 +114,14 @@ and `custom` instead); NEWSTYLE's redundant-alias example stands (thread 15 turn
 off), and its `{ ...vault }` example becomes "a getter hands out a frozen shallow copy" without a
 name, which thread 15 picks. Weigh every CLAUDE.md line by context cost.
 
+*Review (rework):* medium, `fixed`. Fixed STYLE.md's plain-Zod example (`vaultRecord.pick`, which
+does not exist and cannot pick from a refined schema, became `VaultSparse.pick`) and a hole left in
+convex's `server.test.ts`. Checked: every cited name exists; the convex conflict kept main's lines;
+nothing #285 removed returned; the narrowed camelCase rule is NEWSTYLE §3 and §11's. Left, as
+Open Matters: CLAUDE.md's "never in plain Zod" against STYLE.md; shape validators named for their
+type; `ckey` in public names; `no-unused-vars` only warns. To thread 15: a hole in graphql's
+`vault-resolvers.test.ts:264` (`_rootField`).
+
 ### 2. The Validator factory and scope checks (Preplan Phase 1, first half) -- `validator`
 
 > 1. **Checks, and the `Validator` factory.** `src/checks/` after
@@ -593,7 +601,7 @@ on the sprint doc's Cleanup tab.
   record as it is in storage now, open for the gating open on a vault, live for a Vault object
   not gone or a lease in force (`#checkStanding` → `#checkLive`), `StandInGating`, current for
   "the standing passphrase". About 240 lines; one commit. Skip it unless the ruling has come.
-* **Small leftovers:** `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
+* **Small leftovers:** `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
   `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
