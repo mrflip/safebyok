@@ -211,6 +211,17 @@ describe("Kit", () => {
     expect(Kit.user_id.safeParse('auth0|x').success).to.be.true
   })
 
+  it("hands out fn, taking any function, a method, an async one and a class included, and nothing else", () => {
+    const clockNow = Kit.fn<() => number>()
+    for (const candidate of [() => 1, async () => { await Promise.resolve(); return 1 }, Date.now, Map]) {
+      expect(clockNow.safeParse(candidate).success).to.be.true
+    }
+    for (const candidate of [null, undefined, 'now', {}, { now: () => 1 }]) {
+      expect(clockNow.safeParse(candidate).success).to.be.false
+    }
+    expect(Kit.fn().optional().safeParse(undefined).success).to.be.true
+  })
+
   it("hands out epochMillis, the instant every time is, as the same object the package exports", () => {
     expect(Kit.epochMillis).to.eq(Primitives.EpochMillis)
     expect(Kit.epochMillis.safeParse(1_792_022_400).success).to.be.false

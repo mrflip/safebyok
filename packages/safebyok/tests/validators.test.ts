@@ -5,7 +5,7 @@ import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
 import { BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel } from '../src/box'
 import { LeaseGrant, VisibleShape } from '../src/lease'
-import { PasskeyWayinHeader, PassphraseWayinHeader, passphraseCleartext } from '../src/shapes/vault'
+import { PasskeyWayinHeader, PassphraseWayinHeader, passphraseCleartext, wayinkind } from '../src/shapes/vault'
 import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
 import { VaultKin, bankScopeDuck, boxscopeDuck, leaseStampDuck, vaultScopeDuck, vaultStampButFormatDuck, vaultStampDuck } from '../src/shapes/ducks'
 import { CipheredShape, whisperBag } from '../src/shapes/box'
@@ -22,7 +22,7 @@ import { makeWorld } from './vault/world'
 /** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
 const InPackage = {
   BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, VisibleShape, whisperBag,
-  PassphraseWayinHeader, PasskeyWayinHeader, device_id, key_deriver_label, credential_id,
+  PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
   VaultKin, bankScopeDuck, vaultScopeDuck, boxscopeDuck, vaultStampDuck, vaultStampButFormatDuck, leaseStampDuck,
   passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
   declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,

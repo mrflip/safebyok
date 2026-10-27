@@ -3,6 +3,7 @@ import type { VaultError } from './errors'
 import * as Refusals from './refusals'
 import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './shapes/vault'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './shapes/vault-db'
+import type { VaultScope } from './shapes/scopes'
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
  * Import it whole: `import { Expectations } from 'safebyok'`, then
@@ -104,7 +105,7 @@ export const newLifeOf = <DraftT extends Pick<VaultDraft, 'vault_epoch'>>(draft:
  *
  * @example Expectations.tombstoneOf(standing, scope, { vault_tok: 'v1', gate_epoch: 2 })   // while v1 stands at gate 2
  */
-export const tombstoneOf = (standing: unknown, scope: Pick<VaultTombstone, 'applabel' | 'user_id' | 'vaultlabel'>, expected: VaultDelExpectation): VaultTombstone | null => {
+export const tombstoneOf = (standing: unknown, scope: VaultScope, expected: VaultDelExpectation): VaultTombstone | null => {
   if (fieldOf(standing, 'vault_tok') !== expected.vault_tok) { return null }
   if (expected.gate_epoch !== null && fieldOf(standing, 'gate_epoch') !== expected.gate_epoch) { return null }
   return {

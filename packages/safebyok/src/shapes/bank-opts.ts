@@ -201,8 +201,6 @@ export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, u
 
 // == [Stores, libraries and limits]: vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape
 
-const isFunction = (candidate: unknown) => typeof candidate === 'function'
-
 /** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Bank.make reads it. */
 const UnlimitedBytes = Number.MAX_SAFE_INTEGER
 
@@ -212,8 +210,8 @@ const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 const HourMillis = 60 * MinuteMillis
 
 /** Bank.make's options and the adapters' declared limits, one validator each, every one refusing 'bad_option'; each parse below says what it is in its own words. Checked only, where an option is an object: Bank.make keeps what it was handed, prototype and all. */
-export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, custom, lit, str, num, int }) => {
-  const verb = custom(isFunction)
+export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, fn, lit, str, num, int }) => {
+  const verb = fn()
   // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
   const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))
   // A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps.
@@ -235,15 +233,15 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
     leaseHoursAsMillis,
     staleMinutesAsMillis: someMinutes.default(StaleMinutes).transform(minutesToMillis),
     renewMinutesAsMillis: someMinutes.default(0).transform(minutesToMillis),
-    clockShape:           obj({ now: custom<Clock['now']>(isFunction) }),
+    clockShape:           obj({ now: fn<Clock['now']>() }),
     // A clock reading Bank.make accepts: epoch milliseconds from FarPast to FarFuture, a fraction allowed.
     clockReading:         num.gte(FarPast).lte(FarFuture),
     keyDeriverShape:      obj({
       algorithm:         str.optional(),
       key_deriver_label,
       salt_bytes:        int.gte(1).lte(MaxSaltBytes),
-      deriveKeyBytes:    custom<KeyDeriver['deriveKeyBytes']>(isFunction),
-      load:              custom<KeyDeriver['load']>(isFunction).optional(),
+      deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
+      load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
     }),
   }
 })

@@ -233,7 +233,7 @@ export abstract class VaultDB {
         throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
       }
       const raw = await withStaleVaultRecordChecked(adapterAnswer(() => this.doPutVaultRecord(outgoing, expectation)), asked)
-      return checkWrittenVaultRecord(raw, outgoing, asked)
+      return checkWrittenVaultRecord(raw, outgoing)
     })
   }
 
@@ -863,10 +863,10 @@ const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
   return vaultRecord
 }
 
-/** The vault record an adapter handed back as `written` landed: a vault record of the scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
-const checkWrittenVaultRecord = (raw: unknown, written: VaultRecord, scope: VaultScope): VaultRecord => {
+/** The vault record an adapter handed back as `written` landed: a vault record of its scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
+const checkWrittenVaultRecord = (raw: unknown, written: VaultRecord): VaultRecord => {
   const stored = checkAnswer(VaultRecord, raw, 'an update of the vault record', 'landed')
-  if (! Names.sameScope(stored, scope) || stored.vault_tok !== written.vault_tok || stored.gate_epoch !== written.gate_epoch) { throw wrongAnswer('an update of the vault record', 'landed') }
+  if (! Names.sameScope(stored, written) || stored.vault_tok !== written.vault_tok || stored.gate_epoch !== written.gate_epoch) { throw wrongAnswer('an update of the vault record', 'landed') }
   return stored
 }
 

@@ -15,10 +15,16 @@ export const VaultFormat = 'safebyok-vault-v6'
 export const TombstoneFormat = 'safebyok-tombstone-v1'
 // --
 
-// == [Wayin kinds]: WayinKindVals, WayinKind, PasskeySaltBytes
+// == [Wayin kinds]: WayinKindVals, wayinkind, WayinKind, PasskeySaltBytes
 
 /** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
 export const WayinKindVals = ['passphrase', 'passkey'] as const
+
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link WayinKindVals}. Its `parse` refuses 'bad_option'.
+ *
+ * @example wayinkind.safeParse('passkey').success   // true
+ */
+export const { wayinkind } = Validator('bad_option', ({ oneof }) => ({ wayinkind: oneof(WayinKindVals) }))
 export type WayinKind = typeof WayinKindVals[number]
 
 /** How many random bytes a passkey wayin's `prf_salt_b64` holds.

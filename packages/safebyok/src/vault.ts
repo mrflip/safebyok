@@ -3,7 +3,7 @@ import type { Clock, BadNewsHandler } from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
 import { Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
 import type { DeviceRecord, LeaseRecord, LeaseSparse } from './shapes/device'
-import { type WayinKind, type GatedVaultRecord, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
+import { type WayinKind, type GatedVaultRecord, passphraseCleartext, wayinkind, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
 import { vault_tok } from './shapes/fields'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, type BoxBase, boxSparseOf, checkedSidecar, checkedWhisper, whisperBytesOf } from './box'
@@ -470,10 +470,9 @@ export class Vault implements VaultStamp {
   /** Refuse a new passphrase too easy to guess, as an {@link Outcome}: the non-throwing form of {@link Vault.checkStrength}. */
   async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
     try {
-      if (typeof passphrase !== 'string') {
-        throw new VaultError('bad_option', "checkStrength takes the passphrase as the text the user typed, as a string.")
-      }
-      const verdict = await this.#strengthChecker(passphrase)
+      const cleartext = passphraseCleartext.safeParse(passphrase)
+      if (! cleartext.success) { throw new VaultError('bad_option', "checkStrength takes the passphrase as the text the user typed, as a string.") }
+      const verdict = await this.#strengthChecker(cleartext.data)
       if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
@@ -1934,7 +1933,7 @@ const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
  * has already passed. Data cannot tell it from storage restored from an older copy, so it is
  * ignored, never refused.
  */
-const isOlderPicture = (inHand: VaultSparse, fresh: VaultSparse): boolean => (
+const isOlderPicture = (inHand: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>, fresh: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>): boolean => (
   inHand.vault_tok === fresh.vault_tok
   && (fresh.vault_epoch < inHand.vault_epoch || fresh.gate_epoch < inHand.gate_epoch)
 )
@@ -2027,7 +2026,7 @@ export type DeletedBox = Readonly<{ boxlabel: string, vault_tok: string, outcome
 
 /** Refuse 'bad_option' for a slotlabel other than `'passphrase'` or `'passkey'`, quoting none of it. */
 const checkSlotlabel = (given: unknown, call: 'putWayin' | 'delWayin'): void => {
-  if (given !== 'passphrase' && given !== 'passkey') {
+  if (! wayinkind.safeParse(given).success) {
     throw new VaultError('bad_option', `${call} takes the slot of the way in, 'passphrase' or 'passkey': the user's passphrase or passkey is asked for through requestCleartext, never handed to the vault.`)
   }
 }

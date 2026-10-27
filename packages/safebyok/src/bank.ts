@@ -1,6 +1,7 @@
 import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag, vaultBag } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
+import { vaultScopeDuck } from './shapes/ducks'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
 import * as Refusals from './refusals'
@@ -664,7 +665,7 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
 
 /** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
 const draftOf = (scope: VaultScope, now: number): VaultDraft => {
-  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
+  const { applabel, user_id, vaultlabel } = vaultScopeDuck.parse(scope)
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 

@@ -2,6 +2,7 @@ import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
 import type { KeyDeriver } from './key-deriver'
 import { type GatedVaultRecord, type GateRecord, type VaultRecord, type VaultStamp, isGated } from './shapes/vault'
+import type { VaultScope } from './shapes/scopes'
 import { type PasskeyWayin, type PassphraseWayin, Wayin } from './wayin'
 
 /** Gates: a vault's ways in as one frozen value, its passphrase wayin and its passkey wayin or none, at one `gate_epoch`.
@@ -40,7 +41,7 @@ export class Gate {
   /** The passkey's way in, or null. */
   readonly passkey: PasskeyWayin | null
 
-  private constructor(vault: VaultStamp, vaultTok: string, baseEpoch: number, wayins: GateWayins) {
+  private constructor(vault: VaultScope, vaultTok: string, baseEpoch: number, wayins: GateWayins) {
     this.applabel = vault.applabel
     this.user_id = vault.user_id
     this.vaultlabel = vault.vaultlabel
@@ -58,7 +59,7 @@ export class Gate {
    * @example Gate.make(vault, { base: null, ...await passphraseProving.sealWayins() })   // gate_epoch 1
    * @example Gate.make(vault, { base, passphrase: base.passphrase, passkey: null })      // base.gate_epoch + 1
    */
-  static make(vault: VaultStamp, given: { base: Gate | null } & GateWayins): Gate {
+  static make(vault: VaultScope & Pick<VaultStamp, 'vault_tok'>, given: { base: Gate | null } & GateWayins): Gate {
     const vaultTok = given.base?.vault_tok ?? vault.vault_tok
     if (given.passphrase.vault_tok !== vaultTok || (given.passkey !== null && given.passkey.vault_tok !== vaultTok)) {
       throw new VaultError('bad_option', "A gate's wayins are sealed for the vault it lets into: seal them under its vault_tok.")

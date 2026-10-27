@@ -463,13 +463,7 @@ const checkedPasskeyHeader = (header: PasskeyWayinHeader, answer: PasskeyAnswer)
 }
 
 /** What a lease record was made under: its scope, `vault_tok` and `gate_epoch`. */
-const madeUnderOfLease = (record: LeaseRecord): VaultMadeUnder => ({
-  applabel:   record.applabel,
-  user_id:    record.user_id,
-  vaultlabel: record.vaultlabel,
-  vault_tok:  record.vault_tok,
-  gate_epoch: record.gate_epoch,
-})
+const madeUnderOfLease = ({ applabel, user_id, vaultlabel, vault_tok, gate_epoch }: LeaseRecord): VaultMadeUnder => ({ applabel, user_id, vaultlabel, vault_tok, gate_epoch })
 
 /** The refusal of a proving whose slot the gate no longer fills. */
 const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")

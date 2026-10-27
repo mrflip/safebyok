@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -196,6 +196,14 @@ describe("gateSparseOf", () => {
     const sparse = gateSparseOf(TH.gateOf('u1'))
     expect(sparse.passkey).to.be.null
     expect(Object.keys(sparse.passphrase)).to.have.members(['wayinkind', 'device_id', 'registered_at'])
+  })
+})
+
+describe("wayinkind", () => {
+  it("takes each kind of wayin, as its example shows, and refuses any other slot 'bad_option'", () => {
+    expect(wayinkind.safeParse('passkey').success).to.be.true
+    expect(wayinkind.parse('passphrase')).to.eq('passphrase')
+    TH.expectSyncRefusal(() => wayinkind.parse('hunter2'), 'bad_option')
   })
 })
 

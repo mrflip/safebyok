@@ -39,8 +39,8 @@ export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
 export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 
 /** What a VaultLogger must carry, refusing 'bad_option'. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
-export const { loggerShape } = Validator('bad_option', ({ obj, custom }) => {
-  const loggerCall = custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
+export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
+  const loggerCall = fn<VaultLogger['log']>()
   return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }) }
 })
 

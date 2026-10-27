@@ -2,7 +2,7 @@ import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, checkFreshSalt, checkedPasskeyAnswer } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultSparse, headerOf, isGated, passphraseCleartext } from './shapes/vault'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passphraseCleartext } from './shapes/vault'
 import * as Phrases from './phrases'
 import type { Vault } from './vault'
 
@@ -314,7 +314,7 @@ export class RaisedGating implements ProvingGating {
   async #initializeGate(passphrase: string, passkey: PasskeyAnswer | undefined): Promise<void> {
     const held = await this.#tools.freshen(this)
     if (isGated(held)) { throw gateMadeElsewhereError() }
-    await this.#strengthUnder(passphrase, { vault_tok: held.vault_tok, gate_epoch: held.gate_epoch })
+    await this.#strengthUnder(passphrase, held)
     const [passphraseProving, passkeyProving] = await Promise.all([
       PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, passphrase, { gating: this }),
       passkey === undefined ? undefined : PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this }),
@@ -400,7 +400,7 @@ export class RaisedGating implements ProvingGating {
    * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'; a
    * gate made elsewhere meanwhile, for a `thing` made on a vault with none, is 'gate_made_elsewhere'.
    */
-  async #strengthUnder(passphrase: string, thing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>): Promise<void> {
+  async #strengthUnder(passphrase: string, thing: VaultMadeUnder): Promise<void> {
     const verdict = await this.#vault.tryCheckStrength(passphrase)
     this.#tools.demand(thing, this.call, { firstGate: thing.gate_epoch === 0 })
     if (this.landed) { throw gatingOverError() }

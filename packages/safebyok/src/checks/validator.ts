@@ -24,8 +24,10 @@ export const Kit = {
   discrim: Zod.discriminatedUnion,
   lit:     Zod.literal,
   lazy:    Zod.lazy,
-  /** A check Zod has no maker for, as a predicate: a function, a CryptoKey, bytes of one length. */
+  /** A check Zod has no maker for, as a predicate: a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
+  /** A function, as a host's verb or callback is checked, typed as the one meant: `fn<Clock['now']>()`. Nothing past its being one is judged. */
+  fn:      <FnT = (...args: never[]) => unknown>() => Zod.custom<FnT>((candidate) => typeof candidate === 'function'),
   /** A duck of `fields`: an object holding each of them, any of `kin`'s, and nothing else, every field it holds checked whether used or not; parsed to `fields` alone, frozen.
    * So a caller hands in whatever it has that carries them, a Vault object or a record, and the
    * callee takes the fields it asked for. A getter is read for a field it names, and never counts

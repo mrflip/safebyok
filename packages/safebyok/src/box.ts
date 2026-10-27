@@ -10,10 +10,13 @@ import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
 import { revision_tok } from './shapes/fields'
 import { type VaultStamp, VaultSparse } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
-import type { Boxscope } from './shapes/scopes'
+import type { Boxscope, VaultScope } from './shapes/scopes'
 import { Validator } from './checks/validator'
 
-// == [Box]: SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
+// == [Box]: VaultOfBox, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
+
+/** The vault a box lies in, as far as a box reads it: its scope and `vault_tok`, and its demand. A Vault object is one. */
+type VaultOfBox = ConsistencyWith<VaultScope & Pick<VaultStamp, 'vault_tok'>>
 
 /** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
 export type SealBoxProps = {
@@ -59,7 +62,7 @@ export class Box implements Boxscope, BoxSparse {
   /** The stored record this box was made from, frozen through: the one source of every visible field. */
   readonly #record: BoxRecord
   /** The vault it is of: its demand, and the lease that opens it, which the box reads inside the package. */
-  readonly #vault: ConsistencyWith<VaultStamp>
+  readonly #vault: VaultOfBox
   /** The revision a sealed box is written over, or null for a new box, or a box read or stored. */
   readonly #baseRevisionTok: string | null
 
@@ -92,7 +95,7 @@ export class Box implements Boxscope, BoxSparse {
   /** When this revision was put, in epoch milliseconds, whether or not the whisper changed. */
   readonly written_at:             number
 
-  private constructor(vault: ConsistencyWith<VaultStamp>, madeUnder: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
+  private constructor(vault: VaultOfBox, madeUnder: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
     // The record is the check's own copy, which nothing else holds: frozen where it stands.
     this.#record          = deepFreeze(record)
     this.#vault           = vault
@@ -135,7 +138,7 @@ export class Box implements Boxscope, BoxSparse {
    * @example const box = Box.make(vault, record, madeUnder)   // record: what a VaultDB's getBox resolved
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' }, madeUnder)   // throws 'bad_record': no box record
    */
-  static make(vault: ConsistencyWith<VaultStamp>, record: BoxRecord, madeUnder: MadeUnder): Box {
+  static make(vault: VaultOfBox, record: BoxRecord, madeUnder: MadeUnder): Box {
     const checked = checkedBoxRecord(record)
     return new this(vault, checkedMadeUnder(madeUnder), checked, null)
   }
@@ -163,10 +166,10 @@ export class Box implements Boxscope, BoxSparse {
    * @example const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...', { madeUnder, now })
    * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
-  static async seal(vault: ConsistencyWith<VaultStamp>, props: SealBoxProps, whisper: Whisper, made: { madeUnder: SealedUnder, now: number }): Promise<Box> { return valOf(await this.trySeal(vault, props, whisper, made)) }
+  static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: SealedUnder, now: number }): Promise<Box> { return valOf(await this.trySeal(vault, props, whisper, made)) }
 
   /** A new box of `vault` holding `whisper`, as an {@link Outcome}: the non-throwing form of {@link Box.seal}. */
-  static async trySeal(vault: ConsistencyWith<VaultStamp>, props: SealBoxProps, whisper: Whisper, made: { madeUnder: SealedUnder, now: number }): Promise<Outcome<Box>> {
+  static async trySeal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: SealedUnder, now: number }): Promise<Outcome<Box>> {
     return await outcomeOf(async () => {
       checkSealProps(props)
       const { boxlabel } = sealBoxlabel.parse({ boxlabel: props.boxlabel })

@@ -275,14 +275,8 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  * @example const record = await sealLeaseRecord(vaultRecord, vaultKey, { leaseMillis, now })   // record.ask_passphrase_at: leaseMillis from now
  */
 export const sealLeaseRecord = async (standing: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey, grant: { leaseMillis: number, now: number }): Promise<LeaseRecord> => {
-  const granted = LeaseGrant.parse({
-    applabel:          standing.applabel,
-    user_id:           standing.user_id,
-    vaultlabel:        standing.vaultlabel,
-    vault_tok:         standing.vault_tok,
-    gate_epoch:        standing.gate_epoch,
-    ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture),
-  })
+  const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = standing
+  const granted = LeaseGrant.parse({ applabel, user_id, vaultlabel, vault_tok, gate_epoch, ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture) })
   const stamp = { format: LeaseFormat, ...granted } as const
   const leaseKey = await makeLeaseKey()
   const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(standing, stamp))
