@@ -261,8 +261,10 @@ the vault's refresh (`#takeStorage`, whose `leavesInForce` reads the kept stamp)
 (`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`
 ([#305](https://github.com/mrflip/safebyok/pull/305)). A `Box` reaches the Lease through the
 module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving
-reaches the vault's tools through the module-private `registerProvingTools`, which hand it
-`putLease` and `holdLease`, not a key. Neither class has a getter, field, spread, JSON or Symbol
+reaches the vault's tools through a package-private route (the Symbol-keyed accessor
+`vault[provingTools]` from [#311](https://github.com/mrflip/safebyok/pull/311) on, the module-private
+`registerProvingTools` before it), which hands it `putLease` and `holdLease`, not a key: what that
+route reaches is no key and yields none. Neither class has a getter, field, spread, JSON or Symbol
 that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
 ([#305](https://github.com/mrflip/safebyok/pull/305)). The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
@@ -299,6 +301,7 @@ Each is a Coach's call; none breaks a guarantee above.
 
 1. **`vaultRecordHeldBy`** (`src/proving.ts`) is a test-only export of the shape `leaseRecordOf`
    had, but hands out ciphertext and headers, no key: it breaks no guarantee. Listed so a reader
-   does not mistake it for one. The Vault's module-private registries, which it reads through, are
-   being replaced by a Symbol-keyed accessor in the fixup sprint's thread 5; that changes no
-   guarantee, as what the accessor reaches is no key and yields none.
+   does not mistake it for one. It reads through the proving-tools route, the Symbol-keyed
+   accessor from [#311](https://github.com/mrflip/safebyok/pull/311) on, which changes no guarantee:
+   what the accessor reaches is no key and yields none. The held-lease registry stays a WeakMap,
+   as a test of the Vault object's surface asserts no `Lease` is reachable from it without a method call.
