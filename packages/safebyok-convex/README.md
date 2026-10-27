@@ -8,11 +8,14 @@ whisper, a passphrase, or any key that opens one.
 ## Install
 
 ```sh
-pnpm add safebyok safebyok-convex convex
+pnpm add safebyok safebyok-convex convex convex-helpers
 ```
 
-`safebyok` and `convex` are peer dependencies: your app installs them itself, so the adapter and
-your app share one copy of each, and a `VaultError` from one is a `VaultError` to the other.
+`safebyok`, `convex` and `convex-helpers` are peer dependencies: your app installs them itself, so
+the adapter and your app share one copy of each, and a `VaultError` from one is a `VaultError` to
+the other. The component's Convex validators are made from the core's Zod ones by `convex-helpers`
+(0.1.128 or later), when your Convex CLI bundles it. `zod`, a peer of `safebyok` and of this
+package too, comes with them: your package manager installs it if your app has not.
 
 Platform: Node 22 and up, and evergreen browsers for the client; the floor is stated in the core's
 *Where it runs*.
@@ -302,13 +305,16 @@ lists no framework among its dev dependencies.
 The build follows Convex's component template: ESM only, unbundled, so each of the component's
 modules keeps its own file under `dist/component/`, beside its `convex.config.js` and
 `_generated/`, for a host's Convex CLI to bundle at deploy. The component imports the core: its write
-comparisons are `safebyok`'s own `Expectations`, the ones every key-value adapter makes, and its
-records' formats are the core's, so the host's Convex CLI bundles the host's `safebyok` (a peer)
-into the component's functions. Its argument, return and table validators are Convex's own, which
-is all Convex takes there; `tests/component/validators.test.ts` holds them field for field to the
-core's Zod records. `safebyok-convex/test` alone ships as
-source, `src/test.ts`, since its `import.meta.glob` must find the component's `.ts` modules; a
-test runner that resolves as a bundler does (vitest) loads it.
+comparisons are `safebyok`'s own `Expectations`, the ones every key-value adapter makes, so the
+host's Convex CLI bundles the host's `safebyok` (a peer) into the component's functions. Its
+argument, return and table validators are Convex's own, which is all Convex takes there, each made
+from the core's Zod validator by `convex-helpers`' `zodToConvex` (a peer too), so a change to a
+core record reaches the component with no edit here. `tests/component/validators.test.ts` holds
+each to the core's field for field, and names what Convex checks more loosely than the core: names
+and tokens as any text, numbers as any number, a sidecar as any value, and no rule across a vault
+record's fields. The client checks each record whole on every write and read.
+`safebyok-convex/test` alone ships as source, `src/test.ts`, since its `import.meta.glob` must find
+the component's `.ts` modules; a test runner that resolves as a bundler does (vitest) loads it.
 
 `src/component/_generated/` holds Convex's codegen output for the component, written by the
 templates of the installed `convex` and never edited by hand. Codegen for a component needs a
