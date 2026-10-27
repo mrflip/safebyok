@@ -56,7 +56,7 @@ describe("BankProvider", () => {
     const world = makeWorld()
     render(
       <BankProvider applabel="acme" user_id="u1" vaultDB={world.vaultDB} deviceDB={world.deviceDB} keyDeriver={TH.testDeriver}
-        strengthChecker={TH.anyStrengthChecker} leaseHours={0.25}>
+        strengthChecker={TH.anyStrengthChecker} logger={TH.quietLogger} leaseHours={0.25}>
         <Probe />
       </BankProvider>,
     )

@@ -14,11 +14,11 @@ import { Applabel, vaultDB } from '../src/lib/stores'
 // for each of browserOpts' own, so its identity stays put, as the provider needs.
 vi.mock('safebyok/browser', async (importOriginal) => {
   const browser = await importOriginal<typeof import('safebyok/browser')>()
-  const { testDeriver } = await import('safebyok/testing')
+  const { testDeriver, quietLogger } = await import('safebyok/testing')
   const cheapened = new WeakMap<BrowserOpts, BrowserOpts>()
   const cheapOpts = (...args: Parameters<typeof browser.browserOpts>): BrowserOpts => {
     const bag = browser.browserOpts(...args)
-    const kept = cheapened.get(bag) ?? Object.freeze({ ...bag, keyDeriver: testDeriver })
+    const kept = cheapened.get(bag) ?? Object.freeze({ ...bag, keyDeriver: testDeriver, logger: quietLogger })
     cheapened.set(bag, kept)
     return kept
   }

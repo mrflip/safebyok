@@ -21,7 +21,7 @@ describe("BankProvider", () => {
     const onBadNews = (news: VaultError) => { told.push(news) }
     render(
       <BankProvider applabel="acme" user_id="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
-        keyDeriver={TH.testDeriver} strengthChecker={TH.anyStrengthChecker} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
+        keyDeriver={TH.testDeriver} strengthChecker={TH.anyStrengthChecker} logger={TH.quietLogger} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
         staleMinutes={0} onBadNews={onBadNews} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>,
@@ -89,8 +89,9 @@ describe("BankProvider", () => {
   it("makes the bank anew for a strengthChecker that changes identity, as for any option: the new vault runs the new checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
+    const spy = TH.spyLogger()
     const tree = (reason: string) => (
-      <BankProvider {...props} user_id="u1" strengthChecker={(_typed) => ({ strong: false, reason })} requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...props} user_id="u1" logger={spy.logger} strengthChecker={(_typed) => ({ strong: false, reason })} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )
@@ -103,6 +104,7 @@ describe("BankProvider", () => {
     const err = await TH.expectRefusal(TH.unlock(second, 'correct horse battery staple'), 'weak_passphrase')
     expect(err.message).to.eq('Second reason.')
     await TH.expectRefusal(TH.unlock(first, 'correct horse battery staple'), 'vault_gone')
+    expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'BankProvider']])
   })
 
   it("shows the vault locked when storage says its user signed out, as the vault locks itself", async () => {
@@ -148,7 +150,7 @@ describe("BankProvider", () => {
     const reading = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
     const providing = (clock: { now: () => number }) => (
-      <BankProvider {...makeWorld().props} vaultDB={vaultDB} user_id="u1" clock={clock} requestCleartext={TH.scriptedRequestCleartext}>
+      <BankProvider {...TH.omitting(makeWorld().props, 'logger')} vaultDB={vaultDB} user_id="u1" clock={clock} requestCleartext={TH.scriptedRequestCleartext}>
         <Grab />
       </BankProvider>
     )

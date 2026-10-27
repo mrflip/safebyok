@@ -249,9 +249,10 @@ describe("the logger", () => {
 
   it("is the console when the host passes none, each message tagged safebyok", async () => {
     const world = makeWorld()
-    await world.openUnlocked('pw', { logger: undefined })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     try {
+      await world.openUnlocked('pw', { logger: undefined })
+      warn.mockClear()  // the test_ deriver's notice, said in opening
       await spoilVaultRecord(world)
       expect(warn).toHaveBeenCalledOnce()
       expect(String(warn.mock.calls[0]?.[0])).to.match(/^safebyok: Storage rang with a change the vault could not read/)

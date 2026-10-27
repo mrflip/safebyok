@@ -19,6 +19,7 @@ import { Lease, sealLeaseRecord } from '../../src/lease'
 import { registerLeaseReader } from '../../src/held-lease'
 import { vaultRecordHeldBy } from '../../src/proving'
 import { scriptedRequestCleartext } from './gating'
+import { quietLogger } from './logging'
 
 
 /**
@@ -170,7 +171,7 @@ export type BornVaultOpts = MakeBankOpts & Pick<VaultScope, 'vaultlabel'>
  * That is `u1`'s `main` vault in the `acme` app (as {@link scopeOf} has it), deriving through
  * {@link testDeriver}, admitting any passphrase ({@link anyStrengthChecker}), and answering each
  * gating as a test scripts it ({@link scriptedRequestCleartext}, which `TH.unlock` and its kin
- * script). `overrides`
+ * script), and logging through {@link quietLogger}. `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
@@ -188,6 +189,7 @@ export const memoryVaultOpts = (overrides: Partial<BornVaultOpts> = {}): BornVau
   keyDeriver: testDeriver,
   strengthChecker: anyStrengthChecker,
   requestCleartext: scriptedRequestCleartext,
+  logger:     quietLogger,
   ...overrides,
 })
 

@@ -206,7 +206,8 @@ describe("BankProvider", () => {
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       const { Grab, latest } = grabber()
-      render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
+      const spy = TH.spyLogger()
+      render(<BankProvider {...world.props} user_id="u1" logger={spy.logger}><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
       // Storage hands back the older copy; the vault's read refuses it, keeping the newer in hand.
       world.store.write(vaultScopepath, older)
@@ -218,6 +219,7 @@ describe("BankProvider", () => {
       expect(latest().bankVault?.lifecycle).to.eq('ready')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
       expect(shown && TH.cheatGetVaultEpoch(shown).gate_epoch).to.eq(2)
+      expect(spy.calls.map((heard) => heard.level)).to.include('warn')
     })
 
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {
