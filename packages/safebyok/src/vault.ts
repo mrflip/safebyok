@@ -186,8 +186,8 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * `{ ok: true, val }` or `{ ok: false, err }`, never thrown: the form for code that branches on
  * `refusalkind`. `putBox()` and the rest resolve its `val` or throw its `err`: the form for code
  * that reports failure by throwing, as a TanStack `queryFn` does. A refusal a member's doc names
- * comes as `err` from its `try` form. Bad news is told to `onBadNews` once, whichever form met it. `subscribe()` and
- * `useWhisper()` come in the throwing form alone.
+ * comes as `err` from its `try` form. Bad news is told to `onBadNews` once, whichever form met
+ * it. `subscribe()`, `useWhisper()` and `demandConsistentWith()` come in the throwing form alone.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
  * @example if (vault.snapshot.gate !== null && vault.snapshot.ask_passphrase_at === null) { offerUnlock(vault.snapshot.gate.passkey) }
@@ -272,7 +272,7 @@ export class Vault implements VaultStamp {
    * @example await vault.hello()   // vault.snapshot.gate: null while novel; vault.snapshot.ask_passphrase_at: null while locked
    * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.tryHello() } })
    * @example window.addEventListener('focus', () => vault.tryHello())   // wrapped: vault.hello itself would refuse the event as its options
-   * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
+   * @example await vault.hello({ staleMinutes: 0 })   // read now, or share a read already under way
    */
   async hello(given?: { staleMinutes?: number | undefined }): Promise<Vault> { return valOf(await this.tryHello(given)) }
 
@@ -639,7 +639,7 @@ export class Vault implements VaultStamp {
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
   async useWhisper<ResultT>(boxlabel: string, callback: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
-    if (typeof callback !== 'function') { throw new VaultError('bad_option', 'use needs a callback function to hand the whisper to.') }
+    if (typeof callback !== 'function') { throw new VaultError('bad_option', 'useWhisper needs a callback function to hand the whisper to.') }
     const whisper = valOf(await this.tryGetWhisper(boxlabel))
     // The callback's own throw is the host's, and is never told as the vault's bad news.
     return await callback(whisper)
@@ -706,8 +706,9 @@ export class Vault implements VaultStamp {
    * It awaits a hello first: a vault still `novel` then has no passphrase to prove it with, and
    * refuses 'absent_vault'. A pending gating of another kind is waited out first. Refuses
    * 'vault_locked' when the user declines or a `lock()` lands while the gating is pending. Once the
-   * attempt has sent its write, a lock does not stop it: `del()` resolves when the deletion lands,
-   * and refuses 'vault_locked' when storage refuses it. Refuses with what the attempt refused when
+   * attempt has sent its write, a lock, a decline or the bank letting go does not stop it: `del()`
+   * resolves when the deletion lands. When storage refuses it, `del()` refuses as that landing
+   * would have: 'vault_locked' for a lock or a decline. Refuses with what the attempt refused when
    * it settled it: 'stale_write' when the vault changed in storage first.
    *
    * @example await vault.del()   // storage holds a tombstone; bank.ensureVault({ vaultlabel }) births the next life, novel
