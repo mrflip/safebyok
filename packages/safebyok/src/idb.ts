@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import { DeviceRecord, LeaseRecord } from './shapes/device'
+import { deviceRecord, leaseRecord } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { type DeviceDB, deviceOutcomeOf, raisedDeviceRecord } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
@@ -86,7 +86,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       // calls; the sweep of stray rows goes beside it, after.
       const [raw] = await Promise.all([get<unknown>(leaseScopepath, shelf()), sweepStrays()])
       if (raw === undefined || raw === null) { return null }
-      const checked = LeaseRecord.safeParse(raw)
+      const checked = leaseRecord.safeParse(raw)
       if (! checked.success) {
         // Discarded only while the row still reads as no lease, in one transaction: a lease
         // written meanwhile is newer than what was found, and stays.
@@ -113,7 +113,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', async () => {
       const raw: unknown = await get(Scopepath.device(scope), shelf())
       if (raw === undefined || raw === null) { return null }
-      const checked = DeviceRecord.safeParse(raw)
+      const checked = deviceRecord.safeParse(raw)
       if (! checked.success) {
         await del(Scopepath.device(scope), shelf())
         ring()
@@ -156,7 +156,7 @@ const discardedIfUnreadable = (store: UseStore, leaseScopepath: Scopepath.LeaseS
     const reading = objects.get(leaseScopepath)
     reading.addEventListener('error', () => { reject(reading.error ?? new Error('IndexedDB could not read a lease it found unreadable.')) })
     reading.addEventListener('success', () => {
-      if (! LeaseRecord.safeParse(reading.result).success) { objects.delete(leaseScopepath) }
+      if (! leaseRecord.safeParse(reading.result).success) { objects.delete(leaseScopepath) }
       resolve()
     })
   })

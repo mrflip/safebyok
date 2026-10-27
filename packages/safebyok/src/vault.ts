@@ -1,7 +1,7 @@
 import type { BoxListing, Capacity, BoxExpectation } from './shapes/vault-db'
 import type { Clock, BadNewsHandler } from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
-import { Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
+import type { Whisper, Sidecar, BoxDamaged, BoxRecord, BoxSparse } from './shapes/box'
 import type { DeviceRecord, LeaseRecord, LeaseSparse } from './shapes/device'
 import { type WayinKind, type GatedVaultRecord, passphraseCleartext, wayinkind, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
 import { vault_tok } from './shapes/fields'

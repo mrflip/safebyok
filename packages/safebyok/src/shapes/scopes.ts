@@ -40,7 +40,7 @@ export type VaultScopepathFieldname = typeof VaultScopepathFieldnameVals[number]
 export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
 // --
 
-// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, VaultScope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
+// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
 
 /** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
 const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
@@ -74,13 +74,6 @@ export type BankScope = Z.infer<typeof bankScope>
 export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
-
-/** What names one vault: the app's label, the signed-in user's id, and the vault's own label, frozen once checked. Its `parse` refuses 'bad_scope'.
- * Each label is a `label`, and the user's id a `user_id`. A scope carrying more fields passes,
- * the rest left out: a vault record, or a Vault object, passes as its scope. It is
- * `CX.vaultScope`, under the name a host imports.
- */
-export const VaultScope = vaultScope
 // --
 
 // == [Bags]: vaultBag, bankBag, VaultBag, BankBag

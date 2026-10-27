@@ -2,25 +2,25 @@
 
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
-import { BoxFormat, BoxRecord } from './box'
-import { DeviceRecord, DeviceRecordFormat, LeaseFormat, LeaseRecord, LeaseStamp } from './device'
-import { GateRecord, TombstoneFormat, VaultFormat, VaultSparse, VaultStamp } from './vault'
+import { BoxFormat, boxRecord } from './box'
+import { deviceRecord, DeviceRecordFormat, LeaseFormat, leaseRecord, leaseStamp } from './device'
+import { gateRecord, TombstoneFormat, VaultFormat, vaultSparse, vaultStamp } from './vault'
 
-// == [Kin]: VaultKin
+// == [Kin]: vaultKin
 
 /** Every field the vault's kin carry, each checked as its owner checks it: a vault record and its tombstone, a Vault object, a box and its record, a lease and its record, and a device record. What a scope's duck lets ride along. Its `parse` refuses 'bad_scope'.
  * A field more than one of them carries is checked as each of them passes it: any of their
  * formats, and a `gate_epoch` of 0 or more, though a lease's is never 0.
  *
- * @example VaultKin.partial().strict().safeParse(boxRecord).success   // true: a box record is kin
+ * @example vaultKin.partial().strict().safeParse(boxRecord).success   // true: a box record is kin
  */
-export const { VaultKin } = Validator('bad_scope', ({ obj, oneof, uint }) => ({
-  VaultKin: obj({
-    ...VaultSparse.shape,
-    gate:       GateRecord.nullable(),
-    ...BoxRecord.shape,
-    ...LeaseRecord.shape,
-    ...DeviceRecord.unwrap().shape,
+export const { vaultKin } = Validator('bad_scope', ({ obj, oneof, uint }) => ({
+  vaultKin: obj({
+    ...vaultSparse.shape,
+    gate:       gateRecord.nullable(),
+    ...boxRecord.shape,
+    ...leaseRecord.shape,
+    ...deviceRecord.unwrap().shape,
     format:     oneof([VaultFormat, TombstoneFormat, BoxFormat, LeaseFormat, DeviceRecordFormat]),
     gate_epoch: uint,
   }),
@@ -39,9 +39,9 @@ export const { VaultKin } = Validator('bad_scope', ({ obj, oneof, uint }) => ({
  * @example vaultScopeDuck.parse({ ...scope, vault_tok: '' })                      // throws 'bad_scope': vault_tok, though unused
  */
 export const { bankScopeDuck, vaultScopeDuck, boxscopeDuck } = Validator('bad_scope', ({ obj, duck, applabel, user_id, vaultlabel, boxlabel }) => ({
-  bankScopeDuck:  duck(obj({ applabel, user_id }), VaultKin),
-  vaultScopeDuck: duck(obj({ applabel, user_id, vaultlabel }), VaultKin),
-  boxscopeDuck:   duck(obj({ applabel, user_id, vaultlabel, boxlabel }), VaultKin),
+  bankScopeDuck:  duck(obj({ applabel, user_id }), vaultKin),
+  vaultScopeDuck: duck(obj({ applabel, user_id, vaultlabel }), vaultKin),
+  boxscopeDuck:   duck(obj({ applabel, user_id, vaultlabel, boxlabel }), vaultKin),
 }))
 // --
 
@@ -57,11 +57,11 @@ export const { bankScopeDuck, vaultScopeDuck, boxscopeDuck } = Validator('bad_sc
  * @example vaultStampButFormatDuck.parse(box)                    // throws 'bad_record': a box is no vault
  */
 export const { vaultStampDuck, vaultStampButFormatDuck, leaseStampDuck } = Validator('bad_record', ({ str, duck }) => {
-  const vaultKin = VaultSparse.extend({ gate: GateRecord.nullable() })
+  const vaultAlone = vaultSparse.extend({ gate: gateRecord.nullable() })
   return {
-    vaultStampDuck:          duck(VaultStamp, vaultKin),
-    vaultStampButFormatDuck: duck(VaultStamp.omit({ format: true }), vaultKin.extend({ format: str })),
-    leaseStampDuck:          duck(LeaseStamp, LeaseRecord),
+    vaultStampDuck:          duck(vaultStamp, vaultAlone),
+    vaultStampButFormatDuck: duck(vaultStamp.omit({ format: true }), vaultAlone.extend({ format: str })),
+    leaseStampDuck:          duck(leaseStamp, leaseRecord),
   }
 })
 

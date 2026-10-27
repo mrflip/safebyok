@@ -1,4 +1,4 @@
-import { DeviceRecord, DeviceRecordFormat, LeaseRecord } from './shapes/device'
+import { deviceRecord, type DeviceRecord, DeviceRecordFormat, leaseRecord, type LeaseRecord } from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
 import * as Scopepath from './scopepath'
@@ -67,7 +67,7 @@ export const memoryDeviceDB = (): DeviceDB => {
     getLease: (scope) => deviceOutcomeOf('getLease', () => {
       const kept = leases.get(Scopepath.lease(scope))
       if (kept === undefined) { return null }
-      const checked = LeaseRecord.safeParse(kept)
+      const checked = leaseRecord.safeParse(kept)
       // A malformed record reads as "no lease": losing the convenience is the safe failure.
       if (! checked.success) {
         leases.delete(Scopepath.lease(scope))
@@ -86,7 +86,7 @@ export const memoryDeviceDB = (): DeviceDB => {
     getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => {
       const kept = records.get(Scopepath.device(scope))
       if (kept === undefined) { return null }
-      const checked = DeviceRecord.safeParse(kept)
+      const checked = deviceRecord.safeParse(kept)
       // A malformed record reads as none, as on a device that never saw the vault.
       if (! checked.success) {
         records.delete(Scopepath.device(scope))
@@ -125,7 +125,7 @@ export const memoryDeviceDB = (): DeviceDB => {
  * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
  */
 export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
-  const checked = DeviceRecord.safeParse(stored)
+  const checked = deviceRecord.safeParse(stored)
   if (! checked.success || Scopepath.device(checked.data) !== Scopepath.device(record)) { return record }
   const standing = checked.data
   if (standing.highest_vault_epoch >= record.highest_vault_epoch) { return standing }
@@ -140,7 +140,7 @@ export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): Devic
  */
 export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vault_epoch: number): DeviceRecord => {
   const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
-  return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
+  return deviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
 /** `answer`, a device record a DeviceDB handed back for `scope`, checked: the record, or null for one that fails its check or names another scope, as for none.
@@ -152,7 +152,7 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
  * @example deviceRecordFor(scope, { ...record, user_id: 'someone-else' })             // null
  */
 export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
-  const checked = DeviceRecord.safeParse(answer)
+  const checked = deviceRecord.safeParse(answer)
   if (! checked.success || ! sameScope(checked.data, scope)) { return null }
   return checked.data
 }

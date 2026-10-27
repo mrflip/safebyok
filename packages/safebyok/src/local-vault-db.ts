@@ -1,4 +1,4 @@
-import { BoxRecord } from './shapes/box'
+import type { BoxRecord } from './shapes/box'
 import type { VaultScope } from './shapes/scopes'
 import type { VaultRecord, VaultDraft } from './shapes/vault'
 import { VaultError } from './errors'
@@ -118,7 +118,7 @@ class StringStoreVaultDB extends VaultDB {
       .filter(Scopepath.withinVaultScopepathPred(scope))
       // A row under the vault's prefix that is no box's scopepath holds no box a verb can reach: it is passed over.
       .filter((scopepath) => Scopepath.isBox(scopepath))
-      .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
+      .map((boxScopepath) => ({ boxlabel: Scopepath.boxscopeOf(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
       // A row is handed to the split as stored, whatever it holds: the split judges it.

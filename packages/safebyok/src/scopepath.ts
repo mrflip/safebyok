@@ -84,33 +84,33 @@ export const box = (scope: Boxscope): BoxScopepath => {
 }
 // --
 
-// == [Scopes]: bankScope, vaultScope, boxscope
+// == [Scopes]: bankScopeOf, vaultScopeOf, boxscopeOf
 
 /** The bank scope `bankScopepath` names: the inverse of {@link bank}.
  *
- * @example Scopepath.bankScope('bank^acme^u1')  // { applabel: 'acme', user_id: 'u1' }
+ * @example Scopepath.bankScopeOf('bank^acme^u1')  // { applabel: 'acme', user_id: 'u1' }
  */
-export const bankScope = (bankScopepath: BankScopepath): BankScope => {
+export const bankScopeOf = (bankScopepath: BankScopepath): BankScope => {
   const [_scopepathkind, applabel, user_id] = CX.bankScopepath.parse(bankScopepath)
   return               { applabel, user_id }
 }
 
 /** The vault scope `vaultScopepath` names: the inverse of {@link vault}.
  *
- * @example Scopepath.vaultScope('vault^acme^u1^main')        // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
- * @example Scopepath.vaultScope('lease^acme^u1^main')        // throws 'bad_scope': a lease's
- * @example Scopepath.vaultScope('vault^acme^u1^main^extra')  // throws 'bad_scope': one name too many
+ * @example Scopepath.vaultScopeOf('vault^acme^u1^main')        // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+ * @example Scopepath.vaultScopeOf('lease^acme^u1^main')        // throws 'bad_scope': a lease's
+ * @example Scopepath.vaultScopeOf('vault^acme^u1^main^extra')  // throws 'bad_scope': one name too many
  */
-export const vaultScope = (vaultScopepath: VaultScopepath): VaultScope => {
+export const vaultScopeOf = (vaultScopepath: VaultScopepath): VaultScope => {
   const [_scopepathkind, applabel, user_id, vaultlabel] = CX.vaultScopepath.parse(vaultScopepath)
   return               { applabel, user_id, vaultlabel }
 }
 
 /** The box scope `boxScopepath` names: the inverse of {@link box}, for a store listing its rows. Test a row's scopepath with {@link isBox} first, to pass over one no box is filed under.
  *
- * @example Scopepath.boxscope('box^acme^u1^main^openai').boxlabel  // 'openai'
+ * @example Scopepath.boxscopeOf('box^acme^u1^main^openai').boxlabel  // 'openai'
  */
-export const boxscope = (boxScopepath: BoxScopepath): Boxscope => {
+export const boxscopeOf = (boxScopepath: BoxScopepath): Boxscope => {
   const [_scopepathkind, applabel, user_id, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
   return               { applabel, user_id, vaultlabel, boxlabel }
 }

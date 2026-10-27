@@ -6,9 +6,9 @@ import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
+import { BoxFormat, boxRecord, type BoxRecord, type BoxSparse, sidecar, type Sidecar, whisper, type Whisper } from './shapes/box'
 import { revision_tok } from './shapes/fields'
-import { type VaultStamp, VaultSparse } from './shapes/vault'
+import { type VaultStamp, vaultSparse } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import type { Boxscope, VaultScope } from './shapes/scopes'
 import { Validator } from './checks/validator'
@@ -232,7 +232,7 @@ export class Box implements Boxscope, BoxSparse {
       }
       const whisperBytes = valOf(deciphered)
       try {
-        const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+        const checked = whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
         if (! checked.success) {
           throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
         }
@@ -258,7 +258,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 }
 // --
 
-// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, BaseShape, BoxBase, MadeUnder, SealedUnder, checkedBase, checkedMadeUnder, checkedMade, lockedError
+// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, baseShape, BoxBase, MadeUnder, SealedUnder, checkedBase, checkedMadeUnder, checkedMade, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
@@ -274,25 +274,25 @@ const parseJsonOrNull = (text: string): unknown => {
 
 /** `record`, once it is a box record: 'bad_record' otherwise, quoting none of it. */
 const checkedBoxRecord = (record: unknown): BoxRecord => {
-  const checked = BoxRecord.safeParse(record)
+  const checked = boxRecord.safeParse(record)
   if (! checked.success) {
     throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own record.")
   }
   return checked.data
 }
 
-/** `whisper`, once it is one: 'bad_whisper' otherwise, quoting none of it. */
-export const checkedWhisper = (whisper: unknown): Whisper => {
-  const checked = Whisper.safeParse(whisper)
+/** `candidate`, once it is a whisper: 'bad_whisper' otherwise, quoting none of it. */
+export const checkedWhisper = (candidate: unknown): Whisper => {
+  const checked = whisper.safeParse(candidate)
   if (! checked.success) {
     throw new VaultError('bad_whisper', "A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, delete it. (null inside an array or object is fine.)")
   }
   return checked.data
 }
 
-/** `sidecar`, once it is one: 'bad_option' otherwise, quoting none of it. */
-export const checkedSidecar = (sidecar: unknown): Sidecar => {
-  const checked = Sidecar.safeParse(sidecar)
+/** `candidate`, once it is a sidecar: 'bad_option' otherwise, quoting none of it. */
+export const checkedSidecar = (candidate: unknown): Sidecar => {
+  const checked = sidecar.safeParse(candidate)
   if (! checked.success) {
     throw new VaultError('bad_option', "A box's sidecar must be a plain JSON object -- { note: 'work account' }, or {} for none -- never a bare string, number, array or null, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
   }
@@ -300,31 +300,31 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 }
 
 /** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; what a box is made under must show, the vault's scope, the `vault_tok` and both epochs, every other field dropped unread; and what a seal is made with, the vault's epochs and the time. */
-export const { BaseShape, MadeUnderShape, SealedUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
-  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
-  const SealedUnderShape = VaultSparse.pick({ vault_epoch: true, gate_epoch: true }).strip()
+export const { baseShape, madeUnderShape, sealedUnderShape, madeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
+  const madeUnderShape = vaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
+  const sealedUnderShape = vaultSparse.pick({ vault_epoch: true, gate_epoch: true }).strip()
   return {
-    BaseShape: obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
-    MadeUnderShape,
-    SealedUnderShape,
-    MadeShape: obj({ madeUnder: SealedUnderShape, now: epochMillis }),
+    baseShape: obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
+    madeUnderShape,
+    sealedUnderShape,
+    madeShape: obj({ madeUnder: sealedUnderShape, now: epochMillis }),
   }
 })
 
 /** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
  * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
  */
-export type BoxBase = Pick<NonNullable<Z.infer<typeof BaseShape>>, 'revision_tok' | 'registered_at'>
+export type BoxBase = Pick<NonNullable<Z.infer<typeof baseShape>>, 'revision_tok' | 'registered_at'>
 
 /** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
-type MadeUnder = Z.infer<typeof MadeUnderShape>
+type MadeUnder = Z.infer<typeof madeUnderShape>
 
 /** What a seal is handed of the vault it seals in, beside the vault itself: its two epochs as it seals. A {@link VaultSparse} carries them. */
-type SealedUnder = Z.infer<typeof SealedUnderShape>
+type SealedUnder = Z.infer<typeof sealedUnderShape>
 
 /** `base`, once it is a {@link BoxBase} or none: 'bad_option' otherwise, quoting none of it. */
 const checkedBase = (base: unknown): BoxBase | null => {
-  const checked = BaseShape.safeParse(base ?? null)
+  const checked = baseShape.safeParse(base ?? null)
   if (! checked.success) {
     throw new VaultError('bad_option', "Box.seal's `base` is the box the new one replaces -- a box read, or the listing's entry for it -- showing its revision_tok, and its registered_at where known; null or left out for a new box.")
   }
@@ -333,14 +333,14 @@ const checkedBase = (base: unknown): BoxBase | null => {
 
 /** The fields a box keeps of `madeUnder`, frozen, once it shows them: 'bad_option' for anything else. */
 const checkedMadeUnder = (madeUnder: unknown): MadeUnder => {
-  const checked = MadeUnderShape.safeParse(madeUnder)
+  const checked = madeUnderShape.safeParse(madeUnder)
   if (! checked.success) { throw badMadeUnder() }
   return Object.freeze(checked.data)
 }
 
 /** `made`, once it shows the vault's epochs as it seals and the time: 'bad_option' for anything else. */
 const checkedMade = (made: unknown): { madeUnder: SealedUnder, now: number } => {
-  const checked = MadeShape.safeParse(made)
+  const checked = madeShape.safeParse(made)
   if (! checked.success) { throw badMadeUnder() }
   return { madeUnder: Object.freeze(checked.data.madeUnder), now: checked.data.now }
 }

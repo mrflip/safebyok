@@ -4,7 +4,7 @@ import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
 import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
 
-// == [Lease]: LeaseFormat, LeaseRecord, LeaseStamp, LeaseSparse
+// == [Lease]: LeaseFormat, leaseRecord, leaseStamp, LeaseSparse
 
 /** The `format` a {@link LeaseRecord} carries, in its stamp. */
 export const LeaseFormat = 'safebyok-lease-v1'
@@ -14,8 +14,8 @@ export const LeaseFormat = 'safebyok-lease-v1'
  * it ever goes to the backend. Its `parse` refuses 'bad_record'; it is strict, as every stored
  * record is.
  */
-export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
-  LeaseRecord: obj({
+export const { leaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
+  leaseRecord: obj({
     format:            lit(LeaseFormat),
     applabel,
     user_id,
@@ -31,7 +31,7 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     ask_passphrase_at: epochMillis,
   }).strict(),
 }))
-export type LeaseRecord = Z.infer<typeof LeaseRecord>
+export type LeaseRecord = Z.infer<typeof leaseRecord>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
@@ -39,14 +39,14 @@ export type LeaseRecord = Z.infer<typeof LeaseRecord>
  *
  * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
  */
-export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }) }))
-export type LeaseStamp = Z.infer<typeof LeaseStamp>
+export const { leaseStamp } = Validator('bad_record', () => ({ leaseStamp: leaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }) }))
+export type LeaseStamp = Z.infer<typeof leaseStamp>
 
 /** A lease's sparse shape: the same fields as its {@link LeaseStamp}, as a lease is made once and never changed, named for what a log line or a listing shows. A Lease's own fields are these. */
 export type LeaseSparse = LeaseStamp
 // --
 
-// == [Device record]: DeviceRecordFormat, DeviceRecord
+// == [Device record]: DeviceRecordFormat, deviceRecord
 
 /** The `format` a {@link DeviceRecord} carries. */
 export const DeviceRecordFormat = 'safebyok-device-v1'
@@ -64,8 +64,8 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  *
  * @example { format: 'safebyok-device-v1', ...scope, device_id: 'Zm9vYmFy', highest_vault_epoch: 3 }
  */
-export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
-  DeviceRecord: obj({
+export const { deviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
+  deviceRecord: obj({
     format:              lit(DeviceRecordFormat),
     applabel,
     user_id,
@@ -76,5 +76,5 @@ export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, appla
     highest_vault_epoch: uint,
   }).strict().readonly(),
 }))
-export type DeviceRecord = Z.infer<typeof DeviceRecord>
+export type DeviceRecord = Z.infer<typeof deviceRecord>
 // --

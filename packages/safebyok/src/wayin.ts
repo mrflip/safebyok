@@ -1,5 +1,5 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
+import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, wayinRecord, type WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './shapes/fields'
 import { vaultStampDuck } from './shapes/ducks'
@@ -92,7 +92,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   static make(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }): PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin {
-    const checked = WayinRecord.parse(record)
+    const checked = wayinRecord.parse(record)
     return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vaultStamp, checked, kit) : new PasskeyWayin(vaultStamp, checked, kit)
   }
 

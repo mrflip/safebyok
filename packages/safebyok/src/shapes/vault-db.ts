@@ -2,11 +2,11 @@
 
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
-import { BoxDamaged, BoxRecord, type BoxSparse } from './box'
-import { VaultSparse } from './vault'
+import { boxDamaged, type BoxDamaged, boxRecord, type BoxSparse } from './box'
+import { vaultSparse } from './vault'
 import { revision_tok } from './fields'
 
-// == [Expectations]: VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion
+// == [Expectations]: vaultRecordExpectation, boxGetExpectation, boxExpectation, vaultDelExpectation, boxDelExpectation, boxDeletion
 
 /** What an update of the vault record was proven against: the vault, and the `gate_epoch` the writer read.
  * The update lands only while the standing vault record still has both. A `gate_epoch` of 0 is a
@@ -14,7 +14,7 @@ import { revision_tok } from './fields'
  *
  * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
  */
-export type VaultRecordExpectation = Z.infer<typeof VaultRecordExpectation>
+export type VaultRecordExpectation = Z.infer<typeof vaultRecordExpectation>
 
 /** The vault a box read means to read in: it finds the box only while the standing vault record has this `vault_tok`.
  * Otherwise it refuses `vault_mismatch`, reading nothing more: none stand, a tombstone stands, or
@@ -23,7 +23,7 @@ export type VaultRecordExpectation = Z.infer<typeof VaultRecordExpectation>
  *
  * @example { vault_tok: vaultRecord.vault_tok }
  */
-export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
+export type BoxGetExpectation = Z.infer<typeof boxGetExpectation>
 
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
  * The write lands only while the standing vault record has this `vault_tok` (else
@@ -32,7 +32,7 @@ export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: prev?.revision_tok ?? null }
  */
-export type BoxExpectation = Z.infer<typeof BoxExpectation>
+export type BoxExpectation = Z.infer<typeof boxExpectation>
 
 /** The vault a deletion means to remove whole: it lands only while the standing vault record has this `vault_tok` and `gate_epoch`.
  * So a delete proven against a gate another device has since changed refuses as stale: an old
@@ -42,7 +42,7 @@ export type BoxExpectation = Z.infer<typeof BoxExpectation>
  *
  * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
-export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
+export type VaultDelExpectation = Z.infer<typeof vaultDelExpectation>
 
 /** What a box deletion was aimed at: the vault, and the `revision_tok` the deleter read.
  * The `revision_tok` is null for a box listed as damaged with no revision a read could take.
@@ -52,7 +52,7 @@ export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok }
  */
-export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
+export type BoxDelExpectation = Z.infer<typeof boxDelExpectation>
 
 /** What a box deletion that landed found under its boxlabel, from the same atomic step as the removal.
  *
@@ -63,27 +63,27 @@ export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
  *
  * @example { outcome: 'deleted_other' }
  */
-export type BoxDeletion = Z.infer<typeof BoxDeletion>
+export type BoxDeletion = Z.infer<typeof boxDeletion>
 
 /** The checks for each expectation a verb is handed, each sliced from the vault record, and for the {@link BoxDeletion} a box deletion answers. Each refuses 'bad_record', which a verb re-throws as its own refusal.
  * An expectation names what it compares and drops the rest, so a whole record handed as one is
  * read for those fields alone.
  */
-export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
-  const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true }).strip()
-  const BoxGetExpectation = VaultSparse.pick({ vault_tok: true }).strip()
+export const { vaultRecordExpectation, boxGetExpectation, boxExpectation, vaultDelExpectation, boxDelExpectation, boxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
+  const vaultRecordExpectation = vaultSparse.pick({ vault_tok: true, gate_epoch: true }).strip()
+  const boxGetExpectation = vaultSparse.pick({ vault_tok: true }).strip()
   return {
-    VaultRecordExpectation,
-    BoxGetExpectation,
-    BoxExpectation:        BoxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
-    VaultDelExpectation:   VaultRecordExpectation.extend({ gate_epoch: uint.nullable() }),
-    BoxDelExpectation:     BoxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
-    BoxDeletion:           obj({ outcome: oneof(['deleted', 'deleted_other', 'absent']) }),
+    vaultRecordExpectation,
+    boxGetExpectation,
+    boxExpectation:        boxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
+    vaultDelExpectation:   vaultRecordExpectation.extend({ gate_epoch: uint.nullable() }),
+    boxDelExpectation:     boxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
+    boxDeletion:           obj({ outcome: oneof(['deleted', 'deleted_other', 'absent']) }),
   }
 })
 // --
 
-// == [Capacity]: Capacity
+// == [Capacity]: capacity
 
 /** How much room a vault has: boxes against the most it holds, and bytes against the most its storage holds of one vault.
  * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a
@@ -93,17 +93,17 @@ export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultD
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */
-export const { Capacity } = Validator('bad_record', ({ obj, union, int, uint, lit }) => {
+export const { capacity } = Validator('bad_record', ({ obj, union, int, uint, lit }) => {
   // A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
   // safe integer, as Bank.make keeps a declared limit: past this check, no limit is infinite.
   const roomLimit = union([int.positive(), lit(Infinity)]).transform((most) => Math.min(most, Number.MAX_SAFE_INTEGER))
   const room      = obj({ used: uint, max: roomLimit })
-  return { Capacity: obj({ boxes: room, bytes: room }) }
+  return { capacity: obj({ boxes: room, bytes: room }) }
 })
-export type Capacity = Z.infer<typeof Capacity>
+export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Read answers]: StoredBox, BoxListing, VaultReadResponse, ListedBox, StoredRevision, ReadAnswer, ListingAnswer, StoredVaultTok
+// == [Read answers]: StoredBox, BoxListing, VaultReadResponse, listedBox, storedRevision, readAnswer, listingAnswer, storedVaultTok
 
 /** One box row as a VaultDB's `doGetVault` and `doEnsureVault` read it, as {@link splitStoredBoxes} takes it: the boxlabel the row is filed under, and its record exactly as stored.
  * Take `boxlabel` from the row's scopepath or column, never from its record: a damaged box is
@@ -111,7 +111,7 @@ export type Capacity = Z.infer<typeof Capacity>
  * two ciphered fields, with no cast: it is typed `unknown`, as it may be damaged, and the split
  * judges it.
  *
- * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow }
+ * @example { boxlabel: Scopepath.boxscopeOf(scopepath).boxlabel, box: storedRow }
  */
 export type StoredBox = { boxlabel: string, box: unknown }
 
@@ -135,15 +135,15 @@ export type BoxListing = Readonly<{
 export type VaultReadResponse = BoxListing & { vault: unknown }
 
 /** A box as `doGetVault` may hand it up, whole or with its two ciphered fields left out, so a projecting backend is checked as one handing whole records; the one field of a damaged box the listing keeps, when the record holds it as text, what a write over it names; and a vault read's answer, an object holding its vault record as stored, and its listing, each sound box an object to judge, each damaged one a {@link BoxDamaged}. */
-export const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
-  ListedBox:      BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
-  StoredRevision: obj({ revision_tok }),
-  ReadAnswer:     obj({ vault: unk }).loose(),
-  ListingAnswer:  obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BoxDamaged) }).loose(),
+export const { listedBox, storedRevision, readAnswer, listingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
+  listedBox:      boxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
+  storedRevision: obj({ revision_tok }),
+  readAnswer:     obj({ vault: unk }).loose(),
+  listingAnswer:  obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(boxDamaged) }).loose(),
 }))
 
 /** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */
-export const { StoredVaultTok } = Validator('bad_record', () => ({
-  StoredVaultTok: VaultSparse.pick({ vault_tok: true }).strip(),
+export const { storedVaultTok } = Validator('bad_record', () => ({
+  storedVaultTok: vaultSparse.pick({ vault_tok: true }).strip(),
 }))
 // --

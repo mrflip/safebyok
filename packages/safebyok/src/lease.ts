@@ -1,4 +1,4 @@
-import { type BoxCiphered, BoxRecord, BoxSparse, BoxStamp, CipheredShape } from './shapes/box'
+import { type BoxCiphered, type BoxRecord, boxSparse, type BoxSparse, boxStamp, type BoxStamp, cipheredShape } from './shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -6,7 +6,7 @@ import { sameScope } from './names'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseFormat, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
+import { LeaseFormat, leaseRecord, type LeaseRecord, type LeaseStamp, type LeaseSparse } from './shapes/device'
 import type { VaultSparse, VaultStamp } from './shapes/vault'
 import { type VaultStampButFormat, leaseStampDuck, vaultStampButFormatDuck } from './shapes/ducks'
 import type { ConsistencyWith } from './types/type-aliases'
@@ -23,9 +23,9 @@ import type { Vault } from './vault'
  */
 
 /** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; and a box record's sparse fields, as {@link BoxSparse} has them. Each refuses 'bad_record'. */
-export const { LeaseGrant, VisibleShape } = Validator('bad_record', () => ({
-  LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
-  VisibleShape:        BoxSparse.strip(),
+export const { leaseGrant, visibleShape } = Validator('bad_record', () => ({
+  leaseGrant:          leaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
+  visibleShape:        boxSparse.strip(),
 }))
 
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
@@ -45,8 +45,8 @@ export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseSta
  *
  * @example await cipherBytes(boxKey, whisperBytes, boxCtxOf(vault, { ...visible, vault_tok: vault.vault_tok }, 'whisper_ciphered'))
  */
-export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
-  const { sidecar, ...stamp } = BoxStamp.parse(boxStamp)
+export const boxCtxOf = (vaultStamp: VaultStampButFormat, ownStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
+  const { sidecar, ...stamp } = boxStamp.parse(ownStamp)
   return cipherCtx([vaultStampButFormatDuck.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
 }
 
@@ -123,7 +123,7 @@ export class Lease implements LeaseSparse {
    * @example Lease.make(vault, { ...record, user_id: 'someone_else' })   // throws 'corrupt_record': another vault's
    */
   static make(vault: ConsistencyWith<VaultStamp & Pick<Vault, 'tryLock'>>, record: unknown): Lease {
-    const checked = LeaseRecord.safeParse(record)
+    const checked = leaseRecord.safeParse(record)
     if (! checked.success) {
       throw new VaultError('corrupt_record', "This device's lease is not in a form this package writes, so it can't be taken up: the vault asks for a proof instead.")
     }
@@ -276,7 +276,7 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  */
 export const sealLeaseRecord = async (standing: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey, grant: { leaseMillis: number, now: number }): Promise<LeaseRecord> => {
   const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = standing
-  const granted = LeaseGrant.parse({ applabel, user_id, vaultlabel, vault_tok, gate_epoch, ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture) })
+  const granted = leaseGrant.parse({ applabel, user_id, vaultlabel, vault_tok, gate_epoch, ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture) })
   const stamp = { format: LeaseFormat, ...granted } as const
   const leaseKey = await makeLeaseKey()
   const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(standing, stamp))
@@ -288,7 +288,7 @@ const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
 /** `visible`, once it is a box record's visible fields: 'bad_record' otherwise, quoting none of it. */
 const checkedVisible = (visible: unknown): BoxSparse => {
-  const checked = VisibleShape.safeParse(visible)
+  const checked = visibleShape.safeParse(visible)
   if (! checked.success) {
     throw new VaultError('bad_record', "A lease ciphers and deciphers a box bound to that box's visible fields: every field of a box record but box_key_wrapped and whisper_ciphered, as Box.seal and box.extractWhisper hand them in.")
   }
@@ -297,7 +297,7 @@ const checkedVisible = (visible: unknown): BoxSparse => {
 
 /** `ciphered`, once it is a box's two ciphered fields: 'bad_record' otherwise, quoting none of it. */
 const checkedCiphered = (ciphered: unknown): BoxCiphered => {
-  const checked = CipheredShape.safeParse(ciphered)
+  const checked = cipheredShape.safeParse(ciphered)
   if (! checked.success) {
     throw new VaultError('bad_record', "A lease deciphers a box's two ciphered fields, box_key_wrapped and whisper_ciphered, as a box record holds them.")
   }

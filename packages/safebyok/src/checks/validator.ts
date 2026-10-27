@@ -4,7 +4,7 @@ import * as Zod from 'zod'
 import type * as Z from 'zod'
 import { VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
-import { EpochMillis, label, user_id } from './primitives'
+import { epochMillis, label, user_id } from './primitives'
 
 // == [Kit]: Kit, KitWith
 
@@ -44,8 +44,7 @@ export const Kit = {
   /** A safe integer, 0 or more: an epoch or a count. */
   uint:    Zod.int().nonnegative(),
   bool:    Zod.boolean(),
-  label, applabel: label, vaultlabel: label, boxlabel: label, user_id,
-  epochMillis: EpochMillis,
+  label, applabel: label, vaultlabel: label, boxlabel: label, user_id, epochMillis,
 } as const
 
 /** The kit a builder gets: {@link Kit}, with the given modules' exports spread in beneath it. */
@@ -65,7 +64,7 @@ type Merged<SourcesT extends readonly object[]> =
  * never which, and lists the fields the object takes. It quotes no input, and carries no `cause`.
  *
  * Only `parse` changes. `safeParse` and `parseAsync` are Zod's own, and so is any schema made
- * from a validator outside a `Validator` call (`VaultSparse.pick(...)`): its `parse` throws a
+ * from a validator outside a `Validator` call (`vaultSparse.pick(...)`): its `parse` throws a
  * ZodError. Make such a slice in a call of its own where it should refuse. A validator nested in
  * another refuses with the outer one's kind.
  *
@@ -84,16 +83,16 @@ type Merged<SourcesT extends readonly object[]> =
  *   })
  *   vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' })  // throws 'bad_scope', "vaultlabel: A label is ..."
  * @example
- *   export const { BoxRecord, BoxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
- *     const BoxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
- *     const BoxSparse = BoxRecord.omit({ whisper_ciphered: true })
- *     return { BoxRecord, BoxSparse }
+ *   export const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
+ *     const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
+ *     const boxSparse = boxRecord.omit({ whisper_ciphered: true })
+ *     return { boxRecord, boxSparse }
  *   })
- *   BoxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
+ *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
  * @example
- *   export const { VaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, GateRecord }) => {
- *     const VaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: GateRecord.nullable() }).strict()
- *     return { VaultRecord }
+ *   export const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
+ *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
+ *     return { vaultRecord }
  *   }, [GateChecks])
  */
 export const Validator = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
