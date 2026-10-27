@@ -182,6 +182,10 @@ it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19
   the next birth asks first.
 * **A sign-out with an unlock in flight in another tab**: harmless today, a lease being scoped by
   user id.
+* **A lock that lands during a call's opening hello is not refused** (the documentarian's run 2,
+  [#312](https://github.com/mrflip/safebyok/pull/312)): the call then finds no lease and prompts,
+  where a lock landing a step later refuses 'vault_locked'. Decide whether the opening hello is a
+  step a lock refuses at.
 
 ### Must the passphrase be asked again once a vault has a passkey?
 
@@ -228,6 +232,11 @@ carrying nothing of what it threw (it may quote the passphrase: #262), so a dial
 a reason the host could name -- a lost user gesture, a passkey the platform refused -- cannot say
 so. Decide what a `requestCleartext` may refuse with: a short list of kinds it may throw as
 `VaultError`s, kept as they came, or a `gating.refuse(kind)` beside `decline()`.
+
+The same throw reaches `del()` (the documentarian's run 2,
+[#312](https://github.com/mrflip/safebyok/pull/312)): once its write is sent, a `requestCleartext`
+that throws becomes the gating's late landing, so a deletion storage then refuses reaches the
+caller as 'unexpected_error', not 'vault_locked'.
 
 ### "Add "sensitive" and "host" flags to refusals"
 
