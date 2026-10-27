@@ -37,3 +37,24 @@ alone writes this file.
   `isOutcomeShaped` describe) and in outcome.ts's imports.
 * **Stalls:** worker streams have stalled on long command output. Handoffs now say to pipe output
   through `tail`, and to commit after each milestone.
+
+## Thread 3, `device_db_class` (#298): built, in review
+
+*Orchestrator:*
+* **DeviceDB is a base class.** Its hooks are `doGetLease` and the like, and two more:
+  - `doDelUnreadable(scopepath, isReadable)`: one conditional discard for both kinds of record.
+  - `doRaiseDeviceRecord(deviceScopepath, raisedFrom)`: one read-and-write in the store. The base
+    owns the rule and hands it in as the updater.
+  The hooks take scopepaths, where VaultDB's take scopes.
+* **The device-record race was real.** The new `describeDeviceDB` test failed against main's idb
+  store, and passes now.
+* **Behaviour change:** the base now discards a host's unreadable lease without a word, as the
+  built-in stores always did. Fifteen vault tests were rewritten for it.
+* **For thread 2:** `Bank.#bearFrom` and `#revokeLease` no longer take a `deviceDB`; they read
+  `parts.deviceDB`.
+* **For tests:** `safebyok/testing` has `TH.spyOnDeviceHook(deviceDB, verb)`. A DeviceDB's public
+  verbs no longer reject, so a test that needs one to fail spies on its hook.
+* **`isOutcomeShaped` survives on #298,** because `adapterAnswer` still calls it on that branch.
+  The restack deletes it.
+* **This machine is slow:** a full `eslint src tests` hit a five-minute timeout, and attw once took
+  21 minutes. While building, lint and test single files, and run `pnpm justify` once at the end.
