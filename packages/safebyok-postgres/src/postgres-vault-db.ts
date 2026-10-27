@@ -1,4 +1,4 @@
-import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
+import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, vaultScope, type VaultScope, splitStoredBoxes } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultReadResponse, VaultRecord, VaultDraft } from 'safebyok'
 import * as Columns from './columns'
 import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
@@ -491,7 +491,7 @@ const storedVaultOf = (row: unknown): VaultReadResponse => {
 
 /** True when a notification's payload names `scope`, or names nothing readable, which costs a spurious refresh at worst. */
 const namesScope = (payload: string, scope: VaultScope): boolean => {
-  const named = VaultScope.safeParse(jsonOrNull(payload))
+  const named = vaultScope.safeParse(jsonOrNull(payload))
   if (! named.success) { return true }
   return named.data.applabel === scope.applabel && named.data.user_id === scope.user_id && named.data.vaultlabel === scope.vaultlabel
 }

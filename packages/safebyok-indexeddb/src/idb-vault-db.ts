@@ -171,7 +171,7 @@ const storedBoxesOf = (ckeys: IDBValidKey[], rows: unknown[]): StoredBox[] => (
     .map((ckey, idx) => ({ ckey, box: rows[idx] }))
     .filter((stored): stored is { ckey: Scopepath.BoxScopepath, box: unknown } => Scopepath.isBox(stored.ckey))
     // A row goes to the split as stored, whatever it holds: the split judges it.
-    .map(({ ckey, box }) => ({ boxlabel: Scopepath.boxscope(ckey).boxlabel, box }))
+    .map(({ ckey, box }) => ({ boxlabel: Scopepath.boxscopeOf(ckey).boxlabel, box }))
 )
 
 /** The row at `scopepath`, read in the transaction `store` belongs to, or undefined for none. */

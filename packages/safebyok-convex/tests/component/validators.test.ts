@@ -85,16 +85,16 @@ const convexShape = (validator: GenericValidator): Shape => {
 
 // A novel vault's record, as `ensureVault` takes it: the core writes it out as a VaultRecord whose
 // gate is null, and checks its gate_epoch is 0.
-const novelVaultRecordZod = Records.VaultSparse.extend({ gate_epoch: Zod.literal(0), gate: Zod.null() })
+const novelVaultRecordZod = Records.vaultSparse.extend({ gate_epoch: Zod.literal(0), gate: Zod.null() })
 
 const ShapeCases = [
-  [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
-  [Records.VaultScope.unwrap(), VaultScope, 'VaultScope: what names one vault, which the core hands out frozen'],
-  [Records.VaultRecord,  VaultRecord, 'VaultRecord: every field, its gate nested and nullable, the wayins\' ciphered wraps nested in it'],
-  [Records.GateRecord,   Gate,       'Gate: the passphrase, and the passkey or null'],
+  [Records.ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
+  [Records.vaultScope.unwrap(), VaultScope, 'VaultScope: what names one vault, which the core hands out frozen'],
+  [Records.vaultRecord,  VaultRecord, 'VaultRecord: every field, its gate nested and nullable, the wayins\' ciphered wraps nested in it'],
+  [Records.gateRecord,   Gate,       'Gate: the passphrase, and the passkey or null'],
   [novelVaultRecordZod,  NovelVaultRecord, 'NovelVaultRecord: every field, gate_epoch 0 and no gate'],
-  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as an object of any JSON values, both ciphered fields nested'],
-  [Records.BoxSparse,    BoxSparse,  'BoxSparse: the record without its ciphered fields, format kept'],
+  [Records.boxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as an object of any JSON values, both ciphered fields nested'],
+  [Records.boxSparse,    BoxSparse,  'BoxSparse: the record without its ciphered fields, format kept'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod records", () => {
@@ -111,7 +111,7 @@ describe("the Convex validators, field for field with the core's Zod records", (
     expectTypeOf<Readonly<Infer<typeof VaultScope>>>().toEqualTypeOf<Records.VaultScope>()
     // A box's sidecar is an object of any values to Convex, which the core holds to JSON values on every read.
     // Convex holds what storage holds, a record as it goes into the core's check, before its ciphered fields are branded.
-    expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Zod.input<typeof Records.BoxRecord>, 'sidecar'>>()
+    expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Zod.input<typeof Records.boxRecord>, 'sidecar'>>()
     // A box's sparse shape is the stored record less its ciphered fields, so it is the stored
     // record's shape a listing must meet.
     expectTypeOf<Omit<Infer<typeof BoxSparse>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
@@ -222,21 +222,21 @@ const BoxCases = [
 describe("the Convex validators, against the core's Zod records, record by record", () => {
   for (const [vaultRecord, zodOk, convexOk, blurb] of VaultRecordCases) {
     it(`vault record: ${blurb}`, async () => {
-      expect(Records.VaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
+      expect(Records.vaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultRecord, { vaultRecord: vaultRecord as never }))).to.eq(convexOk)
     })
   }
 
   for (const [box, zodOk, convexOk, blurb] of BoxCases) {
     it(`box: ${blurb}`, async () => {
-      expect(Records.BoxRecord.safeParse(box).success).to.eq(zodOk)
+      expect(Records.boxRecord.safeParse(box).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
 
   it("box: a sidecar that is no object -- null, an array, text -- is refused by both: by Zod, and by Convex's record validator, which a deployment runs and convex-test does not", () => {
     for (const sidecar of [null, ['a', 1], 'work account']) {
-      expect(Records.BoxRecord.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar }).success).to.be.false
+      expect(Records.boxRecord.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar }).success).to.be.false
     }
     expect(BoxRecord.fields.sidecar.kind).to.eq('record')
   })

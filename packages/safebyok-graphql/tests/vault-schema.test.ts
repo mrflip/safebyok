@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, BoxDamaged, BoxRecord, GateRecord, VaultRecord, VaultScope } from 'safebyok'
+import { ciphered, boxDamaged, boxRecord, gateRecord, vaultRecord, vaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -14,17 +14,17 @@ type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safePars
 
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
-  ['SafebyokVaultScope',         VaultScope.unwrap(), []],
-  ['SafebyokVaultRecord',        VaultRecord, []],
-  ['SafebyokVaultRecordInput',   VaultRecord, []],
-  ['SafebyokGate',               GateRecord,  []],
-  ['SafebyokGateInput',          GateRecord,  []],
-  ['SafebyokBox',                BoxRecord,   []],
-  ['SafebyokBoxInput',           BoxRecord,   []],
-  ['SafebyokBoxSparse',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
-  ['SafebyokBoxDamaged',         BoxDamaged,  []],
-  ['SafebyokCiphered',           Ciphered,    []],
-  ['SafebyokCipheredInput',      Ciphered,    []],
+  ['SafebyokVaultScope',         vaultScope.unwrap(), []],
+  ['SafebyokVaultRecord',        vaultRecord, []],
+  ['SafebyokVaultRecordInput',   vaultRecord, []],
+  ['SafebyokGate',               gateRecord,  []],
+  ['SafebyokGateInput',          gateRecord,  []],
+  ['SafebyokBox',                boxRecord,   []],
+  ['SafebyokBoxInput',           boxRecord,   []],
+  ['SafebyokBoxSparse',          boxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxDamaged',         boxDamaged,  []],
+  ['SafebyokCiphered',           ciphered,    []],
+  ['SafebyokCipheredInput',      ciphered,    []],
 ] as const
 
 /** The fields of the object or input type `typename`, by name. */
