@@ -36,8 +36,8 @@ export const unexpectedError = (thrown: unknown): VaultError => (
 )
 
 /** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
-export const StaleWriteVals = ['del'] as const
-export type StaleWrite = typeof StaleWriteVals[number]
+export const staleWriteVals = ['del'] as const
+export type StaleWrite = typeof staleWriteVals[number]
 
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {

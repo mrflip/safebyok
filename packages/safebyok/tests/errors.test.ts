@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -19,20 +19,20 @@ const tableKinds = (text: string): string[] => (
 
 /** The kinds a doc block names, in backticks. */
 const namedKinds = (text: string): string[] => (
-  RefusalKindVals.filter((kind) => text.includes(`\`${kind}\``))
+  refusalKindVals.filter((kind) => text.includes(`\`${kind}\``))
 )
 
 const MisuseKinds    = tableKinds(between(readmeText, '### Misuse', '### Conditions'))
 const ConditionKinds = tableKinds(between(readmeText, '### Conditions', '### Bad news'))
 const BadNewsKinds   = tableKinds(between(readmeText, '### Bad news', '\n## '))
 
-describe("RefusalKindVals", () => {
+describe("refusalKindVals", () => {
   it("lists each kind once", () => {
-    expect(new Set(RefusalKindVals).size).to.eq(RefusalKindVals.length)
+    expect(new Set(refusalKindVals).size).to.eq(refusalKindVals.length)
   })
 
   it("is documented in the README, each kind in exactly one family's table", () => {
-    expect([...MisuseKinds, ...ConditionKinds, ...BadNewsKinds]).to.have.members([...RefusalKindVals])
+    expect([...MisuseKinds, ...ConditionKinds, ...BadNewsKinds]).to.have.members([...refusalKindVals])
   })
 
   it("puts the same kinds in each family as the doc block in errors.ts does", () => {
@@ -56,7 +56,7 @@ describe("VaultError", () => {
     const cause = new Error('socket closed')
     const err = new VaultError('storage_unavailable', 'Try again shortly.', { cause })
     expect(err).to.include({ refusalkind: 'storage_unavailable', family: 'condition', message: 'Try again shortly.', cause })
-    for (const refusalkind of RefusalKindVals) {
+    for (const refusalkind of refusalKindVals) {
       expect(new VaultError(refusalkind, 'Said.').family).to.eq(RefusalFamilyForKind[refusalkind])
     }
   })
@@ -86,15 +86,15 @@ describe("VaultError", () => {
 })
 
 /** The kinds RefusalFamilyForKind puts in `family`. */
-const familyKinds = (family: string): string[] => RefusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
+const familyKinds = (family: string): string[] => refusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
 
 describe("RefusalFamilyForKind", () => {
   it("names a family for every kind, and only for kinds", () => {
-    expect(Object.keys(RefusalFamilyForKind)).to.have.members([...RefusalKindVals])
+    expect(Object.keys(RefusalFamilyForKind)).to.have.members([...refusalKindVals])
   })
 
-  it("uses only the families in RefusalFamilyVals, and uses each of them", () => {
-    expect([...new Set(Object.values(RefusalFamilyForKind))]).to.have.members([...RefusalFamilyVals])
+  it("uses only the families in refusalFamilyVals, and uses each of them", () => {
+    expect([...new Set(Object.values(RefusalFamilyForKind))]).to.have.members([...refusalFamilyVals])
   })
 
   it("puts each kind in the family the README's tables do", () => {
@@ -159,7 +159,7 @@ const FamilyCases = [
 
 describe("each kind's family", () => {
   it("covers every kind in the cases below", () => {
-    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...RefusalKindVals])
+    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...refusalKindVals])
   })
 
   for (const [kind, family, blurb] of FamilyCases) {

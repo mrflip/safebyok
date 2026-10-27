@@ -427,7 +427,7 @@ export class Bank {
 
   /** Refuse 'bad_scope' for `names`, already checked, holding an `applabel` or `user_id` other than the bank's: the one comparison {@link Bank.demandConsistentWith} and every call naming a vault make. */
   #demandSameScope(names: BankBag) {
-    const others = CX.BankScopepathFieldnameVals.filter((fieldname) => names[fieldname] !== undefined && names[fieldname] !== this.#scope[fieldname])
+    const others = CX.bankScopepathFieldnameVals.filter((fieldname) => names[fieldname] !== undefined && names[fieldname] !== this.#scope[fieldname])
     if (others.length > 0) { throw otherScopeError(others) }
   }
   // --

@@ -65,7 +65,7 @@ export const { sidecar } = Validator('bad_option', () => ({ sidecar: whisperBag 
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
-// == [The record]: BoxFormat, boxRecord, boxSparse, DamagedBoxRecord, BoxDamageVals, boxDamaged, boxStamp, cipheredShape, BoxCiphered
+// == [The record]: BoxFormat, boxRecord, boxSparse, DamagedBoxRecord, boxDamageVals, boxDamaged, boxStamp, cipheredShape, BoxCiphered
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
 export const BoxFormat = 'safebyok-box-v8'
@@ -127,7 +127,7 @@ export type BoxSparse = Z.infer<typeof boxSparse>
 export type DamagedBoxRecord = Z.input<typeof boxRecord>
 
 /** The ways a box stored may fail to read back: `damaged`, and `newer_format`, a record in a `format` this version does not know, which a newer safebyok may have written. */
-export const BoxDamageVals = ['damaged', 'newer_format'] as const
+export const boxDamageVals = ['damaged', 'newer_format'] as const
 
 /** A box whose stored record does not read back, as a vault's listing shows it, beside its sound boxes and never among them: the boxlabel it is filed under, the revision it holds, and its `damage`. Its `parse` refuses 'bad_record'.
  * Nothing else of it is trusted. Its `revision_tok` is the one its record holds, when it holds one
@@ -142,7 +142,7 @@ export const BoxDamageVals = ['damaged', 'newer_format'] as const
  *   }
  */
 export const { boxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel }) => ({
-  boxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(BoxDamageVals) }).strict(),
+  boxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict(),
 }))
 export type BoxDamaged = Z.infer<typeof boxDamaged>
 

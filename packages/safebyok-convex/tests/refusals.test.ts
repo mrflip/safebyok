@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RefusalKindVals } from 'safebyok'
-import { SafebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
+import { refusalKindVals } from 'safebyok'
+import { safebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
 
 const ErrorDataCases = [
   // safebyok's own refusals:
@@ -23,12 +23,12 @@ describe("isSafebyokErrorData", () => {
   }
 
   it("knows exactly the kinds the functions and a host's getUserId throw", () => {
-    expect(SafebyokErrorKindVals).to.deep.equal(['identity_revoked', 'not_permitted'])
+    expect(safebyokErrorKindVals).to.deep.equal(['identity_revoked', 'not_permitted'])
   })
 })
 
-describe("SafebyokErrorKindVals", () => {
-  it("names only kinds the core's RefusalKindVals lists", () => {
-    for (const kind of SafebyokErrorKindVals) { expect(RefusalKindVals).to.include(kind) }
+describe("safebyokErrorKindVals", () => {
+  it("names only kinds the core's refusalKindVals lists", () => {
+    for (const kind of safebyokErrorKindVals) { expect(refusalKindVals).to.include(kind) }
   })
 })

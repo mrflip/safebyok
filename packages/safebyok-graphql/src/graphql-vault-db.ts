@@ -1,4 +1,4 @@
-import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import { Refusals, Sanitizer, VaultDB, VaultError, refusalKindVals } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
@@ -346,4 +346,4 @@ const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_st
   return new VaultError(refusalkind, message, { meta: { capacity: capacity as Exclude<RefusalMeta['capacity'], undefined> } })
 }
 
-const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (refusalKindVals as readonly unknown[]).includes(kind)

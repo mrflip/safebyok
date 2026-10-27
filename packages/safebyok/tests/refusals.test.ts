@@ -50,7 +50,7 @@ describe("Refusals.unexpectedError", () => {
 })
 
 describe("Refusals.staleWrite", () => {
-  for (const what of Refusals.StaleWriteVals) {
+  for (const what of Refusals.staleWriteVals) {
     it(`refuses a ${what} write as stale_write, saying to read again, with no cause`, () => {
       const refusal = Refusals.staleWrite(what)
       expect(refusal.refusalkind).to.eq('stale_write')

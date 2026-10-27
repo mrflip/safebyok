@@ -14,9 +14,9 @@ import type { Vault } from './vault'
  */
 
 /** Each kind of gating, by the change its attempt makes: see {@link Gating}. */
-export const GatingKindVals = ['initialize_gate', 'unlock_vault', 'change_passphrase', 'put_passkey', 'del_passkey', 'del_vault'] as const
+export const gatingKindVals = ['initialize_gate', 'unlock_vault', 'change_passphrase', 'put_passkey', 'del_passkey', 'del_vault'] as const
 /** The kind of a {@link Gating}: `initialize_gate`, `unlock_vault`, `change_passphrase`, `put_passkey`, `del_passkey` or `del_vault`. */
-export type GatingKind = typeof GatingKindVals[number]
+export type GatingKind = typeof gatingKindVals[number]
 
 /** The refusals of this device's own store, which a grant after `putWayin`'s or `delWayin`'s change to the ways in only warns of. */
 const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable', 'storage_blocked'])
@@ -26,7 +26,7 @@ const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable
  * in that is gone or stored damaged ('absent_wayin', 'damaged_wayin'), or a passkey this browser
  * cannot ask ('passkey_unavailable'), leaves the other way in to try, or Cancel.
  */
-export const CorrectableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
+export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
 
 /** The vault call a gating was raised by, as the logger names it. */
 export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
@@ -91,7 +91,7 @@ export type DelVaultGating = GatingCommon & {
 
 /** One request for cleartext, handed to the host's {@link RequestCleartext}: a discriminated union on `gatingkind`, each kind carrying its one typed attempt beside `decline` and `lockLanded`.
  * Call the attempt on each submit. It runs the kind's whole chain and resolves the vault, or the
- * refusal. A refusal the user can correct ({@link CorrectableKindVals}: 'wrong_passphrase',
+ * refusal. A refusal the user can correct ({@link correctableKindVals}: 'wrong_passphrase',
  * 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin',
  * 'passkey_unavailable') leaves the gating open: show it in place and ask again. Any other
  * outcome, success among them, settles the gating, and every call waiting on it hears it: close
@@ -270,7 +270,7 @@ export class RaisedGating implements ProvingGating {
       return settled.ok ? good(this.#vault) : bad(settled.err)
     } catch (err) {
       const refused = this.#tools.badOutcome(err)
-      if (! (CorrectableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
+      if (! (correctableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
       return refused
     } finally {
       this.#attempting = false

@@ -67,7 +67,7 @@ describe("Scopepath, refusing a scope whose names fail their checks", () => {
     TH.expectSyncRefusal(() => Scopepath.bank({ applabel: 'acme', user_id: '' }), 'bad_scope')
   })
 
-  for (const fieldname of CX.BoxScopepathFieldnameVals) {
+  for (const fieldname of CX.boxScopepathFieldnameVals) {
     it(`refuses a ${fieldname} holding the delimiter, quoting none of it`, () => {
       const refusal = TH.expectSyncRefusal(() => Scopepath.box({ ...u1, boxlabel: 'openai', [fieldname]: 'sec^ret' }), 'bad_scope')
       expect(refusal.meta?.fieldnames).to.deep.equal([fieldname])
