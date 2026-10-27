@@ -658,6 +658,16 @@ strict like the adapter's (one 'safebyok' default); one sentence in `Validator`'
 schema keyed by input (`record`, `.catchall()`) repeats those keys in refusals; the doc blocks of
 `ensureVault` (its store sentence), `StoredBox`, `key-deriver-spec-checks.ts`'s header and `Kit`.
 
+*Review:* medium, `fixed`: filed as [#291](https://github.com/mrflip/safebyok/pull/291). Fixed: the
+scopepath lambdas the PR touched were still named `ckey`; the changeset's first line now names the
+strict IndexedDB options and `VaultReadResponse.vault` as `unknown`. Checked: `vault.stamp` is a
+frozen copy of the six public stamp fields, nothing private reachable; every `ensure*` is
+idempotent; no "standing" renamed. Left: two `ckey` lambda locals on untouched lines (demo's
+`StoreTable.tsx`, convex's test helpers); `nextMicrotask` starts `#settleBirth` a tick later than
+before (harmless; the "a microtask on" comment is a tick off); one misaligned `subscribe:` in
+`string-store.ts`; `TH.cheatGetVaultEpoch` returns the sparse record, more than an epoch.
+Rebased onto main after #272 merged, with STYLE.md's spread example naming `vault.stamp`.
+
 ### 16. Retire "standing" -- `retire_standing`
 
 **Not run in this sprint** (the Coach, 2026-10-27): the prompt stays for a later session.
