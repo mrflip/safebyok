@@ -146,8 +146,8 @@ export class Bank {
    * It holds one once the vault's element of the listing is `ready`, and until it is let go or
    * found gone. Null while the birth is under way, once it was refused, and for a vault never asked
    * for or let go: {@link Bank.bankVaultOf} tells them apart, and {@link Bank.ensureVault} asks.
-   * Refuses 'bad_scope' for a name that fails its check, or a bag of another app or user than the
-   * bank's.
+   * Refuses 'bad_scope' for a name that fails its check, a field the bag does not take, or a bag of
+   * another app or user than the bank's.
    *
    * @example const vault = bank.vaultOf({ vaultlabel: 'main' })   // null until bank.ensureVault has born it
    */
@@ -157,8 +157,8 @@ export class Bank {
 
   /** The element of the bank's listing for the vault `bag` names, or null for a vault never asked for or let go: synchronous, and reading nothing.
    * It is the one {@link Bank.vaults} holds, looked up by the vault's scope rather than found in the
-   * list. Refuses 'bad_scope' for a name that fails its check, or a bag of another app or user than
-   * the bank's.
+   * list. Refuses 'bad_scope' for a name that fails its check, a field the bag does not take, or a
+   * bag of another app or user than the bank's.
    *
    * @example bank.bankVaultOf({ vaultlabel: 'main' })?.lifecycle   // 'starting' | 'ready' | 'refused', or undefined
    */
@@ -239,18 +239,18 @@ export class Bank {
    * `refused`, and the next ask births anew.
    *
    * A vault's own stores, where not the bank's, go in `opts`: a store in the bag naming the vault
-   * refuses 'bad_scope', as any field but its names does. One scope lives in one place: an ask for a vault
-   * the bank holds, or is birthing, names in `opts` the stores it was born from (left out, the
-   * bank's own): the same objects, as stores are compared by identity, so make each store once.
+   * refuses 'bad_scope', as any field but its names does. One scope lives in one place: an ask for
+   * a vault the bank holds, or is birthing, names in `opts` the stores it was born from (left out,
+   * the bank's own): the same objects, as stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_scope' for a bag of another app or user than the bank's, a name that fails its
    * check, or a field it does not take, and 'bad_option' for options amiss, each before storage is
-   * touched; and 'bad_option' for
-   * options naming another `vaultDB` or `deviceDB` object than the vault held was born from, one
-   * made afresh over the same storage among them. Refuses as storage refuses: 'damaged_vault' for a
-   * vault record it cannot use (`delDamagedVault` clears it), 'newer_format', 'identity_revoked',
-   * 'storage_unavailable'. Refuses 'vault_behind' for a vault below this device's record, as the
-   * class says. Its BankVault keeps the refusal; bad news among them is told to `onBadNews`.
+   * touched; and 'bad_option' for options naming another `vaultDB` or `deviceDB` object than the
+   * vault held was born from, one made afresh over the same storage among them. Refuses as storage
+   * refuses: 'damaged_vault' for a vault record it cannot use (`delDamagedVault` clears it),
+   * 'newer_format', 'identity_revoked', 'storage_unavailable'. Refuses 'vault_behind' for a vault
+   * below this device's record, as the class says. Its BankVault keeps the refusal; bad news among
+   * them is told to `onBadNews`.
    *
    * @example const vault = await bank.ensureVault({ vaultlabel: 'main' })
    * @example const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
@@ -287,7 +287,8 @@ export class Bank {
    * on it refuses 'vault_gone', as a birth under way does; one let go in the task that asked for it
    * has read nothing.
    * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_scope' for a name that
-   * fails its check, or a bag of another app or user than the bank's.
+   * fails its check, a field the bag does not take, or a bag of another app or user than the
+   * bank's.
    *
    * @example bank.closeVault({ vaultlabel: 'main' })
    * @example bank.closeVault({ vaultlabel: vault.vaultlabel })   // the vault a Vault object is of
