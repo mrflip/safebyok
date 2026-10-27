@@ -322,12 +322,16 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
   const calls = { create: [] as CredentialCreationOptions[], get: [] as CredentialRequestOptions[] }
   let refusal: string | null = null
   let touched: string | null = null
+  const handed: BufferSource[] = []
 
   const credentialOf = (rawId: Uint8Array<ArrayBuffer>, prf: AuthenticationExtensionsPRFOutputs | undefined): FakeCredential => ({
     type:                      'public-key',
     id:                        toB64(rawId),
     rawId:                     rawId.buffer,
-    getClientExtensionResults: () => (prf === undefined ? {} : { prf }),
+    getClientExtensionResults: () => {
+      if (prf?.results?.first !== undefined) { handed.push(prf.results.first) }
+      return prf === undefined ? {} : { prf }
+    },
   })
   const refuseIfTold = () => {
     if (refusal === null) { return }
@@ -369,6 +373,8 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     calls,
     /** The credential ids (base64url) of every passkey the fake holds, made or not. */
     credentialIds: () => [...madeIds],
+    /** Every PRF answer the fake handed out, as the buffer it handed: what its caller should have zeroed once copied. */
+    answersHanded: () => [...handed],
     /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
     refuseNext:    (errname: string) => { refusal = errname },
     /** Answer the next `get`s with this credential (base64url id) only, as the user touching it. */
