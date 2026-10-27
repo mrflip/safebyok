@@ -115,7 +115,6 @@ export type Refused<OT> = OT & { readonly lifecycle: 'refused', readonly err: Va
  * The collaborator demands at each of its junctions that it is still consistent with the vault
  * record held.
  *
- *
  * @example const make = (vault: ConsistencyWith<VaultScope>) => { vault.demandConsistentWith(thing) }
  */
 export type ConsistencyWith<OT> = OT & Pick<Vault, 'demandConsistentWith'>

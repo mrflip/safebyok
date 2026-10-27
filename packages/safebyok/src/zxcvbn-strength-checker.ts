@@ -107,8 +107,8 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
  *
  * zxcvbn and its dictionary, about 216 kB brotlied, are a chunk of their own in a bundled app. Its
  * `load` fetches them, and `bank.hello()` runs it; failing that, its first call does. After that, a
- * call takes a few milliseconds, so a field may call it on every keystroke. A load that fails throws, failing the
- * bank's hello, and the next load tries again.
+ * call takes a few milliseconds, so a field may call it on every keystroke. A load that fails
+ * throws, failing the bank's hello, and the next load tries again.
  *
  * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. The vault
  *   always passes it.
