@@ -5,7 +5,7 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** thread 3 filed (#298). Thread 1's flag ruled (check stays removed); it files once its worker confirms `describeVaultDB` catches a forgetful `doGetBox`. Threads 2, 4 and 5 waiting.
+* **Status:** threads 1 (#297) and 3 (#298) filed; thread 2 building, stacked on #297; threads 4 and 5 waiting.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
@@ -100,6 +100,20 @@ sprint has merged.
   device-db.ts.
 * **security.md:** it says the one catch, `outcomeOf`, makes a `storage_unavailable` with its
   cause. Have a `sonnet` subagent update that passage to the new default.
+
+*Review:* flagged, then ruled ([#297](https://github.com/mrflip/safebyok/pull/297)).
+* **The reviewer fixed two things:** `bank.ts` and `vault.ts` now call `Refusals.unexpectedError`
+  (STYLE.md *Imports*), and the `VaultDB` class doc no longer promises `bad_option` for a
+  wrapped answer.
+* **Significant:** a wrapped `doGetBox` answer lets `putBox` overwrite a sound box as damaged,
+  dropping its sidecar.
+  - *Coach (2026-10-27):* "Don't defend against a future programmer writing bad code by writing
+    bad code in a critical path. If that's what's happening here, remove the check." It was.
+  - The check stays removed. The worker confirmed `describeVaultDB` fails such an adapter at its
+    first box read (29 tests).
+* **Minor:** a wrapped `bad(vault_mismatch)` reads as `damaged_box`. That has the same cause, and
+  goes the same way.
+* **Minor:** the double export. *Coach:* keep both.
 
 ### 2. `vault_params`: preplan items 5 and 8
 
