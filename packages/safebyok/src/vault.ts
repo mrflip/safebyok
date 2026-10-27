@@ -595,9 +595,11 @@ export class Vault implements VaultStamp {
    * `VaultDB.getBox` under the vault this device holds.
    *
    * Refuses 'damaged_box' when its record fails its checks. It does not open the whisper, so a
-   * whisper that will not open shows only at `extractWhisper()` or `getWhisper()`. A vault found
-   * deleted or made anew elsewhere refuses 'vault_gone', reading no box of the vault stored now, and
-   * this Vault object is gone with it: ask the bank for the vault again (`bank.ensureVault`).
+   * whisper that will not open shows only at `extractWhisper()` or `getWhisper()`. A vault
+   * `VaultDB.getBox` finds deleted or made anew elsewhere refuses 'vault_gone', reading no box of
+   * the vault stored now, and this Vault object is gone with it: ask the bank for the vault again
+   * (`bank.ensureVault`). One its hello, or a read meanwhile, finds so refuses 'vault_gone' or
+   * 'vault_remade', as {@link Vault.hello} does.
    *
    * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
    */
