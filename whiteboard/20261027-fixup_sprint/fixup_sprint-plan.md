@@ -5,8 +5,9 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** threads 1 to 4 filed in one line, main → #297 → #299 → #298 → #300 (top
-  `a35ec328`); thread 5's runs 5a, 5b and 5c building side by side from #300.
+* **Status:** done. Every thread filed, restacked into one line: main → #297 → #299 → #298 →
+  #300 → #303 → #304 → #302 → #295 (justify green at the top, `2a3bc832`). The open questions are
+  in the sprint doc and `human/20261027-sprint_fixup_sprint_done.md`.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
