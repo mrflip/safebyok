@@ -132,11 +132,12 @@ describe("DeviceRecord", () => {
   }
 })
 
-// Every record the package writes to storage, by the schema that checks it. A record whose shape
-// changes moves its `format` on (VOCABULARY.md, *format*): each schema is rendered as JSON Schema
-// and kept as a snapshot under its own format literal, so a change made without a bump fails here.
-// After a bump, the new format's snapshot is written once (`vitest -u`), and the old one goes as
-// obsolete: never update the snapshot of a format that stands. A refinement (a `.refine`, such
+// Every record the package writes to storage, by the schema that checks it: each rendered as JSON
+// Schema and kept as a snapshot under its own format literal, so no change to a stored shape goes
+// unnoticed. Before 1.0 a shape may change under the format it has (CLAUDE.md, *What the package
+// promises*), and a record written before the change reads as damaged. So a change here is made on
+// purpose: update the snapshot (`vitest -u`) in the commit that changes the shape, and say in its
+// changeset what a host holding older records sees. A refinement (a `.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule. Each is rendered twice. As output, it shows every
 // field's shape, a sidecar's JSON among them. As input, a strict record shows
@@ -158,7 +159,7 @@ describe("Stored record formats", () => {
         output: Zod.toJSONSchema(schema, { unrepresentable: 'any' }),
         input:  Zod.toJSONSchema(schema, { unrepresentable: 'any', io: 'input' }),
       }
-      expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed, bump format, then write the new format's snapshot (vitest -u)`).toMatchSnapshot()
+      expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed on purpose, say in the changeset what an older record does, then update the snapshot (vitest -u)`).toMatchSnapshot()
     })
   }
 
