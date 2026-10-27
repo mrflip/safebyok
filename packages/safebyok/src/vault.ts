@@ -550,9 +550,10 @@ export class Vault implements VaultStamp {
    *
    * Refuses 'stale_write' when another call, here or on another device, wrote, created or deleted
    * this box since the revision it was sealed from: nothing was written, and the refusal's
-   * `meta.box_stored` is the box stored now. So does a vault deleted or made anew elsewhere, and a
-   * whole store over a stale listing: a hello shows what is stored, or leave out the sidecar to read
-   * the box first. A vault made anew while the write lands refuses 'vault_remade' after it landed.
+   * `meta.box_stored` is the box stored now. So does a whole store over a stale listing: a hello
+   * shows what is stored, or leave out the sidecar to read the box first. A vault deleted or made
+   * anew elsewhere refuses 'stale_write' too, writing nothing, with no `meta.box_stored`. A vault
+   * made anew while the write lands refuses 'vault_remade' after it landed.
    *
    * A box that will not read or open is written over as new, keeping neither its sidecar nor its
    * `registered_at`, when the whisper is given; a store keeping its whisper refuses 'damaged_box',
