@@ -1208,7 +1208,7 @@ describe("box.extractWhisper, through a vault", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const record = storedBoxOf(world)
-    const checks = vi.spyOn(BoxRecord, 'safeParse')
+    const checks = vi.spyOn(BoxRecord, 'parse')
     const box = Box.make(vault, record, TH.cheatGetVaultEpoch(vault))
     expect(checks).toHaveBeenCalledTimes(1)
     checks.mockClear()

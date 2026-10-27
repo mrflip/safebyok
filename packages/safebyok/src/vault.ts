@@ -1,11 +1,11 @@
 import type { BoxListing, Capacity, BoxExpectation } from './shapes/vault-db'
 import type { Clock, BadNewsHandler } from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
-import { type Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
+import { Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
 import type { DeviceRecord, LeaseRecord, LeaseSparse } from './shapes/device'
 import { type WayinKind, type GatedVaultRecord, passphraseCleartext, wayinkind, type GateRecord, type GateSparse, VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
-import { Box, type BoxBase, boxSparseOf, checkedWhisper, whisperBytesOf } from './box'
+import { Box, type BoxBase, boxSparseOf, whisperBytesOf } from './box'
 import * as CX from './shapes/scopes'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
@@ -621,7 +621,7 @@ export class Vault implements VaultStamp {
       const { boxlabel, sidecar } = putBoxProps.parse(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const given = whisper === undefined ? undefined : checkedWhisper(whisper)
+      const given = whisper === undefined ? undefined : Whisper.parse(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
       this.#checkWhisperFits(given, sidecar ?? {})

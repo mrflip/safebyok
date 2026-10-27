@@ -46,7 +46,7 @@ export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, 
   // A judged object is the caller's own, so each check hands back a copy, as a parse of an object does:
   // a box freezes its record through, and must never freeze, or share, the caller's sidecar.
   const whisperBag = plainBag.overwrite((bag) => structuredClone(bag))
-  const Whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, plainBag]).overwrite((whisper) => structuredClone(whisper))
+  const Whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, plainBag], Phrases.WhisperShape).overwrite((whisper) => structuredClone(whisper))
   return { Whisper, whisperBag }
 })
 
