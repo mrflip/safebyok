@@ -15,7 +15,7 @@ graphql 344; indexeddb 165; fastkey 49; demo 229; e2e 107; root 265).
     `written_at`.
   - CLAUDE.md (126 lines on main, 132 here), each line weighed by its per-turn cost:
     - *Values*: "validate at each module entrypoint, every export", the one line saying a validator
-      is made in a `Validator` call, never plain Zod (the Coach's ruling), and "take a part of a
+      a validator a module exports is made in a `Validator` call (softened by the 2026-10-27 amendment below), and "take a part of a
       thing by parsing or destructuring, never by spreading it" (kept by the Coach's ruling).
     - *Notable files*: the STYLE.md pointer names *Shapes and duck typing*.
     - *Naming at a glance*: a host-facing field keeps its stored spelling (`user_id`).
@@ -55,3 +55,26 @@ graphql 344; indexeddb 165; fastkey 49; demo 229; e2e 107; root 265).
     takes, scope included, so it is not one.
 * **For the Coach**:
   - CLAUDE.md gains six lines; the PR says why each earns its cost.
+
+## Amendment, 2026-10-27 (the Coach's four rulings on the review)
+
+Justify green again, with the same counts as above (the amendment adds no tests).
+
+* **Built**:
+  - CLAUDE.md's validator line now reads "A validator a module exports is made in a `Validator`
+    call (STYLE.md, *Validation*), not in plain Zod", one line still: STYLE.md allows plain Zod for
+    the kit's own primitives and for a variation made from a validator (`VaultSparse.pick(...)`).
+  - STYLE.md *Naming*: a shape's validator is the exception to "named after the parameter it
+    checks"; it takes its type's name (`export const { BoxSparse } = ...`,
+    `type BoxSparse = Z.infer<typeof BoxSparse>`). `checks/validator.ts` is untouched: thread 15
+    fixes its examples.
+  - `@typescript-eslint/no-unused-vars` is `error`, not `warn`, in all ten eslint configs (the
+    root's, the eight packages' and e2e's, and the demo's). **It surfaced 0 sites** (`eslint
+    --no-cache` over all ten): the rule's `args: 'after-used'` and the earlier renames had left no
+    bare `_`. No fix to a name changed behaviour.
+  - Three holes in tests, found by grepping every package, root `tests/` and `scripts/` for
+    `[,` and `, ,`, are named for the slot they skip: `vault-resolvers.test.ts` line 264
+    (`_rootField`, as line 254 names it), `vault-del.test.ts` line 210 (`_damage`, as line 186 has
+    it) and `device-db-conformance.ts` line 94 (`_putOutcome`, the `putLease` result in a
+    `Promise.all`).
+* **Decisions taken**: `_putOutcome` is my name for the middle result; the Coach may prefer another.
