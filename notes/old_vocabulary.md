@@ -11,7 +11,8 @@ A name in the New column that also stands in the Old one was renamed again, by t
 The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 (better_paths,
 streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
 (`whiteboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
-(`whiteboard/20261025-restyle/`).
+(`whiteboard/20261025-restyle/`); the rows on standing, from the fixup sprint of 2026-10-27
+(`whiteboard/20261027-fixup_sprint/unstanding.md`).
 
 To be deleted at 1.0.0.
 
@@ -147,3 +148,7 @@ To be deleted at 1.0.0.
 | `Tombstone`, `VaultPropsExpectation`, `LeaseView`, `LeaseStanding` | `VaultTombstone`, `VaultRecordExpectation`, `LeaseSparse`, `Pick<VaultSparse, 'vault_tok' \| 'gate_epoch'>` |
 | `Stamp`, `Stamped` (the scope, `vault_tok` and both epochs) | `VaultSparse`; `Pick<VaultSparse, 'vault_tok'> & Partial<VaultSparse>` written out |
 | `TH.vaultPropsOf`, `TH.propsOf`, `gate.storedFields`   | `TH.vaultRecordOf` (and `TH.gateOf`), `TH.vaultRecordIn`, `gate.record` |
+| standing, stands (the row a VaultDB call compares or reads); `standingVaultRecord`, `standingBox`, `StandingBoxSql` | stored: "the stored vault record", "no box is stored"; `storedVaultRecord`, `storedBox`, `StoredBoxSql` (Postgres's CTE `standing` is `prior`) |
+| standing (the vault record in hand), the `standing` of `sealLeaseRecord` | the vault record in hand; `held` |
+| the gating standing; a lease standing                  | the pending gating; a lease in force                    |
+| `#checkStanding()`, `StandingGating`, `standsBeside`    | `#demandNotGone()`, `OutsideGating`, `leavesInForce`    |
