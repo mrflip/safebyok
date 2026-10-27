@@ -58,7 +58,7 @@ describe("browserOpts", () => {
 
   it("yields to a strength checker of the host's own, passed after it, as its third example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', user_id: 'u1', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext })
+    const bank = Bank.make({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', user_id: 'u1', vaultDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger: TH.quietLogger })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.unlock(vault, 'pw')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
@@ -67,7 +67,7 @@ describe("browserOpts", () => {
 
   it("brings the zxcvbn test to Bank.make: a common password is refused at a first unlock, as zxcvbnStrengthChecker's first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext })
+    const bank = Bank.make({ applabel: 'acme', user_id: 'u1', vaultDB, ...browserOpts({ dbName: TH.freshDbName() }), keyDeriver: TH.testDeriver, requestCleartext: TH.scriptedRequestCleartext, logger: TH.quietLogger })
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await TH.expectRefusal(TH.unlock(vault, 'password1234'), 'weak_passphrase')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')

@@ -165,6 +165,7 @@ describe("Bank.make's options", () => {
 
   it("takes an option given as undefined as one left out", async () => {
     const world = makeWorld()
+    vi.spyOn(console, 'warn').mockImplementation(() => { /* the test_ deriver's notice, kept out of the test output */ })
     const vault = await world.openUnlocked('pw', { leaseHours: undefined, logger: undefined })
     expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + (LeaseHours * HourMillis))
   })

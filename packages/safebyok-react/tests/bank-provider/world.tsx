@@ -92,7 +92,7 @@ export const grabber = () => {
 export const makeWorld = () => {
   const vaultDB = localVaultDB({ store: memoryStore() })
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
+  const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger }
   const tree = (user_id: string | null, caught: unknown[] = []) => (
     <CatchingBoundary caught={caught}>
       <BankProvider {...props} user_id={user_id}>
@@ -109,7 +109,7 @@ export const madeWorld = async () => {
   const store = memoryStore()
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
+  const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger }
   const made = await TH.settledVault({ ...props, user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(made, 'correct horse')
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')

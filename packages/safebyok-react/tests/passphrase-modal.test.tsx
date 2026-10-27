@@ -366,7 +366,8 @@ describe("PassphraseModal", () => {
 
     it("reports to React nothing of a key deriver's own VaultError, which heard the passphrase", async () => {
       const misuse = new VaultError('bad_option', 'pw-the-passphrase is not a passphrase I take.')
-      const { vault, gating } = await TH.gatedBy(TH.memoryVaultOpts({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(misuse) } }))
+      const spy = TH.spyLogger()
+      const { vault, gating } = await TH.gatedBy(TH.memoryVaultOpts({ logger: spy.logger, keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(misuse) } }))
       const { reported } = TH.renderReporting(<PassphraseModal gating={gating} onDone={noop} />)
       TH.typeNewPassphrase('pw-the-passphrase')
       fireEvent.click(screen.getByText('Create vault'))
@@ -375,6 +376,7 @@ describe("PassphraseModal", () => {
       const told = reported[0] as VaultError
       expect(told.refusalkind).to.eq('unexpected_error')
       expect(told.message).to.not.include('pw-the-passphrase')
+      expect(TH.loggedText(spy.calls)).to.not.include('pw-the-passphrase')
       expect(told.cause).to.be.undefined
       TH.closeVault(vault)
     })

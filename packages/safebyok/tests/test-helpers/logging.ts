@@ -1,4 +1,5 @@
 import type { VaultLogger } from '../../src/logger'
+import { consoleLogger } from '../../src/console-logger'
 import { TestDeriverNotice } from '../../src/key-deriver-spec'
 
 
@@ -30,6 +31,24 @@ export const spyLogger = () => {
   }
   const logger: VaultLogger = { log: hear('log'), warn: hear('warn'), error: hear('error') }
   return { logger, calls }
+}
+
+/**
+ * A VaultLogger for a test that has nothing to say about logging: it swallows `log`, and lets
+ * `warn` and `error` through to the console as the default logger would, so a warning no test
+ * meant to provoke still shows in the test output -- bar the one notice `Bank.make` gives of a
+ * `test_` key deriver's label ({@link TestDeriverNotice}), which every vault opened through
+ * {@link testDeriver} would otherwise print. {@link memoryVaultOpts} hands it to every vault by
+ * default. A test that provokes a warning on purpose, or looks at what a vault logged, hands
+ * {@link spyLogger}'s logger in its place.
+ *
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts())  // logs nowhere, warns as a host would see it
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ logger: TH.spyLogger().logger }))  // keeps every call, prints none
+ */
+export const quietLogger: VaultLogger = {
+  log:   () => { /* kept out of the test output */ },
+  warn:  (message, story, err) => { if (message !== TestDeriverNotice) { consoleLogger.warn(message, story, err) } },
+  error: (message, story, err) => { consoleLogger.error(message, story, err) },
 }
 
 /**

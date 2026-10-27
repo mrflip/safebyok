@@ -862,6 +862,43 @@ describe("spyLogger", () => {
   })
 })
 
+const quiet = () => { /* kept out of the test output */ }
+
+describe("quietLogger", () => {
+  it("swallows log, and says warn and error to the console as the default logger would", () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(quiet)
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(quiet)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(quiet)
+    TH.quietLogger.log('opened')
+    TH.quietLogger.warn('a refresh failed', { call: 'refresh' })
+    TH.quietLogger.error('the adapter is broken')
+    expect(consoleLog).toHaveBeenCalledTimes(0)
+    expect(consoleWarn).toHaveBeenCalledWith('safebyok: a refresh failed', { call: 'refresh' })
+    expect(consoleError).toHaveBeenCalledWith('safebyok: the adapter is broken')
+  })
+
+  it("swallows the notice of a test_ deriver, as memoryVaultOpts' vault gets it, so its first example prints nothing", async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(quiet)
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
+  })
+
+  it("lets through a warning about anything but the test_ deriver, even in a vault's options", () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(quiet)
+    TH.memoryVaultOpts().logger?.warn('something else', { call: 'make' })
+    expect(consoleWarn.mock.calls).to.deep.equal([['safebyok: something else', { call: 'make' }]])
+  })
+
+  it("is replaced by a spyLogger handed in its place, as its second example has it", async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(quiet)
+    const spy = TH.spyLogger()
+    await TH.settledVault(TH.memoryVaultOpts({ logger: spy.logger }))
+    expect(spy.calls).to.have.lengthOf(0)
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
+  })
+})
+
 describe("loggedText", () => {
   it("holds each message, story and error, down through every cause and own property", () => {
     const spy = TH.spyLogger()
@@ -1049,7 +1086,7 @@ describe("omitting", () => {
   it("leaves out the one field named, and keeps the rest", () => {
     const without = TH.omitting(opts, 'keyDeriver')
     expect(without).to.not.have.property('keyDeriver')
-    expect(Object.keys(without)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker', 'requestCleartext'])
+    expect(Object.keys(without)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'vaultDB', 'deviceDB', 'strengthChecker', 'requestCleartext', 'logger'])
     expect(opts.keyDeriver).to.eq(TH.testDeriver)
   })
 

@@ -112,7 +112,7 @@ describe("postgresVaultDB, as the README has it", () => {
   it("stores and reads a real vault, made and opened by the core", async () => {
     const db = await TH.emptyDatabase()
     const opened = () => TH.settledVault({
-      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
     })
     const first = await opened()
     await TH.unlock(first, 'correct horse battery staple')
@@ -208,7 +208,7 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
     const db = await TH.emptyDatabase()
     const opened = async (vaultDB: VaultDB) => {
       const vault = await TH.settledVault({
-        applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+        applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
       })
       await TH.unlock(vault, 'correct horse battery staple')
       return vault
@@ -581,7 +581,7 @@ describe("postgresVaultDB, its box limit", () => {
   it("refuses as vault_full a putBox() its vault's own count let through, when another device filled the vault unheard", async () => {
     const db = await TH.emptyDatabase()
     const opened = () => TH.settledVault({
-      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
       // No listen: neither vault hears the other's writes.
       vaultDB: postgresVaultDB({ client: db, user_id: 'u1', maxBoxes: 2 }),
     })
@@ -601,7 +601,7 @@ describe("postgresVaultDB, its box limit", () => {
   it("opens a vault with the smaller of MaxBoxes and its own, and refuses one asking for more", async () => {
     const db = await TH.emptyDatabase()
     const optsFor = (maxBoxes?: number) => ({
-      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
       vaultDB: postgresVaultDB({ client: db, user_id: 'u1', maxBoxes: 3 }), maxBoxes,
     })
     await TH.expectRefusal(TH.settledVault(optsFor(4)), 'bad_option')
