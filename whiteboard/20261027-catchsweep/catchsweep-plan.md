@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** planning; waiting for PR #311's rebase onto main before the first threads are cut.
+**Status:** planned, six threads; waiting for PR #311's rebase onto main before threads 1, 6 and 4 are cut.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -25,6 +25,11 @@ thread 2 is cut from thread 1's tip (same lines of `lease.ts`); threads 1, 3, 4 
 
 ## Ground rules
 
+* **Names follow the return shape** (the Coach, 2026-10-27): a function resolving an `Outcome` is
+  `tryVerbFoo`; one that throws, or returns the foo itself, is `verbFoo`. "That includes vaultDB --
+  remember, there's no back-compat needed." Every public pair keeps the body in the throwing form;
+  `tryVerbFoo` is `try { return good(await this.verbFoo(...)) } catch (err) { return bad(...) }`.
+  A renamed export is a contract change: the changeset is `minor` and names each rename.
 * **Behaviour is kept** except where a thread's text says what changes, and then the changeset says
   it. Refusal kinds, their order relative to each await, and every demand stay where they are.
 * **Catch exactly one foreign call.** A `try` around a `crypto.subtle` call, an adapter hook or a
@@ -51,6 +56,9 @@ The sites: `lease.ts` `tryCipheredWith`/`cipheredWith`, `tryDecipherWith`/`decip
 `trySealProps`/`sealProps`; `box.ts` `trySeal`/`seal`, `tryExtractWhisper`/`extractWhisper`. The
 inner `outcomeOf` calls inside those bodies (the AEAD mapping) are thread 2's: leave them as they
 are, moved whole. `vault-db.ts`'s verbs return Outcomes with no throwing twin: not in scope.
+`KeptLease.read` (`lease.ts`) resolves an Outcome: it becomes `tryRead`, its two callers in
+`vault.ts` and `bank.ts` renamed; a throwing `read` only if a caller wants one. The stores'
+verbs (`vault-db.ts`, `device-db.ts`) are thread 6's, not this thread's.
 `vault.ts` and `bank.ts` pairs already keep the body in a hand `try`/`catch` whose `#badOutcome`
 also tells bad news to listeners; flipping them would skip that news for a caller of the throwing
 form unless the throwing form catches, tells and rethrows. **Report those, with a recommendation;
@@ -94,7 +102,7 @@ hand-rolls the same line. `vault-resolvers.ts` `vaultDBOf` (l.98): a VaultError 
 server-side and no diagnosis, where today it is `bad_option` "its own setup is wrong, retrying will
 not help". Changeset: `safebyok-graphql` patch naming the kind change; `safebyok` patch if an
 export is added. `pnpm size:budget` may move `vault-db`'s line; follow the rule. Size: medium.
-Depends on: nothing beyond #311.
+Depends on: **thread 6** (it rewrites the same verbs): cut from thread 6's tip once it files.
 
 ### 4. where_prefix: one parse, said where
 
@@ -125,12 +133,34 @@ an entry point and its shape must change, that is a contract question: syndicate
 shape. Empty changeset otherwise. Size: small. Depends on: nothing beyond #311; touches
 `proving.ts` beside thread 2's `#unwrap`, different region, restacked at the wrap-up.
 
+### 6. store_trynames: the stores' verbs named for what they resolve
+
+Coach: "functions returning outcomes <=> named tryVerbFoo ; functions that throw or return a foo
+<=> named verbFoo. That includes vaultDB -- remember, there's no back-compat needed".
+
+Gloss: `VaultDB`'s public verbs (`getVault`, `ensureVault`, `putVaultRecord`, `getBox`, `putBox`,
+`delBox`, `getCapacity`, `delVault`, `delDamagedVault`, and any other resolving an Outcome; not
+`subscribe`, which throws) and `DeviceDB`'s (`getLease`, `putLease`, `delLease`,
+`getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`) become `tryVerbFoo` resolving
+the Outcome, each with a throwing `verbFoo` that holds the body (the `answering`/`guarded` wrapper
+moves to the `try` form, applied once, per the flip of thread 1). The subclass hooks `doVerbFoo`
+throw already: unchanged. Callers follow: `vault.ts`, `bank.ts`, `del-damaged-vault.ts`,
+`gating.ts`, `RefusalPolicy.heed` (which unwraps Outcomes into throws: where a throwing verb now
+exists, `heed` may call it and the `outcomeOf` rewrap in `vault.ts` may go; take that only where it
+falls out plainly, and report the rest), every adapter package's tests and its README,
+`safebyok-graphql`'s resolvers (`served` calls a verb for its Outcome), `safebyok-convex`,
+`demos/`, `e2e/`, the core README's VaultDB and DeviceDB sections. Changeset `minor` for `safebyok`
+listing each rename, `patch` per adapter whose docs or tests changed. Size: large, mechanical:
+`sonnet` may do it if the orchestrator judges so at cut time; default model otherwise. Depends on:
+nothing beyond #311. Look-ahead: thread 3 rewrites these verbs' insides right after; keep each verb's
+body whole so its diff stays small.
+
 ## Not in this sprint
 
 * `safebyok-react` `askAuthenticator`'s `SecurityError` branch: the audit called it a guess; the
   orchestrator read it as a spec'd WebAuthn error with the spec's meaning. Kept.
-* A `HeededVaultDB` returning Outcomes to remove the `heed` unwrap / `outcomeOf` rewrap round trip
-  in `vault.ts`: a design change for the Coach, not a cleanup.
+* Private Outcome-returning helpers (`loadLibs`, `deviceOutcomeOf`, `outcomeOf` itself) keep their
+  names unless a thread meets one in passing; a verb-shaped one may take `try` then.
 
 ## For the Coach
 
