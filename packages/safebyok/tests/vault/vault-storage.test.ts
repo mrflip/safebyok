@@ -9,7 +9,7 @@ import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
 import { bad, valOf } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, boxlabelsOf, isU1Box, u1BoxScopepath, u1VaultScopepath, SevenDaysMillis, uncheckingDeviceDB, storedVaultRecordOf, storedWayinOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld, addLaptopPasskey } from './world'
+import { makeWorld, boxlabelsOf, isU1Box, u1BoxScopepath, u1VaultScopepath, SevenDaysMillis, spoilableDeviceDB, storedVaultRecordOf, storedWayinOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld, addLaptopPasskey } from './world'
 
 
 // == [Scoping, snapshot, tampering]: scoping, snapshot and subscribers, what the backend sees, SpoiledShells, tampering
@@ -353,7 +353,7 @@ describe("the logger", () => {
 
   it("warns once when a lease could not be read, telling nothing of the record", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
     device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
@@ -364,7 +364,7 @@ describe("the logger", () => {
 
   it("takes up a lease whose wrap was altered, unopened, and refuses it 'damaged_lease' at its first use, erasing it and locking", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const vault = await world.openUnlocked('pw', { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     device.spoilRow((row) => {
@@ -382,7 +382,7 @@ describe("the logger", () => {
 
   it("leaves a lease of another scope where it lies at birth: no erase is tried, and the vault is born locked", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
     device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     const erasing = vi.spyOn(device.deviceDB, 'delLease')
@@ -420,7 +420,7 @@ describe("the logger", () => {
   it("never breaks a lock, a hello, a refresh or a refused hello when it throws", async () => {
     const world = makeWorld()
     const logger = throwingLogger()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const reading = world.clock.now()
     const clock = { now: () => reading }
     const vault = await world.openUnlocked('pw', { logger, deviceDB: device.deviceDB, clock })
@@ -445,7 +445,7 @@ describe("the logger", () => {
 
   it("is never handed a whisper, a passphrase, a ciphertext or a salt, whatever it hears", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     const whisper = 'sk-FAKESECRET-whisper'
     const passphrase = 'FAKESECRET passphrase'
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })

@@ -1,5 +1,5 @@
 import type { LeaseRecord, DeviceRecord } from '../../src/types/types'
-import { DeviceDB, memoryDeviceDB } from '../../src/device-db'
+import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
@@ -65,10 +65,9 @@ export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summ
 const answeredNull = () => Promise.resolve(TH.good(null))
 
 /** A device store as one was written before DeviceDB was a class: an object holding the seven verbs, each answering an Outcome. */
-const plainDeviceDB = () => {
-  const answered = answeredNull
-  return { getLease: answered, putLease: answered, delLease: answered, getDeviceRecord: answered, raiseDeviceRecord: answered, delDeviceRecord: answered, delAll: answered }
-}
+const plainDeviceDB = () => ({
+  getLease: answeredNull, putLease: answeredNull, delLease: answeredNull, getDeviceRecord: answeredNull, raiseDeviceRecord: answeredNull, delDeviceRecord: answeredNull, delAll: answeredNull,
+})
 
 /** Storage adapters Bank.make refuses: short of a verb the vault calls, or no DeviceDB at all. */
 export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
@@ -82,17 +81,16 @@ export const HourMillis = 60 * 60 * 1000
 
 export const SevenDaysMillis = 7 * 24 * HourMillis
 
-
 /**
  * A DeviceDB as a host might write its own, a subclass over two maps: rows kept as handed in, so a
- * test can reach in and spoil one the way a damaged store or an older version would. `rows` holds
- * the leases, under their scopepaths.
+ * test can reach in and spoil one the way a damaged store or an older version would, and see what
+ * the base class and the vault make of it. `rows` holds the leases, under their scopepaths.
  */
-export const uncheckingDeviceDB = () => {
+export const spoilableDeviceDB = () => {
   const rows = new Map<string, unknown>()
   const records = new Map<string, unknown>()
   const rowsOf = (scopepath: string) => (Scopepath.isLease(scopepath) ? rows : records)
-  class UncheckingDeviceDB extends DeviceDB {
+  class SpoilableDeviceDB extends DeviceDB {
     protected doGetLease(leaseScopepath: string) { return Promise.resolve(rows.get(leaseScopepath)) }
     protected doPutLease(leaseScopepath: string, record: LeaseRecord) { rows.set(leaseScopepath, record); return Promise.resolve() }
     protected doDelLease(leaseScopepath: string) { rows.delete(leaseScopepath); return Promise.resolve() }
@@ -105,7 +103,7 @@ export const uncheckingDeviceDB = () => {
       return Promise.resolve()
     }
   }
-  const deviceDB: DeviceDB = new UncheckingDeviceDB()
+  const deviceDB: DeviceDB = new SpoilableDeviceDB()
   /** Rewrite the one stored lease through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {
     const [[ckey, row]] = [...rows] as [[string, Record<string, unknown>]]
@@ -147,6 +145,9 @@ export const damagedVaultWorld = async () => {
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
 export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+
+/** Every verb of a DeviceDB, by name: a class instance's verbs are on its prototype, where `Object.keys` never finds them. */
+export const DeviceDBVerbs = ['getLease', 'putLease', 'delLease', 'getDeviceRecord', 'raiseDeviceRecord', 'delDeviceRecord', 'delAll'] as const satisfies readonly DeviceVerb[]
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {

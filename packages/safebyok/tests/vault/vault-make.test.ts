@@ -13,7 +13,7 @@ import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
 import { type VaultLogger } from '../../src/logger'
 import { Argon2idWebV1, TestDeriverNotice } from '../../src/key-deriver-spec'
 import * as TH from '../test-helpers'
-import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, vaultWithPasskey, addLaptopPasskey } from './world'
+import { makeWorld, MisfitStores, VaultDBVerbsUsed, DeviceDBVerbs, spoilableDeviceDB, HourMillis, vaultWithPasskey, addLaptopPasskey } from './world'
 
 /** `world`'s options for Bank.make, `overrides` in place: its vault's user_id and vaultlabel left out, as each vault's draft takes them. */
 const bankOptsOf = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.BornVaultOpts>): MakeBankOpts => {
@@ -135,7 +135,7 @@ describe("Bank.make and bank.ensureVault", () => {
 
   it("takes a store of the host's own that carries every verb, prototype and all", async () => {
     const world = makeWorld()
-    expect(await world.stateOnOpen({ vaultDB: Object.create(world.vaultDB) as MakeBankOpts['vaultDB'], deviceDB: uncheckingDeviceDB().deviceDB })).to.eq('novel')
+    expect(await world.stateOnOpen({ vaultDB: Object.create(world.vaultDB) as MakeBankOpts['vaultDB'], deviceDB: spoilableDeviceDB().deviceDB })).to.eq('novel')
   })
 })
 
@@ -566,7 +566,7 @@ describe("Bank.make, by the Contract", () => {
   it("touches no storage, no device store, no timer and no prompt until a call asks (Contract: Bank.make, Guarantees)", async () => {
     const world = makeWorld()
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
-    const deviceDBCalls = (Object.keys(world.deviceDB) as (keyof typeof world.deviceDB)[]).map((verb) => vi.spyOn(world.deviceDB, verb))
+    const deviceDBCalls = DeviceDBVerbs.map((verb) => vi.spyOn(world.deviceDB, verb))
     const derivations = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
     const strengthTests = Object.assign(vi.fn(TH.anyStrengthChecker), { load: vi.fn() })
     vi.useFakeTimers()

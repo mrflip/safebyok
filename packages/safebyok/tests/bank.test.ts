@@ -15,7 +15,7 @@ import type { Gating } from '../src/gating'
 import type { KeyDeriver } from '../src/key-deriver'
 import { Vault, bear, letGo } from '../src/vault'
 import * as TH from './test-helpers'
-import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
+import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultScopepath, VaultDBVerbsUsed, DeviceDBVerbs, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: Main, bankOptsOf, bankIn, recordOf, gotVaultOf, highestEpochOf, leaseFieldsOf, storeSnapshotOf, stepsOf, checkerLoading, keptTombstones
 
@@ -112,7 +112,7 @@ describe("Bank.make", () => {
   it("touches nothing: the bank is 'made', its snapshot holds no vault, and no store verb or load is called", async () => {
     const world = makeWorld()
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
-    const deviceDBCalls = (Object.keys(world.deviceDB) as (keyof typeof world.deviceDB)[]).map((verb) => vi.spyOn(world.deviceDB, verb))
+    const deviceDBCalls = DeviceDBVerbs.map((verb) => vi.spyOn(world.deviceDB, verb))
     const strengthChecker = checkerLoading(() => undefined)
     const bank = bankIn(world, { strengthChecker })
     await TH.wakeupAtNextTick()

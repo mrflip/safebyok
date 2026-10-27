@@ -12,7 +12,7 @@ import { toB64 } from '../../src/crypto'
 import type { StrengthChecker } from '../../src/passphrase-strength'
 import { heldLeaseOf } from '../../src/held-lease'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf, storedVaultRecordOf } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, spoilableDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin, storedRowOf, storedVaultRecordOf } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -439,7 +439,7 @@ const ForeignLeases = [
 describe("the lease, from a host's own DeviceDB", () => {
   it("is checked by the vault: a sound record spares the passphrase", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('unlocked')
   })
@@ -447,7 +447,7 @@ describe("the lease, from a host's own DeviceDB", () => {
   for (const [spoil, blurb] of SpoiledWayins) {
     it(`reads ${blurb} as no lease at birth, and the DeviceDB discards it, saying nothing`, async () => {
       const world = makeWorld()
-      const device = uncheckingDeviceDB()
+      const device = spoilableDeviceDB()
       await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
       device.spoilRow(spoil)
       const later = await world.open({ deviceDB: device.deviceDB })
@@ -461,7 +461,7 @@ describe("the lease, from a host's own DeviceDB", () => {
   for (const [spoil, blurb] of ForeignLeases) {
     it(`reads ${blurb} as no lease at birth, and leaves it where it lies`, async () => {
       const world = makeWorld()
-      const device = uncheckingDeviceDB()
+      const device = spoilableDeviceDB()
       await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
       device.spoilRow(spoil)
       const spoiled = [...device.rows.values()]
@@ -474,7 +474,7 @@ describe("the lease, from a host's own DeviceDB", () => {
 
   it("says through the logger that a record naming another scope could not be read, and was left where it lies", async () => {
     const world = makeWorld()
-    const device = uncheckingDeviceDB()
+    const device = spoilableDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     await world.open({ deviceDB: device.deviceDB })
