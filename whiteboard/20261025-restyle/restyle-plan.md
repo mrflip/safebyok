@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **paused at the Coach's request, 2026-10-27** (usage limit), after thread 14 ([#287](https://github.com/mrflip/safebyok/pull/287)). Threads 2 to 12 merged; #272 (thread 1), #286 (thread 13), #288 and #289 (cleanup) filed; threads 15 and 16 not started (`human/20261027-sprint_restyle_paused.md`). Thread 15 stands alone once #287 merges. Workers may run `gh pr` commands but never merge or close a PR (the Coach, 2026-10-27).
+* **Status:** **resumed 2026-10-27 for thread 15**, the last thread (thread 16 is not run, at the Coach's word). Threads 2 to 12 merged; #272 (thread 1, amended with four rulings), #286 (13), #287 (14), #288 and #289 (cleanup) filed, unmerged. The older sprint PRs #242 and #250 are being closed out for merge as history; this sprint's #271 closes after thread 15. Workers may run `gh pr` commands but never merge or close a PR.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
