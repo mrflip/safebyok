@@ -1587,7 +1587,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Reading boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, readBox, boxReadRefusal, boxUnder
+  // == [Reading boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, readBox, boxReadRefusal
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1631,7 +1631,7 @@ export class Vault implements VaultStamp {
       this.#demandLease(call)
       return null
     }
-    const fetched = this.#boxUnder(read.val)
+    const fetched = Box.make(this, read.val, vaultSparseOf(this.#vaultRecord))
     this.#demandLease(call)
     return fetched
   }
@@ -1646,11 +1646,6 @@ export class Vault implements VaultStamp {
     const gone = new VaultError('vault_gone', 'The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what stands now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what stands.', { cause: err })
     this.#letGo(gone)
     return gone
-  }
-
-  /** `record` as a {@link Box}, made under the picture's scope, `vault_tok` and epochs. */
-  #boxUnder(record: BoxRecord): Box {
-    return Box.make(this, record, vaultSparseOf(this.#vaultRecord))
   }
   // --
 
@@ -1755,7 +1750,7 @@ export class Vault implements VaultStamp {
 
   /** Update the box listing with `stored`, the record a box write just landed in this vault, resolving the box it makes under the picture in hand. */
   #updateBoxListingOf(stored: BoxRecord): Box {
-    const box = this.#boxUnder(stored)
+    const box = Box.make(this, stored, vaultSparseOf(this.#vaultRecord))
     const entry = boxSparseOf(stored)
     this.#boxes = Object.freeze([...this.#boxes.filter((listed) => listed.boxlabel !== entry.boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel)))
     this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((listed) => listed.boxlabel !== entry.boxlabel))
