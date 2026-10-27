@@ -948,7 +948,9 @@ const queryFn = () => vault.getWhisper('anthropic_api_key')   // throws its refu
 A retry predicate never retries `family: 'misuse'` or `vault_locked`, and may retry
 `storage_unavailable`. A `VaultDB` verb throws nothing either: it resolves an `Outcome`, its `err`
 that same `VaultError`; `outcomeOf(thunk)` makes one of any body that throws, and `valOf(outcome)`
-hands back its `val` or throws its `err`. The kinds are `RefusalKindVals`, and the
+hands back its `val` or throws its `err`. A throw that is no `VaultError` becomes
+`unexpected_error`, which a retry predicate never retries: wrap a call out to your own storage as
+`outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `RefusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.

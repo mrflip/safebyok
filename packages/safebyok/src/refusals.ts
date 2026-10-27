@@ -3,7 +3,8 @@ import type { Capacity } from './types/types'
 
 /** The refusals a storage adapter throws, with the core's own messages: throw these rather than copying its words.
  * Import it whole: `import { Refusals } from 'safebyok'`, then `throw Refusals.vaultMismatch()`.
- * Each maker returns the refusal for the adapter to throw.
+ * Each maker returns the refusal for the adapter to throw. {@link unexpectedError} is the one an
+ * adapter never throws: what `outcomeOf` makes of a throw that is no refusal.
  *
  * A `cause` given as null or undefined, as an aborted IndexedDB transaction can give, becomes an
  * Error saying the backend gave none. A `cause` left out leaves the refusal with none.
@@ -24,6 +25,14 @@ export const StorageTroubleMessage = "The vault's storage could not be reached, 
  */
 export const storageUnavailable = (cause: unknown, message: string = StorageTroubleMessage): VaultError => (
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
+)
+
+/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
+ *
+ * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
+ */
+export const unexpectedError = (thrown: unknown): VaultError => (
+  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
 )
 
 /** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */

@@ -36,6 +36,19 @@ describe("Refusals.storageUnavailable", () => {
   })
 })
 
+describe("Refusals.unexpectedError", () => {
+  it("makes a misuse refusal of a bug, the thrown value its cause, as its example shows", () => {
+    const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
+    const err = Refusals.unexpectedError(thrown)
+    expect(err).to.include({ refusalkind: 'unexpected_error', family: 'misuse', cause: thrown })
+    expect(err.message).to.match(/did not expect/)
+  })
+
+  it("keeps a cause that is never null, for a throw of nothing", () => {
+    expect(Refusals.unexpectedError(undefined).cause).to.be.instanceOf(Error)
+  })
+})
+
 describe("Refusals.staleWrite", () => {
   for (const what of Refusals.StaleWriteVals) {
     it(`refuses a ${what} write as stale_write, saying to read again, with no cause`, () => {

@@ -5,7 +5,7 @@ import { PassphraseKeyBytes } from './consts'
 import { type Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
-import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
+import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
 import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf } from './vault-record'
@@ -308,7 +308,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const madeUnder = vaultSparseOf(tools.vaultRecord())
     const { keyDeriver } = tools
     const sealing = 'slotlabel' in header ? mintedPassphraseHeader(tools) : checkedPassphraseHeader(header, keyDeriver, cleartext)
-    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, cleartext, fromB64(sealing.salt_b64), tools.logger), unexpectedError)
+    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, cleartext, fromB64(sealing.salt_b64), tools.logger))
     if (! derived.ok) { demandAfterFailedSeal(vault, madeUnder, opts.gating) }
     const proving = new PassphraseProving(vault, madeUnder, sealing, opts.gating, valOf(derived))
     proving.demandSelf({ sealing: true })
@@ -379,7 +379,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
       const tools = toolsOf(vault)
       const madeUnder = vaultSparseOf(tools.vaultRecord())
       const sealing = 'slotlabel' in header ? mintedPasskeyHeader(tools, checked) : checkedPasskeyHeader(header, checked)
-      const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(madeUnder, sealing)), unexpectedError)
+      const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(madeUnder, sealing)))
       if (! derived.ok) { demandAfterFailedSeal(vault, madeUnder, opts.gating) }
       const proving = new PasskeyProving(vault, madeUnder, sealing, opts.gating, valOf(derived))
       proving.demandSelf({ sealing: true })

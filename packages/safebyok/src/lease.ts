@@ -4,7 +4,7 @@ import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrap
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { sameScope } from './names'
-import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
+import { type Outcome, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { LeaseRecord } from './types/types'
@@ -190,13 +190,13 @@ export class Lease implements LeaseSparse {
             box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped'))),
             whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered'))),
           }
-        }, unexpectedError)
+        })
         this.#demand()
         return valOf(sealing)
       } finally {
         bytes.fill(0)
       }
-    }, unexpectedError)
+    })
   }
 
   /** The bytes `ciphered` holds, its boxKey unwrapped under the vaultKey, both bound to `visible`: the inverse of {@link Lease.cipheredWith}.
@@ -231,7 +231,7 @@ export class Lease implements LeaseSparse {
         throw err
       }
       return valOf(opened)
-    }, unexpectedError)
+    })
   }
 
   /** The record `visible` makes with its whisper sealed: `visible`, beside the two ciphered fields {@link Lease.cipheredWith} makes of `props.whisper`, its one wait.
@@ -248,7 +248,7 @@ export class Lease implements LeaseSparse {
       const header = checkedVisible(visible)
       const ciphered = valOf(await this.tryCipheredWith(sealing.whisper, header))
       return { ...header, ...ciphered }
-    }, unexpectedError)
+    })
   }
 
   /** Demand, lease-bound, that this lease is consistent with its vault: what each cipher and decipher asks before and after its wait. */

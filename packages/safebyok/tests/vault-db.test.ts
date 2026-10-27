@@ -945,12 +945,14 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
 
 /**
  * A MapVaultDB written as a VaultDB that hands each call on to another and forgets to unwrap the
- * answer: each hook hands back `good` of what it would answer, or, for a write, `bad` of a stale one.
+ * answer: each read hands back `good` of what it would answer, and each write `bad` of a stale one.
  */
 class ForgetfulVaultDB extends MapVaultDB {
   protected override async doGetVault(scope: VaultScope): Promise<VaultReadResponse> { return good(await super.doGetVault(scope)) as unknown as VaultReadResponse }
   protected override async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return good(await super.doGetBox(scope, boxlabel, expected)) }
   protected override doPutVaultRecord(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleVaultRecord(null))) }
+  protected override doPutBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleBox(null))) }
+  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
   protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
 }
 
@@ -977,21 +979,26 @@ describe("the abstract VaultDB, by what threw", () => {
     await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
   })
 
-  it("refuses an answer still wrapped as an Outcome as 'bad_option', saying to unwrap it with valOf, never reading it as a record", async () => {
+  it("refuses a read answered with an Outcome still wrapped as an answer in another shape, never reading it as a record: corrupt_record, or damaged_box for a box", async () => {
     const vaultDB = new ForgetfulVaultDB()
     vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
-    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'bad_option')
-    expect(refusal.message).to.match(/doGetVault answered with an Outcome/)
-    expect(refusal.message).to.match(/valOf/)
-    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'bad_option')
+    vaultDB.rows.set(u1AnthropicBoxScopepath, TH.boxOf('anthropic', 'one'))
+    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'corrupt_record')
+    expect(refusal.message).to.match(/answered a vault read in a shape this package does not know/)
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
   })
 
-  it("refuses a write answered with a refusal still wrapped, which reads as true, rather than taking it as landed", async () => {
+  it("refuses a write answered with a refusal still wrapped, which reads as true, as corrupt_record, saying it may have landed rather than taking it as landed", async () => {
     const vaultDB = new ForgetfulVaultDB()
     vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
     const expected = { vault_tok: 'vault-tok-u1', gate_epoch: 1 }
-    await TH.expectBad(vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 }, expected), 'bad_option')
-    await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault), 'bad_option')
+    const refusals = [
+      await TH.expectBad(vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 }, expected), 'corrupt_record'),
+      await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one')), 'corrupt_record'),
+      await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'corrupt_record'),
+      await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault), 'corrupt_record'),
+    ]
+    for (const refusal of refusals) { expect(refusal.message).to.match(/whether it did is not known/) }
   })
 
   it("says a throw in its own code, not the adapter's, as 'unexpected_error', never as storage_unavailable, which a host would retry", async () => {

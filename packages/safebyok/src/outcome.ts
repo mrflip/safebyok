@@ -33,31 +33,23 @@ export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
  * A thrown VaultError is kept as it came, as {@link isVaultError} tells one. Anything else thrown
  * becomes the VaultError `otherwise` makes of it.
  *
- * @param otherwise - What a throw that is no VaultError becomes. By default it is a
- *   `storage_unavailable`, its cause the throw, as suits a call out to storage. A body that calls
- *   nothing a retry could mend passes {@link unexpectedError}.
+ * @param otherwise - What a throw that is no VaultError becomes. By default it is an
+ *   `unexpected_error`, its cause the throw: a bug, which a retry will not mend. A body that calls
+ *   out to storage passes `Refusals.storageUnavailable`, so a caller knows a retry may help.
  *
  * @example
- *   const { ok, val, err } = await outcomeOf(() => fetchBackup(vaultlabel))
+ *   const { ok, val, err } = await outcomeOf(() => fetchBackup(vaultlabel), Refusals.storageUnavailable)
  *   if (! ok) { showGripe(err.message) }
- * @example await outcomeOf(() => { throw new Error('socket closed') })  // err.refusalkind 'storage_unavailable', err.cause the Error
- * @example await outcomeOf(() => parseImport(file), unexpectedError)   // err.refusalkind 'unexpected_error': a bug, not an outage
+ * @example await outcomeOf(() => parseImport(file))   // a TypeError thrown: err.refusalkind 'unexpected_error', err.cause the TypeError
+ * @example await outcomeOf(() => { throw new Error('socket closed') }, Refusals.storageUnavailable)  // err.refusalkind 'storage_unavailable', err.cause the Error
  */
-export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwise: (thrown: unknown) => VaultError = Refusals.storageUnavailable): Promise<Outcome<ValT>> => {
+export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwise: (thrown: unknown) => VaultError = Refusals.unexpectedError): Promise<Outcome<ValT>> => {
   try {
     return good(await thunk())
   } catch (err) {
     return bad(isVaultError(err) ? err : otherwise(err))
   }
 }
-
-/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
- *
- * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
- */
-export const unexpectedError = (thrown: unknown): VaultError => (
-  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
-)
 
 /** True for a value shaped as an {@link Outcome}: an answer handed up still wrapped, since a stored record never is one.
  *

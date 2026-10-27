@@ -4,7 +4,7 @@ import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
-import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
+import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { Sidecar, Whisper } from './types/types'
 import { type VaultStamp, VaultSparse } from './vault-record'
@@ -289,7 +289,7 @@ export class Box implements Boxscope, BoxSparse {
       } finally {
         whisperBytes.fill(0)
       }
-    }, unexpectedError)
+    })
   }
 
   /** The whisper this box holds, opened under the vault's lease: its `decipherWith` of the ciphered fields, bound to its visible ones, then its JSON parsed.
@@ -334,7 +334,7 @@ export class Box implements Boxscope, BoxSparse {
       } finally {
         whisperBytes.fill(0)
       }
-    }, unexpectedError)
+    })
   }
 }
 // --

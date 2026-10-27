@@ -1,0 +1,5 @@
+---
+"safebyok": minor
+---
+
+**`outcomeOf(thunk)` makes a throw that is no VaultError an `unexpected_error`, where it made a `storage_unavailable`.** A host that wraps a call to its own storage in `outcomeOf` passes `Refusals.storageUnavailable` as the second argument to keep a retryable refusal: `outcomeOf(() => fetchBackup(vaultlabel), Refusals.storageUnavailable)`. A VaultError thrown still comes as it was, and a VaultDB adapter's throws are unchanged: `storage_unavailable`, its error the cause. **`unexpectedError` is also `Refusals.unexpectedError`**, beside `Refusals.storageUnavailable`; the top-level `unexpectedError` export stays. **A VaultDB hook that resolves an `Outcome` still wrapped** (an adapter handing its call on to another VaultDB and forgetting `valOf`) now refuses as any answer in the wrong shape does: `corrupt_record`, or `damaged_box` from `doGetBox`, where it refused `bad_option`. A write so answered is never taken as landed, and `describeVaultDB` fails such an adapter from its first test. No stored shape changed.

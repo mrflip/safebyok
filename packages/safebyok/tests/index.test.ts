@@ -56,8 +56,8 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok.Sanitizer)).to.have.members(['refusalFor'])
   })
 
-  it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
-    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'staleVaultRecord', 'StaleVaultRecordMessage', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
+  it("exports the refusals an adapter throws and unexpectedError, and the comparisons a key-value adapter makes, each as one namespace", () => {
+    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'unexpectedError', 'staleWrite', 'staleVaultRecord', 'StaleVaultRecordMessage', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
     expect(Object.keys(safebyok.Expectations)).to.have.members(['isTombstone', 'vaultRecordMeets', 'vaultRecordRefusalOf', 'vaultMeets', 'vaultRecordPutOf', 'newLifeOf', 'tombstoneOf', 'boxRefusalOf', 'deletionOf'])
   })
 })

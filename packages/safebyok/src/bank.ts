@@ -2,7 +2,8 @@ import type { VaultScope } from './types/types'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './vault-record'
 import { VaultError, isVaultError } from './errors'
-import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
+import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
+import { unexpectedError } from './refusals'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './checks/core-checks'
@@ -505,7 +506,7 @@ export class Bank {
     await nextMicrotask()
     // Let go in the task that asked for it -- a React StrictMode rehearsal, say: nothing is read.
     if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
-    const born = await outcomeOf(() => this.#bear(vaultScopepath, parts), unexpectedError)
+    const born = await outcomeOf(() => this.#bear(vaultScopepath, parts))
     // Let go while it was born: the Vault object goes with it, and the caller hears so.
     if (this.#entries.get(vaultScopepath) !== entry) {
       if (born.ok) { born.val[letGo]() }
@@ -651,8 +652,8 @@ const parseVaultBag = (bag: unknown): Z.infer<typeof vaultBag> => {
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
   const [checker, deriver] = await Promise.all([
-    outcomeOf(() => loadStrengthChecker(parts.strengthChecker), unexpectedError),
-    outcomeOf(() => loadKeyDeriver(parts.keyDeriver), unexpectedError),
+    outcomeOf(() => loadStrengthChecker(parts.strengthChecker)),
+    outcomeOf(() => loadKeyDeriver(parts.keyDeriver)),
   ])
   return checker.ok ? deriver : checker
 }

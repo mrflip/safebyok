@@ -8,7 +8,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok'
+import { LeaseHours, VaultError, outcomeOf, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok'
 import { answering, asKind, heldDialog, scopeOf, settledVault, stateOf, type BornVaultOpts } from 'safebyok/testing'
 import type { PassphraseGating } from '../src/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
@@ -112,7 +112,7 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
   if (kept !== undefined) { return kept }
   const attempt = opts.attempt ?? (() => Promise.resolve())
   const tried = async (cleartext: string | PasskeyAnswer): Promise<Outcome<Vault>> => {
-    const { ok, err } = await outcomeOf(() => attempt(cleartext), unexpectedError)
+    const { ok, err } = await outcomeOf(() => attempt(cleartext))
     return ok ? { ok, val: vault } : { ok, err }
   }
   const common = { vault, leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }

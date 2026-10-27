@@ -2008,10 +2008,17 @@ added or folded into through the subagent, and no other entry changes.
   (`getVaultProps`, `ensureVaultProps`, `putVaultProps`, `delVault`, `delDamagedVault`,
   `listBoxes`, `listBoxRecords`, `getBox`, `putBox`, `delBox`) resolves an `Outcome`
   (`{ ok: true, val }` or `{ ok: false, err }`) and never rejects; the adapter's `do*` hooks still
-  throw, and the one catch is `outcomeOf` (`src/outcome.ts`), which makes the same
-  `storage_unavailable`-with-`cause` conversion. `outcomeOf` is exported for an app wrapping its
+  throw, and the one catch is `outcomeOf` (`src/outcome.ts`). Amended 2026-10-27 (outcome_default):
+  `outcomeOf`'s default for a throw that is no `VaultError` is now `unexpected_error` (family `misuse`,
+  never retried) with the throw as `cause`; it was `storage_unavailable` with the throw as `cause`. The
+  `storage_unavailable`-with-`cause` conversion of an adapter's throw is `asStorageTrouble`'s
+  (`src/vault-db.ts`), reached through `adapterAnswer`; the verbs call `outcomeOf` directly (the
+  private helper `answering` is gone). A caller wrapping a call out to storage passes
+  `Refusals.storageUnavailable` to get the retryable kind. `outcomeOf` is exported for an app wrapping its
   own calls: whatever such a body throws that is not a `VaultError` is kept, as it came, as the
-  `cause`, so an app must not throw secret material from a body it wraps. `VaultError` gains
+  `cause`, so an app must not throw secret material from a body it wraps. `unexpectedError` moved from
+  `src/outcome.ts` to `src/refusals.ts` (still exported top-level; also `Refusals.unexpectedError`),
+  its message and cause handling unchanged. `VaultError` gains
   `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
   set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
   `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both (amended
@@ -2056,8 +2063,16 @@ added or folded into through the subagent, and no other entry changes.
   (`src/vault-db.ts`), a non-`VaultError` throw from the adapter's `do*` hook stays
   `storage_unavailable` (retryable), while a throw from the base's own checks becomes
   `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
-  `VaultDB` that forgot to unwrap another's answer, `valOf`) is refused as `bad_option`; before, a
+  `VaultDB` that forgot to unwrap another's answer, `valOf`) was refused as `bad_option`; before, a
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
+  Amended 2026-10-27 (outcome_default): `adapterAnswer` (`src/vault-db.ts`) no longer checks for an
+  `Outcome`-shaped answer (`isOutcomeShaped`) and no longer refuses one as `bad_option`; it is only a
+  try/catch passing a throw on as storage trouble. A hook that resolves a still-wrapped `Outcome`
+  (`{ ok, val }` or `{ ok: false, err }`) now meets the base class's ordinary answer checks:
+  `corrupt_record` on every verb (for a write or deletion, the message says the write may have landed
+  and whether it did is not known), and `damaged_box` from `getBox`. `tests/vault-db.test.ts` pins
+  that no wrapped answer, good or bad, to `putVaultRecord`, `putBox`, `delBox` or `delVault` is taken
+  as a landed write.
   `outcomeOf` kept a `VaultError` of another copy of safebyok as it came; how a foreign
   `VaultError` is now told, and where, is in the 2026-10-19 (thread a_fixes) entry.
   Amended 2026-10-19 (a_sec, #203; corrected 2026-10-19, a_sec2, #206): what a key deriver

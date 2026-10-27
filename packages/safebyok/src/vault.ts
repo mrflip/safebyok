@@ -7,7 +7,8 @@ import * as CX from './checks/core-checks'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
-import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
+import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
+import { unexpectedError } from './refusals'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -717,7 +718,7 @@ export class Vault implements VaultStamp {
       // lets storage say whether it removed that one or another.
       const expected = { vault_tok: lease.vault_tok, revision_tok: this.#listedRevisionOf(label) }
       const showedDamaged = this.#isListedDamaged(label)
-      const deleted = await outcomeOf(() => this.#vaultDB.delBox(this.#scope, label, expected), unexpectedError)
+      const deleted = await outcomeOf(() => this.#vaultDB.delBox(this.#scope, label, expected))
       // A lock landing meanwhile lets the deletion land.
       this.#demandAfterWait(deleted, { vault_tok: lease.vault_tok }, { call: 'delBox' })
       const { outcome } = valOf(deleted)
@@ -1287,7 +1288,7 @@ export class Vault implements VaultStamp {
   async #delVault(proving: PassphraseProving): Promise<number> {
     this.#demand(proving, { call: 'del' })
     const doomed = this.#vaultRecord
-    const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok, gate_epoch: doomed.gate_epoch }), unexpectedError)
+    const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok, gate_epoch: doomed.gate_epoch }))
     if (! deleted.ok) {
       this.#demandAfterWait(deleted, proving, { call: 'del' })
       throw deleted.err
@@ -1322,7 +1323,7 @@ export class Vault implements VaultStamp {
     const held = this.#vaultRecord
     // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
     const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
-    const written = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }), unexpectedError)
+    const written = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }))
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
     // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
     this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
@@ -1622,7 +1623,7 @@ export class Vault implements VaultStamp {
    * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
    */
   async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
-    const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }), unexpectedError)
+    const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }))
     // A vault that moved on meanwhile refuses as the demand finds it, never as what its read found.
     this.#demandAfterWait(read, { vault_tok: vaultTok }, { call })
     if (! read.ok) { throw this.#boxReadRefusal(read.err) }
@@ -1678,7 +1679,7 @@ export class Vault implements VaultStamp {
     this.#demand(box, { call: 'putBox' })
     // Lands only in the vault this whisper is sealed for, over the revision it was sealed from: a
     // vault reborn elsewhere, or a box written meanwhile by another device, refuses it.
-    const written = await outcomeOf(() => this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }), unexpectedError)
+    const written = await outcomeOf(() => this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }))
     // A lock landing during the write lets it land; the vault moving on meanwhile refuses as the demand finds it.
     this.#demandAfterWait(written, { vault_tok: box.vault_tok }, { call: 'putBox' })
     return this.#updateBoxListingOf(valOf(written), box.vault_tok)
@@ -1704,7 +1705,7 @@ export class Vault implements VaultStamp {
    * standing refuses 'no_whisper' when the whisper is not given.
    */
   async #storedBase(boxlabel: string, vaultTok: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
-    const read = await outcomeOf(() => this.#readBox(boxlabel, vaultTok, 'putBox'), unexpectedError)
+    const read = await outcomeOf(() => this.#readBox(boxlabel, vaultTok, 'putBox'))
     this.#demandAfterWait(read, { vault_tok: vaultTok }, { call: 'putBox' })
     if (! read.ok) {
       if (givenWhisper === undefined || ! isVaultError(read.err, 'damaged_box')) { throw read.err }
