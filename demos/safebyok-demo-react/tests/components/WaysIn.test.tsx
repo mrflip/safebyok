@@ -53,7 +53,7 @@ describe("WaysIn", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })
 
-  it("says nothing when the user cancels a change: the passphrase stands", async () => {
+  it("says nothing when the user cancels a change: the passphrase is unchanged", async () => {
     const { world } = await renderWaysIn()
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
     await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
