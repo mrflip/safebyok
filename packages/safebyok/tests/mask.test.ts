@@ -33,7 +33,7 @@ const RtlScripts = [
 
 const rtlLettersOf = (script: string): string => {
   const inScript = new RegExp(String.raw`^\p{Script=${script}}$`, 'u')
-  return Array.from({ length: 0x2_00_00 }, (_, cp) => String.fromCodePoint(cp))
+  return Array.from({ length: 0x2_00_00 }, (_slot, cp) => String.fromCodePoint(cp))
     .filter((chr) => /^[\p{L}\p{N}]$/u.test(chr) && inScript.test(chr))
     .join('')
 }

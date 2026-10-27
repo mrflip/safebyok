@@ -26,11 +26,11 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
       await db.empty()
       const first = TH.deviceOver(db, undefined, { maxBoxes: Cap })
       await TH.filled(first('u1'), ['standing_one', 'standing_two', 'standing_three', 'standing_four'])
-      const racers = Array.from({ length: Racers }, (_, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
+      const racers = Array.from({ length: Racers }, (_slot, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
 
       const outcomes = await Promise.all(racers.map(({ boxlabel, vaultDB }) => vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf(boxlabel, 'sk-fake'))))
 
-      const landed = racers.filter((_, idx) => outcomes[idx]?.ok)
+      const landed = racers.filter((_racer, idx) => outcomes[idx]?.ok)
       const refusedKinds = outcomes.flatMap((outcome) => (outcome.ok ? [] : outcome.err.refusalkind))
       expect(landed.length).to.be.within(1, Racers)
       expect(refusedKinds.filter((kind) => kind !== 'vault_full')).to.deep.equal([])
