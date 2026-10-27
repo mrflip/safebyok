@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { type PasskeyAnswer, VaultScope } from '../../src/types/types'
-import { type GatedVaultRecord, VaultRecord } from '../../src/vault-record'
+import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord } from '../../src/shapes/vault'
+import { VaultScope } from '../../src/shapes/scopes'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
@@ -189,7 +189,7 @@ describe("putWayin, with a new passphrase", () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const err = await TH.expectRefusal(TH.putWayin(vault, laptop as unknown as string, 'a new passphrase'), 'bad_option')
-    expect(err.message).to.eq('A passphrase is the text the user typed, as a string.')
+    expect(err.message).to.eq('A passphrase is the text the user typed, as a string')
     expect(err.message).to.not.include(laptop.credential_id)
     expect(storedVaultRecordOf(world)).to.deep.equal(before)
   })
@@ -774,7 +774,7 @@ describe("a new passphrase's strength", () => {
     const vault = await world.open({ strengthChecker: checker })
     for (const misfit of [42, undefined, null, { passphrase: 'pw' }]) {
       const err = await TH.expectRefusal(vault.checkStrength(misfit as unknown as string), 'bad_option')
-      expect(err.message).to.match(/checkStrength takes the passphrase/)
+      expect(err.message).to.match(/A passphrase is the text the user typed/)
     }
     expect(checker).not.toHaveBeenCalled()
   })

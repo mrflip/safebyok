@@ -134,7 +134,7 @@ describe("argon2idDeriver's bounds", () => {
   })
 
   it("names the ceiling a count of passes past Argon2's crosses, not only the floor", () => {
-    expect(refusalOf(() => argon2idDeriver({ ...CheapSpec, iterations: 2 ** 32 }))).to.include('below 2^32')
+    expect(refusalOf(() => argon2idDeriver({ ...CheapSpec, iterations: 2 ** 32 }))).to.match(/^iterations: .*4294967296/)
   })
 
   it("refuses a spec with fields missing, naming one", () => {

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { type VaultDB } from '../src/vault-db'
+import type { VaultDB } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
-import { type DelDamagedVaultOpts } from '../src/del-damaged-vault'
-import { delDamagedVault } from '../src/del-damaged-vault'
+import { type DelDamagedVaultOpts, delDamagedVault } from '../src/del-damaged-vault'
 import { Bank } from '../src/bank'
 import { isVaultError } from '../src/errors'
 import * as Scopepath from '../src/scopepath'
@@ -128,6 +127,9 @@ describe("delDamagedVault", () => {
     await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: '' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
+    // A misspelt option is refused, never quietly dropped, and its name is counted, never repeated.
+    const misspelt = await TH.expectRefusal(delDamagedVault({ ...world.optsWith(), vaultlable: 'main' } as DelDamagedVaultOpts), 'bad_option')
+    expect(misspelt.message).to.include('There is a field it does not take').and.not.include('vaultlable')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')
     }

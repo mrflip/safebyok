@@ -34,14 +34,6 @@ export const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) 
   }
 })
 
-const parseMaskOpts = (candidate: MaskOpts | undefined): Record<keyof MaskOpts, number> => {
-  const checked = maskOpts.safeParse(candidate ?? {})
-  if (! checked.success) {
-    throw new VaultError('bad_option', `mask takes head, tail and minStars as whole numbers of characters from 0 to ${String(MaxShown)}, and maxLen as a whole number from 0 to ${String(Number.MAX_SAFE_INTEGER)} or Infinity.`)
-  }
-  return checked.data
-}
-
 /** The characters `plainLine` removes: combining marks, controls, invisibles, spaces, bidirectional controls, and symbols drawn blank or boxed.
  * Right-to-left letters and numbers are kept.
  */
@@ -99,7 +91,7 @@ export const mask = (whisper: string, opts?: MaskOpts): string => {
   if (typeof whisper !== 'string') {
     throw new VaultError('bad_whisper', 'mask masks a whisper that is a string.')
   }
-  const { head, tail, minStars, maxLen } = parseMaskOpts(opts)
+  const { head, tail, minStars, maxLen } = maskOpts.parse(opts ?? {})
   if (whisper === '') { return '' }
   const safeToButcher = plainLine(whisper)
   const butchered = butcher(codePointsOf(safeToButcher), { head, tail, minStars, maxLen })

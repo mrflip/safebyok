@@ -1,9 +1,10 @@
-/** The vault record: the one record per vault every device syncs, its gate nested in it, and the shapes sliced from it. Each `parse` refuses 'bad_record', quoting none of it. */
+/** The vault record: the one record per vault every device syncs, its gate nested in it, the shapes sliced from it, and the proofs its wayins take. Each record's `parse` refuses 'bad_record', quoting none of it. */
 
+import { string as zodString } from 'zod'
 import type * as Z from 'zod'
-import { Validator } from './checks/validator'
-import * as Phrases from './phrases'
-import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './types/type-aliases'
+import { Validator } from '../checks/validator'
+import * as Phrases from '../phrases'
+import { credential_id, device_id, key_deriver_label, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './fields'
 
 // == [Formats]: VaultFormat, TombstoneFormat
 
@@ -14,25 +15,45 @@ export const VaultFormat = 'safebyok-vault-v6'
 export const TombstoneFormat = 'safebyok-tombstone-v1'
 // --
 
-// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft
+// == [Wayin kinds]: WayinKindVals, wayinkind, WayinKind, PasskeySaltBytes
+
+/** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
+export const WayinKindVals = ['passphrase', 'passkey'] as const
+
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link WayinKindVals}. Its `parse` refuses 'bad_option'.
+ *
+ * @example wayinkind.safeParse('passkey').success   // true
+ */
+export const { wayinkind } = Validator('bad_option', ({ oneof }) => ({ wayinkind: oneof(WayinKindVals) }))
+export type WayinKind = typeof WayinKindVals[number]
+
+/** How many random bytes a passkey wayin's `prf_salt_b64` holds.
+ * A new passkey's {@link PasskeyAnswer} carries a fresh salt this long, as `createPasskey` mints.
+ */
+export const PasskeySaltBytes = 32
+// --
+
+// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, headerOf, VaultDraft
 
 /** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves.
  * Each record is strict: a field this version does not know is damage. A VaultDB reads each back
  * through these, and refuses what fails as 'damaged_vault'. Each shape is the record's own fields,
- * picked or left out; a part's shapes nest as the part does.
+ * picked or left out; a part's shapes nest as the part does. A shape taken out of whatever carries
+ * it strips the rest: a Vault object, its record or its snapshot passes as its stamp or its sparse
+ * shape.
  *
  * @example VaultRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampPicked, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse } = Validator('bad_record', ({ obj, str, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
+export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
   const PassphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
-    key_deriver_label:       str.min(1),
+    key_deriver_label,
     /** This wayin's passphraseSalt: fresh for every passphrase the vault takes. */
     salt_b64,
     /** The sealing device's random id for the vault, from its device record: never drawn from the device itself. */
-    device_id:               str.min(1),
+    device_id,
     /** When this wayin was sealed: a new passphrase stamps it afresh. */
     registered_at:           epochMillis,
     /** The vaultKey, wrapped under the passphraseKey: unwrapping it is the passphrase check. */
@@ -42,11 +63,11 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
   const PasskeyWayinRecord = obj({
     wayinkind:               lit('passkey'),
     /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
-    credential_id:           str.min(1),
+    credential_id,
     /** The salt the passkey's PRF is evaluated over: `PasskeySaltBytes` random bytes, fresh for every wayin. */
     prf_salt_b64,
     /** The adding device's random id for the vault, from its device record: never drawn from the device itself. */
-    device_id:               str.min(1),
+    device_id,
     /** When this wayin was added. */
     registered_at:           epochMillis,
     /** The vaultKey, wrapped under the passkeyKey: unwrapping it is the passkey check. */
@@ -86,18 +107,20 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
 
   const VaultRecord = vaultRecordFields.refine((record) => (record.gate === null) === (record.gate_epoch === 0), { error: Phrases.GateEpochAndGate, path: ['gate_epoch'] })
 
-  const VaultSparse = vaultRecordFields.omit({ gate: true })
-  const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true })
-  // The stamp picked from whatever carries it, a vault record, a Vault object or its sparse shape: a ctx takes its fields alone.
-  const VaultStampPicked = VaultStamp.strip()
-  const VaultStampButFormat = VaultStamp.omit({ format: true }).strip()
+  const VaultSparse = vaultRecordFields.omit({ gate: true }).strip()
+  const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true }).strip()
+  // Any format: a box and a lease bind their vault's stamp without it, so a new vault format leaves them open.
+  const VaultStampButFormat = VaultStamp.omit({ format: true })
   const VaultTombstone = vaultRecordFields.pick({ applabel: true, user_id: true, vaultlabel: true }).extend({ format: lit(TombstoneFormat), vault_epoch: int.positive() }).strict()
 
   const PassphraseWayinSparse = PassphraseWayinRecord.omit({ key_deriver_label: true, salt_b64: true, vault_key_wayin_wrapped: true })
   const PasskeyWayinSparse = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
   const GateSparse = GateRecord.extend({ passphrase: PassphraseWayinSparse, passkey: PasskeyWayinSparse.nullable() })
 
-  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampPicked, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse }
+  const PassphraseWayinHeader = PassphraseWayinRecord.omit({ vault_key_wayin_wrapped: true })
+  const PasskeyWayinHeader = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
+
+  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader }
 })
 
 /** A passphrase wayin as stored: the vaultKey wrapped under the passphraseKey the passphrase and this wayin's passphraseSalt make.
@@ -154,34 +177,45 @@ export type VaultSparse = Z.infer<typeof VaultSparse>
 export type VaultStamp = Z.infer<typeof VaultStamp>
 
 /** A vault's stamp as what lies in it binds it: every field of its {@link VaultStamp} but the format, so a new vault format leaves each box and lease open.
- * Its `parse` picks those fields from whatever carries them, a vault record or a Vault object, and
- * refuses 'bad_record' for one missing any; `VaultStampPicked` picks the whole stamp alike.
  *
- * @example { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
+ * @example VaultStampButFormat.parse(vault)   // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
  */
 export type VaultStampButFormat = Z.infer<typeof VaultStampButFormat>
+
+/** The check of what a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: a `vault_tok`, and each of the scope's labels and epochs the thing carries checked as the vault record checks it. Its `parse` refuses 'bad_option', naming each failing field.
+ * Taken out of whatever carries it, it strips the rest: a box's own `format` or `registered_at`
+ * is no part of it.
+ *
+ * @example VaultMadeUnder.parse(box)                          // { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
+ * @example VaultMadeUnder.parse({ gate_epoch: 1 })            // throws 'bad_option', "vault_tok: ..."
+ */
+export const { VaultMadeUnder } = Validator('bad_option', () => ({
+  VaultMadeUnder: VaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
+    .partial({ applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true }),
+}))
 
 /** What a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: the vault's `vault_tok`, and whichever of its scope and epochs the thing carries.
  * A Box, a Lease, a Gate, a Proving, a snapshot and a vault record are each one. A field the
  * thing has of its own beside these, a box's `format` or `registered_at`, is no part of it.
  *
- * @example vault.demandConsistentWith({ vault_tok: box.vault_tok, gate_epoch: box.gate_epoch })
+ * @example vault.demandConsistentWith(box)
+ * @example vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 })   // throws 'gate_moved' for a vault with a way in
  */
-export type VaultMadeUnder = Pick<VaultSparse, 'vault_tok'> & Partial<Pick<VaultSparse, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_epoch' | 'gate_epoch'>>
+export type VaultMadeUnder = Z.infer<typeof VaultMadeUnder>
 
 /** A vault record whose gate is made: what {@link isGated} tells apart, and what every gating but a vault's first works on. */
 export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
 
-/** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, and `gate_epoch` 0.
+/** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
+export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
+  VaultDraft: VaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict(),
+}))
+
+/** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, `gate_epoch` 0, and `vault_epoch` 0, as the store sets the counter.
  *
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
  */
-export type VaultDraft = VaultRecord & { gate: null, gate_epoch: 0 }
-
-/** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
-export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
-  VaultDraft: VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }),
-}))
+export type VaultDraft = Z.infer<typeof VaultDraft>
 
 /** What a deleted vault leaves in its scope: its counter, which the next life of the scope carries on.
  * `vault_epoch` is the deleted vault's plus one. Every write refuses over a tombstone as it does
@@ -201,6 +235,15 @@ export type PasskeyWayinSparse = Z.infer<typeof PasskeyWayinSparse>
 /** A gate as a host may see it while the vault is locked: each wayin as its sparse shape. */
 export type GateSparse = Z.infer<typeof GateSparse>
 
+/** A passphrase wayin's visible fields: its record but the wrap, which the wrap is bound to. */
+export type PassphraseWayinHeader = Z.infer<typeof PassphraseWayinHeader>
+
+/** A passkey wayin's visible fields: its record but the wrap, which the wrap is bound to. */
+export type PasskeyWayinHeader = Z.infer<typeof PasskeyWayinHeader>
+
+/** A wayin's visible header, every field but its wrap: what the wrap is bound to. A {@link PassphraseWayinHeader} or a {@link PasskeyWayinHeader}, told apart by `wayinkind`. */
+export type WayinHeader = PassphraseWayinHeader | PasskeyWayinHeader
+
 /** True for a vault record whose gate is made, as opposed to a novel one's: its `gate` there to read.
  *
  * @example if (isGated(record)) { offerUnlock(record.gate.passphrase) } else { offerNewPassphrase() }
@@ -216,6 +259,18 @@ export const vaultSparseOf = (record: VaultRecord): VaultSparse => {
   return Object.freeze(sparse)
 }
 
+/** `record`'s visible fields, its header: every field but the wrap, which a proving of that wayin seals over and its wrap's ctx binds.
+ *
+ * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
+ */
+export function headerOf(record: PassphraseWayinRecord): PassphraseWayinHeader
+export function headerOf(record: PasskeyWayinRecord): PasskeyWayinHeader
+export function headerOf(record: WayinRecord): WayinHeader
+export function headerOf(record: WayinRecord): WayinHeader {
+  const { vault_key_wayin_wrapped: _wrapped, ...header } = record
+  return header
+}
+
 /** `gate` as a host may see it, frozen through: its {@link GateSparse}, each wayin without what a guess at the passphrase would start from or what opens the vault.
  *
  * @example gateSparseOf(record.gate).passphrase   // { wayinkind: 'passphrase', device_id, registered_at }: no salt, key deriver label or wrap
@@ -226,4 +281,71 @@ export const gateSparseOf = (gate: GateRecord): GateSparse => {
   const { vault_key_wayin_wrapped: _passkeyWrap, ...passkey } = gate.passkey
   return Object.freeze({ passphrase: Object.freeze(passphrase), passkey: Object.freeze(passkey) })
 }
+// --
+
+// == [Wayin summaries]: PassphraseWayinSummary, PasskeyWayinSummary, WayinSummary
+
+/** A vault's passphrase wayin as a log line or a `damaged_wayin` refusal's `meta.wayin_listed` shows it: its {@link PassphraseWayinSparse} and its `vault_tok`.
+ * The `device_id` is one per device per vault, so it links nothing the vault does not already
+ * link. A snapshot's `gate` shows the sparse shape alone.
+ *
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
+ */
+export type PassphraseWayinSummary = PassphraseWayinSparse & Pick<VaultRecord, 'vault_tok'>
+
+/** A vault's passkey wayin as a log line or a `damaged_wayin` refusal's `meta.wayin_listed` shows it: its {@link PasskeyWayinSparse} and its `vault_tok`.
+ * A snapshot's `gate` shows the sparse shape alone.
+ *
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passkey', device_id, registered_at, vault_tok, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }
+ */
+export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_tok'>
+
+/** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
+export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
+// --
+
+// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswerShape, PasskeyAnswer
+
+/** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
+ * What a blank one means is the gating's to say.
+ *
+ * @example passphraseCleartext.parse(typed)   // a PassphraseCleartext, for the key deriver
+ * @example passphraseCleartext.parse(42)      // throws 'bad_option', "A passphrase is the text the user typed, as a string"
+ */
+export const { passphraseCleartext } = Validator('bad_option', () => ({
+  passphraseCleartext: zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(),
+}))
+
+/** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
+export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
+
+/** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
+export const PrfAnswerBytes = 32
+
+/** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` refuses 'bad_option', quoting none of it, as its bytes are secret.
+ * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
+ * again, it would make a key anyone could rebuild.
+ *
+ * @example passkeyAnswerShape.parse(await askPasskey(vault.snapshot.gate))
+ * @example passkeyAnswerShape.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
+ */
+export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes }) => ({
+  passkeyAnswerShape: obj({
+    /** Base64url, as `PublicKeyCredential.id` gives it. */
+    credential_id,
+    prf_salt_b64:  str.min(1),
+    /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
+    prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
+  }),
+}))
+
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
+ * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
+ * it in `attempt`, beside the passphrase.
+ *
+ * @example
+ *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
+ *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
+ */
+export type PasskeyAnswer = Z.infer<typeof passkeyAnswerShape>
 // --

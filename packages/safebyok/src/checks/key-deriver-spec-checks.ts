@@ -1,6 +1,7 @@
 /** The check of a keyDeriverSpec, kept apart: import it only where a spec is checked, so an app that uses only `argon2idWebV1Deriver` ships no Zod. */
 
 import { MaxSaltBytes, PassphraseKeyBytes } from '../consts'
+import * as Phrases from '../phrases'
 import { Validator } from './validator'
 
 /** The fewest salt bytes Argon2id takes: its reference code and `@noble/hashes` refuse fewer. */
@@ -25,5 +26,5 @@ export const { keyDeriverSpec } = Validator('bad_option', ({ obj, str, int, lit 
     parallelism:       int.gte(1),
     salt_bytes:        int.gte(MinArgon2SaltBytes).lte(MaxSaltBytes),
     output_bytes:      lit(PassphraseKeyBytes),
-  }).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }),
+  }, Phrases.KeyDeriverSpecShape).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] }),
 }))

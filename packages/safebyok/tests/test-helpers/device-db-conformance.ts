@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { type DeviceDB } from '../../src/device-db'
-import type { LeaseRecord } from '../../src/types/types'
+import type { LeaseRecord } from '../../src/shapes/device'
 import { scopeOf, leaseOf, deviceRecordOf } from './builders'
 import { expectBad, expectingGood } from './refusals'
 

@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
-import { BaseShape, MadeShape, MadeUnderShape, sealBoxlabel } from '../src/box'
-import { CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape } from '../src/lease'
-import { VaultStampButFormat, VaultStampPicked } from '../src/vault-record'
-import { whisperBag } from '../src/types/types'
-import { passphraseCleartext } from '../src/types/type-aliases'
-import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/vault-db'
-import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/vault-opts'
-import { vaultMadeUnderShape } from '../src/vault'
+import { BoxBase, MadeShape, MadeUnderShape, SealBoxProps } from '../src/box'
+import { freshPasskeyAnswer } from '../src/proving'
+import { LeaseGrant } from '../src/lease'
+import { PasskeyWayinHeader, PassphraseWayinHeader, VaultMadeUnder, VaultStampButFormat, passphraseCleartext, wayinkind } from '../src/shapes/vault'
+import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
+import { CipheredShape, whisperBag } from '../src/shapes/box'
+import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
+import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
 import { parseKeyDeriverSpec } from '../src/key-deriver-spec'
@@ -20,9 +20,10 @@ import { makeWorld } from './vault/world'
 
 /** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
 const InPackage = {
-  BaseShape, MadeShape, MadeUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape, VaultStampButFormat, VaultStampPicked, whisperBag,
+  BoxBase, MadeShape, MadeUnderShape, SealBoxProps, freshPasskeyAnswer, CipheredShape, LeaseGrant, VaultStampButFormat, whisperBag,
+  PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
   passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
-  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,
+  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, VaultMadeUnder,
 }
 
 /** Every validator the package makes, the namespace's and its own. */
@@ -104,7 +105,7 @@ describe("no refusal repeats its input", () => {
     const refusals = await Promise.all([
       bank.tryEnsureVault({ vaultlabel: Marker }),
       bank.tryEnsureVault({ vaultlabel: 'main', user_id: Marker }),
-      bank.tryEnsureVault({ vaultlabel: 'main', [Marker]: Marker } as { vaultlabel: string }),
+      bank.tryEnsureVault({ vaultlabel: 'main', vaultDB: Marker } as unknown as { vaultlabel: string }),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { [Marker]: Marker } as object),
       bank.tryEnsureVault({ vaultlabel: 'main' }, { vaultDB: Marker } as unknown as object),
     ])
@@ -125,6 +126,6 @@ describe("no refusal repeats its input", () => {
       expect(refusal.ok).to.be.false
       expect(TH.thrownText(refusal.err)).to.not.include(Marker)
     }
-    expect(refusalTextOf(() => parseKeyDeriverSpec({ [Marker]: Marker } as never))).to.include('Argon2id cannot run').and.not.include(Marker)
+    expect(refusalTextOf(() => parseKeyDeriverSpec({ [Marker]: Marker } as never))).to.include('algorithm: ').and.not.include(Marker)
   })
 })

@@ -1,7 +1,10 @@
+import 'fake-indexeddb/auto'
+import { runInNewContext } from 'node:vm'
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../src/vault-record'
-import * as TH from './test-helpers'
+import { type GatedVaultRecord, type PasskeyAnswer, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, gateSparseOf, headerOf, isGated, passkeyAnswerShape, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
+import { LeaseStamp } from '../../src/shapes/device'
+import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
@@ -116,18 +119,12 @@ describe("the vault record's shapes", () => {
   it("makes VaultSparse the record without its gate, as its example shows", () => {
     const sparse = VaultSparse.parse(omit(record, ['gate']))
     expect(Object.keys(sparse)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at', 'vault_epoch', 'gate_epoch'])
-    expect(VaultSparse.safeParse(record).success).to.be.false
+    expect(VaultSparse.parse(record), 'taken from the whole record, its gate left out').to.deep.equal(sparse)
   })
 
   it("makes VaultStamp the six fields fixed for the vault's life, never an epoch, as its example shows", () => {
     const stamp = VaultStamp.parse(omit(record, ['gate', 'vault_epoch', 'gate_epoch']))
     expect(Object.keys(stamp)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'])
-  })
-
-  it("makes VaultStampButFormat the stamp but its format, picked from a whole record, as its example shows", () => {
-    expect(VaultStampButFormat.parse(record)).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
-    expect(VaultStampPicked.parse(record)).to.deep.equal({ format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
-    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
   })
 
   it("makes VaultTombstone the format, the scope and a vault_epoch of 1 or more, as its example shows", () => {
@@ -205,6 +202,30 @@ describe("gateSparseOf", () => {
   })
 })
 
+describe("wayinkind", () => {
+  it("takes each kind of wayin, as its example shows, and refuses any other slot 'bad_option'", () => {
+    expect(wayinkind.safeParse('passkey').success).to.be.true
+    expect(wayinkind.parse('passphrase')).to.eq('passphrase')
+    TH.expectSyncRefusal(() => wayinkind.parse('hunter2'), 'bad_option')
+  })
+})
+
+describe("headerOf", () => {
+  it("is a wayin record without its wrap, as its example shows, each kind's header", () => {
+    const gate = TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
+    const passphrase = headerOf(gate.passphrase)
+    expect(passphrase).to.deep.equal(omit(gate.passphrase, ['vault_key_wayin_wrapped']))
+    expect(PassphraseWayinHeader.parse(passphrase)).to.deep.equal(passphrase)
+    const passkey = headerOf(TH.passkeyWayinOf('laptop'))
+    expect(passkey).to.not.have.property('vault_key_wayin_wrapped')
+    expect(PasskeyWayinHeader.parse(passkey)).to.deep.equal(passkey)
+  })
+
+  it("refuses a header that still holds its wrap, as a header is strict as its record is", () => {
+    expect(PassphraseWayinHeader.safeParse(TH.gateOf('u1').passphrase).success).to.be.false
+  })
+})
+
 describe("the named vault record types", () => {
   it("names a gated record GatedVaultRecord, and a novel draft VaultDraft, as its example shows", () => {
     expectTypeOf(TH.vaultRecordOf('u1')).toExtend<GatedVaultRecord>()
@@ -216,6 +237,79 @@ describe("the named vault record types", () => {
     expectTypeOf({ vault_tok: 'vault-tok-u1', gate_epoch: 1 }).toExtend<VaultMadeUnder>()
     expectTypeOf({ format: 'safebyok-box-v8', vault_tok: 'vault-tok-u1', registered_at: 1 }).toExtend<VaultMadeUnder>()
     expectTypeOf({ gate_epoch: 1 }).not.toExtend<VaultMadeUnder>()
+  })
+})
+// --
+
+describe("the stamps, taken from whatever carries them", () => {
+  const record = TH.vaultRecordOf('u1')
+  const stamp = { format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at }
+
+  it("take a vault's stamp from its record, with and without its format, as VaultStampButFormat's example shows", () => {
+    expect(VaultStamp.parse(record)).to.deep.equal(stamp)
+    expect(VaultStampButFormat.parse(record)).to.deep.equal(omit(stamp, ['format']))
+  })
+
+  it("take a vault's stamp from a Vault object", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    expect(VaultStamp.parse(vault)).to.deep.equal(vault.stamp)
+    TH.closeVault(vault)
+  })
+
+  it("refuse 'bad_record' a stamp missing a field it binds", () => {
+    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
+  })
+
+  it("take a lease's stamp from its record, leaving out its key material", async () => {
+    const lease = await TH.leaseOf('u1')
+    expect(LeaseStamp.parse(lease)).to.deep.equal(omit(lease, ['lease_key', 'vault_key_lease_wrapped']))
+  })
+})
+
+// == [Proofs]: passkeyAnswerShape
+
+/** What is no passkey's answer, each refused as bad_option, and the field the refusal names. */
+const misshapenAnswers = (answer: PasskeyAnswer) => [
+  [{ ...answer, prfBytes: [...answer.prfBytes] },          'prfBytes',      'its bytes an array, not a Uint8Array'],
+  [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'prfBytes',      'its bytes one short of 32'],
+  [{ ...answer, credential_id: '' },                       'credential_id', 'an empty credential'],
+  [{ ...answer, prf_salt_b64: undefined },                 'prf_salt_b64',  'no salt'],
+] as const
+
+describe("passkeyAnswerShape", () => {
+  it("takes a passkey's answer, its bytes the very ones handed in, as its first example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const checked = passkeyAnswerShape.parse(answer)
+    expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
+    expect(checked.prfBytes).to.eq(answer.prfBytes)
+  })
+
+  it("takes bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+    expect(foreign instanceof Uint8Array).to.be.false
+    expect(passkeyAnswerShape.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
+  })
+
+  it("refuses an answer already used, its bytes zeroed, as bad_option, as its second example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
+    expect(err.message).to.match(/^prfBytes: .*used already/)
+  })
+
+  it("refuses what is no answer at all as bad_option", () => {
+    for (const given of ["pw", 42, null, { credential_id: 'abc' }]) {
+      TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+    }
+  })
+
+  it("refuses a misshapen answer as bad_option, naming the field and quoting none of it", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    for (const [given, fieldname, blurb] of misshapenAnswers(answer)) {
+      const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+      expect(err.message, blurb).to.match(new RegExp(`^${fieldname}: `))
+      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
+    }
   })
 })
 // --

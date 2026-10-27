@@ -92,6 +92,9 @@ describe("Expectations.vaultRecordPutOf", () => {
 
   it("counts from zero over a vault record that shows no counter, a damaged one", () => {
     expect(Expectations.vaultRecordPutOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', vault_epoch: 'x' }).vault_epoch).to.eq(1)
+    for (const unread of [-1, 1.5, 2 ** 53, Infinity, null]) {
+      expect(Expectations.vaultRecordPutOf(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', vault_epoch: unread }).vault_epoch).to.eq(1)
+    }
   })
 })
 
@@ -120,6 +123,11 @@ describe("Expectations.tombstoneOf", () => {
   it("leaves a tombstone of the vault stored at the gate expected: the scope and the counter plus one", () => {
     expect(Expectations.tombstoneOf(VaultRecord, scope, gate1)).to.deep.equal({ ...VaultTombstone, vault_epoch: 2 })
     expect(Expectations.tombstoneOf(TH.vaultRecordOf('u1', { gate_epoch: 3, vault_epoch: 7 }), scope, { vault_tok: 'vault-tok-u1', gate_epoch: 3 })).to.deep.include({ vault_epoch: 8 })
+  })
+
+  it("holds the scope's names alone, whatever else the scope handed in carries, as a server's own arguments may", () => {
+    const carrying = { ...scope, boxlabel: 'anthropic', vault_tok: 'vault-tok-u1' }
+    expect(Expectations.tombstoneOf(VaultRecord, carrying, gate1)).to.deep.equal({ ...VaultTombstone, vault_epoch: 2 })
   })
 
   it("misses a vault since made anew, none, a record that names no vault, and a gate since changed", () => {

@@ -63,7 +63,7 @@ const BadOpts = [
 describe("idbVaultDB's options", () => {
   for (const [opts, blurb] of BadOpts) {
     it(`refuses ${blurb} with kind 'bad_option'`, () => {
-      expect(() => idbVaultDB(opts as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^idbVaultDB takes an optional dbName/).with.property('refusalkind', 'bad_option')
+      expect(() => idbVaultDB(opts as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^In idbVaultDB's options: /).with.property('refusalkind', 'bad_option')
     })
   }
 

@@ -50,7 +50,7 @@ describe("inspectIdbVaultDB", () => {
 
   it("refuses a dbName that is not non-empty text with kind 'bad_option'", () => {
     for (const dbName of ['', 42, null]) {
-      expect(() => inspectIdbVaultDB({ dbName } as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^inspectIdbVaultDB takes an optional dbName/).with.property('refusalkind', 'bad_option')
+      expect(() => inspectIdbVaultDB({ dbName } as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^In inspectIdbVaultDB's options: /).with.property('refusalkind', 'bad_option')
     }
   })
 

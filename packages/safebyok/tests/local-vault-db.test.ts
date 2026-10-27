@@ -196,7 +196,7 @@ describe("localVaultDB, as it is made", () => {
   }
 
   it("takes a store bare of a bag, by mistake, as no store: kind 'bad_option'", () => {
-    expect(() => localVaultDB(memoryStore() as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError, /one bag of options/)
+    expect(() => localVaultDB(memoryStore() as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError, /^In localVaultDB's options: store: Expected a StringStore/)
   })
 
   it("logs a listener that throws through its logger, the write it heard of landed", async () => {

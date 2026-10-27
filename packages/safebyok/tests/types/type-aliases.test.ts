@@ -1,18 +1,18 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type * as Z from 'zod'
-import type { BoxRecord } from '../../src/box'
-import type { BankScope, VaultScope } from '../../src/checks/core-checks'
+import type { BoxRecord } from '../../src/shapes/box'
+import type { Applabel, BankScope, Boxlabel, UserId, VaultScope, Vaultlabel } from '../../src/shapes/scopes'
 import * as Primitives from '../../src/checks/primitives'
-import { type Ciphered, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../../src/crypto'
+import { cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../../src/crypto'
 import type { VaultError } from '../../src/errors'
-import * as TypeAliases from '../../src/types/type-aliases'
+import * as Fields from '../../src/shapes/fields'
 import {
-  type Applabel, type Boxlabel, type BoxKeyWrapped, type ConsistencyWith, type Lifecycled, type PassphraseCleartext, type PassphraseSalt, type PrfSalt,
-  type Refused, type RevisionTok, type UserId, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type Vaultlabel, type VaultTok, type WhisperCiphered,
-  box_key_wrapped, passphraseCleartext, prf_salt_b64, revision_tok, salt_b64, vault_key_lease_wrapped, vault_key_wayin_wrapped, vault_tok, whisper_ciphered,
-} from '../../src/types/type-aliases'
-import type { LeaseRecord } from '../../src/types/types'
-import type { PasskeyWayinRecord, PassphraseWayinRecord } from '../../src/vault-record'
+  type Ciphered, type BoxKeyWrapped, type PassphraseSalt, type PrfSalt, type RevisionTok, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type VaultTok, type WhisperCiphered,
+  box_key_wrapped, prf_salt_b64, revision_tok, salt_b64, vault_key_lease_wrapped, vault_key_wayin_wrapped, vault_tok, whisper_ciphered,
+} from '../../src/shapes/fields'
+import type { ConsistencyWith, Lifecycled, Refused } from '../../src/types/type-aliases'
+import { type PassphraseCleartext, type PasskeyWayinRecord, type PassphraseWayinRecord, passphraseCleartext } from '../../src/shapes/vault'
+import type { LeaseRecord } from '../../src/shapes/device'
 import type { Vault } from '../../src/vault'
 import * as TH from '../test-helpers'
 
@@ -24,7 +24,7 @@ describe("the names a host writes by hand", () => {
     expectTypeOf<UserId>().toEqualTypeOf<string>()
     expectTypeOf<VaultTok>().toEqualTypeOf<string>()
     expectTypeOf<RevisionTok>().toEqualTypeOf<string>()
-    expectTypeOf<TypeAliases.EpochMillis>().toEqualTypeOf<number>()
+    expectTypeOf<Fields.EpochMillis>().toEqualTypeOf<number>()
   })
 
   it("check a token as text that is not empty, refusing an empty one as 'bad_record' in a sentence", () => {
@@ -36,7 +36,7 @@ describe("the names a host writes by hand", () => {
   })
 
   it("hand out EpochMillis as the same check the package keeps every time with", () => {
-    expect(TypeAliases.EpochMillis).to.eq(Primitives.EpochMillis)
+    expect(Fields.EpochMillis).to.eq(Primitives.EpochMillis)
   })
 })
 

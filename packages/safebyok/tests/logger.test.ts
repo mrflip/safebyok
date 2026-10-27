@@ -33,7 +33,7 @@ describe("parseLogger", () => {
 
   for (const [candidate, blurb] of NotLoggers) {
     it(`refuses ${blurb} as bad_option`, () => {
-      expect(() => parseLogger(candidate as unknown as VaultLogger)).to.throw(VaultError, /log, warn and error functions/)
+      expect(() => parseLogger(candidate as unknown as VaultLogger)).to.throw(VaultError, /^((log|warn|error): Expected a function(; )?)+$|^Expected a VaultLogger/)
     })
   }
 
@@ -186,7 +186,7 @@ describe("setDefaultLogger", () => {
     it(`refuses ${blurb} as bad_option, keeping the default it had`, () => {
       const telemetry = TH.spyLogger()
       setDefaultLogger(telemetry.logger)
-      expect(() => { setDefaultLogger(candidate as unknown as VaultLogger) }).to.throw(VaultError, /log, warn and error functions/)
+      expect(() => { setDefaultLogger(candidate as unknown as VaultLogger) }).to.throw(VaultError, /^((log|warn|error): Expected a function(; )?)+$|^Expected a VaultLogger/)
       DefaultLogger.log('still heard')
       expect(telemetry.calls).to.have.lengthOf(1)
     })

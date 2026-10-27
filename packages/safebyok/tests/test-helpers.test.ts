@@ -6,18 +6,22 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank, DeviceDB, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
-import { Ciphered, fromB64, makeVaultKey, toB64 } from '../src/crypto'
+import { Ciphered } from '../src/shapes/fields'
+import { fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good, valOf } from '../src/outcome'
-import { Box, BoxRecord } from '../src/box'
+import { Box } from '../src/box'
+import { BoxRecord } from '../src/shapes/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultScope, type Capacity, type DeviceRecord, type LeaseRecord } from '../src/types/types'
-import { VaultRecord, type VaultDraft } from '../src/vault-record'
+import { PasskeySaltBytes, VaultRecord, type VaultDraft } from '../src/shapes/vault'
+import { VaultScope } from '../src/shapes/scopes'
+import type { Capacity, VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse } from '../src/shapes/vault-db'
+import type { DeviceRecord, LeaseRecord } from '../src/shapes/device'
 import * as Refusals from '../src/refusals'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
-import { VaultDB, type VaultRecordExpectation, type VaultDelExpectation, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultReadResponse, type VaultDBOpts, splitStoredBoxes } from '../src/vault-db'
+import { VaultDB, type VaultDBOpts, splitStoredBoxes } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
 
@@ -716,9 +720,12 @@ describe("the fixtures", () => {
   })
 
   it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
-    const { now, ...rest } = TH.vaultSliceOf('u1')
+    const { now, keyDeriver, leaseMillis, ...stamp } = TH.vaultSliceOf('u1')
     expect(now()).to.eq(TH.SliceNow)
-    expect(rest).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
+    expect([keyDeriver, leaseMillis]).to.deep.equal([TH.testDeriver, 7 * 24 * 60 * 60_000])
+    // Its own fields are its stamp alone, as a Vault object's are.
+    expect({ ...TH.vaultSliceOf('u1') }).to.deep.equal(stamp)
+    expect(stamp).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at })
     const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
     expect(slice.keyDeriver).to.eq(argon2idWebV1Deriver)
     expect(Wayin.make(TH.vaultSliceOf('u1'), TH.passkeyWayinOf('laptop'), { keyDeriver: argon2idWebV1Deriver }).wayinkind).to.eq('passkey')
