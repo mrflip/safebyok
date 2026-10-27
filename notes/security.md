@@ -561,8 +561,8 @@ added or folded into through the subagent, and no other entry changes.
   first unlock sets its passphrase over them. The wayin is sealed before the first write, so a failing key
   deriver creates nothing. Gateless props carry no secret. Amended 2026-10-22 (bank): **the first gate write is one
   `putVaultProps` expecting `{ vault_tok, gate_epoch: 0 }`, and a device that loses the race is refused
-  `gate_made_elsewhere` without its typed passphrase being tried against the winner's gate.** The vault demands that
-  the Vault object is not gone after each wait (strength check, seal, write) (`packages/safebyok/src/vault.ts`). Before, a loser's
+  `gate_made_elsewhere` without its typed passphrase being tried against the winner's gate.** After each wait
+  (strength check, seal, write) the call demands that the first gate it made is still consistent with the vault record in hand (`packages/safebyok/src/vault.ts`). Before, a loser's
   passphrase was tried against the winner's gate and, if it opened it, unlocked. The refusal carries none of the
   stored props, so no wrapped vaultKey reaches an error. The device record is raised after this device's own gate
   write.
