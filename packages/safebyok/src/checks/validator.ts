@@ -6,7 +6,10 @@ import { VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
 import { EpochMillis, label, user_id } from './primitives'
 
-// == [Kit]: Kit, KitWith
+// == [Kit]: isBytes, Kit, KitWith
+
+/** True for a Uint8Array from any realm: judged by its tag, as `instanceof` refuses one made in an iframe or a test's jsdom. */
+const isBytes = (candidate: unknown): candidate is Uint8Array => ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]'
 
 /** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, the names every scope is made of, and `epochMillis`, the instant every time is.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
@@ -27,7 +30,9 @@ export const Kit = {
   /** A check Zod has no maker for, as a predicate: a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
   /** A function, as a host's verb or callback is checked, typed as the one meant: `fn<Clock['now']>()`. Nothing past its being one is judged. */
-  fn:      <FnT = (...args: never[]) => unknown>() => Zod.custom<FnT>((candidate) => typeof candidate === 'function'),
+  fn:      <FnT = (...args: never[]) => unknown>() => Zod.custom<FnT>((candidate) => typeof candidate === 'function', Phrases.FunctionExpected),
+  /** Bytes, a Uint8Array, judged by its tag, so bytes from another realm (an iframe, jsdom) pass where `instanceof` would refuse them; `bytes(32)` for exactly that many. */
+  bytes:   (count?: number) => Zod.custom<Uint8Array>((candidate) => isBytes(candidate) && (count === undefined || candidate.length === count), Phrases.bytesExpected(count)),
   unk:     Zod.unknown(),
   str:     Zod.string(),
   num:     Zod.number(),

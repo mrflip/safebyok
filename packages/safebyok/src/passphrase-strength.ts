@@ -1,5 +1,6 @@
 import type * as Z from 'zod'
 import { VaultError } from './errors'
+import * as Phrases from './phrases'
 import { Validator } from './checks/validator'
 import { type VaultScope, vaultScope } from './shapes/scopes'
 
@@ -61,9 +62,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
 
 /** What Bank.make's options schema holds `strengthChecker` to, and what a checker must answer, a verdict: each refuses 'bad_option'. */
 export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
-  strengthChecker: custom<StrengthChecker>(isStrengthChecker, {
-    error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
-  }),
+  strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
   passphraseVerdict: union([
     obj({ strong: lit(true) }),
     obj({ strong: lit(false), reason: str.min(1) }),

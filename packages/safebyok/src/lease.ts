@@ -1,4 +1,4 @@
-import { type BoxCiphered, BoxRecord, BoxSparse, BoxStamp, CipheredShape } from './shapes/box'
+import { type BoxCiphered, type BoxRecord, BoxSparse, BoxStamp, CipheredShape } from './shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -156,7 +156,7 @@ export class Lease implements LeaseSparse {
   /** `serialized` ciphered and its boxKey wrapped, as an {@link Outcome}: the non-throwing form of {@link Lease.cipheredWith}. */
   async tryCipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<Outcome<BoxCiphered>> {
     return await outcomeOf(async () => {
-      const bytes = checkedBytes(serialized)
+      const bytes = serializedBytes.parse(serialized)
       try {
         const header = BoxSparse.parse(visible)
         this.#demand()
@@ -192,7 +192,7 @@ export class Lease implements LeaseSparse {
   /** The bytes `ciphered` holds, as an {@link Outcome}: the non-throwing form of {@link Lease.decipherWith}. */
   async tryDecipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Outcome<Uint8Array>> {
     return await outcomeOf(async () => {
-      const sealed = checkedCiphered(ciphered)
+      const sealed = CipheredShape.parse(ciphered)
       const header = BoxSparse.parse(visible)
       this.#demand()
       const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
@@ -223,9 +223,9 @@ export class Lease implements LeaseSparse {
   /** The record `visible` makes with its whisper sealed, as an {@link Outcome}: the non-throwing form of {@link Lease.sealProps}. */
   async trySealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<Outcome<BoxRecord>> {
     return await outcomeOf(async () => {
-      const sealing = checkSealProps(props)
+      const { whisper } = LeaseSealProps.parse(props)
       const header = BoxSparse.parse(visible)
-      const ciphered = valOf(await this.tryCipheredWith(sealing.whisper, header))
+      const ciphered = valOf(await this.tryCipheredWith(whisper, header))
       return { ...header, ...ciphered }
     })
   }
@@ -285,30 +285,11 @@ export const sealLeaseRecord = async (standing: VaultStampButFormat & Pick<Vault
 const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
 
-/** `ciphered`, once it is a box's two ciphered fields: 'bad_record' otherwise, quoting none of it. */
-const checkedCiphered = (ciphered: unknown): BoxCiphered => {
-  const checked = CipheredShape.safeParse(ciphered)
-  if (! checked.success) {
-    throw new VaultError('bad_record', "A lease deciphers a box's two ciphered fields, box_key_wrapped and whisper_ciphered, as a box record holds them.")
-  }
-  return checked.data
-}
-
-/** `serialized`, once it is bytes: 'bad_option' otherwise. Judged by its tag, not `instanceof`, so bytes from another realm (a test's jsdom, an iframe) pass. */
-const checkedBytes = (serialized: unknown): Uint8Array => {
-  if (! ArrayBuffer.isView(serialized) || Object.prototype.toString.call(serialized) !== '[object Uint8Array]') {
-    throw new VaultError('bad_option', 'A lease ciphers bytes, a Uint8Array: the whisper serialized, as Box.seal hands it in.')
-  }
-  return serialized as Uint8Array
-}
-
-/** `props`, once it names the whisper's bytes and nothing else: 'bad_option' otherwise. */
-const checkSealProps = (props: unknown): { whisper: Uint8Array } => {
-  if (typeof props !== 'object' || props === null || Object.keys(props).some((field) => field !== 'whisper')) {
-    throw new VaultError('bad_option', "lease.sealProps seals one prop, `whisper`, the whisper's bytes: check its spelling, and leave out any other.")
-  }
-  return { whisper: checkedBytes((props as { whisper?: unknown }).whisper) }
-}
+/** What a lease ciphers, bytes judged by their tag, so bytes from another realm (a test's jsdom, an iframe) pass; and what {@link Lease.sealProps} seals with, the whisper's bytes and nothing else. Each `parse` refuses 'bad_option'. */
+const { serializedBytes, LeaseSealProps } = Validator('bad_option', ({ obj, bytes }) => ({
+  serializedBytes: bytes(),
+  LeaseSealProps:  obj({ whisper: bytes() }).strict(),
+}))
 
 /** The refusal of a lease whose vaultKey will not unwrap under its leaseKey. */
 const damagedLease = () => new VaultError('damaged_lease', "This device's lease would not open: it may have been damaged where it is kept. It was erased, and the vault is locked: unlock it again to carry on. Reading the vault again does not mend it; a new unlock does.")

@@ -1,4 +1,4 @@
-import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
+import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './consts'
@@ -7,11 +7,13 @@ import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, PrfAnswerBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import { PasskeySaltBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
 import type { LeaseRecord } from './shapes/device'
 import { decorate } from './helpers'
 import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
-import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from './wayin'
+import { PasskeyWayin, PassphraseWayin, Wayin, isPrfSalt, isSaltOf, wayinCtxOf } from './wayin'
+import * as Phrases from './phrases'
+import { Validator } from './checks/validator'
 
 /** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
  * A Proving is sealed over a wayin's header: the current wayin's, to prove what stands, or a
@@ -355,7 +357,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
    */
   static async seal(vault: Vault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
-    const checked = checkedPasskeyAnswer(answer)
+    const checked = passkeyAnswerShape.parse(answer)
     const { prfBytes } = checked
     try {
       const tools = toolsOf(vault)
@@ -376,7 +378,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 }
 
-// == [Headers]: wayinRecordAt, checkedPasskeyAnswer, checkFreshSalt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
+// == [Headers]: wayinRecordAt, freshPasskeyAnswer, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
 
 /** The wayin record `vaultRecord`'s gate holds at `slotlabel`, or null: a novel vault's, or no passkey. */
 const wayinRecordAt = (vaultRecord: Pick<VaultRecord, 'gate'>, slotlabel: WayinKind): PassphraseWayinRecord | PasskeyWayinRecord | null => {
@@ -399,50 +401,30 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
   if (header.key_deriver_label !== keyDeriver.key_deriver_label) {
     throw new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made.')
   }
-  if (fromB64OrNull(header.salt_b64)?.length !== keyDeriver.salt_bytes) {
+  if (! isSaltOf(keyDeriver, header.salt_b64)) {
     throw new VaultError('damaged_wayin', "This vault's passphrase is stored damaged, so it could not be tried. If the vault has a passkey, unlock with it to read what it holds; a damaged passphrase can't be replaced, so the vault is then to be removed and made again. The vault was left as it is.")
   }
   if (! passphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces: type the vault's passphrase.") }
   return header
 }
 
-/** `given`, once it is a passkey's answer: two non-empty strings and 32 bytes, as `safebyok-react`'s `askPasskey` gives it; 'bad_option' otherwise, quoting none of it.
- * An answer already used, its bytes zeroed by the proving sealed of it, is refused 'bad_option'
- * too: sealed again, it would make a key anyone could rebuild.
+/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
+ * A passkey wayin sealed over another salt would read as damaged at every later unlock.
  *
- * @example checkedPasskeyAnswer(await askPasskey(vault.snapshot.gate))
- * @example checkedPasskeyAnswer({ credential_id: 'abc' })   // throws 'bad_option'
- * @example checkedPasskeyAnswer(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
+ * @example freshPasskeyAnswer.parse(await createPasskey(opts))   // passes
+ * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
  */
-export const checkedPasskeyAnswer = (given: unknown): PasskeyAnswer => {
-  const checked = passkeyAnswerShape.safeParse(given)
-  if (! checked.success) {
-    throw new VaultError('bad_option', `A passkey's answer is { credential_id, prf_salt_b64, prfBytes }: the credential's id and the salt it answered for, as base64url text, and its ${String(PrfAnswerBytes)}-byte PRF answer, as safebyok-react's askPasskey and createPasskey give them.`)
-  }
-  if (isAllZero(checked.data.prfBytes)) {
-    throw new VaultError('bad_option', "This passkey's answer was used already: the vault zeroes an answer's bytes once it has used them. Ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer.")
-  }
-  return checked.data
-}
-
-/** Refuse 'bad_option' for a new passkey's answer over a salt that is not {@link PasskeySaltBytes} bytes as base64url text: a passkey wayin sealed over another would read as damaged at every later unlock.
- *
- * @example checkFreshSalt(await createPasskey(opts))   // passes
- * @example checkFreshSalt({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
- */
-export const checkFreshSalt = (answer: PasskeyAnswer): void => {
-  if (fromB64OrNull(answer.prf_salt_b64)?.length !== PasskeySaltBytes) {
-    throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
-  }
-}
+export const { freshPasskeyAnswer } = Validator('bad_option', () => ({
+  freshPasskeyAnswer: passkeyAnswerShape.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
+}))
 
 /** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now, as `tools` hands them. */
 const mintedPasskeyHeader = (tools: ProvingTools, answer: PasskeyAnswer): PasskeyWayinHeader => {
-  checkFreshSalt(answer)
+  const { credential_id, prf_salt_b64: prfSalt } = freshPasskeyAnswer.parse(answer)
   return {
     wayinkind:     'passkey',
-    credential_id: answer.credential_id,
-    prf_salt_b64:  prf_salt_b64.parse(answer.prf_salt_b64),
+    credential_id,
+    prf_salt_b64:  prf_salt_b64.parse(prfSalt),
     device_id:     tools.deviceId(),
     registered_at: tools.now(),
   }
@@ -450,7 +432,7 @@ const mintedPasskeyHeader = (tools: ProvingTools, answer: PasskeyAnswer): Passke
 
 /** `header`, a current passkey wayin's, once its salt is one a passkey wayin holds and the answer is its credential's, over its salt. */
 const checkedPasskeyHeader = (header: PasskeyWayinHeader, answer: PasskeyAnswer): PasskeyWayinHeader => {
-  if (fromB64OrNull(header.prf_salt_b64)?.length !== PasskeySaltBytes) {
+  if (! isPrfSalt(header.prf_salt_b64)) {
     throw new VaultError('damaged_wayin', "This vault's passkey is stored damaged, so it could not be tried. Unlock with the passphrase, then add the passkey again, which replaces it. The vault was left as it is.")
   }
   if (answer.credential_id !== header.credential_id) {

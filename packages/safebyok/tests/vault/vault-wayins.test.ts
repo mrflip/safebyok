@@ -189,7 +189,7 @@ describe("putWayin, with a new passphrase", () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const err = await TH.expectRefusal(TH.putWayin(vault, laptop as unknown as string, 'a new passphrase'), 'bad_option')
-    expect(err.message).to.eq('A passphrase is the text the user typed, as a string.')
+    expect(err.message).to.eq('A passphrase is the text the user typed, as a string')
     expect(err.message).to.not.include(laptop.credential_id)
     expect(storedVaultRecordOf(world)).to.deep.equal(before)
   })

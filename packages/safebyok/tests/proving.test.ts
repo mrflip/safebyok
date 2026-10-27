@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
-import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, passphraseKeyOf } from '../src/proving'
+import { type GatedVaultRecord, VaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import { PasskeyProving, PassphraseProving, StandingGating, freshPasskeyAnswer, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
 import { leaseRecordOf } from '../src/lease'
@@ -299,7 +299,7 @@ describe("proving.wrappedWith", () => {
   })
 })
 
-// == [Key bytes and answers]: passphraseKeyOf, a key deriver's bytes, checkedPasskeyAnswer, checkFreshSalt, a proving's secret
+// == [Key bytes and answers]: passphraseKeyOf, a key deriver's bytes, freshPasskeyAnswer, a proving's secret
 
 /** A fresh 16-byte salt, as a passphrase's wayin keeps it. */
 const saltBytes = new Uint8Array(16).fill(7)
@@ -504,71 +504,49 @@ describe("PasskeyProving.seal, the key", () => {
   })
 })
 
-/** What is no passkey's answer, each refused as bad_option. */
-const misshapenAnswers = (answer: PasskeyAnswer) => [
-  [{ ...answer, prfBytes: [...answer.prfBytes] },          'its bytes an array, not a Uint8Array'],
-  [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'its bytes one short of 32'],
-  [{ ...answer, credential_id: '' },                         'an empty credential'],
-  [{ ...answer, prf_salt_b64: undefined },                    'no salt'],
-  ["pw",                                                   'a passphrase: text is no answer'],
-  [42,                                                     'a number'],
-  [null,                                                   'nothing at all'],
-] as const
-
-describe("checkedPasskeyAnswer", () => {
-  it("takes a passkey's answer as it is, as its first example shows", async () => {
-    const answer = await TH.passkeyOf('laptop')
-    const checked = checkedPasskeyAnswer(answer)
-    expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
-    expect(checked.prfBytes).to.eq(answer.prfBytes)
-  })
-
-  it("refuses an answer short of its fields as bad_option, as its second example shows", () => {
-    TH.expectSyncRefusal(() => checkedPasskeyAnswer({ credential_id: 'abc' }), 'bad_option')
-  })
-
-  it("refuses an answer already used, its bytes zeroed, as bad_option, as its third example shows", async () => {
-    const { vault } = await lockedWorld()
-    const usedAnswer = await TH.passkeyOf('laptop')
-    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating })
-    const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(usedAnswer), 'bad_option')
-    expect(err.message).to.include('used already')
-    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating }), 'bad_option')
-  })
-
-  it("refuses a misshapen answer as bad_option, quoting none of it", async () => {
-    const answer = await TH.passkeyOf('laptop')
-    for (const [given, blurb] of misshapenAnswers(answer)) {
-      const err = TH.expectSyncRefusal(() => checkedPasskeyAnswer(given), 'bad_option')
-      expect(err.message, blurb).to.include('credential_id, prf_salt_b64, prfBytes')
-      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
-    }
-  })
-})
-
 /** Salts no new passkey's wayin is sealed over. */
 const SaltShapeCases = [
   [toB64(new Uint8Array(16)), 'a salt of 16 bytes, not 32'],
   ["not base64url!",          'a salt that is not base64url'],
 ] as const
 
-describe("checkFreshSalt", () => {
+describe("freshPasskeyAnswer", () => {
   it("passes an answer over a fresh 32-byte salt, as its first example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    expect(() => { checkFreshSalt(answer) }).to.not.throw()
+    expect(freshPasskeyAnswer.parse(answer).prfBytes).to.eq(answer.prfBytes)
   })
 
   it("refuses an answer over a salt too short as bad_option, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    TH.expectSyncRefusal(() => { checkFreshSalt({ ...answer, prf_salt_b64: 'c2hvcnQ' }) }, 'bad_option')
+    TH.expectSyncRefusal(() => freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }), 'bad_option')
   })
 
   for (const [saltB64, blurb] of SaltShapeCases) {
-    it(`refuses an answer over ${blurb} as bad_option, naming createPasskey`, async () => {
+    it(`refuses an answer over ${blurb} as bad_option, naming the field and createPasskey`, async () => {
       const answer = await TH.passkeyOf('laptop', saltB64)
-      expect(() => { checkFreshSalt(answer) }).to.throw(/createPasskey/).with.property('refusalkind', 'bad_option')
+      const err = TH.expectSyncRefusal(() => freshPasskeyAnswer.parse(answer), 'bad_option')
+      expect(err.message).to.match(/^prf_salt_b64: .*createPasskey/)
     })
   }
+
+  it("refuses what is no passkey's answer as passkeyAnswerShape does, bad_option", () => {
+    TH.expectSyncRefusal(() => freshPasskeyAnswer.parse({ credential_id: 'abc' }), 'bad_option')
+  })
+
+  it("refuses a second sealing with an answer already used, its bytes zeroed at the first, as bad_option", async () => {
+    const { vault } = await lockedWorld()
+    const usedAnswer = await TH.passkeyOf('laptop')
+    await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating })
+    const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, usedAnswer, { gating: StandingGating }), 'bad_option')
+    expect(err.message).to.include('used already')
+  })
+
+  it("refuses a sealing over a fresh header with an answer over a short salt, bad_option, and zeroes its bytes all the same", async () => {
+    const { vault } = await lockedWorld()
+    const answer = await TH.passkeyOf('laptop', toB64(new Uint8Array(16)))
+    await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, answer, { gating: StandingGating }), 'bad_option')
+    expect(answer.prfBytes.every((byte) => byte === 0)).to.be.true
+  })
 })
 
 describe("a proving's secret", () => {

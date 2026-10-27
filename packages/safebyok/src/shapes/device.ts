@@ -1,6 +1,7 @@
 /** What a device keeps of a vault: its lease, and its device record. Each `parse` refuses 'bad_record', and each record is strict. */
 
 import type * as Z from 'zod'
+import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
 
@@ -24,7 +25,7 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     /** The vault record's `gate_epoch` when this lease was granted: a mismatch voids it. */
     gate_epoch:        int.positive(),
     /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable, usable only to unwrap what it wrapped. */
-    lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, "a CryptoKey handle"),
+    lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, Phrases.CryptoKeyExpected),
     /** The vaultKey, wrapped under the leaseKey. */
     vault_key_lease_wrapped,
     /** The instant from which the lease no longer counts, and the vault asks for a proof. */

@@ -1,9 +1,8 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
-import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, checkFreshSalt, checkedPasskeyAnswer } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passphraseCleartext } from './shapes/vault'
-import * as Phrases from './phrases'
+import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, freshPasskeyAnswer } from './proving'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
 import type { Vault } from './vault'
 
 /** Gatings: one request for cleartext, raised by a vault call that needs the user's passphrase or passkey, and the chain each attempt at it runs.
@@ -290,7 +289,7 @@ export class RaisedGating implements ProvingGating {
         ...common,
         gatingkind:        'unlock_vault',
         attemptPassphrase: attemptOf(checkText, async (passphrase: string) => { await this.#unlockByPassphrase(passphrase) }),
-        attemptPasskey:    attemptOf(checkedPasskeyAnswer, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }),
+        attemptPasskey:    attemptOf(checkPasskey, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }),
       }),
       change_passphrase: () => ({ ...common, gatingkind: 'change_passphrase', attempt: attemptOf(checkTexts, async (current: string, next: string) => { await this.#changePassphrase(current, next) }) }),
       put_passkey:       () => ({ ...common, gatingkind: 'put_passkey', attempt: attemptOf(checkNewPasskey, async (passphrase: string, passkey: PasskeyAnswer) => { await this.#putPasskey(passphrase, passkey) }) }),
@@ -431,12 +430,10 @@ export class RaisedGating implements ProvingGating {
   // --
 }
 
-// == [Refusals]: checkText, checkTexts, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
+// == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
-const checkText = (given: unknown): void => {
-  if (! passphraseCleartext.safeParse(given).success) { throw new VaultError('bad_option', `${Phrases.PassphraseNotText}.`) }
-}
+const checkText = (given: unknown): void => { passphraseCleartext.parse(given) }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
 const checkTexts = (current: unknown, next: unknown): void => {
@@ -444,16 +441,19 @@ const checkTexts = (current: unknown, next: unknown): void => {
   checkText(next)
 }
 
+/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswerShape` checks: an answer already used among them. */
+const checkPasskey = (passkey: unknown): void => { passkeyAnswerShape.parse(passkey) }
+
 /** Refuse 'bad_option' unless the passphrase is text and the passkey's answer one a new passkey gives, over a fresh salt. */
 const checkNewPasskey = (passphrase: unknown, passkey: unknown): void => {
   checkText(passphrase)
-  checkFreshSalt(checkedPasskeyAnswer(passkey))
+  freshPasskeyAnswer.parse(passkey)
 }
 
 /** Refuse 'bad_option' unless the first passphrase is text and the passkey's answer, when given, one a new passkey gives. */
 const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
   checkText(passphrase)
-  if (passkey !== undefined) { checkFreshSalt(checkedPasskeyAnswer(passkey)) }
+  if (passkey !== undefined) { freshPasskeyAnswer.parse(passkey) }
 }
 
 /** What the user was asked to do, by gating kind, and what stands once they decline: the two halves of a declined call's message. */

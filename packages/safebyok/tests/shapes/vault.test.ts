@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto'
+import { runInNewContext } from 'node:vm'
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
+import { type GatedVaultRecord, type PasskeyAnswer, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, gateSparseOf, headerOf, isGated, passkeyAnswerShape, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
 import { LeaseStamp } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
 
@@ -264,3 +265,51 @@ describe("the stamps, taken from whatever carries them", () => {
     expect(LeaseStamp.parse(lease)).to.deep.equal(omit(lease, ['lease_key', 'vault_key_lease_wrapped']))
   })
 })
+
+// == [Proofs]: passkeyAnswerShape
+
+/** What is no passkey's answer, each refused as bad_option, and the field the refusal names. */
+const misshapenAnswers = (answer: PasskeyAnswer) => [
+  [{ ...answer, prfBytes: [...answer.prfBytes] },          'prfBytes',      'its bytes an array, not a Uint8Array'],
+  [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'prfBytes',      'its bytes one short of 32'],
+  [{ ...answer, credential_id: '' },                       'credential_id', 'an empty credential'],
+  [{ ...answer, prf_salt_b64: undefined },                 'prf_salt_b64',  'no salt'],
+] as const
+
+describe("passkeyAnswerShape", () => {
+  it("takes a passkey's answer, its bytes the very ones handed in, as its first example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const checked = passkeyAnswerShape.parse(answer)
+    expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
+    expect(checked.prfBytes).to.eq(answer.prfBytes)
+  })
+
+  it("takes bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+    expect(foreign instanceof Uint8Array).to.be.false
+    expect(passkeyAnswerShape.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
+  })
+
+  it("refuses an answer already used, its bytes zeroed, as bad_option, as its second example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
+    expect(err.message).to.match(/^prfBytes: .*used already/)
+  })
+
+  it("refuses what is no answer at all as bad_option", () => {
+    for (const given of ["pw", 42, null, { credential_id: 'abc' }]) {
+      TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+    }
+  })
+
+  it("refuses a misshapen answer as bad_option, naming the field and quoting none of it", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    for (const [given, fieldname, blurb] of misshapenAnswers(answer)) {
+      const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+      expect(err.message, blurb).to.match(new RegExp(`^${fieldname}: `))
+      expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
+    }
+  })
+})
+// --

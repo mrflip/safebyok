@@ -323,12 +323,18 @@ export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
 /** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
 export const PrfAnswerBytes = 32
 
-/** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
-export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
+/** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` refuses 'bad_option', quoting none of it, as its bytes are secret.
+ * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
+ * again, it would make a key anyone could rebuild.
+ *
+ * @example passkeyAnswerShape.parse(await askPasskey(vault.snapshot.gate))
+ * @example passkeyAnswerShape.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
+ */
+export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes }) => ({
   passkeyAnswerShape: obj({
     credential_id,
     prf_salt_b64:  str.min(1),
-    prfBytes:      custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
+    prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
   }),
 }))
 
