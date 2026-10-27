@@ -261,7 +261,7 @@ export class Bank {
   /** The Vault object for the vault `bag` names, as an {@link Outcome}: the non-throwing form of {@link Bank.ensureVault}. */
   async tryEnsureVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
     try {
-      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
+      const parts = this.#vaultPartsFor(bag, opts)
       return good(await this.#ensureEntry(parts))
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -276,7 +276,7 @@ export class Bank {
   /** Let the vault go and birth it anew, as an {@link Outcome}: the non-throwing form of {@link Bank.reopenVault}. */
   async tryReopenVault(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
     try {
-      const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
+      const parts = this.#vaultPartsFor(bag, opts)
       this.#letGoOf(Scopepath.vault(parts))
       return good(await this.#ensureEntry(parts))
     } catch (err) { return this.#badOutcome(err) }
@@ -390,7 +390,7 @@ export class Bank {
   }
   // --
 
-  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, relist, vaultScopeOf, demandSameScope
+  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, relist, vaultScopeOf, vaultPartsFor, demandSameScope
 
   readonly #parts: ParsedBankOpts
   readonly #scope: BankScope
@@ -427,6 +427,11 @@ export class Bank {
     const { vaultlabel, ...names } = parseVaultBag(bag)
     this.#demandSameScope(names)
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
+  }
+
+  /** The parts the vault `bag` names is born from: its scope, as `#vaultScopeOf` checks it, and `opts` over the bank's own stores and limits. */
+  #vaultPartsFor(bag: Pick<VaultScope, 'vaultlabel'> & Partial<BankScope>, opts: BankVaultOpts | undefined): VaultParts {
+    return vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
   }
 
   /** Refuse 'bad_scope' for `names`, already checked, holding an `applabel` or `user_id` other than the bank's: the one comparison {@link Bank.demandConsistentWith} and every call naming a vault make. */
