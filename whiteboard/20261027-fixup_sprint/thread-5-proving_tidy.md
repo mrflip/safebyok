@@ -1,6 +1,6 @@
 # Thread 5: proving_tidy (2026-10-27)
 
-Branch `20261027-proving_tidy`, PR #TBD, stacked on [#295](https://github.com/mrflip/safebyok/pull/295).
+Branch `20261027-proving_tidy`, PR [#311](https://github.com/mrflip/safebyok/pull/311), stacked on [#295](https://github.com/mrflip/safebyok/pull/295).
 Justify: green (safebyok 3405 tests passed, 37 skipped; every package's lint, typecheck, build and size budget green).
 
 The code-sanity cleanup of `packages/safebyok/src/proving.ts`, to the Coach's six rulings. Behaviour
