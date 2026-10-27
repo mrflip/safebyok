@@ -50,8 +50,10 @@ Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
 * **Every commit lands in main individually**, so each should pass `pnpm justify`. An
   intermediate red commit is allowed only when it isolates something, say a large mechanical
   change from the thoughtful repairs after it, and the PR says so.
-* **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you expect>`.
-  Never plain `--force`, and never a branch that isn't your thread's.
+* **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
+  the branch's tip when you took it, never one fetched since: a lease read off a fresh fetch
+  always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
+  thread's.
 * **Never merge a PR or enable auto-merge. The Coach merges.**
 * Before a command that throws work away (`reset --hard`, `restore`, `clean`, `branch -D`), make
   what it would discard reachable first: commit it or put a branch on it. If you can't tell what
