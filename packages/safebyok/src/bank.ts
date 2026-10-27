@@ -78,11 +78,11 @@ type LibsLoad =
  * read of storage and this device's store, or hands back the one it holds; two asks for one vault
  * at once get one Vault object. A UI renders from `getSnapshot()` and re-renders on `subscribe()`.
  *
- * Each call naming a vault takes a bag whose `vaultlabel` names it, and that holds nothing else
- * but the bank's own `applabel` and `user_id` ({@link Bank.demandConsistentWith}): any other field
- * refuses 'bad_scope'. Name the vault of a Vault object or a {@link BankVault} by its label,
- * `{ vaultlabel: vault.vaultlabel }`. The vault's own stores, where not the bank's, go in a second
- * bag ({@link BankVaultOpts}).
+ * Each call naming a vault takes a bag whose `vaultlabel` names it: `{ vaultlabel: 'main' }`, or a
+ * Vault object, its snapshot or a {@link BankVault} as it is, each carrying its own. An `applabel`
+ * or `user_id` the bag carries must be the bank's ({@link Bank.demandConsistentWith}), or it
+ * refuses 'bad_scope'; any other field is left out. The vault's own stores, where not the bank's,
+ * go in a second bag ({@link BankVaultOpts}): put in the first, a store refuses 'bad_scope'.
  *
  * This device keeps a record of each vault it has seen (its device record): its own id for the
  * vault, and the highest `vault_epoch` it has seen there. A vault storage serves below it is
@@ -145,8 +145,8 @@ export class Bank {
    * It holds one once the vault's element of the listing is `ready`, and until it is let go or
    * found gone. Null while the birth is under way, once it was refused, and for a vault never asked
    * for or let go: {@link Bank.bankVaultOf} tells them apart, and {@link Bank.ensureVault} asks.
-   * Refuses 'bad_scope' for a name that fails its check, a field the bag does not take, or a bag of
-   * another app or user than the bank's.
+   * Refuses 'bad_scope' for a name that fails its check, a store in the bag, or a bag of another app
+   * or user than the bank's.
    *
    * @example const vault = bank.vaultOf({ vaultlabel: 'main' })   // null until bank.ensureVault has born it
    */
@@ -156,8 +156,8 @@ export class Bank {
 
   /** The element of the bank's listing for the vault `bag` names, or null for a vault never asked for or let go: synchronous, and reading nothing.
    * It is the one {@link Bank.vaults} holds, looked up by the vault's scope rather than found in the
-   * list. Refuses 'bad_scope' for a name that fails its check, a field the bag does not take, or a
-   * bag of another app or user than the bank's.
+   * list. Refuses 'bad_scope' for a name that fails its check, a store in the bag, or a bag of
+   * another app or user than the bank's.
    *
    * @example bank.bankVaultOf({ vaultlabel: 'main' })?.lifecycle   // 'starting' | 'ready' | 'refused', or undefined
    */
@@ -238,12 +238,12 @@ export class Bank {
    * `refused`, and the next ask births anew.
    *
    * A vault's own stores, where not the bank's, go in `opts`: a store in the bag naming the vault
-   * refuses 'bad_scope', as any field but its names does. One scope lives in one place: an ask for
+   * refuses 'bad_scope', never quietly left out. One scope lives in one place: an ask for
    * a vault the bank holds, or is birthing, names in `opts` the stores it was born from (left out,
    * the bank's own): the same objects, as stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_scope' for a bag of another app or user than the bank's, a name that fails its
-   * check, or a field it does not take, and 'bad_option' for options amiss, each before storage is
+   * check, or a store in it, and 'bad_option' for options amiss, each before storage is
    * touched; and 'bad_option' for options naming another `vaultDB` or `deviceDB` object than the
    * vault held was born from, one made afresh over the same storage among them. Refuses as storage
    * refuses: 'damaged_vault' for a vault record it cannot use (`delDamagedVault` clears it),
@@ -286,11 +286,10 @@ export class Bank {
    * on it refuses 'vault_gone', as a birth under way does; one let go in the task that asked for it
    * has read nothing.
    * Synchronous; a vault the bank does not hold is no refusal. Refuses 'bad_scope' for a name that
-   * fails its check, a field the bag does not take, or a bag of another app or user than the
-   * bank's.
+   * fails its check, a store in the bag, or a bag of another app or user than the bank's.
    *
    * @example bank.closeVault({ vaultlabel: 'main' })
-   * @example bank.closeVault({ vaultlabel: vault.vaultlabel })   // the vault a Vault object is of
+   * @example bank.closeVault(vault)   // the vault a Vault object is of
    */
   closeVault(bag: VaultBag): void {
     this.#letGoOf(Scopepath.vault(this.#vaultScopeOf(bag)))

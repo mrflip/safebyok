@@ -81,7 +81,7 @@ describe("BankProvider", () => {
       const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
       if (record === null) { throw new Error('the birth kept no device record') }
       await TH.expectGood(world.deviceDB.raiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
-      await act(async () => { await TH.expectRefusal(bank.reopenVault({ vaultlabel: vault.vaultlabel }), 'vault_behind') })
+      await act(async () => { await TH.expectRefusal(bank.reopenVault(vault), 'vault_behind') })
       await waitFor(() => { expect(grab.latest().err?.refusalkind).to.eq('vault_behind') })
       // useBank's example: the host, on the user's say, has this device accept what storage holds.
       const acceptRestore = async () => {

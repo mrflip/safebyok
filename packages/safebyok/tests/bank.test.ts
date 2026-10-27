@@ -289,7 +289,7 @@ describe("bank.ensureVault", () => {
   it("takes a bag of the vaultlabel, and of the bank's own applabel and user_id if it likes, handing back the vault held", async () => {
     const bank = bankIn(makeWorld())
     const vault = await bank.ensureVault(Main)
-    for (const bag of [Main, { ...Main, user_id: 'u1' }, { ...Main, user_id: 'u1', applabel: 'acme' }, { vaultlabel: vault.vaultlabel }]) {
+    for (const bag of [Main, { ...Main, user_id: 'u1' }, { ...Main, user_id: 'u1', applabel: 'acme' }, vault]) {
       expect(await bank.ensureVault(bag)).to.eq(vault)
     }
   })
@@ -871,7 +871,7 @@ describe("bank.closeVault", () => {
     bank.closeVault({ vaultlabel: 'main' })
     expect(bank.vaults).to.deep.equal([])
     const next = await bank.ensureVault(Main)
-    bank.closeVault({ vaultlabel: next.vaultlabel })   // the vault a Vault object is of
+    bank.closeVault(next)   // the vault a Vault object is of, as closeVault's second example shows
     await TH.expectBad(next.tryHello(), 'vault_gone')
   })
 

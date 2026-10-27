@@ -231,7 +231,7 @@ export const bankOf = (vault: Vault): Bank => {
  * @example TH.closeVault(vault)   // the lease stays, for the next vault settled over this deviceDB
  */
 export const closeVault = (vault: Vault): void => {
-  bankOf(vault).closeVault({ vaultlabel: vault.vaultlabel })
+  bankOf(vault).closeVault(vault)
 }
 
 /**
