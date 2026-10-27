@@ -208,8 +208,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    * It demands on the proving, and on the gate the lease names, with nothing awaited before the
    * store. A lock or a gating's end landing before then refuses ('gating_landed'); one landing
    * after erases the lease behind it, in the device store's order. It demands again after the
-   * store, on the stored record's `vault_tok` and `gate_epoch`, never asking it for a lease. A
-   * refusal there holds nothing.
+   * store, on the proving and on the stored record's `vault_tok` and `gate_epoch`, never asking it
+   * for a lease. A refusal there holds nothing.
    *
    * @example const lease = await proving.grantLease()
    */
