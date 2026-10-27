@@ -141,6 +141,18 @@ sprint has merged.
   - 8c's `#fittingLeaseOf` is the builder's call.
 * **Size budgets:** no line should move.
 
+*Review:* fixed ([#299](https://github.com/mrflip/safebyok/pull/299)).
+* **The reviewer fixed two things:** `tests/text.test.ts`'s combining marks are escapes, so they
+  survive NFC; and `#readBox`'s and `#updateBoxListingOf`'s doc blocks name the operation.
+* **It confirmed** that both removed demands are provably vacuous, and that every drop of an
+  ended lease is kept exactly.
+* **Minor, left:**
+  - `#leaseLastsPast` doesn't use `#leaseInForce`; it adds `fitsLease`, which the preplan kept.
+  - The two drops of an ended lease are written the same way.
+  - An inline sort duplicates vault-db.ts's `byBoxlabel`.
+  - `#freshGatedRecord` lacks a verb: thread 4 renames it.
+  - Three over-long doc lines: thread 5 takes them.
+
 ### 3. `device_db_class`: preplan item 4
 
 > I prefer DeviceDB as a class, if it won't cause any new problems
@@ -206,6 +218,8 @@ test for it.
     renamed: `#unlockStands`, `leaseStands`, `#checkStanding`, `#boxUnder`'s callers. Rename
     what is left.
   - The done-when grep in `unstanding.md` is the check.
+  - *Orchestrator:* rename gating.ts's `#freshGatedRecord` (thread 2's) to `#freshenGated`, so
+    its verb says it reads storage through `freshen`; its review asked for it.
   - Leave notes/security.md to a `sonnet` subagent, as the brief says, and name it in the PR's
     open questions.
 
@@ -230,8 +244,11 @@ test for it.
   rewritten doc block is churned by a later rename. The three runs touch disjoint files, so they
   run side by side, each cut from the top of the restacked line once thread 4 files.
 * **Size:** large in total, mechanical in kind. Each run reports its doc-block line counts.
-* **Look-ahead:** thread 4's names (no "standing"), and thread 3's DeviceDB class doc, which the
-  thread 3 review found repeats its per-verb blocks.
+* **Look-ahead:**
+  - Thread 4's names, with no "standing".
+  - Thread 3's DeviceDB class doc, which its review found repeats the per-verb blocks.
+  - Thread 2's review: the first lines of `#freshenGated` (gating.ts) and `Proving.#unwrap` run
+    35 to 45 words, and `#damagedBase`'s second line says how it's built, not what it does.
 
 ## Order
 
