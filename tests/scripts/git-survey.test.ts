@@ -151,6 +151,17 @@ describe('scripts/git-survey.sh', () => {
     expect(repo.git('for-each-ref')).to.equal(before)
   })
 
+  it('names the first three of a merged branch\'s many commits with no match on main', () => {
+    const root = repo.commit('readme.md', 'hello\n', 'docs: a readme')
+    repo.git('switch', '--quiet', '--create', 'sprawl', root)
+    for (const n of [1, 2, 3, 4, 5, 6]) repo.commit(`sprawl-${n}.md`, `${n}\n`, `plan: step ${n}`)
+    repo.git('switch', '--quiet', 'main')
+    const squashedHead = repo.commit('sprawl-all.md', 'all\n', 'feat: sprawl, squashed')
+    repo.setPrs([[8, 'MERGED', 'sprawl', squashedHead, 'main']])
+    const rows = rowsOf(repo.survey('--idle', '0'))
+    expect(rows.get('sprawl')?.rest[1]).to.match(/^commits with no match on main: \w+ plan: step 1;\w+ plan: step 2;\w+ plan: step 3$/)
+  })
+
   it('says how many it found, and that nothing was changed', () => {
     seedKinds(repo)
     const said = repo.survey('--idle', '0')
