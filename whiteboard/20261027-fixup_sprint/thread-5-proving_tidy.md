@@ -74,7 +74,8 @@ refusals. Every test that stood before passes unchanged; two tests are added for
     `gate?.[slotlabel]`, now inlined.
 
 * **For the Coach**:
-  - **Renaming `checkWayin`** (suggested `demandOpens`): `Proving` is exported as a type from
-    `src/index.ts`, so the rename is a contract change and waits for a ruling. Not done here.
+  - **Renaming `checkWayin`** to `demandOpens`: ruled by the Coach on 2026-10-27 and done on this
+    branch after review, as a contract change (`Proving` is exported as a type from `src/index.ts`),
+    so the changeset is no longer empty.
   - **`held-lease.ts` as a WeakMap**: confirm the deviation above, or rule that a reachable `Lease`
     is acceptable and the surface test should stop asserting it; I recommend keeping the WeakMap.
