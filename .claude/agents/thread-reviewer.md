@@ -47,6 +47,11 @@ A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; t
    mechanical rules and commits them in your worktree; the findings it leaves join yours in step
    2, judged the same way. If it bails, do its job by hand: read STYLE.md whole and check what
    the diff adds.
+
+   **Secret material** has its own check. When the range touches a file `notes/guarantees.md`
+   names under *Where the guarantees are kept*, read that note's *The guarantees* section and
+   check the diff against each guarantee. One the diff breaks is a *significant* finding, never a
+   fix you make yourself.
 2. **Judge each finding** against the files. Make a fix, by hand, when it mends a correctness bug
    or a hazard, is local, and stays within what the thread built. Leave a finding whose fix would
    - change a decision the worker or the plan recorded, or the thread's scope;

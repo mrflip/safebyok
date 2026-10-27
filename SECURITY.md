@@ -38,6 +38,10 @@ that breaks that promise is in scope, for example:
 * weak or predictable randomness, or a key derivation weaker than the published keyDeriverSpec;
 * a published package whose contents do not match this repository's source.
 
+`notes/guarantees.md` states, value by value, where secret material may exist, in what form, for
+how long, and which code may hold it. Anything that shows one of those guarantees broken is in
+scope.
+
 ## What is outside safebyok's protection
 
 These are real risks, but no library running inside the page can defend against them:
