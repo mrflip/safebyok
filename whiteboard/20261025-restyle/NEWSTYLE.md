@@ -215,7 +215,8 @@ just the scope.
 * **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
   only own enumerable fields: a getter on the prototype is lost (`{ ...vault }` drops it while
   TypeScript types it as present), and every other own field comes along.
-  To show or copy a thing's fields, a getter hands out a frozen shallow copy of them.
+  To show or copy a thing's fields, a getter hands out a frozen shallow copy of them
+  (`vault.stamp`, #291).
 * **Strip before crossing into host code.** A host's store, callback or checker gets plain data
   picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's store
   the Vault object, `lock()` and all. Nothing that crosses needs a method.
