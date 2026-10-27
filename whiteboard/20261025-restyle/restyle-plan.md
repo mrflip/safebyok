@@ -617,6 +617,13 @@ on the sprint doc's Cleanup tab.
   simultaneous initialization or requests arriving in the same event loop", `export function
   nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }`. Use it for the
   `await Promise.resolve()` in `bank.ts` (about line 464), whose comment says why it waits.
+* **The bank's getters and VOCABULARY rows.** The Coach (2026-10-27): "yes add. I'd prefer the
+  interface go through bank via getters than off a snapshot (bank.vaults, not
+  bank.snapshot.vaults) outside of react." Add `bank.vaults` (and `bank.lifecycle`, where
+  `bank.status` was before #286), prototype getters reading the current snapshot; the README's
+  non-React examples use them; React keeps `useSyncExternalStore` on the snapshot. VOCABULARY
+  gains rows for `BankVault`, the bank's listing, and `lifecycle` (made, starting, ready,
+  refused), saying how it differs from freshness's `timely`/`refused`.
 * **Small leftovers:** `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
