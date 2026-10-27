@@ -3,8 +3,8 @@ import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
 /** The smallest storage the local adapters need: text by scopepath, with a `subscribe` so the vault and an inspector can watch it.
- * The supplied {@link memoryStore} and {@link domStore} call each listener in turn as a write
- * lands. One that throws stops no other and fails no write: what it threw goes to the default
+ * The supplied {@link memoryStore} and {@link domStore} call each listener in turn as a write or an
+ * erase lands. One that throws stops no other and fails no write: what it threw goes to the default
  * logger, and to the platform's `reportError` where there is one. Their `subscribe` refuses
  * 'bad_option' for a listener that is not a function.
  */
