@@ -10,6 +10,7 @@ import { BoxRecord, BoxSparse, BoxStamp } from './box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
+import * as CX from './checks/core-checks'
 import { sameScope } from './names'
 import { type Outcome, good, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
@@ -145,9 +146,7 @@ export class Lease implements LeaseSparse {
     if (! checked.success) {
       throw new VaultError('corrupt_record', "This device's lease is not in a form this package writes, so it can't be taken up: the vault asks for a proof instead.")
     }
-    if (! sameScope(checked.data, vault)) {
-      throw new VaultError('corrupt_record', "This device's lease names another app, user or vault than the one opening it, so it can't be taken up: the vault asks for a proof instead.")
-    }
+    CX.vaultScope.parseConsistent(checked.data, vault, { kind: 'corrupt_record', message: "This device's lease names another app, user or vault than the one opening it, so it can't be taken up: the vault asks for a proof instead." })
     return new Lease(vault, checked.data)
   }
 
