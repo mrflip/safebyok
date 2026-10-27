@@ -1,10 +1,13 @@
 import { v } from 'convex/values'
+import { BoxFormat as CoreBoxFormat, TombstoneFormat as CoreTombstoneFormat, VaultFormat as CoreVaultFormat } from 'safebyok'
 
 /** Convex validators for safebyok's stored records, field for field with the core's Zod records of the same names.
- * They check what Convex can: which fields, their types, which are optional, and each record's
- * `format`. Every name is any text here, and a box's sidecar any object Convex holds. The finer
- * rules are the client's, checked by the core's records on every write and every read: each name
- * a label or a user_id, checked by the package, and a sidecar's values JSON.
+ * Convex takes only its own validators for a function's arguments and returns and for a table's
+ * schema, so these are written out here, each `format` taken from the core, and a test holds them
+ * field for field to the core's Zod records. They check what Convex can: which fields, their types,
+ * which are optional, and each record's `format`. Every name is any text here, and a box's sidecar
+ * any object Convex holds. The finer rules are the client's, checked by the core's records on
+ * every write and every read: each name a label or a user_id, and a sidecar's values JSON.
  *
  * A new record format widens its `format` union: an additive deploy, shipped with this package.
  */
@@ -30,10 +33,10 @@ export const VaultScope = v.object({
 })
 
 /** The VaultRecord formats this package stores. */
-export const VaultFormat = v.union(v.literal('safebyok-vault-v6'))
+export const VaultFormat = v.union(v.literal(CoreVaultFormat))
 
 /** The formats of a BoxRecord this package stores. */
-export const BoxFormat = v.union(v.literal('safebyok-box-v8'))
+export const BoxFormat = v.union(v.literal(CoreBoxFormat))
 
 /** A passphrase's way into a vault: how its passphraseKey is derived, and the vaultKey wrapped under that key.
  *
@@ -218,7 +221,7 @@ export const VaultDelExpectation = v.object({
 })
 
 /** The format a {@link VaultTombstone} carries. */
-export const TombstoneFormat = v.union(v.literal('safebyok-tombstone-v1'))
+export const TombstoneFormat = v.union(v.literal(CoreTombstoneFormat))
 
 /** What a deleted vault leaves in its scope: its counter, which the next vault made there carries on.
  *

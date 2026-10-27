@@ -73,11 +73,12 @@ const epochOf = (standing: unknown): number => {
 }
 
 /** The vault record an update stores over `standing`, which it has met: `vaultRecord`, its gate with it, with `vault_epoch` the standing one plus one, whatever `vaultRecord` carries.
- * The store moves the counter, never the writer (VAULTDB.md, line 3.2).
+ * The store moves the counter, never the writer (VAULTDB.md, line 3.2). It hands back the type it
+ * was handed, so a server holding the record in its own types (Convex's) keeps them.
  *
  * @example Expectations.vaultRecordPutOf(next, standing)   // next, its vault_epoch standing.vault_epoch + 1
  */
-export const vaultRecordPutOf = (vaultRecord: VaultRecord, standing: unknown): VaultRecord => (
+export const vaultRecordPutOf = <RecordT extends Pick<VaultRecord, 'vault_epoch'>>(vaultRecord: RecordT, standing: unknown): RecordT => (
   { ...vaultRecord, vault_epoch: epochOf(standing) + 1 }
 )
 
@@ -89,7 +90,7 @@ export const vaultRecordPutOf = (vaultRecord: VaultRecord, standing: unknown): V
  *   const life = Expectations.newLifeOf(draft, standing)
  *   if (life) { write(life) }
  */
-export const newLifeOf = (draft: VaultDraft, standing: unknown): VaultDraft | null => {
+export const newLifeOf = <DraftT extends Pick<VaultDraft, 'vault_epoch'>>(draft: DraftT, standing: unknown): DraftT | null => {
   if (standing === null || standing === undefined) { return draft }
   return isTombstone(standing) ? { ...draft, vault_epoch: epochOf(standing) } : null
 }
