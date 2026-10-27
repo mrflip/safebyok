@@ -1,4 +1,4 @@
-import { Validator, VaultError, isVaultError, type VaultDBOpts } from 'safebyok'
+import { Validator, Validators, VaultError, isVaultError, type VaultDBOpts } from 'safebyok'
 
 /** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
 export type IdbVaultDBOpts = VaultDBOpts & {
@@ -8,11 +8,12 @@ export type IdbVaultDBOpts = VaultDBOpts & {
   dbName?: string | undefined
 }
 
-const DefaultDbName = 'safebyok'
+/** The database a call names when it names none: the core's own, so the vault and its device store sit side by side. */
+const DefaultDbName = Validators.idbOpts.parse({}).dbName
 
-/** What the options hold, and nothing else: `dbName`, defaulted, and the `logger` every VaultDB takes. Its `parse` refuses 'bad_option'. */
-const { idbVaultDBOpts } = Validator('bad_option', ({ obj, str, unk }) => ({
-  idbVaultDBOpts: obj({ dbName: str.min(1).default(DefaultDbName), logger: unk.optional() }).strict(),
+/** What the options hold, and nothing else: the core's IndexedDB options (`dbName`, defaulted), and the `logger` every VaultDB takes. Its `parse` refuses 'bad_option'. */
+const { idbVaultDBOpts } = Validator('bad_option', ({ unk }) => ({
+  idbVaultDBOpts: Validators.idbOpts.extend({ logger: unk.optional() }).strict(),
 }))
 
 /** The database name a call was handed, or 'safebyok' without one.

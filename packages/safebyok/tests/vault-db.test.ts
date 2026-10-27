@@ -44,13 +44,13 @@ class MapVaultDB extends VaultDB {
   private standingVaultRecord(scope: VaultScope) { return this.rows.get(Scopepath.vault(scope)) }
 
   protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
-    return Promise.resolve({ vault: (this.rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxes(scope)) })
+    return Promise.resolve({ vault: this.rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(this.storedBoxes(scope)) })
   }
 
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     const life = Expectations.newLifeOf(draft, this.standingVaultRecord(draft))
     if (life) { this.rows.set(Scopepath.vault(draft), life) }
-    return Promise.resolve({ vault: this.rows.get(Scopepath.vault(draft)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxes(draft)) })
+    return Promise.resolve({ vault: this.rows.get(Scopepath.vault(draft)), ...splitStoredBoxes(this.storedBoxes(draft)) })
   }
 
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) {

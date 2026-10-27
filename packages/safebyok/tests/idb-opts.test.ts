@@ -22,4 +22,14 @@ describe("parseDbName", () => {
         .to.throw(VaultError, /^browserOpts takes an optional dbName/).with.property('refusalkind', 'bad_option')
     }
   })
+
+  it("reads the name it is handed, as its first example shows", () => {
+    expect(parseDbName({ dbName: 'acme' }, 'idbDeviceDB')).to.eq('acme')
+  })
+
+  it("refuses a field the options do not take, counting it, naming neither it nor its value, as its second example shows", () => {
+    expect(() => parseDbName({ dbname: 'acme_misspelt' } as unknown as IdbOpts, 'browserOpts'))
+      .to.throw(VaultError, /^browserOpts takes an optional dbName.*There is a field it does not take \(its name is not repeated\): it takes only dbName\./)
+      .that.satisfies((err: Error) => ! err.message.includes('dbname') && ! err.message.includes('acme_misspelt'))
+  })
 })

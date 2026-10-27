@@ -1338,7 +1338,7 @@ class RoundTripVaultDB extends VaultDB {
 
   protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     if (! this.opts.readsApart) { return await this.backend.atomically((rows) => vaultIn(rows, scope, this.opts.listsToLimit ? this.maxBoxes : Infinity)) }
-    const vault = await this.backend.atomically((rows) => (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'])
+    const vault = await this.backend.atomically((rows) => rows.get(Scopepath.vault(scope)) ?? null)
     return { vault, ...splitStoredBoxes(await this.backend.atomically((rows) => boxesIn(rows, scope))) }
   }
 
@@ -1470,7 +1470,7 @@ const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string })
 
 /** The vault of `scope` in `rows`: its vault record, or null, and its boxes. */
 const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): VaultReadResponse => (
-  { vault: (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
+  { vault: rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
 )
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {
