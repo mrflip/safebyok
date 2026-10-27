@@ -78,3 +78,22 @@ Justify green again, with the same counts as above (the amendment adds no tests)
     it) and `device-db-conformance.ts` line 94 (`_putOutcome`, the `putLease` result in a
     `Promise.all`).
 * **Decisions taken**: `_putOutcome` is my name for the middle result; the Coach may prefer another.
+
+## Rebase, 2026-10-27 (onto main after #286 and #287)
+
+Justify green: core 3380 passed, 37 skipped; react 309; convex 350; postgres 322; graphql 344;
+indexeddb 167; fastkey 49; demo 229; e2e 107; root 265.
+
+* **Conflict**: one, in STYLE.md's *Validation*, where #287 rewrote the two refusal bullets this
+  branch had reorganized into *What a refusal says*. Resolved as main has the bullets ("a refusal of
+  a host's bag of options says what Zod found", "a refusal never repeats its input: no value, and
+  no key"), which replace this branch's "as informative as it can be" and "a message never carries
+  the input" bullets (the second contradicted #287: a key no longer repeats). The branch's own
+  layout round them is kept.
+* **Follow-ups from #287 and #286**: STYLE.md's list of the kit's makers drops `rec` and says why
+  (a record's keys in a failing path would be the input's own) and that a value checked whole takes
+  `custom`; a typed bag is `obj({ ... }).strict()` (no `strictObject` in the kit); `LeaseVault`,
+  a type the code no longer has, is no longer cited. The `zod/mini` mentions that remained are the
+  *Tree-shaking* measurements, now marked as taken while the choice was open; the core and every
+  package using Zod are on classic Zod (IndexedDB depends on none). The names the guidance cites
+  were checked against main: `useBankVault` and `Validators` exist.
