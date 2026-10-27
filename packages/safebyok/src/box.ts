@@ -316,7 +316,7 @@ export class Box implements Boxscope, BoxSparse {
       if (lease === null) { throw lockedError() }
       const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
       const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
-      // What the decipher brought, a refusal included, is used only while the vault in hand is still the one the box was made under.
+      // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
       try {
         // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
         this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
