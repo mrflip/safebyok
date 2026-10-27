@@ -110,7 +110,7 @@ export const StoreTable = ({ rows }: { rows: StoreRow[] }) => {
 export const WipeStoreButton = ({ store, storeTitle }: { store: StringStore, storeTitle: string }) => {
   const wipe = () => {
     if (! globalThis.confirm(`Wipe every row of ${storeTitle}?`)) { return }
-    for (const ckey of store.scopepaths()) { store.erase(ckey) }
+    for (const scopepath of store.scopepaths()) { store.erase(scopepath) }
   }
   return <button className="mini danger" onClick={wipe}>wipe</button>
 }
