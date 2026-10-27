@@ -2,6 +2,16 @@ import type * as Z from 'zod'
 import { VaultError, isVaultError } from './errors'
 import { type KitWith, Validator } from './checks/validator'
 
+/** `err` with its message put in `said`'s words when it refuses a host's options, 'bad_option', its meta kept; any other throw as it is: how a check of options names the call the host made around what failed.
+ *
+ * @example
+ *   try { return makeBankOpts.parse(opts) } catch (err) { throw optionsRefusal(err, (message) => `In Bank.make's options: ${message}.`) }
+ */
+export const optionsRefusal = (err: unknown, said: (message: string) => string): unknown => {
+  if (! isVaultError(err, 'bad_option')) { return err }
+  return new VaultError('bad_option', said(err.message), err.meta === undefined ? {} : { meta: err.meta })
+}
+
 /** Make a check of a host's options bag, which hands the bag back as given when it is left out or every field passes `fieldsOf`.
  * It refuses 'bad_option' otherwise, so a misspelt option is never quietly ignored. The message
  * names each field it judged, counts a field it does not take without naming it, quotes no value,
@@ -22,8 +32,7 @@ export const optionsCheck = (fieldsOf: (kit: KitWith<readonly []>) => Z.ZodRawSh
       optionsBag.parse(candidate)
       return candidate
     } catch (err) {
-      if (! isVaultError(err, 'bad_option')) { throw err }
-      throw new VaultError('bad_option', `${err.message}. ${said}`, err.meta === undefined ? {} : { meta: err.meta })
+      throw optionsRefusal(err, (message) => `${message}. ${said}`)
     }
   }
 }

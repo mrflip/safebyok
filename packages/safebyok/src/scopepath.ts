@@ -14,8 +14,8 @@
  */
 
 import type * as Z from 'zod'
-import * as CX from './checks/core-checks'
-import type { BankScope, Boxscope, VaultScope } from './checks/core-checks'
+import * as CX from './shapes/scopes'
+import type { BankScope, Boxscope, VaultScope } from './shapes/scopes'
 import { ScopepathDelimiter } from './consts'
 
 /** The character a scopepath joins its parts on, which no name may hold: `^`. */

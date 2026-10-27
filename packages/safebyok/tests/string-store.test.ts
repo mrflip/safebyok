@@ -44,7 +44,7 @@ describe("memoryStore", () => {
 
   it("refuses a listener that is not a function as it subscribes, so no later write meets it", () => {
     const store = memoryStore()
-    expect(() => store.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
+    expect(() => store.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /^Expected a function$/)
     store.write('one', '1')
     expect(store.read('one')).to.eq('1')
   })

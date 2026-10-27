@@ -1,4 +1,4 @@
-import { VaultError } from './errors'
+import { Validator } from './checks/validator'
 import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
@@ -19,13 +19,16 @@ export type StringStore = {
   subscribe(listener: () => void): () => void
 }
 
+/** What a store's `subscribe` is handed: a function to call after each write or erase. Its `parse` refuses 'bad_option'. */
+const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
+
 /** The listeners of one store, and the `ring` that calls them. */
 const makeBell = () => {
   const listeners = new Set<() => void>()
   return {
     ring: () => { listeners.forEach((listener) => { callQuietly(listener) }) },
     subscribe: (listener: () => void) => {
-      if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write or erase.') }
+      ListenerShape.parse(listener)
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },

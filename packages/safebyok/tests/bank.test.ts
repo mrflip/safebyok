@@ -6,11 +6,12 @@ import { Bank, type BankSnapshot } from '../src/bank'
 import { VaultError, isVaultError } from '../src/errors'
 import { memoryDeviceDB } from '../src/device-db'
 import type { VaultDB } from '../src/vault-db'
-import type { VaultTombstone } from '../src/vault-record'
+import type { VaultTombstone } from '../src/shapes/vault'
 import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import { browserOpts } from '../src/browser'
-import { type MakeBankOpts, type BankVaultOpts, parseMakeBankOpts, vaultPartsOf } from '../src/vault-opts'
+import type { MakeBankOpts, BankVaultOpts } from '../src/shapes/bank-opts'
+import { parseMakeBankOpts, vaultPartsOf } from '../src/vault-opts'
 import type { Gating } from '../src/gating'
 import type { KeyDeriver } from '../src/key-deriver'
 import { Vault, bear, letGo } from '../src/vault'
@@ -106,7 +107,7 @@ describe("Bank.make", () => {
   it("refuses a keyDeriver whose load is no function 'bad_option'", () => {
     const keyDeriver = { ...TH.testDeriver, load: 'soon' }
     const err = TH.expectSyncRefusal(() => bankIn(makeWorld(), { keyDeriver: keyDeriver as unknown as KeyDeriver }), 'bad_option')
-    expect(err.message).to.include('its load, if it carries one, is a function too')
+    expect(err.message).to.include("In Bank.make's options: keyDeriver.load: Expected a function")
   })
 
   it("touches nothing: the bank is 'made', its snapshot holds no vault, and no store verb or load is called", async () => {
@@ -288,7 +289,7 @@ describe("bank.ensureVault", () => {
   it("takes a bag of the vaultlabel, and of the bank's own applabel and user_id if it likes, handing back the vault held", async () => {
     const bank = bankIn(makeWorld())
     const vault = await bank.ensureVault(Main)
-    for (const bag of [Main, { ...Main, user_id: 'u1' }, { ...Main, user_id: 'u1', applabel: 'acme' }, { vaultlabel: vault.vaultlabel }]) {
+    for (const bag of [Main, { ...Main, user_id: 'u1' }, { ...Main, user_id: 'u1', applabel: 'acme' }, vault]) {
       expect(await bank.ensureVault(bag)).to.eq(vault)
     }
   })
@@ -324,33 +325,43 @@ describe("bank.ensureVault", () => {
     const elsewhere = makeWorld()
     const births = [vi.spyOn(world.vaultDB, 'ensureVault'), vi.spyOn(elsewhere.vaultDB, 'ensureVault')]
     const bank = bankIn(world)
-    for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }, { ...Main, vaultDb: elsewhere.vaultDB }]) {
-      const refusal = await TH.expectRefusal(bank.ensureVault(bag), 'bad_scope')
-      expect(refusal.message).to.include("In the bag naming the vault: There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel")
-      expect(refusal.message).to.include("a vault's own stores go in the second bag").and.not.match(/vaultDB|deviceDB|vaultDb/u)
+    for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }]) {
+      const refusal = await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
+      expect(refusal.message).to.match(/^In the bag naming the vault: /u)
+      expect(refusal.message).to.include("A vault's stores go in the second bag, its options")
     }
     for (const birth of births) { expect(birth).not.toHaveBeenCalled() }
     expect(bank.vaults).to.deep.equal([])
   })
 
-  it("refuses 'bad_scope' a bag holding any field but its three names -- an option, a Vault object, its snapshot, its element of the bank's listing, its record -- the same from every call naming a vault", async () => {
+  it("names the vault by whatever carries its label -- a Vault object, its snapshot, its element of the bank's listing, its record, a bag with a stray field -- the same from every call naming a vault, as vaultBag's second example shows", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
     const [bankVault] = bank.vaults
     const record = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
-    const bags: unknown[] = [{ ...Main, leaseHours: 1 }, { ...Main, userId: 'u1' }, vault, vault.getSnapshot(), bankVault, record]
+    const bags: unknown[] = [vault, vault.getSnapshot(), bankVault, record, { ...Main, leaseHours: 1 }]
     for (const bag of bags) {
       const named = bag as typeof Main
-      await TH.expectRefusal(bank.ensureVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.reopenVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.clearCachedVault(named), 'bad_scope')
-      await TH.expectRefusal(bank.delDamagedVault(named), 'bad_scope')
-      for (const lookup of [() => bank.vaultOf(named), () => bank.bankVaultOf(named), () => { bank.closeVault(named) }]) {
-        expect(lookup).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
-      }
+      expect(bank.vaultOf(named)).to.eq(vault)
+      expect(bank.bankVaultOf(named)).to.eq(bankVault)
+      expect(await bank.ensureVault(named)).to.eq(vault)
     }
-    expect(bank.vaultOf(Main)).to.eq(vault)
+    bank.closeVault(vault)
+    expect(bank.vaultOf(Main)).to.be.null
+  })
+
+  it("refuses 'bad_scope' a carrier naming another bank's user, from every call naming a vault", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const other = { ...TH.scopeOf('u2') }
+    await TH.expectRefusal(bank.ensureVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.reopenVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.clearCachedVault(other), 'bad_scope')
+    await TH.expectRefusal(bank.delDamagedVault(other), 'bad_scope')
+    for (const lookup of [() => bank.vaultOf(other), () => bank.bankVaultOf(other), () => { bank.closeVault(other) }]) {
+      expect(lookup).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
+    }
   })
 
   it("refuses options naming other stores than the vault held was born from 'bad_option', during its birth and after, handing back the held one to options naming its own", async () => {
@@ -860,7 +871,7 @@ describe("bank.closeVault", () => {
     bank.closeVault({ vaultlabel: 'main' })
     expect(bank.vaults).to.deep.equal([])
     const next = await bank.ensureVault(Main)
-    bank.closeVault({ vaultlabel: next.vaultlabel })   // the vault a Vault object is of
+    bank.closeVault(next)   // the vault a Vault object is of, as closeVault's second example shows
     await TH.expectBad(next.tryHello(), 'vault_gone')
   })
 
@@ -1124,6 +1135,28 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
     await bank.ensureVault(Main)
     expect(heard).not.toHaveBeenCalled()
     TH.expectSyncRefusal(() => bank.subscribe('listen' as unknown as () => void), 'bad_option')
+  })
+
+  it("hears out a listener that throws: the hello and the birth it heard of resolve, every other listener is told, and what it threw is logged and reported", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const world = makeWorld()
+      const bank = bankIn(world)
+      const thrown = new Error('a listener that throws')
+      bank.subscribe(() => { throw thrown })
+      const heard = vi.fn()
+      bank.subscribe(heard)
+      await bank.hello()
+      const vault = await bank.ensureVault(Main)
+      expect(bank.vaultOf(Main)).to.eq(vault)
+      expect(heard).toHaveBeenCalled()
+      expect(reported.length).to.be.greaterThan(0)
+      expect(reported.every((err) => err === thrown)).to.be.true
+      expect(world.logged.some((call) => call.level === 'error' && call.story?.['call'] === 'subscribe')).to.be.true
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it("reads a vault's lifecycle, or undefined for a vault not asked for, as bankVaultOf's example shows; a bad name or another user's bag refuses 'bad_scope'", async () => {

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { VaultError, isVaultError } from '../../src/errors'
-import type { DeviceRecord } from '../../src/types/types'
+import type { DeviceRecord } from '../../src/shapes/device'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
-import { type Vault } from '../../src/vault'
+import type { Vault } from '../../src/vault'
 import { Bank } from '../../src/bank'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
@@ -38,9 +38,31 @@ describe("the snapshot and its subscribers", () => {
   it("refuses a listener that is not a function as it subscribes, so no later change meets it", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
+    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /Expected a function/)
     await TH.unlock(vault, 'pw')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
+  })
+
+  it("hears out a listener that throws: the call that changed the snapshot resolves, every other listener is told, and what it threw is logged and reported", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const world = makeWorld()
+      const vault = await world.open()
+      const thrown = new Error('a listener that throws')
+      vault.subscribe(() => { throw thrown })
+      const heard = vi.fn()
+      vault.subscribe(heard)
+      await TH.unlock(vault, 'pw')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+      expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+      expect(heard).toHaveBeenCalled()
+      expect(reported.length).to.be.greaterThan(0)
+      expect(reported.every((err) => err === thrown)).to.be.true
+      expect(world.logged.some((call) => call.level === 'error' && call.story?.['call'] === 'subscribe')).to.be.true
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it("keeps its identity until something changes", async () => {
@@ -288,7 +310,7 @@ describe("the logger", () => {
     const ensureVault = vi.spyOn(vaultDB, 'ensureVault')
     Object.defineProperty(vaultDB, 'logger', { value: { log: () => undefined } })
     const err = await TH.expectRefusal(world.open({ vaultDB, logger: undefined }), 'bad_option')
-    expect(err.message).to.match(/log, warn and error functions/)
+    expect(err.message).to.match(/^warn: Expected a function; error: Expected a function$/)
     expect(ensureVault).not.toHaveBeenCalled()
   })
 
@@ -346,7 +368,7 @@ describe("the logger", () => {
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
     for (const nonsense of [{}, { log: () => undefined, warn: () => undefined }, 'console']) {
       const err = await TH.expectRefusal(world.open({ logger: nonsense as unknown as TH.BornVaultOpts['logger'] }), 'bad_option')
-      expect(err.message).to.match(/log, warn and error functions/)
+      expect(err.message).to.match(/^In Bank.make's options: logger(\.\w+)?: Expected a (function|VaultLogger)/)
     }
     expect(ensureVault).not.toHaveBeenCalled()
   })

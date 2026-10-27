@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../src/gate'
 import { PassphraseProving, OutsideGating } from '../src/proving'
-import { type GatedVaultRecord, VaultRecord } from '../src/vault-record'
+import { type GatedVaultRecord, VaultRecord } from '../src/shapes/vault'
 import * as TH from './test-helpers'
 import { makeWorld, storedVaultRecordOf } from './vault/world'
 

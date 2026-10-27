@@ -1,0 +1,94 @@
+/** What a device keeps of a vault: its lease, and its device record. Each `parse` refuses 'bad_record', and each record is strict. */
+
+import type * as Z from 'zod'
+import * as Phrases from '../phrases'
+import { Validator } from '../checks/validator'
+import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
+
+// == [Lease]: LeaseFormat, isLeaseKey, LeaseRecord, LeaseStamp, LeaseSparse
+
+/** The `format` a {@link LeaseRecord} carries, in its stamp. */
+export const LeaseFormat = 'safebyok-lease-v1'
+
+/** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
+ * A device store hands back what it kept by structured clone, so a key that is extractable, of
+ * another algorithm, or for another use was not written by this package: its record reads as none.
+ *
+ * @example isLeaseKey(await makeLeaseKey())   // true
+ * @example isLeaseKey(await makeVaultKey())   // false: extractable
+ */
+export const isLeaseKey = (val: unknown): val is CryptoKey => (
+  val instanceof CryptoKey
+    && ! val.extractable
+    && val.algorithm.name === 'AES-GCM'
+    && val.usages.includes('unwrapKey')
+    && val.usages.every((usage) => usage === 'wrapKey' || usage === 'unwrapKey')
+)
+
+/** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
+ * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
+ * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
+ */
+export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
+  LeaseRecord: obj({
+    format:            lit(LeaseFormat),
+    applabel,
+    user_id,
+    vaultlabel,
+    vault_tok,
+    /** The vault record's `gate_epoch` when this lease was granted: a mismatch voids it. */
+    gate_epoch:        int.positive(),
+    /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable AES-GCM, usable only to wrap and unwrap, as {@link isLeaseKey} says. One kept otherwise reads as no lease. */
+    lease_key:         custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
+    /** The vaultKey, wrapped under the leaseKey. */
+    vault_key_lease_wrapped,
+    /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
+    ask_passphrase_at: epochMillis,
+  }).strict(),
+}))
+export type LeaseRecord = Z.infer<typeof LeaseRecord>
+
+/** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
+ * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
+ * gate it was granted under. Its wrap's ctx holds the whole of it, beside its vault's stamp.
+ *
+ * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
+ */
+export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }).strip() }))
+export type LeaseStamp = Z.infer<typeof LeaseStamp>
+
+/** A lease's sparse shape, as a log line or a listing shows it: the same fields as its {@link LeaseStamp}. A Lease's own fields are these. */
+export type LeaseSparse = LeaseStamp
+// --
+
+// == [Device record]: DeviceRecordFormat, DeviceRecord
+
+/** The `format` a {@link DeviceRecord} carries. */
+export const DeviceRecordFormat = 'safebyok-device-v1'
+
+/** What this device keeps of one scope, locked or not, across the vault's lives there: its own id, and the highest `vault_epoch` it has seen. Nothing in it is secret.
+ * A vault served below `highest_vault_epoch` was rolled back, and the bank refuses it as
+ * 'vault_behind'. The DeviceDB raises it, never lowers it: a write of a lower epoch keeps the
+ * higher, and the first `device_id` stored stays. `bank.clearCachedVault` erases it. Its `parse`
+ * is strict, refuses 'bad_record', and hands back the record frozen. A record that fails it reads
+ * as none. `deviceRecordOf` builds one from a parsed scope.
+ *
+ * @example { format: 'safebyok-device-v1', ...scope, device_id: 'Zm9vYmFy', highest_vault_epoch: 3 }
+ */
+// A field added here bumps the format: a device whose safebyok predates the field discards the
+// record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
+// its next read raises it again.
+export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
+  DeviceRecord: obj({
+    format:              lit(DeviceRecordFormat),
+    applabel,
+    user_id,
+    vaultlabel,
+    /** This device's random id for the scope, minted the first time it births the vault there, and carried by every wayin it seals. */
+    device_id,
+    /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */
+    highest_vault_epoch: uint,
+  }).strict().readonly(),
+}))
+export type DeviceRecord = Z.infer<typeof DeviceRecord>
+// --

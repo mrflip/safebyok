@@ -1,11 +1,11 @@
 import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { BoxFormat, type BoxRecord, type BoxSparse } from '../src/box'
+import { BoxFormat, type BoxRecord, type BoxSparse } from '../src/shapes/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { Lease, LeaseStamp, sealLeaseRecord } from '../src/lease'
-import { LeaseRecord } from '../src/types/types'
-import type { VaultSparse, VaultStampButFormat } from '../src/vault-record'
+import { Lease, sealLeaseRecord } from '../src/lease'
+import { LeaseStamp, LeaseRecord } from '../src/shapes/device'
+import type { VaultSparse, VaultStampButFormat } from '../src/shapes/vault'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
 import * as TH from './test-helpers'
 
@@ -133,7 +133,7 @@ describe("LeaseStamp", () => {
     const { lease_key: _leaseKey, vault_key_lease_wrapped: _wrapped, ...stamped } = await TH.leaseOf('u1')
     expect(LeaseStamp.parse(stamped)).to.deep.equal(stamped)
     expect(Object.keys(stamped)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'gate_epoch', 'ask_passphrase_at'])
-    expect(LeaseStamp.safeParse(await TH.leaseOf('u1')).success, 'a stamp holds no key material').to.be.false
+    expect(LeaseStamp.parse(await TH.leaseOf('u1')), 'taken from the record, its key material left out').to.not.have.any.keys('lease_key', 'vault_key_lease_wrapped')
   })
 })
 

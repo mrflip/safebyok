@@ -1,15 +1,16 @@
-import { type Ciphered, toB64 } from '../../src/crypto'
+import { type Ciphered, type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/shapes/fields'
+import { toB64 } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
-import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/box'
-import type { VaultScope, PasskeyAnswer, DeviceRecord, LeaseRecord } from '../../src/types/types'
-import { type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/vault-record'
-import { type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/types/type-aliases'
+import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/shapes/box'
+import type { VaultScope } from '../../src/shapes/scopes'
+import type { DeviceRecord, LeaseRecord } from '../../src/shapes/device'
+import { type PasskeyAnswer, type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/shapes/vault'
 import type { Vault, VaultSnapshot } from '../../src/vault'
 import { Bank } from '../../src/bank'
-import type { MakeBankOpts } from '../../src/vault-opts'
+import type { MakeBankOpts } from '../../src/shapes/bank-opts'
 import { localVaultDB } from '../../src/local-vault-db'
 import type { VaultDB } from '../../src/vault-db'
 import { good, valOf } from '../../src/outcome'
@@ -50,7 +51,7 @@ export const testDeriver: KeyDeriver = {
  * @example TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: 'vault-tok-other' })
  */
 export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
-  return {
+  const slice: VaultSlice = {
     format:          VaultFormat,
     ...scopeOf(user_id),
     vault_tok:       `vault-tok-${user_id}`,
@@ -60,6 +61,14 @@ export const vaultSliceOf = (user_id: string, keyDeriver: KeyDeriver = testDeriv
     now:             () => SliceNow,
     ...overrides,
   }
+  const { keyDeriver: deriver, leaseMillis, now, ...stamp } = slice
+  return withHidden(stamp, { keyDeriver: deriver, leaseMillis, now })
+}
+
+/** `stamp`'s fields, and `beside`'s beside them, writable but hidden: a stand-in showing a spread, a log line or a duck what a Vault object shows, its stamp, while its methods stay on its prototype. */
+const withHidden = <StampT extends object, BesideT extends Record<string, unknown>>(stamp: StampT, beside: BesideT): StampT & BesideT => {
+  const hidden = Object.fromEntries(Object.entries(beside).map(([fieldname, val]) => [fieldname, { value: val, writable: true, configurable: true, enumerable: false }]))
+  return Object.defineProperties({ ...stamp }, hidden) as StampT & BesideT
 }
 
 /** The time a {@link vaultSliceOf} slice's clock reads, unless told otherwise: noon, 19 October 2026. */
@@ -97,10 +106,13 @@ export type LeasedSlice = VaultSlice & {
  */
 export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
   const base = vaultSliceOf(user_id, testDeriver, overrides)
+  const { keyDeriver, leaseMillis, now } = base
   const madeUnder: VaultSparse = Object.freeze({ format: base.format, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: base.vault_tok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 })
-  const leaseRecord = await sealLeaseRecord(madeUnder, vaultKey, { leaseMillis: base.leaseMillis, now: base.now() })
-  const slice: LeasedSlice = {
-    ...base,
+  const leaseRecord = await sealLeaseRecord(madeUnder, vaultKey, { leaseMillis, now: now() })
+  const slice: LeasedSlice = withHidden<VaultStamp, Omit<LeasedSlice, keyof VaultStamp>>(base, {
+    keyDeriver,
+    leaseMillis,
+    now,
     madeUnder,
     leaseRecord,
     lease: null,
@@ -120,7 +132,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
       return Promise.resolve(good(undefined))
     },
     making: () => ({ madeUnder: slice.madeUnder, now: slice.now() }),
-  }
+  })
   slice.lease = Lease.make(slice, leaseRecord)
   // A box and a lease read the lease the slice holds as they read a Vault object's.
   registerLeaseReader(slice, () => slice.lease)
@@ -224,7 +236,7 @@ export const bankOf = (vault: Vault): Bank => {
  * @example TH.closeVault(vault)   // the lease stays, for the next vault settled over this deviceDB
  */
 export const closeVault = (vault: Vault): void => {
-  bankOf(vault).closeVault({ vaultlabel: vault.vaultlabel })
+  bankOf(vault).closeVault(vault)
 }
 
 /**
@@ -395,21 +407,28 @@ export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: 
 )
 
 /** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
- * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`.
+ * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`. With a
+ * `vault_epoch`, it is no draft but the new life a store makes of one over a tombstone, the counter
+ * carried on.
  *
  * @example vaultDB.ensureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
+ * @example gatelessOf('u1', { vault_epoch: 2 })   // a new life, as a read over a tombstone shows it
  */
-export const gatelessOf = (user_id: string, overrides: Partial<VaultDraft> = {}): VaultDraft => ({
-  format:              VaultFormat,
-  ...scopeOf(user_id),
-  vault_tok:           `vault-tok-${user_id}`,
-  registered_at:       Date.UTC(2026, 9, 14),
-  vault_epoch:         0,
-  gate_epoch:          0,
-  gate:                null,
-  ...overrides,
-})
+export function gatelessOf(user_id: string, overrides?: Partial<VaultDraft>): VaultDraft
+export function gatelessOf(user_id: string, overrides: Partial<Omit<VaultDraft, 'vault_epoch'>> & Pick<VaultRecord, 'vault_epoch'>): VaultRecord
+export function gatelessOf(user_id: string, overrides: Partial<VaultRecord> = {}): VaultRecord {
+  return {
+    format:              VaultFormat,
+    ...scopeOf(user_id),
+    vault_tok:           `vault-tok-${user_id}`,
+    registered_at:       Date.UTC(2026, 9, 14),
+    vault_epoch:         0,
+    gate_epoch:          0,
+    gate:                null,
+    ...overrides,
+  }
+}
 
 /**
  * A shape-valid BoxRecord for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,

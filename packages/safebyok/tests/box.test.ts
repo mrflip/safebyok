@@ -1,18 +1,19 @@
 import { inspect } from 'node:util'
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Box, BoxDamaged, BoxRecord, BoxSparse, BoxStamp, type SealBoxProps, boxSparseOf } from '../src/box'
+import { Box, type SealBoxProps, boxSparseOf } from '../src/box'
+import { BoxDamaged, BoxRecord, BoxSparse, BoxStamp } from '../src/shapes/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
-import type { Whisper } from '../src/types/types'
-import type { VaultSparse } from '../src/vault-record'
-import { box_key_wrapped, whisper_ciphered } from '../src/types/type-aliases'
+import type { Whisper } from '../src/shapes/box'
+import type { VaultSparse } from '../src/shapes/vault'
+import { box_key_wrapped, whisper_ciphered } from '../src/shapes/fields'
 import { FarFuture } from '../src/consts'
-import * as CX from '../src/checks/core-checks'
+import * as CX from '../src/shapes/scopes'
 import * as TH from './test-helpers'
 
 const OldIso = '2026-10-14T00:00:00.000Z'
@@ -137,11 +138,11 @@ const OwnFields = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'vault_epoc
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("BoxSparse", () => {
-  it("is every field of the box record but its two ciphered ones, as its example shows, and refuses a whole record or one missing a field", () => {
+  it("is every field of the box record but its two ciphered ones, as its example shows, taken from a whole record, and refuses one missing a field", () => {
     const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = TH.boxOf('anthropic_api_key', 'a1')
     expect(BoxSparse.parse(listed)).to.deep.equal(listed)
     expect(Object.keys(BoxSparse.shape)).to.have.members(Object.keys(listed))
-    expect(BoxSparse.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success, 'a sparse box holds no ciphertext').to.be.false
+    expect(BoxSparse.parse(TH.boxOf('anthropic_api_key', 'a1')), 'taken from the record, its ciphertext left out').to.not.have.any.keys('box_key_wrapped', 'whisper_ciphered')
     expect(BoxSparse.safeParse(TH.omitting(listed, 'sidecar')).success).to.be.false
   })
 })
@@ -395,8 +396,14 @@ describe("Box.seal", () => {
     [{ props: { sidcar: { note: Secret } } },                         'bad_option',   'a misspelt prop'],
     [{ props: { base: { revision: Secret } } },                       'bad_option',   'a base that shows no revision_tok'],
     [{ props: { base: { revision_tok: 'r1', registered_at: 'then' } } }, 'bad_option', 'a base whose registered_at is no time'],
-    [{ props: { boxlabel: '' } },                                     'bad_scope',    'an empty boxlabel'],
+    [{ props: { boxlabel: '' } },                                     'bad_option',   'an empty boxlabel, as SealBoxProps refuses any prop amiss'],
   ] as const
+
+  it("names the prop it refused, quoting none of it", async () => {
+    const vault = await vaultOf()
+    const err = await TH.expectRefusal(Box.seal(vault, { boxlabel: 'anthropic_api_key', base: { revision_tok: 'r1', registered_at: 'then' } } as unknown as SealBoxProps, Secret, vault.making()), 'bad_option')
+    expect(err.message).to.match(/^base\.registered_at: /)
+  })
 
   for (const [given, refusalkind, blurb] of SealRefusals) {
     it(`refuses ${blurb} as '${refusalkind}'`, async () => {
@@ -429,7 +436,7 @@ describe("Box.seal", () => {
     const vault = await vaultOf()
     const box = await TH.expectGood(Box.trySeal(vault, { boxlabel: 'anthropic_api_key' }, Secret, vault.making()))
     expect(box).to.be.instanceOf(Box)
-    await TH.expectBad(Box.trySeal(vault, { boxlabel: '' }, Secret, vault.making()), 'bad_scope')
+    await TH.expectBad(Box.trySeal(vault, { boxlabel: '' }, Secret, vault.making()), 'bad_option')
   })
 
   it("refuses as 'vault_locked' a seal by another copy of safebyok into a vault this copy holds: that copy reads no lease of it", async () => {

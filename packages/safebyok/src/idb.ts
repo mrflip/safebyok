@@ -1,10 +1,10 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import type { DeviceRecord, LeaseRecord } from './types/types'
+import type { DeviceRecord, LeaseRecord } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
-import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
+import { Validator } from './checks/validator'
 
 export type { IdbOpts } from './idb-opts'
 export * as ChangeBell from './change-bell'
@@ -147,6 +147,9 @@ class IdbDeviceDB extends DeviceDB {
 /** One stored row, as {@link inspectIdbDeviceDB} reports it: its scopepath and the raw stored value. */
 export type IdbRow = { scopepath: string, row: unknown }
 
+/** What an inspector's `subscribe` is handed: a function to call after each write. Its `parse` refuses 'bad_option'. */
+const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
+
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. Unlike the store, its `rows()`
  * and `wipe()` reject, with a `NotSupportedError` where there is no IndexedDB.
@@ -169,7 +172,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
     },
     /** Call `listener` after any write to the shelf, in this tab or another, returning the unsubscribe. Throws 'bad_option' for a `listener` that is no function. */
     subscribe: (listener: () => void): (() => void) => {
-      if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
+      ListenerShape.parse(listener)
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
     /** Erase every row on the shelf: every lease and device record in this database. */

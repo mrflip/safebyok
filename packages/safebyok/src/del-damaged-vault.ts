@@ -1,19 +1,26 @@
-import * as CX from './checks/core-checks'
-import { VaultError } from './errors'
+import * as CX from './shapes/scopes'
+import { Validator } from './checks/validator'
 import { valOf } from './outcome'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import { randomId } from './crypto'
-import type { VaultScope } from './types/types'
+import type { VaultScope } from './shapes/scopes'
 import type { VaultDB } from './vault-db'
-import { type MakeBankOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
+import { type MakeBankOpts, makeBankOpts } from './shapes/bank-opts'
+import { parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Bank.make's options and the vault's label: which vault, and the two stores it lives in. */
 export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'vaultDB' | 'deviceDB'> & Pick<VaultScope, 'vaultlabel'>
 
+/** The check of {@link delDamagedVault}'s one bag: Bank.make's options, each its own to check, and the `vaultlabel`. Its `parse` refuses 'bad_option' for anything else, a misspelt field among them, counted and never named. */
+const { delDamagedVaultOpts } = Validator('bad_option', ({ unk }) => ({
+  delDamagedVaultOpts: makeBankOpts.extend({ vaultlabel: unk, strengthChecker: unk.optional() }),
+}))
+
 /** Delete a vault whose birth refuses it as `damaged_vault`: its vault record, every box, and this device's lease of it.
  * There is no Vault object to `del()` it with, so this is how to clear it and start over. What
  * the vault held is gone for good: ask the user first. It takes the options `Bank.make` took
- * beside the vault's `vaultlabel`, and refuses misuse as they do, before touching storage.
+ * beside the vault's `vaultlabel`, and refuses misuse as they do, before touching storage:
+ * 'bad_option' for a field neither takes, 'bad_scope' for a name that fails its check.
  * Reaches `VaultDB.delDamagedVault`, then the DeviceDB's `delLease` and `raiseDeviceRecord`, which
  * raises this device's record of the scope to the tombstone's `vault_epoch`.
  *
@@ -39,17 +46,12 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'v
  *   }
  */
 export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> => {
-  if (! isBag(opts)) { throw new VaultError('bad_option', "delDamagedVault takes one bag of options: applabel, user_id, vaultDB and deviceDB, as Bank.make took them, and the vault's vaultlabel.") }
-  const scope = CX.vaultScope.parse({ applabel: opts.applabel, user_id: opts.user_id, vaultlabel: opts.vaultlabel })
-  const vaultDB = parseVaultDB(opts.vaultDB)
-  await delDamagedVaultIn(scope, vaultDB, parseDeviceDB(opts.deviceDB))
+  delDamagedVaultOpts.parse(opts)
+  await delDamagedVaultIn(CX.vaultScope.parse(opts), parseVaultDB(opts.vaultDB), parseDeviceDB(opts.deviceDB))
 }
 
 /** {@link delDamagedVault}'s work, for a scope and stores already checked. */
 export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDB: DeviceDB): Promise<void> => {
-  if (typeof vaultDB.delDamagedVault !== 'function') {
-    throw new VaultError('bad_option', "vaultDB has no delDamagedVault: a storage adapter that hands each call on to another's must hand this one on too.")
-  }
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   const tombstone = valOf(await vaultDB.delDamagedVault(scope))

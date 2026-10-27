@@ -1,9 +1,12 @@
-import { type Capacity, type Clock, type VaultScope, Whisper, Sidecar, type DeviceRecord, type WayinKind } from './types/types'
-import { type GatedVaultRecord, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './vault-record'
-import { vault_tok } from './types/type-aliases'
+import type { BoxListing, Capacity } from './shapes/vault-db'
+import type { Clock, BadNewsHandler } from './shapes/bank-opts'
+import type { VaultScope } from './shapes/scopes'
+import { Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
+import type { DeviceRecord } from './shapes/device'
+import { type WayinKind, type GatedVaultRecord, passphraseCleartext, wayinkind, type GateRecord, type GateSparse, VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
-import { Box, type BoxBase, type BoxDamaged, type BoxRecord, type BoxSparse, boxSparseOf, checkedSidecar, checkedWhisper, whisperBytesOf } from './box'
-import * as CX from './checks/core-checks'
+import { Box, type BoxBase, boxSparseOf, whisperBytesOf } from './box'
+import * as CX from './shapes/scopes'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
@@ -12,12 +15,12 @@ import * as Refusals from './refusals'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
-import { jsonBytes } from './vault-db'
+import { callback, jsonBytes } from './vault-db'
 import { byCodeUnit } from './text'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
-import { type BadNewsHandler, type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
+import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
@@ -243,7 +246,7 @@ export class Vault implements VaultStamp {
   /** Call `listener` after every snapshot change, returning the function that unsubscribes it. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each snapshot change.') }
+    callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -371,7 +374,9 @@ export class Vault implements VaultStamp {
    */
   demandConsistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): void {
     const demandOpts = checkDemandOpts(opts)
-    this.#demand(checkedMadeUnder(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
+    // Checked only: the thing itself is judged, as a Proving or a Gate is told apart by its class.
+    VaultMadeUnder.parse(thing)
+    this.#demand(thing, { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
 
   /** True while `thing` is consistent with the vault record in hand now: {@link Vault.demandConsistentWith}'s question, asked without refusing.
@@ -382,7 +387,8 @@ export class Vault implements VaultStamp {
    */
   consistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
-    return this.#inconsistencyWith(checkedMadeUnder(thing)) === null && (! leaseBound || this.#leaseInForce() !== null)
+    VaultMadeUnder.parse(thing)
+    return this.#inconsistencyWith(thing) === null && (! leaseBound || this.#leaseInForce() !== null)
   }
   // --
 
@@ -441,10 +447,7 @@ export class Vault implements VaultStamp {
   async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
     try {
       this.#demandNotGone()
-      if (typeof passphrase !== 'string') {
-        throw new VaultError('bad_option', "checkStrength takes the passphrase as the text the user typed, as a string.")
-      }
-      const verdict = await this.#strengthChecker(passphrase)
+      const verdict = await this.#strengthChecker(passphraseCleartext.parse(passphrase))
       this.#demandNotGone()
       if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
       return good(undefined)
@@ -485,7 +488,7 @@ export class Vault implements VaultStamp {
   async tryPutWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
     try {
       this.#demandNotGone()
-      checkSlotlabel(slotlabel, 'putWayin')
+      wayinkind.parse(slotlabel)
       await this.#helloWithin(this.#staleMillis)
       this.#demandNotGone()
       const kindNow = (): GatingKind => {
@@ -515,7 +518,7 @@ export class Vault implements VaultStamp {
   async tryDelWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
     try {
       this.#demandNotGone()
-      checkSlotlabel(slotlabel, 'delWayin')
+      wayinkind.parse(slotlabel)
       if (slotlabel === 'passphrase') {
         throw new VaultError('passphrase_required', "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed.")
       }
@@ -582,10 +585,10 @@ export class Vault implements VaultStamp {
   async tryPutBox(props: PutBoxProps, whisper?: Whisper): Promise<Outcome<Box>> {
     try {
       this.#demandNotGone()
-      const { boxlabel, sidecar } = putBoxPropsOf(props)
+      const { boxlabel, sidecar } = putBoxProps.parse(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const given = whisper === undefined ? undefined : checkedWhisper(whisper)
+      const given = whisper === undefined ? undefined : Whisper.parse(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
       this.#checkWhisperFits(given, sidecar ?? {})
@@ -646,11 +649,11 @@ export class Vault implements VaultStamp {
    *
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
-  async useWhisper<ResultT>(boxlabel: string, callback: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
-    if (typeof callback !== 'function') { throw new VaultError('bad_option', 'useWhisper needs a callback function to hand the whisper to.') }
+  async useWhisper<ResultT>(boxlabel: string, handed: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
+    callback.parse(handed)
     const whisper = valOf(await this.tryGetWhisper(boxlabel))
     // The callback's own throw is the host's, and is never told as the vault's bad news.
-    return await callback(whisper)
+    return await handed(whisper)
   }
 
   /** Delete the box `boxlabel`, whatever revision of it is stored, resolving what was removed: a damaged one too, as deleting is its remedy.
@@ -837,7 +840,7 @@ export class Vault implements VaultStamp {
   #clockNow(): number { return Math.floor(this.#clock.now()) }
   // --
 
-  // == [State and snapshot]: vaultRecord, lease, expiry, leaseInForce, listeners, snapshot, picture, replaceSnapshot
+  // == [State and snapshot]: vaultRecord, lease, expiry, leaseInForce, listeners, snapshot, picture, replaceSnapshot, heedListener
 
   // The vault record in hand, frozen: gateless while novel, and of one vault_tok for the Vault object's life.
   #vaultRecord: VaultRecord
@@ -931,7 +934,17 @@ export class Vault implements VaultStamp {
     // Trouble is told apart by identity, as two refusals of one kind read alike as JSON.
     if (next.trouble === this.#snapshot.trouble && stableJsonify({ ...next, trouble: null }) === stableJsonify({ ...this.#snapshot, trouble: null })) { return }
     this.#snapshot = next
-    this.#listeners.forEach((listener) => { listener() })
+    this.#listeners.forEach((listener) => { this.#heedListener(listener) })
+  }
+
+  /** Call `listener`, a host's, as the snapshot changes: what it throws reaches no call, and is logged as an error and reported to the platform, as a VaultDB's listener's is. */
+  #heedListener(listener: () => void) {
+    try {
+      listener()
+    } catch (err) {
+      this.#logger.error("A listener passed to subscribe threw as it heard of a snapshot change. The change stands, the call that made it went on as it would have, and every other listener was called; the listener is the host's to mend.", { call: 'subscribe' }, asError(err))
+      reportToPlatform(err)
+    }
   }
   // --
 
@@ -990,7 +1003,7 @@ export class Vault implements VaultStamp {
    * the record's highest `vault_epoch` is `behind`. A read older than the picture but not below the
    * record (`isOlderPicture`) is ignored.
    */
-  #judgeRead(read: (VaultRecord & Listing) | null, record: DeviceRecord | null): (VaultRecord & Listing) | 'ignore' | 'behind' {
+  #judgeRead(read: (VaultRecord & BoxListing) | null, record: DeviceRecord | null): (VaultRecord & BoxListing) | 'ignore' | 'behind' {
     if (this.#goneBy !== null) { return 'ignore' }
     if (read === null) {
       const gone = goneError()
@@ -1014,7 +1027,7 @@ export class Vault implements VaultStamp {
    * None is taken up here. A read finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: KeptLease | null, readAt: number, leasesSeen: number }) {
+  #takePicture(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: KeptLease | null, readAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1251,7 +1264,7 @@ export class Vault implements VaultStamp {
   async #delVault(proving: PassphraseProving): Promise<number> {
     this.#demand(proving, { call: 'del' })
     const doomed = this.#vaultRecord
-    const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok, gate_epoch: doomed.gate_epoch }))
+    const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, doomed))
     if (! deleted.ok) {
       this.#demandAfterWait(deleted, proving, { call: 'del' })
       throw deleted.err
@@ -1673,16 +1686,12 @@ export class Vault implements VaultStamp {
 
   /** Write `box` with `VaultDB.putBox`, in the vault it was sealed for and over the revision it was sealed from, resolving the record as stored: storage refuses it unless that revision is still stored.
    * A stale refusal comes as storage gave it, the box stored as its `meta.box_stored`.
-   * Storage's 'invalid_box' becomes 'bad_record', as this vault sealed the box, and its
-   * 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
+   * Storage's 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
    */
   async #writeOver(box: Box): Promise<BoxRecord> {
     try {
       return await this.#vaultDB.putBox(this.#scope, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }, box.record)
     } catch (err) {
-      if (isVaultError(err, 'invalid_box')) {
-        throw new VaultError('bad_record', 'Storage refused the box this vault sealed as one this package would not build, so nothing was written. This is a bug: report it, with this error.', { cause: err })
-      }
       if (isVaultError(err, 'vault_mismatch')) {
         throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: err })
       }
@@ -1838,15 +1847,12 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // == [Vocabulary]: BirthRead, frozenVaultRecord, isOlderPicture, fitsLease, leavesInForce, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
-/** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. */
-type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>
-
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it. */
 export type BirthRead = Readonly<{
   /** The vault record `VaultDB.ensureVault` resolved. */
   vaultRecord: VaultRecord
   /** The box listing `VaultDB.ensureVault` resolved beside it. */
-  listing:     Listing
+  listing:     BoxListing
   /** The lease record {@link DeviceDB.getLease} found, or null. */
   leaseKept:   KeptLease | null
   /** This device's record of the scope, as raised at birth. */
@@ -1867,7 +1873,7 @@ const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
  * has already passed. Data cannot tell it from storage restored from an older copy, so it is
  * ignored, never refused.
  */
-const isOlderPicture = (inHand: VaultSparse, fresh: VaultSparse): boolean => (
+const isOlderPicture = (inHand: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>, fresh: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>): boolean => (
   inHand.vault_tok === fresh.vault_tok
   && (fresh.vault_epoch < inHand.vault_epoch || fresh.gate_epoch < inHand.gate_epoch)
 )
@@ -1903,7 +1909,7 @@ const UntrustedStorageKinds = ['identity_revoked', 'vault_behind', 'newer_format
 const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initialize_gate'])
 // --
 
-// == [Argument parsers]: checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkSlotlabel, passkeyBeforePassphrase, absentBox, noWhisper
+// == [Argument parsers]: checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, checkDemandOpts, PutBoxProps, putBoxProps, DeletedBox, passkeyBeforePassphrase, absentBox, noWhisper
 
 /** `hello()`'s options, returned once they hold `staleMinutes` alone, which `parseStaleMinutes` checks: 'bad_option' for any other field. */
 const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryHello()`.")
@@ -1917,41 +1923,14 @@ const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s re
 /** `demandConsistentWith()`'s options, returned once they hold `leaseBound` alone, a boolean: 'bad_option' otherwise. */
 const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force.")
 
-/** The check of a thing `demandConsistentWith()` judges: one carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
-export const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
-  vaultMadeUnderShape: obj({
-    vault_tok,
-    applabel:    str.optional(),
-    user_id:     str.optional(),
-    vaultlabel:  str.optional(),
-    vault_epoch: num.optional(),
-    gate_epoch:  num.optional(),
-  }).loose(),
-}))
-
-/** `thing`, as `demandConsistentWith()` was handed it, once it carries a `vault_tok`: 'bad_option' for anything else, quoting none of it. */
-const checkedMadeUnder = (thing: unknown): VaultMadeUnder => {
-  if (vaultMadeUnderShape.safeParse(thing).success) { return thing as VaultMadeUnder }
-  throw new VaultError('bad_option', "demandConsistentWith() takes something the vault handed out -- a box, a lease, a listing's entry -- or its snapshot: an object carrying the vault_tok it was made under, and its epochs as numbers.")
-}
-
 /** The box `putBox()` seals, as its caller names it: its boxlabel, and its sidecar, left out to keep the one it has. */
 export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
 
-/** `putBox()`'s props, returned once they hold a boxlabel and a sidecar alone: 'bad_option' for any other field. */
-const checkPutBoxProps = optionsCheck(({ unk }) => ({ boxlabel: unk, sidecar: unk.optional() }), "putBox()'s props are `boxlabel`, and `sidecar`, the box's own visible data (it is authenticated but never encrypted). A note is kept in the sidecar: { boxlabel, sidecar: { note } }.")
-
-/** The boxlabel and sidecar a `putBox()` was handed, the sidecar checked and undefined when left out.
- * Refuses 'bad_option' for props that are no object, a sidecar that is no JSON object, or a field
- * beside them, quoting none of it. The boxlabel is the caller's to check.
+/** The check of what `putBox()` is handed to name the box it seals: a bag of its `boxlabel`, and its {@link Sidecar}, a copy handed back, undefined when left out.
+ * Its `parse` refuses 'bad_option' for props that are no object, a sidecar that is no JSON object,
+ * or a field beside them, quoting none of it. The boxlabel is the caller's to check, as a name.
  */
-const putBoxPropsOf = (props: unknown): { boxlabel: unknown, sidecar: Sidecar | undefined } => {
-  if (typeof props !== 'object' || props === null) {
-    throw new VaultError('bad_option', "putBox() takes the box it stores as its first argument, { boxlabel, sidecar }, and the whisper second: putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...').")
-  }
-  const { boxlabel, sidecar } = checkPutBoxProps(props as Partial<Record<'boxlabel' | 'sidecar', unknown>>)
-  return { boxlabel, sidecar: sidecar === undefined ? undefined : checkedSidecar(sidecar) }
-}
+const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: Sidecar.optional() }).strict() }))
 
 /** The box `delBox()` removed. Storage keeps nothing of it. */
 export type DeletedBox = Readonly<{
@@ -1961,13 +1940,6 @@ export type DeletedBox = Readonly<{
   /** `deleted` for the revision the snapshot listed, `deleted_other` for another written over it meanwhile. */
   outcome:   'deleted' | 'deleted_other'
 }>
-
-/** Refuse 'bad_option' for a slotlabel other than `'passphrase'` or `'passkey'`, quoting none of it. */
-const checkSlotlabel = (given: unknown, call: 'putWayin' | 'delWayin'): void => {
-  if (given !== 'passphrase' && given !== 'passkey') {
-    throw new VaultError('bad_option', `${call} takes the slot of the way in, 'passphrase' or 'passkey': the user's passphrase or passkey is asked for through requestCleartext, never handed to the vault.`)
-  }
-}
 
 /** The refusal of `putWayin('passkey')` on a novel vault: a passkey is added under the passphrase, which it has none of yet. */
 const passkeyBeforePassphrase = () => new VaultError('absent_vault', "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey.")

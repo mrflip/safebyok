@@ -1,10 +1,11 @@
 import { it, describe, expect, vi } from 'vitest'
-import type { BoxRecord, BoxSparse } from '../../src/box'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/box'
 import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
-import type { VaultRecord, VaultDraft } from '../../src/vault-record'
+import type { VaultRecord, VaultDraft } from '../../src/shapes/vault'
 import { MaxLabelChars, MaxUserIdChars } from '../../src/checks/primitives'
-import { type VaultDB, type VaultDBOpts, type BoxDelExpectation, type VaultDelExpectation } from '../../src/vault-db'
+import type { VaultDB, VaultDBOpts } from '../../src/vault-db'
+import type { BoxDelExpectation, VaultDelExpectation } from '../../src/shapes/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, raceOutcomeOf } from './racing'
 import { gateOf, vaultRecordOf, gatelessOf, ensureGated, vaultRecordIn, recordOfRead, boxesOf, scopeOf, boxOf, noBoxYet, inThisVault, thisVault, OddLabels, deleting, wayinOf, fakeCiphered } from './builders'
 import { expectGood, expectingGood, expectBad, omitting } from './refusals'
@@ -745,7 +746,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultRecord()
       await expectingGood(vaultDB).delVault(scopeOf('u1'), thisVault)
       const reborn = await expectingGood(vaultDB).ensureVault(gatelessOf('u1', { vault_tok: 'vault-tok-reborn' }))
-      expect(reborn, 'the new life: a fresh vault_tok, no box, the counter past the vault deleted').to.deep.equal({ ...gatelessOf('u1', { vault_tok: 'vault-tok-reborn', vault_epoch: 2 }), boxes: [], damagedBoxes: [] })
+      expect(reborn, 'the new life: a fresh vault_tok, no box, the counter past the vault deleted').to.deep.equal({ ...gatelessOf('u1', { vault_tok: 'vault-tok-reborn' }), vault_epoch: 2, boxes: [], damagedBoxes: [] })
       expect(await vaultRecordIn(vaultDB, scopeOf('u1'))).to.deep.equal(recordOfRead(reborn))
       // The old life's deletion, sent again, meets a vault made anew, not the tombstone it replaced.
       await expectBad(vaultDB.delVault(scopeOf('u1'), thisVault), 'stale_write')
@@ -972,7 +973,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'kept'))
       const unparsable = omitting(boxOf('anthropic', 'one'), 'sidecar')
       await expectBad(vaultDB.ensureVault(vaultRecordOf('u1', { vault_tok: 'vault-tok-gated' }) as unknown as VaultDraft), 'bad_record')
-      await expectBad(vaultDB.ensureVault(gatelessOf('u1', { vault_epoch: 3 })), 'bad_record')
+      await expectBad(vaultDB.ensureVault({ ...gatelessOf('u1'), vault_epoch: 3 } as unknown as VaultDraft), 'bad_record')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, unparsable), 'invalid_box')
       await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: '' }, boxOf('anthropic', 'one')), 'bad_record')
       await expectBad(vaultDB.putVaultRecord(vaultRecordOf('u1', { gate_epoch: 0 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'bad_record')
