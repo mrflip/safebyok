@@ -309,7 +309,8 @@ the options `Bank.make`, its calls and its stores take, the objects a host hands
 clock, a key deriver, a logger) and what their callbacks return, and the expectations a `VaultDB`
 is handed. The pieces the package builds those from are its own. Each is Zod, made in a
 `Validator` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
-`bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and `EpochMillis` are plain Zod, the names they are all made of.
+`bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and
+`EpochMillis` are plain Zod, the names they are all made of.
 
 ```ts
 import { Validator, Validators } from 'safebyok'
