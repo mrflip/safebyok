@@ -508,6 +508,8 @@ export class Bank {
         throw gone
       }
       this.#setView(entry, frozenBankVault(parts, 'ready'), born.val)
+      // The view tells the listeners, which may let the vault go: a Vault object let go is never handed out.
+      this.#demandHeld(vaultScopepath, entry)
       return born.val
     }
     this.#setView(entry, refusedBankVault(parts, born.err), null)
