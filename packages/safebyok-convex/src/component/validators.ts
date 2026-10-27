@@ -3,7 +3,7 @@ import { v } from 'convex/values'
 import { Validators } from 'safebyok'
 import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 
-/** Convex validators for safebyok's stored records, each made from the core's Zod validator of the same name by convex-helpers' `zodToConvex`.
+/** Convex validators for safebyok's stored records, each made from the core's Zod validator its doc block names by convex-helpers' `zodToConvex`.
  * Convex takes only its own validators for a function's arguments and returns and for a table's
  * schema, so each is converted here from the core's, and a test holds each to the core's field for
  * field. They check what Convex can: which fields, their types, which are optional, and each
@@ -12,7 +12,8 @@ import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-esl
  * any value, and a vault record's rule tying `gate` to `gate_epoch` is left out. The finer rules
  * are the client's, checked by the core's records on every write and every read.
  *
- * Their types are the core's, a salt the core brands keeping its {@link $brand}.
+ * Their types are the core's, a salt the core brands keeping its {@link $brand}; a box's alone is
+ * Convex's reading of its fields, as {@link BoxRecord} says.
  *
  * A new record format in the core widens the `format` its record converts to: an additive deploy,
  * shipped with this package.
