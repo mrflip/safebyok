@@ -18,8 +18,9 @@ or tone.
 
 Doc blocks only. Behaviour, names, the code of `@example`s and running `//` comments stay as they
 are, with two exceptions: a maintainer's invariant you move out of a doc block becomes a running
-comment, and a field of an inline object type may take a doc block of its own. Every doc block
-in the target is in scope, exported or not.
+comment, and a field of an inline object type may take a doc block of its own, the type
+reformatted onto lines of its own to make room. Every doc block in the target is in scope,
+exported or not.
 
 ## Your handoff
 
@@ -30,16 +31,17 @@ work only there.
 ## The pass
 
 * **Gather first.** For each class, module or interface, find what holds for every member, check
-  it against each, and write it once in that doc (STYLE.md, *Say a thing once*). In `vault.ts`
-  the candidates are:
+  it against each, and write it once in that doc (STYLE.md, *Say a thing once*). Candidates, a
+  start rather than the set:
   - a malformed argument or option refuses 'bad_option' before anything is read, asked for or
     written, its message naming the field, never the value;
   - a call refuses with what storage beneath it refuses, as it came, unless its doc says
     otherwise;
-  - once the Vault object is gone, every call but those the class doc lists refuses 'vault_gone'
-    or 'vault_remade';
-  - what the class doc says of `ensureLease`, the two forms, `onBadNews` and event handlers
-    stays, tightened by the same rules.
+  - a refusal every call gives in one state (the object gone, a lock landing mid-call);
+  - a precondition every member runs first (an awaited call, a check): list each one you write
+    in the open questions, as your reading of the code;
+  - what the class doc already says of the two forms, bad news and event handlers stays,
+    tightened by the same rules.
 * **Then each member**, reading it and what it calls, no more.
 * **Names stay.** Where you cannot write a first line the name keeps (STYLE.md, *Naming*),
   propose a rename in the open questions.
