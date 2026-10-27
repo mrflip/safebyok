@@ -179,7 +179,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    */
   async checkWayin(): Promise<void> {
     this.#demand()
-    await this.#unwrap(this.#currentWrap(), this.header, CheckUsage)
+    await this.#unwrap(CheckUsage)
   }
 
   /** A Wayin for `newProving`'s slotlabel: the vaultKey unwrapped from the gate's wayin at this proving's slotlabel and wrapped under `newProving`, bound to its header.
@@ -194,7 +194,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async resealWayinFor(newProving: PasskeyProving): Promise<PasskeyWayin>
   async resealWayinFor(newProving: Proving): Promise<PassphraseWayin | PasskeyWayin> {
     this.#demand()
-    const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
+    const vaultKey = await this.#unwrap(RewrapUsage)
     const wrapped = await newProving.wrappedWith(vaultKey, newProving.header)
     this.#demand()
     newProving.#demand()
@@ -218,7 +218,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const tools = toolsOf(this.vault)
     this.#demand()
     const standing = tools.vaultRecord()
-    const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
+    const vaultKey = await this.#unwrap(RewrapUsage)
     const record = await sealLeaseRecord(standing, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     this.#demand()
@@ -264,11 +264,14 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return wayin.vault_key_wayin_wrapped
   }
 
-  /** The vaultKey out of `wrapped` under the wayinKey, bound to `visible`, with `usage`: {@link wrongProof} when it will not unwrap. A demand follows the wait. */
-  async #unwrap(wrapped: VaultKeyWayinWrapped, visible: WayinHeader, usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
+  /** The vaultKey out of the gate's current wayin at this proving's slotlabel, under the wayinKey, bound to this proving's header, with `usage`: {@link wrongProof} when it will not unwrap.
+   * The wrap is read from the vault record in hand before the wait, and a demand follows the wait.
+   */
+  async #unwrap(usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
+    const wrapped = this.#currentWrap()
     let vaultKey: CryptoKey | null
     try {
-      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.#vaultStamp, visible), usage)
+      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.#vaultStamp, this.header), usage)
     } catch {
       vaultKey = null
     }
