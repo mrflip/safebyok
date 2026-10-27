@@ -78,7 +78,7 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *   that expected them is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
- *   storage sees it. A vault reports the same as `bad_record`, since it built the box.
+ *   storage sees it. From a vault, which built the box, it is a bug.
  * * `vault_gone`, `vault_remade`, `gate_moved`: a call found the vault moved on from what it held,
  *   at one of its own steps, so it did nothing more (see `Vault.demandConsistentWith`). The vault
  *   was deleted; deleted and made anew under another `vault_tok`; or had its ways in changed. The

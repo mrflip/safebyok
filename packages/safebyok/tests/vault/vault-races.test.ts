@@ -959,12 +959,12 @@ describe("versioned updates: two devices writing at once", () => {
     expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
   })
 
-  it("a store whose box storage refuses as invalid_box is refused as bad_record: the vault sealed that box, so the fault is not the caller's input", async () => {
+  it("a store whose box storage refuses as invalid_box is refused as storage said it, listing nothing: from a vault, which sealed the box, it is a bug", async () => {
     const { hereDB, here } = await twoDeviceWorld()
     const refused = new VaultError('invalid_box', 'Nothing was written: that box is not one this package builds.')
     vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(refused))
-    const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'bad_record')
-    expect(err.cause).to.eq(refused)
+    const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'invalid_box')
+    expect(err).to.eq(refused)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
   })
 

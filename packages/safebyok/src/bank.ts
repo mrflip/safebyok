@@ -3,8 +3,7 @@ import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { vaultScopeDuck } from './shapes/ducks'
 import { VaultError, isVaultError } from './errors'
-import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
-import * as Refusals from './refusals'
+import { type Outcome, good, outcomeOf, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './shapes/scopes'
@@ -216,10 +215,10 @@ export class Bank {
 
   /** Load the libraries the vaults share, as an {@link Outcome}: the non-throwing form of {@link Bank.hello}. */
   async tryHello(): Promise<Outcome<Bank>> {
-    try {
-      const started = await this.#initialize()
-      return started.ok ? good(this) : started
-    } catch (err) { return this.#badOutcome(err) }
+    return outcomeOf(async () => {
+      valOf(await this.#initialize())
+      return this
+    })
   }
   // --
 
@@ -259,10 +258,10 @@ export class Bank {
 
   /** The Vault object for the vault `bag` names, as an {@link Outcome}: the non-throwing form of {@link Bank.ensureVault}. */
   async tryEnsureVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
-    try {
+    return outcomeOf(async () => {
       const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
-      return good(await this.#ensureEntry(parts))
-    } catch (err) { return this.#badOutcome(err) }
+      return this.#ensureEntry(parts)
+    })
   }
 
   /** Let the vault `bag` names go, and birth it anew: a Vault object of what storage holds now, as {@link Bank.ensureVault} says.
@@ -274,11 +273,11 @@ export class Bank {
 
   /** Let the vault go and birth it anew, as an {@link Outcome}: the non-throwing form of {@link Bank.reopenVault}. */
   async tryReopenVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
-    try {
+    return outcomeOf(async () => {
       const parts = vaultPartsOf(this.#parts, this.#vaultScopeOf(bag), opts)
       this.#letGoOf(Scopepath.vault(parts))
-      return good(await this.#ensureEntry(parts))
-    } catch (err) { return this.#badOutcome(err) }
+      return this.#ensureEntry(parts)
+    })
   }
 
   /** Let the vault `bag` names go: its Vault object is gone, every call on it refusing 'vault_gone', and it leaves the bank's listing.
@@ -333,7 +332,7 @@ export class Bank {
 
   /** Forget what this device keeps of the vault, as an {@link Outcome}: the non-throwing form of {@link Bank.clearCachedVault}. */
   async tryClearCachedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
-    try {
+    return outcomeOf(async () => {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
       const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
@@ -342,8 +341,7 @@ export class Bank {
       // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
       // reads neither.
       this.#letGoOf(Scopepath.vault(scope))
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+    })
   }
 
   /** Delete the vault `bag` names, whose birth was refused 'damaged_vault' -- its vault record, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
@@ -371,7 +369,7 @@ export class Bank {
 
   /** Delete a vault refused 'damaged_vault', as an {@link Outcome}: the non-throwing form of {@link Bank.delDamagedVault}. */
   async tryDelDamagedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
-    try {
+    return outcomeOf(async () => {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
       const vaultScopepath = Scopepath.vault(scope)
@@ -384,8 +382,7 @@ export class Bank {
         throw err
       }
       this.#letGoOf(vaultScopepath)
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+    })
   }
   // --
 
@@ -595,12 +592,7 @@ export class Bank {
   }
   // --
 
-  // == [Two forms and bad news]: badOutcome, tellBadNews
-
-  /** The refusal `thrown` makes, as the outcome a public `tryX` resolves: a throw that is no VaultError becomes 'unexpected_error'. */
-  #badOutcome(thrown: unknown): BadOutcome {
-    return bad(isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown))
-  }
+  // == [Bad news]: tellBadNews
 
   /** Hand `news`, a birth's refusal, to the host's `onBadNews` when it is bad news, never awaited: what it throws is logged and reported, as a Vault object's handler throw is. */
   #tellBadNews(news: VaultError) {

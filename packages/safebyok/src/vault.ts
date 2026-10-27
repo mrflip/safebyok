@@ -1740,16 +1740,12 @@ export class Vault implements VaultStamp {
 
   /** Write `box` over `expected`, as `putBox()` does, resolving the record as stored: one write, which storage refuses unless the revision `expected` names still stands.
    * A stale refusal comes as storage gave it, the box that stands as its `meta.box_stored`.
-   * Storage's 'invalid_box' becomes 'bad_record', as this vault sealed the box, and its
-   * 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
+   * Storage's 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
    */
   async #writeOver(box: Box, expected: BoxExpectation): Promise<BoxRecord> {
     try {
       return await this.#vaultDB.putBox(this.#scope, expected, box.record)
     } catch (err) {
-      if (isVaultError(err, 'invalid_box')) {
-        throw new VaultError('bad_record', 'Storage refused the box this vault sealed as one this package would not build, so nothing was written. This is a bug: report it, with this error.', { cause: err })
-      }
       if (isVaultError(err, 'vault_mismatch')) {
         throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what stands now.', { cause: err })
       }
