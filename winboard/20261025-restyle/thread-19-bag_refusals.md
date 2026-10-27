@@ -2,7 +2,7 @@
 
 Branch `20261027-bag_refusals`, PR #307, stacked on #301. Justify: green.
 
-* **Built**: `parseVaultBag` is retired from `packages/safebyok/src/bank.ts`; `#vaultScopeOf` calls `vaultBag.parse(bag)`, so a bad bag refuses 'bad_scope' with the `Validator`'s own message and no hint about stores. `otherScopeError` now reads "This names another <fields> than the bank's, which serves one app and one signed-in user. Name the vault by its vaultlabel."; its check, 'bad_scope' kind and `meta.fieldnames` are unchanged. Tests asserting the old wording follow (bank.test.ts); a changeset (patch) says the two messages are shorter.
+* **Built**: `parseVaultBag` is retired from `packages/safebyok/src/bank.ts`; `#vaultScopeOf` calls `vaultBag.parse(bag)`, so a bad bag refuses 'bad_scope' with the `Validator`'s own message and no hint about stores. `otherScopeError` now reads "This names another <fields> than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.", advice that fits a bag and a Vault object alike; its check, 'bad_scope' kind and `meta.fieldnames` are unchanged. Tests asserting the old wording follow (bank.test.ts); a changeset (patch) says the two messages are shorter.
 * **Decisions taken**: `vaultBag.parse` example in `shapes/scopes.ts` said "stores go in the second bag" as the refusal; it now says "a field it does not take", which is what the validator says.
 * **Deviations**: none.
 * **Discoveries**: the Bank class doc block still tells the reader that stores go in the second bag; that is guidance about the API, not a promise of message wording, so it stays.
