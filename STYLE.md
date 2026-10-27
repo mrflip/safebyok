@@ -79,12 +79,23 @@ thing's stage in its life is its `lifecycle`.
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`).
-A shape's validator is the exception: it takes its type's name (`export const { BoxSparse } =
-...`, `type BoxSparse = Z.infer<typeof BoxSparse>`), for it checks no one parameter.
+
+**A validator is lowerCamelCase, and its type ModuleCase** (the Coach, 2026-10-27), so an import
+tells the checker, an enumeration's values and the type apart:
+
+```ts
+import { fooThing, fooThingVals, type FooThing } // the enum checker, its values, its type
+```
+
+A shape's validator checks no one parameter, so it takes its type's name in lowerCamelCase
+(`export const { boxSparse } = ...`, `type BoxSparse = Z.infer<typeof boxSparse>`). A validator
+named for a stored field keeps the field's spelling (`vault_tok`, `wayinkind`). A local that would
+take a validator's name is named for what it is (`candidate`, `record`), or the code beside it
+reaches the validator through `Validators`.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
-spreads a narrower: `export const WayinKindVals = [...] as const`,
-`wayinkind = oneof(WayinKindVals)`, `export type WayinKind = typeof WayinKindVals[number]`.
+spreads a narrower: `export const wayinKindVals = [...] as const`,
+`wayinkind = oneof(wayinKindVals)`, `export type WayinKind = typeof wayinKindVals[number]`.
 
 **A thing's shapes are named for their purpose, prefixed with the type**, from the fixed set in
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
@@ -172,7 +183,7 @@ The tag smushing above is for a label that names a thing (`boxlabel`).
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: never an ISO string, never a `Date`. The
 clock seam (`Clock.now()`) already yields it, every index sorts it, and one convention means no
-parsing at any boundary. A field named `*_at` holds one, checked by `EpochMillis`.
+parsing at any boundary. A field named `*_at` holds one, checked by `epochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
@@ -351,7 +362,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
   bringing names into scope.
 * The primitives the kit hands out (`checks/primitives.ts`) are plain Zod, and so is a variation
-  made directly from a validator (`VaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
+  made directly from a validator (`vaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
   use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
 * **One input, one validator.** A function checks what it is handed with one validator, never a
   cascade of validators each taking a part of the input and refusing with its own kind. Checks

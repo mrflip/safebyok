@@ -251,7 +251,7 @@ refusal without the main meta's `box_stored`, `vault_stored` or `capacity`.
 The client half, a VaultDB over `fetch`, to hand `Bank.make` as its `vaultDB`:
 
 ```ts
-import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import { VaultDB, VaultError, refusalKindVals } from 'safebyok'
 import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
@@ -331,7 +331,7 @@ const checkedAnswer = (sent: unknown): RouteAnswer => {
 
 const misshapen = () => new Error('The vault route answered something that is not a vault answer.')
 
-const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (refusalKindVals as readonly unknown[]).includes(kind)
 
 ```
 
