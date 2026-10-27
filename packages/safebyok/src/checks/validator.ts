@@ -54,7 +54,7 @@ type Merged<SourcesT extends readonly object[]> =
  * never which, and lists the fields the object takes. It quotes no input, and carries no `cause`.
  *
  * Only `parse` changes. `safeParse` and `parseAsync` are Zod's own, and so is any schema made
- * from a validator outside a `Validator` call (`VaultRecord.pick(...)`): its `parse` throws a
+ * from a validator outside a `Validator` call (`VaultSparse.pick(...)`): its `parse` throws a
  * ZodError. Make such a slice in a call of its own where it should refuse. A validator nested in
  * another refuses with the outer one's kind.
  *
