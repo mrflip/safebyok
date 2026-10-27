@@ -5,7 +5,7 @@ import type { VaultDB } from './vault-db'
 /** What a vault does with a refusal from storage beyond throwing it: lock, or nothing more. */
 export type RefusalResponse = 'lock' | 'none'
 
-/** What a vault does about a storage refusal beyond throwing it.
+/** The {@link RefusalResponse} a vault gives a storage refusal beyond throwing it.
  * `identity_revoked` and `vault_behind` answer `lock`: storage the vault cannot trust to serve this
  * user's own vault locks it, as `lock()` does, removing nothing stored. Every other kind answers
  * `none`. No host option changes this.

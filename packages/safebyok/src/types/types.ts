@@ -48,7 +48,7 @@ export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, 
   return { Whisper, whisperBag }
 })
 
-/** What names one vault: its applabel, user_id and vaultlabel. Its `parse` hands back a frozen copy, or refuses 'bad_scope'.
+/** The applabel, user_id and vaultlabel that name one vault. Its `parse` hands back a frozen copy, or refuses 'bad_scope'.
  * Each label is a `label`, and the user_id a `user_id`. A scope carrying more fields passes, the
  * rest left out: a vault record, or a Vault object, passes as its scope.
  */
@@ -113,7 +113,7 @@ export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_
 /** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
-/** What a passkey answers when asked for a vault's PRF: the cleartext a gating's `attemptPasskey` takes. `safebyok-react`'s `askPasskey` makes one.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating's `attemptPasskey` takes. `safebyok-react`'s `askPasskey` makes one.
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
