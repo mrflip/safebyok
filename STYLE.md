@@ -1,10 +1,11 @@
 # Style Guide
 
 Conventions for the `.ts` files in this package, for a human or an AI session working in it.
-CLAUDE.md's *Conventions At A Glance* covers a local name and a small edit. Read the section you
-need here when naming an export, a module, a stored field or a new tag, or when writing a doc
-block, a test, or an entrypoint that takes a caller's input. The naming vocabulary below is
-specific, and not guessable from general TypeScript habit.
+CLAUDE.md's *Naming at a glance* carries the few rules that shape code too deeply to fix in
+review; everything else is here. Read the section you need when naming an export, a module, a
+stored field or a new tag, or when writing a doc block, a test, or an entrypoint that takes a
+caller's input. The naming vocabulary below is specific, and not guessable from general
+TypeScript habit.
 
 The core's `eslint.config.mjs` (`packages/safebyok/`) is the source of truth for anything
 mechanically enforceable; where it and this document disagree, the linter wins and this document
@@ -56,6 +57,15 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` or a `flavor`.
+
+**A name is the doc block's first line, compressed.** Write that line (*Comments and doc
+blocks*), then read the name against it: the verb promises what the line says, in the vocabulary
+of the verbs below and of CLAUDE.md's *name the operation*. A method that does its work by
+calling `getBox` keeps that verb (`getBoxOrThrow`), never `readBox`; one that creates a vault on
+every call is `createVault`, never `ensureVault`, because `ensure` promises idempotence; one that
+"puts the box stored into the vault's listing" is `updateBoxListingOf`, not `takeStoredBox`. A
+name that promises more or less than its first line is a bug in the name, and the line is the one
+to trust.
 
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
@@ -223,6 +233,8 @@ between columns lets the editor align them (see *Tests*).
 * Lead with what the thing *is* or *returns*: `/** The fields written to storage: the visible
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
   that will be written to the database */`.
+* **Once that first line is written, read the member's name against it** (*Naming*): the verb
+  promises exactly what the line says.
 * **Each sentence tells the caller something they would otherwise get wrong**, given the
   signature, the names, what a capable developer already knows, and what is said once elsewhere
   (a class's own doc, `errors.ts`). Leave out what those already say.
@@ -310,6 +322,8 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
 * **For anything that holds a secret, test what must not happen**: that the wrong passphrase is
   refused, that tampered ciphertext is refused, that an error does not carry the secret, that
   locking forgets the key.
+* **Never a real secret in a test, fixture or example**: generate one, or use an obvious fake
+  that validates. Credentials for anything (npm, GitHub) come from the environment, not a file.
 * Test an entrypoint with generous, sloppy input: that is its job. Code past the validation
   boundary is entitled to clean data; don't feed it garbage it will never see.
 * Once tests start to look alike, switch to a bulk example list, grouped by comments, with `"`
