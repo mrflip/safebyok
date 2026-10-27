@@ -398,7 +398,10 @@ of one vault (`Infinity` for a limit it does not keep, which the base class answ
 safe integer). A scope holding no vault answers nothing used. It is an estimate for a host to warn
 its user by: the count is exact as of its step, and the bytes are the backend's own measure, which
 need not be the vault's (the vault weighs each box at the room it reserves, twice
-`maxWhisperBytes`, against `maxVaultBytes`). Each adapter's README says how it weighs. A
+`maxWhisperBytes`, against `maxVaultBytes`). The count is of the vault's box rows, not its
+listing: a row filed under a name that is no label, which the listing passes over, counts too, so
+an adapter enforcing `maxBoxes` from it counts rows no listing shows. Each adapter's README says
+how it weighs. A
 `vault_full` from storage carries the same reckoning, made in the step that refused the write, as
 `err.meta.capacity`: the adapter throws `Refusals.vaultFull(capacity)`, and the base class checks
 it as it checks `getCapacity`'s answer, refusing a `vault_full` without a sound one as

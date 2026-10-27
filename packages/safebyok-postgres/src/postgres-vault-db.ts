@@ -484,7 +484,7 @@ const storedVaultOf = (row: unknown): VaultReadResponse => {
   const sparseBoxes = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
   return {
     // A row goes up as stored, whatever its cells hold: the base class judges the record, and the split each box.
-    vault: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)) as VaultReadResponse['vault'],
+    vault: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)),
     ...splitStoredBoxes(sparseBoxes.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, BoxSparseColumns) }))),
   }
 }

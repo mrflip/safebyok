@@ -82,7 +82,7 @@ class StringStoreVaultDB extends VaultDB {
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
   // read of a vault reads its record and its boxes in one such step.
   protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
-    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
+    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)), ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
@@ -91,7 +91,7 @@ class StringStoreVaultDB extends VaultDB {
       const standing = readJson(this.store, vaultScopepath)
       const life = Expectations.newLifeOf(draft, standing)
       if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
-      return { vault: (life ?? standing) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(draft)) }
+      return { vault: life ?? standing, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 

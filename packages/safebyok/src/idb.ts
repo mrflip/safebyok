@@ -50,7 +50,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  * reads as null, and is discarded. A row under any scopepath but a lease's or a device record's, an
  * earlier version's among them, is deleted unread at the next read or erase of a lease. It files
  * rows under their {@link Scopepath}, and refuses 'bad_scope' alike for a scope whose names fail
- * their checks. It refuses 'bad_option' for a `dbName` that is not non-empty text.
+ * their checks. It refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
  *
  * A failure of IndexedDB's own is a condition, as {@link deviceOutcomeOf} says. A context with no
  * IndexedDB meets 'storage_blocked' at first use.
@@ -167,7 +167,8 @@ export type IdbRow = { scopepath: string, row: unknown }
 
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. It refuses 'bad_option' for a
- * `dbName` that is not non-empty text, and its `subscribe` for a listener that is no function.
+ * `dbName` that is not non-empty text or an option it does not take, and its `subscribe` for a
+ * listener that is no function.
  * Unlike the store, its `rows()` and `wipe()` reject, with a `NotSupportedError` where there is no
  * IndexedDB.
  *

@@ -1,7 +1,7 @@
 import type * as Z from 'zod'
 import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, boxSparseOf } from './box'
 import { Capacity, type VaultScope } from './types/types'
-import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './vault-record'
+import { VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './vault-record'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './checks/core-checks'
@@ -90,20 +90,19 @@ export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultD
 })
 
 /** One box row as a VaultDB's `doGetVault` and `doEnsureVault` read it, as {@link splitStoredBoxes} takes it: the boxlabel the row is filed under, and its record exactly as stored.
- * `boxlabel` is the label the row is filed under, from its scopepath or its column, which an
- * adapter always has. The record is whole, or without its two ciphered fields where the backend can
- * project, and may be damaged: its own `boxlabel` missing, or naming another label than its row's,
- * is damage the split finds. So `box` is whatever storage holds, typed `unknown`, and an adapter
- * hands its row up as it read it, with no cast: the split's check is what brands it. The row's boxlabel lets a damaged box still be named, and so deleted
- * or written over.
+ * Take `boxlabel` from the row's scopepath or column, never from its record: a damaged box is
+ * still named by it, and so deleted or written over. Hand `box` up as read, whole or without its
+ * two ciphered fields, with no cast: it is typed `unknown`, as it may be damaged, and the split
+ * judges it.
  *
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow }
  */
 export type StoredBox = { boxlabel: string, box: unknown }
 
 /** One vault as a VaultDB's `doGetVault` and `doEnsureVault` answer it, read in one atomic step: its vault record exactly as stored, and its boxes split into the sound and the damaged.
- * `vault` is the record as stored: a vault record, one damaged, a tombstone (where a store keeps
- * one in the vault record's place), or null for none. `boxes` and `damagedBoxes` are what
+ * `vault` is what storage holds in the vault record's place, exactly as read: a vault record, one
+ * damaged, a tombstone (where a store keeps one there), or null for none. So it is typed `unknown`,
+ * and an adapter hands its row up with no cast. `boxes` and `damagedBoxes` are what
  * {@link splitStoredBoxes} makes of the box rows, or what a server's `getVaultRecords` relays. The
  * base class checks all of it again: the vault record as a read of it, each sound box as the split
  * judges one, and each damaged box's boxlabel, revision and damage, taking its word that the box
@@ -112,7 +111,7 @@ export type StoredBox = { boxlabel: string, box: unknown }
  * @example { vault: storedRow ?? null, ...splitStoredBoxes(boxRows) }
  */
 export type VaultReadResponse = {
-  vault:        VaultRecord | VaultTombstone | DamagedVaultRecord | null
+  vault:        unknown
   boxes:        readonly BoxSparse[]
   damagedBoxes: readonly BoxDamaged[]
 }
