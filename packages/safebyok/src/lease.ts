@@ -31,7 +31,7 @@ export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: Lease
 export type LeaseStamp = Z.infer<typeof LeaseStamp>
 
 /** A lease's sparse shape: the same fields as its {@link LeaseStamp}, as a lease is made once and never changed, named for what a log line or a listing shows. A Lease's own fields are these. */
-export type LeaseSparse = Z.infer<typeof LeaseStamp>
+export type LeaseSparse = LeaseStamp
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
