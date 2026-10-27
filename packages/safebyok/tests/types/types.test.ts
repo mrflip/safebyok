@@ -33,6 +33,13 @@ describe("Whisper", () => {
     const bag = { apiKey: 'fake', scopes: ['read', 'write'] }
     expect(Whisper.parse(bag)).to.deep.equal(bag)
   })
+
+  it("hands back a copy of an object or array, sharing none of the caller's own", () => {
+    const bag = { apiKey: 'fake', scopes: ['read', { tier: 2 }] }
+    const checked = Whisper.parse(bag) as typeof bag
+    expect(checked).to.not.eq(bag)
+    expect(checked.scopes[1]).to.not.eq(bag.scopes[1])
+  })
 })
 
 const ScopeCases = [
@@ -83,6 +90,14 @@ describe("Sidecar", () => {
     expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
     expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
     expect(Sidecar.safeParse('work account').success).to.be.false
+  })
+
+  it("hands back a copy, sharing none of the caller's own objects", () => {
+    const sidecar = { note: 'work account', tags: [{ team: 'atlas' }] }
+    const checked = Sidecar.parse(sidecar)
+    expect(checked).to.deep.equal(sidecar)
+    expect(checked).to.not.eq(sidecar)
+    expect(checked['tags']).to.not.eq(sidecar.tags)
   })
 })
 
