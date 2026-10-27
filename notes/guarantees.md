@@ -10,7 +10,7 @@ guarantee changes only with a Coach's ruling and a changeset. A guarantee a read
 a bug: report it, do not amend the guarantee. **Changing any file named under *Where the
 guarantees are kept* means reading *The guarantees* first and checking the change against them.**
 
-Last verified against the code 2026-10-27, on `main` after #293, with
+Last verified against the code 2026-10-27, on `main` after #302, with
 [#305](https://github.com/mrflip/safebyok/pull/305) applied.
 
 ## Where the guarantees are kept
@@ -22,7 +22,7 @@ these guarantees until shown otherwise.
 |---|---|
 | `packages/safebyok/src/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/proving.ts` | the passphrase and PRF answer made into a wayinKey; every wrap and unwrap of the vaultKey under one; the lease grant |
-| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box |
+| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `LeaseRecord` and `Whisper` checks, which say what a stored leaseKey and a whisper are |
@@ -81,8 +81,8 @@ Three layers hold key material, and the words for each matter.
 So for the strong key the minimal path is: the deriver's bytes, or the authenticator's, exist until
 `passphraseKeyOf` or `PasskeyProving.seal` has imported them into a non-extractable handle and
 zeroed them; the handle exists in `Proving.#wayinKey` until the proving is dropped; nothing of
-either is ever stored. One copy outside the core is the browser's own PRF result buffer, which
-`safebyok-react`'s `bytesOf` copies and leaves to the collector (see *Open items*).
+either is ever stored. Outside the core, `safebyok-react`'s `bytesOf` copies the browser's PRF
+result into the answer and zeroes the buffer it copied from, so the answer's bytes are the one copy.
 
 ## The secret values
 
@@ -97,7 +97,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
-| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, in transit through the Vault and the `DeviceDB`, and at rest in the device store | the lease | `Lease`; the `DeviceDB` stores it opaque |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `KeptLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `KeptLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
 | whisper | the host's JSON value, then its UTF-8 bytes | the host's value in and out; bytes as locals, zeroed | one seal or open | `Box.seal`, `box.extractWhisper`, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
@@ -155,11 +155,13 @@ Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped`
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `sealLeaseRecord`, called by
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
-`device-db.ts` guard) → `holdLease` → `vault.#holdLease` → `Lease.make` → `Lease.#record`; read
-back by `DeviceDB.getLease` in `bank.ts`'s birth read, `vault.#readStorage` (for
-`#takePicture`'s revocation check, which reads the stamp alone), `#takeUpFromPantry` and
-`#takeUpAtBirth`, each ending in `Lease.make`; erased by `DeviceDB.delLease` from `vault.#lockNow`,
-`del-damaged-vault.ts` and the bank. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
+`device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
+handed to hold; read back by `KeptLease.read` (`lease.ts`), which checks `DeviceDB.getLease`'s
+answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#takeStorage`
+(whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
+which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
+`vault.#lockNow`, `del-damaged-vault.ts` and the bank. Neither the Vault nor the Bank holds a
+record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `tryPutBox` → `#checkWhisperFits`
 (`whisperBytesOf`, zeroed) → `#sealAndPutBox` → `Box.seal`, `trySeal` → `checkedWhisper`
@@ -208,7 +210,8 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `provin
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
-`getLease`; and `Lease.#record` in memory for the lease's life, dropped at its
+`KeptLease.read`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
+memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
@@ -250,9 +253,13 @@ thrown error rides as a `cause`, so it must not echo the record it was handed.
 
 **G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
-key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`
-and the `LeaseRecord` in transit and at rest. The Vault passes lease records opaque (`#holdLease`,
-`#takeUpFromPantry`, `#takeUpAtBirth`, `#readStorage`); a `Box` reaches the Lease through the
+key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`,
+`KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
+`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.read` (`lease.ts`) checks what
+`DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
+the vault's refresh (`#takeStorage`, whose `leavesInForce` reads the kept stamp) and its take-ups
+(`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`
+([#305](https://github.com/mrflip/safebyok/pull/305)). A `Box` reaches the Lease through the
 module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving
 reaches the vault's tools through the module-private `registerProvingTools`, which hand it
 `putLease` and `holdLease`, not a key. Neither class has a getter, field, spread, JSON or Symbol
@@ -290,18 +297,8 @@ that yields a key, and no module exports a route to one: `leaseRecordOf`, which 
 
 Each is a Coach's call; none breaks a guarantee above.
 
-1. **The Vault and the Bank carry lease records.** They never use the key, but four sites hold a
-   `LeaseRecord` in transit (`bank.ts`'s birth read, `vault.#readStorage`, `#takeUpFromPantry`,
-   `#takeUpAtBirth`, `#holdLease`). Were the `DeviceDB`'s three lease verbs wrapped, inside the
-   core, by a seam that hands back a `Lease` rather than a record (`Lease.make` applied at the
-   store's edge, and `Proving.grantLease` making the Lease it holds), only `Proving`, `Lease` and
-   the store would ever hold the record, and G9 could say so of the handle too. The revocation check
-   in `#takePicture` reads the lease's stamp, which a `Lease` shows. A refactor of the plumbing, not
-   of the cryptography.
-2. **The browser's PRF result buffer.** `safebyok-react`'s `bytesOf` copies the authenticator's
-   `BufferSource` into the answer and leaves the original to the collector. Zeroing the source
-   after the copy (`new Uint8Array(buffer).fill(0)`) closes the one copy of the PRF answer that
-   safebyok does not zero. A one-line change in `passkey.ts`.
-3. **`vaultRecordHeldBy`** (`src/proving.ts`) is a test-only export of the same shape
-   `leaseRecordOf` had, but hands out ciphertext and headers, no key: it breaks no guarantee.
-   Listed so a reader does not mistake it for one.
+1. **`vaultRecordHeldBy`** (`src/proving.ts`) is a test-only export of the shape `leaseRecordOf`
+   had, but hands out ciphertext and headers, no key: it breaks no guarantee. Listed so a reader
+   does not mistake it for one. The Vault's module-private registries, which it reads through, are
+   being replaced by a Symbol-keyed accessor in the fixup sprint's thread 5; that changes no
+   guarantee, as what the accessor reaches is no key and yields none.
