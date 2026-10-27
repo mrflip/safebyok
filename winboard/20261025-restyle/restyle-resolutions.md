@@ -2,6 +2,15 @@
 
 The Coach's rulings on the restyle sprint's open matters, swept from the sprint doc's Resolved tab, newest batch first.
 
+## 2026-10-28, second round after the close
+
+- **Convex's validators from the core's Zod.** Rec: convex-helpers as a peer of safebyok-convex; proceed is the yes for the dependency. Coach: "yes". Raised: #287. Work: Thread 18 (#308).
+- **Scope validators stay camelCase.** Rec: none, a count. Coach: "unless it causes problems for the validator to be lowCamelCase and the type to be ModuleCase, it makes it less confusing: import { fooThing, fooThingVals, type FooThing } // the enum checker, its values, its type". Raised: #291. Work: Thread 20 (#310).
+- **Stamps stay in Validators.** Rec: keep. Coach: "yes please". Raised: #293. Work: None.
+- **The bag's refusal always says where stores go.** Rec: add the hint only for an unknown field. Coach: "didn't we sort this out -- why is parseVaultBag a thing and guessing at keys?" Raised: #293 review. Work: Thread 19 (#307): parseVaultBag retired.
+- **otherScopeError's hint fits only one caller.** Rec: reword to fit both. Coach: "this also smells like we're proactively debugging an error in a critical path". Raised: #293 review. Work: Thread 19 (#307): one piece of advice, fitting both callers.
+- **Vault objects as the vault bag.** Coach: "I think this is being handled by another thread, so skip". *Orchestrator:* no thread handles it (#301 builds the duck but leaves vaultBag strict); returned to the Coach, still open.
+
 ## 2026-10-27, after the close
 
 - **Validators exports internals too.** Rec: accept, or trim to the validators that face a host or adapter. Coach: "trim". Raised: #287. Work: Thread 17 (#293), 95 names to 66.

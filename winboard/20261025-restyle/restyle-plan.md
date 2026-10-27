@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **done, 2026-10-27.** Threads 1 to 14 merged (#272 to #283, #286, #287); thread 15 merged (#291); thread 17, a follow-up from the Coach's rulings on #287's matters, filed after the sprint PR merged as [#293](https://github.com/mrflip/safebyok/pull/293); thread 16 not run, at the Coach's word. Rulings in `restyle-resolutions.md`; the account in `human/20261027-sprint_restyle_done.md`; the branch's history before the squash at tag `sprint/20261026-restyle`. This folder moved to `winboard/` with the sprint PR.
+* **Status:** **done, 2026-10-27.** Threads 1 to 14 merged (#272 to #283, #286, #287); thread 15 merged (#291); thread 17, a follow-up from the Coach's rulings on #287's matters, merged as #293; threads 18 to 20, a second round of follow-ups, filed as [#308](https://github.com/mrflip/safebyok/pull/308), [#307](https://github.com/mrflip/safebyok/pull/307) and [#310](https://github.com/mrflip/safebyok/pull/310); thread 16 not run, at the Coach's word. Rulings in `restyle-resolutions.md`; the account in `human/20261027-sprint_restyle_done.md`; the branch's history before the squash at tag `sprint/20261026-restyle`. This folder moved to `winboard/` with the sprint PR.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -706,6 +706,62 @@ admits a Vault object (it compiles, then refuses), the bag's "stores go in the s
 every refusal, and `otherScopeError`'s "hand in something of this bank's" fitting one caller of
 two. All three wait on the Coach's ruling on Vault objects as the bag. Rebased onto main once #271
 merged, its thread file moved to `winboard/` with the rest; these lines are written on #293.
+
+### 18. Convex's validators derived from the core's -- `convex_helpers`
+
+From the Coach's "yes" to *Convex's validators from the core's Zod* (2026-10-27).
+
+*Gloss:* safebyok-convex derives its component's argument, return and table validators from the
+core's `Validators` with `convex-helpers`' `zodToConvex` (`server/zod4`), `convex-helpers` a peer
+of safebyok-convex alone; the parity test proves each against the core's. **Depends on:** nothing
+(cut from main). **Size:** medium.
+
+*Review:* medium, `fixed`: filed as [#308](https://github.com/mrflip/safebyok/pull/308). Fixed:
+two module and test doc blocks that misdescribed the derivation, two style nits. Checked: the
+component runs no core parse; the client judges every record it reads, so the looser server
+validators (names and tokens any text, the sidecar `v.any()`, the null-gate rule dropped) admit
+nothing the client trusts unchecked; `notes/security.md` says so. Left: four
+`eslint-disable-line` on `$brand` type imports (one per declaration-emitting file is the floor);
+`erasableSyntaxOnly: false` in two tsconfigs until `convex-helpers` 0.1.129 ages in; `zod` a
+declared peer; `Capacity`'s `v.literal(Infinity)` untried on a real deployment; the parity test's
+`custom` to `any` mapping. *Orchestrator:* my matter row had said the component runs the core's
+write checks; it does not, and the Coach was told.
+
+### 19. The bank's bag refusals say less -- `bag_refusals`
+
+From the Coach's rulings on #293's review matters: "why is parseVaultBag a thing and guessing at
+keys?" and "this also smells like we're proactively debugging an error in a critical path".
+
+*Gloss:* retire `parseVaultBag` (callers parse `vaultBag` in one line, its Validator's refusal
+stands); `otherScopeError` says what went wrong and one thing to do. **Depends on:** #301 (stacked
+on it). **Size:** small.
+
+*Review:* medium, `flagged`, then `fixed` on a second review: filed as
+[#307](https://github.com/mrflip/safebyok/pull/307). Flagged: the new advice ("name the vault by
+its vaultlabel") was wrong for `bank.demandConsistentWith`, the error's other caller; resumed
+with a directive (YOLO), it now says to use the bank of the app and user the thing belongs to,
+and its test asserts the kind, `meta.fieldnames` and no leaked value. Left: `otherScopeError`'s
+doc block names the bag case only; four bank refusal sentences sit inline rather than in
+`phrases.ts`.
+
+### 20. Validators lowerCamelCase, types ModuleCase -- `validator_case`
+
+From the Coach's ruling on *Scope validators stay camelCase*: "unless it causes problems for the
+validator to be lowCamelCase and the type to be ModuleCase, it makes it less confusing: import {
+fooThing, fooThingVals, type FooThing }".
+
+*Gloss:* rename every validator lowerCamelCase beside its ModuleCase type, value lists
+`fooThingVals`; resolve collisions by renaming for what a thing does or dropping a duplicate;
+reverse STYLE.md's rule; a changeset listing every rename. **Depends on:** thread 19 (stacked on
+it). **Size:** wide, mechanical (71 files).
+
+*Review:* medium, `fixed`: filed as [#310](https://github.com/mrflip/safebyok/pull/310). A
+TypeScript-checker scan found no validator read where a local was meant, or the reverse; it
+renamed 11 locals and parameters that shadowed a validator (none misbehaving) and two stale
+links. The changeset's list is complete against every entry point. `notes/security.md` brought
+to the new names by a sonnet subagent, each change marked. Left: `Box.seal`'s `whisper`
+parameter beside the `whisper` validator (STYLE and VOCABULARY pull opposite ways); safebyok-convex's
+own Convex validators keep ModuleCase.
 
 ## Not in this sprint
 
