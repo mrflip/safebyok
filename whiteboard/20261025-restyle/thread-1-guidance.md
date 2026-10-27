@@ -1,71 +1,57 @@
-# Thread 1: Guidance (2026-10-26)
+# Thread 1: Guidance (2026-10-26, reworked 2026-10-27)
 
-Branch `20261026-guidance`, PR [#272](https://github.com/mrflip/safebyok/pull/272), stacked on
-#267. Its base is `20261024-contract_tab` for now, and should be `main`. Justify: green (core 3156 passed, 37
-skipped; every package and the root green; size budgets unchanged).
+Branch `20261026-guidance`, PR [#272](https://github.com/mrflip/safebyok/pull/272), based on
+`main`. Justify: green (core 3276 passed, 37 skipped; react 308; convex 350; postgres 322;
+graphql 344; indexeddb 165; fastkey 49; demo 229; e2e 107; root 265).
 
 * **Built**:
   - STYLE.md takes in NEWSTYLE §1-§10. New sections: *Build for maintenance* (§1), *Shapes and
     duck typing* (§3), *Crossings, spreading and logging* (§4), *Stateful objects and snapshots*
     (§5), *Order comes from an explicit list* (§6), *Scopepaths* (§7), *Tree-shaking* (§10).
-    *Validation* is rewritten to §2 (always at a boundary; Zod for preconditions with a specific
-    check beside it where warranted; the `Validator` call; what a refusal says; sanitizing
-    shape). *Naming* gains §8 (smushed `path`, `Boxscope`, `Pred`, validator names, enumerations,
-    `state`/`lifecycle`, shape names, `-Sparse`, the stamp, a host-facing field's stored
-    spelling). *Imports* gains §9 and the `Z` type import. *Tags*: `ckey` is a generic key, and
-    `scopepath` is a tag. *Comments* asks for shape names and *stamp*. *Mechanically enforced*
-    lists `no-multi-spaces` off and the named-ignore rule. Every existing heading is kept, so
-    `STYLE.md, *Naming*` and the rest still resolve.
-  - VOCABULARY.md: *The stamp* rewritten to NEWSTYLE's meaning; a new *Shapes* section (record,
-    sparse, stamp, scope, dna, tombstone, snapshot); a **scopepath** row; the **ckey** row and
-    *Words safebyok does not use* make `ckey` a generic map key.
-  - CLAUDE.md: *Non-Negotiables* says an entrypoint is every export, a private helper trusting its
-    exported caller; *Conventions At A Glance* gains a named ignore, `scopepath` among the
-    smushed tags, a host-facing field's stored spelling, and "never spread a thing to take a part
-    of it"; the STYLE.md line in *Notable files* names *Validation* for a validator and *Shapes
-    and duck typing* for a type's shapes or a stateful class.
-  - `@typescript-eslint/no-unused-vars` ignore patterns go from `^_` to `^_[a-zA-Z0-9]` in all ten
-    configs (the core's, the root's, each package's, the demo's and e2e's).
-  - An empty changeset, `.changeset/20261026-guidance.md`.
+    *Validation* is rewritten to §2; *Naming* gains §8 and the one-name rule; *Imports* gains §9;
+    *Tags* makes `ckey` a generic key and `scopepath` a tag. Every existing heading is kept.
+  - VOCABULARY.md: a *Shapes* section (record, sparse, stamp, scope, dna, tombstone, snapshot), a
+    **scopepath** row, **ckey** a generic map key, and the time row spelt `registered_at`,
+    `written_at`.
+  - CLAUDE.md (126 lines on main, 132 here), each line weighed by its per-turn cost:
+    - *Values*: "validate at each module entrypoint, every export", the one line saying a validator
+      is made in a `Validator` call, never plain Zod (the Coach's ruling), and "take a part of a
+      thing by parsing or destructuring, never by spreading it" (kept by the Coach's ruling).
+    - *Notable files*: the STYLE.md pointer names *Shapes and duck typing*.
+    - *Naming at a glance*: a host-facing field keeps its stored spelling (`user_id`).
+  - `no-unused-vars` passes only a named ignore (`^_[a-zA-Z0-9]`) in all ten eslint configs; the
+    eleven bare `_` and holes in tests now say what they skip. An empty changeset.
 * **Decisions taken**:
-  - **One transition paragraph, not a caveat per line.** STYLE.md's introduction says the
-    `Validator`, primitives, `Phrases`, `consts` and `Scopepath` are still being built, that
-    `whiteboard/20261025-restyle/good/` holds the worked example of each until it lands, and that
-    unconverted code keeps its older form (`zod/mini`, `Ckeys`, a hand-written type). VOCABULARY's
-    *Shapes* intro, its **scopepath** row and its *The stamp* paragraph each carry one such
-    sentence. The wrap-up thread strikes them (see *For the Coach*).
-  - **The lint change flagged nothing.** `no-unused-vars` defaults to `args: 'after-used'`, so
-    `(_, ii) =>` was never reported. I renamed the eleven bare `_` and holes in tests anyway
-    (`_slot`, `_racer`, `_fnName`, `_match`, `_callback`), so the code follows the rule it is
-    taught by. All are in tests; nothing in `src/` changed, so the changeset is empty.
-  - **CLAUDE.md lines weighed by cost.** Four short additions, each something a writer gets wrong
-    unless told; the principles stay in STYLE.md. No line came out: none was made obsolete.
-  - "Bound", "what the tag authenticates" and "binding" all say *stamp*. I wrote "authenticated
-    by the tag" in place of NEWSTYLE's "authentics", which read as a typo.
-  - `types/types.ts` (NEWSTYLE §3) is written `types.ts`: the file is `src/types.ts` today.
+  - **#285's structure wins.** CLAUDE.md is main's, with this branch's lines placed where #285
+    sends such lines: the principles into *Values*, the naming line into *Naming at a glance*. The
+    named-ignore line went nowhere new: STYLE.md (*Build for maintenance*) already has it, and the
+    linter enforces it. `scopepath` among the smushed tags is in STYLE.md alone.
+  - **STYLE.md's camelCase rule is scoped, not deleted.** "Everything else is camelCase" became
+    "a field holding a stored value keeps its stored spelling wherever it goes ... Other names are
+    camelCase: a field with no stored counterpart (`damagedBoxes`), a verb (`getUserId`), a
+    concept (`keyDeriverLabel`)". Thread 6's note asked for the concept names to stay camel. The
+    `askPassphraseAt` example is gone.
+  - **Paths as on main**: `consts.ts` and `phrases.ts` sit at `src/`'s root, not `src/utils/`.
+  - **The spread example**: NEWSTYLE's `{ ...vault }` no longer appears; STYLE.md says the linter
+    refuses a spread of a class instance (`no-misused-spread`), and "a getter hands out a frozen
+    shallow copy of its fields", unnamed, for thread 15 to name.
+  - **The kit**: `zod` is gone from STYLE.md's list, `lazy` and `custom` are in, with `epochMillis`
+    among the primitives, as `checks/validator.ts`'s `Kit` has them. A maker the kit lacks comes in
+    by a named import from `zod`, as the kit's own doc block says.
 * **Deviations**:
-  - **The eslint `safebyok/tree-shaking` comment and message are left for thread 2.** NEWSTYLE §11
-    wants "classic zod does not tree-shake" restated as §10. Thread 2 loosens that rule and
-    rewrites those same lines beside this thread, so editing them here would only conflict.
-    Thread 2 (or 3) should restate the reason as §10's: the library's size, not tree-shaking.
-  - NEWSTYLE §11's `src/validators.ts` line (`NameFloor`'s one outer `@__PURE__`) is a code fact,
-    not guidance. Thread 2 removes `src/validators.ts`, so nothing is done here.
-  - VOCABULARY's `ctx`, **visible** and **unencrypted** rows still say "bound". Rewording them in
-    terms of stamps describes thread 9's ctx, so that is thread 9's to do. Retiring "vault props"
-    is thread 8's, as the plan says.
+  - **NEWSTYLE.md itself is not edited here.** It lives only on the sprint branch, which this
+    thread does not write. Its two ruled edits (drop `zod` from §2's kit list, adding `lazy` and
+    `custom`; §4's `{ ...vault }` example becomes "a getter hands out a frozen shallow copy of its
+    fields") are the orchestrator's to make there, if NEWSTYLE is to be kept current at all now
+    STYLE.md carries it.
 * **Discoveries**:
-  - Today's `Stamp` type holds both epochs, and NEWSTYLE's stamp holds neither. VOCABULARY now
-    says so in one sentence, and the preplan folds `Stamp` into `VaultSparse`.
-  - `src/utils.ts` exists beside the planned `src/utils/` folder. Thread 2 should choose names that
-    keep `./utils` from resolving two ways.
+  - The rebase took one hand resolution in code: `safebyok-convex/tests/component/vaults.test.ts`,
+    main's flat arguments with this branch's `_slot`. The docs conflicts were STYLE.md's
+    introduction, VOCABULARY's *The stamp* (main's, thread 9 and 11's, kept whole) and its
+    format/ckey rows (main's format row; the validators row dropped, as its option is gone).
+  - `src/scopepath.ts` still says "The scopepath of a vault's props" (line 26): a "props" left for
+    thread 15.
+  - The **dna** shape has no type in `src/`; `VaultDraft` is the record a VaultDB's `ensureVault`
+    takes, scope included, so it is not one.
 * **For the Coach**:
-  - The transition sentences (STYLE.md's introduction; VOCABULARY's *The stamp*, *Shapes* and
-    **scopepath**) are development caveats in guidance documents. I judged them the honest way to
-    say "write this from now on" while `src/` does not yet read that way. The wrap-up thread
-    should strike them once thread 13 files.
-  - CLAUDE.md gained one line that is a principle rather than a name: "never spread a thing to
-    take a part of it, nor hand host code the thing itself". I kept it because it is a safety rule
-    and the habit runs the other way. Strike it if STYLE.md alone should carry it.
-  - Once thread 2 lands, CLAUDE.md might name the `Validator` call in *Conventions At A Glance*
-    ("validators are made in a `Validator(kind, kit => ...)` call"). It shapes code deeply, but
-    today it would name a module that does not exist.
+  - CLAUDE.md gains six lines; the PR says why each earns its cost.
