@@ -1688,8 +1688,8 @@ export class Vault implements VaultStamp {
 
   /** What a `putBox()` leaving out the sidecar or the whisper seals: the box read from storage, opened, its sidecar and whisper kept where not given, and its revision the base.
    * Opening it proves what is kept unaltered. A box that will not read or open is written over as
-   * new, keeping nothing, when the whisper is given, and refuses 'damaged_box' when it is not; none
-   * stored refuses 'no_whisper' when the whisper is not given.
+   * new, keeping nothing, when the whisper is given, and refuses 'damaged_box' when it is not; where
+   * no box is stored, it refuses 'no_whisper' when the whisper is not given.
    */
   async #storedBase(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
     const read = await outcomeOf(() => this.#readBox(boxlabel, 'putBox'))
