@@ -6,7 +6,7 @@ import type { KeyDeriver } from '../src/key-deriver'
 import type { PasskeyAnswer } from '../src/types/types'
 import { type GatedVaultRecord, VaultRecord } from '../src/vault-record'
 import { passphraseCleartext } from '../src/types/type-aliases'
-import { PasskeyProving, PassphraseProving, OutsideGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
+import { PasskeyProving, PassphraseProving, OutsideGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf, provingTools } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
 import { heldLeaseOf } from '../src/held-lease'
@@ -30,7 +30,7 @@ const landableGating = () => {
   return { gating: { get landed() { return landed } }, land: () => { landed = true } }
 }
 
-// == [Sealing]: PassphraseProving.seal, PasskeyProving.seal
+// == [Sealing]: PassphraseProving.seal, PasskeyProving.seal, provingTools
 
 describe("PassphraseProving.seal", () => {
   it("makes a proving over the current passphrase's header, as its first example shows, showing only its slotlabel", async () => {
@@ -154,6 +154,23 @@ describe("PasskeyProving.seal", () => {
     const { vault } = await lockedWorld()
     const err = await TH.expectRefusal(PasskeyProving.seal(vault, { slotlabel: 'passkey' }, { credential_id: 'abc' } as never, { gating: OutsideGating }), 'bad_option')
     expect(err.message).to.not.include('abc')
+  })
+})
+
+describe("provingTools", () => {
+  it("keys the Vault object's getter of what a seal reads, which no Object.keys, spread or JSON of the vault shows, as its doc block says: a symbol of the module's own, registered under no name", async () => {
+    const { vault } = await lockedWorld()
+    expect(vault[provingTools].vaultRecord().vault_tok).to.eq(vault.vault_tok)
+    expect(Object.keys(vault)).to.not.include('provingTools')
+    expect(Object.getOwnPropertySymbols(vault), 'an accessor of the class, no own key a spread would copy').to.deep.eq([])
+    expect(JSON.stringify(vault)).to.not.include('provingTools')
+    expect(Symbol.keyFor(provingTools)).to.be.undefined
+  })
+
+  it("is what a seal refuses 'bad_option' without: a slice of a vault is no Vault object", async () => {
+    const slice = TH.vaultSliceOf('u1') as unknown as Vault
+    await TH.expectRefusal(PassphraseProving.seal(slice, { slotlabel: 'passphrase' }, 'pw', { gating: OutsideGating }), 'bad_option')
+    await TH.expectRefusal(PasskeyProving.seal(slice, { slotlabel: 'passkey' }, await TH.passkeyOf('laptop'), { gating: OutsideGating }), 'bad_option')
   })
 })
 

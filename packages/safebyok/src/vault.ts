@@ -23,7 +23,7 @@ import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
 import { registerLeaseReader } from './held-lease'
-import { type PassphraseProving, Proving, type VaultPrivateTools, registerProvingTools } from './proving'
+import { type PassphraseProving, Proving, type ProvingTools, type VaultPrivateTools, provingTools } from './proving'
 import { Gate } from './gate'
 import { type GatingCall, type GatingTools, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
 
@@ -741,6 +741,9 @@ export class Vault implements VaultStamp {
 
   /** The refusal every call on this Vault object meets once it is gone, or null while it is not: ask it of one whose read may have found the vault deleted or made anew before its birth settled. */
   get [goneBy](): VaultError | null { return this.#goneBy?.() ?? null }
+
+  /** The tools its provings reach inside the package, through their `seal`: `putLease`, `holdLease` and what a seal reads, never a key or a Lease. A class accessor under a symbol of `proving.ts`: no field, spread or JSON of the Vault object shows it. */
+  get [provingTools](): ProvingTools { return this.#provingTools }
   // --
 
   // == [Options and setup]: bear, the constructor, scope, parsed options, limits, vaultDB, onBadNews, requestCleartext, onGone, clockNow
@@ -808,7 +811,7 @@ export class Vault implements VaultStamp {
       leaseMillis: this.#leaseMillis,
       demand:      (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
     }
-    registerProvingTools(this, {
+    this.#provingTools = {
       ...tools,
       vaultRecord: () => this.#vaultRecord,
       logger:      this.#logger,
@@ -816,7 +819,7 @@ export class Vault implements VaultStamp {
       deviceId:    () => this.#deviceId,
       putLease:    (record) => this.#deviceDB.putLease(record),
       holdLease:   (lease) => this.#holdLease(lease),
-    })
+    }
     this.#gatingTools = {
       ...tools,
       freshen:     async (gating) => await this.#freshen(gating),
@@ -1156,6 +1159,8 @@ export class Vault implements VaultStamp {
   #gating: RaisedGating | null = null
   // What a gating reaches of this Vault object, which no getter shows: see GatingTools.
   readonly #gatingTools: GatingTools
+  // What a proving reaches of this Vault object, through its [provingTools] getter: see ProvingTools.
+  readonly #provingTools: ProvingTools
 
   /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, resolving true; or resolve false, asking nobody, when `shouldAsk` says not to ask.
    * `shouldAsk` runs only when the vault must ask, after the hello and before any gating is joined

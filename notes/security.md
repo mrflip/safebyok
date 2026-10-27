@@ -107,7 +107,15 @@ added or folded into through the subagent, and no other entry changes.
   only at open, the ciphertext's ctx binding the lease's `vault_tok`; this changes the Box object's own visible fields and what
   `demandConsistentWith` judges). A proving reaches the key deriver, logger, lease
   length, clock and the vault record in hand through `ProvingTools`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
-  exports (amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
+  exports (amended 2026-10-27 (proving_tidy): the WeakMap is gone; `ProvingTools` is reached through a Symbol-keyed getter on the Vault class,
+  `get [provingTools]()`, with `export const provingTools = Symbol('Vault.provingTools')` a local Symbol in `src/proving.ts` (not `Symbol.for`) that
+  no entry point exports; `PassphraseProving.seal` and `PasskeyProving.seal` read `vault[provingTools]` once and refuse 'bad_option' for an object
+  without it, and a Proving keeps the tools in a non-enumerable protected field. A host holding a Vault object can find the getter with
+  `Object.getOwnPropertySymbols(Vault.prototype)` and so reach `ProvingTools`: `vaultRecord()` (the vault record in hand, gate wraps included),
+  `demand`, `keyDeriver`, `logger`, `leaseMillis`, `now()`, `deviceId()`, `putLease(record)` (writes a lease record to the host's own DeviceDB) and
+  `holdLease(record)` (returns a `Lease` object for a record the caller supplies). The lease registry in `src/held-lease.ts` stays a WeakMap, as
+  `tests/vault/vault-boxes.test.ts` "the Vault object's public surface" walks symbol-keyed getters and asserts no Lease is reachable from a Vault
+  object without a method call; amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
   `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `putLease` and `holdLease`, the power to grant
   a lease, and `GatingTools`, handed to each gating by its constructor, alone holds `putGate`, `delVault` and `takeUp`; a merged bundle would give
   each the other's powers).
@@ -116,7 +124,7 @@ added or folded into through the subagent, and no other entry changes.
   vault's `vault_tok` and two epochs, all stored unencrypted, with the scope being the vault's address; the ciphertext stays in the private
   `#record`. A Lease's `format` is likewise an own field; its leaseKey and wrapped vaultKey stay private. Older entries here that name
   `vault.leaseMillis`, `vault.now()` or `vault.keyDeriver` as public describe what stood before.
-  (4) `vaultRecordHeldBy(vault)` (reading through the private `toolsOf`) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
+  (4) `vaultRecordHeldBy(vault)` (reading through the Symbol-keyed `vault[provingTools]`; amended 2026-10-27 (proving_tidy), it read through a private `toolsOf` WeakMap lookup) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
   record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
