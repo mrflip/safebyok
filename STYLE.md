@@ -107,6 +107,30 @@ every call is `createVault`, never `ensureVault`, because `ensure` promises idem
 name that promises more or less than its first line is a bug in the name, and the line is the one
 to trust.
 
+**The receiver is part of the name; nothing else is.** Read a name where it is called:
+`box.put()` and `vault.putBox(box)` both say "put the box", and both are good. A verb leaves its
+object to the receiver only when the receiver *is* the object: `gating.settle()` settles the
+gating, and one that settles the user's prompt is `settlePrompt()`. Being private, or the only
+method of its kind, earns no shortcut: neither shows at the call site or in a grep, and a second
+method ends it. Never `putSelf`: the receiver already says it.
+
+**The verbs, at a glance.** Each promises this much and no more; the paragraphs below say more.
+
+| Name | Promises |
+| --- | --- |
+| `getFoo` | Reads foo, resolving it or null for none. Changes nothing. |
+| `putFoo` | Stores foo, resolving it as stored. |
+| `delFoo` | Deletes foo. |
+| `ensureFoo` | Has foo or makes it so, idempotently, and hands it back. |
+| `makeFoo`, `Foo.make` | Builds foo in memory. Stores nothing. |
+| `checkFoo` | Refuses a bad foo. Returns nothing. |
+| `checkedFoo` | Refuses a bad foo, else returns it, typed. |
+| `parseFoo` | Refuses a bad foo, else returns it cleaned or converted (*Validation*). |
+| `demandFoo` | Synchronous: throws unless foo holds. |
+| `isFoo`, or the condition (`consistentWith`) | Synchronous yes or no. Never throws. |
+| `fooOf(thing)` | Pure: the foo derived from `thing`. |
+| `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
+
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
 nothing. A function that only checks and refuses is not an `ensure`: it is a `check`
@@ -544,8 +568,10 @@ rows with it.
 * `/** */` for doc blocks, `//` for a running clarification or commented-out code.
 * Bulleted lists use `*` at the top level and `-` below, indented two spaces per level.
 * **Every exported function, class, constant and type gets a doc block**, written for its caller:
-  what it is and how to use it, never how it came to be, what's next, or how it works inside. A
-  caveat for future authors is a running comment by the code it concerns.
+  a developer, or their agent, *using* it, who is no expert in security, distributed systems or
+  backends. For a private member, the reader is the code that calls it. Never how it came to be,
+  what's next, or how it works inside: a caveat for maintainers is a running comment by the code
+  it concerns, and an invariant they keep ("every lock goes through here") one above the member.
 * **The purpose goes on the `/**` line**, a sentence that stands alone when the block is folded
   in an editor: `/** Brief statement */` alone, or `/** Brief statement.` with the rest on the
   lines below. Never `/**` alone on its line.
@@ -555,39 +581,61 @@ rows with it.
   that will be written to the database */`. A function that reads storage, decrypts, asks the
   user or writes leads with that verb: `/** Read and open the box stored under boxlabel, ...`.
   Never open on "What a ..." or "What ... does": name the thing, or say the act.
-* **Once that first line is written, read the member's name against it** (*Naming*): the verb
-  promises exactly what the line says. A line that needs words the name lacks means a wrong
-  name: rename it, or flag it.
+* **Read the member's name against that first line** (*Naming*).
 * **Name the shape and say *stamp*.** A block says which shape it takes or hands back
   (`VaultSparse`, `BoxStamp`) by its name, and calls the fields a ciphertext is bound to the
   stamp (*Naming*). An interface a host implements says what is checked, and by whom.
-* **Name every reach across a seam**: storage, a decryption, the user, a timer. Private members
-  too: for those the reader is the calling code, and the reach is the first thing it must know.
-  Name the reach, in one sentence with `{@link}`s; never narrate the steps.
+* **Each sentence tells the caller something they would otherwise get wrong**, given the
+  signature, the names, what a capable developer already knows, and what is said once elsewhere.
+  Leave out a parameter's type, what it is when its name says so, the return type, and a default
+  that is an option of the same name elsewhere.
+* **Say a thing once.** What holds for every member of a class, module or interface goes in its
+  doc, one sentence each; a member that is an exception says so. Another function's doc is
+  linked on first mention, never restated. A `try` twin is one line: `/** The whisper in
+  `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link getBox}. */`. A storage
+  adapter's members say only where they differ from `VaultDB`'s contract.
+* **A block is as long as its contract, not its code.** A patently obvious member needs its
+  first line and nothing more. A guard, or an entrypoint other calls go through, states its
+  contract even when it is simple: what holds once it succeeds. Beyond that, only what the
+  signature cannot give: the state the call leaves behind, side effects, when it may be called,
+  and any security fact a caller could get wrong ("replacing is not revoking"). Most public
+  methods take 5 to 15 lines of prose.
+* **Name every reach across a seam**: storage, a decryption, the user, a timer, an injected
+  interface, a public call it goes through. One sentence with `{@link}`s: `Reads {@link
+  DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` Private members too, down to the
+  private call that holds the reach (`Reads the box through #readBox`). Never the order of steps.
 * **Say what a member does and when to call it, never who calls it.** A list of callers, or of
   what each does with the result, belongs to those callers and goes stale. A rule its callers
-  must keep stays, as an instruction: "Ask it first in every call." An invariant for maintainers
-  ("every lock goes through here") is a `//` comment above the member.
+  must keep stays, as an instruction: "Ask it first in every call."
 * **Never tour the fields.** A type's doc says what the whole is and what holds of every field.
   Each field's own facts go on that field, inline object types included. Where a field, a
   parameter or a return value has a documented type, link it rather than list its fields.
-* **Each sentence tells the caller something they would otherwise get wrong**, given the
-  signature, the names, what a capable developer already knows, and what is said once elsewhere
-  (a class's own doc, `errors.ts`). Leave out what those already say.
-* **A block is as long as its contract, not its code.** A patently obvious export needs its
-  first line and nothing more. A guard, or an entrypoint other calls go through, states its
-  contract even when it is simple: what holds once it succeeds. Most public methods take 5 to
-  15 lines of prose.
-* **Name the refusals that are common and not obvious**: those a caller will meet in normal use
-  and should branch on. Not those passed through from another call, and not those only a bug or
-  a record that breaks the package's own invariants brings about.
+* **Name the refusals that are common and not obvious.** `RefusalKind` in `errors.ts` sorts them:
+  - *Misuse* (`bad_option`, `bad_scope`, `insecure_context`, ...) is said once, in the class
+    or module doc.
+  - *Conditions* a caller meets in normal use are named: a wrong proof, a weak passphrase, a race
+    with another device or tab (`stale_write`, `created_elsewhere`), a lock landing mid-call, a
+    limit reached.
+  - *Bad news* is named on the call where a host first meets it, as `hello` names
+    `damaged_vault`.
+  - Not what passes through from storage or another public call, and not what only a bug or a
+    record breaking the package's own invariants brings about.
+  - The kind goes unexplained. A clause only for a meaning or an aftermath this member gives it;
+    a remedy only when it is another call (`delDamagedVault` clears them). The user's next step
+    is the message's job.
 * **Plain sentences**: subject, verb, object, in that order; one fact to a sentence; under 25
   words.
+* **Facts come from the code**, not from the old prose, which is sometimes wrong. Where they
+  disagree, write what the code does and raise the disagreement; the doc never changes behaviour.
 * Don't be stingy with `@example`s. A short example on one line; a long one on following lines,
-  indented two spaces.
-* `@param` and `@returns` only for what the name and type can't say. A `@param` is the
-  parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner named
-  it.`
+  indented two spaces. Each has a test whose title points back to it (*Tests*). What is best said
+  beside an example goes in its `//` comment.
+* `@param` and `@returns` only for what the name and type can't say: a unit or range, what `null`
+  or leaving an optional parameter out means, a return the first line doesn't cover. A `@param`
+  is the parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner
+  named it.`
+* Each `{@link}` names something in scope in its file: add a type-only import, or write the name
+  as plain code. A private member is always plain code.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would grep for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
@@ -614,6 +662,22 @@ After:
  * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
  * with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format' or 'vault_behind'.
  */
+```
+
+A private helper whose block toured its return value and hid its reach. Before:
+
+```ts
+/** What a `putBox()` leaving out the sidecar or the whisper seals: the box read from storage and opened, its sidecar and whisper kept where not given, its revision the base.
+```
+
+After, and renamed from `#storedBase`, as the line showed the name was wrong:
+
+```ts
+/** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
+ * Reads through `#readBox`, and decrypts the whisper under the lease in hand. The write then
+ * lands only over the revision read.
+ */
+async #fillFromStored(boxlabel: string, ...)
 ```
 
 Well-named, short functions rarely need running comments. A comment that narrates the code, makes
