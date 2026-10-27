@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
+import * as Zod from 'zod'
 import * as safebyok from '../src/index'
 import * as Primitives from '../src/checks/primitives'
 import * as Validators from '../src/validators'
@@ -29,12 +30,25 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
-  it("exports every validator as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
-    expect(Object.keys(safebyok.Validators)).to.have.members(Object.keys(Validators))
+  it("exports the validators a host or an adapter calls as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
+    expect(Object.keys(safebyok.Validators)).to.have.members([
+      'EpochMillis', 'label', 'user_id',
+      'bankScope', 'vaultScope', 'boxscope', 'VaultScope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath',
+      'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped', 'Ciphered',
+      'PassphraseWayinRecord', 'PasskeyWayinRecord', 'WayinRecord', 'GateRecord', 'VaultRecord', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'VaultDraft', 'GateSparse', 'PassphraseWayinSparse', 'PasskeyWayinSparse',
+      'BoxRecord', 'BoxSparse', 'BoxDamaged', 'BoxStamp', 'LeaseRecord', 'LeaseStamp', 'DeviceRecord', 'Whisper', 'Sidecar', 'Capacity',
+      'VaultRecordExpectation', 'BoxGetExpectation', 'BoxExpectation', 'VaultDelExpectation', 'BoxDelExpectation', 'BoxDeletion',
+      'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
+      'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswerShape',
+    ])
     for (const [valname, validator] of Object.entries(Validators)) {
       expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
     }
-    expect(safebyok.Validators.VaultRecord).to.eq(safebyok.VaultRecord)
+    const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
+    expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['VaultRecord', 'BoxRecord', 'Whisper', 'Sidecar', 'Ciphered', 'LeaseStamp', 'label'])
+    for (const [exportname, exported] of validatorsByName) {
+      expect(safebyok.Validators[exportname as keyof typeof Validators], exportname).to.eq(exported)
+    }
     expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
   })
 

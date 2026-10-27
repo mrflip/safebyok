@@ -184,7 +184,7 @@ const VaultPanel = () => {
   const bankVault = useListedVault('main')
   const vault = useVault('main')
   if (bankVault?.lifecycle === 'refused') {
-    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault(bankVault) }}>Retry</button></p>
+    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault({ vaultlabel: 'main' }) }}>Retry</button></p>
   }
   if (vault === null) { return <p>Opening your vault…</p> }
   return <Boxes vault={vault} />

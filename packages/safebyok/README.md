@@ -80,10 +80,12 @@ or the call says otherwise) reads nothing anew; call `hello()` on `visibilitycha
 `hello({ staleMinutes: 0 })` to read now. At sign-out, `bank.closeVaults()`, and drop the bank.
 
 Each bank call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id`
-in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`);
-anything else in it is left out, so a Vault object, its snapshot or a vault the bank lists may be
-handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
-names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
+in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`), and
+any other field refuses `bad_scope` too, so name the vault of a Vault object or a vault the bank
+lists by its label: `bank.closeVault({ vaultlabel: vault.vaultlabel })`. A vault stored elsewhere
+than the bank's stores names its own in a second bag:
+`bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`; put in the first, a store is
+refused, never ignored.
 
 A Vault object's own fields are its stamp, fixed for its life: `format`, `applabel`, `user_id`,
 `vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a log line of it shows those
@@ -300,12 +302,15 @@ read, so lowering it strands nothing.
 
 ## Validators
 
-Every check the package makes is exported, under its own name, in the `Validators` namespace:
-the stored records (`Validators.VaultRecord`, `Validators.BoxRecord`), the scopes, each stored
-field (`Validators.vault_tok`), the options `Bank.make` and its stores take, and the expectations
-a `VaultDB` is handed. Each is Zod, made in a `Validator` call: its `parse` throws a `VaultError`
-of its kind (`bad_record`, `bad_scope`, `bad_option`, `bad_whisper`), and its `safeParse` is Zod's
-own. `label`, `user_id` and `EpochMillis` are plain Zod, the names they are all made of.
+The checks a host or a storage adapter calls or builds on are exported, each under its own name,
+in the `Validators` namespace: the stored records (`Validators.VaultRecord`,
+`Validators.BoxRecord`), the scopes and scopepaths, each stored field (`Validators.vault_tok`),
+the options `Bank.make`, its calls and its stores take, the objects a host hands in (a store, a
+clock, a key deriver, a logger) and what their callbacks return, and the expectations a `VaultDB`
+is handed. The pieces the package builds those from are its own. Each is Zod, made in a
+`Validator` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
+`bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and
+`EpochMillis` are plain Zod, the names they are all made of.
 
 ```ts
 import { Validator, Validators } from 'safebyok'

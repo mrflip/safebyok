@@ -2,6 +2,12 @@
 
 The Coach's rulings on the restyle sprint's open matters, swept from the sprint doc's Resolved tab, newest batch first.
 
+## 2026-10-27, after the close
+
+- **Validators exports internals too.** Rec: accept, or trim to the validators that face a host or adapter. Coach: "trim". Raised: #287. Work: Thread 17 (#293), 95 names to 66.
+- **A store in the vault bag is now ignored.** Rec: accept. Coach: "can the other bag be strict too?" Raised: #287. Work: Thread 17 (#293): the bag naming a vault is strict, refusing a store or any unknown field `bad_scope`. Overrides the 2026-10-26 ruling that unknown fields there are ignored.
+- **bank.lifecycle has no bank.err beside it.** Rec: add bank.err only when a host asks. Coach: (empty: took the Rec). Raised: #291. Work: None.
+
 ## 2026-10-27, last batch
 
 - **bank.bankVaultOf replaces entryOf.** Rec: keep. Coach: "yes please. Also, ensure is meant to idempotently establish a condition: a no-op if it's met. Are all the ensure methods in bank following that convention?" Raised: #286. Work: Kept; thread 15 checks every ensure\* and answers in its PR, fixing or renaming any that is not.
