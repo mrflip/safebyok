@@ -44,7 +44,7 @@ describe("the package's entry point", () => {
     for (const [valname, validator] of Object.entries(Validators)) {
       expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
     }
-    const validatorsByName = Object.entries(safebyok).filter(([, exported]) => exported instanceof Zod.ZodType)
+    const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
     expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['VaultRecord', 'BoxRecord', 'Whisper', 'Sidecar', 'Ciphered', 'LeaseStamp', 'label'])
     for (const [exportname, exported] of validatorsByName) {
       expect(safebyok.Validators[exportname as keyof typeof Validators], exportname).to.eq(exported)
