@@ -156,9 +156,10 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *    made anew, here or elsewhere -- every call but `subscribe()`, `getSnapshot()`,
  *    `checkStrength()` and `consistentWith()` refuses 'vault_gone', or 'vault_remade' for a vault
  *    made anew. The bank hands out a new Vault object when asked again.
- *  * A lock landing mid-call refuses 'vault_locked' at the call's next step, writing nothing,
- *    unless a gating has unlocked the vault again meanwhile. A write already sent to storage is past
- *    its reach: it lands or refuses as storage decides.
+ *  * A lock landing mid-call, in a call that needs the vault unlocked or a gating answered, refuses
+ *    'vault_locked' at the call's next step, writing nothing more, unless a gating has unlocked the
+ *    vault again meanwhile. A write already sent to storage is past its reach: it lands or refuses
+ *    as storage decides, and `putBox()`, `delBox()` and `del()` resolve once it lands.
  *  * A throw that is no refusal (a bug, in safebyok or in a function handed to it) refuses
  *    'unexpected_error', what was thrown its cause, and is not logged. What a function that hears
  *    the passphrase throws -- the key deriver, the strengthChecker, `requestCleartext` -- is kept
