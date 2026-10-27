@@ -134,8 +134,9 @@ export const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({
  * {@link Box.seal}, not yet stored. `box.extractWhisper()` opens it under the lease the vault holds.
  *
  * Misuse refuses before anything is ciphered: 'bad_whisper' for a whisper JSON cannot carry,
- * 'bad_scope' for a boxlabel that is not a label, and 'bad_option' for a malformed sidecar, base,
- * `madeUnder` or `made`. No refusal quotes what the call was handed.
+ * 'bad_scope' for a boxlabel that is not a label, and 'bad_option' for props holding a field but
+ * `boxlabel`, `sidecar` and `base`, or a malformed sidecar, base, `madeUnder` or `made`. No refusal
+ * quotes what the call was handed.
  *
  * @example
  *   const box = await vault.getBox('anthropic_api_key')
