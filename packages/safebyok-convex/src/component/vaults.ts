@@ -1,12 +1,13 @@
 import { v } from 'convex/values'
 import type { Infer } from 'convex/values'
 import { Expectations } from 'safebyok'
+import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
+  Boxscope, Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
@@ -20,6 +21,9 @@ import {
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
  * always be deleted whole. A delete is never refused for room.
+ *
+ * Each takes and returns the core's records as `./validators` types them, a salt the core brands
+ * keeping its {@link $brand}.
  */
 
 // ------------------------------------------------------------------------------- the vault
@@ -83,7 +87,7 @@ export const putVaultRecord = mutation({
  * The vault record and the box are read from one query's snapshot.
  */
 export const getBox = query({
-  args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
+  args:    { ...Boxscope.fields, expected: BoxGetExpectation },
   returns: GetBoxAnswer,
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
@@ -152,7 +156,7 @@ export const getCapacity = query({
 
 /** Remove the box under `boxlabel` as `VaultDB`'s `doDelBox` does, and take it off the vault's tally. */
 export const delBox = mutation({
-  args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
+  args:    { ...Boxscope.fields, expected: BoxDelExpectation },
   returns: v.nullable(BoxDeletion),
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof BoxDeletion> | null> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)

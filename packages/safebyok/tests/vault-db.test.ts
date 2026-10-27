@@ -1168,7 +1168,7 @@ const StoredVaultRecordCases = [
   [null,                                                           'stale_write',   { vault_stored: null },                                    'none: stale_write, carrying null'],
   [{ ...TH.vaultRecordOf('u1'), gate_epoch: 'two' },                'damaged_vault', undefined,                                                       'damaged vault record: damaged_vault, as a read of it'],
   [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },      'newer_format',  undefined,                                                       'vault record of a later format: newer_format, as a read of it'],
-  [TH.vaultRecordOf('u2'),                                          'damaged_vault', undefined,                                                       "another scope's vault record: damaged_vault, as a read of it"],
+  [TH.vaultRecordOf('u2'),                                          'damaged_vault', { fieldnames: ['user_id'] },                                     "another scope's vault record: damaged_vault, as a read of it, naming the field"],
   [{ ...TH.vaultRecordOf('u1'), user_id: 'u 1' },                   'damaged_vault', undefined,                                                       "vault record whose user_id fails its check: damaged_vault, never the check's bad_scope"],
 ] as const
 

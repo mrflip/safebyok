@@ -313,11 +313,13 @@ describe("Box.seal", () => {
     expect(box.vault_tok).to.eq(vault.lease?.vault_tok)
   })
 
-  it("takes the box's scope and vault_tok from the vault it seals in, and only the epochs from madeUnder: another vault's names there are dropped unread", async () => {
+  it("demands madeUnder consistent with the vault it seals in, so a box is never made under another vault, or ahead of it", async () => {
     const vault = await vaultOf()
-    const madeUnder = { ...vault.madeUnder, applabel: 'elsewhere', vaultlabel: 'other', vault_tok: 'vault-tok-other', vault_epoch: 7, gate_epoch: 1 }
-    const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret, { madeUnder, now: vault.now() })
-    expect(madeUnderOf(box)).to.deep.equal({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel, vault_tok: vault.vault_tok, vault_epoch: 7, gate_epoch: 1 })
+    const sealUnder = (madeUnder: object) => Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret, { madeUnder: madeUnder as never, now: vault.now() })
+    await TH.expectRefusal(sealUnder({ ...vault.madeUnder, applabel: 'elsewhere', vaultlabel: 'other' }), 'vault_remade')
+    await TH.expectRefusal(sealUnder({ ...vault.madeUnder, vault_tok: 'vault-tok-other' }), 'vault_remade')
+    await TH.expectRefusal(sealUnder({ ...vault.madeUnder, vault_epoch: vault.madeUnder.vault_epoch + 7 }), 'gate_moved')
+    await TH.expectRefusal(sealUnder({ ...vault.madeUnder, gate_epoch: vault.madeUnder.gate_epoch + 1 }), 'gate_moved')
   })
 
   it("ciphers the whisper as its JSON with every object's keys sorted, so it opens with them in order (Contract: Box, whisper_codec)", async () => {

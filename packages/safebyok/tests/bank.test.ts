@@ -900,6 +900,36 @@ describe("bank.closeVault", () => {
     await TH.expectBad(birth, 'vault_gone')
     expect(bank.bankVaultOf(Main)).to.be.null
   })
+
+  it("writes nothing more for a birth let go during its first read: no vault record ensured, no device record raised", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const reading = TH.holdNextCall(world.deviceDB, 'getDeviceRecord')
+    const ensuring = vi.spyOn(world.vaultDB, 'ensureVault')
+    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const birth = bank.tryEnsureVault(Main)
+    await reading.reached
+    bank.closeVault(Main)
+    reading.release()
+    await TH.expectBad(birth, 'vault_gone')
+    expect(ensuring).not.toHaveBeenCalled()
+    expect(raising).not.toHaveBeenCalled()
+  })
+
+  it("raises no device record and births no Vault object for a birth let go during its read of storage", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const reading = TH.holdNextCall(world.vaultDB, 'ensureVault')
+    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const subscribing = vi.spyOn(world.vaultDB, 'subscribe')
+    const birth = bank.tryEnsureVault(Main)
+    await reading.reached
+    bank.closeVault(Main)
+    reading.release()
+    await TH.expectBad(birth, 'vault_gone')
+    expect(raising).not.toHaveBeenCalled()
+    expect(subscribing).not.toHaveBeenCalled()
+  })
 })
 
 describe("bank.closeVaults and bank.reopenVault", () => {

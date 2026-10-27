@@ -2,10 +2,10 @@ import type * as Z from 'zod'
 import { DeviceRecord, DeviceRecordFormat, LeaseRecord, type VaultScope } from './types/types'
 import * as CX from './checks/core-checks'
 import * as Scopepath from './scopepath'
-import { sameScope } from './names'
 import { VaultError } from './errors'
 import { type Outcome, outcomeOf } from './outcome'
 import { isStorageBlocked } from './refusals'
+import { consistent } from './checks/validator'
 
 /** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device record. Extend it, and implement its `do*` methods against your store.
  * Nothing here ever goes to the backend. A {@link LeaseRecord} holds a non-extractable leaseKey, a
@@ -240,7 +240,7 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
  */
 export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
   const checked = DeviceRecord.safeParse(answer)
-  if (! checked.success || ! sameScope(checked.data, scope)) { return null }
+  if (! checked.success || ! consistent(checked.data, scope)) { return null }
   return checked.data
 }
 

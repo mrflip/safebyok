@@ -3,9 +3,8 @@ import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, boxSparseOf } from '.
 import { Capacity, type VaultScope } from './types/types'
 import { VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './vault-record'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
-import * as Names from './names'
 import * as CX from './checks/core-checks'
-import { Validator } from './checks/validator'
+import { Validator, verifyConsistent } from './checks/validator'
 import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
@@ -460,8 +459,7 @@ export abstract class VaultDB {
     const raw = await adapterAnswer(() => this.doDelVault(scope, expectation))
     if (raw === null || raw === undefined) { throw Refusals.staleWrite('del') }
     const tombstone = checkAnswer(VaultTombstone, raw, 'a vault deletion', 'landed')
-    if (! Names.sameScope(tombstone, scope)) { throw wrongAnswer('a vault deletion', 'landed') }
-    return tombstone
+    return verifyConsistent(tombstone, scope, { kind: 'corrupt_record', message: wrongAnswerSays('a vault deletion', 'landed') })
   }
 
   /** Remove a vault whose stored vault record fails its checks, and no other: the escape hatch behind the package's `delDamagedVault`.
@@ -907,7 +905,7 @@ const checkDraft = (draft: unknown): VaultDraft => {
 }
 // --
 
-// == [Vault record checks]: checkVaultRecord, checkWrittenVaultRecord, damagedVaultRecord, unnamedVaultRecord, newerVaultRecord, mayBeNewer, readStoredVault, isSoundVaultRecord, others
+// == [Vault record checks]: checkVaultRecord, checkWrittenVaultRecord, damagedVaultRecord, damagedVaultRecordSays, unnamedVaultRecord, newerVaultRecord, mayBeNewer, readStoredVault, isSoundVaultRecord, others
 
 /** A vault record read from storage for `scope`, once it passes its checks: 'newer_format' for a format a later version may write, 'damaged_vault' otherwise. */
 const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
@@ -915,19 +913,21 @@ const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
   if (mayBeNewer(raw)) { throw newerVaultRecord() }
   const vaultRecord = checked(VaultRecord, raw, (opts) => damagedVaultRecord('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
   // A record that names some other scope is a record out of place, wherever it came from.
-  if (! Names.sameScope(vaultRecord, scope)) { throw damagedVaultRecord('names a different app, user or vault than the one asked for') }
-  return vaultRecord
+  return verifyConsistent(vaultRecord, scope, { kind: 'damaged_vault', message: damagedVaultRecordSays('names a different app, user or vault than the one asked for') })
 }
 
 /** The vault record an adapter handed back as `written` landed: a vault record of the scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
 const checkWrittenVaultRecord = (raw: unknown, written: VaultRecord, scope: VaultScope): VaultRecord => {
   const stored = checkAnswer(VaultRecord, raw, 'an update of the vault record', 'landed')
-  if (! Names.sameScope(stored, scope) || stored.vault_tok !== written.vault_tok || stored.gate_epoch !== written.gate_epoch) { throw wrongAnswer('an update of the vault record', 'landed') }
-  return stored
+  const { vault_tok, gate_epoch } = written
+  return verifyConsistent(stored, { ...scope, vault_tok, gate_epoch }, { kind: 'corrupt_record', message: wrongAnswerSays('an update of the vault record', 'landed') })
 }
 
 /** A vault record read from storage that fails its checks, as `said` says how: 'damaged_vault', quoting none of it. */
-const damagedVaultRecord = (said: string, opts?: ErrorOptions) => new VaultError('damaged_vault', `This vault's stored record ${said}, so no vault unlocker (passphrase or passkey) can be tried against it, and the vault can't be opened. It was left as it is: restore it from a backup, or, if the user chooses to start over, delDamagedVault() clears it.`, opts)
+const damagedVaultRecord = (said: string, opts?: ErrorOptions) => new VaultError('damaged_vault', damagedVaultRecordSays(said), opts)
+
+/** What {@link damagedVaultRecord} says. */
+const damagedVaultRecordSays = (said: string): string => `This vault's stored record ${said}, so no vault unlocker (passphrase or passkey) can be tried against it, and the vault can't be opened. It was left as it is: restore it from a backup, or, if the user chooses to start over, delDamagedVault() clears it.`
 
 const unnamedVaultRecord = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to remove, and nothing was removed. Its backend's own tools can clear it.", opts)
 
@@ -979,7 +979,7 @@ export const { StoredVaultTok } = Validator('bad_record', () => ({
 }))
 // --
 
-// == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes
+// == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, wrongAnswerSays, jsonBytes
 
 /** A box read from storage, as `getBox` holds it: a box's shape, under the boxlabel it was asked for; 'damaged_box' otherwise. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
@@ -997,8 +997,8 @@ const damagedBox = (said: string, opts?: ErrorOptions) => new VaultError('damage
 /** The box an adapter handed back as `written` landed: a box's shape, under the boxlabel and at the revision written; `corrupt_record` otherwise, quoting neither. */
 const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
   const box = checkAnswer(BoxRecord, raw, 'a box write', 'landed')
-  if (box.boxlabel !== written.boxlabel || box.revision_tok !== written.revision_tok) { throw wrongAnswer('a box write', 'landed') }
-  return box
+  const { boxlabel, revision_tok } = written
+  return verifyConsistent(box, { boxlabel, revision_tok }, { kind: 'corrupt_record', message: wrongAnswerSays('a box write', 'landed') })
 }
 
 /** An adapter's answer to `said` through `answerSchema`: one in another shape is the adapter's bug, `corrupt_record`, its check's 'bad_record' the cause. */
@@ -1009,9 +1009,12 @@ const checkAnswer = <AnswerT>(answerSchema: Z.ZodType<AnswerT>, raw: unknown, sa
 /** The refusal of an adapter's answer to `said` that is not in the protocol's shape: `corrupt_record`, quoting none of it.
  * For a write or deletion, `landed` says it may have landed all the same.
  */
-const wrongAnswer = (said: string, landed?: 'landed', opts?: ErrorOptions) => new VaultError('corrupt_record', landed === 'landed'
+const wrongAnswer = (said: string, landed?: 'landed', opts?: ErrorOptions) => new VaultError('corrupt_record', wrongAnswerSays(said, landed), opts)
+
+/** What {@link wrongAnswer} says. */
+const wrongAnswerSays = (said: string, landed?: 'landed'): string => (landed === 'landed'
   ? `Storage says ${said} landed, but answered with what this package cannot read back, so whether it did is not known: reading the vault again shows what is stored. The storage adapter needs a developer's look: it wrote or reported something it should not have.`
-  : `Storage answered ${said} in a shape this package does not know. The storage adapter needs a developer's look.`, opts)
+  : `Storage answered ${said} in a shape this package does not know. The storage adapter needs a developer's look.`)
 
 /** The UTF-8 bytes of `val`'s JSON: the weight the vault measures a record by against its storage's limits.
  * Every in-tree backend counts a record as no heavier.

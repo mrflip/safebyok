@@ -115,16 +115,18 @@ method of its kind, earns no shortcut: neither shows at the call site or in a gr
 method ends it. Never `putSelf`: the receiver already says it.
 
 **The verbs, at a glance.** Each promises this much and no more; the paragraphs below say more.
+A function named for what it returns (`fooOf`, `fooRefusal`) has no side effects: one that acts
+is named for the act.
 
 | Name | Promises |
 | --- | --- |
-| `getFoo` | Reads foo, resolving it or null for none. Changes nothing. |
+| `getFoo` | Reads foo, resolving it or null for none; one with no null form refuses instead, as `getWhisper` does. Changes nothing. |
 | `putFoo` | Stores foo, resolving it as stored. |
 | `delFoo` | Deletes foo. |
 | `ensureFoo` | Has foo or makes it so, idempotently, and hands it back. |
 | `makeFoo`, `Foo.make` | Builds foo in memory. Stores nothing. |
 | `checkFoo` | Refuses a bad foo. Returns nothing. |
-| `checkedFoo` | Refuses a bad foo, else returns it, typed. |
+| `checkedFoo` | Refuses a bad foo, else returns it, typed. What `optionsCheck` makes. |
 | `parseFoo` | Refuses a bad foo, else returns it cleaned or converted (*Validation*). |
 | `demandFoo` | Synchronous: throws unless foo holds. |
 | `isFoo`, or the condition (`consistentWith`) | Synchronous yes or no. Never throws. |
@@ -380,9 +382,12 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   refusal only to prefix the call's name and say what to do (`optionsCheck`, `checkMakeBankOpts`).
   Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
   the value.
-* **A refusal never repeats its input: no value, and no key** (the Coach, 2026-10-26). A field an
-  object does not take is counted, and the refusal lists the fields it takes. No handler sifts
-  broken input to explain it: a catch only aligns the kind and attaches context.
+* **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
+  fields involved, in its message and `meta.fieldnames`: a field that failed its check, or that
+  disagrees with another bag (the Coach, 2026-10-27, loosening "no key" until the package is more
+  mature). A field an object does not take is still counted, not named, and the refusal lists the
+  fields it takes. No handler sifts broken input to explain it: a catch only aligns the kind and
+  attaches context.
 
 **To sanitize shape.** Destructure the fields you need from the parsed output: `obj` strips the
 rest, so a vault record, a Vault object or a bank's listing handed in as a scope comes out as just
@@ -571,7 +576,8 @@ rows with it.
   a developer, or their agent, *using* it, who is no expert in security, distributed systems or
   backends. For a private member, the reader is the code that calls it. Never how it came to be,
   what's next, or how it works inside: a caveat for maintainers is a running comment by the code
-  it concerns, and an invariant they keep ("every lock goes through here") one above the member.
+  it concerns, and an invariant they keep ("every lock goes through here") one on the line above
+  the member's doc block.
 * **The purpose goes on the `/**` line**, a sentence that stands alone when the block is folded
   in an editor: `/** Brief statement */` alone, or `/** Brief statement.` with the rest on the
   lines below. Never `/**` alone on its line.
@@ -580,7 +586,8 @@ rows with it.
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
   that will be written to the database */`. A function that reads storage, decrypts, asks the
   user or writes leads with that verb: `/** Read and open the box stored under boxlabel, ...`.
-  Never open on "What a ..." or "What ... does": name the thing, or say the act.
+  "Read" means a storage read: a lookup in memory leads with what it returns. Never open on "What
+  a ..." or "What ... does": name the thing, or say the act.
 * **Read the member's name against that first line** (*Naming*).
 * **Name the shape and say *stamp*.** A block says which shape it takes or hands back
   (`VaultSparse`, `BoxStamp`) by its name, and calls the fields a ciphertext is bound to the
@@ -591,7 +598,10 @@ rows with it.
   that is an option of the same name elsewhere.
 * **Say a thing once.** What holds for every member of a class, module or interface goes in its
   doc, one sentence each; a member that is an exception says so. Another function's doc is
-  linked on first mention, never restated. A `try` twin is one line: `/** The whisper in
+  linked on first mention, never restated. A condition every member meets alike (a lock landing
+  mid-call, the object gone) is said once, in the class doc or on the call that causes it
+  (`lock()`); a member names it only where what it leaves behind differs. A `try` twin is one
+  line: `/** The whisper in
   `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link getBox}. */`. A storage
   adapter's members say only where they differ from `VaultDB`'s contract.
 * **A block is as long as its contract, not its code.** A patently obvious member needs its
@@ -599,14 +609,17 @@ rows with it.
   contract even when it is simple: what holds once it succeeds. Beyond that, only what the
   signature cannot give: the state the call leaves behind, side effects, when it may be called,
   and any security fact a caller could get wrong ("replacing is not revoking"). Most public
-  methods take 5 to 15 lines of prose.
+  methods take 5 to 15 lines of prose; one whose contract has many conditions may run longer, in
+  short paragraphs of one theme each (limits, races, locks).
 * **Name every reach across a seam**: storage, a decryption, the user, a timer, an injected
   interface, a public call it goes through. One sentence with `{@link}`s: `Reads {@link
   DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` Private members too, down to the
-  private call that holds the reach (`Reads the box through #readBox`). Never the order of steps.
+  private call that holds the reach, named in backticks (`Reads the box through #readBox`).
+  Never the order of steps.
 * **Say what a member does and when to call it, never who calls it.** A list of callers, or of
   what each does with the result, belongs to those callers and goes stale. A rule its callers
-  must keep stays, as an instruction: "Ask it first in every call."
+  must keep stays, as an instruction: "Ask it first in every call." A caller list that is the
+  only word on what a parameter means becomes that `@param`: what to pass, and why.
 * **Never tour the fields.** A type's doc says what the whole is and what holds of every field.
   Each field's own facts go on that field, inline object types included. Where a field, a
   parameter or a return value has a documented type, link it rather than list its fields.
@@ -619,7 +632,8 @@ rows with it.
   - *Bad news* is named on the call where a host first meets it, as `hello` names
     `damaged_vault`.
   - Not what passes through from storage or another public call, and not what only a bug or a
-    record breaking the package's own invariants brings about.
+    record breaking the package's own invariants brings about. A refusal from beneath that the
+    member turns into another kind is its own, and named, with what it leaves behind.
   - The kind goes unexplained. A clause only for a meaning or an aftermath this member gives it;
     a remedy only when it is another call (`delDamagedVault` clears them). The user's next step
     is the message's job.
@@ -627,6 +641,7 @@ rows with it.
   words.
 * **Facts come from the code**, not from the old prose, which is sometimes wrong. Where they
   disagree, write what the code does and raise the disagreement; the doc never changes behaviour.
+  Timing words ("at once", "before", "never") are facts too: check each against the awaits.
 * Don't be stingy with `@example`s. A short example on one line; a long one on following lines,
   indented two spaces. Each has a test whose title points back to it (*Tests*). What is best said
   beside an example goes in its `//` comment.
@@ -635,7 +650,7 @@ rows with it.
   is the parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner
   named it.`
 * Each `{@link}` names something in scope in its file: add a type-only import, or write the name
-  as plain code. A private member is always plain code.
+  as plain code. A private member is always plain code, in backticks: never a `{@link}`.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would grep for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
@@ -656,7 +671,7 @@ After:
 
 ```ts
 /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
- * Never prompts. Within `opts.staleMinutes` of the last read it re-settles without reading.
+ * Never prompts. Within `staleMinutes` of the last read it re-settles without reading.
  * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link DeviceDB.getLease}.
  *
  * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
