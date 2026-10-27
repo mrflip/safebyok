@@ -11,6 +11,12 @@ on:
   schedule:
     - cron: '23 6 * * 1'
 
+# As in ci.yml: a new push to a pull request cancels its run in progress, and pushes to main run
+# one at a time, a waiting one replaced by a newer push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

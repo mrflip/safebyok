@@ -6,11 +6,15 @@ a check failed. A thread needs none of it: what a PR must carry is PROCESS.md, *
 ## On every pull request
 
 CI runs on every PR, over the root and every workspace package: `lint-typecheck` (lint, typecheck,
-no merge commits, a changeset, and `actionlint` over the workflows) and `test-build` (tests with
+no merge commits, a changeset, and `actionlint` over the workflows, by `scripts/actionlint.sh`,
+which `pnpm justify` runs too, as `pnpm lint:workflows`) and `test-build` (tests with
 coverage, which builds every package with its package checks, then the size budgets) must pass;
 `node-compat` runs the tests on Node 22, the platform floor, which must pass too, and on the
 newest Node, which reports. CodeQL scans the code and the workflows, and a finding shows on the
 PR.
+
+Both run again on each push to main, one push at a time: a run in progress finishes, and one
+still waiting is replaced by a newer push, so a run of merges holds no more runners than one run.
 
 ## Dependabot
 

@@ -6,11 +6,14 @@ on:
     branches: [main]
 
 # A new push to a pull request cancels that pull request's run still in progress: only the latest
-# commit's result matters there. Pushes to main each get a group of their own, by run id, so every
-# commit to main keeps its result.
+# commit's result matters there. Pushes to main share one group and run one at a time, so a run of
+# merges never holds more runners than one run's jobs, and pull requests keep the rest. A run in
+# progress on main always finishes; one still waiting is replaced by a newer push, so a commit
+# merged while another waited has no run of its own, and the commit after it, which holds it,
+# answers for both.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -99,21 +102,12 @@ jobs:
             exit 1
           fi
 
-      # actionlint, the release recorded here by its hash: the tarball is fetched and checked
-      # against the sha256 in its release's checksums file (actionlint_<version>_checksums.txt)
-      # before anything in it runs. The runner's shellcheck lints each `run:` script.
+      # actionlint, the release recorded in scripts/actionlint.sh by its version and hash, as
+      # `pnpm justify` runs it: the tarball is checked against the sha256 in its release's checksums
+      # file before anything in it runs. The runner's shellcheck lints each `run:` script.
       - name: Lint the workflows
         if: ${{ !cancelled() }}
-        env:
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-        run: |
-          tarball="$RUNNER_TEMP/actionlint.tgz"
-          curl --fail --silent --show-error --location --output "$tarball" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          echo "$ACTIONLINT_SHA256  $tarball" | sha256sum --check --strict
-          tar --extract --gzip --file "$tarball" --directory "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -color
+        run: scripts/actionlint.sh -color
 
   # The unit tests with coverage, which build every package first: under CI a build fails on any
   # warning, and checks each package as a consumer would see it (publint, arethetypeswrong: each
