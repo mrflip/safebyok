@@ -1,6 +1,7 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
 import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
 import type { VaultScope } from './types/types'
+import { codePointsOf } from './text'
 
 /** The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked.
  * NIST SP 800-63B asks for length, and against composition rules, which make passphrases harder to
@@ -67,9 +68,6 @@ const estimatorOf = (): Promise<ZxcvbnFactory> => {
   return made.estimator
 }
 
-/** How many Unicode code points `text` holds: NIST's count of characters, a lone surrogate counting one. */
-const codePointCount = (text: string): number => (text.match(/./gsu) ?? []).length
-
 /** The verdict that admits, frozen; its own, so that browserOpts() brings in no validation code with it. */
 const Strong: PassphraseVerdict = Object.freeze({ strong: true })
 
@@ -92,7 +90,8 @@ const reasonFor = (warning: string | null): string => {
 
 /** The passphrase as zxcvbn judges it: see {@link zxcvbnStrengthChecker}. */
 const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<PassphraseVerdict> => {
-  if (codePointCount(passphrase) < MinPassphraseChars) { return TooShort }
+  // NIST counts characters as code points, a lone surrogate counting one.
+  if (codePointsOf(passphrase).length < MinPassphraseChars) { return TooShort }
   const estimator = await estimatorOf()
   const { score, feedback } = estimator.check(passphrase, userInputsOf(scope))
   if (score >= MinZxcvbnScore) { return Strong }

@@ -11,6 +11,7 @@ import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
 import { type Outcome, outcomeOf } from './outcome'
+import { byCodeUnit } from './text'
 
 // == [Expectations and records]: VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse
 
@@ -732,7 +733,7 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
 }
 // --
 
-// == [Listing helpers]: splitStoredBoxes, checkedListing, ListingAnswer, isNameable, judgedBox, damagedOf, mayBeNewerBox, listingOf, isDamagedBox, byBoxlabel, byCodeUnit
+// == [Listing helpers]: splitStoredBoxes, checkedListing, ListingAnswer, isNameable, judgedBox, damagedOf, mayBeNewerBox, listingOf, isDamagedBox, byBoxlabel
 
 /** Split the box rows a VaultDB read into the sound and the damaged, as `doGetVault` and `doEnsureVault` answer them: the judging of damage is the package's, so an adapter adds one line.
  * A row whose record reads back as a box filed under its own boxlabel is sound, and listed as its
@@ -808,12 +809,6 @@ const isDamagedBox = (box: BoxSparse | BoxDamaged): box is BoxDamaged => 'damage
 
 /** Two listed boxes in boxlabel order, as {@link byCodeUnit} orders names. */
 const byBoxlabel = (one: { boxlabel: string }, two: { boxlabel: string }): number => byCodeUnit(one.boxlabel, two.boxlabel)
-
-/** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
-export const byCodeUnit = (one: string, two: string): number => {
-  if (one === two) { return 0 }
-  return one < two ? -1 : 1
-}
 // --
 
 // == [Name checks]: heldScope, heldBoxlabel, heldName

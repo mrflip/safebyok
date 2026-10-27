@@ -19,7 +19,8 @@ import { type BankVaultOpts, type MakeBankOpts, type ParsedBankOpts, type VaultP
 import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
-import { type VaultDB, byCodeUnit } from './vault-db'
+import type { VaultDB } from './vault-db'
+import { byCodeUnit } from './text'
 
 // == [Public types]: BankVault, BankSnapshot
 

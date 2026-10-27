@@ -1,5 +1,6 @@
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
+import { codePointsOf } from './text'
 
 /** How `mask` shows a whisper: how many characters to reveal, and how many stars to hide it behind. */
 export interface MaskOpts {
@@ -52,9 +53,6 @@ const composeAndStrip = (text: string): string => text.normalize('NFC').replaceA
  * It runs twice, since removing an invisible from between two Hangul jamo leaves them to compose.
  */
 const plainLine = (text: string): string => composeAndStrip(composeAndStrip(text))
-
-/** `text` as a list of its code points, so that a surrogate pair is never parted. */
-const codePointsOf = (text: string): string[] => text.match(/./gsu) ?? []
 
 /** The cut itself: `chars`, already safe, reduced to head, stars and tail by the give-up rules. */
 const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Record<keyof MaskOpts, number>): string => {
