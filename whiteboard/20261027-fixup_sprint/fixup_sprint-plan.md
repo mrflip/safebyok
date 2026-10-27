@@ -261,6 +261,24 @@ home are in the doc.
   - Thread 2's review: the first lines of `#freshenGated` (gating.ts) and `Proving.#unwrap` run
     35 to 45 words, and `#damagedBase`'s second line says how it's built, not what it does.
 
+*Review, 5a ([#304](https://github.com/mrflip/safebyok/pull/304)):* [fixed](https://github.com/mrflip/safebyok/pull/304#issuecomment-6453476949),
+7 fixes, 0 significant. The run's three corrections to match the code hold. Fixed: the class-wide
+lock bullet names only the calls that need the vault unlocked, and says "writing nothing more"
+(a gating's attempt may already have stored its change); three dropped facts put back (the
+Outcome's shape and the `try` form, `ask_passphrase_at`'s cue, putBox's `written_at` stamp);
+getBox's 'vault_remade'; putBox's two 'stale_write' cases kept apart; who drops an ended lease;
+four VOCABULARY.md words; three private consts as plain code. Left, minor: `#storedBase` →
+`#fillFromStored` (Your calls); `#demandLease`'s noun first line; `lock()`'s "Forget the unlock"
+(Finally); the bank-only symbols name their caller; two message bugs (Finally).
+
+*Review, 5b ([#302](https://github.com/mrflip/safebyok/pull/302)):* [fixed](https://github.com/mrflip/safebyok/pull/302#issuecomment-6453340797),
+5 fixes, 0 significant: `maxRecordBytes` names putBox's `box_too_large`; `readVault` hands back no
+tombstone; `BoxExpectation`'s null `revision_tok`; DeviceDB's 'bad_scope' "each but `delAll`";
+`valOf` is the throwing form, not outcomeOf's inverse. Left, minor: `delBox` takes only null as
+stale (a row); the verbs no longer say a failing record is discarded (the class doc does);
+`doRaiseDeviceRecord`'s transaction wording; idb.ts's top block lacks `@module`; the README's
+`whisper_too_large` and `storage_blocked` rows (rows); the renames (rows).
+
 ## Order
 
 * Threads 1 and 3 run at once, from `origin/main`.
