@@ -628,6 +628,15 @@ on the sprint doc's Cleanup tab.
   simultaneous initialization or requests arriving in the same event loop", `export function
   nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }`. Use it for the
   `await Promise.resolve()` in `bank.ts` (about line 464), whose comment says why it waits.
+* **The Coach's rulings of 2026-10-27, last pass.** On #286: keep `bankVaultOf`; "`ensure` is
+  meant to idempotently establish a condition: a no-op if it's met. Are all the ensure methods in
+  bank following that convention?" Check every `ensure*` in the core (bank.ts first), say in the
+  PR which are no-ops when the condition holds, and fix or rename any that is not. "useVault gives
+  a vault. for the other -- mildly prefer useListedVault as a name": rename `useBankVault` to
+  `useListedVault`. On #272's review: "a shape's validator takes its type's name": fix
+  `checks/validator.ts`'s camelCase `@example` blocks; rename `StringStore.ckeys()`, `fullCkey`
+  and safebyok-indexeddb's exported `IdbRow.ckey` to scopepath names (a public change: the
+  changeset says so).
 * **The bank's getters and VOCABULARY rows.** The Coach (2026-10-27): "yes add. I'd prefer the
   interface go through bank via getters than off a snapshot (bank.vaults, not
   bank.snapshot.vaults) outside of react." Add `bank.vaults` (and `bank.lifecycle`, where
@@ -635,7 +644,7 @@ on the sprint doc's Cleanup tab.
   non-React examples use them; React keeps `useSyncExternalStore` on the snapshot. VOCABULARY
   gains rows for `BankVault`, the bank's listing, and `lifecycle` (made, starting, ready,
   refused), saying how it differs from freshness's `timely`/`refused`.
-* **Small leftovers:** `VaultReadResponse.vault` is still cast by IndexedDB and local, as box rows were before #287: type it as #287 typed `StoredBox.box`; `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
+* **Small leftovers:** `VaultReadResponse.vault` is still cast by IndexedDB and local, as box rows were before #287: type it as #287 typed `StoredBox.box`; `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
   `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
@@ -644,7 +653,14 @@ on the sprint doc's Cleanup tab.
 
 **Depends on:** thread 14: cut from its tip, stacked on #287. **Size:** medium.
 
+*Orchestrator, 2026-10-27:* #287's review leftovers come here too: make the core's `idbOpts`
+strict like the adapter's (one 'safebyok' default); one sentence in `Validator`'s doc that a host
+schema keyed by input (`record`, `.catchall()`) repeats those keys in refusals; the doc blocks of
+`ensureVault` (its store sentence), `StoredBox`, `key-deriver-spec-checks.ts`'s header and `Kit`.
+
 ### 16. Retire "standing" -- `retire_standing`
+
+**Not run in this sprint** (the Coach, 2026-10-27): the prompt stays for a later session.
 
 The Coach's prompt, verbatim, is `unstanding.md` in this directory (2026-10-27): retire
 "standing" as a term of art, each of its five meanings with its own name (stored, held,
