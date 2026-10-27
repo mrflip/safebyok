@@ -50,6 +50,12 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
+// == [Callbacks]: CallbackNotFunction
+
+/** A listener or callback handed over as anything but a function. */
+export const CallbackNotFunction = "A listener or callback is a function, called back with what it is handed"
+// --
+
 // == [Passphrases]: PassphraseNotText
 
 /** A passphrase handed over as anything but text. */

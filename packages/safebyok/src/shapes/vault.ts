@@ -197,10 +197,10 @@ export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
 
 /** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
 export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
-  VaultDraft: VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }).strict(),
+  VaultDraft: VaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict(),
 }))
 
-/** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, and `gate_epoch` 0.
+/** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, `gate_epoch` 0, and `vault_epoch` 0, as the store sets the counter.
  *
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
  */

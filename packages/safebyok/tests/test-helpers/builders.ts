@@ -402,21 +402,28 @@ export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: 
 )
 
 /** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
- * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`.
+ * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`. With a
+ * `vault_epoch`, it is no draft but the new life a store makes of one over a tombstone, the counter
+ * carried on.
  *
  * @example vaultDB.ensureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
+ * @example gatelessOf('u1', { vault_epoch: 2 })   // a new life, as a read over a tombstone shows it
  */
-export const gatelessOf = (user_id: string, overrides: Partial<VaultDraft> = {}): VaultDraft => ({
-  format:              VaultFormat,
-  ...scopeOf(user_id),
-  vault_tok:           `vault-tok-${user_id}`,
-  registered_at:       Date.UTC(2026, 9, 14),
-  vault_epoch:         0,
-  gate_epoch:          0,
-  gate:                null,
-  ...overrides,
-})
+export function gatelessOf(user_id: string, overrides?: Partial<VaultDraft>): VaultDraft
+export function gatelessOf(user_id: string, overrides: Partial<Omit<VaultDraft, 'vault_epoch'>> & Pick<VaultRecord, 'vault_epoch'>): VaultRecord
+export function gatelessOf(user_id: string, overrides: Partial<VaultRecord> = {}): VaultRecord {
+  return {
+    format:              VaultFormat,
+    ...scopeOf(user_id),
+    vault_tok:           `vault-tok-${user_id}`,
+    registered_at:       Date.UTC(2026, 9, 14),
+    vault_epoch:         0,
+    gate_epoch:          0,
+    gate:                null,
+    ...overrides,
+  }
+}
 
 /**
  * A shape-valid BoxRecord for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,

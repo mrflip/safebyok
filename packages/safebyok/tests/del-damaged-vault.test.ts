@@ -134,6 +134,9 @@ describe("delDamagedVault", () => {
     await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: '' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
+    // A misspelt option is refused, never quietly dropped, and its name is counted, never repeated.
+    const misspelt = await TH.expectRefusal(delDamagedVault({ ...world.optsWith(), vaultlable: 'main' } as DelDamagedVaultOpts), 'bad_option')
+    expect(misspelt.message).to.include('There is a field it does not take').and.not.include('vaultlable')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')
     }

@@ -1,4 +1,4 @@
-/** Helpers the package's own modules share: how a model attaches its vault and its record where no loop, spread, log line or `JSON.stringify` will find them, and how a call yields to the microtasks queued behind it.
+/** Helpers the package's own modules share: how a model attaches its vault and its record where no loop, spread, log line or `JSON.stringify` will find them, how a call yields to the microtasks queued behind it, and how a stored row's field is read before the row is checked.
  * Not the `safebyok/utils` entry point (`utils.ts`), which is for the app around a vault.
  */
 
@@ -32,3 +32,13 @@ export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT =>
  * @example await nextMicrotask()   // every promise settled earlier in this task has run its handlers
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
+
+/** The field `fieldname` of `row`, a stored row as it stands, unchecked: undefined when the row is no object or has none.
+ * For the few reads made before, or instead of, a row's check: its `format`, or the tokens a
+ * key-value adapter compares inside its one atomic step.
+ *
+ * @example fieldOf(raw, 'format')   // 'safebyok-vault-v6', or whatever a damaged row holds there
+ */
+export const fieldOf = (row: unknown, fieldname: string): unknown => (
+  typeof row === 'object' && row !== null ? (row as Record<string, unknown>)[fieldname] : undefined
+)

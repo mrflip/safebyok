@@ -434,7 +434,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
   it("refuses an onChange that is not a function, so no later write meets it", () => {
     const vaultDB = new MapVaultDB()
     expect(() => vaultDB.subscribe(TH.scopeOf('u1'), 'not a listener' as unknown as () => void))
-      .to.throw(VaultError, /onChange function/).with.property('refusalkind', 'bad_option')
+      .to.throw(VaultError, /A listener or callback is a function/).with.property('refusalkind', 'bad_option')
   })
 })
 // --
@@ -447,13 +447,13 @@ const UnwrappedPassphrase = omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wra
 /** Writes a VaultDB refuses before its adapter's half sees them: none is one a vault builds. */
 const RefusedWrites = [
   // the records:
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault({ ...TH.gatelessOf('u1'), vault_epoch: 1.5 }),                                'a draft with a fractional vault_epoch'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault({ ...TH.gatelessOf('u1'), vault_epoch: 1.5 } as unknown as VaultDraft), 'a draft with a fractional vault_epoch'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), gate: { passphrase: UnwrappedPassphrase, passkey: null } } as VaultRecord, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'vault record whose passphrase is missing its wrapped vaultKey'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault({ ...TH.gatelessOf('u1'), applabel: 'Ac\u{7}me' }),                         'a draft whose applabel holds a control character, the record at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultRecord({ ...TH.vaultRecordOf('u1'), user_id: 'u^1' }, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'an update of the vault record whose user_id holds a ^'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.vaultRecordOf('u1') as unknown as VaultDraft), 'a gated draft handed to ensureVault: a vault is first stored gateless'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultRecords({ ...TH.gatelessOf('u1'), gate_epoch: 1 } as never), 'a draft at a gated epoch with no way in, handed to ensureVaultRecords'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault(TH.gatelessOf('u1', { vault_epoch: 3 })),                                       'a draft claiming a vault_epoch: the store sets the counter'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVault({ ...TH.gatelessOf('u1'), vault_epoch: 3 } as unknown as VaultDraft),           'a draft claiming a vault_epoch: the store sets the counter'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { when: new Date() } as never })), 'a box whose sidecar no read would accept'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('key\u{D83D}', 'one')),                  'a box whose boxlabel is half of an emoji, the box at fault though only its label failed'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 })), 'a box time in epoch seconds'],

@@ -5,6 +5,9 @@ import { type BoxListing, BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGet
 import type { VaultScope } from './shapes/scopes'
 import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone } from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
+import { Validator } from './checks/validator'
+import * as Phrases from './phrases'
+import { fieldOf } from './helpers'
 import * as Names from './names'
 import * as CX from './shapes/scopes'
 import * as Refusals from './refusals'
@@ -247,7 +250,8 @@ export abstract class VaultDB {
 
   /** The vault `doEnsureVault` ensures from `draft`, once the draft is checked, as {@link VaultDB.getVault} hands one back. */
   private async ensuredVault(draft: VaultDraft): Promise<VaultRecord & BoxListing> {
-    const outgoing = checkDraft(draft)
+    // A draft claims no counter, vault_epoch 0: the store sets it, and carries it on past a tombstone.
+    const outgoing = checkOutgoing(VaultDraft, draft, 'novel vault record draft')
     const asked = heldScope(this, outgoing)
     const read = await adapterAnswer(() => this.doEnsureVault(outgoing))
     const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
@@ -454,7 +458,7 @@ export abstract class VaultDB {
    */
   subscribe(scope: VaultScope, onChange: () => void): () => void {
     const asked = heldScope(this, scope)
-    checkListener(onChange)
+    callback.parse(onChange)
     let live = true
     const unsubscribe = startedWatch(() => this.doSubscribe(asked, () => {
       if (live) { heedListener(onChange, (err) => { this.listenerFailed(err) }) }
@@ -681,7 +685,7 @@ const OlderBoxFormats: ReadonlySet<unknown> = new Set(['safebyok-box-v1', 'safeb
 
 /** True when a stored box names a `format`, of any type, this version neither writes nor wrote before: a later version's, not damage. */
 const mayBeNewerBox = (raw: unknown): boolean => {
-  const format = formatOf(raw)
+  const format = fieldOf(raw, 'format')
   return format !== undefined && format !== BoxFormat && ! OlderBoxFormats.has(format)
 }
 
@@ -731,7 +735,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, withStaleVaultRecordChecked, unsaidVaultRecord, remade, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing, checkDraft
+// == [Storage and listener guards]: asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, withStaleVaultRecordChecked, unsaidVaultRecord, remade, boxStoredOf, invalidBox, callback, checked, checkOutgoing
 
 /** What an adapter threw, as a VaultError: a VaultError untouched, anything else wrapped. */
 const asStorageTrouble = (err: unknown): VaultError => (isVaultError(err) ? err : Refusals.storageUnavailable(err))
@@ -811,11 +815,13 @@ const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | BoxDamaged | n
 /** A box handed to `putBox` that this package would not build: kind 'invalid_box', quoting none of it. */
 const invalidBox = () => new VaultError('invalid_box', "Nothing was written: that box is not one this package builds. Hand a VaultDB's putBox only the boxes a vault seals.")
 
-const checkListener = (onChange: unknown) => {
-  if (typeof onChange !== 'function') {
-    throw new VaultError('bad_option', 'subscribe needs an onChange function to call after each write.')
-  }
-}
+/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
+ *
+ * @example this.#listeners.add(callback.parse(listener))
+ */
+export const { callback } = Validator('bad_option', ({ custom }) => ({
+  callback: custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function', Phrases.CallbackNotFunction),
+}))
 
 /** `candidate` through `recordSchema`, or the refusal `refused` makes, its cause the schema's own 'bad_record'.
  * That cause names each failing field and what it expected, in its message and `meta.fieldnames`,
@@ -837,17 +843,6 @@ const checked = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unknown, 
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' | 'read' = 'written'): RecordT => checked(recordSchema, candidate, (opts) => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`, opts)
 ))
-
-/** A draft handed to `ensureVault`, once it is a novel vault's record, `gate_epoch` 0 and `gate` null, with `vault_epoch` 0: 'bad_record' otherwise, quoting none of it.
- * The counter is the store's to set, so a draft claims none.
- */
-const checkDraft = (draft: unknown): VaultDraft => {
-  const outgoing = checkOutgoing(VaultDraft, draft, 'novel vault record draft')
-  if (outgoing.vault_epoch !== 0) {
-    throw new VaultError('bad_record', "Nothing was written: a draft's vault_epoch is 0. The store sets the counter, and carries it on from a vault deleted in the scope.")
-  }
-  return outgoing
-}
 // --
 
 // == [Vault record checks]: checkVaultRecord, checkWrittenVaultRecord, damagedVaultRecord, unnamedVaultRecord, newerVaultRecord, mayBeNewer, readStoredVault, isSoundVaultRecord, others
@@ -884,14 +879,8 @@ const OlderVaultRecordFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v
 const mayBeNewer = (raw: unknown): boolean => {
   // This is all this version can tell from damage. So any change to what a stored record may hold
   // -- a field, a shape, a kind of way in, or a range a check accepts -- bumps `format`.
-  const format = formatOf(raw)
+  const format = fieldOf(raw, 'format')
   return format !== undefined && format !== VaultFormat && format !== TombstoneFormat && ! OlderVaultRecordFormats.has(format)
-}
-
-/** The `format` a stored record names, of any type, or undefined for none, or for a record that is no object. */
-const formatOf = (raw: unknown): unknown => {
-  if (typeof raw !== 'object' || raw === null) { return undefined }
-  return (raw as { format?: unknown }).format
 }
 
 /** The vault as the adapter stores it; an adapter's own `damaged_vault`, from a VaultDB it hands on to, refuses as one too damaged to name, the vault's token out of reach. */
