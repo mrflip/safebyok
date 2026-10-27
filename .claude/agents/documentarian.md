@@ -72,7 +72,7 @@ it right without the sentence, cut it.
 
 4. **Refusals: the common and not obvious ones.** `RefusalKind` in `errors.ts` says what each
    kind means and what to do about it, and sorts the kinds into three families:
-   * *Misuse* (`bad_option`, `bad_label`, `vault_closed` after `close()`, ...) is said once, in
+   * *Misuse* (`bad_option`, `bad_scope`, `insecure_context`, ...) is said once, in
      the class or module doc, not repeated per member unless one treats it differently.
    * *Condition*: name those a caller meets in normal use. A wrong proof; a weak passphrase; a
      race with another device or tab (`stale_write`, `created_elsewhere`); the vault locked or
