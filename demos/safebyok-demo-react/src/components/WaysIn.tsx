@@ -14,7 +14,7 @@ import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
  * passphrase dialog offers "Use a passkey".
  */
 export const WaysIn = () => {
-  const vault = useVault('main')?.vault ?? null
+  const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const [gripe, setGripe] = useState<string | null>(null)
 

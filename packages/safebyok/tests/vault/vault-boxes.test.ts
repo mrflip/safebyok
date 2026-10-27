@@ -49,6 +49,16 @@ describe("putBox and getWhisper", () => {
     expect(summary).to.not.have.property('whisper')
   })
 
+  it("freezes its own copy of a sidecar, never the caller's", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const sidecar = { note: 'work account', tags: ['atlas'] }
+    const box = await vault.putBox({ boxlabel: 'anthropic', sidecar }, 'sk-fake')
+    expect(Object.isFrozen(sidecar)).to.be.false
+    expect(Object.isFrozen(sidecar.tags)).to.be.false
+    expect(box.sidecar).to.deep.equal(sidecar)
+  })
+
   it("replacing a whisper keeps the sidecar", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')

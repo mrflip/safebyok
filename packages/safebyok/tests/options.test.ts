@@ -19,18 +19,14 @@ describe("optionsCheck", () => {
 
   it("refuses a field it does not know as 'bad_option', as its example's second call shows, saying what failed and then what it was told to", () => {
     const err = TH.expectSyncRefusal(() => checkStoreOpts({ note: 'work' }), 'bad_option')
-    expect(err.message).to.eq(`There is no field note: check its spelling, or leave it out. ${Said}`)
+    expect(err.message).to.eq(`There is a field it does not take (its name is not repeated): it takes only sidecar. Check the spelling, or leave it out. ${Said}`)
   })
 
-  it("refuses an unknown field beside a known one, naming the field and quoting no value", () => {
+  it("refuses an unknown field beside a known one, counting it, naming neither it nor any value", () => {
     const err = TH.expectSyncRefusal(() => checkStoreOpts({ sidecar: { hint: 'SUPERSECRET' }, sidcar: { hint: 'SUPERSECRET' } }), 'bad_option')
-    expect(err.message).to.include('There is no field sidcar')
+    expect(err.message).to.include('There is a field it does not take')
+    expect(err.message).to.not.include('sidcar')
     expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
-  })
-
-  it("never repeats an unknown field shaped as a credential", () => {
-    const err = TH.expectSyncRefusal(() => checkStoreOpts({ [`sk_live_${'0Fake'.repeat(5)}`]: true }), 'bad_option')
-    expect(err.message).to.eq(`There is no field (a name not repeated here): check its spelling, or leave it out. ${Said}`)
   })
 
   const NotBags = [
@@ -45,14 +41,6 @@ describe("optionsCheck", () => {
       expect(err.message).to.eq(`${found}. ${Said}`)
     })
   }
-
-  it("adds its hint for something handed in that is no plain bag, after what failed and what it was told to", () => {
-    const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), Said, 'An event, most likely.')
-    class Clicked { readonly type = 'click' }
-    expect(TH.expectSyncRefusal(() => checkHelloOpts(new Clicked()), 'bad_option').message).to.eq(`There is no field type: check its spelling, or leave it out. ${Said} An event, most likely.`)
-    expect(TH.expectSyncRefusal(() => checkHelloOpts(12), 'bad_option').message).to.eq(`Invalid input: expected object, received number. ${Said} An event, most likely.`)
-    expect(TH.expectSyncRefusal(() => checkHelloOpts({ type: 'click' }), 'bad_option').message).to.eq(`There is no field type: check its spelling, or leave it out. ${Said}`)
-  })
 
   it("refuses a known field its schema refuses, naming it in the message and meta.fieldnames", () => {
     const checkLabel = optionsCheck(({ str }) => ({ vaultlabel: str.optional() }), 'vaultlabel is text.')

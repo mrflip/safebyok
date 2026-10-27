@@ -719,7 +719,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     expect(await vaultTwo.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
     await TH.expectRefusal(vaultOne.hello({ staleMinutes: 0 }), 'vault_gone')
     await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'vault_gone')
-    expect(TH.bankOf(vaultOne).entryOf(u1Main)?.status).to.eq('refused')
+    expect(TH.bankOf(vaultOne).bankVaultOf(u1Main)?.lifecycle).to.eq('refused')
   })
 
   it("getWhisper() of a box the reborn vault wrote refuses as vault_gone at once, never damaged_box, reading no vault record; the Vault object is gone with it, and the next hello refuses vault_gone, reading nothing", async () => {

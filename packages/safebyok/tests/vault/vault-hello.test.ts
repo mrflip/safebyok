@@ -314,7 +314,8 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'vault_gone')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
-    expect(TH.bankOf(vault).entryOf(u1Main)).to.deep.include({ status: 'refused', vault: null })
+    expect(TH.bankOf(vault).bankVaultOf(u1Main)).to.deep.include({ lifecycle: 'refused' })
+    expect(TH.bankOf(vault).vaultOf(u1Main)).to.be.null
   })
 
   it("makes the Vault object gone when a refresh finds the vault deleted and made anew: it refuses 'vault_remade', as every later call does, and the bank births the new life", async () => {
@@ -326,7 +327,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     await TH.expectRefusal(vault.refresh(), 'vault_remade')
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'vault_remade')
     await TH.expectRefusal(TH.unlock(vault, 'pw'), 'vault_remade')
-    expect(TH.bankOf(vault).entryOf(u1Main)?.err?.refusalkind).to.eq('vault_remade')
+    expect(TH.bankOf(vault).bankVaultOf(u1Main)).to.have.nested.property('err.refusalkind', 'vault_remade')
     const reborn = await TH.bankOf(vault).ensureVault(u1Main)
     expect(TH.stateOf(reborn.getSnapshot())).to.eq('novel')
     expect(reborn.getSnapshot()).to.deep.include({ vault_tok: remade.vault_tok })
@@ -912,7 +913,8 @@ describe("vault.hello, by the Contract", () => {
     TH.closeVault(there)
     const { ok, err } = await bank.tryEnsureVault(u1Main)
     expect(err?.refusalkind).to.eq('vault_behind')
-    expect(bank.entryOf(u1Main)).to.deep.include({ status: 'refused', vault: null, err })
+    expect(bank.bankVaultOf(u1Main)).to.deep.include({ lifecycle: 'refused', err })
+    expect(bank.vaultOf(u1Main)).to.be.null
     if (! ok && isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
       await bank.clearCachedVault(u1Main)
       await bank.ensureVault(u1Main)

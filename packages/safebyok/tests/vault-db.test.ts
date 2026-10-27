@@ -70,7 +70,7 @@ class MapVaultDB extends VaultDB {
   private storedBoxes(scope: VaultScope): StoredBox[] {
     const prefix = Scopepath.withinVaultScopepathPrefix(scope)
     const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-    return [...this.rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, row]) => ({ boxlabel: ckey.slice(prefix.length), box: row as StoredBox['box'] }))
+    return [...this.rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, row]) => ({ boxlabel: ckey.slice(prefix.length), box: row }))
   }
 
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) {
@@ -683,7 +683,7 @@ describe("the abstract VaultDB, on the way in", () => {
   it("hands its adapter only a record as this package writes it: one holding a field it does not know is refused 'bad_record', its adapter handed nothing", async () => {
     const vaultDB = new MapVaultDB()
     const refusal = await TH.expectBad(vaultDB.ensureVault({ ...TH.gatelessOf('u1'), stray_field: 'x' } as VaultDraft), 'bad_record')
-    expect((refusal.cause as VaultError).message).to.eq("There is no field stray_field: check its spelling, or leave it out")
+    expect((refusal.cause as VaultError).message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only format, applabel, /)
     expect(vaultDB.rows.size).to.eq(0)
   })
 
@@ -1018,9 +1018,9 @@ describe("splitStoredBoxes", () => {
   it("splits the rows an adapter read into the sound and the damaged, each sorted by boxlabel, as its example hands them up", () => {
     const rows: StoredBox[] = [
       { boxlabel: 'openai',    box: TH.boxOf('openai', 'two') },
-      { boxlabel: 'mistral',   box: 'not a box' as never },
+      { boxlabel: 'mistral',   box: 'not a box' },
       { boxlabel: 'anthropic', box: omit(TH.boxOf('anthropic', 'one'), ['box_key_wrapped', 'whisper_ciphered']) },
-      { boxlabel: 'cohere',    box: { ...TH.boxOf('cohere', 'four'), format: 'safebyok-box-v9' } as never },
+      { boxlabel: 'cohere',    box: { ...TH.boxOf('cohere', 'four'), format: 'safebyok-box-v9' } },
       { boxlabel: 'Bad Label', box: TH.boxOf('Bad Label', 'five') },
     ]
     expect(splitStoredBoxes(rows)).to.deep.equal({
@@ -1265,7 +1265,7 @@ describe("the abstract VaultDB, reading a damaged box", () => {
     vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
     vaultDB.rows.set(u1AnthropicBoxScopepath, { ...TH.boxOf('anthropic', 'one'), note: 'work account' })
     const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
-    expect((refusal.cause as VaultError).message).to.eq("There is no field note: check its spelling, or leave it out")
+    expect((refusal.cause as VaultError).message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only format, boxlabel, /)
   })
 
   it("refuses standing vault record that fails its checks, met by ensureVault, as damaged_vault", async () => {

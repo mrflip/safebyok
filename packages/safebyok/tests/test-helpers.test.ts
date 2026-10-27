@@ -376,7 +376,7 @@ describe("settledVault", () => {
     const vault = await TH.settledVault(opts)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
-    expect(TH.bankOf(vault).entryOf({ user_id: 'u1', vaultlabel: 'main' })?.vault).to.eq(vault)
+    expect(TH.bankOf(vault).vaultOf({ user_id: 'u1', vaultlabel: 'main' })).to.eq(vault)
   })
 
   it("makes a bank of its own each call, so two calls over one deviceDB are two tabs of one device", async () => {
@@ -1475,7 +1475,7 @@ const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): VaultRea
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {
   const prefix = Scopepath.withinVaultScopepathPrefix(scope)
   const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box: box as StoredBox['box'] }))
+  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box }))
 }
 
 /** How full `scope` is in `rows`: its boxes counted, each weighed as its row's JSON, against `maxBoxes` and no limit on bytes. */

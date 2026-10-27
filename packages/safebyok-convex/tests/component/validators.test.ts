@@ -29,7 +29,7 @@ type Shape =
   | { kind: 'any' }
 
 /** Zod's half: read from its public `def`, refinements (min, regex, int) set aside. */
-type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, shape?: Record<string, ZodLike>, element?: ZodLike, out?: ZodLike, valueType?: ZodLike } }
+type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, shape?: Record<string, ZodLike>, element?: ZodLike } }
 
 const zodShape = (schema: ZodLike): Shape => {
   const { def } = schema
@@ -46,11 +46,9 @@ const zodShape = (schema: ZodLike): Shape => {
   }
   if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
   if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType) } }
-  // A box's sidecar: a check the core alone runs, piped into an object of JSON values.
-  if (def.type === 'pipe' && def.out) { return zodShape(def.out) }
-  if (def.type === 'record' && def.valueType) { return { kind: 'record', value: zodShape(def.valueType) } }
-  // A JSON value, which Convex holds as any value: the core alone checks it.
-  if (def.type === 'lazy') { return { kind: 'any' } }
+  // A box's sidecar: a check the core alone runs, of a plain object of JSON values, which Convex
+  // holds as an object of any values.
+  if (def.type === 'custom') { return { kind: 'record', value: { kind: 'any' } } }
   throw new Error(`no shape for a Zod ${def.type}`)
 }
 

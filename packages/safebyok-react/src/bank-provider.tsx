@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Bank, type Gating, type RequestCleartext, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultEntry, type VaultLogger, type VaultSnapshot } from 'safebyok'
+import { Bank, type BankVault, type Gating, type RequestCleartext, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultLogger, type VaultSnapshot } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
-// == [Hooks]: useBank, useVault, useEntry, useVaultSnapshot
+// == [Hooks]: useBank, useBankVault, useVault, useVaultFor, useListed, useVaultSnapshot
 
 /** What the provider hands down: the signed-in user's bank, whose vaults the hooks ask it for. */
 type Provided = { bank: Bank | null }
@@ -41,51 +41,66 @@ const unsubscribeFromNothing = () => { /* nothing was heard */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 const getNothing = () => null
 
-/** The bank's entry for the signed-in user's vault under `vaultlabel`, asking the bank for that vault when it holds none; null while nobody is signed in, and until the ask lands.
- * The entry is `starting` while the vault's birth reads storage, `timely` holding the Vault object
- * (`novel`, `locked` or `unlocked`), or `refused` with why: storage that cannot be reached
- * (`storage_unavailable`), a user storage no longer serves (`identity_revoked`), a vault whose
- * stored props fail their checks (`damaged_vault`, which `bank.delDamagedVault` answers),
- * a browser that will not let the app keep anything on this device (`storage_blocked`), storage
- * serving an older copy than this device has seen (`vault_behind`, which `bank.clearCachedVault`
- * answers), or a vault deleted (`vault_gone`) or made anew elsewhere (`vault_remade`).
+/** The bank's listing of the signed-in user's vault under `vaultlabel` -- its scope and its `lifecycle` -- asking the bank for that vault when it lists none; null while nobody is signed in, and until the ask lands.
+ * The vault is `starting` while its birth reads storage, `ready` once the bank holds its Vault
+ * object ({@link useVault} hands it down), or `refused` with why, in `err`: storage that cannot
+ * be reached (`storage_unavailable`), a user storage no longer serves (`identity_revoked`), a
+ * vault whose stored record fails its checks (`damaged_vault`, which `bank.delDamagedVault`
+ * answers), a browser that will not let the app keep anything on this device (`storage_blocked`),
+ * storage serving an older copy than this device has seen (`vault_behind`, which
+ * `bank.clearCachedVault` answers), or a vault deleted (`vault_gone`) or made anew elsewhere
+ * (`vault_remade`).
  *
- * It asks only while the bank holds no entry for the vault: as it mounts, and after the entry is
- * let go (a sign-out, `bank.closeVault`, `bank.clearCachedVault`). A refused entry stays refused
+ * It asks only while the bank lists nothing for the vault: as it mounts, and after the vault is
+ * let go (a sign-out, `bank.closeVault`, `bank.clearCachedVault`). A refused vault stays refused
  * until the app asks again (`useBank().ensureVault`), so a vault deleted stays gone, rather than
  * coming back as a new, novel one nobody asked for. A refusal that is misuse -- the developer's to
  * fix, which no retry mends -- is thrown in render, to the nearest error boundary, as is a
- * `vaultlabel` that fails its check.
- *
- * Its Vault object's fields read live in an event handler; render from {@link useVaultSnapshot},
- * which re-renders as they change. A vault opened once that meets an older copy on a later read
- * stays `timely` and locked, its snapshot's `trouble` 'vault_behind'.
+ * `vaultlabel` that fails its check. A vault opened once that meets an older copy on a later read
+ * stays `ready` and locked, its snapshot's `trouble` 'vault_behind'.
  *
  * @example
- *   const entry = useVault('main')
- *   if (entry === null || entry.status === 'starting') { return <p>Opening your vault…</p> }
- *   if (entry.vault === null) { return <p>{"Can't open your vault: "}{entry.err?.message}</p> }
- *   const { vault } = entry
+ *   const bankVault = useBankVault('main')
+ *   if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
+ *   if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
+ */
+export const useBankVault = (vaultlabel: string): BankVault | null => useListed('useBankVault', vaultlabel).bankVault
+
+/** The Vault object of the signed-in user's vault under `vaultlabel`, asking the bank for it as {@link useBankVault} does; null until the bank holds it `ready`, and while nobody is signed in.
+ * It is what the bank hands out for the vault (`bank.vaultOf`), the same object for the vault's
+ * life; {@link useBankVault} says why there is none. Its own fields are fixed for its life; render
+ * what changes from {@link useVaultSnapshot}, which re-renders as it changes, and read it live in
+ * an event handler through `vault.snapshot`.
+ *
+ * @example
+ *   const vault = useVault('main')
+ *   if (vault === null) { return <p>Opening your vault…</p> }
  *   return <button onClick={() => { void vault.lock() }}>Lock</button>
  */
-export const useVault = (vaultlabel: string): VaultEntry | null => useEntry('useVault', vaultlabel)
+export const useVault = (vaultlabel: string): Vault | null => useVaultFor('useVault', vaultlabel)
 
-/** {@link useVault}'s work, for `hookname`: the entry, asked for when the bank holds none, and misuse thrown. */
-const useEntry = (hookname: string, vaultlabel: string): VaultEntry | null => {
+/** {@link useVault}'s work, for `hookname`: the Vault object the bank hands out once its listing of the vault is `ready`. */
+const useVaultFor = (hookname: string, vaultlabel: string): Vault | null => {
+  const { bank, bankVault } = useListed(hookname, vaultlabel)
+  return bank !== null && bankVault?.lifecycle === 'ready' ? bank.vaultOf({ vaultlabel }) : null
+}
+
+/** {@link useBankVault}'s work, for `hookname`: the bank, and its listing of the vault, asked for when the bank lists none, and misuse thrown. */
+const useListed = (hookname: string, vaultlabel: string): { bank: Bank | null, bankVault: BankVault | null } => {
   const { bank } = useProvided(hookname)
-  const readEntry = useCallback(() => (bank === null ? null : bank.entryOf({ vaultlabel })), [bank, vaultlabel])
-  // The server renders with no bank, as the client's first render does: no entry on either.
-  const entry = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, readEntry, getNothing)
-  const unasked = bank !== null && entry === null
+  const readListed = useCallback(() => (bank === null ? null : bank.bankVaultOf({ vaultlabel })), [bank, vaultlabel])
+  // The server renders with no bank, as the client's first render does: nothing listed on either.
+  const bankVault = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, readListed, getNothing)
+  const unasked = bank !== null && bankVault === null
   useEffect(() => {
     if (! unasked) { return }
-    // A refusal lands in the entry, and is rendered from there.
+    // A refusal lands in the listing, and is rendered from there.
     void bank.tryEnsureVault({ vaultlabel })
   }, [unasked, bank, vaultlabel])
   // Thrown here, in render, so the nearest error boundary (or the dev overlay) shows it: every hook
   // has run by now, so the throw leaves the rules of hooks alone.
-  if (entry?.status === 'refused' && entry.err?.family === 'misuse') { throw entry.err }
-  return entry
+  if (bankVault?.lifecycle === 'refused' && bankVault.err.family === 'misuse') { throw bankVault.err }
+  return { bank, bankVault }
 }
 
 /** The live snapshot of the signed-in user's vault under `vaultlabel` -- its gate (its ways in), the box listing, when it next asks for the passphrase -- or null while there is no Vault object.
@@ -99,7 +114,7 @@ const useEntry = (hookname: string, vaultlabel: string): VaultEntry | null => {
  *   return <p>{snapshot.boxes.length} keys stored</p>
  */
 export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
-  const vault: Vault | null = useEntry('useVaultSnapshot', vaultlabel)?.vault ?? null
+  const vault = useVaultFor('useVaultSnapshot', vaultlabel)
   // The server renders with no vault, as the client's first render does: no snapshot on either.
   return useSyncExternalStore(vault?.subscribe ?? subscribeToNothing, vault?.getSnapshot ?? getNothing, getNothing)
 }
@@ -161,7 +176,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
   }
 }
 
-/** Makes the signed-in user's bank from its props, and hands it down to {@link useBank}, and the user's vaults to {@link useVault} and {@link useVaultSnapshot}.
+/** Makes the signed-in user's bank from its props, and hands it down to {@link useBank}, and the user's vaults to {@link useVault}, {@link useBankVault} and {@link useVaultSnapshot}.
  * It makes the bank (`Bank.make`) in an effect, once a user is signed in, for that user: that
  * checks the options, and reads nothing. A vault is asked for only by a hook that names it,
  * `useVault('main')`; until its birth settles, there is no Vault object. A vault refused or
@@ -196,7 +211,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * calls refused 'vault_gone'. `allowStartOver` offers nothing, for now.
  *
  * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
- * birth refused as misuse or with a value that is no VaultError at all, which `useVault` throws
+ * birth refused as misuse or with a value that is no VaultError at all, which `useVault` and `useBankVault` throw
  * -- reaches the nearest error boundary.
  *
  * @example

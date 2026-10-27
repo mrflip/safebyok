@@ -196,12 +196,14 @@ between columns lets the editor align them (see *Tests*).
   const`, `export type BoxKind = typeof BoxKindVals[number]`.
 * Name a schema after what it checks, in the same case: the field `salt_bytes` has the validator
   `salt_bytes`.
-* **A refusal of a host's bag of options says what Zod found, in Zod's English**: parse with
-  `InEnglish` and say `issuesText(err)` first (`src/options.ts`; `optionsCheck` does both), then
-  what to do. zod/mini alone says only "Invalid input"; never `Z.config`, which is the host's Zod
-  too. Zod's English names a refused value's type, never the value.
-* **A validation error must never quote a secret.** Zod's issues can carry the input they
-  refused: a schema that sees secret material reports without it.
+* **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
+  made in a `Validator` call does (`src/checks/validator.ts`), and a check of options catches its
+  refusal only to prefix the call's name and say what to do (`optionsCheck`, `checkMakeBankOpts`).
+  Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
+  the value.
+* **A refusal never repeats its input: no value, and no key** (the Coach, 2026-10-26). A field an
+  object does not take is counted, and the refusal lists the fields it takes. No handler sifts
+  broken input to explain it: a catch only aligns the kind and attaches context.
 * Records read back from storage are validated too: storage is someone else's database, and a
   vault may have been written by another version of this package.
 

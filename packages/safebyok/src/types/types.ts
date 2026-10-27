@@ -1,4 +1,6 @@
 import type * as Z from 'zod'
+import { record } from 'zod'
+import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import * as CX from '../checks/core-checks'
 import type { PasskeyWayinSparse, PassphraseWayinSparse, VaultRecord } from '../vault-record'
@@ -24,7 +26,8 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
 }
 
 /** The check for a {@link Whisper}, exactly what JSON can carry, never what it would mangle, and never a bare null; and `whisperBag`, the plain JSON object a whisper or a {@link Sidecar} may be.
- * Its `parse` refuses 'bad_whisper', quoting none of it.
+ * Its `parse` refuses 'bad_whisper', quoting none of it, and naming none of an object's keys: an
+ * object that is not plain JSON fails whole.
  *
  * @example Whisper.parse('sk-ant-...')                  // a string passes through
  * @example Whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
@@ -32,11 +35,16 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  * @example Whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example Whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
-export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, rec, custom }) => {
-  const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, whisperBag]))
-  const whisperBag = custom<Record<string, unknown>>(isPlainBag, "a whisper object must be a plain object").pipe(rec(str, whisperJson))
+export const { Whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
+  const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
+  // An object is judged whole, so a refusal's path never holds one of its keys, which are the caller's own.
+  const whisperMembers = record(str, whisperJson)
+  const plainBag = custom<Record<string, WhisperJson>>((val) => isPlainBag(val) && whisperMembers.safeParse(val).success, Phrases.WhisperBagShape)
   const whisperArr = arr(whisperJson)
-  const Whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, whisperBag])
+  // A judged object is the caller's own, so each check hands back a copy, as a parse of an object does:
+  // a box freezes its record through, and must never freeze, or share, the caller's sidecar.
+  const whisperBag = plainBag.overwrite((bag) => structuredClone(bag))
+  const Whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, plainBag]).overwrite((whisper) => structuredClone(whisper))
   return { Whisper, whisperBag }
 })
 

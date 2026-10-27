@@ -568,7 +568,7 @@ describe("when storage says the user is no longer signed in", () => {
   it("takes no option to stay unlocked: Bank.make refuses one, as it refuses any option it does not know", () => {
     const world = makeWorld()
     const err = TH.expectSyncRefusal(() => bankIn(world, { whenIdentityRevoked: 'stay' } as Partial<TH.BornVaultOpts>), 'bad_option')
-    expect(err.message).to.include('whenIdentityRevoked')
+    expect(err.message).to.include('There is a field it does not take')
   })
 
   it("locks nothing for not_permitted: the vault's own user, refused one call", async () => {

@@ -59,9 +59,10 @@ describe("BoxRecord", () => {
     it(blurb, () => { expect(BoxRecord.safeParse(candidate).success).to.eq(expected) })
   }
 
-  it("refuses a field it does not know, such as the note a box once had, as 'bad_record', naming it", () => {
+  it("refuses a field it does not know, such as the note a box once had, as 'bad_record', counting it and never naming it", () => {
     const err = TH.expectSyncRefusal(() => BoxRecord.parse({ ...wholeBox, note: 'work account' }), 'bad_record')
-    expect(err.message).to.eq("There is no field note: check its spelling, or leave it out")
+    expect(err.message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only format, boxlabel, /)
+    expect(err.message).to.not.include('note')
   })
 
   it("tells a row that is no box from one that is, as its example shows", () => {

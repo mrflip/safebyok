@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useBank, useVault, useVaultSnapshot } from 'safebyok-react'
+import { useBank, useBankVault, useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
@@ -29,7 +29,8 @@ const noteOf = (sidecar: Sidecar): string => {
 
 export const VaultDashboard = () => {
   const bank = useBank()
-  const entry = useVault('main')
+  const bankVault = useBankVault('main')
+  const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
@@ -39,18 +40,17 @@ export const VaultDashboard = () => {
   // Why the bank has no vault to hand down -- storage unreachable, signed out of the backend -- is
   // shown here, in place, with a way to ask again. (Misuse would have gone to an error boundary.)
   // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
-  const refusal = entry?.err ?? null
-  if (entry !== null && refusal !== null && bank !== null) {
-    // The entry's scope names the vault to the bank as it is: the bank is this user's.
-    const choice = entry.scope
-    const askAgain = () => { void bank.tryEnsureVault(choice) }
+  // The listed vault names itself to the bank as it is: the bank is this user's.
+  if (bank !== null && bankVault?.lifecycle === 'refused') {
+    const refusal = bankVault.err
+    const askAgain = () => { void bank.tryEnsureVault(bankVault) }
     // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
     // and start over, which asks first, as it takes every box in the vault with it.
     if (refusal.refusalkind === 'damaged_vault') {
       const startOver = async () => {
         if (! globalThis.confirm("Remove this vault and start over? Every box in it is lost for good.")) { return }
         setGripe(null)
-        const deleted = await bank.tryDelDamagedVault(choice)
+        const deleted = await bank.tryDelDamagedVault(bankVault)
         if (! deleted.ok) { setGripe(deleted.err.message); return }
         askAgain()
       }
@@ -72,7 +72,7 @@ export const VaultDashboard = () => {
       const accept = async () => {
         if (! globalThis.confirm("Accept the older copy of this vault that storage holds now? Only do this if it was restored from a backup on purpose.")) { return }
         setGripe(null)
-        const cleared = await bank.tryClearCachedVault(choice)
+        const cleared = await bank.tryClearCachedVault(bankVault)
         if (! cleared.ok) { setGripe(cleared.err.message); return }
         askAgain()
       }
@@ -93,7 +93,6 @@ export const VaultDashboard = () => {
       </p>
     )
   }
-  const vault = entry?.vault ?? null
   // No Vault object until its birth has read storage: until then, the vault is opening.
   if (vault === null || snapshot === null) { return <p className="quiet">Opening vault…</p> }
 

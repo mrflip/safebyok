@@ -50,32 +50,20 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
 // --
 
-// == [Refusals]: FailedItsCheck, UnsaidName, unknownFields, moreFailures
+// == [Refusals]: unknownFields, moreFailures, WhisperBagShape
 
-/** A refused input whose check gave no sentence of its own. */
-export const FailedItsCheck = "It failed its check"
-
-/** A field name or key the refusal will not repeat, since it does not look like one of ours and could be the caller's data. */
-export const UnsaidName = "(a name not repeated here)"
-
-/** Fields the schema does not have, by the names it may repeat. */
-export const unknownFields = (fieldnames: readonly string[]): string => (
-  fieldnames.length === 1
-    ? `There is no field ${fieldnames[0]!}: check its spelling, or leave it out`
-    : `There are no fields ${fieldnames.join(', ')}: check their spelling, or leave them out`
-)
+/** An object holding `count` fields it does not take, never named, as a name may be the caller's data, and the `fieldnames` it takes. */
+export const unknownFields = (count: number, fieldnames: readonly string[]): string => {
+  const held  = count === 1 ? 'There is a field it does not take (its name is not repeated)' : `There are ${String(count)} fields it does not take (their names are not repeated)`
+  const takes = fieldnames.length === 0 ? 'it takes no fields' : `it takes only ${fieldnames.join(', ')}`
+  return `${held}: ${takes}. Check the spelling, or leave ${count === 1 ? 'it' : 'them'} out`
+}
 
 /** How many more failures a refusal found than it names. */
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
-// --
 
-// == [Bank calls]: storesInBag
-
-/** The bag naming a vault holds `fieldnames`, each named as a store is: a vault's own stores go in the call's second bag, its options. */
-export const storesInBag = (fieldnames: readonly string[]): string => {
-  const named = fieldnames.length === 1 ? `The field ${fieldnames[0]!} names` : `The fields ${fieldnames.join(', ')} name`
-  return `${named} a store beside the vaultlabel, where a vault's own vaultDB and deviceDB go in the call's second bag, its options: bank.ensureVault({ vaultlabel }, { vaultDB }). Left there, the bank's own stores would be used instead`
-}
+/** An object in a whisper or a sidecar that is not plain JSON. */
+export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map or a class's instance"
 // --
 
 // == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, DeviceScopepathShape, BoxScopepathShape

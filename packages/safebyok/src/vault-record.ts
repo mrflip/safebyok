@@ -14,7 +14,7 @@ export const VaultFormat = 'safebyok-vault-v6'
 export const TombstoneFormat = 'safebyok-tombstone-v1'
 // --
 
-// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse
+// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft
 
 /** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves. Each `parse` refuses 'bad_record', quoting none of it.
  * Each record is strict: a field this version does not know is damage. A VaultDB reads each back
@@ -179,6 +179,11 @@ export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
  */
 export type VaultDraft = VaultRecord & { gate: null, gate_epoch: 0 }
+
+/** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
+export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
+  VaultDraft: VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }),
+}))
 
 /** What a deleted vault leaves in its scope: its counter, which the next life of the scope carries on.
  * `vault_epoch` is the deleted vault's plus one. Every write refuses over a tombstone as it does

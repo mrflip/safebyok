@@ -1,5 +1,4 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { VaultError, isVaultError } from './errors'
 import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
 import { type VaultStamp, VaultStampPicked, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
 import type { KeyDeriver } from './key-deriver'
@@ -91,22 +90,20 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
     return this.#record
   }
 
-  /** The wayin a stored record stands for, checked through its schema; refuses 'damaged_wayin' for a record this package never writes.
-   * The schema's 'bad_record' is the refusal's cause, naming each failing field and repeating no
-   * key that is not shaped as one of ours.
+  /** The wayin a stored record stands for, checked through its schema: 'bad_record', the schema's own refusal, for a record this package never writes.
    *
    * @param vaultStamp - The stamp of the vault record it is one of: that record itself will do, or
    *   the Vault object, as only its six stamp fields are taken. One missing any refuses 'bad_record'.
    * @param kit.keyDeriver - The vault's key deriver, which judges a passphrase wayin's salt.
    *
    * @example Wayin.make(vaultRecord, vaultRecord.gate.passphrase, { keyDeriver })  // a PassphraseWayin
-   * @example Wayin.make(vaultRecord, { ...record, device_id: '' }, { keyDeriver })  // throws 'damaged_wayin'
+   * @example Wayin.make(vaultRecord, { ...record, device_id: '' }, { keyDeriver })  // throws 'bad_record'
    */
   static make(vaultStamp: VaultStamp, record: PassphraseWayinRecord, kit: { keyDeriver: KeyDeriver }): PassphraseWayin
   static make(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }): PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin {
-    const checked = damagedWayinUnless(record)
+    const checked = WayinRecord.parse(record)
     return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vaultStamp, checked, kit) : new PasskeyWayin(vaultStamp, checked, kit)
   }
 
@@ -186,12 +183,3 @@ export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   }
 }
 
-/** `record`, once it is a wayin's record: 'damaged_wayin' otherwise, its cause the schema's own 'bad_record', which names each failing field and quotes no value. */
-const damagedWayinUnless = (record: unknown): WayinRecord => {
-  try {
-    return WayinRecord.parse(record)
-  } catch (err) {
-    if (! isVaultError(err, 'bad_record')) { throw err }
-    throw new VaultError('damaged_wayin', "One of this vault's unlockers is stored in a form this package never writes, so it can't be tried. The other vault unlocker, if the vault has one, still can.", { cause: err })
-  }
-}

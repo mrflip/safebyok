@@ -8,13 +8,13 @@ import { Probe, makeWorld, shownState, expectShown, expectOutcome, putThroughNew
 
 /** An Unlock button, as a host would write one: the vault unlocked ahead of time, through ensureUnlocked. */
 const UnlockButton = () => {
-  const vault = useVault('main')?.vault ?? null
+  const vault = useVault('main')
   return vault === null ? null : <button onClick={() => { void vault.tryEnsureUnlocked() }}>Unlock ahead</button>
 }
 
 /** Keeps in `seen` the Vault object the provider hands down for `vaultlabel`, once there is one. */
 const VaultKeeper = ({ seen, vaultlabel }: { seen: Map<string, Vault>, vaultlabel: string }) => {
-  const vault = useVault(vaultlabel)?.vault ?? null
+  const vault = useVault(vaultlabel)
   useLayoutEffect(() => { if (vault !== null) { seen.set(vaultlabel, vault) } }, [seen, vaultlabel, vault])
   return null
 }
@@ -182,7 +182,7 @@ describe("BankProvider", () => {
       const eager: { reading: { outcome: unknown } } = { reading: { outcome: 'pending' } }
       // A layout effect runs in the commit itself, before React's passive effects have had their turn.
       const Eager = () => {
-        const vault = useVault('main')?.vault ?? null
+        const vault = useVault('main')
         useLayoutEffect(() => {
           if (vault !== null) { eager.reading = watched(vault.getWhisper('anthropic_api_key')) }
         }, [vault])

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as Primitives from '../../src/checks/primitives'
-import { Kit, Validator, sayable } from '../../src/checks/validator'
+import { Kit, Validator } from '../../src/checks/validator'
 import { VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
 
@@ -50,7 +50,7 @@ describe("Validator", () => {
   it("refuses an unknown field in a slice made in the call, as its second example shows", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
-    expect(err.message).to.eq("There is no field note: check its spelling, or leave it out")
+    expect(err.message).to.eq("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
@@ -92,30 +92,31 @@ describe("Validator", () => {
     expect(err.meta?.fieldnames).to.deep.equal([])
   })
 
-  it("quotes no value it refuses, and repeats an unknown key only when it is shaped as one of our field names", () => {
+  it("quotes no value it refuses, counts the fields it does not take, never naming one, and lists the fields it takes", () => {
     const secret = 'sk-live-0xSECRET'
     const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
-    expect(err.message).to.include("There are no fields vault_key, (a name not repeated here), (a name not repeated here)")
+    expect(err.message).to.not.include('vault_key')
+    expect(err.message).to.include("There are 3 fields it does not take (their names are not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
     expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     expect(err.cause).to.be.undefined
   })
 
-  it("never repeats an unknown key shaped as a credential, while it repeats one shaped as our snake_case or camelCase field names", () => {
-    const credentials = [`ghp_${'aB3'.repeat(12)}`, `sk_live_${'0Fake'.repeat(5)}`, 'sk_live_abc123def', 'AKIAIOSFODNN7EXAMPLE', 'deadbeef0123', 'a'.repeat(33)]
-    const ours = ['salt_b64', 'vault_key_wayin_wrapped', 'staleMinute', 'idbVaultDB', 'prfSaltB64']
-    const { strictBag } = Validator('bad_option', ({ obj }) => ({ strictBag: obj({}).strict() }))
-    const err = TH.expectSyncRefusal(() => strictBag.parse(Object.fromEntries([...credentials, ...ours].map((ckey) => [ckey, 1]))), 'bad_option')
-    for (const credential of credentials) { expect(err.message).to.not.include(credential) }
-    expect(err.message).to.eq(`There are no fields ${[...credentials.map(() => '(a name not repeated here)'), ...ours].join(', ')}: check their spelling, or leave them out`)
+  it("names an unknown field's place by its path, never its name, and says when an object takes no fields", () => {
+    const { strictBag, holder } = Validator('bad_option', ({ obj }) => {
+      const strictBag = obj({}).strict()
+      return { strictBag, holder: obj({ inner: strictBag }) }
+    })
+    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not take (its name is not repeated): it takes no fields. Check the spelling, or leave it out")
+    const nested = TH.expectSyncRefusal(() => holder.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_option')
+    expect(nested.message).to.match(/^inner: There are 2 fields it does not take/)
+    expect(nested.message).to.not.include('staleMinute')
+    expect(nested.meta?.fieldnames).to.deep.equal(['inner'])
   })
 
-  it("never repeats a record's key that may be the caller's data in a failing field's path", () => {
-    const { listing } = Validator('bad_record', ({ rec, str, label }) => ({ listing: rec(str, label) }))
-    const err = TH.expectSyncRefusal(() => listing.parse({ 'sk-live-0xSECRET': 'Not A Label', fine_name: 'Nor This' }), 'bad_record')
-    expect(err.message).to.not.include('SECRET')
-    expect(err.meta?.fieldnames).to.deep.equal(['(a name not repeated here)', 'fine_name'])
+  it("gives no record maker in its kit, as a record's keys in a refusal's path would be the input's", () => {
+    expect(Object.keys(Kit)).to.not.include('rec')
   })
 
   it("says Zod's English, never what a host's z.config error map would say, which could quote the input", () => {
@@ -188,20 +189,6 @@ describe("Validator", () => {
     try { vaultScope.parse(null) } catch (err) { caught = err }
     expect(caught).to.be.instanceOf(VaultError)
     expect(caught).to.not.be.instanceOf(Zod.ZodError)
-  })
-})
-
-describe("sayable", () => {
-  it("repeats a key shaped as one of our field names, as its first example shows", () => {
-    expect(sayable('staleMinute')).to.eq('staleMinute')
-  })
-
-  it("stands in for a key shaped as a credential, as its second example shows", () => {
-    expect(sayable(`sk_live_${'0Fake'.repeat(3)}`)).to.eq("(a name not repeated here)")
-  })
-
-  it("repeats an index as it is", () => {
-    expect(sayable(3)).to.eq('3')
   })
 })
 

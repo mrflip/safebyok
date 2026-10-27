@@ -7,15 +7,16 @@ import { expect, vi } from 'vitest'
 import { Scopepath, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
 import * as TH from '../test-helpers'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { BankProvider, useBank, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
+import { BankProvider, useBank, useBankVault, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
 
-// == [Test helpers]: useProvided, Probe, grabber, makeWorld, madeWorld, damagedWorld, lockedWorld, watched, providerOf, VaultExample, BoxCount, countStoreCalls, others
+// == [Test helpers]: useProvided, Probe, grabber, makeWorld, madeWorld, damagedWorld, lockedWorld, watched, providerOf, VaultExample, BankVaultExample, BoxCount, countStoreCalls, others
 
-/** Everything the provider hands down for u1's `main` vault, through each of its hooks, as one bag: the bank, the entry, and the entry's Vault object, if any. */
+/** Everything the provider hands down for u1's `main` vault, through each of its hooks, as one bag: the bank, the bank's listing of the vault, its Vault object, if any, and its refusal, if any. */
 export const useProvided = () => {
   const bank = useBank()
-  const entry = useVault('main')
-  return { bank, entry, vault: entry?.vault ?? null, err: entry?.err ?? null }
+  const bankVault = useBankVault('main')
+  const vault = useVault('main')
+  return { bank, bankVault, vault, err: bankVault?.lifecycle === 'refused' ? bankVault.err : null }
 }
 
 /** What the Probe shows for a call refused `err`: 'dismissed' for a dialog declined (vault_locked), the kind otherwise. */
@@ -27,15 +28,15 @@ const saidOf = (err: VaultError) => (err.refusalkind === 'vault_locked' ? 'dismi
  */
 export const Probe = () => {
   const bank = useBank()
-  const entry = useVault('main')
+  const bankVault = useBankVault('main')
+  const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const [outcome, setOutcome] = useState('')
 
-  if (entry?.err !== null && entry?.err !== undefined) {
-    const retry = () => { if (bank !== null) { void bank.tryEnsureVault(entry.scope) } }
-    return <p><span data-testid="state">{`refused: ${entry.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
+  if (bankVault?.lifecycle === 'refused') {
+    const retry = () => { if (bank !== null) { void bank.tryEnsureVault(bankVault) } }
+    return <p><span data-testid="state">{`refused: ${bankVault.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
   }
-  const vault = entry?.vault ?? null
   if (vault === null || snapshot === null) { return <span data-testid="state">no vault</span> }
 
   const put = () => {
@@ -205,11 +206,17 @@ export const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve char
 
 /** useVault's @example, as a host would write it. */
 export const VaultExample = () => {
-  const entry = useVault('main')
-  if (entry === null || entry.status === 'starting') { return <p>Opening your vault…</p> }
-  if (entry.vault === null) { return <p>{"Can't open your vault: "}{entry.err?.message}</p> }
-  const { vault } = entry
+  const vault = useVault('main')
+  if (vault === null) { return <p>Opening your vault…</p> }
   return <button onClick={() => { void vault.lock() }}>Lock</button>
+}
+
+/** useBankVault's @example, as a host would write it. */
+export const BankVaultExample = () => {
+  const bankVault = useBankVault('main')
+  if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
+  if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
+  return <p>Your vault is open.</p>
 }
 
 /** useVaultSnapshot's @example, as a host would write it. */

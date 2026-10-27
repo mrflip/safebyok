@@ -1,7 +1,7 @@
 import type * as Z from 'zod'
-import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, type DamagedBoxRecord, boxSparseOf } from './box'
+import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, boxSparseOf } from './box'
 import { Capacity, type VaultScope } from './types/types'
-import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone, type VaultDraft } from './vault-record'
+import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './vault-record'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './checks/core-checks'
@@ -75,7 +75,7 @@ export type BoxDeletion = Z.infer<typeof BoxDeletion>
  * An expectation names what it compares and drops the rest, so a whole record handed as one is
  * read for those fields alone.
  */
-const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
+export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
   const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true }).strip()
   const BoxGetExpectation = VaultSparse.pick({ vault_tok: true }).strip()
   const revision_tok = BoxRecord.shape.revision_tok.nullable()
@@ -93,12 +93,13 @@ const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpec
  * `boxlabel` is the label the row is filed under, from its scopepath or its column, which an
  * adapter always has. The record is whole, or without its two ciphered fields where the backend can
  * project, and may be damaged: its own `boxlabel` missing, or naming another label than its row's,
- * is damage the split finds. The row's boxlabel lets a damaged box still be named, and so deleted
+ * is damage the split finds. So `box` is whatever storage holds, typed `unknown`, and an adapter
+ * hands its row up as it read it, with no cast: the split's check is what brands it. The row's boxlabel lets a damaged box still be named, and so deleted
  * or written over.
  *
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow }
  */
-export type StoredBox = { boxlabel: string, box: BoxRecord | BoxSparse | DamagedBoxRecord }
+export type StoredBox = { boxlabel: string, box: unknown }
 
 /** One vault as a VaultDB's `doGetVault` and `doEnsureVault` answer it, read in one atomic step: its vault record exactly as stored, and its boxes split into the sound and the damaged.
  * `vault` is the record as stored: a vault record, one damaged, a tombstone (where a store keeps
@@ -763,7 +764,7 @@ const checkedListing = (response: unknown): { boxes: readonly BoxSparse[], damag
 }
 
 /** A box as `doGetVault` may hand it up, whole or with its two ciphered fields left out, so a projecting backend is checked as one handing whole records; the one field of a damaged box the listing keeps, when the record holds it as text, what a write over it names; and a vault read's answer, an object holding its vault record as stored, and its listing, each sound box an object to judge, each damaged one a {@link BoxDamaged}. */
-const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
+export const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
   ListedBox:      BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
   StoredRevision: obj({ revision_tok: BoxRecord.shape.revision_tok }),
   ReadAnswer:     obj({ vault: unk }).loose(),
@@ -1037,10 +1038,9 @@ const isSoundVaultRecord = (raw: unknown, scope: VaultScope): boolean => {
   }
 }
 
-/** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread; and a novel vault's record, as `ensureVault` takes its draft. */
-const { StoredVaultTok, VaultDraft } = Validator('bad_record', ({ lit }) => ({
+/** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */
+export const { StoredVaultTok } = Validator('bad_record', () => ({
   StoredVaultTok: VaultSparse.pick({ vault_tok: true }).strip(),
-  VaultDraft:     VaultSparse.extend({ gate_epoch: lit(0), gate: lit(null) }),
 }))
 // --
 

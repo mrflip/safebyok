@@ -11,13 +11,13 @@ import { EpochMillis, label, user_id } from './primitives'
 /** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, the names every scope is made of, and `epochMillis`, the instant every time is.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
  * A maker the kit lacks comes in by a named import from `zod` beside the call: the whole of Zod
- * would carry every locale it ships into each host's bundle.
+ * would carry every locale it ships into each host's bundle. It has no record maker on purpose: a
+ * refusal names a failing field by its path, and a record's keys in that path are the input's own.
  */
 export const Kit = {
   obj:     Zod.object,
   arr:     Zod.array,
   tuple:   Zod.tuple,
-  rec:     Zod.record,
   oneof:   Zod.enum,
   union:   Zod.union,
   discrim: Zod.discriminatedUnion,
@@ -47,10 +47,10 @@ type Merged<SourcesT extends readonly object[]> =
 // == [Validator]: Validator
 
 /** Make validators: `build` gets the kit and returns its schemas by name, and each comes back refusing `kind` from `parse`.
- * A failed `parse` throws a VaultError of `kind`. Its message names every failing field, up to
- * eight, counting the rest, each with its check's own sentence; its `meta.fieldnames` lists the
- * same fields. It quotes no input, and repeats a key only when it is shaped as one of our field
- * names. It carries no `cause`.
+ * A failed `parse` throws a VaultError of `kind`. Its message names every failing field by its
+ * path, up to eight, counting the rest, each with its check's own sentence or Zod's English; its
+ * `meta.fieldnames` lists the same fields. For fields an object does not take it says how many,
+ * never which, and lists the fields the object takes. It quotes no input, and carries no `cause`.
  *
  * Only `parse` changes. `safeParse` and `parseAsync` are Zod's own, and so is any schema made
  * from a validator outside a `Validator` call (`vaultRecord.pick(...)`): its `parse` throws a
@@ -73,7 +73,7 @@ type Merged<SourcesT extends readonly object[]> =
  *     const boxSparse = boxRecord.omit({ whisper_ciphered: true })
  *     return { boxRecord, boxSparse }
  *   })
- *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is no field note: ..."
+ *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
  * @example
  *   export const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
  *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
@@ -88,7 +88,7 @@ export const Validator = <ValsT extends Record<string, Z.ZodType>, const Sources
 }
 // --
 
-// == [Refusals]: refusing, InEnglish, MaxFailuresSaid, MaxSayableChars, SnakeFieldname, CamelFieldname, isSayable, sayable, fieldnameOf, sentenceOf, refusalOf
+// == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf
 
 /** `schema`, but for a `parse` that throws a VaultError of `kind` where Zod's would throw its own.
  * It is a clone, a schema of its own over the same definition: Zod binds each schema's own methods
@@ -105,54 +105,35 @@ const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT)
   return wrapped
 }
 
-/** Zod's own English for each failure, whatever error map the host set with `z.config`, which could quote the input. A sentence a check carries still wins. */
-const InEnglish = { error: Zod.locales.en().localeError }
+/** Zod's own English for each failure, whatever error map the host set with `z.config`, which could quote the input; and for fields an object does not take, how many, and the fields it does. A sentence a check carries still wins. */
+const InEnglish = {
+  error: (issue: Z.core.$ZodRawIssue) => (issue.code === 'unrecognized_keys' ? Phrases.unknownFields(issue.keys.length, fieldnamesOf(issue.inst)) : English(issue)),
+}
+
+/** Zod's English error map. */
+const English = Zod.locales.en().localeError
+
+/** The fields an object schema takes, by its shape: none for any other schema. */
+const fieldnamesOf = (schema: unknown): string[] => (schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : [])
 
 /** The most failures a refusal's message names; it counts the rest. */
 const MaxFailuresSaid = 8
 
-/** The longest name a refusal repeats: longer than any of our field names, shorter than most credentials. */
-const MaxSayableChars = 32
-
-/** A field name of ours in snake_case: lowercase words joined by single underscores, each word letters ending in at most three digits (`salt_b64`). */
-const SnakeFieldname = /^[a-z]+\d{0,3}(?:_[a-z]+\d{0,3})*$/
-
-/** A field name of ours in camelCase: a lowercase word, then words each opening on a capital, each ending in at most three digits (`maxWhisperBytes`, `vaultDB`). */
-const CamelFieldname = /^[a-z]+\d{0,3}(?:[A-Z][a-z]*\d{0,3})*$/
-
-/** True for a key a refusal may repeat: shaped as one of our field names, {@link SnakeFieldname} or {@link CamelFieldname}, and no longer than {@link MaxSayableChars}.
- * A credential (`ghp_` and 36 mixed characters, `sk_live_0Fake...`, `AKIA...`) mixes digits and
- * cases within a word, so it is never repeated: any key not shaped as ours could be the caller's data.
- */
-const isSayable = (ckey: string): boolean => ckey.length <= MaxSayableChars && (SnakeFieldname.test(ckey) || CamelFieldname.test(ckey))
-
-/** One step of a failing field's path as a refusal says it: an index, a field name, or a stand-in for a key that may be the caller's data.
- * A check that names a key itself, outside a refusal, says it through this.
- *
- * @example sayable('staleMinute')                        // 'staleMinute'
- * @example sayable('sk_live_0FakeKey9')                  // '(a name not repeated here)'
- */
-export const sayable = (step: PropertyKey): string => (
-  typeof step === 'number' || (typeof step === 'string' && isSayable(step)) ? String(step) : Phrases.UnsaidName
-)
-
 /** Where one failure is, as a refusal says it: its path's steps joined on `.`, and '' for the input as a whole. */
-const fieldnameOf = (issue: Z.ZodError['issues'][number]): string => issue.path.map((step) => sayable(step)).join('.')
+const fieldnameOf = (issue: Z.core.$ZodIssue): string => issue.path.map(String).join('.')
 
-/** One failure as a refusal says it: where, then what. Zod's own sentences name a type, a limit or the values we allow, never the value refused; an unknown field's name is repeated only when it is shaped as one of ours. */
-const sentenceOf = (issue: Z.ZodError['issues'][number]): string => {
+/** One failure as a refusal says it: where, then Zod's sentence, which names a type, a limit or the values we allow, never the value refused. */
+const sentenceOf = (issue: Z.core.$ZodIssue): string => {
   const fieldname = fieldnameOf(issue)
-  const sentence  = issue.code === 'unrecognized_keys' ? Phrases.unknownFields(issue.keys.map((fieldname) => sayable(fieldname))) : issue.message
-  return fieldname ? `${fieldname}: ${sentence}` : sentence
+  return fieldname ? `${fieldname}: ${issue.message}` : issue.message
 }
 
-/** The refusal for a failed parse: every failure, up to {@link MaxFailuresSaid}, each where and what, and the fields named in `meta.fieldnames`, quoting no input. */
+/** The refusal for a failed parse: the first {@link MaxFailuresSaid} failures, each where and what, joined, the rest counted, and the fields named in `meta.fieldnames`. */
 const refusalOf = (kind: RefusalKind, err: Z.ZodError): VaultError => {
   const issues     = err.issues.slice(0, MaxFailuresSaid)
-  const said       = issues.map((issue) => sentenceOf(issue))
-  const unsaid     = err.issues.length - said.length
-  const sentences  = unsaid > 0 ? [...said, Phrases.moreFailures(unsaid)] : said
+  const unsaid     = err.issues.length - issues.length
+  const sentences  = [...issues.map((issue) => sentenceOf(issue)), ...(unsaid > 0 ? [Phrases.moreFailures(unsaid)] : [])]
   const fieldnames = Object.freeze([...new Set(issues.map((issue) => fieldnameOf(issue)).filter((fieldname) => fieldname !== ''))])
-  return new VaultError(kind, sentences.length > 0 ? sentences.join('; ') : Phrases.FailedItsCheck, { meta: { fieldnames } })
+  return new VaultError(kind, sentences.join('; '), { meta: { fieldnames } })
 }
 // --

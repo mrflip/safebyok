@@ -23,6 +23,17 @@ describe("parseDbName", () => {
     }
   })
 
+  it("takes the logger every VaultDB takes beside the dbName", () => {
+    expect(parseDbName({ dbName: 'acme', logger: null }, 'idbVaultDB')).to.eq('acme')
+  })
+
+  it("refuses a field the options do not take, counting it, naming neither it nor its value", () => {
+    const opts = { dbname: 'acme_misspelt' } as unknown as IdbVaultDBOpts
+    expect(() => parseDbName(opts, 'idbVaultDB'))
+      .to.throw(VaultError, /^idbVaultDB takes an optional dbName.*There is a field it does not take \(its name is not repeated\): it takes only dbName, logger\./)
+      .that.satisfies((err: Error) => ! err.message.includes('dbname') && ! err.message.includes('acme_misspelt'))
+  })
+
   it("never quotes what it refused", () => {
     expect(() => parseDbName({ dbName: 12_345_678 } as unknown as IdbVaultDBOpts, 'idbVaultDB')).to.throw(VaultError).that.satisfies((err: Error) => ! err.message.includes('12345678'))
   })

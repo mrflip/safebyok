@@ -54,7 +54,7 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
 /** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
-const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
+export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
   const call = custom(isFunction)
   return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, ckeys: call, subscribe: call }) }) }
 })
@@ -123,7 +123,7 @@ class StringStoreVaultDB extends VaultDB {
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
       // A row is handed to the split as stored, whatever it holds: the split judges it.
-      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) as StoredBox['box'] }))
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
   }
 
   // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.

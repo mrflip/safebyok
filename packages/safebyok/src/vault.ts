@@ -809,7 +809,7 @@ export class Vault implements VaultStamp {
     this.vaultlabel = vaultlabel
     this.vault_tok = vaultTok
     this.registered_at = registered_at
-    this.#scope = parts.scope
+    this.#scope = CX.vaultScope.parse(parts)
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     this.#leaseMillis = parts.leaseMillis
@@ -1960,16 +1960,13 @@ const UntrustedStorageKinds = ['identity_revoked', 'vault_behind', 'newer_format
 const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initialize_gate'])
 // --
 
-// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkSlotlabel, passkeyBeforePassphrase, absentBox, noWhisper
-
-/** What a call that takes options most likely had in place of its bag, and what to do: an event, as `call` was handed to `addEventListener` or `onClick` itself. */
-const eventHint = (call: 'hello' | 'ensureUnlocked', tried: 'tryHello' | 'tryEnsureUnlocked') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
+// == [Argument parsers]: checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, PutBoxProps, checkPutBoxProps, putBoxPropsOf, DeletedBox, checkSlotlabel, passkeyBeforePassphrase, absentBox, noWhisper
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
-const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage.", eventHint('hello', 'tryHello'))
+const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryHello()`.")
 
 /** What `ensureUnlocked()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
-const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway.", eventHint('ensureUnlocked', 'tryEnsureUnlocked'))
+const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryEnsureUnlocked()`.")
 
 /** The refusal of a `renewMinutes` as long as the lease or longer, under which every call would ask the user. */
 const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done.")
@@ -1978,7 +1975,7 @@ const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s re
 const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand.")
 
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
-const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
+export const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
   vaultMadeUnderShape: obj({
     vault_tok,
     applabel:    str.optional(),

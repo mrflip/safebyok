@@ -301,7 +301,12 @@ lists no framework among its dev dependencies.
 
 The build follows Convex's component template: ESM only, unbundled, so each of the component's
 modules keeps its own file under `dist/component/`, beside its `convex.config.js` and
-`_generated/`, for a host's Convex CLI to bundle at deploy. `safebyok-convex/test` alone ships as
+`_generated/`, for a host's Convex CLI to bundle at deploy. The component imports the core: its write
+comparisons are `safebyok`'s own `Expectations`, the ones every key-value adapter makes, and its
+records' formats are the core's, so the host's Convex CLI bundles the host's `safebyok` (a peer)
+into the component's functions. Its argument, return and table validators are Convex's own, which
+is all Convex takes there; `tests/component/validators.test.ts` holds them field for field to the
+core's Zod records. `safebyok-convex/test` alone ships as
 source, `src/test.ts`, since its `import.meta.glob` must find the component's `.ts` modules; a
 test runner that resolves as a bundler does (vitest) loads it.
 

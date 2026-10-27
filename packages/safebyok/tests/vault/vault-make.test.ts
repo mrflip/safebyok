@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, expectTypeOf } from 'vitest'
 import { LeaseHours } from '../../src/types/types'
-import { FarFuture, ForeverMillis, MinuteMillis } from '../../src/consts'
+import { FarFuture, ForeverMillis, MaxSaltBytes, MinuteMillis } from '../../src/consts'
 import { MaxUserIdChars } from '../../src/checks/primitives'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
@@ -11,7 +11,7 @@ import { type MakeBankOpts, parseStaleMinutes } from '../../src/vault-opts'
 import { fromB64 } from '../../src/crypto'
 import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
 import { type VaultLogger } from '../../src/logger'
-import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../../src/key-deriver-spec'
+import { Argon2idWebV1, TestDeriverNotice } from '../../src/key-deriver-spec'
 import * as TH from '../test-helpers'
 import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, vaultWithPasskey, addLaptopPasskey } from './world'
 
@@ -146,26 +146,21 @@ describe("Bank.make's options", () => {
     TH.expectSyncRefusal(() => Bank.make(TH.omitting(bankOptsOf(world), 'vaultDB')), 'bad_option')
   })
 
-  it("refuses an option it does not take as 'bad_option', naming it, before storage is touched", () => {
+  it("refuses an option it does not take as 'bad_option', counting it and naming the options it takes, before storage is touched", () => {
     const world = makeWorld()
     const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
     const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), leaseHour: 1 } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.match(/does not take the option leaseHour: check the spelling/)
+    expect(err.message).to.match(/^In Bank\.make's options: There is a field it does not take \(its name is not repeated\): it takes only applabel, /)
     expect(err.message).to.include('leaseHours')
+    expect(err.message).to.not.include('leaseHour,')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
   })
 
-  it("refuses forcePassphraseReentryHours, naming leaseHours", () => {
+  it("counts every option it does not take, naming none, and never quotes a value", () => {
     const world = makeWorld()
-    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), forcePassphraseReentryHours: 1 } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.include('forcePassphraseReentryHours (called leaseHours now)')
-  })
-
-  it("names every option it refuses, and never quotes a value", () => {
-    const world = makeWorld()
-    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), note: 'FAKESECRET', colour: 'FAKESECRET' } as MakeBankOpts), 'bad_option')
-    expect(err.message).to.match(/the options note, colour:/)
-    expect(TH.thrownText(err)).to.not.include('FAKESECRET')
+    const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), note: 'FAKESECRET', colour: 'FAKESECRET', forcePassphraseReentryHours: 1 } as MakeBankOpts), 'bad_option')
+    expect(err.message).to.include('There are 3 fields it does not take')
+    for (const said of ['note', 'colour', 'forcePassphraseReentryHours', 'FAKESECRET']) { expect(TH.thrownText(err)).to.not.include(said) }
   })
 
   it("takes an option given as undefined as one left out", async () => {
@@ -564,8 +559,8 @@ describe("Bank.make, by the Contract", () => {
 
   it("takes staleMinutes of zero, fractions and Infinity, and an onBadNews of null as none (Contract: Bank.make, Does 1)", () => {
     const world = makeWorld()
-    for (const staleMinutes of [0, 0.5, 30, Infinity]) { expect(Bank.make(bankOptsOf(world, { staleMinutes })).status).to.eq('made') }
-    expect(Bank.make(bankOptsOf(world, { onBadNews: null })).status).to.eq('made')
+    for (const staleMinutes of [0, 0.5, 30, Infinity]) { expect(Bank.make(bankOptsOf(world, { staleMinutes })).snapshot.lifecycle).to.eq('made') }
+    expect(Bank.make(bankOptsOf(world, { onBadNews: null })).snapshot.lifecycle).to.eq('made')
   })
 
   it("touches no storage, no device store, no timer and no prompt until a call asks (Contract: Bank.make, Guarantees)", async () => {
@@ -786,7 +781,7 @@ describe("the vault's snapshot, slice by slice (Contract: VaultSnapshot)", () =>
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const { snapshot } = vault
-    expect(TH.bankOf(vault).entryOf(snapshot)?.vault).to.eq(vault)
+    expect(TH.bankOf(vault).vaultOf(snapshot)).to.eq(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.not.throw()
     TH.closeVault(vault)
     expect(() => { vault.demandConsistentWith(snapshot) }).to.throw(VaultError)

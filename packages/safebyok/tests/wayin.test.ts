@@ -2,7 +2,6 @@ import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
-import { isVaultError } from '../src/errors'
 import { PasskeyProving, PassphraseProving, StandingGating, headerOf, passphraseKeyOf } from '../src/proving'
 import type { PasskeyAnswer } from '../src/types/types'
 import { type GatedVaultRecord, VaultRecord, type PasskeyWayinRecord } from '../src/vault-record'
@@ -121,8 +120,8 @@ describe("Wayin.make", () => {
     })
   })
 
-  it("refuses a record this package never writes as damaged_wayin, as its second example shows", () => {
-    TH.expectSyncRefusal(() => Wayin.make(vaultRecord, { ...TH.wayinOf('passphrase'), device_id: '' }, slice), 'damaged_wayin')
+  it("refuses a record this package never writes as bad_record, as its second example shows", () => {
+    TH.expectSyncRefusal(() => Wayin.make(vaultRecord, { ...TH.wayinOf('passphrase'), device_id: '' }, slice), 'bad_record')
   })
 
   const MisshapenCases = [
@@ -134,15 +133,15 @@ describe("Wayin.make", () => {
   ] as const
 
   for (const [record, blurb] of MisshapenCases) {
-    it(`refuses ${blurb} as damaged_wayin, the schema's complaint its cause`, () => {
-      const err = TH.expectSyncRefusal(() => Wayin.make(vaultRecord, record, slice), 'damaged_wayin')
-      expect(isVaultError(err.cause, 'bad_record'), "the cause is the schema's own bad_record, never a raw ZodError").to.be.true
+    it(`refuses ${blurb} as the schema's own bad_record, with no cause`, () => {
+      const err = TH.expectSyncRefusal(() => Wayin.make(vaultRecord, record, slice), 'bad_record')
+      expect(err.cause).to.be.undefined
     })
   }
 
-  it("names a failing field in its cause, and never a key that is not shaped as one of ours", () => {
+  it("names a failing field, and never a key it does not take", () => {
     const pasted = 'sk-ant-api03-' + 'x'.repeat(40)
-    const err = TH.expectSyncRefusal(() => Wayin.make(vaultRecord, { ...TH.wayinOf('passphrase'), device_id: '', [pasted]: 1 }, slice), 'damaged_wayin')
+    const err = TH.expectSyncRefusal(() => Wayin.make(vaultRecord, { ...TH.wayinOf('passphrase'), device_id: '', [pasted]: 1 }, slice), 'bad_record')
     expect(TH.thrownText(err)).to.include('device_id')
     expect(TH.thrownText(err)).to.not.include(pasted)
   })

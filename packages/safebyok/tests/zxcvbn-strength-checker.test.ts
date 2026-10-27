@@ -182,7 +182,7 @@ describe("zxcvbnStrengthChecker's loading", () => {
       if (refused.ok) { throw new Error('the birth was not refused') }
       expect(refused.err.refusalkind).to.eq('unexpected_error')
       expect(refused.err.cause).to.be.instanceOf(Error)
-      expect(bank.getSnapshot().status).to.eq('refused')
+      expect(bank.getSnapshot().lifecycle).to.eq('refused')
       expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
       const vault = await bank.ensureVault({ vaultlabel })
       expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')

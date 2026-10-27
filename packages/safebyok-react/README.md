@@ -10,10 +10,13 @@ otherwise write itself.
   `vault.ensureUnlocked()` on a vault locked, `vault.putWayin(...)`, `vault.delWayin('passkey')`,
   `vault.del()` -- it shows the dialog for that gating's kind, one at a time, and the call waits on
   it (*Asking for the passphrase*, below).
-* `useVault(vaultlabel)` -- the bank's entry for the user's vault under that label, asking the
-  bank for it (`bank.ensureVault`) when it holds none: `starting`, `timely` with its Vault object,
-  or `refused` with why; `null` while nobody is signed in, and until the ask lands. Its Vault
-  object's fields read live in an event handler; render from the snapshot.
+* `useVault(vaultlabel)` -- the user's vault under that label, its Vault object, asking the bank
+  for it (`bank.ensureVault`) when it lists none; `null` while nobody is signed in, until its
+  birth lands, and once refused. Its own fields are fixed for its life; render what changes from
+  the snapshot, and read `vault.snapshot` live in an event handler.
+* `useBankVault(vaultlabel)` -- that vault as the bank lists it (`bank.snapshot.vaults`): its
+  scope and its `lifecycle`, `starting`, `ready`, or `refused` with why, in `err`; it asks as
+  `useVault` does. Render a refusal from it.
 * `useVaultSnapshot(vaultlabel)` -- that vault's live snapshot, through
   `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while there is no Vault object.
   Choose the screen from two of its fields: `gate === null`, no passphrase yet; `ask_passphrase_at
@@ -111,20 +114,20 @@ unmounting. Under React's
 `StrictMode`, whose rehearsal in development asks for a vault and lets it go again at once, that
 rehearsal reads nothing from storage: only the vault kept is born.
 
-**A vault is asked for by the hook that names it.** `useVault('main')` asks the bank for the
-user's `main` vault as it mounts, unless the bank holds an entry for it already, and renders from
-that entry as it changes. Two components naming one vault share its one Vault object. The
+**A vault is asked for by the hook that names it.** `useVault('main')` (or `useBankVault('main')`)
+asks the bank for the user's `main` vault as it mounts, unless the bank lists it already, and
+renders from the bank's listing as it changes. Two components naming one vault share its one Vault object. The
 provider makes its bank in an effect, sets it as state from that effect -- what React's
 `set-state-in-effect` lint rule warns of, done here on purpose: a bank made during render would be
 made twice under `StrictMode`, and one of the two never let go -- and the hook asks in an effect of
 its own. For your app:
 
-* `useBank()`, `useVault('main')` and `useVaultSnapshot('main')` are `null` for the renders after a user
-  signs in, until the ask lands, and on the server, just as while nobody is signed in. Tell
+* `useBank()`, `useVault('main')`, `useBankVault('main')` and `useVaultSnapshot('main')` are
+  `null` for the renders after a user signs in, until the ask lands, and on the server, just as while nobody is signed in. Tell
   "signed out" from "not here yet" by your own session, so those frames show a spinner rather
   than a sign-in prompt.
-* Each bank made renders everything under the provider again, and each change to an entry renders
-  the components that read it. A prop that is a new object at every render (above) makes a bank,
+* Each bank made renders everything under the provider again, and each change to a vault the bank
+  lists renders the components that read it. A prop that is a new object at every render (above) makes a bank,
   and those renders, at every render.
 * A changed prop or a new user lets the old vaults go, and every call on an old Vault object, one
   still under way or waiting on the dialog among them, is refused `vault_gone`. Where your code
@@ -134,11 +137,16 @@ Read a vault with the hooks:
 
 ```tsx
 const VaultPanel = () => {
-  const entry = useVault('main')
-  if (entry === null || entry.status === 'starting') { return <p>Opening your vault…</p> }
-  if (entry.vault === null) { return <p>{"Can't open your vault: "}{entry.err?.message}</p> }
-  const { vault } = entry
+  const vault = useVault('main')
+  if (vault === null) { return <p>Opening your vault…</p> }
   return <button onClick={() => { void vault.lock() }}>Lock</button>
+}
+
+const VaultStanding = () => {
+  const bankVault = useBankVault('main')
+  if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
+  if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
+  return <p>Your vault is open.</p>
 }
 
 const BoxCount = () => {
@@ -152,53 +160,55 @@ const BoxCount = () => {
 
 The provider makes its bank with `Bank.make` as soon as there is a signed-in user, and
 `useVault('main')` asks it for the vault: one read of storage that births the Vault object, or is
-refused. The entry is `starting` until it settles. What happens when `Bank.make` throws, or the
+refused. The vault is listed `starting` until it settles. What happens when `Bank.make` throws, or the
 birth is refused, depends on the error's family (safebyok's `RefusalFamilyForKind`): who has to
 act. The `safebyok` README's *Errors* section lists every kind, its family, and what it means.
 
-**A condition or bad news stays in place,** in the entry: `refused`, its `err` a `VaultError`, no
-Vault object. Storage that cannot be reached (`storage_unavailable`), a user storage no longer
+**A condition or bad news stays in place,** in the bank's listing: `useBankVault` hands down the
+vault `refused`, its `err` a `VaultError`, and `useVault` no Vault object.
+Storage that cannot be reached (`storage_unavailable`), a user storage no longer
 serves (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a
 vault whose stored record fails its checks (`damaged_vault`), or storage serving an older copy of
 the vault than this device has seen (`vault_behind`). (A damaged box never stops the birth:
 the snapshot lists it among its `damagedBoxes`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show
-it where the vault's UI would be. **A refused entry stays refused until the app asks again**:
-`useBank().ensureVault({ vaultlabel: 'main' })` reads storage afresh, the entry `starting`
-while it reads, then `timely`, or `refused` with what it met. A browser that keeps the app from
+it where the vault's UI would be. **A refused vault stays refused until the app asks again**:
+`useBank().ensureVault({ vaultlabel: 'main' })` reads storage afresh, the vault `starting`
+while it reads, then `ready`, or `refused` with what it met. A browser that keeps the app from
 storing anything on this device (`storage_blocked`) is a condition too, but one asking again will
 not mend until the browser's settings or room change: say so, rather than offering a Retry.
 
 ```tsx
 const VaultPanel = () => {
   const bank = useBank()
-  const entry = useVault('main')
-  if (entry?.err) {
-    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault(entry.scope) }}>Retry</button></p>
+  const bankVault = useBankVault('main')
+  const vault = useVault('main')
+  if (bankVault?.lifecycle === 'refused') {
+    return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault(bankVault) }}>Retry</button></p>
   }
-  if (! entry?.vault) { return <p>Opening your vault…</p> }
-  return <Boxes vault={entry.vault} />
+  if (vault === null) { return <p>Opening your vault…</p> }
+  return <Boxes vault={vault} />
 }
 ```
 
-Branch on `entry.err.refusalkind` for a better message: an `identity_revoked` user should sign in
+Branch on `bankVault.err.refusalkind` for a better message: an `identity_revoked` user should sign in
 again, a `damaged_vault` will not mend on retry, and a `newer_format` vault was written by a
 newer version of the app: the user updates, and never deletes it. Its `message` is calm and safe to
 show.
 
 **A vault deleted stays gone.** Deleted by its own `del()`, or found deleted (`vault_gone`) or
 deleted and made anew (`vault_remade`) by a later read, here or on another device, its Vault
-object is gone, and its entry is `refused` with that kind. Nothing asks for it again on its own: a
+object is gone, and the bank lists the vault `refused` with that kind. Nothing asks for it again on its own: a
 new vault, `novel`, is stored only once the app asks the bank (`bank.ensureVault`), as on the
 user's "Start a new vault".
 
 **A vault behind this device.** Should a later read find storage handing back an older copy of the
-vault than this device has seen, the vault takes nothing from it, and locks: the entry stays
-`timely`, the vault `locked`, its snapshot's `trouble` `vault_behind`. At birth, the entry is
+vault than this device has seen, the vault takes nothing from it, and locks: it stays listed
+`ready`, the vault `locked`, its snapshot's `trouble` `vault_behind`. At birth, it is listed
 `refused` `vault_behind`. Asking again will not mend it: it holds until storage serves the newer
 copy again, or the user or the host, sure the older copy was restored on purpose, has this device
 accept it with `bank.clearCachedVault` (the `safebyok` README's *A vault behind this device*). That
-lets the entry go, so `useVault` asks for the vault again:
+lets the vault go, so `useVault` asks for it again:
 
 ```tsx
 const bank = useBank()
@@ -211,11 +221,11 @@ const acceptRestore = async () => {
 
 **A damaged vault.** For a `damaged_vault`, the one way forward is to delete the vault and start
 over: `bank.delDamagedVault({ vaultlabel: 'main' })` does that with the bank's own stores
-(the `safebyok` README's *A vault that cannot be opened*), and lets the entry go, so `useVault`
+(the `safebyok` README's *A vault that cannot be opened*), and lets the vault go, so `useVault`
 asks for the vault again: a new one, `novel`, for the user to choose a passphrase for. The user's
 boxes in it are lost for good, so ask first. It refuses with storage's refusal (say,
-`storage_unavailable`) if deleting it fails, the entry left as it was; `stale_write` means the
-vault was made anew meanwhile, and lets the entry go too, so `useVault` asks for the one that
+`storage_unavailable`) if deleting it fails, the vault left listed as it was; `stale_write` means the
+vault was made anew meanwhile, and lets it go too, so `useVault` asks for the one that
 stands; `bad_option` means it reads sound now: ask for it again.
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
@@ -227,8 +237,8 @@ user signed out, pass `user_id={null}`, which lets the vaults go.
 
 **Misuse goes to your error boundary.** A bad label or option -- a bug in the app's code -- is
 thrown while rendering, as is a birth refused as misuse, or with anything that is not a
-`VaultError`: `BankProvider` throws what `Bank.make` refuses, and `useVault` what the birth was
-refused with. Wrap the provider in an error boundary, keyed on the user's identity, so the dev
+`VaultError`: `BankProvider` throws what `Bank.make` refuses, and `useVault` and `useBankVault`
+what the birth was refused with. Wrap the provider in an error boundary, keyed on the user's identity, so the dev
 overlay or the boundary's fallback shows it and a different user (or a sign-out and back in) gets
 a fresh attempt:
 

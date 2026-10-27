@@ -14,8 +14,8 @@ this package and type in the three places *Writing an adapter of your own* names
 pnpm add safebyok safebyok-indexeddb
 ```
 
-`safebyok` (and `zod`, its peer) are peer dependencies: your app installs them, so the adapter
-and your app share one copy, and a `VaultError` from one is a `VaultError` to the other. Its one
+`safebyok` is a peer dependency: your app installs it (and `zod`, its peer), so the adapter and
+your app share one copy, and a `VaultError` from one is a `VaultError` to the other. Its one
 dependency is [`idb-keyval`](https://github.com/jakearchibald/idb-keyval), which `safebyok`
 already brings for its device store.
 
@@ -158,9 +158,11 @@ And keep, as they are:
   own tests are for what is yours alone: the rows as stored, a damaged row, a failure partway,
   another tab's ring.
 
-The packaging is the template too: `package.json` (`safebyok` and `zod` as peers, ESM and
-CommonJS through `exports`), `tsdown.config.ts`, `vitest.config.ts`, `tsconfig.json`, and an
-`eslint.config.mjs` cut from the core's, which differs from it in nothing but its names. Rename
+The packaging is the template too: `package.json` (`safebyok` as its peer, ESM and CommonJS
+through `exports`), `tsdown.config.ts`, `vitest.config.ts`, `tsconfig.json`, and an
+`eslint.config.mjs` cut from the core's, which differs from it in nothing but its names. Its
+option checks are made with the core's `Validator` (`src/idb-opts.ts`), so it needs no Zod of its
+own. Rename
 the package, its rules' names and its entry points, and add it to the `fixed` group in
 `.changeset/config.json`.
 

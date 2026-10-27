@@ -81,7 +81,7 @@ or the call says otherwise) reads nothing anew; call `hello()` on `visibilitycha
 
 Each bank call naming a vault takes a bag whose `vaultlabel` names it. An `applabel` or `user_id`
 in the bag must be the bank's, or the call refuses `bad_scope` (`bank.demandConsistentWith`);
-anything else in it is left out, so a Vault object, its snapshot or an entry's `scope` may be
+anything else in it is left out, so a Vault object, its snapshot or a vault the bank lists may be
 handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the bank's stores
 names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
 
@@ -92,12 +92,23 @@ those alone. Everything that changes -- its `gate`, `boxes`, `capacity`, `ask_pa
 event handler and it is current. React renders from `getSnapshot()`, the same object, and
 re-renders on `subscribe()`.
 
+The bank has a snapshot of its own, `bank.snapshot` (and `getSnapshot()`), frozen likewise. It
+sits flat on the bank's scope (`applabel`, `user_id`) beside its `lifecycle` -- `made`,
+`starting` while `hello()` loads, `ready`, or `refused` with its `err` -- and `vaults`, the
+listing: each vault asked for and not let go, sorted by `vaultlabel`, as its scope and its own
+`lifecycle` (`starting` while its birth reads storage, `ready`, or `refused` with its `err`). The
+listing holds no Vault object: `bank.vaultOf({ vaultlabel })` hands out the one the bank holds,
+null until it is `ready`, and `bank.bankVaultOf({ vaultlabel })` looks one vault's place in the
+listing up. The listing is the same array until a vault in it changes, and each of its elements
+the same object until it changes itself.
+
 ### The snapshot
 
 The snapshot carries what a host renders, and nothing more. It sits flat on the vault's scope
 (`applabel`, `user_id`, `vaultlabel`), so it may be handed to any bank call as it is, and carries
-the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it. Beside
-them:
+the vault's `format` and `vault_tok`, so `vault.demandConsistentWith(snapshot)` judges it: it
+checks the scope, the `vault_tok` and whether the Vault object is gone, and, as the snapshot holds
+no epochs, no longer catches a change to the ways in (`gate_moved`). Beside them:
 
 | field               | what it holds                                                                                      |
 |---------------------|----------------------------------------------------------------------------------------------------|
@@ -278,6 +289,29 @@ vault's total is a conservative estimate made before the box is sealed (each cou
 set exactly tight it may refuse a write that would just fit. A replacement weighs what it replaces,
 and is never refused as full. `maxWhisperBytes` is checked as a whisper is stored, never as one is
 read, so lowering it strands nothing.
+
+## Validators
+
+Every check the package makes is exported, under its own name, in the `Validators` namespace:
+the stored records (`Validators.VaultRecord`, `Validators.BoxRecord`), the scopes, each stored
+field (`Validators.vault_tok`), the options `Bank.make` and its stores take, and the expectations
+a `VaultDB` is handed. Each is Zod, made in a `Validator` call: its `parse` throws a `VaultError`
+of its kind (`bad_record`, `bad_scope`, `bad_option`, `bad_whisper`), and its `safeParse` is Zod's
+own. `label`, `user_id` and `EpochMillis` are plain Zod, the names they are all made of.
+
+```ts
+import { Validator, Validators } from 'safebyok'
+
+const { sidebarOpts } = Validator('bad_option', ({ obj, bool, vaultlabel }) => ({
+  sidebarOpts: obj({ vaultlabel, collapsed: bool.optional() }).strict(),
+}))
+sidebarOpts.parse({ vaultlabel: 'work', collapsed: true })
+Validators.vault_tok.safeParse(storedRow.vault_tok).success
+```
+
+A refusal names each failing field and says what it must be, in Zod's English, and never repeats
+what it was handed: not a value, and not the name of a field it does not take, which it counts,
+listing the fields it does take. Your own validators made with `Validator` refuse the same way.
 
 ## Your own storage adapter
 
@@ -920,14 +954,14 @@ adapter. None of them quotes the record, its ciphertext or its sidecar.
 
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
 or the dev overlay (in React, `BankProvider` throws misuse from `Bank.make` to the nearest error
-boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's entry, which
-`useVault` hands down).
+boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's listing,
+which `useBankVault` hands down).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `bad_scope`           | a name in a scope -- an `applabel`, `vaultlabel` or `boxlabel` that is no `label`, or a `user_id` that fails `user_id` -- the message naming each failing field, as `meta.fieldnames` does; or a bag handed to a bank's call naming another `applabel` or `user_id` than the bank's (`bank.demandConsistentWith`) | Pass labels the app chose; check a user-typed one first with `label`; percent-encode a user id outside the rules; make a bank per signed-in user, and drop it at sign-out |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
-| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's options, or one it does not take, a `vaultDB` or `deviceDB` (or any field named as a store, ending `db` in any case: `vaultDb`) beside a `vaultlabel` rather than in the vault's options, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's options naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
+| `bad_option`          | an option or argument out of its range: a `Bank.make` option or a vault's options, or one it does not take (counted, never named, beside the names it takes), an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureUnlocked()` as its options; a vault's options naming another `vaultDB` or `deviceDB` than the vault the bank holds was opened with | Fix the call; the message names what it takes |
 | `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: a malformed vault record, a name in it that fails its check included, an expectation missing a field, or a vault record and its expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_scope`, and so is a name that passes its check but is longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it that fails its check, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored`, `vault_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
@@ -997,7 +1031,8 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 `bank.ensureVault`, as it reads the vault from storage, can refuse with `storage_unavailable`,
 `not_permitted`, `identity_revoked`, `newer_format`, `vault_behind` or `damaged_vault` (a damaged
 box never stops it), and no Vault object is born: the refusal reaches its caller, the bad news
-among them `onBadNews` too, and the bank's entry for the vault keeps it (`bank.entryOf({ vaultlabel })`).
+among them `onBadNews` too, and the bank's listing keeps it: `bank.bankVaultOf({ vaultlabel })` is
+`refused`, the refusal its `err`.
 So can `storage_blocked`, from this device's own store or a vault store on it, which asking again
 will not mend. Ask with `bank.ensureVault` again to try again. Once born, a refused `hello()`
 leaves the Vault object as it was, its storage watch live, so the host calls `hello()` again, or
