@@ -79,7 +79,7 @@ describe("what the backend sees", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a very memorable passphrase')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'sidecars are visible in storage' } }, 'sk-ant-api03-fake-but-secret')
-    const everything = world.dbStore.scopepaths().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include('sk-ant-api03-fake-but-secret')
     expect(everything).to.not.include('a very memorable passphrase')
     expect(everything).to.include('sidecars are visible in storage') // the sidecar is visible by design
@@ -91,7 +91,7 @@ describe("what the backend sees", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'one_box' }, 'the same whisper')
     await vault.putBox({ boxlabel: 'two_box' }, 'the same whisper')
-    const [oneRow, twoRow] = world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))
+    const [oneRow, twoRow] = world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))
       .map((ckey) => JSON.parse(world.dbStore.read(ckey) ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } })
     expect(oneRow?.whisper_ciphered.ciphertext_b64).to.not.eq(twoRow?.whisper_ciphered.ciphertext_b64)
   })
@@ -112,7 +112,7 @@ describe("tampering", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const ckey = world.dbStore.scopepaths().find((ckey) => isU1Box(ckey))
+    const ckey = world.dbStore.scopepaths().find((scopepath) => isU1Box(scopepath))
     const row = JSON.parse(world.dbStore.read(ckey ?? '') ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(ckey ?? '', JSON.stringify(row))
@@ -192,7 +192,7 @@ const throwingLogger = () => ({ log: drainDown, warn: drainDown, error: drainDow
 
 /** Every ciphertext, salt and wrapped key the backend holds, as base64url text. */
 const storedSecrets = (world: ReturnType<typeof makeWorld>): string[] => {
-  const everything = world.dbStore.scopepaths().map((ckey) => world.dbStore.read(ckey) ?? '').join('\n')
+  const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath) ?? '').join('\n')
   return Array.from(everything.matchAll(/"(?:ciphertext_b64|salt_b64)":"([^"]+)"/g), (hit) => hit[1]!)
 }
 

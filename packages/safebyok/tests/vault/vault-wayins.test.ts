@@ -19,7 +19,7 @@ import { makeWorld, storedVaultRecordOf, vaultWithPasskey,SevenDaysMillis, u1Vau
 // == [Passphrase]: countingDeriver, putWayin with a passphrase, the passphrase
 
 /** Everything in the store behind `world`'s vaultDB, as text: what a call that writes nothing leaves exactly as it was. */
-const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.scopepaths().map((ckey) => [ckey, world.dbStore.read(ckey)]))
+const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)]))
 
 /** `opts` without the vault's names: what Bank.make takes. */
 const bankOptsOf = ({ vaultlabel: _vaultlabel, ...bankOpts }: TH.BornVaultOpts) => bankOpts
@@ -318,7 +318,7 @@ describe("the vault's passphrase", () => {
     const vault = await world.open()
     await TH.unlock(vault, 'a very memorable passphrase')
     await TH.putWayin(vault, 'a very memorable passphrase', 'another memorable passphrase')
-    const everything = world.dbStore.scopepaths().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include('memorable')
   })
 
@@ -604,7 +604,7 @@ describe("the vault's passkey", () => {
 
   it("the backend holds no passkey's answer, only its credential and salt (Contract: putWayin, Guarantees)", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    const everything = world.dbStore.scopepaths().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include(toB64(laptop.prfBytes))
     expect(everything).to.include(laptop.credential_id)
     expect(everything).to.include(laptop.prf_salt_b64)
