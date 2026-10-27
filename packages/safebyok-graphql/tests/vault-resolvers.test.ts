@@ -261,7 +261,7 @@ describe("vaultResolvers, for a request naming another user than its own", () =>
   it("leaves that user's vault as it was after every operation naming it", async () => {
     const db = await withU2Vault()
     const schema = TH.schemaOver(db)
-    for (const [, document, variableValues] of OnU2Vault) { await asked(schema, document, variableValues) }
+    for (const [_rootField, document, variableValues] of OnU2Vault) { await asked(schema, document, variableValues) }
     const left = await TH.expectingGood(TH.requestFor(db, 'u2')).getVaultRecords(TH.scopeOf('u2'))
     expect(TH.recordOfRead(left!)).to.deep.include({ vault_tok: 'vault-tok-u2', gate_epoch: 1 })
     expect(left?.boxes).to.have.lengthOf(1).and.to.have.nested.property('[0].revision_tok', 'rev-r1')
