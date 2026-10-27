@@ -1,6 +1,6 @@
 # Thread 18: Convex validators from the core's Zod (2026-10-27)
 
-Branch `20261027-convex_helpers`, PR #PRNUM, on main. Justify: green (core 3403 / 37 skipped,
+Branch `20261027-convex_helpers`, PR [#308](https://github.com/mrflip/safebyok/pull/308), on main. Justify: green (core 3403 / 37 skipped,
 convex 367 / 9 skipped, react 309, indexeddb 167, postgres 322, graphql 344, fastkey 49, demo 229,
 e2e 107, root 266; every size budget within its limit, none moved: no budget measures
 safebyok-convex).
