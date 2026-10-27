@@ -1713,12 +1713,12 @@ export class Vault implements VaultStamp {
   }
 
   /** What a store seals over a box storage refused as damaged: the revision the listing names, or none for a box it does not show yet, which storage refuses while one stands; 'damaged_box' for one listed with none.
+   * It is `#listedBase`'s revision alone: a box that will not read vouches for none of its fields.
    * The next hello lists it, with its revision for the next store.
    */
   #damagedBase(boxlabel: string): BoxBase | null {
-    const revision = this.#listedRevisionOf(boxlabel)
-    if (revision === null && this.#isListedDamaged(boxlabel)) { throw damagedBeyondNaming() }
-    return revision === null ? null : { revision_tok: revision }
+    const listed = this.#listedBase(boxlabel)
+    return listed === null ? null : { revision_tok: listed.revision_tok }
   }
 
   /** Write `box` over `expected`, as `putBox()` does, resolving the record as stored: one write, which storage refuses unless the revision `expected` names still stands.
