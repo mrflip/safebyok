@@ -712,15 +712,15 @@ export class Vault implements VaultStamp {
       const label = this.#checkedBoxlabel(boxlabel)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
       if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { throw absentBox() }
-      const lease = this.#demandLease('delBox')
+      this.#demandLease('delBox')
       // Lands only in the vault this device holds a lease for, whatever revision of the box stands:
       // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
       // lets storage say whether it removed that one or another.
-      const expected = { vault_tok: lease.vault_tok, revision_tok: this.#listedRevisionOf(label) }
+      const expected = { vault_tok: this.vault_tok, revision_tok: this.#listedRevisionOf(label) }
       const showedDamaged = this.#isListedDamaged(label)
       const deleted = await outcomeOf(() => this.#vaultDB.delBox(this.#scope, label, expected))
       // A lock landing meanwhile lets the deletion land.
-      this.#demandAfterWait(deleted, { vault_tok: lease.vault_tok }, { call: 'delBox' })
+      this.#demandAfterWait(deleted, { vault_tok: this.vault_tok }, { call: 'delBox' })
       const { outcome } = valOf(deleted)
       // Storage arbitrates: nothing stood there to delete.
       if (outcome === 'absent') { throw absentBox() }
@@ -731,7 +731,7 @@ export class Vault implements VaultStamp {
           this.#logger.warn("The box deleted was not the revision this device showed: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox' })
         }
       }
-      return good(this.#dropBoxListingOf({ boxlabel: label, vault_tok: lease.vault_tok, outcome }))
+      return good(this.#dropBoxListingOf({ boxlabel: label, vault_tok: this.vault_tok, outcome }))
     } catch (err) { return this.#badOutcome(err) }
   }
   // --
@@ -1613,25 +1613,25 @@ export class Vault implements VaultStamp {
     const label = this.#checkedBoxlabel(boxlabel)
     // Checked before the user is asked for anything: a box the listing does not show is none.
     if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { return null }
-    const lease = this.#demandLease(call)
-    return await this.#readBox(label, lease.vault_tok, call)
+    this.#demandLease(call)
+    return await this.#readBox(label, call)
   }
 
-  /** The box under `boxlabel` as storage holds it in the vault `vaultTok`, or null when none stands; the box demanded after the read, then the lease.
+  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the box demanded after the read, then the lease.
    * A box another device wrote is what storage holds, not drift. The demand on what the read was
    * made under cannot see a lock, which moves no `vault_tok`, so the lease is demanded again before
    * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
    */
-  async #readBox(boxlabel: string, vaultTok: string, call: VaultCall): Promise<Box | null> {
-    const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: vaultTok }))
+  async #readBox(boxlabel: string, call: VaultCall): Promise<Box | null> {
+    const read = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: this.vault_tok }))
     // A vault that moved on meanwhile refuses as the demand finds it, never as what its read found.
-    this.#demandAfterWait(read, { vault_tok: vaultTok }, { call })
+    this.#demandAfterWait(read, { vault_tok: this.vault_tok }, { call })
     if (! read.ok) { throw this.#boxReadRefusal(read.err) }
     if (read.val === null) {
       this.#demandLease(call)
       return null
     }
-    const fetched = this.#boxUnder(read.val, vaultTok)
+    const fetched = this.#boxUnder(read.val)
     this.#demand(fetched, { call })
     this.#demandLease(call)
     return fetched
@@ -1649,9 +1649,9 @@ export class Vault implements VaultStamp {
     return gone
   }
 
-  /** `record` as a {@link Box}, lying in the vault `vaultTok`, which the read or write that handed it back expected; made under the picture's scope and epochs. */
-  #boxUnder(record: BoxRecord, vaultTok: string): Box {
-    return Box.make(this, record, { ...vaultSparseOf(this.#vaultRecord), vault_tok: vaultTok })
+  /** `record` as a {@link Box}, made under the picture's scope, `vault_tok` and epochs. */
+  #boxUnder(record: BoxRecord): Box {
+    return Box.make(this, record, vaultSparseOf(this.#vaultRecord))
   }
   // --
 
@@ -1665,7 +1665,7 @@ export class Vault implements VaultStamp {
     const lease = this.#demandLease('putBox')
     const readFirst = givenSidecar === undefined || givenWhisper === undefined
     const { base, sidecar, whisper } = readFirst
-      ? await this.#storedBase(boxlabel, lease.vault_tok, givenSidecar, givenWhisper)
+      ? await this.#storedBase(boxlabel, givenSidecar, givenWhisper)
       : { base: this.#listedBase(boxlabel), sidecar: givenSidecar, whisper: givenWhisper }
     // A lock landing while the box was read and opened refuses, sealing nothing.
     if (readFirst) { this.#demand(lease, { leaseBound: true, call: 'putBox' }) }
@@ -1682,7 +1682,7 @@ export class Vault implements VaultStamp {
     const written = await outcomeOf(() => this.#writeOver(box, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }))
     // A lock landing during the write lets it land; the vault moving on meanwhile refuses as the demand finds it.
     this.#demandAfterWait(written, { vault_tok: box.vault_tok }, { call: 'putBox' })
-    return this.#updateBoxListingOf(valOf(written), box.vault_tok)
+    return this.#updateBoxListingOf(valOf(written))
   }
 
   /** What a whole `putBox()` seals over, reading nothing: the listing's entry for `boxlabel`, its revision and `registered_at` adopted as they stand, or none for a box it does not show, which is a new box.
@@ -1704,9 +1704,9 @@ export class Vault implements VaultStamp {
    * new, keeping nothing, when the whisper is given, and refuses 'damaged_box' when it is not; none
    * standing refuses 'no_whisper' when the whisper is not given.
    */
-  async #storedBase(boxlabel: string, vaultTok: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
-    const read = await outcomeOf(() => this.#readBox(boxlabel, vaultTok, 'putBox'))
-    this.#demandAfterWait(read, { vault_tok: vaultTok }, { call: 'putBox' })
+  async #storedBase(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
+    const read = await outcomeOf(() => this.#readBox(boxlabel, 'putBox'))
+    this.#demandAfterWait(read, { vault_tok: this.vault_tok }, { call: 'putBox' })
     if (! read.ok) {
       if (givenWhisper === undefined || ! isVaultError(read.err, 'damaged_box')) { throw read.err }
       return { base: this.#damagedBase(boxlabel), sidecar: givenSidecar ?? {}, whisper: givenWhisper }
@@ -1754,9 +1754,9 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Update the box listing with `stored`, the record a box write just landed in the vault `vaultTok`, once the box it makes is demanded consistent: a lock meanwhile lets it land. Resolves that box. */
-  #updateBoxListingOf(stored: BoxRecord, vaultTok: string): Box {
-    const box = this.#boxUnder(stored, vaultTok)
+  /** Update the box listing with `stored`, the record a box write just landed in this vault, once the box it makes is demanded consistent: a lock meanwhile lets it land. Resolves that box. */
+  #updateBoxListingOf(stored: BoxRecord): Box {
+    const box = this.#boxUnder(stored)
     this.#demand(box, { call: 'putBox' })
     const entry = boxSparseOf(stored)
     this.#boxes = Object.freeze([...this.#boxes.filter((listed) => listed.boxlabel !== entry.boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel)))
