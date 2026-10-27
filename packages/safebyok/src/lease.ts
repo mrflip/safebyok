@@ -240,8 +240,10 @@ export class Lease implements LeaseSparse {
     return await outcomeOf(async () => {
       const sealing = checkSealProps(props)
       const header = checkedVisible(visible)
-      const ciphered = valOf(await this.tryCipheredWith(sealing.whisper, header))
-      return { ...header, ...ciphered }
+      const ciphered = await this.tryCipheredWith(sealing.whisper, header)
+      // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+      this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
+      return { ...header, ...valOf(ciphered) }
     })
   }
 

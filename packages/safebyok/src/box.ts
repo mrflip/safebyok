@@ -276,7 +276,7 @@ export class Box implements Boxscope, BoxSparse {
           registered_at:          base?.registered_at ?? now,
           written_at:             now,
         }, { whisper: whisperBytes })
-        // What the seal brought, a refusal included, is used only while the vault still stands where the box is made.
+        // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
         vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
         return new Box(vault, madeUnder, checkedBoxRecord(valOf(sealed)), base?.revision_tok ?? null)
       } finally {
