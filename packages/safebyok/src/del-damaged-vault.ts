@@ -1,11 +1,12 @@
-import * as CX from './checks/core-checks'
+import * as CX from './shapes/scopes'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
 import { type DeviceDB, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import { randomId } from './crypto'
-import type { VaultScope } from './types/types'
+import type { VaultScope } from './shapes/scopes'
 import type { VaultDB } from './vault-db'
-import { type MakeBankOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
+import type { MakeBankOpts } from './shapes/bank-opts'
+import { isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Bank.make's options and the vault's label: which vault, and the two stores it lives in. */
 export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'vaultDB' | 'deviceDB'> & Pick<VaultScope, 'vaultlabel'>

@@ -1,5 +1,6 @@
-import { DeviceRecord, DeviceRecordFormat, LeaseRecord, type VaultScope } from './types/types'
-import * as CX from './checks/core-checks'
+import { DeviceRecord, DeviceRecordFormat, LeaseRecord } from './shapes/device'
+import type { VaultScope } from './shapes/scopes'
+import * as CX from './shapes/scopes'
 import * as Scopepath from './scopepath'
 import { sameScope } from './names'
 import { VaultError } from './errors'

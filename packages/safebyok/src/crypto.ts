@@ -1,22 +1,12 @@
 import { base64urlnopad } from '@scure/base'
-import type * as Z from 'zod'
 import { VaultError } from './errors'
-import { Validator } from './checks/validator'
+import type { Ciphered } from './shapes/fields'
 import { stableJsonify } from './stable-jsonify'
 
 /** The cryptography under the vault: AES-256-GCM encryption and key wrapping through WebCrypto, every primitive the platform's.
  * Every encryption binds a {@link cipherCtx} as AES-GCM's additional data, so ciphertext copied
  * anywhere else refuses to open. Key derivation from a passphrase is in key-deriver.ts.
  */
-
-/** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
-export const { Ciphered } = Validator('bad_record', ({ obj, str }) => ({
-  Ciphered: obj({
-    cipher_iv_b64:  str.min(1),
-    ciphertext_b64: str.min(1),
-  }).strict(),
-}))
-export type Ciphered = Z.infer<typeof Ciphered>
 
 /** `count` cryptographically secure random bytes, from the platform. */
 export const randomBytes = (count: number): Uint8Array => (

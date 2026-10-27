@@ -220,7 +220,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * **Build for ease of maintenance, not ease of implementation.** A module's customer uses one
   method; that method should read whole on its own, without tracing into a generic.
 * **Don't DRY short bodies through a generic.** Spelled out, a maker and its inverse read as
-  mirror images, each clear at a glance (`CX` is the core's checks, `checks/core-checks.ts`):
+  mirror images, each clear at a glance (`CX` is the core's scope checks, `shapes/scopes.ts`):
 
   ```ts
   export const box = (scope: Boxscope): BoxScopepath => {
@@ -440,7 +440,7 @@ the scope.
   `VaultRecord | VaultTombstone | DamagedVaultRecord | null` says present, dead, broken, missing;
   `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
 * **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
-  validator yet waits in `types.ts`, and leaves it when one is written.
+  validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.

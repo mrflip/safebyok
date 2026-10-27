@@ -1,8 +1,7 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary } from './types/types'
-import { type VaultStamp, VaultStampPicked, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './vault-record'
+import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, VaultStampPicked, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './shapes/vault'
 import type { KeyDeriver } from './key-deriver'
-import type { PrfSalt } from './types/type-aliases'
+import type { PrfSalt } from './shapes/fields'
 
 /** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proving makes, a passphrase's or a passkey's.
  * A Wayin is a record only: `Wayin.make` reads one from its record. A proving opens and seals one

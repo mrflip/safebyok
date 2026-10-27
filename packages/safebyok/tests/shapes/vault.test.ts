@@ -1,7 +1,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../src/vault-record'
-import * as TH from './test-helpers'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
+import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'

@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import { DeviceRecord, LeaseRecord } from './types/types'
+import { DeviceRecord, LeaseRecord } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { type DeviceDB, deviceOutcomeOf, raisedDeviceRecord } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'

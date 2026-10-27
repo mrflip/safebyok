@@ -6,104 +6,11 @@ import { heldLeaseOf } from './held-lease'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { Sidecar, Whisper } from './types/types'
-import { type VaultStamp, VaultSparse } from './vault-record'
-import { type ConsistencyWith, box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './types/type-aliases'
-import type { Boxscope } from './checks/core-checks'
+import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
+import { type VaultStamp, VaultSparse } from './shapes/vault'
+import type { ConsistencyWith } from './types/type-aliases'
+import type { Boxscope } from './shapes/scopes'
 import { Validator } from './checks/validator'
-
-// == [The record]: BoxRecord, BoxFormat, BoxStamp
-
-/** The box's format, as each record carries it and each of its ctxs begins. */
-export const BoxFormat = 'safebyok-box-v8'
-
-/** One box as storage holds it: the whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields.
- * Nothing in it opens without the vaultKey. The visible fields, the sidecar among them, are
- * stored in the clear: storage, and a locked vault, can read them. A {@link Box} is made from one,
- * and hands it back as `box.record`.
- *
- * A box revision is never rewritten, so every field it shows is fixed for its life: they are its
- * stamp ({@link BoxStamp}), with the `vault_tok` of its vault. Both encryptions bind that stamp,
- * beside its vault's stamp but for the vault's format (the scope, `vault_tok` and `registered_at`),
- * as AES-GCM's additional data. So ciphertext moved between revisions, boxes or vaults refuses to
- * open, as does an altered sidecar or time; a new vault format leaves it open. Its boxlabel is a
- * label, as `label` checks. Its `parse` refuses 'bad_record'. It is strict, as every stored record
- * is: a field this version does not know is damage.
- *
- * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
- */
-export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
-  BoxRecord: obj({
-    format:                 lit(BoxFormat),
-    boxlabel,
-    revision_tok,
-    /** This box's boxKey, wrapped under the vaultKey. */
-    box_key_wrapped,
-    /** The whisper, ciphered under this box's boxKey. */
-    whisper_ciphered,
-    /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
-    whisper_codec:          lit('json_v1'),
-    /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
-    whisper_schema_version: lit(1),
-    /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
-     * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
-     * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
-     */
-    sidecar:                Sidecar,
-    /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
-    registered_at:          epochMillis,
-    /** When this revision was written, an {@link EpochMillis}: a store of the same whisper moves it too. */
-    written_at:             epochMillis,
-  }).strict(),
-}))
-export type BoxRecord = Z.infer<typeof BoxRecord>
-
-/** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
- * It holds nothing secret, and shows while the vault is locked: the sidecar is as storage holds it,
- * and only opening the box proves it unaltered. A record that fails its check never lists as one:
- * it is a {@link BoxDamaged}. Strict, as the record is.
- *
- * @example BoxSparse.parse(listed)   // { format, boxlabel, revision_tok, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at }
- */
-export const { BoxSparse } = Validator('bad_record', () => ({
-  BoxSparse: BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }),
-}))
-export type BoxSparse = Z.infer<typeof BoxSparse>
-
-/** A box record as storage may hold it, which may fail its check: to the compiler a {@link BoxRecord} as written, to a reader the outcome a damaged one is. */
-export type DamagedBoxRecord = Z.input<typeof BoxRecord>
-
-/** The ways a box stored may fail to read back: `damaged`, and `newer_format`, a record in a `format` this version does not know, which a newer safebyok may have written. */
-export const BoxDamageVals = ['damaged', 'newer_format'] as const
-
-/** A box whose stored record does not read back, as a vault's listing shows it, beside its sound boxes and never among them: the boxlabel it is filed under, the revision it holds, and its `damage`. Its `parse` refuses 'bad_record'.
- * Nothing else of it is trusted. Its `revision_tok` is the one its record holds, when it holds one
- * as text, and null otherwise: it only names the record a fresh `putBox()` writes over. It holds
- * room in the vault. `delBox()` removes it; `getBox()`, `getWhisper()` and `useWhisper()` refuse it
- * 'damaged_box'. A `damage` of `newer_format` is a box a newer safebyok wrote: offer to update the
- * app, not to delete it.
- *
- * @example
- *   for (const box of snapshot.damagedBoxes) {
- *     if (box.damage === 'newer_format') { offerUpdate() } else { offerRemove(box.boxlabel) }
- *   }
- */
-export const { BoxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel }) => ({
-  BoxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(BoxDamageVals) }).strict(),
-}))
-export type BoxDamaged = Z.infer<typeof BoxDamaged>
-
-/** A box's stamp: every field of its record but the two ciphered ones, as {@link BoxSparse} holds them, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
- * A box revision is never rewritten, so every field it shows is fixed for its life. Both its
- * encryptions bind its stamp, beside its vault's.
- *
- * @example BoxStamp.parse({ ...sparse, vault_tok: box.vault_tok })   // sparse: box.record but its two ciphered fields
- */
-export const { BoxStamp } = Validator('bad_record', () => ({
-  BoxStamp: BoxSparse.extend({ vault_tok }),
-}))
-export type BoxStamp = Z.infer<typeof BoxStamp>
-// --
 
 // == [Box]: BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
 

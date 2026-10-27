@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Scopepath from '../src/scopepath'
-import * as CX from '../src/checks/core-checks'
-import type { VaultScope } from '../src/types/types'
+import * as CX from '../src/shapes/scopes'
+import type { VaultScope } from '../src/shapes/scopes'
 import { memoryStore } from '../src/string-store'
 import * as TH from './test-helpers'
 

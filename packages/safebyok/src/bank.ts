@@ -1,21 +1,20 @@
-import type { VaultScope } from './types/types'
+import { type VaultScope, type BankScope, bankBag, vaultBag } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
-import { VaultFormat, type VaultDraft } from './vault-record'
+import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
 import * as Refusals from './refusals'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
-import * as CX from './checks/core-checks'
-import type { BankScope } from './checks/core-checks'
+import * as CX from './shapes/scopes'
 import type * as Z from 'zod'
-import { Validator } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
-import { type BankVaultOpts, type MakeBankOpts, type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
+import type { BankVaultOpts, MakeBankOpts } from './shapes/bank-opts'
+import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
@@ -623,21 +622,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: vaultBag, bankBag, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
-
-/** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
- * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
- * a store put there among them. `bankBag` judges a thing carrying a scope (a Vault object, a box,
- * an element of the bank's listing), so everything else the thing carries is left out.
- *
- * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
- * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
- * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
- */
-export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
-  const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
-  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }).strict() }
-})
+// == [Helpers]: parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
 /** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
 const parseVaultBag = (bag: unknown): Z.infer<typeof vaultBag> => {

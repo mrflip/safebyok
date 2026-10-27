@@ -1,7 +1,7 @@
 import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
 import type { KeyDeriver } from './key-deriver'
-import { type GatedVaultRecord, type GateRecord, type VaultRecord, type VaultStamp, isGated } from './vault-record'
+import { type GatedVaultRecord, type GateRecord, type VaultRecord, type VaultStamp, isGated } from './shapes/vault'
 import { type PasskeyWayin, type PassphraseWayin, Wayin } from './wayin'
 
 /** Gates: a vault's ways in as one frozen value, its passphrase wayin and its passkey wayin or none, at one `gate_epoch`.

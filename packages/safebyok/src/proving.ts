@@ -7,11 +7,10 @@ import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
-import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf } from './vault-record'
+import { PasskeySaltBytes, PrfAnswerBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import type { LeaseRecord } from './shapes/device'
 import { decorate } from './helpers'
-import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
-import { Validator } from './checks/validator'
+import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
 
 /** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
@@ -337,18 +336,6 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     return new VaultError('wrong_passphrase', "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged.")
   }
 }
-
-/** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
-const PrfAnswerBytes = 32
-
-/** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
-export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
-  passkeyAnswerShape: obj({
-    credential_id: str.min(1),
-    prf_salt_b64:  str.min(1),
-    prfBytes:      custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
-  }),
-}))
 
 /** The proving of a passkey's answer: the passkeyKey HKDF makes of its PRF bytes, with the header's whole wayin ctx as its `info`.
  *

@@ -1,5 +1,4 @@
-import type * as Z from 'zod'
-import { BoxRecord, BoxSparse, BoxStamp } from './box'
+import { type BoxCiphered, BoxRecord, BoxSparse, BoxStamp } from './shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -7,9 +6,10 @@ import { sameScope } from './names'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseRecord } from './types/types'
-import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './vault-record'
-import { type ConsistencyWith, box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './types/type-aliases'
+import { LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
+import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './shapes/vault'
+import type { ConsistencyWith } from './types/type-aliases'
+import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './shapes/fields'
 import { FarFuture } from './consts'
 import type { Vault } from './vault'
 
@@ -20,21 +20,6 @@ import type { Vault } from './vault'
  * and decipher unwraps it for that call alone and keeps nothing. When to grant, when to ask, and
  * the write to the device store are the vault's.
  */
-
-/** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` refuses 'bad_record'.
- * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
- * gate it was granted under. Its wrap's ctx holds the whole of it, beside its vault's stamp.
- *
- * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
- */
-export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }) }))
-export type LeaseStamp = Z.infer<typeof LeaseStamp>
-
-/** A lease's sparse shape: the same fields as its {@link LeaseStamp}, as a lease is made once and never changed, named for what a log line or a listing shows. A Lease's own fields are these. */
-export type LeaseSparse = LeaseStamp
-
-/** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
-export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
 
 /** The `format` a lease record carries, in its stamp. */
 const LeaseFormat = 'safebyok-lease-v1'

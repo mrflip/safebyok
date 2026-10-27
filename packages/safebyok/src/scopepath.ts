@@ -1,6 +1,6 @@
 import type * as Z from 'zod'
-import * as CX from './checks/core-checks'
-import type { BankScope, Boxscope, VaultScope } from './checks/core-checks'
+import * as CX from './shapes/scopes'
+import type { BankScope, Boxscope, VaultScope } from './shapes/scopes'
 import { ScopepathDelimiter } from './consts'
 
 /** Where a store files what a scope names: the kind, then the scope's names in order, joined on `^`. A key-value adapter of your own files its rows under these.

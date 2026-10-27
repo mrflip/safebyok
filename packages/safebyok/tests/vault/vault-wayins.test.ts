@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { type PasskeyAnswer, VaultScope } from '../../src/types/types'
-import { type GatedVaultRecord, VaultRecord } from '../../src/vault-record'
+import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord } from '../../src/shapes/vault'
+import { VaultScope } from '../../src/shapes/scopes'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'

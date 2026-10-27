@@ -1,8 +1,8 @@
-import { BoxRecord } from './box'
+import { BoxRecord } from './shapes/box'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './vault-record'
-import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './vault-db'
+import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './shapes/vault'
+import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './shapes/vault-db'
 
 /** Whether what stands in storage is what a write expects: the comparisons a key-value adapter makes inside its one atomic step.
  * Import it whole: `import { Expectations } from 'safebyok'`, then

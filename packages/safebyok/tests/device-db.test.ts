@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deviceOutcomeOf, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
 import { VaultError } from '../src/errors'
-import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types/types'
+import type { DeviceRecord, LeaseRecord } from '../src/shapes/device'
+import type { VaultScope } from '../src/shapes/scopes'
 import * as TH from './test-helpers'
 
 TH.describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())

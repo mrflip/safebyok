@@ -1,11 +1,27 @@
-/** The checks for scopes and scopepaths, made in {@link Validator}: a failed `parse` refuses 'bad_scope', quoting nothing. */
+/** The checks for scopes, the bags naming a vault, and scopepaths, made in {@link Validator}, with the names a scope is made of: a failed `parse` refuses 'bad_scope', quoting nothing. */
 
 import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
-import { Validator } from './validator'
+import type { label, user_id } from '../checks/primitives'
+import { Validator } from '../checks/validator'
 
-export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from './primitives'
+export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from '../checks/primitives'
+
+// == [Names]: Applabel, Vaultlabel, Boxlabel, UserId
+
+/** The app's label, as a host writes it to `Bank.make`: a {@link label}, which every scope opens with. */
+export type Applabel = Z.infer<typeof label>
+
+/** The label of one of a user's vaults, as a host writes it to `bank.ensureVault`: a {@link label}, such as `main`. */
+export type Vaultlabel = Z.infer<typeof label>
+
+/** A box's label within its vault, as a host writes it to `putBox` and `getBox`: a {@link label}, such as `anthropic`. */
+export type Boxlabel = Z.infer<typeof label>
+
+/** The signed-in user's stable, opaque id from the host's own auth, as {@link user_id} checks it: the one name in a scope that is not a label. */
+export type UserId = Z.infer<typeof user_id>
+// --
 
 // == [Fieldnames]: each scope's fieldnames, in the order its scopepath joins them
 
@@ -24,7 +40,7 @@ export type VaultScopepathFieldname = typeof VaultScopepathFieldnameVals[number]
 export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
 // --
 
-// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
+// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, VaultScope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
 
 /** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
 const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
@@ -58,4 +74,28 @@ export type BankScope = Z.infer<typeof bankScope>
 export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
+
+/** What names one vault: the app's label, the signed-in user's id, and the vault's own label, frozen once checked. Its `parse` refuses 'bad_scope'.
+ * Each label is a `label`, and the user's id a `user_id`. A scope carrying more fields passes,
+ * the rest left out: a vault record, or a Vault object, passes as its scope. It is
+ * `CX.vaultScope`, under the name a host imports.
+ */
+export const VaultScope = vaultScope
+// --
+
+// == [Bags]: vaultBag, bankBag
+
+/** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
+ * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
+ * a store put there among them. `bankBag` judges a thing carrying a scope (a Vault object, a box,
+ * an element of the bank's listing), so everything else the thing carries is left out.
+ *
+ * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
+ * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
+ * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
+ */
+export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+  const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
+  return { bankBag, vaultBag: bankBag.extend({ vaultlabel }).strict() }
+})
 // --

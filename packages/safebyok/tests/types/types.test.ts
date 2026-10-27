@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { BoxRecord } from '../../src/box'
-import { DeviceRecord, LeaseRecord, Sidecar, VaultScope, Whisper } from '../../src/types/types'
-import { VaultRecord, VaultTombstone } from '../../src/vault-record'
+import { BoxRecord, Sidecar, Whisper } from '../../src/shapes/box'
+import { DeviceRecord, LeaseRecord } from '../../src/shapes/device'
+import { VaultScope } from '../../src/shapes/scopes'
+import { VaultRecord, VaultTombstone } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [

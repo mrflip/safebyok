@@ -1,9 +1,10 @@
-/** The vault record: the one record per vault every device syncs, its gate nested in it, and the shapes sliced from it. Each `parse` refuses 'bad_record', quoting none of it. */
+/** The vault record: the one record per vault every device syncs, its gate nested in it, the shapes sliced from it, and the proofs its wayins take. Each record's `parse` refuses 'bad_record', quoting none of it. */
 
+import { string as zodString } from 'zod'
 import type * as Z from 'zod'
-import { Validator } from './checks/validator'
-import * as Phrases from './phrases'
-import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './types/type-aliases'
+import { Validator } from '../checks/validator'
+import * as Phrases from '../phrases'
+import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './fields'
 
 // == [Formats]: VaultFormat, TombstoneFormat
 
@@ -12,6 +13,18 @@ export const VaultFormat = 'safebyok-vault-v6'
 
 /** The `format` a {@link VaultTombstone} carries, which tells it from a vault record stored in the same place. */
 export const TombstoneFormat = 'safebyok-tombstone-v1'
+// --
+
+// == [Wayin kinds]: WayinKindVals, WayinKind, PasskeySaltBytes
+
+/** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
+export const WayinKindVals = ['passphrase', 'passkey'] as const
+export type WayinKind = typeof WayinKindVals[number]
+
+/** How many random bytes a passkey wayin's `prf_salt_b64` holds.
+ * A new passkey's {@link PasskeyAnswer} carries a fresh salt this long, as `createPasskey` mints.
+ */
+export const PasskeySaltBytes = 32
 // --
 
 // == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft
@@ -228,4 +241,66 @@ export const gateSparseOf = (gate: GateRecord): GateSparse => {
   const { vault_key_wayin_wrapped: _passkeyWrap, ...passkey } = gate.passkey
   return Object.freeze({ passphrase: Object.freeze(passphrase), passkey: Object.freeze(passkey) })
 }
+// --
+
+// == [Wayin summaries]: PassphraseWayinSummary, PasskeyWayinSummary, WayinSummary
+
+/** A vault's passphrase wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PassphraseWayinSparse}, its kind and when and by which device it was sealed, and its `vault_tok`.
+ * The `device_id` is one per device per vault, so it links nothing the vault does not already
+ * link. A snapshot's `gate` shows the sparse shape alone.
+ *
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
+ */
+export type PassphraseWayinSummary = PassphraseWayinSparse & Pick<VaultRecord, 'vault_tok'>
+
+/** A vault's passkey wayin as a log line and a `damaged_wayin` refusal's `meta.wayin_listed` show it: its {@link PasskeyWayinSparse}, what to ask the authenticator with, and its `vault_tok`.
+ * A snapshot's `gate` shows the sparse shape alone.
+ *
+ * @example err.meta?.wayin_listed   // { wayinkind: 'passkey', device_id, registered_at, vault_tok, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }
+ */
+export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_tok'>
+
+/** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
+export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
+// --
+
+// == [Proofs]: passphraseCleartext, PassphraseCleartext, PasskeyAnswer, PrfAnswerBytes, passkeyAnswerShape
+
+/** The check for a passphrase's cleartext, the text the user typed: any string, blank included, since what a blank one means is the gating's to say. Its `parse` refuses 'bad_option', quoting none of it.
+ *
+ * @example passphraseCleartext.parse(typed)   // a PassphraseCleartext, for the key deriver
+ * @example passphraseCleartext.parse(42)      // throws 'bad_option', "A passphrase is the text the user typed, as a string"
+ */
+export const { passphraseCleartext } = Validator('bad_option', () => ({
+  passphraseCleartext: zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(),
+}))
+
+/** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
+export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
+
+/** What a passkey answers when asked for a vault's PRF, to hand to the vault as proof: `safebyok-react`'s `askPasskey` makes one.
+ * `credential_id` is base64url, as `PublicKeyCredential.id` gives it. `prfBytes`, 32 of them, are
+ * as good as the passphrase for this vault: pass them to the vault, then drop them.
+ *
+ * @example
+ *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
+ *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
+ */
+export type PasskeyAnswer = {
+  credential_id: string
+  prf_salt_b64:  string
+  prfBytes:      Uint8Array
+}
+
+/** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
+export const PrfAnswerBytes = 32
+
+/** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
+export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
+  passkeyAnswerShape: obj({
+    credential_id: str.min(1),
+    prf_salt_b64:  str.min(1),
+    prfBytes:      custom<Uint8Array>((candidate) => candidate instanceof Uint8Array && candidate.length === PrfAnswerBytes),
+  }),
+}))
 // --

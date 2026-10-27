@@ -1,7 +1,7 @@
 import { argon2idWebV1Deriver } from './key-deriver'
 import { idbDeviceDB, type IdbOpts } from './idb'
 import { parseDbName } from './idb-opts'
-import type { MakeBankOpts } from './vault-opts'
+import type { MakeBankOpts } from './shapes/bank-opts'
 import { zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
 export { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from './zxcvbn-strength-checker'

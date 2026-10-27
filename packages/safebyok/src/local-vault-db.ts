@@ -1,13 +1,14 @@
-import { BoxRecord } from './box'
-import type { VaultScope } from './types/types'
-import type { VaultRecord, VaultDraft } from './vault-record'
+import { BoxRecord } from './shapes/box'
+import type { VaultScope } from './shapes/scopes'
+import type { VaultRecord, VaultDraft } from './shapes/vault'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
-import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type VaultReadResponse, splitStoredBoxes, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
+import type { VaultRecordExpectation, StoredBox, VaultReadResponse, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()

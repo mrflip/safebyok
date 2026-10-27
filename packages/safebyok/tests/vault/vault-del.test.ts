@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
 import { toB64 } from '../../src/crypto'
-import { StaleMinutes } from '../../src/types/types'
+import { StaleMinutes } from '../../src/shapes/bank-opts'
 import { MinuteMillis } from '../../src/consts'
 import * as TH from '../test-helpers'
 import { makeWorld, u1BoxScopepath, storedRowOf, storedVaultRecordOf, boxlabelsOf, rowsOf, u1VaultScopepath, vaultWithPasskey, spoilWayin } from './world'
