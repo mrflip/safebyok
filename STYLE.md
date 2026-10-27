@@ -549,14 +549,28 @@ rows with it.
 * **The purpose goes on the `/**` line**, a sentence that stands alone when the block is folded
   in an editor: `/** Brief statement */` alone, or `/** Brief statement.` with the rest on the
   lines below. Never `/**` alone on its line.
-* Lead with what the thing *is* or *returns*: `/** The fields written to storage: the visible
+* **Lead with what the thing *is*, or with what it *does***. A type, a constant or a pure
+  function leads with what it is or returns: `/** The fields written to storage: the visible
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
-  that will be written to the database */`.
+  that will be written to the database */`. A function that reads storage, decrypts, asks the
+  user or writes leads with that verb: `/** Read and open the box stored under boxlabel, ...`.
+  Never open on "What a ..." or "What ... does": name the thing, or say the act.
 * **Once that first line is written, read the member's name against it** (*Naming*): the verb
-  promises exactly what the line says.
+  promises exactly what the line says. A line that needs words the name lacks means a wrong
+  name: rename it, or flag it.
 * **Name the shape and say *stamp*.** A block says which shape it takes or hands back
   (`VaultSparse`, `BoxStamp`) by its name, and calls the fields a ciphertext is bound to the
   stamp (*Naming*). An interface a host implements says what is checked, and by whom.
+* **Name every reach across a seam**: storage, a decryption, the user, a timer. Private members
+  too: for those the reader is the calling code, and the reach is the first thing it must know.
+  Name the reach, in one sentence with `{@link}`s; never narrate the steps.
+* **Say what a member does and when to call it, never who calls it.** A list of callers, or of
+  what each does with the result, belongs to those callers and goes stale. A rule its callers
+  must keep stays, as an instruction: "Ask it first in every call." An invariant for maintainers
+  ("every lock goes through here") is a `//` comment above the member.
+* **Never tour the fields.** A type's doc says what the whole is and what holds of every field.
+  Each field's own facts go on that field, inline object types included. Where a field, a
+  parameter or a return value has a documented type, link it rather than list its fields.
 * **Each sentence tells the caller something they would otherwise get wrong**, given the
   signature, the names, what a capable developer already knows, and what is said once elsewhere
   (a class's own doc, `errors.ts`). Leave out what those already say.
