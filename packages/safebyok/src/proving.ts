@@ -7,7 +7,7 @@ import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import { PasskeySaltBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
 import type { LeaseRecord } from './shapes/device'
 import { decorate } from './helpers'
 import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
@@ -218,11 +218,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const record = await sealLeaseRecord(standing, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     this.#demand()
-    tools.demand(madeUnderOfLease(record), this.#call())
+    tools.demand(VaultMadeUnder.parse(record), this.#call())
     const put = await tools.putLease(record)
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     this.#demand()
-    tools.demand(madeUnderOfLease(put.ok ? put.val : record), this.#call())
+    tools.demand(VaultMadeUnder.parse(put.ok ? put.val : record), this.#call())
     const stored = valOf(put)
     return tools.holdLease(stored)
   }
@@ -378,7 +378,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 }
 
-// == [Headers]: wayinRecordAt, freshPasskeyAnswer, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
+// == [Headers]: wayinRecordAt, freshPasskeyAnswer, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, gateMovedPast, demandAfterFailedSeal, sealLandedError
 
 /** The wayin record `vaultRecord`'s gate holds at `slotlabel`, or null: a novel vault's, or no passkey. */
 const wayinRecordAt = (vaultRecord: Pick<VaultRecord, 'gate'>, slotlabel: WayinKind): PassphraseWayinRecord | PasskeyWayinRecord | null => {
@@ -443,9 +443,6 @@ const checkedPasskeyHeader = (header: PasskeyWayinHeader, answer: PasskeyAnswer)
   }
   return header
 }
-
-/** What a lease record was made under: its scope, `vault_tok` and `gate_epoch`. */
-const madeUnderOfLease = ({ applabel, user_id, vaultlabel, vault_tok, gate_epoch }: LeaseRecord): VaultMadeUnder => ({ applabel, user_id, vaultlabel, vault_tok, gate_epoch })
 
 /** The refusal of a proving whose slot the gate no longer fills. */
 const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")

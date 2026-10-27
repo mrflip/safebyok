@@ -6,7 +6,6 @@ import type { VaultScope } from './shapes/scopes'
 import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone } from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import { Validator } from './checks/validator'
-import * as Phrases from './phrases'
 import { fieldOf } from './helpers'
 import * as Names from './names'
 import * as CX from './shapes/scopes'
@@ -819,9 +818,7 @@ const invalidBox = () => new VaultError('invalid_box', "Nothing was written: tha
  *
  * @example this.#listeners.add(callback.parse(listener))
  */
-export const { callback } = Validator('bad_option', ({ custom }) => ({
-  callback: custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function', Phrases.CallbackNotFunction),
-}))
+export const { callback } = Validator('bad_option', ({ fn }) => ({ callback: fn() }))
 
 /** `candidate` through `recordSchema`, or the refusal `refused` makes, its cause the schema's own 'bad_record'.
  * That cause names each failing field and what it expected, in its message and `meta.fieldnames`,

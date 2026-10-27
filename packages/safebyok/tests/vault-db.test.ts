@@ -434,7 +434,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
   it("refuses an onChange that is not a function, so no later write meets it", () => {
     const vaultDB = new MapVaultDB()
     expect(() => vaultDB.subscribe(TH.scopeOf('u1'), 'not a listener' as unknown as () => void))
-      .to.throw(VaultError, /A listener or callback is a function/).with.property('refusalkind', 'bad_option')
+      .to.throw(VaultError, /Expected a function/).with.property('refusalkind', 'bad_option')
   })
 })
 // --

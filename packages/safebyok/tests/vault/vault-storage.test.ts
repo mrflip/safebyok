@@ -38,7 +38,7 @@ describe("the snapshot and its subscribers", () => {
   it("refuses a listener that is not a function as it subscribes, so no later change meets it", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /A listener or callback is a function/)
+    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /Expected a function/)
     await TH.unlock(vault, 'pw')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
   })

@@ -381,7 +381,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
   made in a `Validator` call does (`src/checks/validator.ts`), and a check of options catches its
-  refusal only to prefix the call's name and say what to do (`optionsCheck`, `checkMakeBankOpts`).
+  refusal only to prefix the call's name and say what to do (`optionsCheck`, `optionsRefusal`).
   Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
   the value.
 * **A refusal never repeats its input: no value, and no key** (the Coach, 2026-10-26). A field an

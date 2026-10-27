@@ -1184,7 +1184,7 @@ describe("useWhisper", () => {
     const world = makeWorld()
     const vault = await world.open()
     const err = await TH.expectRefusal(vault.useWhisper('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
-    expect(err.message).to.include('A listener or callback is a function')
+    expect(err.message).to.include('Expected a function')
   })
 })
 // --
