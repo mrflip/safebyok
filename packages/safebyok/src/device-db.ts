@@ -15,12 +15,12 @@ import { isStorageBlocked } from './refusals'
  * one.
  *
  * The public verbs are the base class's; never override them. Each resolves an {@link Outcome} and
- * never rejects. Each refuses 'bad_scope' for a scope whose names fail their checks before your
- * code sees it, and hands your `do*` method the row's {@link Scopepath}. A VaultError your code
- * throws passes as it came; anything else becomes 'storage_blocked' where {@link isStorageBlocked}
- * names it, else 'storage_unavailable', that throw its `cause`, naming no scope and quoting no
- * record. A record read back that fails its check reads as null, and is discarded through
- * `doDelUnreadable`.
+ * never rejects. Each but `delAll` refuses 'bad_scope' for a scope whose names fail their checks
+ * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A VaultError
+ * your code throws passes as it came; anything else becomes 'storage_blocked' where
+ * {@link isStorageBlocked} names it, else 'storage_unavailable', that throw its `cause`, naming no
+ * scope and quoting no record. A record read back that fails its check reads as null, and is
+ * discarded through `doDelUnreadable`.
  *
  * **Calls land in the order they were made.** Each verb calls its `do*` method before it awaits
  * anything, so a store that starts each call's work in the order it is called keeps one scope's
