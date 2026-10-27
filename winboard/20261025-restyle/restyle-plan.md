@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **done, 2026-10-27.** Threads 1 to 14 merged (#272 to #283, #286, #287); thread 15 filed as [#291](https://github.com/mrflip/safebyok/pull/291); thread 16 not run, at the Coach's word. Rulings in `restyle-resolutions.md`; the account in `human/20261027-sprint_restyle_done.md`; the branch's history before the squash at tag `sprint/20261026-restyle`. This folder moved to `winboard/` with the sprint PR.
+* **Status:** **done, 2026-10-27.** Threads 1 to 14 merged (#272 to #283, #286, #287); thread 15 merged (#291); thread 17, a follow-up from the Coach's rulings on #287's matters, filed after the sprint PR merged as [#293](https://github.com/mrflip/safebyok/pull/293); thread 16 not run, at the Coach's word. Rulings in `restyle-resolutions.md`; the account in `human/20261027-sprint_restyle_done.md`; the branch's history before the squash at tag `sprint/20261026-restyle`. This folder moved to `winboard/` with the sprint PR.
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -683,6 +683,29 @@ and the adapters: hence last, cut from thread 15's tip once it files (or `origin
 merged). Thread 15's merged bundle (`VaultPrivateTools`) and its gating names are what this
 thread finds. **Depends on:** thread 15. **Size:** medium, mechanical but wide (about 240 lines,
 25 files).
+
+### 17. Validators trimmed; the bag naming a vault strict -- `validators_trim`
+
+A follow-up after the sprint closed, from two of the Coach's rulings on #287's matters (2026-10-27):
+"trim" on *Validators exports internals too*, and "can the other bag be strict too?" on *A store
+in the vault bag is now ignored*.
+
+*Gloss:* trim the `Validators` namespace to what a host or an adapter author calls or composes,
+the internals still exported from their own modules; rename nothing, and leave `vaultScope` and
+`VaultScope` both in (the Coach's naming question is open). Make `vaultBag` strict, so a store or
+any unknown field there is refused `bad_scope`, naming no field and quoting no value; every caller
+fixed; `notes/security.md` amended through a sonnet subagent. **Depends on:** thread 15 (cut from
+its tip; #291 merged meanwhile). **Size:** small.
+
+*Review:* medium, `fixed`: filed as [#293](https://github.com/mrflip/safebyok/pull/293). The
+namespace went from 95 names to 66; the strict bag's refusal leaks nothing; every caller passing a
+Vault object or `BankVault` as the bag was found. Fixed: three doc blocks' `bad_scope` lists, a
+README line's width, the changeset's note that `Sidecar` refuses `bad_option` where `whisperBag`
+refused `bad_whisper`, a destructure hole named. Left, as open matters: the bag's type still
+admits a Vault object (it compiles, then refuses), the bag's "stores go in the second bag" hint on
+every refusal, and `otherScopeError`'s "hand in something of this bank's" fitting one caller of
+two. All three wait on the Coach's ruling on Vault objects as the bag. Rebased onto main once #271
+merged, its thread file moved to `winboard/` with the rest; these lines are written on #293.
 
 ## Not in this sprint
 
