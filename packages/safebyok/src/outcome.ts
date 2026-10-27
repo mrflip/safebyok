@@ -1,7 +1,7 @@
 import { VaultError, isVaultError } from './errors'
 import * as Refusals from './refusals'
 
-/** What a non-throwing safebyok call resolves to: a {@link GoodOutcome} holding its `val`, or a {@link BadOutcome} holding its refusal as `err`.
+/** The answer a non-throwing safebyok call resolves to: a {@link GoodOutcome} holding its `val`, or a {@link BadOutcome} holding its refusal as `err`.
  * TypeScript narrows on `ok`.
  *
  * @example
@@ -11,10 +11,10 @@ import * as Refusals from './refusals'
  */
 export type Outcome<ValT> = GoodOutcome<ValT> | BadOutcome
 
-/** A call that succeeded: `ok` true, and its answer as `val`. */
+/** The outcome of a call that succeeded, its answer as `val`. */
 export type GoodOutcome<ValT> = { ok: true, val: ValT, err?: never }
 
-/** A call that was refused: `ok` false, and the refusal as `err`, always a {@link VaultError}. */
+/** The outcome of a call that was refused, its refusal as `err`. */
 export type BadOutcome = { ok: false, val?: never, err: VaultError }
 
 /** `val` as the outcome of a call that succeeded.
@@ -51,7 +51,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
   }
 }
 
-/** `outcome`'s `val`, or its `err` thrown: how a VaultDB that hands each call on to another unwraps each answer.
+/** `outcome`'s `val`, or its `err` thrown: the inverse of {@link outcomeOf}.
  *
  * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
  * @example

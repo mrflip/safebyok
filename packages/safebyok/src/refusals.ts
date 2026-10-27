@@ -10,7 +10,7 @@ import type { Capacity } from './types/types'
  * Error saying the backend gave none. A `cause` left out leaves the refusal with none.
  */
 
-/** What `storage_unavailable` says unless an adapter says more exactly what failed. */
+/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
 export const StorageTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
@@ -39,14 +39,14 @@ export const unexpectedError = (thrown: unknown): VaultError => (
 export const StaleWriteVals = ['del'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
-/** What each stale write says: what changed under the writer, and to read again. */
+/** The message of each stale write: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   del: 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
 /** A `stale_write` refusal of a deletion: what it expected is no longer stored, so nothing was removed.
- * The `VaultDB` base class throws it when an adapter's deletion answers `false`, or `null` for a
- * box. An adapter that hands each call on to another VaultDB passes it on as it came.
+ * The `VaultDB` base class throws it when an adapter's deletion answers null. An adapter that hands
+ * each call on to another VaultDB passes it on as it came.
  *
  * @example throw Refusals.staleWrite('del')
  */
@@ -67,7 +67,7 @@ export const staleBox = (boxStored: unknown): VaultError => (
   new VaultError('stale_write', StaleBoxMessage, { meta: { box_stored: boxStored as Exclude<RefusalMeta['box_stored'], undefined> } })
 )
 
-/** What a box write's `stale_write` says. */
+/** The message of a box write's `stale_write`. */
 export const StaleBoxMessage = "That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written. What is stored now is this error's meta.box_stored: write again over it, or leave it."
 
 /** A `stale_write` refusal of an update of the vault record, carrying the stored vault record as `meta.vault_stored`. Throw it from `doPutVaultRecord`.
@@ -86,7 +86,7 @@ export const staleVaultRecord = (vaultStored: unknown): VaultError => (
   new VaultError('stale_write', StaleVaultRecordMessage, { meta: { vault_stored: vaultStored as Exclude<RefusalMeta['vault_stored'], undefined> } })
 )
 
-/** What an update of the vault record's `stale_write` says. */
+/** The message of an update of the vault record's `stale_write`. */
 export const StaleVaultRecordMessage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What is stored now is this error's meta.vault_stored: read the vault again before retrying."
 
 /** A `vault_mismatch` refusal of a box read or write, for a vault record that is not the one it expects. Throw it from `doGetBox` or `doPutBox`.
@@ -97,7 +97,7 @@ export const StaleVaultRecordMessage = "The vault changed in storage since this 
  */
 export const vaultMismatch = (): VaultError => new VaultError('vault_mismatch', VaultMismatchMessage)
 
-/** What `vault_mismatch` says. */
+/** The message of `vault_mismatch`. */
 const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so the box was neither read nor written. Open the vault again to see what is stored now."
 
 /** A `not_permitted` refusal: a rule of the backend's refuses the signed-in user, still the vault's own, this one call.
@@ -133,7 +133,7 @@ export const vaultFull = (capacity: Capacity, opts?: ErrorOptions): VaultError =
   return new VaultError('vault_full', message, { ...optsOf(opts), meta: { capacity } })
 }
 
-/** What `storage_blocked` says unless an adapter says more exactly what was withheld. */
+/** The message of `storage_blocked` where an adapter says no more exactly what was withheld. */
 export const StorageBlockedMessage = "This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so the vault's storage failed. Trying again will not help until that changes."
 
 /** A `storage_blocked` refusal: the browser withholds storage on this device until something outside the app changes.
@@ -168,7 +168,7 @@ export const isStorageBlocked = (err: unknown): boolean => (
   typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string' && BlockedStorageNames.has(err.name)
 )
 
-/** What a backend that failed without an error is said to have failed with. */
+/** The message of the cause given a backend that failed without an error. */
 const NoErrorGiven = 'The storage backend failed without giving an error.'
 
 /** A cause as a refusal keeps it: never null or undefined. */

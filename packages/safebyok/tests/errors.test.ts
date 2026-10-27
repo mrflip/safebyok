@@ -38,7 +38,7 @@ describe("RefusalKindVals", () => {
   it("puts the same kinds in each family as the doc block in errors.ts does", () => {
     expect(namedKinds(between(errorsSource, '* **Misuse**', '* **Condition**'))).to.have.members(MisuseKinds)
     expect(namedKinds(between(errorsSource, '* **Condition**', '* **Bad news**'))).to.have.members(ConditionKinds)
-    expect(namedKinds(between(errorsSource, '* **Bad news**', '* `vault_full` means'))).to.have.members(BadNewsKinds)
+    expect(namedKinds(between(errorsSource, '* **Bad news**', '\n *\n'))).to.have.members(BadNewsKinds)
   })
 })
 
