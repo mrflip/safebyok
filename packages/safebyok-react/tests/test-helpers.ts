@@ -270,7 +270,7 @@ export class Catcher extends Component<{ children: ReactNode }, { caught: string
 }
 
 /**
- * Suspends the Suspense boundary it stands in while `hiding` is pending, and renders nothing: a
+ * Suspends the Suspense boundary around it while `hiding` is pending, and renders nothing: a
  * boundary already shown hides what it holds, which stays mounted, and shows it again once
  * `hiding` settles. Null suspends nothing.
  *

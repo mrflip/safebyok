@@ -280,7 +280,7 @@ describe("BankProvider", () => {
       expect(latest().err).to.be.null
     })
 
-    it("leaves a vault deleted and made anew elsewhere refused until the app asks again: then the one that stands", async () => {
+    it("leaves a vault deleted and made anew elsewhere refused until the app asks again: then the one now stored", async () => {
       const world = await madeWorld()
       const { Grab, latest } = grabber()
       render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
@@ -325,7 +325,7 @@ describe("BankProvider", () => {
       expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     })
 
-    it("asks again only once the bank holds no entry: a vault let go is born anew, one standing is left alone", async () => {
+    it("asks again only once the bank holds no entry: a vault let go is born anew, one still held is left alone", async () => {
       const world = makeWorld()
       const reads = vi.spyOn(world.vaultDB, 'ensureVault')
       const { Grab, latest } = grabber()

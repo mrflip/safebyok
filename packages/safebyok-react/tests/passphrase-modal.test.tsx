@@ -888,9 +888,9 @@ describe("PassphraseModal", () => {
   describe("once it has gone", () => {
     // Each call is held under way while the dialog unmounts -- its host took it away, or the test
     // that rendered it ended -- and settles after. A dialog gone touches neither its own state nor
-    // its host's callbacks, whatever the outcome; one that stands meets the outcome as ever.
+    // its host's callbacks, whatever the outcome; one still mounted meets the outcome as ever.
 
-    it("meets a refusal that lands while it stands, as ever", async () => {
+    it("meets a refusal that lands while it is mounted, as ever", async () => {
       const unlocking = TH.held()
       const { heard } = renderUnlocking(unlocking.promise)
       TH.submitPassphrase('pw')
