@@ -1,0 +1,307 @@
+# Security guarantees: where secret material lives
+
+What safebyok promises about its secret material: which values are secret, in what form each may
+exist, for how long, and which code may hold or use it. SECURITY.md says what is in scope for a
+report; this note says what a report would show broken. VOCABULARY.md names every key and its
+encrypted form.
+
+Each guarantee names the code that keeps it and, where there is one, the test that checks it. A
+guarantee changes only with a Coach's ruling and a changeset. A guarantee a reader finds broken is
+a bug: report it, do not amend the guarantee. **Changing any file named under *Where the
+guarantees are kept* means reading *The guarantees* first and checking the change against them.**
+
+Last verified against the code 2026-10-27, on `main` after #293, with
+[#305](https://github.com/mrflip/safebyok/pull/305) applied.
+
+## Where the guarantees are kept
+
+Six files hold every line of code that touches a secret. A change to one of them is a change to
+these guarantees until shown otherwise.
+
+| File | What it keeps |
+|---|---|
+| `packages/safebyok/src/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
+| `packages/safebyok/src/proving.ts` | the passphrase and PRF answer made into a wayinKey; every wrap and unwrap of the vaultKey under one; the lease grant |
+| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box |
+| `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
+| `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
+| `packages/safebyok/src/types/types.ts` | the `LeaseRecord` and `Whisper` checks, which say what a stored leaseKey and a whisper are |
+
+Beside them, three host functions hear the passphrase and are guarded where they are called:
+`keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
+(`passphrase-strength.ts`, `guardStrengthChecker`) and `requestCleartext` (`vault-opts.ts`,
+`parseRequestCleartext`). The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque.
+
+## The construction
+
+safebyok is a **key-wrapping hierarchy** (envelope encryption): two tiers of key-encryption keys
+over a per-box data-encryption key. It is not a ratchet of any kind. Nothing in it evolves a key
+forward, derives the next key from the last, or offers forward secrecy: the vaultKey is static for
+the vault's life, and a wayin removed stops opening the vault from now on but revokes nothing
+already copied (README, *Removal is not revocation*). A whisper is ciphered under a fresh boxKey
+at every write, and that boxKey wrapped under the vaultKey: envelope encryption, not a ratchet,
+and rightly so, as a vault reads its secrets back and has no counterparty to keep chain state
+with. Post-compromise security is rotation's job, which is not built (VOCABULARY, *rotation*).
+
+```
+passphrase + salt_b64      ──Argon2id──────>  passphraseKey  ─┐
+passkey PRF answer + ctx   ──HKDF-SHA256───>  passkeyKey     ─┤ wayinKey   wraps  vaultKey  → vault_key_wayin_wrapped   (synced)
+                                                               │
+leaseKey (this browser, non-extractable)   ───────────────────┘            wraps  vaultKey  → vault_key_lease_wrapped   (this device)
+vaultKey  wraps    boxKey   → box_key_wrapped
+boxKey    ciphers  whisper  → whisper_ciphered
+```
+
+Every cipher is AES-256-GCM through WebCrypto, under a fresh random 96-bit IV, with the ciphertext
+bound to a `ctx` as additional data (`crypto.ts`, `cipherCtx`). The ctx names the vault's stamp
+(scope, `vault_tok`, `registered_at`, and for a wayin its `format`), a purpose string unique to
+the kind of field, and the record's own visible header or stamp. So a wrap or a ciphertext moved
+to another vault, slot, box, lease or purpose does not open, and a visible field altered in
+storage (a sidecar, a salt, a deadline) makes its record refuse to open.
+
+## Bytes, handles, and the three stores
+
+Three layers hold key material, and the words for each matter.
+
+* **Bytes** are a `Uint8Array` in JavaScript memory. Any code holding a reference can read or copy
+  them. safebyok zeroes every array of secret bytes it holds once it is done with it, and holds
+  such an array only as a local.
+* **A handle** is a `CryptoKey`: an object WebCrypto (`crypto.subtle`) hands back whose material
+  lives inside the browser's crypto implementation. Code holding a handle can *use* it, for the
+  usages it carries, and can read its bytes only if it was made `extractable`. A non-extractable
+  key's bytes are never observable from JavaScript, by anyone, including the code that made it.
+  `crypto.ts` is the only module that calls `crypto.subtle`.
+* **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
+  material still inside the browser, never as bytes JavaScript sees. The one key safebyok stores
+  this way is the leaseKey (`idbDeviceDB.putLease`). No other key is ever written anywhere: not to
+  IndexedDB, not to the host's VaultDB, which receives only ciphertext and visible fields. The
+  wayinKey (the strong key) in particular lives only as a handle in a `Proving`, for one gating,
+  and is never persisted.
+
+So for the strong key the minimal path is: the deriver's bytes, or the authenticator's, exist until
+`passphraseKeyOf` or `PasskeyProving.seal` has imported them into a non-extractable handle and
+zeroed them; the handle exists in `Proving.#wayinKey` until the proving is dropped; nothing of
+either is ever stored. One copy outside the core is the browser's own PRF result buffer, which
+`safebyok-react`'s `bytesOf` copies and leaves to the collector (see *Open items*).
+
+## The secret values
+
+Eight values are secret. Everything else safebyok stores or shows is either public or
+*visible*: readable where it lies, authenticated by the ctx that binds it, and never secret.
+
+| Value | Form | Where it may exist | For how long | Who touches it |
+|---|---|---|---|---|
+| passphrase | JS string | function arguments and locals of one gating's chain; the host's dialog | the call | the gating chain, `PassphraseProving.seal`, `passphraseKeyOf`; the host's `keyDeriver`, `strengthChecker` and dialog |
+| passkey PRF answer | `Uint8Array` in the host's `PasskeyAnswer` | the answer object, until `PasskeyProving.seal` zeroes it | one seal | `PasskeyProving.seal`; the host's `askPasskey` |
+| passphraseKey bytes | the deriver's `Uint8Array` | a local in `passphraseKeyOf`, zeroed after import | one import | `passphraseKeyOf`; the host's `keyDeriver` |
+| wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
+| vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
+| boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, in transit through the Vault and the `DeviceDB`, and at rest in the device store | the lease | `Lease`; the `DeviceDB` stores it opaque |
+| whisper | the host's JSON value, then its UTF-8 bytes | the host's value in and out; bytes as locals, zeroed | one seal or open | `Box.seal`, `box.extractWhisper`, `Lease` |
+
+Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
+`device_id`, `key_deriver_label`, every label and `user_id` (a scope name; a host that counts its
+user ids sensitive digests them before they reach safebyok), `vault_tok`, every epoch,
+`registered_at` and `ask_passphrase_at`, a box's sidecar (visible, authenticated, never
+encrypted), and every wrap and ciphertext. The snapshot shows no salt and no wrap, so an offline
+guess has nothing to start from (README, *The passphrase and the passkey*).
+
+## Access points, value by value
+
+For each secret: the code that holds its naked value (the string, the bytes, or an extractable
+handle), and the code that operates on it as a non-extractable handle without ever holding its
+bytes. Everything not listed never sees the value. Private methods are named with their `#`.
+
+**Passphrase.** Naked: the host's dialog (`safebyok-react`'s `passphrase-modal.tsx` and
+`gating-modal.tsx` hold what was typed in component state) → `gating.attempt`,
+`attemptPassphrase` (`gating.ts`, `attemptOf`, `#attempt`) → `checkText`, `checkTexts`,
+`checkFirstGate`, `checkNewPasskey` (shape only) → one chain: `#initializeGate`,
+`#unlockByPassphrase`, `#changePassphrase`, `#putPasskey`, `#delPasskey`, `#delVault`;
+`#strengthUnder` → `vault.tryCheckStrength` → `guardStrengthChecker` → the host's
+`strengthChecker`; `PassphraseProving.seal` → `passphraseCleartext.parse`,
+`checkedPassphraseHeader` (its `trim`) → `passphraseKeyOf` → the host's
+`keyDeriver.deriveKeyBytes` (`argon2idDeriver`'s, or `safebyok-fastkey`'s `deriveWithWasm`).
+Operates on it without holding it: nothing; a passphrase has no handle form.
+
+**Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
+`bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt`,
+`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswerShape`, `isAllZero`),
+`checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
+`PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
+`subtle.deriveKey`), and `prfBytes.fill(0)`.
+
+**passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
+(`isSharedMemory`, `isAllZero`, the length check) → `importWrappingKeyBytes`
+(`subtle.importKey`), then `keyBytes.fill(0)`.
+
+**wayinKey.** Never naked: non-extractable from `importWrappingKeyBytes` or
+`deriveWrappingKey`. Held: `Proving.#wayinKey`, set in the constructor. Operates: `wrappedWith`
+(`wrapKeyUnder`), `#unwrap` (`unwrapKeyUnder`) through `checkWayin`, `resealWayinFor` and
+`grantLease`; `PassphraseProving.sealWayins`.
+
+**vaultKey.** Naked, as an extractable handle in a local: `makeVaultKey` in `sealWayins`;
+`#unwrap` with `RewrapUsage` in `resealWayinFor` and `grantLease`, handed to `wrappedWith`
+(`wrapKeyUnder`) and `sealLeaseRecord` (`wrapKeyUnder` under the leaseKey). Operates, as a
+non-extractable one-usage handle in a local: `checkWayin` (`#unwrap`, `CheckUsage`);
+`Lease.#vaultKeyOrNull` in `tryCipheredWith` (`wrapKey`) and `tryDecipherWith` (`unwrapKey`).
+Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped` (DeviceDB).
+
+**boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.tryCipheredWith`, wrapped by
+`wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
+`unwrapKeyUnder` in `Lease.tryDecipherWith`, used by `decipherBytes`. Stored only as
+`box_key_wrapped`.
+
+**leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `sealLeaseRecord`, called by
+`Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
+`DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
+`device-db.ts` guard) → `holdLease` → `vault.#holdLease` → `Lease.make` → `Lease.#record`; read
+back by `DeviceDB.getLease` in `bank.ts`'s birth read, `vault.#readStorage` (for
+`#takePicture`'s revocation check, which reads the stamp alone), `#takeUpFromPantry` and
+`#takeUpAtBirth`, each ending in `Lease.make`; erased by `DeviceDB.delLease` from `vault.#lockNow`,
+`del-damaged-vault.ts` and the bank. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
+
+**whisper.** Naked: the host → `vault.putBox`, `tryPutBox` → `#checkWhisperFits`
+(`whisperBytesOf`, zeroed) → `#sealAndPutBox` → `Box.seal`, `trySeal` → `checkedWhisper`
+(`Whisper`, a `structuredClone`) → `whisperBytesOf` (`stableJsonify`, `TextEncoder`) →
+`lease.sealProps`, `trySealProps` → `tryCipheredWith` (`cipherBytes`), bytes zeroed in both.
+Out: `vault.getWhisper`, `tryGetWhisper`, `useWhisper` → `box.extractWhisper`,
+`tryExtractWhisper` → `lease.tryDecipherWith` (`decipherBytes`) → `TextDecoder`, parse, zero →
+the host, or its `useWhisper` callback. `mask` (`safebyok/utils`) reads one to show a whiff of it.
+
+## The guarantees
+
+**G1. A passphrase is never a field.** Inside the core a passphrase is only ever a function
+argument or a local: the gating's `attempt` hands it to its chain (`gating.ts`, `attemptOf`), the
+chain to `PassphraseProving.seal` and `vault.tryCheckStrength`, `seal` to `passphraseKeyOf`, and
+that to `keyDeriver.deriveKeyBytes`. No class, record, snapshot or closure that outlives the call
+holds it; the one comparison of two passphrases is `current === next` in `change_passphrase`,
+both typed by the same user. Three host functions hear it: the dialog that collects it, the
+`strengthChecker` and the `keyDeriver`. *Caveat:* a JavaScript string cannot be zeroed, so copies
+live until collected, and the React dialog holds what was typed in component state until it
+closes. Kept by: `gating.ts` (chains), `proving.ts`. Checked by: `grep` for a field or record
+holding one finds none.
+
+**G2. The strong key's bytes are locals, zeroed; its handle is non-extractable.** The deriver's
+output is a view over the deriver's own buffer, imported non-extractable with `wrapKey`/
+`unwrapKey` only, and zeroed in a `finally`, imported or refused (`passphraseKeyOf`,
+`importWrappingKeyBytes`). A passkey's PRF bytes are zeroed in `PasskeyProving.seal`'s `finally`,
+whatever happens, so an answer is single-use, and one handed in again is refused `bad_option` by
+its all-zero bytes (`checkedPasskeyAnswer`). The passkeyKey is HKDF-SHA256 of those bytes, its
+`info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
+wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
+method returns it or a vaultKey (`proving.ts` header). Bytes refused before import: anything but
+32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/proving.test.ts`,
+`tests/wayin.test.ts`.
+
+**G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an
+*extractable* local where WebCrypto requires it to be wrapped: fresh in `sealWayins`
+(`makeVaultKey`), and unwrapped `RewrapUsage` in `resealWayinFor` and `grantLease`. An extractable
+handle yields its bytes to anyone holding it, so each is dropped at the end of its method and
+crosses no boundary: those methods return a `Wayin`, a `Lease` or a wrap. (b) As a
+*non-extractable* local with one usage: `checkWayin` (`CheckUsage`), and `Lease.#vaultKeyOrNull`
+for each cipher or decipher, which keeps nothing between calls. The pantry holds the vaultKey
+only as `vault_key_lease_wrapped`, ciphertext bytes under the leaseKey; there is no handle to a
+naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `proving.ts`,
+`lease.ts`. Checked by: `tests/lease.test.ts`, `tests/proving.test.ts`.
+
+**G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
+only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
+written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
+`getLease`; and `Lease.#record` in memory for the lease's life, dropped at its
+`ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
+erased from the store at `lock()`. A record read back whose key is extractable, of another
+algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
+non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
+vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
+record, is inside the trust boundary, as the host already is (SECURITY.md, *What is outside
+safebyok's protection*). Kept by: `lease.ts`, `idb.ts`, `types.ts`. Checked by:
+`tests/lease.test.ts` (*makes its leaseKey non-extractable*, *refuses a leaseKey that is
+extractable*).
+
+**G5. A boxKey is a local.** Fresh and extractable only to be wrapped, in `Lease.tryCipheredWith`;
+unwrapped non-extractable, `decrypt` only, in `tryDecipherWith`; dropped at the end of each.
+
+**G6. The whisper's bytes are zeroed; its value is the host's.** `putBox` validates the host's
+value and takes a `structuredClone` (`Whisper`), serializes it (`whisperBytesOf`), and zeroes the
+bytes once ciphered, refused or not (`Box.trySeal`, `Lease.tryCipheredWith`, and the sizing copy
+in `#checkWhisperFits`). `extractWhisper` decodes the deciphered bytes, parses them, zeroes them,
+and hands the parsed value to the host. A `Box` holds its record, ciphertext, never a whisper.
+*Caveat:* the JSON value itself cannot be zeroed; `mask` from `safebyok/utils` is how to show one.
+
+**G7. The set of secrets is closed.** The eight values above are the secrets. A new one, or a new
+form of one (a cache, a copy in a snapshot, a key kept between calls), is a design change that
+amends this note first.
+
+**G8. No secret reaches a refusal, a log, or a thrown value.** A `VaultError` carries none in its
+message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
+kind, a limit or a field name. Every validator's refusal quotes no input: `tests/validators.test.ts`,
+*no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
+message, stack, meta or cause. The three host functions that hear the passphrase have their throws
+replaced, never kept as a `cause`: `deriverThrewRefusal` (kind only, logged), `guardStrengthChecker`
+(nothing), `parseRequestCleartext` (kind only, logged). A WebCrypto failure is caught and replaced
+(`wrongProof`, `damaged_lease`, `damaged_box`). `unexpectedError` keeps a foreign throw as `cause`
+only where the thrower heard no secret: storage adapters and the device store. The logger hears
+messages, a story bag of kinds and calls, and `VaultError`s; `Proving.toJSON`, `Lease.toJSON` and
+`Wayin.toJSON` show no key material, and a lease that will not read is warned of without its
+record. *Host obligations, documented:* a `strengthChecker`'s `reason` becomes the
+`weak_passphrase` message, so it must not quote the passphrase (CUSTOMIZATION.md); a `DeviceDB`'s
+thrown error rides as a `cause`, so it must not echo the record it was handed.
+
+**G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
+only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
+key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`
+and the `LeaseRecord` in transit and at rest. The Vault passes lease records opaque (`#holdLease`,
+`#takeUpFromPantry`, `#takeUpAtBirth`, `#readStorage`); a `Box` reaches the Lease through the
+module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving
+reaches the vault's tools through the module-private `registerProvingTools`, which hand it
+`putLease` and `holdLease`, not a key. Neither class has a getter, field, spread, JSON or Symbol
+that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
+([#305](https://github.com/mrflip/safebyok/pull/305)). The entry points export `Lease` and
+`Proving` as types and classes alone, and none of the registries. Checked by:
+`tests/lease.test.ts` (*hands out no record*), `grep` for the crypto imports.
+
+**G10. Foundations the construction rests on.**
+
+* *Authenticated encryption everywhere, bound by ctx.* AES-256-GCM only; a fresh 96-bit IV from
+  `crypto.getRandomValues` per call; the ctx as additional data (above). Per key the number of
+  ciphers is small (a vaultKey wraps once per box write, wayin and lease grant), far under the
+  2^32 guidance for random IVs.
+* *Key separation by usage and purpose.* Wrapping keys carry `wrapKey`/`unwrapKey` only; a boxKey
+  `encrypt`/`decrypt` only; an unwrapped key gets the one usage its call needs, and WebCrypto
+  enforces it. Each kind of field has its own purpose string (`PurposeForWayinkind`,
+  `vault_key_lease_wrapped`, `box_key_wrapped`, `whisper_ciphered`), and the passkeyKey's HKDF
+  `info` is its wayin's ctx, so the same bytes under another purpose make another key.
+* *A memory-hard, labelled, salted derivation.* Argon2id (`@noble/hashes`, or hash-wasm in
+  safebyok-fastkey) under a stored `key_deriver_label` whose spec is fixed (`Argon2idWebV1`: 64 MiB,
+  3 passes, 1 lane, 16-byte salt, 32-byte key); a fresh random salt per wayin; a wayin under
+  another label refuses `unknown_key_deriver`, so there is no silent downgrade; a deriver wearing a
+  supplied label must carry exactly its parameters (`Bank.make`).
+* *Randomness* from `crypto.getRandomValues` and `subtle.generateKey` alone (`randomBytes`,
+  `randomId`, the key makers).
+* *No secret is compared.* A wrong passphrase or passkey is learned from the AEAD tag failing to
+  verify in `unwrapKey`, never from comparing key bytes.
+* *Strict validation on read.* A stored record that fails its schema reads as damaged or absent and
+  is never partly used; before 1.0.0 no older shape is read (CLAUDE.md).
+* *A static vaultKey.* No rotation yet: removal is not revocation; a vault made anew has a new
+  `vault_tok`, which voids every box (README, VOCABULARY *rotation*).
+
+## Open items
+
+Each is a Coach's call; none breaks a guarantee above.
+
+1. **The Vault and the Bank carry lease records.** They never use the key, but four sites hold a
+   `LeaseRecord` in transit (`bank.ts`'s birth read, `vault.#readStorage`, `#takeUpFromPantry`,
+   `#takeUpAtBirth`, `#holdLease`). Were the `DeviceDB`'s three lease verbs wrapped, inside the
+   core, by a seam that hands back a `Lease` rather than a record (`Lease.make` applied at the
+   store's edge, and `Proving.grantLease` making the Lease it holds), only `Proving`, `Lease` and
+   the store would ever hold the record, and G9 could say so of the handle too. The revocation check
+   in `#takePicture` reads the lease's stamp, which a `Lease` shows. A refactor of the plumbing, not
+   of the cryptography.
+2. **The browser's PRF result buffer.** `safebyok-react`'s `bytesOf` copies the authenticator's
+   `BufferSource` into the answer and leaves the original to the collector. Zeroing the source
+   after the copy (`new Uint8Array(buffer).fill(0)`) closes the one copy of the PRF answer that
+   safebyok does not zero. A one-line change in `passkey.ts`.
+3. **`vaultRecordHeldBy`** (`src/proving.ts`) is a test-only export of the same shape
+   `leaseRecordOf` had, but hands out ciphertext and headers, no key: it breaks no guarantee.
+   Listed so a reader does not mistake it for one.
