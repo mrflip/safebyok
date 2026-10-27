@@ -101,9 +101,9 @@ export type VaultSnapshot = Readonly<{
    * @example const { boxes } = vault.snapshot.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
    */
   capacity:          Readonly<{ boxes: Readonly<Capacity['boxes']>, bytes: Readonly<Capacity['bytes']> }>
-  /** Epoch ms from which the vault asks for a proof again, while unlocked on this device; null while it is locked, or has no passphrase yet.
-   * Null with a `gate` is the host's cue to offer to unlock the vault. It is `leaseHours` after a
-   * proof last unlocked the vault, or a passphrase last proved a change to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
+  /** Epoch ms from which the vault must be unlocked again, while unlocked on this device; null while it is locked, or has no passphrase yet.
+   * Null with a `gate` is the host's cue to offer to unlock the vault. It is `leaseHours` after the
+   * vault was last unlocked, or a passphrase last proved a change to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
    * compare with `>= FarFuture - MinuteMillis`, never for equality. Show it with `Intl`'s
    * `DateTimeFormat` or `RelativeTimeFormat`, and as "until locked" at or past that mark.
    *
@@ -169,7 +169,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * Storage alone settles a race, and the vault argues with none: after a write storage refuses as
  * stale it reads nothing, and `hello()` shows what is stored. Every thing a Vault object hands out
  * was made under the vault as it stood then (its scope, `vault_tok` and epochs). Each call demands,
- * at each of its steps, that the vault record in hand is still the one what it holds was made
+ * at each of its steps, that the vault record in hand is still the one each thing it holds was made
  * under: a call finding the vault deleted, made anew, or its ways in changed meanwhile refuses
  * 'vault_gone', 'vault_remade' or 'gate_moved' ({@link Vault.demandConsistentWith}). A box that will
  * not open under the lease in hand is 'damaged_box' at once, with no read of storage first.
@@ -324,7 +324,7 @@ export class Vault implements VaultStamp {
    * `lock()` lands while the gating is pending, or when the lease is gone by the time it settles;
    * and with what the gating's attempt refused, when it settled the gating: 'gate_made_elsewhere'
    * when another device set the first passphrase while the user typed one. A first passphrase set
-   * while this device's store would not keep the unlock refuses as the store did, 'storage_blocked'
+   * while this device's store would not keep the lease refuses as the store did, 'storage_blocked'
    * or 'storage_unavailable', saying the passphrase was set. A wrong passphrase never reaches here:
    * the dialog meets it. A `renewMinutes` as long as the lease or longer refuses 'bad_option', as
    * every call would prompt.
@@ -1536,7 +1536,7 @@ export class Vault implements VaultStamp {
   /** `boxlabel`, once it is a label: 'bad_scope' otherwise, naming the field and quoting none of it. */
   #checkedBoxlabel(boxlabel: unknown): string { return CX.boxscope.parse({ ...this.#scope, boxlabel }).boxlabel }
 
-  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it asks for a proof. */
+  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it raises a gating. */
   #isListed(boxlabel: string): boolean { return this.#listedOf(boxlabel) !== undefined }
 
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
