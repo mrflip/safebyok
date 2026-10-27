@@ -165,7 +165,7 @@ export abstract class VaultDB {
 
   /** The most bytes this backend holds in one record, or `Infinity` for no per-record limit.
    * `Bank.make` refuses ('bad_option') a `maxWhisperBytes` over half of it, and
-   * {@link VaultDB.putBox} a heavier box.
+   * {@link VaultDB.putBox} refuses a heavier box as `box_too_large`.
    */
   abstract readonly maxRecordBytes: number
 
