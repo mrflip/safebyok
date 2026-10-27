@@ -624,14 +624,14 @@ on the sprint doc's Cleanup tab.
   non-React examples use them; React keeps `useSyncExternalStore` on the snapshot. VOCABULARY
   gains rows for `BankVault`, the bank's listing, and `lifecycle` (made, starting, ready,
   refused), saying how it differs from freshness's `timely`/`refused`.
-* **Small leftovers:** `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
+* **Small leftovers:** `VaultReadResponse.vault` is still cast by IndexedDB and local, as box rows were before #287: type it as #287 typed `StoredBox.box`; `useVault`'s `@example` and the README's first `VaultPanel` show "Opening your vault…" for `null`, which also means refused: say so, or point to `useBankVault` (#286's review); `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
   `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
   example names `bad_label`, now `bad_scope`; a TODO.md entry, "allow async passphrase checking",
   unless a host's passphrase checker may already be async (check first; say which).
 
-**Depends on:** thread 14. **Size:** medium.
+**Depends on:** thread 14: cut from its tip, stacked on #287. **Size:** medium.
 
 ### 16. Retire "standing" -- `retire_standing`
 
