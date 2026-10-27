@@ -76,7 +76,10 @@ export type MakeBankOpts = {
    * @example Bank.make({ ...opts, requestCleartext: (gating) => showDialogFor(gating) })
    */
   requestCleartext?: RequestCleartext | null | undefined
-  /** Time source for expiry and for the times stored with each record, as a {@link Clock}; tests inject one. Default: the wall clock. */
+  /** Time source for expiry and for the times stored with each record, as a {@link Clock}; tests inject one. Default: the wall clock.
+   * Its `now()` answers epoch milliseconds, as `Date.now()` does. `Bank.make` reads it once, and
+   * refuses 'bad_option' for a reading out of bounds or a throw.
+   */
   clock?: Clock | undefined
   /** The largest whisper `putBox()` accepts, in bytes of its JSON and its box's sidecar's together. Default: {@link MaxWhisperBytes}, 40444.
    * Checked on write only, so lowering it never strands a whisper already stored. At most half the
@@ -90,6 +93,8 @@ export type MakeBankOpts = {
    */
   maxBoxes?: number | undefined
   /** Where the vault says what it has nobody to throw to, such as a background refresh that failed, as a {@link VaultLogger}.
+   * It hears no secret material and no option's value, and what it throws is ignored.
+   *
    * Left out or null, the `vaultDB`'s own logger. It does not go the other way: to have one logger
    * hear both, give it to the adapter's factory and leave this out. To have the vault use the
    * default whatever the adapter was given, pass `DefaultLogger`.
@@ -99,6 +104,10 @@ export type MakeBankOpts = {
    * A passphrase it finds weak refuses 'weak_passphrase', its reason the message. Left out, every
    * new passphrase refuses so, the message saying a checker must be chosen (CUSTOMIZATION.md). In a
    * browser, `browserOpts()` supplies `zxcvbnStrengthChecker`.
+   *
+   * It hears each new passphrase in plain text: it should keep nothing, and send nothing anywhere.
+   * Make it once, before any bank. Its `load`, if any, runs at each `bank.hello()`, and one that
+   * fails refuses that hello.
    */
   strengthChecker?: StrengthChecker | undefined
 }
