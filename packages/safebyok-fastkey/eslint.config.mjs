@@ -177,7 +177,7 @@ export default defineConfig([
       'no-global-assign': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', {
+      '@typescript-eslint/no-unused-vars': ['error', {
         varsIgnorePattern:         '^_[a-zA-Z0-9]',
         argsIgnorePattern:         '^_[a-zA-Z0-9]',
         caughtErrorsIgnorePattern: '^_[a-zA-Z0-9]',

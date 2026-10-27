@@ -91,7 +91,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       await Promise.all([deviceDB.delLease(scopeOf('u1')), deviceDB.putLease(second)])
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
       // A read made first sees what stood then; one made after a write sees the write.
-      const [before, , after] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(first), deviceDB.getLease(scopeOf('u1'))])
+      const [before, _putOutcome, after] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(first), deviceDB.getLease(scopeOf('u1'))])
       expect(before).to.deep.equal({ ok: true, val: second })
       expect(after).to.deep.equal({ ok: true, val: first })
     })
