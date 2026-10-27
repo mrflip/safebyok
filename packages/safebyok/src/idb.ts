@@ -3,8 +3,8 @@ import { DeviceRecord, LeaseRecord } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { type DeviceDB, deviceOutcomeOf, raisedDeviceRecord } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
-import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
+import { Validator } from './checks/validator'
 
 export type { IdbOpts } from './idb-opts'
 export * as ChangeBell from './change-bell'
@@ -165,6 +165,9 @@ const discardedIfUnreadable = (store: UseStore, leaseScopepath: Scopepath.LeaseS
 /** One stored row, as {@link inspectIdbDeviceDB} reports it: its scopepath and the raw stored value. */
 export type IdbRow = { scopepath: string, row: unknown }
 
+/** What an inspector's `subscribe` is handed: a function to call after each write. Its `parse` refuses 'bad_option'. */
+const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
+
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. It refuses 'bad_option' for a
  * `dbName` that is not non-empty text or an option it does not take, and its `subscribe` for a
@@ -190,7 +193,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
     },
     /** Call `listener` after any write to the shelf, in this tab or another; returns the unsubscribe. */
     subscribe: (listener: () => void): (() => void) => {
-      if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
+      ListenerShape.parse(listener)
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
     /** Remove every row on the shelf: every lease and device record in this database. */

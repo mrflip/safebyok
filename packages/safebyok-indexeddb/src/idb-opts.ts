@@ -8,16 +8,14 @@ export type IdbVaultDBOpts = VaultDBOpts & {
   dbName?: string | undefined
 }
 
-/** The database a call names when it names none: the core's own, so the vault and its device store sit side by side. */
-const DefaultDbName = Validators.idbOpts.parse({}).dbName
-
 /** What the options hold, and nothing else: the core's IndexedDB options (`dbName`, defaulted), and the `logger` every VaultDB takes. Its `parse` refuses 'bad_option'. */
 const { idbVaultDBOpts } = Validator('bad_option', ({ unk }) => ({
   idbVaultDBOpts: Validators.idbOpts.extend({ logger: unk.optional() }).strict(),
 }))
 
 /** The database name a call was handed, or 'safebyok' without one.
- * Kind 'bad_option' for anything else, a field the options do not take among them, quoting none of it.
+ * Kind 'bad_option' for anything else, a field the options do not take among them, naming the call
+ * the host made, quoting none of it.
  *
  * @param said - The function the host called, as the refusal names it.
  *
@@ -29,7 +27,7 @@ export const parseDbName = (opts: IdbVaultDBOpts | undefined, said: string): str
     return idbVaultDBOpts.parse(opts ?? {}).dbName
   } catch (err) {
     if (! isVaultError(err, 'bad_option')) { throw err }
-    throw new VaultError('bad_option', `${said} takes an optional dbName, the name of the IndexedDB database to keep records in, non-empty text ('${DefaultDbName}' when left out), and an optional logger: ${err.message}.`, err.meta === undefined ? {} : { meta: err.meta })
+    throw new VaultError('bad_option', `In ${said}'s options: ${err.message}.`, err.meta === undefined ? {} : { meta: err.meta })
   }
 }
 

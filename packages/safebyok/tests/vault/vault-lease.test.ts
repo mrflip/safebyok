@@ -157,7 +157,7 @@ describe("the lease", () => {
   it("says in its refusal that Infinity is welcome", async () => {
     const world = makeWorld()
     const err = await TH.expectRefusal(world.open({ leaseHours: 0 }), 'bad_option')
-    expect(err.message).to.match(/greater than zero/)
+    expect(err.message).to.match(/^In Bank.make's options: leaseHours: .*above zero/)
     expect(err.message).to.match(/Infinity/)
   })
 

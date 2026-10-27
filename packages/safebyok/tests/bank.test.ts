@@ -107,7 +107,7 @@ describe("Bank.make", () => {
   it("refuses a keyDeriver whose load is no function 'bad_option'", () => {
     const keyDeriver = { ...TH.testDeriver, load: 'soon' }
     const err = TH.expectSyncRefusal(() => bankIn(makeWorld(), { keyDeriver: keyDeriver as unknown as KeyDeriver }), 'bad_option')
-    expect(err.message).to.include('its load, if it carries one, is a function too')
+    expect(err.message).to.include("In Bank.make's options: keyDeriver.load: Expected a function")
   })
 
   it("touches nothing: the bank is 'made', its snapshot holds no vault, and no store verb or load is called", async () => {

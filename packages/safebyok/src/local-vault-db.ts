@@ -1,12 +1,13 @@
 import { BoxRecord } from './shapes/box'
 import type { VaultScope } from './shapes/scopes'
 import type { VaultRecord, VaultDraft } from './shapes/vault'
-import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
+import * as Phrases from './phrases'
+import { optionsRefusal } from './options'
 import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
 import type { VaultRecordExpectation, StoredBox, VaultReadResponse, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
@@ -46,8 +47,10 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
 export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  if (! localVaultDBOptsShape.safeParse(opts).success) {
-    throw new VaultError('bad_option', 'localVaultDB takes one bag of options: a `store` (a StringStore, such as memoryStore() or domStore(localStorage, prefix)), and optionally a `logger`.')
+  try {
+    localVaultDBOptsShape.parse(opts)
+  } catch (err) {
+    throw optionsRefusal(err, (message) => `In localVaultDB's options: ${message}.`)
   }
   return new StringStoreVaultDB(opts)
 }
@@ -55,7 +58,7 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 /** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
 export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
   const call = fn()
-  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }) }) }
+  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {

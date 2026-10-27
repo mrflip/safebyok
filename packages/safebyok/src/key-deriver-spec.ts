@@ -92,14 +92,11 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
   }
 }
 
-/** What a refusal of a spec says, whichever field failed: every field and what it must be, quoting nothing handed in. */
-const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algorithm 'argon2id', the one key derivation function safebyok runs; key_deriver_label, a non-empty string of your own choosing; memory_kib, a whole number of KiB, at least 8 for each lane and at most 1048576 (1 GiB); iterations, a whole number of passes, at least 1 and below 2^32; parallelism, a whole number of lanes, at least 1; salt_bytes, a whole number of bytes from 8 to 65536; and output_bytes, 32, as the passphraseKey is a 256-bit key."
-
 /** `candidate` as a KeyDeriverSpec Argon2id can run, holding nothing but a spec's fields: the check for another Argon2id implementation to make.
  * `argon2idDeriver` makes it, and so does `Bank.make` of a deriver declaring `algorithm: 'argon2id'`.
  * Weak parameters that run are allowed: choosing them is the host's call.
  *
- * It refuses 'bad_option' for a spec Argon2id cannot run, in one sentence saying what each field
+ * It refuses 'bad_option' for a spec Argon2id cannot run, naming each field that fails and what it
  * must be: a salt under 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes,
  * no lanes, or a key other than 32 bytes. It refuses as {@link checkSuppliedSpecKept} does a label safebyok reserves.
  *
@@ -114,10 +111,9 @@ const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algor
  *   // throws 'bad_option': that label is reserved
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
-  const checked = keyDeriverSpec.safeParse(candidate)
-  if (! checked.success) { throw new VaultError('bad_option', SpecRefused) }
-  checkSuppliedSpecKept(checked.data)
-  return checked.data
+  const spec = keyDeriverSpec.parse(candidate)
+  checkSuppliedSpecKept(spec)
+  return spec
 }
 
 /** The label prefix that marks a deriver made cheap for tests, which no vault of real secrets should use. */

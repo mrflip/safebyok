@@ -310,7 +310,7 @@ describe("the logger", () => {
     const ensureVault = vi.spyOn(vaultDB, 'ensureVault')
     Object.defineProperty(vaultDB, 'logger', { value: { log: () => undefined } })
     const err = await TH.expectRefusal(world.open({ vaultDB, logger: undefined }), 'bad_option')
-    expect(err.message).to.match(/log, warn and error functions/)
+    expect(err.message).to.match(/^warn: Expected a function; error: Expected a function$/)
     expect(ensureVault).not.toHaveBeenCalled()
   })
 
@@ -368,7 +368,7 @@ describe("the logger", () => {
     const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
     for (const nonsense of [{}, { log: () => undefined, warn: () => undefined }, 'console']) {
       const err = await TH.expectRefusal(world.open({ logger: nonsense as unknown as TH.BornVaultOpts['logger'] }), 'bad_option')
-      expect(err.message).to.match(/log, warn and error functions/)
+      expect(err.message).to.match(/^In Bank.make's options: logger(\.\w+)?: Expected a (function|VaultLogger)/)
     }
     expect(ensureVault).not.toHaveBeenCalled()
   })

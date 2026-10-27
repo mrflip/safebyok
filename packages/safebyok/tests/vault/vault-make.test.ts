@@ -68,7 +68,7 @@ describe("Bank.make and bank.ensureVault", () => {
     it(`refuses a missing ${ckey} with kind 'bad_option'`, async () => {
       const opts = TH.omitting(makeWorld().optsWith(), ckey)
       const err = await TH.expectRefusal(TH.settledVault(opts), 'bad_option')
-      expect(err.message).to.include(`${ckey} is not a`)
+      expect(err.message).to.include(`In Bank.make's options: ${ckey}: Expected a`)
     })
   }
 
@@ -76,16 +76,31 @@ describe("Bank.make and bank.ensureVault", () => {
     it(`refuses ${blurb} with kind 'bad_option', before it touches storage`, async () => {
       const world = makeWorld()
       const err = await TH.expectRefusal(world.open(opts), 'bad_option')
-      expect(err.message).to.match(/vaultDB is not a VaultDB|deviceDB is not a DeviceDB/)
+      expect(err.message).to.match(/^In Bank.make's options: (vaultDB: Expected a storage adapter|deviceDB: Expected a DeviceDB)/)
     })
   }
 
   it("refuses a vaultDB that carries every verb but is no VaultDB, whose checks it would skip", async () => {
     const world = makeWorld()
     const verbs = Object.fromEntries(VaultDBVerbsUsed.map((verb) => [verb, world.vaultDB[verb].bind(world.vaultDB)]))
-    const lookalike = { maxRecordBytes: 1024 * 1024, maxVaultBytes: Infinity, maxBoxes: Infinity, delDamagedVault: () => Promise.resolve(), ...verbs }
+    const lookalike = { maxRecordBytes: 1024 * 1024, maxVaultBytes: Infinity, maxBoxes: Infinity, ...verbs }
     const err = await TH.expectRefusal(world.open({ vaultDB: lookalike as unknown as MakeBankOpts['vaultDB'] }), 'bad_option')
-    expect(err.message).to.include('extends the VaultDB class')
+    expect(err.message).to.include('an instance of the VaultDB class')
+  })
+
+  it("refuses a VaultDB without delDamagedVault at Bank.make, not at the bank's first delDamagedVault", () => {
+    const world = makeWorld()
+    Object.defineProperty(world.vaultDB, 'delDamagedVault', { value: undefined })
+    const err = TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world)), 'bad_option')
+    expect(err.message).to.match(/^In Bank.make's options: vaultDB: Expected a storage adapter/)
+  })
+
+  it("names every option amiss in one refusal, each by its name, quoting none of them", () => {
+    const world = makeWorld()
+    const err = TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, { leaseHours: 0, onBadNews: 'tell me' as unknown as null, clock: { now: 42 } as unknown as TH.BornVaultOpts['clock'] })), 'bad_option')
+    expect(err.message).to.match(/^In Bank.make's options: /)
+    expect(err.meta?.fieldnames).to.have.members(['leaseHours', 'onBadNews', 'clock.now'])
+    expect(err.message).to.not.include('tell me')
   })
 
   it("hands on storage's damaged_vault as it came, even from a VaultDB that throws before its promise", async () => {
@@ -447,7 +462,7 @@ describe("the key deriver seam", () => {
       it(`is refused at open as bad_option, not at the first unlock: ${blurb}`, async () => {
         const world = makeWorld()
         const err = await TH.expectRefusal(world.open({ keyDeriver: handBuilt(change) }), 'bad_option')
-        expect(err.message).to.include('keyDeriverSpec')
+        expect(err.meta?.fieldnames).to.deep.equal(Object.keys(change))
         expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
       })
     }

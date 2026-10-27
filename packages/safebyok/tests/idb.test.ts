@@ -157,7 +157,7 @@ describe("the IndexedDB device store's options", () => {
   for (const [makerTitle, make] of Makers) {
     for (const [opts, blurb] of BadIdbOpts) {
       it(`${makerTitle} refuses ${blurb} with kind 'bad_option'`, () => {
-        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, /dbName/).with.property('refusalkind', 'bad_option')
+        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, new RegExp(`^In ${makerTitle}'s options: `)).with.property('refusalkind', 'bad_option')
       })
     }
     it(`${makerTitle} keeps its records in 'safebyok' given no options, or no dbName`, () => {
@@ -389,7 +389,7 @@ describe("inspectIdbDeviceDB", () => {
   it("refuses a listener that is not a function as it subscribes, so no later write meets it", async () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbDeviceDB({ dbName })
-    expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
+    expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /^Expected a function$/)
     await idbDeviceDB({ dbName }).putLease(await TH.leaseOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })

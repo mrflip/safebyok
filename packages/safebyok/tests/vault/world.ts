@@ -131,7 +131,7 @@ export const damagedVaultWorld = async () => {
 }
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'delDamagedVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {

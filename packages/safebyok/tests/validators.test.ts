@@ -126,6 +126,6 @@ describe("no refusal repeats its input", () => {
       expect(refusal.ok).to.be.false
       expect(TH.thrownText(refusal.err)).to.not.include(Marker)
     }
-    expect(refusalTextOf(() => parseKeyDeriverSpec({ [Marker]: Marker } as never))).to.include('Argon2id cannot run').and.not.include(Marker)
+    expect(refusalTextOf(() => parseKeyDeriverSpec({ [Marker]: Marker } as never))).to.include('algorithm: ').and.not.include(Marker)
   })
 })

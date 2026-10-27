@@ -1,4 +1,4 @@
-import { VaultError } from './errors'
+import * as Phrases from './phrases'
 import { Validator } from './checks/validator'
 import { consoleLogger } from './console-logger'
 
@@ -41,7 +41,7 @@ export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 /** What a VaultLogger must carry, refusing 'bad_option'. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
 export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
-  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }) }
+  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape) }
 })
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
@@ -66,9 +66,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
-  if (! loggerShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', 'logger is not a VaultLogger: it needs log, warn and error functions. Leave it out to use the default logger (the console, unless setDefaultLogger was given another), or pass functions that do nothing to log nowhere.')
-  }
+  loggerShape.parse(candidate)
   const known = guardedFor.get(candidate)
   if (known !== undefined) { return known }
   const made = guarded(candidate)

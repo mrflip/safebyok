@@ -277,7 +277,7 @@ describe("BankProvider", () => {
       )
       await expectShown('boundary')
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
-      expect((caught[0] as VaultError).message).to.match(/onBadNews is a function/)
+      expect((caught[0] as VaultError).message).to.match(/^In Bank.make's options: onBadNews: Expected a function/)
     })
   })
   // --

@@ -9,6 +9,7 @@ import type { KeyDeriver } from '../key-deriver'
 import type { VaultLogger } from '../logger'
 import { type StrengthChecker, DefaultStrengthChecker, strengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
+import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import { key_deriver_label } from './fields'
 
@@ -217,15 +218,16 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
   // A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps.
   const declaredBoxes = union([int.positive(), lit(Infinity)]).transform((count) => Math.min(count, UnlimitedBoxes))
   // A lease in hours, above zero and at most MaxLeaseHours, or `Infinity`, which becomes ForeverMillis.
-  const someHours = union([num.positive().lte(MaxLeaseHours), lit(Infinity)])
+  const hoursSaid = Phrases.leaseHoursShape(MaxLeaseHours)
+  const someHours = union([num.positive(hoursSaid).lte(MaxLeaseHours, hoursSaid), lit(Infinity)], hoursSaid)
   const leaseHoursAsMillis = someHours.default(LeaseHours).transform((hours) => (hours === Infinity ? ForeverMillis : Math.round(hours * HourMillis))).pipe(num.gte(1))
   // Minutes, zero or more, or `Infinity`, which becomes ForeverMillis.
-  const someMinutes = union([num.gte(0), lit(Infinity)])
+  const someMinutes = union([num.gte(0, Phrases.MinutesShape), lit(Infinity)], Phrases.MinutesShape)
   const minutesToMillis = (minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis))
   return {
-    // The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class.
-    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultRecord: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, subscribe: verb }),
-    deviceDBShape:        obj({ getLease: verb, putLease: verb, delLease: verb, getDeviceRecord: verb, raiseDeviceRecord: verb, delDeviceRecord: verb, delAll: verb }),
+    // The public verbs the bank and its vaults call on a VaultDB, beside its being an instance of the `VaultDB` base class.
+    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultRecord: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, delDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
+    deviceDBShape:        obj({ getLease: verb, putLease: verb, delLease: verb, getDeviceRecord: verb, raiseDeviceRecord: verb, delDeviceRecord: verb, delAll: verb }, Phrases.DeviceDBShape),
     maxWhisperBytes:      int.positive().default(MaxWhisperBytes),
     maxBoxes:             int.positive().optional(),
     declaredBytes,
@@ -242,7 +244,7 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
       salt_bytes:        int.gte(1).lte(MaxSaltBytes),
       deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
       load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
-    }),
+    }, Phrases.KeyDeriverShape),
   }
 })
 // --
