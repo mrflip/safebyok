@@ -1,0 +1,12 @@
+{
+  "extends": "../../../packages/safebyok/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": [],
+    "paths": {
+      "zod": ["../../../packages/safebyok/node_modules/zod"],
+      "zod/*": ["../../../packages/safebyok/node_modules/zod/*"]
+    }
+  },
+  "include": ["."]
+}
