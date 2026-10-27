@@ -207,7 +207,7 @@ describe("damaged boxes", () => {
   }
 
   // The first names no revision, so a store over it is refused (below).
-  for (const [spoil, , blurb] of DamagedListings.slice(1)) {
+  for (const [spoil, _damage, blurb] of DamagedListings.slice(1)) {
     it(`putBox over a box ${blurb} writes it afresh, carrying nothing from it`, async () => {
       const { world, vault } = await worldWithDamagedBox(spoil)
       world.advance(60_000)
