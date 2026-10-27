@@ -144,6 +144,17 @@ added or folded into through the subagent, and no other entry changes.
   refuses `bad_record`, never binds less.
   (5) No ciphertext written before this change opens: no format bump, pre-1.0, by the Coach's ruling. The same release already makes every
   older stored vault read as damaged (the strict vault record, below), so a host sees no new damage.
+  (6) Amended 2026-10-27 (security_notes), PR [#280](https://github.com/mrflip/safebyok/pull/280): **binding `registered_at` reverses the
+  2026-10-21 choice (trust_lines) to leave it unbound so that a backend altering it would not stop a way in opening.** The restyle binds every field
+  fixed for a vault's life, and the Coach confirmed the reversal on 2026-10-27. A backend that changes a vault record's `registered_at` under the
+  same `vault_tok` now stops every wayin, box and lease of that vault from opening, as altering `vault_tok` already did: the wrap's ctx no longer
+  matches, and the refusal for the right passphrase is `wrong_passphrase` (`proving.ts`: "the stored vault may be damaged"), which misleads. Nothing
+  in `packages/safebyok/src` rewrites a vault record's `registered_at` after the vault is born (`draftOf` in `bank.ts` sets it once); it is read,
+  carried and bound. The fields bound are exactly the stamps' schemas: `VaultStamp` is the vault record's `format`, `applabel`, `user_id`,
+  `vaultlabel`, `vault_tok`, `registered_at` (`vault-record.ts`); `BoxStamp` is `BoxSparse` plus `vault_tok` (`box.ts`); `LeaseStamp` is
+  `LeaseRecord` less `lease_key` and `vault_key_lease_wrapped` (`lease.ts`). A field its schema fixes (`format`, `whisper_codec` `json_v1`,
+  `whisper_schema_version` 1) is a literal in the strict record, so a stamp holding another value is refused `bad_record` at its parse, before
+  `cipherCtx` is called: a ctx is built only from a parsed stamp.
 * 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
   an old flat vault reads as damaged under an unbumped format; a device record is strict, frozen and built from the scope's names alone.**
   (1) `VaultRecord` (`packages/safebyok/src/vault-record.ts`) is `{ format, applabel, user_id, vaultlabel, vault_tok, registered_at, vault_epoch,
@@ -164,7 +175,8 @@ added or folded into through the subagent, and no other entry changes.
   (6) A device record is handed out frozen (its check is `.readonly()`), and `deviceRecordOf(scope, device_id, highest_vault_epoch)` builds one from
   the scope's parsed names alone, so nothing else a holder carries is stored. The device record is strict and one failing its check reads as
   none: a field added to it later would make an older build discard the record, and with it the `highest_vault_epoch` rollback watermark, until
-  its next read raises it again; so a new field moves its `format` on.
+  its next read raises it again; so a new field moves its `format` on (amended 2026-10-27 (security_notes): the zod_classic entry says what a
+  bump does and does not keep).
   (7) `PassphraseWayinSparse` (leaves out a passphrase wayin's `salt_b64`, `key_deriver_label` and wrap: what an offline guess at the passphrase
   needs) and `PasskeyWayinSparse` (leaves out its wrap) are defined but not yet shown anywhere; a later thread puts them on the snapshot (amended 2026-10-26 (snapshot): now shown. A vault's
   snapshot (`vault.snapshot`, `getSnapshot()`, what a React host renders and may put in devtools or an error report) carries `gate:
@@ -177,7 +189,12 @@ added or folded into through the subagent, and no other entry changes.
   must equal the bank's (`bank.demandConsistentWith`), else the call refuses `bad_scope`, naming the differing fields in `meta.fieldnames`
   and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is. Sign-out is
   expected to call `bank.closeVaults()` and drop the bank; `safebyok-react`'s `BankProvider` does so when its `user_id` prop changes or goes
-  null.
+  null. Amended 2026-10-27 (security_notes), PR [#278](https://github.com/mrflip/safebyok/pull/278): the scope a call acts on is never the bag's.
+  `#vaultScopeOf` (`bank.ts`) parses the bag, refuses an `applabel` or `user_id` other than the bank's, and then builds the scope from the bank's own
+  `applabel` and `user_id` and the bag's `vaultlabel` alone, so a misspelt user field (`userId`), stripped as an unknown field, can never name another
+  user's vault. `BankProvider` makes one bank per signed-in user; a review of #278 caught it handing the last user's bank to the hooks for the render
+  in which `user_id` changed, before its effect let that bank go, and it is fixed: `provided` is the held bank only while `held.bank.user_id`
+  equals the prop, and no bank otherwise (`bank-provider.tsx`).
   (2) A field in the bag named as a store is refused `bad_option`: `vaultDB`, `deviceDB`, or any field whose name ends `db` in any case (a
   misspelt `vaultDb` included). It is judged by name only, never by value, so a Vault object's own function fields still pass as a bag.
   It is refused, not ignored, since ignoring it would birth the vault in the bank's default store. A vault's own stores go in a second,
@@ -226,6 +243,11 @@ added or folded into through the subagent, and no other entry changes.
   was silently stripped. A lease or device record in this device's store holding an unknown field is discarded and read as absent, as any lease
   or device record failing its check already was; for the device record that drops its `highest_vault_epoch` rollback watermark. This leans on
   the rule that any change to a stored shape bumps `format`.
+  Amended 2026-10-27 (security_notes), PRs [#274](https://github.com/mrflip/safebyok/pull/274) and [#279](https://github.com/mrflip/safebyok/pull/279):
+  the rule for the device record is written down (the core `README.md`, where the `DeviceDB` is described, and the device record's doc block):
+  a field added to it moves its `format` on. A bump does not keep an older build's watermark either, since a build discards a record in a format
+  it does not know as it does one with an unknown field, so each new field costs older builds the watermark until their next read raises it
+  again. The #274 review found no new attack window in it: whoever can add a field to a device record can delete its row.
   (2) amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): superseded, no refusal repeats a key or value from its input; see the entry at the top. Stood until then: a refusal repeats a key only when it is shaped as one of the package's own field names: snake_case words (`salt_b64`) or camelCase
   (`maxWhisperBytes`, `vaultDB`), each word letters ending in at most three digits, 32 characters at most (`packages/safebyok/src/checks/validator.ts`:
   `isSayable`, `SnakeFieldname`, `CamelFieldname`, `sayable`); any other key in a failing path or an unknown-field list is said as "(a name not
