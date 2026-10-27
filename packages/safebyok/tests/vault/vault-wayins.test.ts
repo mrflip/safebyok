@@ -19,7 +19,7 @@ import { makeWorld, storedVaultRecordOf, vaultWithPasskey,SevenDaysMillis, u1Vau
 // == [Passphrase]: countingDeriver, putWayin with a passphrase, the passphrase
 
 /** Everything in the store behind `world`'s vaultDB, as text: what a call that writes nothing leaves exactly as it was. */
-const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.ckeys().map((ckey) => [ckey, world.dbStore.read(ckey)]))
+const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)]))
 
 /** `opts` without the vault's names: what Bank.make takes. */
 const bankOptsOf = ({ vaultlabel: _vaultlabel, ...bankOpts }: TH.BornVaultOpts) => bankOpts
@@ -108,7 +108,7 @@ describe("putWayin, with a new passphrase", () => {
     expect(await vault.putWayin('passphrase')).to.eq(vault)
     expect(gatingkinds).to.deep.equal(['initialize_gate'])
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(vault.getSnapshot().gate?.passkey).to.be.null
     await world.openUnlocked('first pw', { deviceDB: memoryDeviceDB() })
   })
@@ -189,7 +189,7 @@ describe("putWayin, with a new passphrase", () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const err = await TH.expectRefusal(TH.putWayin(vault, laptop as unknown as string, 'a new passphrase'), 'bad_option')
-    expect(err.message).to.include('A passphrase is the text the user typed')
+    expect(err.message).to.eq('A passphrase is the text the user typed, as a string.')
     expect(err.message).to.not.include(laptop.credential_id)
     expect(storedVaultRecordOf(world)).to.deep.equal(before)
   })
@@ -318,7 +318,7 @@ describe("the vault's passphrase", () => {
     const vault = await world.open()
     await TH.unlock(vault, 'a very memorable passphrase')
     await TH.putWayin(vault, 'a very memorable passphrase', 'another memorable passphrase')
-    const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include('memorable')
   })
 
@@ -445,7 +445,7 @@ describe("the vault's passkey", () => {
     TH.answering(vault, async (gating) => { await TH.expectGood(TH.asKind(gating, 'initialize_gate').attempt('pw', laptop)) })
     await vault.ensureUnlocked()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(laptop.credential_id)
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(fresh, await TH.passkeyOf('laptop'))
@@ -604,7 +604,7 @@ describe("the vault's passkey", () => {
 
   it("the backend holds no passkey's answer, only its credential and salt (Contract: putWayin, Guarantees)", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include(toB64(laptop.prfBytes))
     expect(everything).to.include(laptop.credential_id)
     expect(everything).to.include(laptop.prf_salt_b64)

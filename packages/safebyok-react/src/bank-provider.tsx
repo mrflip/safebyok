@@ -3,7 +3,7 @@ import { Bank, type BankVault, type Gating, type RequestCleartext, parseLogger, 
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
-// == [Hooks]: useBank, useBankVault, useVault, useVaultFor, useListed, useVaultSnapshot
+// == [Hooks]: useBank, useListedVault, useVault, useVaultFor, useListed, useVaultSnapshot
 
 /** What the provider hands down: the signed-in user's bank, whose vaults the hooks ask it for. */
 type Provided = { bank: Bank | null }
@@ -60,21 +60,21 @@ const getNothing = () => null
  * stays `ready` and locked, its snapshot's `trouble` 'vault_behind'.
  *
  * @example
- *   const bankVault = useBankVault('main')
+ *   const bankVault = useListedVault('main')
  *   if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
  *   if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
  */
-export const useBankVault = (vaultlabel: string): BankVault | null => useListed('useBankVault', vaultlabel).bankVault
+export const useListedVault = (vaultlabel: string): BankVault | null => useListed('useListedVault', vaultlabel).bankVault
 
-/** The Vault object of the signed-in user's vault under `vaultlabel`, asking the bank for it as {@link useBankVault} does; null until the bank holds it `ready`, and while nobody is signed in.
+/** The Vault object of the signed-in user's vault under `vaultlabel`, asking the bank for it as {@link useListedVault} does; null until the bank holds it `ready`, and while nobody is signed in.
  * It is what the bank hands out for the vault (`bank.vaultOf`), the same object for the vault's
- * life; {@link useBankVault} says why there is none. Its own fields are fixed for its life; render
+ * life; {@link useListedVault} says why there is none. Its own fields are fixed for its life; render
  * what changes from {@link useVaultSnapshot}, which re-renders as it changes, and read it live in
  * an event handler through `vault.snapshot`.
  *
  * @example
  *   const vault = useVault('main')
- *   if (vault === null) { return <p>Opening your vault…</p> }
+ *   if (vault === null) { return <p>Opening your vault…</p> }   // or refused: useListedVault says which
  *   return <button onClick={() => { void vault.lock() }}>Lock</button>
  */
 export const useVault = (vaultlabel: string): Vault | null => useVaultFor('useVault', vaultlabel)
@@ -85,7 +85,7 @@ const useVaultFor = (hookname: string, vaultlabel: string): Vault | null => {
   return bank !== null && bankVault?.lifecycle === 'ready' ? bank.vaultOf({ vaultlabel }) : null
 }
 
-/** {@link useBankVault}'s work, for `hookname`: the bank, and its listing of the vault, asked for when the bank lists none, and misuse thrown. */
+/** {@link useListedVault}'s work, for `hookname`: the bank, and its listing of the vault, asked for when the bank lists none, and misuse thrown. */
 const useListed = (hookname: string, vaultlabel: string): { bank: Bank | null, bankVault: BankVault | null } => {
   const { bank } = useProvided(hookname)
   const readListed = useCallback(() => (bank === null ? null : bank.bankVaultOf({ vaultlabel })), [bank, vaultlabel])
@@ -110,7 +110,7 @@ const useListed = (hookname: string, vaultlabel: string): { bank: Bank | null, b
  *
  * @example
  *   const snapshot = useVaultSnapshot('main')
- *   if (snapshot === null) { return <p>Opening your vault…</p> }
+ *   if (snapshot === null) { return <p>Opening your vault…</p> }   // or refused: useListedVault says which
  *   return <p>{snapshot.boxes.length} keys stored</p>
  */
 export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
@@ -176,7 +176,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
   }
 }
 
-/** Makes the signed-in user's bank from its props, and hands it down to {@link useBank}, and the user's vaults to {@link useVault}, {@link useBankVault} and {@link useVaultSnapshot}.
+/** Makes the signed-in user's bank from its props, and hands it down to {@link useBank}, and the user's vaults to {@link useVault}, {@link useListedVault} and {@link useVaultSnapshot}.
  * It makes the bank (`Bank.make`) in an effect, once a user is signed in, for that user: that
  * checks the options, and reads nothing. A vault is asked for only by a hook that names it,
  * `useVault('main')`; until its birth settles, there is no Vault object. A vault refused or
@@ -211,7 +211,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * calls refused 'vault_gone'. `allowStartOver` offers nothing, for now.
  *
  * Misuse -- a bad label or option, which `Bank.make` throws as the provider makes its bank, or a
- * birth refused as misuse or with a value that is no VaultError at all, which `useVault` and `useBankVault` throw
+ * birth refused as misuse or with a value that is no VaultError at all, which `useVault` and `useListedVault` throw
  * -- reaches the nearest error boundary.
  *
  * @example

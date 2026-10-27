@@ -280,6 +280,9 @@ export default defineConfig([
       // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
       // field dropped by destructuring): typescript-eslint's, configured above, is the one.
       'sonarjs/no-unused-vars': 'off',
+      // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
+      // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
+      'sonarjs/redundant-type-aliases': 'off',
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],

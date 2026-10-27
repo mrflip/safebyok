@@ -18,7 +18,7 @@ const bagsByDbName = new Map<string, BrowserOpts>()
 /** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, to spread into `Bank.make` beside your storage adapter.
  * They are {@link argon2idWebV1Deriver}, {@link idbDeviceDB} and {@link zxcvbnStrengthChecker}. A
  * field you pass after the spread wins. The same `dbName` always answers the same bag, so it is
- * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text.
+ * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
  *
  * @param opts - Where the device store keeps its records: `dbName`, default 'safebyok'.
  *

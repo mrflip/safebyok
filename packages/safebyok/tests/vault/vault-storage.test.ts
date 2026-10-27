@@ -79,7 +79,7 @@ describe("what the backend sees", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a very memorable passphrase')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'sidecars are visible in storage' } }, 'sk-ant-api03-fake-but-secret')
-    const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
     expect(everything).to.not.include('sk-ant-api03-fake-but-secret')
     expect(everything).to.not.include('a very memorable passphrase')
     expect(everything).to.include('sidecars are visible in storage') // the sidecar is visible by design
@@ -91,7 +91,7 @@ describe("what the backend sees", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'one_box' }, 'the same whisper')
     await vault.putBox({ boxlabel: 'two_box' }, 'the same whisper')
-    const [oneRow, twoRow] = world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))
+    const [oneRow, twoRow] = world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))
       .map((ckey) => JSON.parse(world.dbStore.read(ckey) ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } })
     expect(oneRow?.whisper_ciphered.ciphertext_b64).to.not.eq(twoRow?.whisper_ciphered.ciphertext_b64)
   })
@@ -112,7 +112,7 @@ describe("tampering", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const ckey = world.dbStore.ckeys().find((ckey) => isU1Box(ckey))
+    const ckey = world.dbStore.scopepaths().find((scopepath) => isU1Box(scopepath))
     const row = JSON.parse(world.dbStore.read(ckey ?? '') ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(ckey ?? '', JSON.stringify(row))
@@ -125,7 +125,7 @@ describe("tampering", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'victim_box' }, 'sk-fake')
-    const fromCkey = world.dbStore.ckeys().find((candidate) => candidate.includes('victim_box'))
+    const fromCkey = world.dbStore.scopepaths().find((candidate) => candidate.includes('victim_box'))
     world.dbStore.write(u1BoxScopepath('other_box'), world.dbStore.read(fromCkey ?? '') ?? '')
     await TH.expectRefusal(vault.getWhisper('other_box'), 'damaged_box')
   })
@@ -135,7 +135,7 @@ describe("tampering", () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
       await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
-      const ckey = world.dbStore.ckeys().find((candidate) => isU1Box(candidate)) ?? ''
+      const ckey = world.dbStore.scopepaths().find((candidate) => isU1Box(candidate)) ?? ''
       const row = JSON.parse(world.dbStore.read(ckey) ?? '{}') as Record<string, unknown>
       const spoiled = JSON.stringify(spoil(row))
       world.dbStore.write(ckey, spoiled)
@@ -192,7 +192,7 @@ const throwingLogger = () => ({ log: drainDown, warn: drainDown, error: drainDow
 
 /** Every ciphertext, salt and wrapped key the backend holds, as base64url text. */
 const storedSecrets = (world: ReturnType<typeof makeWorld>): string[] => {
-  const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey) ?? '').join('\n')
+  const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath) ?? '').join('\n')
   return Array.from(everything.matchAll(/"(?:ciphertext_b64|salt_b64)":"([^"]+)"/g), (hit) => hit[1]!)
 }
 
@@ -772,7 +772,7 @@ describe("vault record behind this device's record", () => {
     world.dbStore.write(u1VaultScopepath, older)
     await TH.expectRefusal(TH.unlock(deaf, await TH.passkeyOf('laptop')), 'vault_behind')
     expect(TH.stateOf(deaf.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(deaf).gate_epoch).to.eq(3)
+    expect(TH.cheatGetVaultEpoch(deaf).gate_epoch).to.eq(3)
     expect(deaf.getSnapshot().gate?.passkey).to.be.null
     expect(await world.getLease()).to.be.null
   })
@@ -781,7 +781,7 @@ describe("vault record behind this device's record", () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultScopepath, older)
     await TH.expectRefusal(vault.refresh(), 'vault_behind')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(3)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(3)
     expect(vault.getSnapshot().gate?.passkey).to.be.null
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     await TH.expectRefusal(world.open(), 'vault_behind')

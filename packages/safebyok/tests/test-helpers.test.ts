@@ -741,19 +741,20 @@ describe("the fixtures", () => {
     expect(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })).to.include({ user_id: 'u1', device_id: 'device-one', highest_vault_epoch: 3 })
   })
 
-  it("madeUnderOf: the vault record a Vault object holds but its gate, what a box made of it now is made under, as its example shows", async () => {
+  it("cheatGetVaultEpoch: the vault record a Vault object holds but its gate, its epochs among it, what a box made of it now is made under, as its examples show", async () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
     const stored = await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1'))
     if (stored === null) { throw new Error('no vault was stored') }
     const { gate: _gate, ...sparse } = stored
-    expect(TH.madeUnderOf(vault)).to.deep.equal(sparse)
+    expect(TH.cheatGetVaultEpoch(vault)).to.deep.equal(sparse)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const record = valOf(await opts.vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', { vault_tok: vault.vault_tok }))
     if (record === null) { throw new Error('no box was stored') }
-    expect(await Box.make(vault, record, TH.madeUnderOf(vault)).extractWhisper()).to.eq('sk-fake')
-    TH.expectSyncRefusal(() => TH.madeUnderOf({} as never), 'bad_option')
+    expect(await Box.make(vault, record, TH.cheatGetVaultEpoch(vault)).extractWhisper()).to.eq('sk-fake')
+    TH.expectSyncRefusal(() => TH.cheatGetVaultEpoch({} as never), 'bad_option')
   })
 
   it("leasedSliceOf: a vault slice holding a lease around the vaultKey it is handed, made under its scope and vault token, as its examples show", async () => {
@@ -1337,7 +1338,7 @@ class RoundTripVaultDB extends VaultDB {
 
   protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     if (! this.opts.readsApart) { return await this.backend.atomically((rows) => vaultIn(rows, scope, this.opts.listsToLimit ? this.maxBoxes : Infinity)) }
-    const vault = await this.backend.atomically((rows) => (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'])
+    const vault = await this.backend.atomically((rows) => rows.get(Scopepath.vault(scope)) ?? null)
     return { vault, ...splitStoredBoxes(await this.backend.atomically((rows) => boxesIn(rows, scope))) }
   }
 
@@ -1469,7 +1470,7 @@ const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string })
 
 /** The vault of `scope` in `rows`: its vault record, or null, and its boxes. */
 const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): VaultReadResponse => (
-  { vault: (rows.get(Scopepath.vault(scope)) ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
+  { vault: rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
 )
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {

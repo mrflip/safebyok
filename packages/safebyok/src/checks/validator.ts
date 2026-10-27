@@ -10,9 +10,10 @@ import { EpochMillis, label, user_id } from './primitives'
 
 /** What a `Validator` builder is handed: Zod's makers under short names, its scalars ready made, the names every scope is made of, and `epochMillis`, the instant every time is.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
- * A maker the kit lacks comes in by a named import from `zod` beside the call: the whole of Zod
- * would carry every locale it ships into each host's bundle. It has no record maker on purpose: a
- * refusal names a failing field by its path, and a record's keys in that path are the input's own.
+ * Bring a maker the kit lacks in by a named import from `zod` beside the call, never the whole of
+ * Zod, which would carry every locale it ships into each host's bundle. Judge an object keyed by
+ * its input whole, with `custom`: the kit has no record maker, as a record's keys would stand in
+ * a refusal's paths.
  */
 export const Kit = {
   obj:     Zod.object,
@@ -53,9 +54,13 @@ type Merged<SourcesT extends readonly object[]> =
  * never which, and lists the fields the object takes. It quotes no input, and carries no `cause`.
  *
  * Only `parse` changes. `safeParse` and `parseAsync` are Zod's own, and so is any schema made
- * from a validator outside a `Validator` call (`vaultRecord.pick(...)`): its `parse` throws a
+ * from a validator outside a `Validator` call (`VaultSparse.pick(...)`): its `parse` throws a
  * ZodError. Make such a slice in a call of its own where it should refuse. A validator nested in
  * another refuses with the outer one's kind.
+ *
+ * A schema keyed by its input repeats those keys in a refusal: Zod's `record`, or an object's
+ * `.catchall()`, puts each key that fails in the path the message and `meta.fieldnames` name.
+ * Judge such an object whole with `custom`, as safebyok's own whisper check does.
  *
  * Modules of validators in `sources` (each a star import) are spread into the kit beneath it, so
  * a name the kit gives wins. A bundler keeps or drops a call whole.
@@ -68,16 +73,16 @@ type Merged<SourcesT extends readonly object[]> =
  *   })
  *   vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' })  // throws 'bad_scope', "vaultlabel: A label is ..."
  * @example
- *   export const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
- *     const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
- *     const boxSparse = boxRecord.omit({ whisper_ciphered: true })
- *     return { boxRecord, boxSparse }
+ *   export const { BoxRecord, BoxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
+ *     const BoxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
+ *     const BoxSparse = BoxRecord.omit({ whisper_ciphered: true })
+ *     return { BoxRecord, BoxSparse }
  *   })
- *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
+ *   BoxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
  * @example
- *   export const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
- *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
- *     return { vaultRecord }
+ *   export const { VaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, GateRecord }) => {
+ *     const VaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: GateRecord.nullable() }).strict()
+ *     return { VaultRecord }
  *   }, [GateChecks])
  */
 export const Validator = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(

@@ -133,7 +133,7 @@ export const realRecords = async (user_id = 'u1') => {
     await vault.putBox({ boxlabel, sidecar }, whisper)
   }
   closeVault(vault)
-  const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
+  const rows = store.scopepaths().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
   const vaultRecordRow = rows.find((row) => VaultRecord.safeParse(row.record).success)
   if (! vaultRecordRow) { throw new Error('the core stored no vault record') }
   return {

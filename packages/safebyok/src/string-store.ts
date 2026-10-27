@@ -2,14 +2,14 @@ import { VaultError } from './errors'
 import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
-/** The smallest storage the local adapters need: text by ckey, with a `subscribe` so the vault and an inspector can watch it. */
+/** The smallest storage the local adapters need: text by scopepath, with a `subscribe` so the vault and an inspector can watch it. */
 export type StringStore = {
-  /** The stored text under `ckey`, or null for none. */
-  read(ckey: string): string | null
-  write(ckey: string, text: string): void
-  erase(ckey: string): void
-  /** Every ckey currently stored, in no particular order. */
-  ckeys(): string[]
+  /** The stored text under `scopepath`, or null for none. */
+  read(scopepath: string): string | null
+  write(scopepath: string, text: string): void
+  erase(scopepath: string): void
+  /** Every scopepath currently stored, in no particular order. */
+  scopepaths(): string[]
   /** Call `listener` after any write or erase; returns the unsubscribe. */
   subscribe(listener: () => void): () => void
 }
@@ -50,10 +50,10 @@ export const memoryStore = (): StringStore => {
   const bag = new Map<string, string>()
   const bell = makeBell()
   return {
-    read:  (ckey) => bag.get(ckey) ?? null,
-    write: (ckey, text) => { bag.set(ckey, text); bell.ring() },
-    erase: (ckey) => { bag.delete(ckey); bell.ring() },
-    ckeys: () => [...bag.keys()],
+    read:       (scopepath) => bag.get(scopepath) ?? null,
+    write:      (scopepath, text) => { bag.set(scopepath, text); bell.ring() },
+    erase:      (scopepath) => { bag.delete(scopepath); bell.ring() },
+    scopepaths: () => [...bag.keys()],
     subscribe: bell.subscribe,
   }
 }
@@ -71,14 +71,14 @@ export const memoryStore = (): StringStore => {
 export const domStore = (webStorage: Storage, prefix: string): StringStore => {
   const bell = makeBell()
   return {
-    read:  (ckey) => webStorage.getItem(prefix + ckey),
-    write: (ckey, text) => { webStorage.setItem(prefix + ckey, text); bell.ring() },
-    erase: (ckey) => { webStorage.removeItem(prefix + ckey); bell.ring() },
-    ckeys: () => {
+    read:       (scopepath) => webStorage.getItem(prefix + scopepath),
+    write:      (scopepath, text) => { webStorage.setItem(prefix + scopepath, text); bell.ring() },
+    erase:      (scopepath) => { webStorage.removeItem(prefix + scopepath); bell.ring() },
+    scopepaths: () => {
       const found: string[] = []
       for (let ii = 0; ii < webStorage.length; ii += 1) {
-        const fullCkey = webStorage.key(ii)
-        if (fullCkey?.startsWith(prefix)) { found.push(fullCkey.slice(prefix.length)) }
+        const prefixedScopepath = webStorage.key(ii)
+        if (prefixedScopepath?.startsWith(prefix)) { found.push(prefixedScopepath.slice(prefix.length)) }
       }
       return found
     },

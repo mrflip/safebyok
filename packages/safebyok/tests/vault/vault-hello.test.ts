@@ -340,7 +340,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     expect(await recordEpochIn(world)).to.eq(0)
     await vault.hello({ staleMinutes: 0 })
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(await recordEpochIn(world)).to.eq(1)
   })
 
@@ -352,7 +352,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
     expect(await vault.hello({ staleMinutes: 0 })).to.eq(vault)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(vault.getSnapshot()).to.deep.include({ freshness: 'timely' })
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }]])
     expect(world.logged[0]?.err?.cause).to.eq(trouble)
@@ -777,7 +777,7 @@ describe("vault.hello, by the Contract", () => {
     const stored = storedVaultRecordOf(world)
     await vault.hello({ staleMinutes: 0 })
     expect(vault).to.deep.include({ vault_tok: stored['vault_tok'], registered_at: stored['registered_at'] })
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(stored['gate_epoch'])
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(stored['gate_epoch'])
     expect(vault.snapshot.gate?.passphrase).to.deep.include({ device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
     expect(vault.snapshot.gate?.passkey).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
@@ -859,7 +859,7 @@ describe("vault.hello, by the Contract", () => {
     expect(err.family).to.eq('bad_news')
     expect(told).to.deep.equal([err])
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     expect(vault.snapshot).to.deep.include({ trouble: err, freshness: 'refused' })
   })
 
@@ -872,7 +872,7 @@ describe("vault.hello, by the Contract", () => {
     expect(shared).to.eq(err)
     expect(told).to.deep.equal([err])
     expect(TH.stateOf(there.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(there).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(there).gate_epoch).to.eq(1)
     expect(there.getSnapshot().gate?.passkey).to.be.null
     expect(there.getSnapshot()).to.deep.include({ trouble: err, freshness: 'refused' })
     expect(await world.getLease()).to.be.null
@@ -888,7 +888,7 @@ describe("vault.hello, by the Contract", () => {
     await TH.expectRefusal(TH.unlock(there, 'pw'), 'vault_behind')
     await TH.expectRefusal(TH.unlock(there, await TH.passkeyOf('laptop')), 'vault_behind')
     expect(TH.stateOf(there.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(there).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(there).gate_epoch).to.eq(1)
     expect(there.getSnapshot().gate?.passkey).to.be.null
     expect(await world.getLease()).to.be.null
   })
@@ -898,7 +898,7 @@ describe("vault.hello, by the Contract", () => {
     restoreOlder()
     const err = await TH.expectRefusal(here.refresh(), 'vault_behind')
     expect(TH.stateOf(here.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(here).gate_epoch).to.eq(3)
+    expect(TH.cheatGetVaultEpoch(here).gate_epoch).to.eq(3)
     expect(here.getSnapshot().gate?.passkey).to.be.null
     expect(here.getSnapshot()).to.deep.include({ trouble: err, freshness: 'refused' })
     expect(await world.getLease()).to.be.null
@@ -921,7 +921,7 @@ describe("vault.hello, by the Contract", () => {
     }
     const accepted = await bank.ensureVault(u1Main)
     expect(TH.stateOf(accepted.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(accepted).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(accepted).gate_epoch).to.eq(2)
     expect(accepted.snapshot.gate?.passkey?.credential_id).to.eq(storedWayinOf(world, 'passkey')?.['credential_id'])
     expect(await recordEpochIn(world)).to.eq(2)
   })
@@ -1201,7 +1201,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     release()
     await ensuring
     reading.release()
-    await TH.eventually(() => TH.madeUnderOf(vault).gate_epoch === 2)
+    await TH.eventually(() => TH.cheatGetVaultEpoch(vault).gate_epoch === 2)
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     await vault.hello({ staleMinutes: 0 })
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
@@ -1220,10 +1220,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await TH.unlock(other, 'pw-two')
     await TH.putWayin(other, 'pw-two', 'pw-three')
     await vault.hello({ staleMinutes: 0 })
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(3)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(3)
     noting.release()
     await changing
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(3)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(3)
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
@@ -1240,10 +1240,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await TH.unlock(other, 'pw')
     await TH.putWayin(other, 'pw', 'pw-two')
     await vault.hello({ staleMinutes: 0 })
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     noting.release()
     await TH.expectBad(making, 'gate_moved')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
@@ -1257,7 +1257,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await deriving.reached
     await TH.putWayin(other, 'pw', 'pw-new')
     // The change bell's refresh reads epoch 2, and drops the lease from memory, erasing nothing.
-    await TH.eventually(() => TH.madeUnderOf(vault).gate_epoch === 2)
+    await TH.eventually(() => TH.cheatGetVaultEpoch(vault).gate_epoch === 2)
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     deriving.release()
     await TH.expectBad(unlocking, 'gate_moved')
@@ -1269,10 +1269,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
   it("stays locked when the passphrase changes on another device while ensureUnlocked() consults this device's store for its lease, which it leaves where it lies", async () => {
     const { world, vault, ensuring, other, release } = await takeUpHeld()
     const outdated = await world.getLease()
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
     await TH.putWayin(other, 'pw', 'pw-new')
     // The change bell's refresh brings the new epoch while the take-up's answer is held.
-    await TH.eventually(() => TH.madeUnderOf(vault).gate_epoch === 2)
+    await TH.eventually(() => TH.cheatGetVaultEpoch(vault).gate_epoch === 2)
     release()
     await TH.expectBad(ensuring, 'vault_locked')
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')

@@ -105,7 +105,7 @@ reads as absent, its rows left as they were.
 ### Looking at the rows
 
 `inspectIdbVaultDB({ dbName })` is a raw window onto the rows, for a debug panel or a demo's
-"what the backend sees": `rows()` lists every stored row with its ckey, `subscribe(listener)`
+"what the backend sees": `rows()` lists every stored row with its scopepath, `subscribe(listener)`
 hears every write, and `wipe()` removes every row, every user's vault in that database. It asks
 no vault's opinion: what it shows is what is stored.
 

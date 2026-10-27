@@ -114,11 +114,11 @@ describe("VaultDashboard, a vault stored damaged", () => {
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Remove and start over' }))
     expect(confirming).toHaveBeenCalledWith("Remove this vault and start over? Every box in it is lost for good.")
-    expect(store.ckeys()).to.have.lengthOf(2)
+    expect(store.scopepaths()).to.have.lengthOf(2)
     confirming.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
+    expect(store.scopepaths(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
   })
 
   it("says why deleting it failed, and keeps offering it", async () => {

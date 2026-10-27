@@ -462,7 +462,7 @@ the scope.
   only own enumerable fields: a getter on the prototype is lost while TypeScript types it as
   present, and every other own field comes along. The linter refuses a spread of a class instance
   (`no-misused-spread`); where a caller wants a thing's fields as plain data, a getter hands out a
-  frozen shallow copy of its fields.
+  frozen shallow copy of its fields (`vault.stamp`).
 * **Strip before crossing into host code.** A host's store, callback or checker gets plain data
   picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's store
   the Vault object, `lock()` and all. Nothing that crosses needs a method.

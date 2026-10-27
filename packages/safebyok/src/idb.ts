@@ -50,7 +50,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  * reads as null, and is discarded. A row under any scopepath but a lease's or a device record's, an
  * earlier version's among them, is deleted unread at the next read or erase of a lease. It files
  * rows under their {@link Scopepath}, and refuses 'bad_scope' alike for a scope whose names fail
- * their checks. It refuses 'bad_option' for a `dbName` that is not non-empty text.
+ * their checks. It refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
  *
  * A failure of IndexedDB's own is a condition, as {@link deviceOutcomeOf} says. A context with no
  * IndexedDB meets 'storage_blocked' at first use.
@@ -162,12 +162,13 @@ const discardedIfUnreadable = (store: UseStore, leaseScopepath: Scopepath.LeaseS
   })
 ))
 
-/** One stored row, as {@link inspectIdbDeviceDB} reports it: its ckey and the raw stored value. */
-export type IdbRow = { ckey: string, row: unknown }
+/** One stored row, as {@link inspectIdbDeviceDB} reports it: its scopepath and the raw stored value. */
+export type IdbRow = { scopepath: string, row: unknown }
 
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. It refuses 'bad_option' for a
- * `dbName` that is not non-empty text, and its `subscribe` for a listener that is no function.
+ * `dbName` that is not non-empty text or an option it does not take, and its `subscribe` for a
+ * listener that is no function.
  * Unlike the store, its `rows()` and `wipe()` reject, with a `NotSupportedError` where there is no
  * IndexedDB.
  *
@@ -179,13 +180,13 @@ export type IdbRow = { ckey: string, row: unknown }
 export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
   const dbName = parseDbName(opts, 'inspectIdbDeviceDB')
   return {
-    /** Every stored row on the shelf, sorted by ckey. */
+    /** Every stored row on the shelf, sorted by scopepath. */
     rows: async (): Promise<IdbRow[]> => {
       const stored = await entries(shelfStore(dbName))
       return stored
         .filter((pair): pair is [string, unknown] => typeof pair[0] === 'string')
-        .map(([ckey, row]) => ({ ckey, row }))
-        .toSorted((one, two) => one.ckey.localeCompare(two.ckey))
+        .map(([scopepath, row]) => ({ scopepath, row }))
+        .toSorted((one, two) => one.scopepath.localeCompare(two.scopepath))
     },
     /** Call `listener` after any write to the shelf, in this tab or another; returns the unsubscribe. */
     subscribe: (listener: () => void): (() => void) => {

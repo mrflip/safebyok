@@ -23,7 +23,7 @@ export { ScopepathDelimiter as Delimiter } from './consts'
 
 /** A bank's scopepath: `bank^acme^u1`. */
 export type BankScopepath = Z.input<typeof CX.bankScopepath>
-/** The scopepath of a vault's props: `vault^acme^u1^main`. */
+/** The scopepath of a vault's record: `vault^acme^u1^main`. */
 export type VaultScopepath = Z.input<typeof CX.vaultScopepath>
 /** The scopepath of a vault's lease, on a device: `lease^acme^u1^main`. */
 export type LeaseScopepath = Z.input<typeof CX.leaseScopepath>
@@ -158,7 +158,7 @@ export const withinVaultScopepathPrefix = (scope: VaultScope): string => {
  * It is a test of the prefix alone: a row under the vault's prefix that {@link isBox} rejects
  * passes it, so a vault's deletion erases that row too.
  *
- * @example store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))   // each row under the vault's prefix: test each with isBox before boxscope
+ * @example store.scopepaths().filter(Scopepath.withinVaultScopepathPred(scope))   // each row under the vault's prefix: test each with isBox before boxscope
  */
 export const withinVaultScopepathPred = (scope: VaultScope): ScopepathPred => {
   const prefix = withinVaultScopepathPrefix(scope)

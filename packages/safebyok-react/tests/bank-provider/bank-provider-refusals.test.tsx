@@ -217,7 +217,7 @@ describe("BankProvider", () => {
       expect(latest().vault).to.eq(shown)
       expect(latest().bankVault?.lifecycle).to.eq('ready')
       expect(shown?.getSnapshot().trouble?.refusalkind).to.eq('vault_behind')
-      expect(shown && TH.madeUnderOf(shown).gate_epoch).to.eq(2)
+      expect(shown && TH.cheatGetVaultEpoch(shown).gate_epoch).to.eq(2)
     })
 
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {
@@ -350,7 +350,7 @@ describe("BankProvider", () => {
         await latest().bank?.ensureVault({ vaultlabel: 'main' })
       })
       await expectShown('novel')
-      expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
+      expect(store.scopepaths(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
       expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
       expect(latest().err).to.be.null
     })
@@ -364,7 +364,7 @@ describe("BankProvider", () => {
       await expectShown('no vault')
     })
 
-    it("matches useBankVault's @example for a refusal: the refusal's message, in place", async () => {
+    it("matches useListedVault's @example for a refusal: the refusal's message, in place", async () => {
       const world = makeWorld()
       vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       render(

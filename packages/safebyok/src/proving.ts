@@ -9,7 +9,7 @@ import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { PasskeySaltBytes, type LeaseRecord, type PasskeyAnswer, type WayinKind } from './types/types'
 import { type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf } from './vault-record'
-import { decorate } from './adorn'
+import { decorate } from './helpers'
 import { passphraseCleartext, type PassphraseCleartext, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './types/type-aliases'
 import { Validator } from './checks/validator'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
@@ -37,47 +37,55 @@ export type ProvingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del' | '
 /** The gating of a proving made outside any gating, which never lands: a test hands it to `seal`. Every vault call's proving is made for a real gating. */
 export const StandingGating: ProvingGating = Object.freeze({ landed: false })
 
-/** What a proving reaches of its Vault object inside the package, which no getter of the Vault object shows: what the vault hands each proving made of it.
+/** What a Vault object hands its gatings and its provings inside the package, which no getter of the Vault object shows: the tools both use.
+ * Each adds its own powers: a proving's ({@link ProvingTools}) store and hold the lease it grants,
+ * and a gating's (`GatingTools`) read storage, store a gate and delete the vault. Neither is
+ * handed the other's.
+ */
+export type VaultPrivateTools = {
+  /** The vault's key deriver: what a passphrase proving derives through, and what the gates a gating's chain reads judge their wayins by. */
+  keyDeriver:  KeyDeriver
+  /** How long a lease the vault grants lasts, in whole milliseconds. */
+  leaseMillis: number
+  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
+  demand:      (thing: VaultMadeUnder, call: ProvingCall, opts?: { firstGate: boolean }) => void
+}
+
+/** What a proving reaches of its Vault object: the {@link VaultPrivateTools}, and what it reads and stores as it seals a wayin or grants a lease.
  * A proving is made under the vault record in hand as it is sealed: its scope, `vault_tok` and
  * epochs, as `vaultRecord()` shows them then.
  */
-export type ProvingInside = {
+export type ProvingTools = VaultPrivateTools & {
   /** The vault record in hand: the gate whose wayins a proving opens, and the epochs a proving is made under. */
   vaultRecord: () => VaultRecord
-  /** The vault's key deriver, which a passphrase proving derives through. */
-  keyDeriver: KeyDeriver
   /** The vault's logger, which hears that a key deriver threw. */
-  logger:     VaultLogger
-  /** How long a lease the vault grants lasts, in whole milliseconds. */
-  leaseMillis: number
+  logger:      VaultLogger
   /** The time by the vault's clock, in whole epoch milliseconds: what a fresh header and a lease are stamped by. */
-  now:        () => number
+  now:         () => number
   /** This device's id for the vault, from the bank's device record: what a fresh header carries. */
-  deviceId:   () => string
+  deviceId:    () => string
   /** Store `record` as this device's lease, {@link DeviceDB.putLease}, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
-  putLease:   (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
+  putLease:    (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
   /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
-  holdLease:  (stored: LeaseRecord) => Lease
-  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
-  demand:     (thing: VaultMadeUnder, call: ProvingCall, opts?: { firstGate: boolean }) => void
+  holdLease:   (stored: LeaseRecord) => Lease
 }
 
-/** Each registered vault's inside: a weak map, so a vault let go is let go here too. */
-const insides = new WeakMap<object, ProvingInside>()
+/** Each registered vault's proving tools: a weak map, so a vault let go is let go here too. */
+const registered = new WeakMap<object, ProvingTools>()
 
-/** Let this package's provings reach `vault`'s inside, once: what a Vault object's constructor calls.
+/** Let this package's provings reach `vault`'s tools, once: what a Vault object's constructor calls.
  *
- * @example registerProvingInside(this, { vaultRecord: () => this.#vaultRecord, ... })
+ * @example registerProvingTools(this, { ...tools, vaultRecord: () => this.#vaultRecord, ... })
  */
-export const registerProvingInside = (vault: object, inside: ProvingInside): void => {
-  if (! insides.has(vault)) { insides.set(vault, inside) }
+export const registerProvingTools = (vault: object, tools: ProvingTools): void => {
+  if (! registered.has(vault)) { registered.set(vault, tools) }
 }
 
-/** The inside of `vault`, which only a Vault object registers. */
-const insideOf = (vault: object): ProvingInside => {
-  const inside = insides.get(vault)
-  if (inside === undefined) { throw new VaultError('bad_option', 'A proving is made for a Vault object, which a Bank hands out: a slice of one will not do.') }
-  return inside
+/** The proving tools of `vault`, which only a Vault object registers. */
+const toolsOf = (vault: object): ProvingTools => {
+  const tools = registered.get(vault)
+  if (tools === undefined) { throw new VaultError('bad_option', 'A proving is made for a Vault object, which a Bank hands out: a slice of one will not do.') }
+  return tools
 }
 
 /** The vault record `vault` holds now, as its provings read it: for tests alone, which have no other way to the epochs of a Vault object's picture.
@@ -86,7 +94,7 @@ const insideOf = (vault: object): ProvingInside => {
  *
  * @example vaultRecordHeldBy(vault).vault_epoch   // up by one on every write of the vault record
  */
-export const vaultRecordHeldBy = (vault: object): VaultRecord => insideOf(vault).vaultRecord()
+export const vaultRecordHeldBy = (vault: object): VaultRecord => toolsOf(vault).vaultRecord()
 
 /** What a header of `slotlabel` names when it names only the slot: the header `seal` mints. */
 type FreshHeader<SlotT extends WayinKind> = { slotlabel: SlotT }
@@ -191,7 +199,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     this.#demand()
     newProving.#demand()
     const record: unknown = { ...newProving.header, vault_key_wayin_wrapped: wrapped }
-    return Wayin.make(this.#vaultStamp, record, { keyDeriver: insideOf(this.vault).keyDeriver })
+    return Wayin.make(this.#vaultStamp, record, { keyDeriver: toolsOf(this.vault).keyDeriver })
   }
 
   /** Grant this device a lease on the vault, by the wayin this proving opens in the gate that stands, resolving the Lease as stored and held.
@@ -207,20 +215,20 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    * @example const lease = await proving.grantLease()
    */
   async grantLease(): Promise<Lease> {
-    const inside = insideOf(this.vault)
+    const tools = toolsOf(this.vault)
     this.#demand()
-    const standing = inside.vaultRecord()
+    const standing = tools.vaultRecord()
     const vaultKey = await this.#unwrap(this.#currentWrap(), this.header, RewrapUsage)
-    const record = await sealLeaseRecord(standing, vaultKey, { leaseMillis: inside.leaseMillis, now: inside.now() })
+    const record = await sealLeaseRecord(standing, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     this.#demand()
-    inside.demand(madeUnderOfLease(record), this.#call())
-    const put = await inside.putLease(record)
+    tools.demand(madeUnderOfLease(record), this.#call())
+    const put = await tools.putLease(record)
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     this.#demand()
-    inside.demand(madeUnderOfLease(put.ok ? put.val : record), this.#call())
+    tools.demand(madeUnderOfLease(put.ok ? put.val : record), this.#call())
     const stored = valOf(put)
-    return inside.holdLease(stored)
+    return tools.holdLease(stored)
   }
 
   /** Only its slotlabel: all JSON and a log line show of a proving. */
@@ -236,7 +244,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    * gate is for the first: a gate standing then was made elsewhere ('gate_made_elsewhere').
    */
   #demand(opts?: { sealing: boolean }) {
-    insideOf(this.vault).demand(this, this.#call(), { firstGate: opts?.sealing === true && this.gate_epoch === 0 })
+    toolsOf(this.vault).demand(this, this.#call(), { firstGate: opts?.sealing === true && this.gate_epoch === 0 })
   }
 
   /** The vault call its gating was raised by, as a refusal logs it. */
@@ -251,7 +259,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** The wrap of the gate's wayin at this proving's slotlabel, as the vault holds it now; a gate with none there has moved past it. */
   #currentWrap(): VaultKeyWayinWrapped {
-    const wayin = wayinRecordAt(insideOf(this.vault).vaultRecord(), this.slotlabel)
+    const wayin = wayinRecordAt(toolsOf(this.vault).vaultRecord(), this.slotlabel)
     if (wayin === null) { throw gateMovedPast() }
     return wayin.vault_key_wayin_wrapped
   }
@@ -296,11 +304,11 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    */
   static async seal(vault: Vault, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
     const cleartext = passphraseCleartext.parse(passphrase)
-    const inside = insideOf(vault)
-    const madeUnder = vaultSparseOf(inside.vaultRecord())
-    const { keyDeriver } = inside
-    const sealing = 'slotlabel' in header ? mintedPassphraseHeader(inside) : checkedPassphraseHeader(header, keyDeriver, cleartext)
-    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, cleartext, fromB64(sealing.salt_b64), inside.logger), unexpectedError)
+    const tools = toolsOf(vault)
+    const madeUnder = vaultSparseOf(tools.vaultRecord())
+    const { keyDeriver } = tools
+    const sealing = 'slotlabel' in header ? mintedPassphraseHeader(tools) : checkedPassphraseHeader(header, keyDeriver, cleartext)
+    const derived = await outcomeOf(() => passphraseKeyOf(keyDeriver, cleartext, fromB64(sealing.salt_b64), tools.logger), unexpectedError)
     if (! derived.ok) { demandAfterFailedSeal(vault, madeUnder, opts.gating) }
     const proving = new PassphraseProving(vault, madeUnder, sealing, opts.gating, valOf(derived))
     proving.demandSelf({ sealing: true })
@@ -317,11 +325,11 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const passphraseWrap = await this.wrappedWith(vaultKey, this.header)
     const passkeyWrap = passkeyProving === undefined ? null : await passkeyProving.wrappedWith(vaultKey, passkeyProving.header)
     this.demandSelf({ sealing: true })
-    const inside = insideOf(this.vault)
-    if (passkeyProving !== undefined) { inside.demand(passkeyProving, this.gating.call ?? 'demandConsistentWith', { firstGate: passkeyProving.gate_epoch === 0 }) }
+    const tools = toolsOf(this.vault)
+    if (passkeyProving !== undefined) { tools.demand(passkeyProving, this.gating.call ?? 'demandConsistentWith', { firstGate: passkeyProving.gate_epoch === 0 }) }
     return {
-      passphrase: Wayin.make(this.vaultStamp, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }, { keyDeriver: inside.keyDeriver }),
-      passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vaultStamp, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }, { keyDeriver: inside.keyDeriver }),
+      passphrase: Wayin.make(this.vaultStamp, { ...this.header, vault_key_wayin_wrapped: passphraseWrap }, { keyDeriver: tools.keyDeriver }),
+      passkey:    passkeyProving === undefined || passkeyWrap === null ? null : Wayin.make(this.vaultStamp, { ...passkeyProving.header, vault_key_wayin_wrapped: passkeyWrap }, { keyDeriver: tools.keyDeriver }),
     }
   }
 
@@ -368,9 +376,9 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     const checked = checkedPasskeyAnswer(answer)
     const { prfBytes } = checked
     try {
-      const inside = insideOf(vault)
-      const madeUnder = vaultSparseOf(inside.vaultRecord())
-      const sealing = 'slotlabel' in header ? mintedPasskeyHeader(inside, checked) : checkedPasskeyHeader(header, checked)
+      const tools = toolsOf(vault)
+      const madeUnder = vaultSparseOf(tools.vaultRecord())
+      const sealing = 'slotlabel' in header ? mintedPasskeyHeader(tools, checked) : checkedPasskeyHeader(header, checked)
       const derived = await outcomeOf(() => deriveWrappingKey(prfBytes, wayinCtxOf(madeUnder, sealing)), unexpectedError)
       if (! derived.ok) { demandAfterFailedSeal(vault, madeUnder, opts.gating) }
       const proving = new PasskeyProving(vault, madeUnder, sealing, opts.gating, valOf(derived))
@@ -406,13 +414,13 @@ const wayinRecordAt = (vaultRecord: Pick<VaultRecord, 'gate'>, slotlabel: WayinK
   return slotlabel === 'passphrase' ? gate.passphrase : gate.passkey
 }
 
-/** A fresh passphrase header: the vault's key deriver, a fresh salt of its length, this device's id, and the time now, each as `inside` hands it. */
-const mintedPassphraseHeader = (inside: ProvingInside): PassphraseWayinHeader => ({
+/** A fresh passphrase header: the vault's key deriver, a fresh salt of its length, this device's id, and the time now, each as `tools` hands it. */
+const mintedPassphraseHeader = (tools: ProvingTools): PassphraseWayinHeader => ({
   wayinkind:         'passphrase',
-  key_deriver_label: inside.keyDeriver.key_deriver_label,
-  salt_b64:          salt_b64.parse(toB64(randomBytes(inside.keyDeriver.salt_bytes))),
-  device_id:         inside.deviceId(),
-  registered_at:     inside.now(),
+  key_deriver_label: tools.keyDeriver.key_deriver_label,
+  salt_b64:          salt_b64.parse(toB64(randomBytes(tools.keyDeriver.salt_bytes))),
+  device_id:         tools.deviceId(),
+  registered_at:     tools.now(),
 })
 
 /** `header`, a current passphrase wayin's, once its deriver is the vault's and its salt one that deriver makes, and the passphrase is not blank. */
@@ -457,15 +465,15 @@ export const checkFreshSalt = (answer: PasskeyAnswer): void => {
   }
 }
 
-/** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now, as `inside` hands them. */
-const mintedPasskeyHeader = (inside: ProvingInside, answer: PasskeyAnswer): PasskeyWayinHeader => {
+/** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now, as `tools` hands them. */
+const mintedPasskeyHeader = (tools: ProvingTools, answer: PasskeyAnswer): PasskeyWayinHeader => {
   checkFreshSalt(answer)
   return {
     wayinkind:     'passkey',
     credential_id: answer.credential_id,
     prf_salt_b64:  prf_salt_b64.parse(answer.prf_salt_b64),
-    device_id:     inside.deviceId(),
-    registered_at: inside.now(),
+    device_id:     tools.deviceId(),
+    registered_at: tools.now(),
   }
 }
 
@@ -499,7 +507,7 @@ const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker chang
  * A seal begun on a vault with no gate was for the first: a gate standing now was made elsewhere ('gate_made_elsewhere').
  */
 const demandAfterFailedSeal = (vault: Vault, madeUnder: VaultSparse, gating: ProvingGating) => {
-  insideOf(vault).demand(madeUnder, gating.call ?? 'demandConsistentWith', { firstGate: madeUnder.gate_epoch === 0 })
+  toolsOf(vault).demand(madeUnder, gating.call ?? 'demandConsistentWith', { firstGate: madeUnder.gate_epoch === 0 })
   if (gating.landed) { throw sealLandedError() }
 }
 

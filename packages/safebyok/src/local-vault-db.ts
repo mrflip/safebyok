@@ -56,7 +56,7 @@ const isFunction = (candidate: unknown) => typeof candidate === 'function'
 /** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
 export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
   const call = custom(isFunction)
-  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, ckeys: call, subscribe: call }) }) }
+  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {
@@ -82,7 +82,7 @@ class StringStoreVaultDB extends VaultDB {
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
   // read of a vault reads its record and its boxes in one such step.
   protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
-    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
+    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)), ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
@@ -91,7 +91,7 @@ class StringStoreVaultDB extends VaultDB {
       const standing = readJson(this.store, vaultScopepath)
       const life = Expectations.newLifeOf(draft, standing)
       if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
-      return { vault: (life ?? standing) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(draft)) }
+      return { vault: life ?? standing, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 
@@ -115,7 +115,7 @@ class StringStoreVaultDB extends VaultDB {
 
   /** Every box row of `scope`, read in the synchronous step that calls it: each under the boxlabel its scopepath names. */
   private storedBoxesOf(scope: VaultScope): StoredBox[] {
-    return this.store.ckeys()
+    return this.store.scopepaths()
       .filter(Scopepath.withinVaultScopepathPred(scope))
       // A row under the vault's prefix that is no box's scopepath holds no box a verb can reach: it is passed over.
       .filter((scopepath) => Scopepath.isBox(scopepath))
@@ -141,7 +141,7 @@ class StringStoreVaultDB extends VaultDB {
   // Each box weighs its row's text as stored, in UTF-8 bytes, against no limit: the store keeps none.
   protected doGetCapacity(scope: VaultScope): Promise<unknown> {
     return soon(() => {
-      const texts = this.store.ckeys()
+      const texts = this.store.scopepaths()
         .filter(Scopepath.withinVaultScopepathPred(scope))
         .map((scopepath) => this.store.read(scopepath))
         .filter((text): text is string => text !== null)
@@ -170,8 +170,8 @@ class StringStoreVaultDB extends VaultDB {
       if (tombstone === null) { return null }
       // Every row under the vault's prefix goes, a box's or not.
       const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-      for (const ckey of this.store.ckeys()) {
-        if (isWithinVault(ckey)) { this.store.erase(ckey) }
+      for (const scopepath of this.store.scopepaths()) {
+        if (isWithinVault(scopepath)) { this.store.erase(scopepath) }
       }
       this.store.write(vaultScopepath, JSON.stringify(tombstone))
       return readJson(this.store, vaultScopepath)

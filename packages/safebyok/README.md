@@ -86,21 +86,29 @@ handed in as it is: `bank.closeVault(vault)`. A vault stored elsewhere than the 
 names its own in a second bag: `bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })`.
 
 A Vault object's own fields are its stamp, fixed for its life: `format`, `applabel`, `user_id`,
-`vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a spread or a log line of it shows
-those alone. Everything that changes -- its `gate`, `boxes`, `capacity`, `ask_passphrase_at`,
+`vaultlabel`, `vault_tok` and `registered_at`. It is frozen, so a log line of it shows those
+alone, and `vault.stamp` hands them out as one frozen plain object, to spread or copy. Everything that changes -- its `gate`, `boxes`, `capacity`, `ask_passphrase_at`,
 `trouble` and the rest -- is read through `vault.snapshot`, frozen in one object: read it in an
 event handler and it is current. React renders from `getSnapshot()`, the same object, and
 re-renders on `subscribe()`.
 
-The bank has a snapshot of its own, `bank.snapshot` (and `getSnapshot()`), frozen likewise. It
-sits flat on the bank's scope (`applabel`, `user_id`) beside its `lifecycle` -- `made`,
-`starting` while `hello()` loads, `ready`, or `refused` with its `err` -- and `vaults`, the
-listing: each vault asked for and not let go, sorted by `vaultlabel`, as its scope and its own
-`lifecycle` (`starting` while its birth reads storage, `ready`, or `refused` with its `err`). The
-listing holds no Vault object: `bank.vaultOf({ vaultlabel })` hands out the one the bank holds,
-null until it is `ready`, and `bank.bankVaultOf({ vaultlabel })` looks one vault's place in the
-listing up. The listing is the same array until a vault in it changes, and each of its elements
-the same object until it changes itself.
+The bank reads where it stands through `bank.lifecycle` -- `made`, `starting` while `hello()`
+loads, `ready`, or `refused` -- and its listing through `bank.vaults`: each vault asked for and not
+let go, sorted by `vaultlabel`, as its scope and its own `lifecycle` (`starting` while its birth
+reads storage, `ready`, or `refused` with its `err`). The listing holds no Vault object:
+`bank.vaultOf({ vaultlabel })` hands out the one the bank holds, null until it is `ready`, and
+`bank.bankVaultOf({ vaultlabel })` looks one vault's place in the listing up. The listing is the
+same array until a vault in it changes, and each of its elements the same object until it changes
+itself.
+
+```ts
+if (bank.lifecycle !== 'ready') { await bank.hello() }
+const refused = bank.vaults.filter((bankVault) => bankVault.lifecycle === 'refused')
+```
+
+React renders from the bank's snapshot, `bank.snapshot` (and `getSnapshot()`), frozen likewise:
+flat on the bank's scope (`applabel`, `user_id`), with the same `lifecycle` and `vaults`, and the
+`err` of a `refused` bank.
 
 ### The snapshot
 
@@ -332,7 +340,7 @@ import { Scopepath } from 'safebyok'
 Scopepath.vault(scope)                          // 'vault^acme^u1^main'
 Scopepath.box({ ...scope, boxlabel: 'openai' }) // 'box^acme^u1^main^openai'
 Scopepath.withinVaultScopepathPrefix(scope)     // 'box^acme^u1^main^' -- every box of the vault, by prefix scan or key range
-store.ckeys().filter(Scopepath.withinVaultScopepathPred(scope))  // every row under the vault's prefix, from a list of every key
+store.scopepaths().filter(Scopepath.withinVaultScopepathPred(scope))  // every row under the vault's prefix, from a list of every scopepath
 Scopepath.isBox(row) ? Scopepath.boxscope(row).boxlabel : null  // a listed row's boxlabel; null for a row no box is filed under
 ```
 
@@ -955,7 +963,7 @@ adapter. None of them quotes the record, its ciphertext or its sidecar.
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
 or the dev overlay (in React, `BankProvider` throws misuse from `Bank.make` to the nearest error
 boundary, and `useVault` throws a birth's misuse there; a condition lands in the bank's listing,
-which `useBankVault` hands down).
+which `useListedVault` hands down).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |

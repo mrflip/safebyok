@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useBank, useBankVault, useVault, useVaultSnapshot } from 'safebyok-react'
+import { useBank, useListedVault, useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
@@ -29,7 +29,7 @@ const noteOf = (sidecar: Sidecar): string => {
 
 export const VaultDashboard = () => {
   const bank = useBank()
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const [form, setForm] = useState<FormState | null>(null)

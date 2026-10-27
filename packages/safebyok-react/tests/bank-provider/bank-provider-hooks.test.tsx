@@ -4,7 +4,7 @@ import { Bank, VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Activity, StrictMode, useLayoutEffect } from 'react'
 import { renderToString } from 'react-dom/server'
-import { BankProvider, useBank, useBankVault, useVault, useVaultSnapshot } from '../../src/bank-provider'
+import { BankProvider, useBank, useListedVault, useVault, useVaultSnapshot } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, putThroughNewVault, unreachable, CatchingBoundary, hushConsole, VaultExample, BankVaultExample, BoxCount, countStoreCalls } from './world'
 
 /** Whether the provider above holds a bank. */
@@ -27,7 +27,7 @@ describe("BankProvider", () => {
       await expectShown('locked')
     })
 
-    it("hands down the vault as the bank lists it, none while signed out, then ready, as useBankVault's example shows", async () => {
+    it("hands down the vault as the bank lists it, none while signed out, then ready, as useListedVault's example shows", async () => {
       const world = makeWorld()
       const tree = (user_id: string | null) => <BankProvider {...world.props} user_id={user_id}><BankVaultExample /></BankProvider>
       const { rerender } = render(tree(null))
@@ -95,7 +95,7 @@ describe("BankProvider", () => {
 
     it("each throws, rendered with no BankProvider above it, saying what it needs", () => {
       hushConsole()
-      const hooks = [['useBank', () => useBank()], ['useBankVault', () => useBankVault('main')], ['useVault', () => useVault('main')], ['useVaultSnapshot', () => useVaultSnapshot('main')]] as const
+      const hooks = [['useBank', () => useBank()], ['useListedVault', () => useListedVault('main')], ['useVault', () => useVault('main')], ['useVaultSnapshot', () => useVaultSnapshot('main')]] as const
       for (const [hookname, useHook] of hooks) {
         const Lone = () => {
           useHook()

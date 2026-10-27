@@ -23,22 +23,22 @@ describe("what the vault makes things under", () => {
     const world = makeWorld()
     const vault = await world.open()
     expect(TH.stateOf(vault.snapshot)).to.eq('novel')
-    expect(TH.madeUnderOf(vault)).to.deep.include({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, gate_epoch: 0 })
+    expect(TH.cheatGetVaultEpoch(vault)).to.deep.include({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, gate_epoch: 0 })
   })
 
   it("is the vault record held but for its gate: its stamp, the Vault object's own fields, and its vault_epoch and gate_epoch", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    expect(TH.madeUnderOf(vault)).to.deep.equal({ ...TH.shownOf(vault), vault_epoch: 1, gate_epoch: 1 })
+    expect(TH.cheatGetVaultEpoch(vault)).to.deep.equal({ ...TH.shownOf(vault), vault_epoch: 1, gate_epoch: 1 })
   })
 
   it("moves up by one on every change to the ways in", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const before = TH.madeUnderOf(vault).gate_epoch
+    const before = TH.cheatGetVaultEpoch(vault).gate_epoch
     await TH.putWayin(vault, 'pw', 'pw two')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
-    expect(TH.madeUnderOf(vault).vault_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.cheatGetVaultEpoch(vault).vault_epoch).to.eq(2)
   })
 })
 // --
@@ -83,7 +83,7 @@ describe("vault.demandConsistentWith", () => {
   it("drops a lease it finds ended, as the expiry would, when lease-bound", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { leaseHours: 1 })
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     world.advance(60 * 60 * 1000)
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leaseBound: true }) }, 'vault_locked')
@@ -93,7 +93,7 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a thing of another gate_epoch as 'gate_moved', as its third example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 }) }, 'gate_moved')
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: madeUnder.gate_epoch + 1 }) }, 'gate_moved')
   })
@@ -102,7 +102,7 @@ describe("vault.demandConsistentWith", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await TH.putWayin(vault, 'pw', 'pw two')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch - 1 }) }).to.not.throw()
     expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch }) }).to.not.throw()
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch + 1 }) }, 'gate_moved')
@@ -111,14 +111,14 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a thing of another scope as 'vault_remade', whatever its vault_tok", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, user_id: 'u2' }) }, 'vault_remade')
   })
 
   it("refuses 'vault_gone' once the bank lets the vault go", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     TH.closeVault(vault)
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder) }, 'vault_gone')
   })
@@ -126,7 +126,7 @@ describe("vault.demandConsistentWith", () => {
   it("refuses a thing carrying no vault_tok, or an option it does not take, as 'bad_option', quoting none of it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     const sloppy: unknown[] = [null, 'a vault_tok', 42, { gate_epoch: 1 }, { vault_tok: 7 }, { vault_tok: madeUnder.vault_tok, gate_epoch: 'one' }]
     for (const thing of sloppy) {
       const err = TH.expectSyncRefusal(() => { vault.demandConsistentWith(thing as never) }, 'bad_option')
@@ -138,7 +138,7 @@ describe("vault.demandConsistentWith", () => {
   it("tells the logger the kind and the call it refused, never the thing's fields", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: 0 }) }, 'gate_moved')
     expect(world.logged).to.have.lengthOf(1)
     expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'demandConsistentWith', refusalkind: 'gate_moved' } })
@@ -151,7 +151,7 @@ describe("vault.consistentWith", () => {
   it("answers the demand's question without refusing: true while the thing stands, false once the vault moved on", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     expect(vault.consistentWith(madeUnder)).to.be.true
     expect(vault.consistentWith({ ...madeUnder, gate_epoch: 0 })).to.be.false
     expect(vault.consistentWith({ ...madeUnder, vault_tok: 'vault-tok-other' })).to.be.false
@@ -173,7 +173,7 @@ describe("vault.consistentWith", () => {
   it("asks for a lease in hand that has not ended when lease-bound, dropping none it finds ended", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { leaseHours: 1 })
-    const madeUnder = TH.madeUnderOf(vault)
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
     expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.true
     world.advance(60 * 60 * 1000)
     expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.false
@@ -240,10 +240,10 @@ describe("the refresh's judgment", () => {
       await reading.served.reached
     })
     await TH.putWayin(vault, 'pw', 'pw two')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     reading.served?.release()
     await reading.done
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     expect(world.logged).to.have.lengthOf(0)
   })

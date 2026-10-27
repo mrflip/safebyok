@@ -21,9 +21,9 @@ import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditio
 import type { KeyDeriver } from './key-deriver'
 import { Lease, type LeaseSparse } from './lease'
 import { registerLeaseReader } from './held-lease'
-import { type PassphraseProving, Proving, registerProvingInside } from './proving'
+import { type PassphraseProving, Proving, type VaultPrivateTools, registerProvingTools } from './proving'
 import { Gate } from './gate'
-import { type GatingCall, type GatingInside, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
+import { type GatingCall, type GatingTools, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
 
 // == [Public types]: VaultFreshness, VaultSnapshot, bear, letGo, goneBy
 
@@ -205,7 +205,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   if (! ok && err.refusalkind === 'vault_locked') { offerUnlock() }
  */
 export class Vault implements VaultStamp {
-  // == [Vault: fields]: format, applabel, user_id, vaultlabel, vault_tok, registered_at, snapshot, getSnapshot, subscribe, logger
+  // == [Vault: fields]: format, applabel, user_id, vaultlabel, vault_tok, registered_at, stamp, snapshot, getSnapshot, subscribe, logger
 
   // Its own fields are its stamp, fixed for its life and frozen with it. Everything that changes
   // lives in a private field, which a freeze leaves writable, and is read through the snapshot that
@@ -224,6 +224,14 @@ export class Vault implements VaultStamp {
   readonly vault_tok:     string
   /** When the stored vault was made, in epoch milliseconds. Fixed for the Vault object's life. */
   readonly registered_at: number
+
+  /** Its own fields, its stamp, as one frozen plain object: what to spread, copy or show where the Vault object itself would carry its methods along. The same object for the Vault object's life.
+   *
+   * @example const { vault_tok, registered_at } = vault.stamp
+   * @example const shown = { ...vault.stamp, boxCount: vault.snapshot.boxes.length }   // never { ...vault }
+   */
+  get stamp(): VaultStamp { return this.#stamp }
+  readonly #stamp: VaultStamp
 
   /** Everything about the vault that changes, frozen in one object: what {@link Vault.getSnapshot} returns. See {@link VaultSnapshot}.
    *
@@ -809,6 +817,7 @@ export class Vault implements VaultStamp {
     this.vaultlabel = vaultlabel
     this.vault_tok = vaultTok
     this.registered_at = registered_at
+    this.#stamp = Object.freeze({ format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at })
     this.#scope = CX.vaultScope.parse(parts)
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
@@ -828,28 +837,29 @@ export class Vault implements VaultStamp {
     this.#deviceId = born.record.device_id
     this.#snapshot = this.#picture(null)
     registerLeaseReader(this, () => this.#lease)
-    registerProvingInside(this, {
-      vaultRecord: () => this.#vaultRecord,
+    const tools: VaultPrivateTools = {
       keyDeriver:  this.#keyDeriver,
+      leaseMillis: this.#leaseMillis,
+      demand:      (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
+    }
+    registerProvingTools(this, {
+      ...tools,
+      vaultRecord: () => this.#vaultRecord,
       logger:      this.#logger,
-      leaseMillis: this.#leaseMillis,
       now:         () => this.#clockNow(),
-      deviceId:   () => this.#deviceId,
-      putLease:   (record) => this.#deviceDB.putLease(record),
-      holdLease:  (stored) => this.#holdLease(stored),
-      demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
+      deviceId:    () => this.#deviceId,
+      putLease:    (record) => this.#deviceDB.putLease(record),
+      holdLease:   (stored) => this.#holdLease(stored),
     })
-    this.#gatingInside = {
-      freshen:    async (gating) => await this.#freshen(gating),
-      putGate:    async (gate, call) => await this.#putGate(gate, call),
-      delVault:   async (proving) => await this.#delVault(proving),
-      afterDel:   async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
-      takeUp:     async (gating, renewMillis) => await this.#takeUpFromPantry(gating, renewMillis),
-      badOutcome: (thrown) => this.#badOutcome(thrown),
-      demand:     (thing, call, opts) => { this.#demand(thing, { call, firstGate: opts?.firstGate === true }) },
-      request:    this.#requestCleartext,
-      keyDeriver: this.#keyDeriver,
-      leaseMillis: this.#leaseMillis,
+    this.#gatingTools = {
+      ...tools,
+      freshen:     async (gating) => await this.#freshen(gating),
+      putGate:     async (gate, call) => await this.#putGate(gate, call),
+      delVault:    async (proving) => await this.#delVault(proving),
+      afterDel:    async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
+      takeUp:      async (gating, renewMillis) => await this.#takeUpFromPantry(gating, renewMillis),
+      badOutcome:  (thrown) => this.#badOutcome(thrown),
+      request:     this.#requestCleartext,
     }
     this.#takePicture({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
@@ -1089,7 +1099,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Demand]: checkStanding, demand, demandAfterWait, inconsistencyWith, leaseRefusal, demandLease, gatedProps
+  // == [Demand]: checkStanding, demand, demandAfterWait, inconsistencyWith, provingInconsistency, leaseRefusal, demandLease, gatedRecord
 
   /** Refuse once this Vault object is gone, 'vault_remade' for a vault made anew and 'vault_gone' otherwise: what every call asks first, and again after a wait it has no thing in hand for. */
   #checkStanding() {
@@ -1172,13 +1182,13 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Gating]: gating, gatingInside, ensureUnlocked, leaseStandsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
+  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseStandsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
 
   // The gating standing now, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
   #gating: RaisedGating | null = null
-  // What a gating reaches of this Vault object, which no getter shows: see GatingInside.
-  readonly #gatingInside: GatingInside
+  // What a gating reaches of this Vault object, which no getter shows: see GatingTools.
+  readonly #gatingTools: GatingTools
 
   /** Have the vault unlocked: at once while a lease of the ways in held stands past `renewMillis` from now, else once the gating standing or raised now settles.
    * See {@link Vault.ensureUnlocked}. An unlocking gating standing (`unlock_vault`,
@@ -1244,7 +1254,7 @@ export class Vault implements VaultStamp {
 
   /** Raise a gating of `gatingkind` for `call`, standing until it settles: with `renewMillis`, it consults this device's store first. */
   #raiseGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
-    const raised: RaisedGating = RaisedGating.raise(gatingkind, call, this, this.#gatingInside, () => {
+    const raised: RaisedGating = RaisedGating.raise(gatingkind, call, this, this.#gatingTools, () => {
       if (this.#gating === raised) { this.#gating = null }
     })
     this.#gating = raised
@@ -1318,7 +1328,7 @@ export class Vault implements VaultStamp {
     this.#demandAfterWait(written, gate, { call, firstGate: firstGate && ! written.ok })
     if (! written.ok) { throw this.#gateWriteRefusal(gate, written.err) }
     const next = frozenVaultRecord(written.val) as GatedVaultRecord
-    const stored = Gate.of(this, next, { keyDeriver: this.#keyDeriver })
+    const stored = Gate.of(next, { keyDeriver: this.#keyDeriver })
     this.#demand(stored, { call })
     // The picture takes it first, so the record raised after never outruns the picture.
     this.#takeOwnWrite(next)
