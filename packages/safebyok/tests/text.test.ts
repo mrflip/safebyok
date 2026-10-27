@@ -12,7 +12,7 @@ describe("codePointsOf", () => {
   })
 
   it("keeps a combining mark apart from the letter it follows, and a newline as any other", () => {
-    expect(codePointsOf('é\n')).to.deep.equal(['e', '́', '\n'])
+    expect(codePointsOf('e\u{301}\n')).to.deep.equal(['e', '\u{301}', '\n'])
   })
 
   it("makes nothing of the empty string", () => {
