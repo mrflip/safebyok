@@ -9,7 +9,6 @@ import { passphraseCleartext } from '../src/types/type-aliases'
 import { PasskeyProving, PassphraseProving, OutsideGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
-import { leaseRecordOf } from '../src/lease'
 import { heldLeaseOf } from '../src/held-lease'
 import * as TH from './test-helpers'
 import { makeRacingWorld, makeWorld, storedVaultRecordOf, vaultWithPasskey } from './vault/world'
@@ -243,7 +242,7 @@ describe("proving.grantLease", () => {
     const lease = await proving.grantLease()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(heldLeaseOf(vault)).to.eq(lease)
-    expect(leaseRecordOf(lease)).to.deep.eq(await world.getLease())
+    expect(await world.getLease()).to.deep.include(TH.shownOf(lease)).and.have.property('lease_key')
     expect(lease.gate_epoch).to.eq(stored.gate_epoch)
   })
 

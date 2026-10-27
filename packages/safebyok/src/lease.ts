@@ -72,9 +72,6 @@ export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, pu
   return cipherCtx([VaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
 }
 
-/** Reads a lease's record from inside this module, for {@link leaseRecordOf}: set once, by the class's static block. */
-let recordOf: (lease: Lease) => LeaseRecord
-
 /** This device's lease on one vault: the vaultKey wrapped under a leaseKey that never leaves this browser profile, and the instant it ends.
  * A lease is made once and never changed. Its own fields are its {@link LeaseSparse}, frozen: all
  * `{ ...lease }`, JSON and a log line show. `vault.demandConsistentWith` judges its scope,
@@ -131,10 +128,6 @@ export class Lease implements LeaseSparse {
     this.gate_epoch        = record.gate_epoch
     this.ask_passphrase_at = record.ask_passphrase_at
     Object.freeze(this)
-  }
-
-  static {
-    recordOf = (lease) => lease.#record
   }
 
   /** The lease a stored record stands for on `vault`; refuses 'corrupt_record' for one this package does not write, or another vault's.
@@ -272,13 +265,6 @@ export class Lease implements LeaseSparse {
     return boxCtxOf(this.#vault, { ...visible, vault_tok: this.vault_tok }, purpose)
   }
 }
-
-/** The record `lease` stands for, frozen, its leaseKey and wrapped vaultKey among it: for tests alone, which have no other way to it.
- * Nothing in `src/` calls it, and nothing should: a Lease shows no getter, field or JSON of its
- * record, so whatever holds one cannot unwrap the vaultKey extractable, and the package's entry
- * points export none of this.
- */
-export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
 
 /** A lease record wrapping `vaultKey` under a new non-extractable leaseKey, granted under `held`, the vault record held.
  * `vaultKey` is the one a proving just unwrapped from `held`'s gate. The wrap binds `held`'s stamp,
