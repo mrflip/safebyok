@@ -50,8 +50,7 @@ const zodLiteralShape = ({ def }: ZodLike): Shape | null => {
   return { kind: 'literal', values: values.map(String).toSorted((one, two) => one.localeCompare(two)) }
 }
 
-/**
- * What the core checks, as Convex can check it. Refinements (min, max, regex, int, a record's rule
+/** What the core checks, as Convex can check it. Refinements (min, max, regex, int, a record's rule
  * across its fields) are set aside: Convex has none. A custom check is any value, and a transform
  * or a frozen copy is what it takes in.
  */
