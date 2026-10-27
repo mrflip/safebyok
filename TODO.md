@@ -109,6 +109,16 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the
   passphrase (`vault.del()`).
 
+* **After the restyle (#273 to #283): three later changes.** Each changes a signature or a
+  refusal, so each waited for its own PR. `Box.seal` still takes the two epochs from its caller,
+  unchecked; reading them from the vault's own record drops the argument. The server's
+  `getVaultRecords` and `getVault` now answer alike, and could fold into `getVault` and
+  `ensureVault`. A `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin
+  summary with `vault_tok`, where the snapshot shows each way in as its sparse shape.
+* **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
+  labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from
+  a vault. The code stays until the box-limit code is next touched; then drop it.
+
 ## Soonish
 
 Wanted; each has a design question to settle first, named here.
@@ -339,6 +349,13 @@ every call. `leaseHours` keeps its floor above zero, and a `renewMinutes` as lon
 refuses `bad_option`; today the host calls `lock()` once done. Decide how a host says "ask every
 time", and what a lease of no length means for the device store.
 
+### What "rollback" means
+
+The Coach (2026-10-26), on strict device records losing the rollback watermark: "We have a lot of
+things surrounding the very muddy meaning of rollback." The watermark, the device-record format
+rule in VAULTDB.md (#279), the vault epoch and `stale_write` each guard a different "going
+backwards". Settle one definition, say which mechanism guards which case, and name each for it.
+
 ## Potential Optimizations
 
 ### A storage read begun before a create can undo it
@@ -358,6 +375,16 @@ vault it made stands, and the next read takes it up. The Coach (2026-10-21):
 
 For now: "apologize for bad UX, keep control flow clean". The core stays hello, then unlock, then
 the operation, with no re-fetch; the refusal says what happened and to unlock again.
+
+## Optimizations
+
+### Improve tree shaking
+
+Since the restyle moved the core to classic Zod (#274), small entries carry all of it for a handful
+of checks: the mask entry grew from about 6 to 25 kB brotlied, and fastkey's WASM deriver from 16
+to 35 kB. Inside an app that loads the Bank, Zod is shared and costs nothing more. Using
+`zod/mini` selectively, in those entries alone, could slim them. The Coach (2026-10-26): if it
+raised the standard bundle (an app loading the Bank) overall, it is not worth it.
 
 ## The react lifecycle
 
