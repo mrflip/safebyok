@@ -29,7 +29,7 @@ import type { JSONValue, Value } from 'convex/values'
  *   const host = app.defineModules({ safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId }) })
  *   const deployment = fakeDeployment(host)
  *   const client = deployment.client('u1')
- *   await client.query(deployment.api.safebyok.getVault, { scope })
+ *   await client.query(deployment.api.safebyok.getVault, { ...scope })
  *   await deployment.close()
  *
  * @example

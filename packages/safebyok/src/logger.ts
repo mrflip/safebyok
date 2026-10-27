@@ -1,5 +1,5 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { Validator } from './checks/validator'
 import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
@@ -38,9 +38,11 @@ export type VaultLogger = {
 export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
 export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 
-const loggerCall = Z.custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
-/** What a VaultLogger must carry. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
-const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerCall })
+/** What a VaultLogger must carry, refusing 'bad_option'. Checked only: what Bank.make keeps calls the host's own, `this` and all. */
+const { loggerShape } = Validator('bad_option', ({ obj, custom }) => {
+  const loggerCall = custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
+  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }) }
+})
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
 // of reach, so that no logger can claim to be guarded, by a property it carries or inherits.

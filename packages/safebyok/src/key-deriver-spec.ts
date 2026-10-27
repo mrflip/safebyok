@@ -1,5 +1,6 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { Validator } from './checks/validator'
+import type { KeyDeriver } from './key-deriver'
 
 /** A keyDeriverSpec: Argon2id's whole parameter set, under the keyDeriverLabel a vault records.
  * A vault stores only the label, so a label must always mean the same parameters: change one and
@@ -73,6 +74,18 @@ export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown
   }
 }
 
+/** Run `keyDeriver`'s `load`, if it has one: what `bank.hello()` does before any vault is born. Its failure is 'unexpected_error', what it threw the cause, as a load hears no passphrase.
+ *
+ * @example await loadKeyDeriver(argon2idWebV1Deriver)   // resolves at once: it carries no load
+ */
+export const loadKeyDeriver = async (keyDeriver: Pick<KeyDeriver, 'load'>): Promise<void> => {
+  try {
+    await keyDeriver.load?.()
+  } catch (err) {
+    throw new VaultError('unexpected_error', "The keyDeriver's load() failed, so no passphrase could be turned into a key, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause: check that your build ships what the deriver loads and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause: err })
+  }
+}
+
 /** Refuse 'bad_option' for a passphraseSalt that is not `spec.salt_bytes` long, never quoting it: a deriver's check before it derives.
  * So a damaged stored salt fails with a kind, not as the library's plain Error.
  *
@@ -97,16 +110,19 @@ const MinMemoryKibPerLane = 8
 /** One past the largest 32-bit unsigned integer, Argon2's bound on its counts. */
 const Uint32Bound = 2 ** 32
 
-// Marked pure, so a bundler drops it from an app that imports only argon2idWebV1Deriver.
-const keyDeriverSpec = /* @__PURE__ */ Z.object({
-  algorithm:         Z.literal('argon2id'),
-  key_deriver_label: Z.string().check(Z.minLength(1)),
-  memory_kib:        Z.int().check(Z.gte(MinMemoryKibPerLane), Z.lte(MaxMemoryKib)),
-  iterations:        Z.int().check(Z.gte(1), Z.lt(Uint32Bound)),
-  parallelism:       Z.int().check(Z.gte(1)),
-  salt_bytes:        Z.int().check(Z.gte(MinArgon2SaltBytes), Z.lte(MaxSaltBytes)),
-  output_bytes:      Z.literal(PassphraseKeyBytes),
-}).check(Z.refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }))
+// Marked pure, and read only inside parseKeyDeriverSpec, so a bundler drops it, and Zod with it,
+// from an app that imports only argon2idWebV1Deriver: a destructured or exported member would keep it.
+const SpecChecks = /* @__PURE__ */ Validator('bad_option', ({ obj, str, int, lit }) => ({
+  keyDeriverSpec: obj({
+    algorithm:         lit('argon2id'),
+    key_deriver_label: str.min(1),
+    memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
+    iterations:        int.gte(1).lt(Uint32Bound),
+    parallelism:       int.gte(1),
+    salt_bytes:        int.gte(MinArgon2SaltBytes).lte(MaxSaltBytes),
+    output_bytes:      lit(PassphraseKeyBytes),
+  }).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }),
+}))
 
 /** What each of a spec's fields must be, as a refusal says it: never quoting what was handed in. */
 const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
@@ -138,7 +154,7 @@ const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
  *   // throws 'bad_option': that label is reserved
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
-  const checked = keyDeriverSpec.safeParse(candidate)
+  const checked = SpecChecks.keyDeriverSpec.safeParse(candidate)
   if (! checked.success) {
     const field = checked.error.issues[0]?.path[0]
     const limit = (typeof field === 'string' && Object.hasOwn(SpecLimitForField, field))

@@ -1,5 +1,5 @@
 import { VaultError, type RefusalMeta } from './errors'
-import type { Capacity } from './types'
+import type { Capacity } from './types/types'
 
 /** The refusals a storage adapter throws, with the core's own messages: throw these rather than copying its words.
  * Import it whole: `import { Refusals } from 'safebyok'`, then `throw Refusals.vaultMismatch()`.
@@ -26,7 +26,7 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
 )
 
-/** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault props' {@link staleVaultProps}. */
+/** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
 export const StaleWriteVals = ['del'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
@@ -45,7 +45,7 @@ export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stal
 
 /** A `stale_write` refusal of a box write, carrying what stands under its boxlabel as `meta.box_stored`. Throw it from `doPutBox`.
  * The `VaultDB` base class checks `boxStored` as `getBox` checks a record, so a caller meets a
- * box, a `DamagedBox` or null. A `stale_write` from `doPutBox` carrying no `box_stored` is
+ * box, a `BoxDamaged` or null. A `stale_write` from `doPutBox` carrying no `box_stored` is
  * refused as `corrupt_record`.
  *
  * @param boxStored - The record under the boxlabel, exactly as stored and damaged or not, read in
@@ -61,28 +61,28 @@ export const staleBox = (boxStored: unknown): VaultError => (
 /** What a box write's `stale_write` says. */
 export const StaleBoxMessage = "That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
 
-/** A `stale_write` refusal of an update of the vault props, carrying the vault props standing as `meta.vault_props_stored`. Throw it from `doPutVaultProps`.
- * The `VaultDB` base class checks `vaultPropsStored` as `getVault` checks vault props, so a
- * caller meets sound vault props or null; damaged ones refuse as a read of them would. A
- * `stale_write` from `doPutVaultProps` carrying no `vault_props_stored` is refused as
+/** A `stale_write` refusal of an update of the vault record, carrying the vault record standing as `meta.vault_stored`. Throw it from `doPutVaultRecord`.
+ * The `VaultDB` base class checks `vaultStored` as `getVault` checks a vault record, so a
+ * caller meets a sound vault record or null; a damaged one refuses as a read of it would. A
+ * `stale_write` from `doPutVaultRecord` carrying no `vault_stored` is refused as
  * `corrupt_record`.
  *
- * @param vaultPropsStored - The vault props record exactly as stored, read in the same atomic step
+ * @param vaultStored - The vault record exactly as stored, read in the same atomic step
  *   that refused the write; null for none.
  *
- * @example throw Refusals.staleVaultProps(standingRow ?? null)
+ * @example throw Refusals.staleVaultRecord(standingRow ?? null)
  */
-export const staleVaultProps = (vaultPropsStored: unknown): VaultError => (
+export const staleVaultRecord = (vaultStored: unknown): VaultError => (
   // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
-  new VaultError('stale_write', StaleVaultPropsMessage, { meta: { vault_props_stored: vaultPropsStored as Exclude<RefusalMeta['vault_props_stored'], undefined> } })
+  new VaultError('stale_write', StaleVaultRecordMessage, { meta: { vault_stored: vaultStored as Exclude<RefusalMeta['vault_stored'], undefined> } })
 )
 
-/** What an update of the vault props' `stale_write` says. */
-export const StaleVaultPropsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_props_stored: read the vault again before retrying."
+/** What an update of the vault record's `stale_write` says. */
+export const StaleVaultRecordMessage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_stored: read the vault again before retrying."
 
-/** A `vault_mismatch` refusal of a box read or write, for vault props that are not the ones it expects. Throw it from `doGetBox` or `doPutBox`.
- * None stand, or they have another `vault_tok`. It carries nothing of the props that stand, as they
- * hold every wayin.
+/** A `vault_mismatch` refusal of a box read or write, for a vault record that is not the one it expects. Throw it from `doGetBox` or `doPutBox`.
+ * None stands, or it has another `vault_tok`. It carries nothing of the record that stands, as it
+ * holds every wayin.
  *
  * @example throw Refusals.vaultMismatch()
  */

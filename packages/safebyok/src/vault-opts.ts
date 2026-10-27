@@ -1,40 +1,49 @@
-import * as Z from 'zod/mini'
-import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, StaleMinutes, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
-import type { VaultValidators } from './validators'
-import { VaultError, listedKindOf } from './errors'
+import type * as Z from 'zod'
+import { type Clock, type VaultScope, MaxWhisperBytes, MaxLeaseHours, LeaseHours, StaleMinutes, wallClock, MaxBoxes } from './types/types'
+import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from './consts'
+import { VaultError, isVaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
 import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthChecker, guardStrengthChecker, strengthChecker } from './passphrase-strength'
-import { InEnglish, issuesText } from './options'
-import * as Names from './names'
+import * as CX from './checks/core-checks'
+import { Validator, sayable } from './checks/validator'
 import type { Gating, RequestCleartext } from './gating'
 
 /** The type of {@link MakeBankOpts.onBadNews}: told each piece of bad news, and never awaited. */
 export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 
-/** The options `Bank.make` takes: the app, the stores its vaults live in by default, the libraries they share, and how they behave.
+/** The options `Bank.make` takes: the app and the signed-in user, the stores their vaults live in by default, the libraries they share, and how they behave.
  * `Bank.make` refuses ('bad_option') an option it does not take, and one out of its range or of
- * the wrong type; `applabel` refuses 'bad_label' instead. Each refusal names the option, never
- * its value. Each vault is then named by a {@link VaultDraft}.
+ * the wrong type; `applabel` and `user_id` refuse 'bad_scope' instead. Each refusal names the
+ * option, never its value. Each vault is then named by its `vaultlabel`, its own stores, if any,
+ * in a {@link BankVaultOpts}.
  */
 export type MakeBankOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
   applabel:   string
-  /** Where each vault is stored, unless its {@link VaultDraft} names another. */
+  /** The signed-in user's stable, opaque id from the host's auth: never an email or a handle, which can change and would orphan the vault.
+   * It is 1 to 100 ASCII letters, digits and `-_.~:@+|%`, never dots alone, as the exported
+   * `user_id` checks: percent-encode (RFC 3986) one that holds anything else. A bank serves this
+   * one user: make a bank as the user signs in, and drop it, with every Vault object it handed
+   * out, as they sign out.
+   */
+  user_id:    string
+  /** Where each vault is stored, unless its {@link BankVaultOpts} names another. */
   vaultDB:    VaultDB
-  /** What this device keeps of each vault, unless its {@link VaultDraft} names another: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
+  /** What this device keeps of each vault, unless its {@link BankVaultOpts} names another: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
   deviceDB:   DeviceDB
   /** What turns a passphrase into passphraseKey bytes: in a browser, the pinned Argon2id deriver `browserOpts()` supplies.
-   * See {@link KeyDeriver} for the narrow reasons to substitute.
+   * See {@link KeyDeriver} for the narrow reasons to substitute. Make it once, before any bank,
+   * and hand the same one to each: its `load`, if it carries one, runs at each bank's `hello()`.
    */
   keyDeriver: KeyDeriver
   /** How many hours a proof's lease keeps the vault unlocked on this device, across reloads. Default: {@link LeaseHours}, 168 (seven days).
    * Any number above zero up to {@link MaxLeaseHours}, 588 (24.5 days), fractions too: 0.25 is
    * fifteen minutes. No timer reaches further. `Infinity` means never ask again on this device:
-   * the vault stays unlocked until `lock()`, or the vault changes under it, and `askPassphraseAt`
+   * the vault stays unlocked until `lock()`, or the vault changes under it, and `ask_passphrase_at`
    * reads as {@link FarFuture}.
    *
    * Lowering it takes hold on each device at the vault's next birth: a lease ending further off
@@ -94,13 +103,6 @@ export type MakeBankOpts = {
    * default whatever the adapter was given, pass `DefaultLogger`.
    */
   logger?: VaultLogger | null | undefined
-  /** The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each field given replaces ours, each left out keeps ours.
-   * Ours are `Label` and `UserId`, from `safebyok/validators`. Each is a Zod schema that checks
-   * synchronously, and only checks: what passes is kept exactly as given. The floor (`NameFloor`)
-   * holds beneath every one. A field the bag does not know refuses, a `note` among them: a box's
-   * sidecar is the host's to check.
-   */
-  validators?: VaultValidators | undefined
   /** The check every new passphrase must pass, as a {@link StrengthChecker}: in the `initialize_gate` gating that sets the first, and in each `change_passphrase`.
    * It runs before any key derivation, handed the passphrase and the vault's scope; never on a
    * passphrase that unlocks a vault that stands. A passphrase it finds weak refuses 'weak_passphrase', its
@@ -108,32 +110,26 @@ export type MakeBankOpts = {
    * must be chosen (CUSTOMIZATION.md). In a browser, `browserOpts()` supplies
    * `zxcvbnStrengthChecker`.
    *
-   * Its `load`, if any, runs at `bank.hello()`, and one that fails fails that hello: no vault is
-   * born until it succeeds. Each vault asks it as `vault.checkPassphrase(typed)`.
+   * Make it once, before any bank, and hand the same one to each. Its `load`, if any, runs at
+   * `bank.hello()`, and one that fails fails that hello: no vault is born until it succeeds. Each
+   * vault asks it as `vault.checkStrength(typed)`.
    * A checker that answers anything but a verdict refuses the call that asked it 'bad_option'; one
    * that throws, 'unexpected_error', carrying nothing of what it threw.
    */
   strengthChecker?: StrengthChecker | undefined
 }
 
-/** Which vault `bank.ensureVault` births: the user's, under its label, in the app the bank was made for; and the stores it lives in, where not the bank's.
- * It refuses 'bad_label' for a name that fails its check, and 'bad_option' for anything else
- * amiss, naming the field, never its value.
+/** A vault's own options, where they are not the bank's: the second bag `bank.ensureVault` and its siblings take, beside the one naming the vault.
+ * Left out, the bank's own. It refuses 'bad_option' for anything amiss, a field it does not take
+ * among them, naming the field, never its value.
  *
- * @example await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
+ * @example await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })
  */
-export type VaultDraft = {
-  /** The signed-in user's stable, opaque id from the host's auth: never an email or a handle, which can change and would orphan the vault.
-   * By default 1 to 100 ASCII letters, digits and `-_.:@+|`, as the exported `UserId` checks, or
-   * what `validators.userId` admits.
-   */
-  userId:     string
-  /** The vault's own label; an app that keeps one vault per user calls it `main`. */
-  vaultlabel: string
+export type BankVaultOpts = {
   /** Where this vault is stored, in place of the bank's `vaultDB`: the same object at every ask for the vault, as the bank compares stores by identity. */
-  vaultDB?:   VaultDB | undefined
+  vaultDB?:  VaultDB | undefined
   /** What this device keeps of this vault, in place of the bank's `deviceDB`: the same object at every ask, likewise. */
-  deviceDB?:  DeviceDB | undefined
+  deviceDB?: DeviceDB | undefined
 }
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
@@ -141,26 +137,34 @@ const isFunction = (candidate: unknown) => typeof candidate === 'function'
 /** True for any object but null, an array included. */
 export const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
 
-const anyOpt = Z.optional(Z.unknown())
-
-/** Every option Bank.make takes, each checked here or by a parse of its own: this check refuses any other. */
-const makeBankOptsShape = Z.strictObject({
-  applabel:               anyOpt,
-  vaultDB:                anyOpt,
-  deviceDB:               anyOpt,
-  keyDeriver:             anyOpt,
-  leaseHours:             anyOpt,
-  staleMinutes:           anyOpt,
-  onBadNews:              anyOpt,
-  requestCleartext:       anyOpt,
-  clock:                  anyOpt,
-  maxWhisperBytes:        anyOpt,
-  maxBoxes:               anyOpt,
-  logger:                 anyOpt,
-  validators:             anyOpt,
-  // A function default is read as the factory for one, so the default checker is handed back by one.
-  strengthChecker:        Z._default(Z.optional(strengthChecker), () => DefaultStrengthChecker),
-} satisfies Record<keyof MakeBankOpts, Z.core.SomeType>)
+/** Every option Bank.make takes, each checked here or by a parse of its own, and every field a {@link BankVaultOpts} holds, each likewise: each refuses any other, 'bad_option'.
+ * `makeBankOpts` checks `strengthChecker`, handing the default back in its place when left out.
+ */
+const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) => {
+  const anyOpt = unk.optional()
+  const makeBankOpts = obj({
+    applabel:               anyOpt,
+    user_id:                anyOpt,
+    vaultDB:                anyOpt,
+    deviceDB:               anyOpt,
+    keyDeriver:             anyOpt,
+    leaseHours:             anyOpt,
+    staleMinutes:           anyOpt,
+    onBadNews:              anyOpt,
+    requestCleartext:       anyOpt,
+    clock:                  anyOpt,
+    maxWhisperBytes:        anyOpt,
+    maxBoxes:               anyOpt,
+    logger:                 anyOpt,
+    // A function default is read as the factory for one, so the default checker is handed back by one.
+    strengthChecker:        strengthChecker.default(() => DefaultStrengthChecker),
+  } satisfies Record<keyof MakeBankOpts, Z.ZodType>).strict()
+  const bankVaultOpts = obj({
+    vaultDB:  anyOpt,
+    deviceDB: anyOpt,
+  } satisfies Record<keyof BankVaultOpts, Z.ZodType>).strict()
+  return { makeBankOpts, bankVaultOpts }
+})
 
 /** Each option Bank.make (or Vault.make, before it) once took under another name, and the name it takes now (notes/old_vocabulary.md). */
 const RenamedMakeBankOpts: ReadonlyMap<string, keyof MakeBankOpts> = new Map([
@@ -169,53 +173,85 @@ const RenamedMakeBankOpts: ReadonlyMap<string, keyof MakeBankOpts> = new Map([
 ])
 
 /** Bank.make's options with `strengthChecker` checked, or the default in its place; every other option as handed in, for its own parse.
- * Refuses 'bad_option' for an option Bank.make does not take, naming each, with the name a
- * renamed one goes by now, or the place a moved one goes; and for a `strengthChecker` that is not
- * one, in Zod's words.
+ * Refuses 'bad_option' for an option Bank.make does not take, naming each shaped as one of ours,
+ * with the name a renamed one goes by now, or the place a moved one goes; and for a
+ * `strengthChecker` that is not one.
  */
 export const checkMakeBankOpts = (opts: object) => {
-  const checked = makeBankOptsShape.safeParse(opts, InEnglish)
-  if (checked.success) { return checked.data }
-  const unknownCkeys = checked.error.issues.flatMap((issue) => (issue.code === 'unrecognized_keys' ? issue.keys : []))
-  const named = unknownCkeys.map((ckey) => {
-    const renamed = RenamedMakeBankOpts.get(ckey)
-    if (renamed !== undefined) { return `${ckey} (called ${renamed} now)` }
-    return DraftCkeys.has(ckey) ? `${ckey} (each vault's own: hand it to bank.ensureVault)` : ckey
-  })
-  if (unknownCkeys.length === 0) { throw new VaultError('bad_option', `Bank.make's ${issuesText(checked.error)}`) }
-  const takes = Object.keys(makeBankOptsShape.def.shape).join(', ')
-  throw new VaultError('bad_option', `Bank.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
+  const unknownCkeys = Object.keys(opts).filter((ckey) => ! Object.hasOwn(makeBankOpts.shape, ckey))
+  if (unknownCkeys.length > 0) {
+    const named = unknownCkeys.map((ckey) => {
+      const renamed = RenamedMakeBankOpts.get(ckey)
+      if (renamed !== undefined) { return `${ckey} (called ${renamed} now)` }
+      return ckey === 'vaultlabel' ? `${ckey} (each vault's own: hand it to bank.ensureVault)` : sayable(ckey)
+    })
+    const takes = Object.keys(makeBankOpts.shape).join(', ')
+    throw new VaultError('bad_option', `Bank.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
+  }
+  try {
+    return makeBankOpts.parse(opts)
+  } catch (err) {
+    if (! isVaultError(err, 'bad_option')) { throw err }
+    throw new VaultError('bad_option', `Bank.make's ${err.message}`, err.meta === undefined ? {} : { meta: err.meta })
+  }
 }
 
-/** The fields of a {@link VaultDraft}, which Bank.make names as each vault's own when handed one. */
-const DraftCkeys: ReadonlySet<string> = new Set(['userId', 'vaultlabel'])
-
-/** Every field a {@link VaultDraft} holds, each checked by a parse of its own: this check refuses any other. */
-const vaultDraftShape = Z.strictObject({
-  userId:     anyOpt,
-  vaultlabel: anyOpt,
-  vaultDB:    anyOpt,
-  deviceDB:   anyOpt,
-} satisfies Record<keyof VaultDraft, Z.core.SomeType>)
-
-/** `draft` as handed to `bank.ensureVault`, once a bag of no field it does not take: 'bad_option' otherwise, naming the field. */
-const checkVaultDraft = (draft: unknown): VaultDraft => {
-  if (! isBag(draft)) { throw new VaultError('bad_option', "bank.ensureVault takes the vault it births as one bag: { userId, vaultlabel }, and its own vaultDB or deviceDB where not the bank's.") }
-  const checked = vaultDraftShape.safeParse(draft, InEnglish)
-  if (checked.success) { return draft as VaultDraft }
-  throw new VaultError('bad_option', `bank.ensureVault's draft ${issuesText(checked.error)}: it takes userId, vaultlabel, vaultDB and deviceDB, and refuses any other rather than quietly ignore it.`)
+/** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise, naming the field where it is shaped as one of ours. Its stores are checked by {@link vaultPartsOf}. */
+const checkBankVaultOpts = (opts: unknown): BankVaultOpts => {
+  if (opts === undefined) { return {} }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "bank.ensureVault takes a vault's own options as a second bag, { vaultDB, deviceDB }, where they are not the bank's: leave it out for the bank's own.") }
+  try {
+    bankVaultOpts.parse(opts)
+    return opts
+  } catch (err) {
+    if (! isVaultError(err, 'bad_option')) { throw err }
+    throw new VaultError('bad_option', `In bank.ensureVault's options: ${err.message}. They take vaultDB and deviceDB, and refuse any other rather than quietly ignore it: the vault's vaultlabel goes in the first bag.`, err.meta === undefined ? {} : { meta: err.meta })
+  }
 }
 
-/** The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class. Checked only: Bank.make keeps the adapter. */
-const vaultDBShape = Z.object({
-  getVault:         Z.custom(isFunction),
-  ensureVault:      Z.custom(isFunction),
-  putVaultProps:    Z.custom(isFunction),
-  getBox:           Z.custom(isFunction),
-  putBox:           Z.custom(isFunction),
-  delBox:           Z.custom(isFunction),
-  delVault:         Z.custom(isFunction),
-  subscribe:        Z.custom(isFunction),
+/** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Bank.make reads it. */
+const UnlimitedBytes = Number.MAX_SAFE_INTEGER
+
+/** The most boxes the vault keeps as a limit: an adapter's `Infinity` becomes this as Bank.make reads it. */
+const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
+
+const HourMillis = 60 * MinuteMillis
+
+/** Bank.make's options and the adapters' declared limits, one validator each, every one refusing 'bad_option'; each parse below says what it is in its own words. Checked only, where an option is an object: Bank.make keeps what it was handed, prototype and all. */
+const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, custom, lit, str, num, int }) => {
+  const verb = custom(isFunction)
+  // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
+  const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))
+  // A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps.
+  const declaredBoxes = union([int.positive(), lit(Infinity)]).transform((count) => Math.min(count, UnlimitedBoxes))
+  // A lease in hours, above zero and at most MaxLeaseHours, or `Infinity`, which becomes ForeverMillis.
+  const someHours = union([num.positive().lte(MaxLeaseHours), lit(Infinity)])
+  const leaseHoursAsMillis = someHours.default(LeaseHours).transform((hours) => (hours === Infinity ? ForeverMillis : Math.round(hours * HourMillis))).pipe(num.gte(1))
+  // Minutes, zero or more, or `Infinity`, which becomes ForeverMillis.
+  const someMinutes = union([num.gte(0), lit(Infinity)])
+  const minutesToMillis = (minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis))
+  return {
+    // The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class.
+    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultRecord: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, subscribe: verb }),
+    deviceDBShape:        obj({ getLease: verb, putLease: verb, delLease: verb, getDeviceRecord: verb, raiseDeviceRecord: verb, delDeviceRecord: verb, delAll: verb }),
+    maxWhisperBytes:      int.positive().default(MaxWhisperBytes),
+    maxBoxes:             int.positive().optional(),
+    declaredBytes,
+    declaredBoxes,
+    leaseHoursAsMillis,
+    staleMinutesAsMillis: someMinutes.default(StaleMinutes).transform(minutesToMillis),
+    renewMinutesAsMillis: someMinutes.default(0).transform(minutesToMillis),
+    clockShape:           obj({ now: custom<Clock['now']>(isFunction) }),
+    // A clock reading Bank.make accepts: epoch milliseconds from FarPast to FarFuture, a fraction allowed.
+    clockReading:         num.gte(FarPast).lte(FarFuture),
+    keyDeriverShape:      obj({
+      algorithm:         str.optional(),
+      key_deriver_label: str.min(1),
+      salt_bytes:        int.gte(1).lte(MaxSaltBytes),
+      deriveKeyBytes:    custom<KeyDeriver['deriveKeyBytes']>(isFunction),
+      load:              custom<KeyDeriver['load']>(isFunction).optional(),
+    }),
+  }
 })
 
 /** `candidate`, once it is a {@link VaultDB} carrying its verbs: 'bad_option' otherwise. */
@@ -225,17 +261,6 @@ export const parseVaultDB = (candidate: VaultDB): VaultDB => {
   }
   return candidate
 }
-
-/** What a DeviceDB must carry. Checked only: Bank.make keeps the device store it was handed. */
-const deviceDBShape = Z.object({
-  getLease: Z.custom(isFunction),
-  putLease: Z.custom(isFunction),
-  delLease: Z.custom(isFunction),
-  getDeviceRecord:   Z.custom(isFunction),
-  raiseDeviceRecord: Z.custom(isFunction),
-  delDeviceRecord:   Z.custom(isFunction),
-  delAll:   Z.custom(isFunction),
-})
 
 /** `candidate`, once it carries a {@link DeviceDB}'s verbs: 'bad_option' otherwise. */
 export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
@@ -254,9 +279,8 @@ export const StoredBytesPerWhisperByte = 2
 
 /** The room Bank.make plans for a box's stored fields besides its whisper and sidecar, in bytes of their JSON.
  * It is what Bank.make counts when it checks that `maxBoxes` boxes fit the storage's
- * `maxVaultBytes`. Under the default validators, the fields at their largest, the scope and
- * boxlabel included, take under 1000. A host's validators may admit longer names, so each store
- * also weighs its box as it is ({@link BoxFixedBytes}): this is only the plan.
+ * `maxVaultBytes`. The fields at their largest, the scope and boxlabel included, take under
+ * 1000. Each store also weighs its box as it is ({@link BoxFixedBytes}): this is only the plan.
  */
 export const BoxFieldsBytes = 1024
 
@@ -266,49 +290,12 @@ export const BoxFieldsBytes = 1024
  */
 export const BoxFixedBytes = 512
 
-const maxWhisperBytes = Z._default(Z.int().check(Z.positive()), MaxWhisperBytes)
-
-const maxBoxes = Z.optional(Z.int().check(Z.positive()))
-
-/** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Bank.make reads it. */
-const UnlimitedBytes = Number.MAX_SAFE_INTEGER
-
-/** A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps. */
-const someBytes = Z.union([Z.number().check(Z.positive()), Z.literal(Infinity)])
-
-const bytesKept = Z.transform((bytes: number) => Math.min(bytes, UnlimitedBytes))
-
-const byteLimit = Z.number().check(Z.positive(), Z.lte(UnlimitedBytes))
-
-const declaredBytes = Z.pipe(Z.pipe(someBytes, bytesKept), byteLimit)
-
-/** The most boxes the vault keeps as a limit: an adapter's `Infinity` becomes this as Bank.make reads it. */
-const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
-
-/** A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps. */
-const someBoxes = Z.union([Z.int().check(Z.positive()), Z.literal(Infinity)])
-
-const declaredBoxes = Z.pipe(someBoxes, Z.transform((count: number) => Math.min(count, UnlimitedBoxes)))
-
 /** How Bank.make reads each limit an adapter declares. */
 const DeclaredLimitFor = {
   maxRecordBytes: declaredBytes,
   maxVaultBytes:  declaredBytes,
   maxBoxes:       declaredBoxes,
 } as const
-
-const HourMillis = 60 * MinuteMillis
-
-/** A lease in hours, above zero and at most {@link MaxLeaseHours}, or `Infinity`, which becomes {@link ForeverMillis}. */
-const someHours = Z.union([Z.number().check(Z.positive(), Z.lte(MaxLeaseHours)), Z.literal(Infinity)])
-
-const leaseHoursOrDefault = Z._default(someHours, LeaseHours)
-
-const hoursToMillis = Z.transform((hours: number) => (hours === Infinity ? ForeverMillis : Math.round(hours * HourMillis)))
-
-const someMillis = Z.number().check(Z.gte(1))
-
-const leaseHoursAsMillis = Z.pipe(Z.pipe(leaseHoursOrDefault, hoursToMillis), someMillis)
 
 /** `leaseHours`, or its default, in the whole milliseconds the vault keeps: 'bad_option' out of range. */
 export const parseLeaseHours = (candidate: number | undefined): number => {
@@ -318,13 +305,6 @@ export const parseLeaseHours = (candidate: number | undefined): number => {
   }
   return checked.data
 }
-
-/** Minutes, zero or more, or `Infinity`, which becomes {@link ForeverMillis}. */
-const someMinutes = Z.union([Z.number().check(Z.gte(0)), Z.literal(Infinity)])
-
-const minutesToMillis = Z.transform((minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis)))
-
-const staleMinutesAsMillis = Z.pipe(Z._default(someMinutes, StaleMinutes), minutesToMillis)
 
 /** `staleMinutes`, as Bank.make or `hello()` is handed it, in the milliseconds the vault keeps: 'bad_option', naming `where`, out of range.
  *
@@ -337,8 +317,6 @@ export const parseStaleMinutes = (candidate: unknown, where: 'Bank.make' | 'hell
   }
   return checked.data
 }
-
-const renewMinutesAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
 
 /** `ensureUnlocked()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
 export const parseRenewMinutes = (candidate: unknown): number => {
@@ -386,14 +364,6 @@ export const parseRequestCleartext = (candidate: unknown, logger: VaultLogger): 
 /** The refusal of a call whose `requestCleartext` threw: nothing of the throw, which may quote the passphrase. */
 const requestThrewError = () => new VaultError('unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
 
-/** What a Clock must carry: a `now()` function. */
-const clockShape = Z.object({
-  now: Z.custom<Clock['now']>((candidate) => typeof candidate === 'function'),
-})
-
-/** A clock reading Bank.make accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
-const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
-
 /** The host's clock, or the wall clock when left out, checked by one reading: 'bad_option' for one with no `now()`, that throws, or that reads outside 1981 to 2255. */
 export const parseClock = (candidate: Clock | undefined): Clock => {
   if (candidate === undefined) { return wallClock }
@@ -438,14 +408,6 @@ export const parseMaxBoxes = (candidate: number | undefined, storeBoxes: number)
   return checked.data
 }
 
-/** What a KeyDeriver must carry. Checked only: Bank.make keeps the deriver it was handed, prototype and all. */
-const keyDeriverShape = Z.object({
-  algorithm:         Z.optional(Z.string()),
-  key_deriver_label: Z.string().check(Z.minLength(1)),
-  salt_bytes:        Z.int().check(Z.gte(1), Z.lte(MaxSaltBytes)),
-  deriveKeyBytes:    Z.custom<KeyDeriver['deriveKeyBytes']>((candidate) => typeof candidate === 'function'),
-})
-
 /** `candidate` as the KeyDeriver a vault keeps, once it passes: 'bad_option' otherwise.
  * It needs the shape of a deriver, a label that is not safebyok's to reserve, and, for one
  * declaring `algorithm: 'argon2id'`, a whole spec Argon2id can run. A test deriver's label warns
@@ -456,7 +418,7 @@ export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: Vault
     throw new VaultError('bad_option', "Bank.make needs a keyDeriver: in a browser, spread browserOpts() from 'safebyok/browser' into its options.")
   }
   if (! keyDeriverShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: it needs a key_deriver_label, a salt_bytes from 1 to 65536 and a deriveKeyBytes function.')
+    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: it needs a key_deriver_label, a salt_bytes from 1 to 65536 and a deriveKeyBytes function, and its load, if it carries one, is a function too.')
   }
   // A deriver declaring Argon2id must be one Argon2id can run: its refusal here, with a kind, is
   // the one it would otherwise make at the first unlock, as a plain Error from the library.
@@ -482,25 +444,25 @@ export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof Declared
  *
  * @returns The most the adapter holds of one vault, in the finite form the vault keeps.
  */
-export const checkLimitsFit = (vaultDB: VaultDB, whisperByteLimit: number, boxLimit: number): number => {
+export const checkLimitsFit = (vaultDB: VaultDB, limits: { maxWhisperBytes: number, maxBoxes: number }): number => {
   const recordBytes = parseDeclared(vaultDB, 'maxRecordBytes')
-  if (whisperByteLimit * StoredBytesPerWhisperByte > recordBytes) {
+  if (limits.maxWhisperBytes * StoredBytesPerWhisperByte > recordBytes) {
     throw new VaultError('bad_option', `maxWhisperBytes is over half of the ${String(recordBytes)} bytes this storage adapter holds in one record, so a whisper that large might not store: pass a smaller maxWhisperBytes.`)
   }
   const vaultBytes = parseDeclared(vaultDB, 'maxVaultBytes')
-  const boxBytes = (whisperByteLimit * StoredBytesPerWhisperByte) + BoxFieldsBytes
-  if (boxLimit * boxBytes <= vaultBytes) { return vaultBytes }
+  const boxBytes = (limits.maxWhisperBytes * StoredBytesPerWhisperByte) + BoxFieldsBytes
+  if (limits.maxBoxes * boxBytes <= vaultBytes) { return vaultBytes }
   const fitting = Math.floor(vaultBytes / boxBytes)
   const outcome = fitting === 0
     ? 'At that maxWhisperBytes, not even one box fits: pass a smaller maxWhisperBytes.'
     : `At that maxWhisperBytes, at most ${String(fitting)} boxes fit: pass a smaller maxBoxes or maxWhisperBytes.`
-  throw new VaultError('bad_option', `${String(boxLimit)} boxes (maxBoxes) of up to ${String(whisperByteLimit)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
+  throw new VaultError('bad_option', `${String(limits.maxBoxes)} boxes (maxBoxes) of up to ${String(limits.maxWhisperBytes)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
 }
 
 /** Bank.make's options as {@link parseMakeBankOpts} hands them back: each checked, and read into the form the bank keeps for its vaults. */
 export type ParsedBankOpts = {
   applabel:         string
-  rules:            Names.NameRules
+  user_id:          string
   vaultDB:          VaultDB
   deviceDB:         DeviceDB
   leaseMillis:      number
@@ -512,7 +474,7 @@ export type ParsedBankOpts = {
   keyDeriver:       KeyDeriver
   /** The host's checker, checked: each vault guards it under its own scope. */
   strengthChecker:  StrengthChecker
-  whisperByteLimit: number
+  maxWhisperBytes:  number
   /** `maxBoxes` as given, held to each vault's vaultDB at its birth. */
   maxBoxes:         number | undefined
 }
@@ -520,17 +482,16 @@ export type ParsedBankOpts = {
 /** Bank.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take or out of range, and
- * 'bad_label' for an `applabel` that fails its `validators`. The limits are held to the default
- * `vaultDB`'s here, and to a draft's own at its birth.
+ * 'bad_scope' for an `applabel` that is not a label or a `user_id` that fails its check. The
+ * limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
  *
- * @example const { applabel, leaseMillis } = parseMakeBankOpts(opts)
+ * @example const { applabel, user_id, leaseMillis } = parseMakeBankOpts(opts)
  */
 export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   checkSecureContext()
-  if (! isBag(opts)) { throw new VaultError('bad_option', "Bank.make takes one bag of options: applabel, vaultDB, deviceDB and keyDeriver at least.") }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "Bank.make takes one bag of options: applabel, user_id, vaultDB, deviceDB and keyDeriver at least.") }
   const shaped = checkMakeBankOpts(opts)
-  const rules = Names.rulesOf(opts.validators)
-  const applabel = Names.check(rules, 'applabel', opts.applabel)
+  const { applabel, user_id } = CX.bankScope.parse(opts)
   const vaultDB = parseVaultDB(opts.vaultDB)
   const deviceDB = parseDeviceDB(opts.deviceDB)
   const leaseMillis = parseLeaseHours(opts.leaseHours)
@@ -541,39 +502,39 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
   const requestCleartext = parseRequestCleartext(opts.requestCleartext, logger)
   const clock = parseClock(opts.clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
-  const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
+  const limits = { maxWhisperBytes: parseMaxWhisperBytes(opts.maxWhisperBytes), maxBoxes: opts.maxBoxes }
   // Held to the default vaultDB now, so misuse is refused at Bank.make, not at the first birth.
-  limitsOf(vaultDB, whisperByteLimit, opts.maxBoxes)
-  return { applabel, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, whisperByteLimit, maxBoxes: opts.maxBoxes }
+  limitsOf(vaultDB, limits)
+  return { applabel, user_id, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, requestCleartext, logger, clock, keyDeriver, strengthChecker: shaped.strengthChecker, maxWhisperBytes: limits.maxWhisperBytes, maxBoxes: limits.maxBoxes }
 }
 
 /** What each vault is made of: the bank's parts, its own scope and stores, and its limits as held to its own vaultDB. */
-export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'strengthChecker' | 'maxBoxes'> & {
+export type VaultParts = Omit<ParsedBankOpts, 'applabel' | 'user_id' | 'strengthChecker' | 'maxBoxes'> & {
   scope:            VaultScope
   strengthChecker:  GuardedStrengthChecker
-  boxLimit:         number
-  vaultByteLimit:   number
+  /** The most boxes the vault holds: `maxBoxes` as given, or its default, held to the vaultDB's own. */
+  maxBoxes:         number
+  /** The most bytes the vaultDB holds of the vault, in the finite form the vault keeps. */
+  maxVaultBytes:    number
 }
 
-/** The parts of the vault `draft` names, under `bank`, checked before storage is touched: 'bad_label' for a name that fails its check, 'bad_option' for anything else.
+/** The parts of the vault in `scope`, a scope of `bank`'s checked by the bank, under `bank`, with its own options `opts` checked before storage is touched: 'bad_option' for anything amiss in them.
  *
- * @example const { scope } = parseVaultDraft({ userId: 'u1', vaultlabel: 'main' }, bank)   // scope: { applabel, user_id: 'u1', vaultlabel: 'main' }
+ * @example const { vaultDB } = vaultPartsOf(bank, scope, { vaultDB: workVaultDB })   // the work vault's own store, its limits held to it
  */
-export const parseVaultDraft = (draft: VaultDraft, bank: ParsedBankOpts): VaultParts => {
-  const checked = checkVaultDraft(draft)
-  const scope = Names.checkScope(bank.rules, { applabel: bank.applabel, user_id: checked.userId, vaultlabel: checked.vaultlabel })
+export const vaultPartsOf = (bank: ParsedBankOpts, scope: VaultScope, opts: BankVaultOpts | undefined): VaultParts => {
+  const checked = checkBankVaultOpts(opts)
   const vaultDB = checked.vaultDB === undefined ? bank.vaultDB : parseVaultDB(checked.vaultDB)
   const deviceDB = checked.deviceDB === undefined ? bank.deviceDB : parseDeviceDB(checked.deviceDB)
-  const { boxLimit, vaultByteLimit } = limitsOf(vaultDB, bank.whisperByteLimit, bank.maxBoxes)
-  const { applabel: _applabel, maxBoxes: _maxBoxes, ...shared } = bank
-  return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), boxLimit, vaultByteLimit }
+  const limits = limitsOf(vaultDB, bank)
+  const { applabel: _applabel, user_id: _user_id, maxBoxes: _maxBoxes, ...shared } = bank
+  return { ...shared, scope, vaultDB, deviceDB, strengthChecker: guardStrengthChecker(bank.strengthChecker, scope), maxBoxes: limits.maxBoxes, maxVaultBytes: limits.maxVaultBytes }
 }
 
-/** The box and byte limits a vault keeps over `vaultDB`: `maxBoxes` given, or the default, held with `whisperByteLimit` to what the adapter declares. */
-const limitsOf = (vaultDB: VaultDB, whisperByteLimit: number, maxBoxesGiven: number | undefined) => {
-  const boxLimit = parseMaxBoxes(maxBoxesGiven, parseDeclared(vaultDB, 'maxBoxes'))
-  const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { boxLimit, vaultByteLimit }
+/** The box and byte limits a vault keeps over `vaultDB`: `given.maxBoxes`, or the default, held with `given.maxWhisperBytes` to what the adapter declares. */
+const limitsOf = (vaultDB: VaultDB, given: Pick<ParsedBankOpts, 'maxWhisperBytes' | 'maxBoxes'>): Pick<VaultParts, 'maxBoxes' | 'maxVaultBytes'> => {
+  const boxes = parseMaxBoxes(given.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
+  return { maxBoxes: boxes, maxVaultBytes: checkLimitsFit(vaultDB, { maxWhisperBytes: given.maxWhisperBytes, maxBoxes: boxes }) }
 }
 
 /** Refuse ('insecure_context') a page the platform says is not a secure context, where a browser withholds WebCrypto.

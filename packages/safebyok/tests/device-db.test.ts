@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deviceOutcomeOf, deviceRecordFor, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
+import { deviceOutcomeOf, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions, memoryDeviceDB, raisedDeviceRecord, type DeviceDB } from '../src/device-db'
 import { VaultError } from '../src/errors'
-import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types'
+import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types/types'
 import * as TH from './test-helpers'
 
 TH.describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
@@ -30,8 +30,8 @@ describe("memoryDeviceDB", () => {
     expect(await memoryDeviceDB().getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
   })
 
-  it("refuses a scope whose name holds the ckey delimiter as a bad Outcome of 'bad_label', never a rejection", async () => {
-    await TH.expectBad(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_label')
+  it("refuses a scope whose name holds the ckey delimiter as a bad Outcome of 'bad_scope', never a rejection", async () => {
+    await TH.expectBad(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
   })
 })
 
@@ -52,6 +52,11 @@ describe("raisedDeviceRecord", () => {
       .to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 4 }))
   })
 
+  it("throws 'bad_record' rather than raise a stored record to an epoch that fails its check, as its doc block says: no record the core hands it carries one", () => {
+    const standing = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
+    TH.expectSyncRefusal(() => raisedDeviceRecord(standing, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
+  })
+
   const GivesWayCases = [
     // what may stand under the ckey that is no device record of this scope:
     [null,                                                       'a null left by a store'],
@@ -64,6 +69,21 @@ describe("raisedDeviceRecord", () => {
       expect(raisedDeviceRecord(stored, record)).to.eq(record)
     })
   }
+})
+
+describe("deviceRecordOf", () => {
+  it("builds the record from the scope's parsed names alone, frozen: a Vault object passes as its scope, as its example shows", () => {
+    const holder = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', lock: () => undefined }
+    const record = deviceRecordOf(holder, 'device-one', 3)
+    expect(record).to.deep.equal(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 }))
+    expect(Object.isFrozen(record)).to.be.true
+  })
+
+  it("refuses a scope that fails its check as bad_scope, and a device_id or epoch that fails as bad_record", () => {
+    TH.expectSyncRefusal(() => deviceRecordOf({ ...TH.scopeOf('u1'), vaultlabel: 'Main' }, 'device-one', 3), 'bad_scope')
+    TH.expectSyncRefusal(() => deviceRecordOf(TH.scopeOf('u1'), '', 3), 'bad_record')
+    TH.expectSyncRefusal(() => deviceRecordOf(TH.scopeOf('u1'), 'device-one', -1), 'bad_record')
+  })
 })
 
 describe("deviceRecordFor", () => {
@@ -83,6 +103,7 @@ describe("deviceRecordFor", () => {
     [{ ...record, device_id: undefined },          'one with no device_id'],
     [{ ...record, device_id: '' },                 'one with an empty device_id'],
     [{ ...record, highest_vault_epoch: -1 },       'one with a negative epoch'],
+    [{ ...record, user_id: 'u 1' },                "one whose user_id fails its check, never refused as the check's bad_scope"],
     [{ ...record, format: 'safebyok-device-v0' },  'one of another format'],
     [{ ...record, vaultlabel: 'work' },            "another vault's"],
     ['a string, not a record',                     'what is no record at all'],
@@ -126,8 +147,8 @@ describe("deviceOutcomeOf", () => {
   }
 
   it("passes a VaultError through as it came", async () => {
-    const refusal = new VaultError('bad_label', 'no such label')
-    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_label')).to.eq(refusal)
+    const refusal = new VaultError('bad_scope', 'no such label')
+    expect(await TH.expectBad(deviceOutcomeOf('delDeviceRecord', () => { throw refusal }), 'bad_scope')).to.eq(refusal)
   })
 })
 

@@ -1,18 +1,21 @@
-import { VaultScope, type LeaseRecord, type DeviceRecord } from '../../src/types'
+import { VaultScope, type LeaseRecord, type DeviceRecord } from '../../src/types/types'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
 import type { KeyDeriver } from '../../src/key-deriver'
-import * as Ckeys from '../../src/ckeys'
+import * as Scopepath from '../../src/scopepath'
 import * as TH from '../test-helpers'
 
 /** Where the vault each world opens, `u1`'s `main`, files its props and each of its boxes. */
-export const u1VaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
+export const u1VaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
 
-export const u1BoxCkey = (boxlabel: string) => Ckeys.box(TH.scopeOf('u1'), boxlabel)
+export const u1BoxScopepath = (boxlabel: string) => Scopepath.box({ ...TH.scopeOf('u1'), boxlabel })
 
-export const isU1Box = Ckeys.isBoxIn(TH.scopeOf('u1'))
+/** Where a row of `u1`'s `main` under `boxlabel` sits, unchecked: for planting a row under a name no maker would file. */
+export const u1PlantedScopepath = (boxlabel: string) => Scopepath.withinVaultScopepathPrefix(TH.scopeOf('u1')) + boxlabel
+
+export const isU1Box = Scopepath.withinVaultScopepathPred(TH.scopeOf('u1'))
 
 /** An unsubscribe with nothing to undo. */
 export const silence = (): void => undefined
@@ -38,7 +41,7 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<TH.BornVaultOpts>): TH.BornVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger, ...defaults, ...overrides }
+    { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, requestCleartext: TH.scriptedRequestCleartext, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<TH.BornVaultOpts>) => TH.settledVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<TH.BornVaultOpts>) => {
@@ -50,7 +53,7 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
-    return vault.getSnapshot().state
+    return TH.stateOf(vault.getSnapshot())
   }
   return { dbStore, vaultDB, deviceDB, clock, advance, logged, optsWith, open, openUnlocked, getLease, stateOnOpen, deafVaultDB }
 }
@@ -60,7 +63,7 @@ export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summ
 
 /** Storage adapters Bank.make refuses: short of a verb the vault calls. */
 export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
-  [{ vaultDB: { getVaultProps: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
+  [{ vaultDB: { getVaultRecord: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
   [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
   [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getDeviceRecord') }, 'a deviceDB that keeps no device record'],
 ]
@@ -97,37 +100,37 @@ export const uncheckingDeviceDB = () => {
 
 /** The stored row of the box `boxlabel`, as the backend holds it. */
 export const storedRowOf = (world: ReturnType<typeof makeWorld>, boxlabel: string): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1BoxCkey(boxlabel)) ?? 'null') as Record<string, unknown>
+  JSON.parse(world.dbStore.read(u1BoxScopepath(boxlabel)) ?? 'null') as Record<string, unknown>
 )
 
 /** The vault's stored props, as the backend holds them. */
-export const storedVaultPropsOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? 'null') as Record<string, unknown>
+export const storedVaultRecordOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
+  JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as Record<string, unknown>
 )
 
-/** The ckeys of every row `userId`'s vault has in storage: its vault props and its boxes. */
-export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
-  world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.vaultProps(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
+/** The ckeys of every row `user_id`'s vault has in storage: its vault record and its boxes. */
+export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => (
+  world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
 )
 
-/** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */
+/** u1's stored vault record in `world`, its gate's way in of `wayinkind` spoiled by `spoil`. */
 export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
-  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as Record<string, Record<string, unknown>>
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
+  const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as Record<string, unknown> & { gate: Record<string, Record<string, unknown>> }
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, [wayinkind]: { ...vaultRecord.gate[wayinkind], ...spoil } } }))
 }
 
-/** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
+/** A world whose `u1` vault, with a box and a lease, has had its stored vault record spoiled. */
 export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return world
 }
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
@@ -147,7 +150,7 @@ export const vaultWithPasskey = async () => {
 
 /**
  * A world whose slow waits can be held mid-flight, to land a lock inside an unlock: each
- * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, the answer of
+ * `holdNext` arms a gate on the next look at the vault record, passphrase derivation, the answer of
  * a lease write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
  * own copy of testDeriver, so a spy on it stays here.
  */
@@ -162,8 +165,11 @@ export const makeRacingWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 
-/** The stored vault props' way in of `wayinkind`, as the backend holds it: null for no passkey. */
-export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => storedVaultPropsOf(world)[wayinkind] as Record<string, unknown> | null
+/** The stored vault record's way in of `wayinkind`, as the backend holds it in its gate: null for no passkey, or no gate. */
+export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => {
+  const gate = storedVaultRecordOf(world)['gate'] as Record<string, Record<string, unknown> | null> | null
+  return gate === null ? null : gate[wayinkind] ?? null
+}
 
 /**
  * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored once a
@@ -173,8 +179,8 @@ export const rolledBackWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await addLaptopPasskey(vault)
-  const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  const older = world.dbStore.read(u1VaultScopepath) ?? ''
   await TH.delWayin(vault, 'pw')
-  const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  const newer = world.dbStore.read(u1VaultScopepath) ?? ''
   return { world, vault, older, newer }
 }

@@ -1,6 +1,6 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
-import type { VaultScope } from './types'
+import { Validator } from './checks/validator'
+import type { VaultScope } from './types/types'
 
 /** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
  * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
@@ -16,14 +16,15 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * that answers no verdict 'bad_option'.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`. `bank.hello()` runs it once it is called, so make it cost nothing once it has
- * succeeded, and forget a failure. A `load` that fails refuses the hello 'unexpected_error', so a
+ * `load`. Make the checker once, before any bank, and hand the same one to each: each bank's
+ * `hello()` runs its `load`, so make it cost nothing once it has succeeded, and forget a failure.
+ * Call it early only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
  * vault that cannot check a new passphrase never opens.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
  * quote it. `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to
  * replace it, or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
- * `vault.checkPassphrase(typed)`.
+ * `vault.tryCheckStrength(typed)`.
  *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
@@ -32,7 +33,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  */
 export type StrengthChecker = {
   (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge; `bank.hello()` runs it. */
+  /** Fetch or build what the checker needs before it can judge; each bank's `hello()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 
@@ -63,21 +64,21 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** What Bank.make's options schema holds `strengthChecker` to. */
-export const strengthChecker = Z.custom<StrengthChecker>(isStrengthChecker, {
-  error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
-})
+/** What Bank.make's options schema holds `strengthChecker` to, and what a checker must answer, a verdict: each refuses 'bad_option'. */
+export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
+  strengthChecker: custom<StrengthChecker>(isStrengthChecker, {
+    error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
+  }),
+  passphraseVerdict: union([
+    obj({ strong: lit(true) }),
+    obj({ strong: lit(false), reason: str.min(1) }),
+  ]),
+}))
 
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
-const reasonText = Z.string().check(Z.minLength(1))
-const passphraseVerdict = Z.union([
-  Z.object({ strong: Z.literal(true) }),
-  Z.object({ strong: Z.literal(false), reason: reasonText }),
-])
-
-/** `hostChecker` held to its contract and told `scope`: `vault.checkPassphrase`, and the only caller of the host's checker.
+/** `hostChecker` held to its contract and told `scope`: what `vault.checkStrength` asks, and the only caller of the host's checker.
  * So the vault and a dialog checking as the user types decide alike. A blank passphrase is weak
  * before the host's checker hears it. It refuses 'bad_option' for an answer that is no verdict.
  * It refuses 'unexpected_error' for a throw, carrying nothing of it, as the checker heard the

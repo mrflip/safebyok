@@ -216,15 +216,15 @@ describe("argon2idWasmDeriver's bounds", () => {
 /** Two devices sharing one vault store: each opens the vault through its own key deriver. */
 const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const deviceOf = (keyDeriver: KeyDeriver) => TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, strengthChecker: anyStrengthChecker })
+  const deviceOf = (keyDeriver: KeyDeriver) => TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, strengthChecker: anyStrengthChecker })
   return { first: () => deviceOf(firstDeriver), second: () => deviceOf(secondDeriver) }
 }
 
 // Each runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
   it("is accepted by Bank.make under the supplied label", async () => {
-    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, strengthChecker: anyStrengthChecker })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    const vault = await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, strengthChecker: anyStrengthChecker })
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     TH.closeVault(vault)
   })
 

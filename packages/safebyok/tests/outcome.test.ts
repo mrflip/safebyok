@@ -8,8 +8,8 @@ const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new 
 
 describe("good and bad", () => {
   it("makes a good outcome of a val, as good's example shows (Contract: Shapes)", () => {
-    const vaultProps = { vault_tok: 'vault-tok-u1' }
-    expect(good(vaultProps)).to.deep.equal({ ok: true, val: vaultProps })
+    const vaultRecord = { vault_tok: 'vault-tok-u1' }
+    expect(good(vaultRecord)).to.deep.equal({ ok: true, val: vaultRecord })
     expect(good(null)).to.deep.equal({ ok: true, val: null })
   })
 
@@ -131,7 +131,7 @@ describe("isOutcomeShaped", () => {
 
 describe("valOf", () => {
   it("hands back a good outcome's val, and throws a bad one's err, as its example shows", () => {
-    expect(valOf(good('vault props'))).to.eq('vault props')
+    expect(valOf(good('vault record'))).to.eq('vault record')
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => valOf(bad(refusal))).to.throw(refusal)
   })

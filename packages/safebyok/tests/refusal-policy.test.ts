@@ -38,7 +38,7 @@ describe("RefusalPolicy.heed", () => {
     expect(await heeded.getVault(scope)).to.be.null
     expect(getVault).toHaveBeenCalledWith(scope)
     const ensured = await heeded.ensureVault(TH.gatelessOf('u1'))
-    expect(ensured).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(ensured).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
     expect(await heeded.getVault(scope)).to.deep.equal(ensured)
   })
 
@@ -46,7 +46,7 @@ describe("RefusalPolicy.heed", () => {
   const VerbArgsCases = [
     ['getVault',    [scope]],
     ['ensureVault', [TH.gatelessOf('u1')]],
-    ['putVaultProps',    [TH.vaultPropsOf('u1'), TH.thisVault]],
+    ['putVaultRecord',    [TH.vaultRecordOf('u1'), TH.thisVault]],
     ['getBox',           [scope, 'anthropic']],
     ['putBox',           [scope, TH.noBoxYet, TH.boxOf('anthropic', 'one')]],
     ['delBox',           [scope, 'anthropic', TH.thisVault]],
@@ -80,7 +80,7 @@ describe("RefusalPolicy.heed", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const onRefusal = vi.fn(() => Promise.resolve())
     const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
-    await TH.expectRefusal(heeded.putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
+    await TH.expectRefusal(heeded.putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
     expect(onRefusal).toHaveBeenCalledTimes(1)
   })
 

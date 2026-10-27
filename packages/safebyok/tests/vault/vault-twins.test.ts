@@ -3,7 +3,7 @@ import { Vault } from '../../src/vault'
 import { VaultError, type RefusalKind } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, vaultWithPasskey, u1VaultPropsCkey, storedVaultPropsOf } from './world'
+import { makeWorld, vaultWithPasskey, u1VaultScopepath, storedVaultRecordOf } from './world'
 
 // == [The pairs]: TwinCases, each X over its tryX
 
@@ -49,8 +49,8 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
   ["putWayin",        "vault_locked",         ({ vault }) => { answerWithDecline(vault); return ['passphrase'] },  ({ vault }) => { answerWithPw(vault); return ['passphrase'] },  (val, { vault }) => { expect(val).to.eq(vault) }],
   ["delWayin",        "passphrase_required",  () => ['passphrase'],                                                ({ vault }) => { answerWithPw(vault); return ['passkey'] },     (val, { vault }) => { expect(val).to.eq(vault) }],
   ["putBox",          "bad_whisper",          () => [{ boxlabel: 'openai' }, null],                                () => [{ boxlabel: 'openai' }, 'sk-fake-two'],                  (val) => { expect(val).to.have.property('boxlabel', 'openai') }],
-  ["getBox",          "bad_label",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
-  ["getWhisper",      "bad_label",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.eq('sk-fake') }],
+  ["getBox",          "bad_scope",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
+  ["getWhisper",      "bad_scope",            () => ['tab\there'],                                                 () => ['anthropic'],                                            (val) => { expect(val).to.eq('sk-fake') }],
   ["delBox",          "absent_box",           () => ['openai'],                                                    () => ['anthropic'],                                            (val, { vault }) => { expect(val).to.deep.eq({ boxlabel: 'anthropic', vault_tok: vault.vault_tok, outcome: 'deleted' }) }],
   ["del",             "vault_gone",           ({ vault }) => { TH.closeVault(vault); return [] },                  ({ vault }) => { answerWithPw(vault); return [] },              (val) => { expect(val).to.be.undefined }],
 ]
@@ -64,13 +64,13 @@ const twinsOf = (vault: Vault, callname: TwinName) => {
 
 /**
  * A vault unlocked with `pw`, born with `overrides` over a vaultDB that hears no change bells, whose
- * stored vault props are then spoiled underfoot: its next read meets 'damaged_vault', and no watch
+ * stored vault record is then spoiled underfoot: its next read meets 'damaged_vault', and no watch
  * has met it first.
  */
 const damagedUnderfoot = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), ...overrides })
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
+  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return { world, vault }
 }
 
@@ -142,7 +142,7 @@ const brokenStoreVault = async () => {
 describe("a throw that is no refusal (Contract: Shapes)", () => {
   it("resolves, from a try form, as 'unexpected_error', misuse, what was thrown its cause", async () => {
     const { vault, thrown } = await brokenStoreVault()
-    const err = await TH.expectBad(vault.tryGetBox('ANTHROPIC_API_KEY'), 'unexpected_error')
+    const err = await TH.expectBad(vault.tryGetBox('anthropic_api_key'), 'unexpected_error')
     expect(err.family).to.eq('misuse')
     expect(err.cause).to.eq(thrown)
   })
@@ -156,7 +156,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
 
   it("throws, from the throwing form, the same 'unexpected_error'", async () => {
     const { vault, thrown } = await brokenStoreVault()
-    const err = await TH.expectRefusal(vault.getBox('ANTHROPIC_API_KEY'), 'unexpected_error')
+    const err = await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
   })
 
@@ -197,7 +197,7 @@ describe("vault.hello as an event handler", () => {
     const vault = await world.open()
     const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
-    expect(err.message).to.match(/^Unrecognized keys?: "[^.]*\. hello\(\)'s only option is `staleMinutes`/)
+    expect(err.message).to.match(/^There (is no field|are no fields) [^:]*: check [^.]*\. hello\(\)'s only option is `staleMinutes`/)
     expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
     expect(err.message).to.include('`() => vault.tryHello()`')
     expect(propsReads).not.toHaveBeenCalled()
@@ -212,8 +212,8 @@ describe("vault.hello as an event handler", () => {
     window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(propsReads).toHaveBeenCalledOnce() })
-    expect(vault.state).to.eq('novel')
-    expect(vault.trouble).to.be.null
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
+    expect(vault.snapshot.trouble).to.be.null
   })
 
   it("refuses any object that is no plain bag of options, as a React event is, as bad_option", async () => {
@@ -227,7 +227,7 @@ describe("vault.hello as an event handler", () => {
   it("still refuses a plain bag that misspells its option, and a value that is no object, with kind 'bad_option'", async () => {
     const vault = await makeWorld().open()
     const misspelt = await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
-    expect(misspelt.message).to.eq("Unrecognized key: \"staleMinute\". hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
+    expect(misspelt.message).to.eq("There is no field staleMinute: check its spelling, or leave it out. hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage.")
     const numbered = await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
     expect(numbered.message).to.match(/^Invalid input: expected object, received number\. hello\(\)'s only option .* an event, most likely/)
   })

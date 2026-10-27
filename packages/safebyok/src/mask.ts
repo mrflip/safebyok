@@ -1,5 +1,5 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { Validator } from './checks/validator'
 
 /** How `mask` shows a whisper: how many characters to reveal, and how many stars to hide it behind. */
 export interface MaskOpts {
@@ -19,13 +19,18 @@ const Collapsed = '***...***'
 /** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
 const MaxShown = 1000
 
-const shownCount = Z.int().check(Z.nonnegative(), Z.lte(MaxShown))
-const resultLen = Z.union([Z.literal(Infinity), Z.int().check(Z.nonnegative())])
-const maskOpts = Z.object({
-  head:     Z._default(shownCount, 2),
-  tail:     Z._default(shownCount, 4),
-  minStars: Z._default(shownCount, 6),
-  maxLen:   Z._default(resultLen, 15),
+/** What `mask` takes as options, each defaulted, refusing 'bad_option'. */
+const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) => {
+  const shownCount = uint.lte(MaxShown)
+  const resultLen  = union([lit(Infinity), uint])
+  return {
+    maskOpts: obj({
+      head:     shownCount.default(2),
+      tail:     shownCount.default(4),
+      minStars: shownCount.default(6),
+      maxLen:   resultLen.default(15),
+    }),
+  }
 })
 
 const parseMaskOpts = (candidate: MaskOpts | undefined): Record<keyof MaskOpts, number> => {

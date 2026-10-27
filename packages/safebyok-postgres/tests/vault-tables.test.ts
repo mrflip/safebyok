@@ -3,7 +3,7 @@ import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import * as TH from './test-helpers'
-import { VaultPropsColumns, BoxColumns, TombstoneColumns } from '../src/columns'
+import { VaultRowColumns, BoxColumns, TombstoneColumns } from '../src/columns'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 /** A column as information_schema describes it: its name and its type. */
@@ -56,14 +56,14 @@ describe("VaultTablesSql", () => {
 
   it("can be run again over the tables it made, keeping their rows", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await db.exec(VaultTablesSql)
-    expect(await TH.propsOf(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(await TH.vaultRecordIn(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 
-  it("makes the vault props' columns exactly as the adapter writes them, in order, and no more", async () => {
+  it("makes the vault record's columns exactly as the adapter writes it, in order, and no more", async () => {
     const db = await TH.database()
-    expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultPropsColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
+    expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultRowColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
   })
 
   it("makes the tombstone's columns exactly as the adapter writes them, in order, and no more", async () => {
@@ -95,7 +95,7 @@ describe("VaultTablesSql", () => {
     ])
   })
 
-  it("holds every column NOT NULL but the vault props' passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
+  it("holds every column NOT NULL but the vault record's passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
     const db = await tablesOnlyDatabase()
     const { rows } = await db.query(
       "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
@@ -134,7 +134,7 @@ describe("VaultTablesSql", () => {
 
   it("keeps every row from a role that is not the tables' owner", async () => {
     const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await db.exec('CREATE ROLE stranger; GRANT SELECT, INSERT ON safebyok_vaults TO stranger')
     try {
       await db.exec('SET ROLE stranger')
@@ -168,7 +168,7 @@ describe("VaultNotifySql", () => {
   it("is what push needs: a vault over tables without it never hears another request's write, and works whole", async () => {
     const db = await tablesOnlyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)

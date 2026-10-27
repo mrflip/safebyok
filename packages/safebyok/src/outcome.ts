@@ -7,7 +7,7 @@ import * as Refusals from './refusals'
  * @example
  *   const { ok, val, err } = await vaultDB.getVault(scope)
  *   if (! ok) { return err }
- *   val  // VaultProps | null
+ *   val  // VaultRecord | null
  */
 export type Outcome<ValT> = GoodOutcome<ValT> | BadOutcome
 
@@ -19,7 +19,7 @@ export type BadOutcome = { ok: false, val?: never, err: VaultError }
 
 /** `val` as the outcome of a call that succeeded.
  *
- * @example good(vaultProps)  // { ok: true, val: vaultProps }
+ * @example good(vaultRecord)  // { ok: true, val: vaultRecord }
  */
 export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 

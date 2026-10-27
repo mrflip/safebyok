@@ -12,7 +12,7 @@ import { Applabel, dbStore, deviceStore, vaultDB } from './lib/stores'
 import { useSession } from './hooks/useSession'
 
 // The demo's fake auth; a real app has its own (Google, Clerk, Convex...). All the vault needs
-// from it is a stable userId.
+// from it is a stable user_id.
 const auth = createAuth({ applabel: Applabel, dbStore, deviceStore })
 
 const Page = () => {
@@ -42,17 +42,18 @@ const Page = () => {
   )
 }
 
-// A user who forgets the passphrase may start a new vault from the dialog (allowStartOver), as a
-// real app would let them once it has said a forgotten passphrase cannot be recovered.
+// A user who forgets the passphrase is to be offered a new vault from the dialog (allowStartOver),
+// as a real app would once it has said a forgotten passphrase cannot be recovered. The provider
+// takes it, and offers nothing yet.
 export const App = () => {
   const session = useSession(auth)
-  const userId = session?.userId ?? null
+  const user_id = session?.user_id ?? null
   return (
-    <TroubleBoundary key={userId ?? 'signed-out'}>
+    <TroubleBoundary key={user_id ?? 'signed-out'}>
       <BankProvider
         {...browserOpts({ dbName: Applabel })}
         applabel={Applabel}
-        userId={userId}
+        user_id={user_id}
         vaultDB={vaultDB}
         allowStartOver
       >

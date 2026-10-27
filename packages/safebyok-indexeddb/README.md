@@ -29,12 +29,13 @@ import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const bank = Bank.make({
+const bank = Bank.make({   // as the user signs in
   applabel:   'acme',
+  user_id:    session.user_id,
   vaultDB:    idbVaultDB({ dbName: 'acme' }),
   ...browserOpts({ dbName: 'acme' }),   // the key deriver, and the device store beside the vault
 })
-const vault = await bank.ensureVault({ userId: session.userId, vaultlabel: 'main' })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's
@@ -75,21 +76,22 @@ its own failures.
 One IndexedDB database per `dbName`, `<dbName>:vault_db`, holding one object store, `records`:
 **a row per record, each the record itself**, as safebyok wrote it, kept by structured clone
 field by field. Nothing is serialized, normalized or repaired: every field a record holds is
-bound into its encryption, but for the vault props' `gate_epoch` and, for each of their two ways
-in (`passphrase` and `passkey`), the other one beside it, so one changed in storage makes the
-record refuse to open. A vault stored in the format before (`safebyok-vault-v4`, its ways in a
-`wayins` list) reads as damaged, to be made anew.
+bound into its encryption, but for the vault record's `gate_epoch` and, for each of the two ways
+in its `gate` (`passphrase` and `passkey`), the other one beside it, so one changed in storage
+makes the record refuse to open. A vault stored in a shape before (its ways in flat beside its
+fields, or a `wayins` list) reads as damaged, to be made anew.
 
-| ckey                                               | Row                      |
+| Scopepath                                          | Row                      |
 | -------------------------------------------------- | ------------------------ |
-| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps` |
+| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultRecord`, its gate nested |
 | `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `BoxRecord`          |
 
-The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
-of every name, whatever a host's validators admit.
+The names are joined on `^` (the core's `Scopepath`), which no label or user id may hold. A row
+under a vault's prefix that is no box's scopepath is passed over by a listing, and erased with the
+vault.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
-  (`box_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
+  (`box_key_wrapped`), and, inside the vault record's gate, the vaultKey, wrapped under each way in.
 * **In the open**: the scope, each `boxlabel` and `sidecar`, the `vault_tok`, `gate_epoch`,
   `revision_tok`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and box was first stored and each box last written (epoch
@@ -97,7 +99,7 @@ of every name, whatever a host's validators admit.
 * **Never**: a whisper, a passphrase, any key in usable form. The lease lives in the device
   store's database, not here.
 
-A vault written under the JSON-tuple ckeys of earlier versions (`["vault","acme","u1","main"]`)
+A vault written under the JSON-tuple keys of earlier versions (`["vault","acme","u1","main"]`)
 reads as absent, its rows left as they were.
 
 ### Looking at the rows
@@ -114,10 +116,10 @@ This package is the example of a key-value backend, as `safebyok-postgres` is of
 browser store, a native one in an app shell, a key-value service -- copy it, and type in three
 places:
 
-1. **`src/ckeys.ts`: where each record lives.** A ckey per record, built from its scope, so a
-   read is one lookup and a vault's boxes are the rows under its prefix, read as a key range
-   (`boxRange`) rather than by scanning the shelf. The core's `Ckeys` joins on `^`, which no name
-   holds, so a vault's prefix (`box^acme^u1^main^`) begins its own boxes' ckeys and no
+1. **`src/box-range.ts`: where each record lives.** A scopepath per record, from the core's
+   `Scopepath`, so a read is one lookup and a vault's boxes are the rows under its prefix, read as
+   a key range (`boxRange`) rather than by scanning the shelf. `Scopepath` joins on `^`, which no
+   name holds, so a vault's prefix (`box^acme^u1^main^`) begins its own boxes' scopepaths and no
    other's. If your store has columns or namespaces, use them instead.
 2. **`src/idb-vault-db.ts`: each verb, in one transaction of your store.** Extend `VaultDB` and
    write its `do*` methods, never its public verbs: the base class checks labels, scope, records
@@ -125,7 +127,7 @@ places:
    into `stale_write` and anything you throw into `storage_unavailable`. A write reads what
    stands, compares, and writes, all in one transaction (`src/shelf.ts`'s `inOneTransaction`);
    a store with no transactions needs a conditional write instead (compare-and-set on the
-   ckey), or it cannot keep the promise.
+   scopepath), or it cannot keep the promise.
 3. **`doSubscribe`: how your store tells listeners of a write.** Here, `ChangeBell` from
    `safebyok/idb`, rung after each write that lands: this tab's listeners, and a
    BroadcastChannel to the others. Another store in this browser rings a bell of its own name the
@@ -138,7 +140,7 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultTokMeets`), and a box read before it
+  (`Expectations.vaultRecordMeets`, `vaultMeets`, `vaultTokMeets`), and a box read before it
   hands its box up (`vaultMeets`, else `Refusals.vaultMismatch()`), and for a box write, the
   refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
   `stale_write` carrying the box that stands). An adapter

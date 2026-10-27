@@ -1,4 +1,4 @@
-import type { BoxRecord, Tombstone, VaultProps } from 'safebyok'
+import type { BoxRecord, GateRecord, VaultRecord, VaultTombstone } from 'safebyok'
 
 /** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
  * jsonb reorders keys, which is harmless for a Ciphered, a way in or a box's sidecar: safebyok
@@ -22,8 +22,14 @@ function everyFieldOf<RecordT>() {
   ): ColumnsT => columns
 }
 
-/** Every field of a VaultProps, in `safebyok_vaults`'s order: the one place, beside vault-tables.sql, naming its columns. */
-export const VaultPropsColumns = everyFieldOf<VaultProps>()([
+/** A vault record as a `safebyok_vaults` row lays it out: its gate's two wayins in columns of their own beside `gate_epoch`, both null while the vault is novel.
+ * The layout is this adapter's own; the record it stands for is the core's {@link VaultRecord}, its
+ * gate nested, which {@link rowOfVaultRecord} and {@link vaultRecordOfRow} turn it to and from.
+ */
+export type VaultRow = Omit<VaultRecord, 'gate'> & { passphrase: GateRecord['passphrase'] | null, passkey: GateRecord['passkey'] }
+
+/** Every field of a {@link VaultRow}, in `safebyok_vaults`'s order: the one place, beside vault-tables.sql, naming its columns. */
+export const VaultRowColumns = everyFieldOf<VaultRow>()([
   ['applabel',         'text'],
   ['user_id',          'text'],
   ['vaultlabel',       'text'],
@@ -36,8 +42,8 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['registered_at',    'bigint'],
 ] as const)
 
-/** Every field of a Tombstone, in `safebyok_vault_tombstones`'s order. */
-export const TombstoneColumns = everyFieldOf<Tombstone>()([
+/** Every field of a VaultTombstone, in `safebyok_vault_tombstones`'s order. */
+export const TombstoneColumns = everyFieldOf<VaultTombstone>()([
   ['applabel',         'text'],
   ['user_id',          'text'],
   ['vaultlabel',       'text'],
@@ -141,4 +147,26 @@ export const recordOf = (row: unknown, columns: readonly Column[]): unknown => {
     if (cell === undefined) { return [] }
     return [[field, kind === 'jsonb' && typeof cell === 'string' ? JSON.parse(cell) as unknown : cell]]
   }))
+}
+
+/** `vaultRecord` as its `safebyok_vaults` row holds it: its gate's wayins in their own columns, both null for a novel vault's.
+ *
+ * @example rowOfVaultRecord(record)   // { ...record but its gate, passphrase: record.gate?.passphrase ?? null, passkey: record.gate?.passkey ?? null }
+ */
+export const rowOfVaultRecord = (vaultRecord: VaultRecord): VaultRow => {
+  const { gate, ...head } = vaultRecord
+  return { ...head, passphrase: gate?.passphrase ?? null, passkey: gate?.passkey ?? null }
+}
+
+/** A `safebyok_vaults` row read through {@link recordOf}, as the vault record it stands for, unchecked: its two wayin columns nested as the gate, or null where both are null.
+ * A row with either column set hands up a gate holding both, as stored, so a passkey beside no
+ * passphrase reads as the damaged gate it is, never as a novel vault. A row that is not an object
+ * comes back as it is, for the VaultDB's check to refuse.
+ *
+ * @example vaultRecordOfRow(recordOf(row, VaultRowColumns))   // { ...row but the two wayins, gate: { passphrase, passkey } }
+ */
+export const vaultRecordOfRow = (row: unknown): unknown => {
+  if (typeof row !== 'object' || row === null) { return row }
+  const { passphrase = null, passkey = null, ...head } = row as Record<string, unknown>
+  return { ...head, gate: passphrase === null && passkey === null ? null : { passphrase, passkey } }
 }

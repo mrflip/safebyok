@@ -4,8 +4,8 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, vi } from 'vitest'
-import { Ckeys, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
-import * as TH from 'safebyok/testing'
+import { Scopepath, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
+import * as TH from '../test-helpers'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { BankProvider, useBank, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
 
@@ -32,7 +32,7 @@ export const Probe = () => {
   const [outcome, setOutcome] = useState('')
 
   if (entry?.err !== null && entry?.err !== undefined) {
-    const retry = () => { if (bank !== null) { void bank.tryEnsureVault({ userId: entry.scope.user_id, vaultlabel: 'main' }) } }
+    const retry = () => { if (bank !== null) { void bank.tryEnsureVault(entry.scope) } }
     return <p><span data-testid="state">{`refused: ${entry.err.refusalkind}`}</span> <button onClick={retry}>Retry</button></p>
   }
   const vault = entry?.vault ?? null
@@ -47,7 +47,7 @@ export const Probe = () => {
 
   return (
     <div>
-      <span data-testid="state">{snapshot.state}</span>
+      <span data-testid="state">{TH.stateOf(snapshot)}</span>
       <span data-testid="boxcount">{snapshot.boxes.length}</span>
       <span data-testid="outcome">{outcome}</span>
       <button onClick={put}>put</button>
@@ -85,21 +85,21 @@ export const grabber = () => {
 }
 
 /**
- * A fresh world in memory: its two stores, the BankProvider props over them (all but `userId`),
+ * A fresh world in memory: its two stores, the BankProvider props over them (all but `user_id`),
  * and the Probe in a provider inside a boundary, as a tree or mounted.
  */
 export const makeWorld = () => {
   const vaultDB = localVaultDB({ store: memoryStore() })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
-  const tree = (userId: string | null, caught: unknown[] = []) => (
+  const tree = (user_id: string | null, caught: unknown[] = []) => (
     <CatchingBoundary caught={caught}>
-      <BankProvider {...props} userId={userId}>
+      <BankProvider {...props} user_id={user_id}>
         <Probe />
       </BankProvider>
     </CatchingBoundary>
   )
-  const mount = (userId: string | null, caught: unknown[] = []) => render(tree(userId, caught))
+  const mount = (user_id: string | null, caught: unknown[] = []) => render(tree(user_id, caught))
   return { vaultDB, deviceDB, props, tree, mount }
 }
 
@@ -109,14 +109,14 @@ export const madeWorld = async () => {
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
-  const made = await TH.settledVault({ ...props, userId: 'u1', vaultlabel: 'main' })
+  const made = await TH.settledVault({ ...props, user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(made, 'correct horse')
   await made.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(made)
   const spoil = () => {
-    const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
-    const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-    store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+    const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
+    const vaultRecord = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
+    store.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   }
   return { store, vaultDB, deviceDB, props, spoil }
 }
@@ -143,7 +143,8 @@ export const expectOutcome = (outcome: string) => waitFor(() => { expect(screen.
 /** Puts a box through the Probe into a vault not yet made, choosing `passphrase` for it. */
 export const putThroughNewVault = async (passphrase: string) => {
   fireEvent.click(screen.getByText('put'))
-  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  await screen.findByPlaceholderText('vault passphrase')
+  TH.typeNewPassphrase(passphrase)
   fireEvent.click(screen.getByText('Create vault'))
   await expectOutcome('stored')
 }
@@ -169,13 +170,13 @@ export const hushConsole = () => vi.spyOn(console, 'error').mockImplementation((
  */
 export const lockedWorld = async () => {
   const world = makeWorld()
-  const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1', vaultlabel: 'main' })
+  const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(maker, 'pw')
   await maker.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-fake')
   TH.closeVault(maker)
   const grab = grabber()
-  const tree = (userId: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
-    <BankProvider {...world.props} keyDeriver={keyDeriver} userId={userId}><grab.Grab /></BankProvider>
+  const tree = (user_id: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
+    <BankProvider {...world.props} keyDeriver={keyDeriver} user_id={user_id}><grab.Grab /></BankProvider>
   )
   return { ...world, ...grab, tree }
 }
@@ -196,7 +197,7 @@ export const watched = <ResultT,>(promise: Promise<ResultT>) => {
 
 /** The provider over a world, with whatever logger and clock the render hands it. */
 export const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Partial<Pick<BankProviderProps, 'logger' | 'clock' | 'strengthChecker'>>) => (
-  <BankProvider {...world.props} userId="u1" {...sinks}><Probe /></BankProvider>
+  <BankProvider {...world.props} user_id="u1" {...sinks}><Probe /></BankProvider>
 )
 
 /** Advice on a passphrase being chosen: a word until it is twelve characters or more. */

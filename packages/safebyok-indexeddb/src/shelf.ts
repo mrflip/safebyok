@@ -2,7 +2,7 @@ import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
 import { Refusals } from 'safebyok'
 
 /** The shelf is the one object store, `records` in the database `<dbName>:vault_db`, holding every row.
- * Its name is a stored contract, like the ckeys: a vault already written is found there.
+ * Its name is a stored contract, like the scopepaths: a vault already written is found there.
  */
 
 // One UseStore per dbName, shared by every adapter and inspector over it: making one is free
@@ -11,7 +11,7 @@ const shelves = new Map<string, UseStore>()
 
 /** The shelf of the database `dbName`, as `idb-keyval`'s own calls take one.
  *
- * @example await get(vaultPropsCkey(scope), shelfOf('acme'))
+ * @example await get(Scopepath.vault(scope), shelfOf('acme'))
  */
 export const shelfOf = (dbName: string): UseStore => {
   const kept = shelves.get(dbName)
@@ -26,7 +26,7 @@ export const shelfOf = (dbName: string): UseStore => {
  * browser's error its cause, or a context with no IndexedDB at all. Any other failure comes as it
  * came, for the VaultDB base class to say as `storage_unavailable`.
  *
- * @example await withheldShelfOf('acme')('readonly', (store) => settle(store.get(ckey)))
+ * @example await withheldShelfOf('acme')('readonly', (store) => settle(store.get(scopepath)))
  */
 export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => ValT | PromiseLike<ValT>): Promise<ValT> => {
   if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) {
@@ -45,7 +45,7 @@ export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode
  * gives no error for (a transaction aborted from outside) rejects with null, which the VaultDB
  * base class says as `storage_unavailable`.
  *
- * @example const standing = await settle<unknown>(store.get(ckey))
+ * @example const standing = await settle<unknown>(store.get(scopepath))
  */
 export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTransaction): Promise<ValT> => {
   const target: EventTarget = request
@@ -70,9 +70,9 @@ export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTr
  *
  * @example
  *   const landed = await inOneTransaction(shelfOf('acme'), async (store) => {
- *     const standing = await settle(store.get(ckey))
+ *     const standing = await settle(store.get(scopepath))
  *     if (! meetsExpectation(standing)) { return false }
- *     store.put(record, ckey)
+ *     store.put(record, scopepath)
  *     return true
  *   })
  */

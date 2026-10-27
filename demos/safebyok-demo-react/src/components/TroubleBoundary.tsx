@@ -8,7 +8,7 @@ import { Component, type ReactNode } from 'react'
  * on the signed-in user, so another user, or a sign-out and back in, gets a fresh attempt.
  *
  * @example
- *   <TroubleBoundary key={userId ?? 'signed-out'}>
+ *   <TroubleBoundary key={user_id ?? 'signed-out'}>
  *     <BankProvider ...><Page /></BankProvider>
  *   </TroubleBoundary>
  */

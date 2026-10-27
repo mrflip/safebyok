@@ -16,7 +16,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld({ vaultDB })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     expect(world.vaultDB).to.eq(vaultDB)
-    expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("renders no vault for a signed-out page", () => {
@@ -35,7 +35,7 @@ describe("makeWorld", () => {
   it("lets go of the vault it seeds through, even when a store is refused", async () => {
     const world = TH.makeWorld()
     const tally = TH.tallyWatches(world.vaultDB)
-    await TH.expectRefusal(world.seed({ '': 'sk-ant-test-not-a-real-key' }), 'bad_label')
+    await TH.expectRefusal(world.seed({ '': 'sk-ant-test-not-a-real-key' }), 'bad_scope')
     expect(tally.opened).to.eq(1)
     expect(tally.opened - tally.closed).to.eq(0)
   })
@@ -46,14 +46,14 @@ describe("makeWorld", () => {
     const vault = await world.open()
     await TH.unlock(vault, TH.Passphrase)
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("opens the vault from outside the page already unlocked, with the tests' passphrase", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.openUnlocked()
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 })
@@ -64,7 +64,7 @@ describe("makeWorld's vaults opened from outside the page", () => {
 
   it("are handed out open, to a test that opens them", async () => {
     opened = await TH.makeWorld().open()
-    expect(opened.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(opened.getSnapshot())).to.eq('novel')
   })
 
   it("are let go once that test has ended", async () => {

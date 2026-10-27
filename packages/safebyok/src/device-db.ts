@@ -1,5 +1,6 @@
-import { DeviceRecord, LeaseRecord, type VaultScope } from './types'
-import * as Ckeys from './ckeys'
+import { DeviceRecord, DeviceRecordFormat, LeaseRecord, type VaultScope } from './types/types'
+import * as CX from './checks/core-checks'
+import * as Scopepath from './scopepath'
 import { sameScope } from './names'
 import { VaultError } from './errors'
 import { type Outcome, isOutcomeShaped, outcomeOf, valOf } from './outcome'
@@ -49,8 +50,8 @@ export interface DeviceDB {
 export type DeviceVerb = keyof DeviceDB
 
 /** A DeviceDB over a Map, which remembers nothing past the page: for tests, and wherever IndexedDB is missing or blocked.
- * It files rows under {@link Ckeys}, and refuses alike a name holding `^`. A malformed record reads
- * as null, and is discarded.
+ * It files rows under their {@link Scopepath}, and refuses 'bad_scope' alike for a scope whose names
+ * fail their checks. A malformed record reads as null, and is discarded.
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
@@ -59,48 +60,48 @@ export type DeviceVerb = keyof DeviceDB
  *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
  */
 export const memoryDeviceDB = (): DeviceDB => {
-  const leases = new Map<string, LeaseRecord>()
-  const records = new Map<string, DeviceRecord>()
+  const leases = new Map<Scopepath.LeaseScopepath, LeaseRecord>()
+  const records = new Map<Scopepath.DeviceScopepath, DeviceRecord>()
   return {
     getLease: (scope) => deviceOutcomeOf('getLease', () => {
-      const kept = leases.get(Ckeys.lease(scope))
+      const kept = leases.get(Scopepath.lease(scope))
       if (kept === undefined) { return null }
       const checked = LeaseRecord.safeParse(kept)
       // A malformed record reads as "no lease": losing the convenience is the safe failure.
       if (! checked.success) {
-        leases.delete(Ckeys.lease(scope))
+        leases.delete(Scopepath.lease(scope))
         return null
       }
       return checked.data
     }),
 
     putLease: (record) => deviceOutcomeOf('putLease', () => {
-      leases.set(Ckeys.lease(record), record)
+      leases.set(Scopepath.lease(record), record)
       return record
     }),
 
-    delLease: (scope) => deviceOutcomeOf('delLease', () => { leases.delete(Ckeys.lease(scope)) }),
+    delLease: (scope) => deviceOutcomeOf('delLease', () => { leases.delete(Scopepath.lease(scope)) }),
 
     getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => {
-      const kept = records.get(Ckeys.deviceRecord(scope))
+      const kept = records.get(Scopepath.device(scope))
       if (kept === undefined) { return null }
       const checked = DeviceRecord.safeParse(kept)
       // A malformed record reads as none, as on a device that never saw the vault.
       if (! checked.success) {
-        records.delete(Ckeys.deviceRecord(scope))
+        records.delete(Scopepath.device(scope))
         return null
       }
       return checked.data
     }),
 
     raiseDeviceRecord: (record) => deviceOutcomeOf('raiseDeviceRecord', () => {
-      const ckey = Ckeys.deviceRecord(record)
-      const raised = raisedDeviceRecord(records.get(ckey), record)
-      records.set(ckey, raised)
+      const deviceScopepath = Scopepath.device(record)
+      const raised = raisedDeviceRecord(records.get(deviceScopepath), record)
+      records.set(deviceScopepath, raised)
       return raised
     }),
 
-    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', () => { records.delete(Ckeys.deviceRecord(scope)) }),
+    delDeviceRecord: (scope) => deviceOutcomeOf('delDeviceRecord', () => { records.delete(Scopepath.device(scope)) }),
 
     delAll: () => deviceOutcomeOf('delAll', () => {
       leases.clear()
@@ -109,21 +110,36 @@ export const memoryDeviceDB = (): DeviceDB => {
   }
 }
 
-/** The device record a {@link DeviceDB.raiseDeviceRecord} stores, given what stands under its ckey (`stored`, as read, unchecked) and the `record` handed to it.
+/** The device record a {@link DeviceDB.raiseDeviceRecord} stores, given what stands under its scopepath (`stored`, as read, unchecked) and the `record` handed to it.
  * Where `stored` is a device record of the same scope, it keeps its `device_id`, and the higher
  * `highest_vault_epoch` of the two: a lower one never replaces a higher. Anything else stored --
  * none, or a row that fails its check -- gives way to `record` as it came. A DeviceDB of your own
  * calls it inside the one transaction that reads and writes the row.
+ *
+ * It builds a raised record afresh, checked, so it throws 'bad_record' when it must raise a stored
+ * record to a `record` whose `highest_vault_epoch` fails its check. The core never hands a DeviceDB
+ * such a record: only a host's own call can, so let the throw abort that transaction.
  *
  * @example raisedDeviceRecord(undefined, record)                                    // record
  * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
  */
 export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
   const checked = DeviceRecord.safeParse(stored)
-  if (! checked.success || Ckeys.deviceRecord(checked.data) !== Ckeys.deviceRecord(record)) { return record }
+  if (! checked.success || Scopepath.device(checked.data) !== Scopepath.device(record)) { return record }
   const standing = checked.data
   if (standing.highest_vault_epoch >= record.highest_vault_epoch) { return standing }
-  return { ...standing, highest_vault_epoch: record.highest_vault_epoch }
+  return deviceRecordOf(standing, standing.device_id, record.highest_vault_epoch)
+}
+
+/** The device record of `scope` holding `device_id` and `highest_vault_epoch`, frozen: built from the scope's parsed names, so nothing else `scope` carries is stored.
+ * Throws 'bad_scope' for a scope that fails its check, and 'bad_record' for a `device_id` or an
+ * epoch that does.
+ *
+ * @example deviceDB.raiseDeviceRecord(deviceRecordOf(vault, deviceId, vaultEpoch))   // a Vault object passes as its scope
+ */
+export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vault_epoch: number): DeviceRecord => {
+  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
+  return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
 /** `answer`, a device record a DeviceDB handed back for `scope`, checked: the record, or null for one that fails its check or names another scope, as for none.
@@ -149,8 +165,8 @@ export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecor
  *
  * @param verb - The DeviceDB verb answering, which the message names.
  *
- * @example getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => myStore.read(recordCkeyOf(scope)))   // { ok: true, val: the record, or null }
- * @example await deviceOutcomeOf('delDeviceRecord', () => myStore.erase(ckey))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
+ * @example getDeviceRecord: (scope) => deviceOutcomeOf('getDeviceRecord', () => myStore.read(Scopepath.device(scope)))   // { ok: true, val: the record, or null }
+ * @example await deviceOutcomeOf('delDeviceRecord', () => myStore.erase(Scopepath.device(scope)))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => ValT | Promise<ValT>): Promise<Outcome<ValT>> => (
   outcomeOf(body, (thrown) => deviceTrouble(verb, thrown))
@@ -186,7 +202,7 @@ const guarded = <ValT>(verb: DeviceVerb, call: () => Promise<Outcome<ValT>>): Pr
 
 /** What failed, for each device-store verb, and what it leaves undone; and what the user may do instead of trying again, if anything. */
 const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }> = {
-  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
+  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a vault unlocker (the passphrase or passkey)" },
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
   delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
   getDeviceRecord:   { failed: "reading its record of this vault (the newest copy of the vault it has seen), so the vault could not check storage against it" },

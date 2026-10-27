@@ -1,29 +1,26 @@
 import { describe, it, expect, vi } from 'vitest'
-import * as ZClassic from 'zod'
-import * as Z from 'zod/mini'
 import { type DeviceDB } from '../src/device-db'
 import { type VaultDB } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
-import { type MakeBankOpts } from '../src/vault-opts'
 import { type DelDamagedVaultOpts } from '../src/del-damaged-vault'
 import { delDamagedVault } from '../src/del-damaged-vault'
 import { Bank } from '../src/bank'
 import { isVaultError } from '../src/errors'
-import * as Ckeys from '../src/ckeys'
+import * as Scopepath from '../src/scopepath'
 import * as TH from './test-helpers'
-import { damagedVaultWorld, rowsOf, makeWorld, u1VaultPropsCkey, isU1Box, storedVaultPropsOf, MisfitStores, VaultDBVerbsUsed } from './vault/world'
+import { damagedVaultWorld, rowsOf, makeWorld, u1VaultScopepath, isU1Box, storedVaultRecordOf, MisfitStores, VaultDBVerbsUsed } from './vault/world'
 
 
 describe("delDamagedVault", () => {
-  it("clears a vault whose birth refuses it as damaged_vault -- its vault props, its boxes and this device's lease -- so a new one can be born", async () => {
+  it("clears a vault whose birth refuses it as damaged_vault -- its vault record, its boxes and this device's lease -- so a new one can be born", async () => {
     const world = await damagedVaultWorld()
     expect(await world.getLease()).to.not.be.null
     await TH.expectRefusal(world.open(), 'damaged_vault')
     await delDamagedVault(world.optsWith())
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
-    expect(fresh.getSnapshot().state).to.eq('novel')
+    expect(TH.stateOf(fresh.getSnapshot())).to.eq('novel')
     await TH.unlock(fresh, 'another pw')
     await fresh.putBox({ boxlabel: 'anthropic' }, 'sk-new-fake')
     expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
@@ -36,12 +33,12 @@ describe("delDamagedVault", () => {
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/writing its record of this vault/)
     expect(err.cause).to.eq(trouble)
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
   })
 
   it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
     const world = await damagedVaultWorld()
-    const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
+    const theirs = await world.openUnlocked('their pw', { user_id: 'u2' })
     await theirs.putBox({ boxlabel: 'anthropic' }, 'theirs')
     await delDamagedVault(world.optsWith())
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
@@ -62,25 +59,25 @@ describe("delDamagedVault", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("refuses vault props too damaged to name their vault, removing nothing, the lease included", async () => {
+  it("refuses a vault record too damaged to name its vault, removing nothing, the lease included", async () => {
     const world = await damagedVaultWorld()
-    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v1"}')
+    world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v1"}')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'damaged_vault')
     expect(err.message).to.include('nothing was removed')
-    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq('{"format":"safebyok-vault-v1"}')
+    expect(world.dbStore.read(u1VaultScopepath)).to.eq('{"format":"safebyok-vault-v1"}')
     expect(world.dbStore.ckeys().some((ckey) => isU1Box(ckey))).to.eq(true)
     expect(await world.getLease()).to.not.be.null
   })
 
   it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing deleted, the lease kept", async () => {
     const world = await damagedVaultWorld()
-    const newer = JSON.stringify({ ...storedVaultPropsOf(world), format: 'safebyok-vault-v7' })
-    world.dbStore.write(u1VaultPropsCkey, newer)
+    const newer = JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v7' })
+    world.dbStore.write(u1VaultScopepath, newer)
     const atOpen = await TH.expectRefusal(world.open(), 'newer_format')
     expect(atOpen.message).to.include('update the app')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'newer_format')
     expect(err.message).to.include('newer version')
-    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(newer)
+    expect(world.dbStore.read(u1VaultScopepath)).to.eq(newer)
     expect(world.dbStore.ckeys().some((ckey) => isU1Box(ckey))).to.eq(true)
     expect(await world.getLease()).to.not.be.null
   })
@@ -97,7 +94,7 @@ describe("delDamagedVault", () => {
     }
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')
     expect((err.cause as Error).message).to.include('busy')
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.not.be.null
     await delDamagedVault(world.optsWith({ deviceDB: flakyDevice }))
     expect(await world.getLease()).to.be.null
@@ -105,15 +102,15 @@ describe("delDamagedVault", () => {
 
   it("lets a vault made anew since survive: stale_write, the new vault and its unlock untouched", async () => {
     const world = await damagedVaultWorld()
-    // Storage answers the first look at the vault props with the damaged vault, and every later one with another.
+    // Storage answers the first look at the vault record with the damaged vault, and every later one with another.
     let looks = 0
     const replacing = localVaultDB({
       store: {
         ...world.dbStore,
         read: (ckey) => {
-          if (ckey !== u1VaultPropsCkey) { return world.dbStore.read(ckey) }
+          if (ckey !== u1VaultScopepath) { return world.dbStore.read(ckey) }
           looks += 1
-          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultPropsOf(world), vault_tok: 'made-anew' })
+          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultRecordOf(world), vault_tok: 'made-anew' })
         },
       },
     })
@@ -122,23 +119,21 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks the scope with the vault's validators, handing the VaultDB's verb the scope alone, and refuses a misspelt bag as Bank.make does", async () => {
+  it("checks the scope as Bank.make and bank.ensureVault do, handing the VaultDB's verb the scope alone", async () => {
     const world = await damagedVaultWorld()
-    const longUserId = ZClassic.string().min(1).max(300)
     const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userID: longUserId } as unknown as MakeBankOpts['validators'] })), 'bad_option')
-    const narrowUserId = ZClassic.string().max(1)
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ validators: { userId: narrowUserId } })), 'bad_label')
+    const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: 'alice smith' })), 'bad_scope')
+    expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
     expect(verb).not.toHaveBeenCalled()
-    await delDamagedVault(world.optsWith({ validators: { userId: longUserId } }))
+    await delDamagedVault(world.optsWith())
     expect(verb.mock.calls[0]).to.deep.equal([TH.scopeOf('u1')])
-    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
   })
 
   it("takes the options Bank.make took beside the vault's names, and refuses misuse before touching storage", async () => {
     const world = await damagedVaultWorld()
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_label')
-    await TH.expectRefusal(delDamagedVault(world.optsWith({ userId: '' })), 'bad_label')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ applabel: 'not-a-label' })), 'bad_scope')
+    await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: '' })), 'bad_scope')
     await TH.expectRefusal(delDamagedVault(null as unknown as DelDamagedVaultOpts), 'bad_option')
     for (const [misfit] of MisfitStores) {
       await TH.expectRefusal(delDamagedVault(world.optsWith(misfit)), 'bad_option')
@@ -149,24 +144,24 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("checks names with the host's validators, as Bank.make does", async () => {
+  it("takes a user_id that is an email address, as Bank.make does", async () => {
     const world = makeWorld()
-    const opts = world.optsWith({ userId: 'u1@example', validators: { userId: Z.string() } })
+    const opts = world.optsWith({ user_id: 'u1@example' })
     const vault = await TH.settledVault(opts)
     await TH.unlock(vault, 'pw')
     TH.closeVault(vault)
-    const ckey = Ckeys.vaultProps({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
-    const vaultProps = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object
-    world.dbStore.write(ckey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+    const vaultScopepath = Scopepath.vault({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
+    const vaultRecord = JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null') as object
+    world.dbStore.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
     await delDamagedVault(opts)
-    expect(JSON.parse(world.dbStore.read(ckey) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
+    expect(JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
   })
 
   it("raises this device's record to the tombstone's vault_epoch, keeping its device_id, so a restored copy of the damaged vault is behind", async () => {
     const world = await damagedVaultWorld()
     const before = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
     await delDamagedVault(world.optsWith())
-    const tombstone = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? 'null') as { vault_epoch: number }
+    const tombstone = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as { vault_epoch: number }
     const after = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
     expect(after?.highest_vault_epoch).to.eq(tombstone.vault_epoch)
     expect(after?.device_id).to.eq(before?.device_id)
@@ -174,14 +169,14 @@ describe("delDamagedVault", () => {
 
   it("clears a vault its bank refused as damaged_vault, and the same bank then births a new life, novel, as its example shows", async () => {
     const world = await damagedVaultWorld()
-    const { userId, vaultlabel, ...bankOpts } = world.optsWith()
+    const { vaultlabel, ...bankOpts } = world.optsWith()
     const bank = Bank.make(bankOpts)
-    const { ok, err } = await bank.tryEnsureVault({ userId, vaultlabel: 'main' })
+    const { ok, err } = await bank.tryEnsureVault({ vaultlabel: 'main' })
     expect(ok).to.be.false
     expect(isVaultError(err, 'damaged_vault')).to.be.true
-    await delDamagedVault({ ...bankOpts, userId, vaultlabel })
-    const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
-    expect(vault.getSnapshot().state).to.eq('novel')
+    await delDamagedVault({ ...bankOpts, vaultlabel })
+    const vault = await bank.ensureVault({ vaultlabel: 'main' })
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     bank.closeVaults()
   })
 })

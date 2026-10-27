@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, memoryStore, type RequestCleartext } from 'safebyok'
 import { BankProvider } from 'safebyok-react'
@@ -16,8 +16,8 @@ const renderBar = (requestCleartext?: RequestCleartext) => {
   if (requestCleartext === undefined) {
     world.renderInVault(ui)
   } else {
-    const { userId: _userId, vaultlabel: _vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB: world.vaultDB, deviceDB: world.deviceDB })
-    render(<BankProvider {...bankOpts} requestCleartext={requestCleartext} userId="u1">{ui}</BankProvider>)
+    const { user_id: _user_id, vaultlabel: _vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB: world.vaultDB, deviceDB: world.deviceDB })
+    render(<BankProvider {...bankOpts} requestCleartext={requestCleartext} user_id="u1">{ui}</BankProvider>)
   }
   return { world, auth, dbStore }
 }
@@ -38,7 +38,7 @@ describe("SessionBar", () => {
     signInAs('  margo ')
     await screen.findByText('margo')
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(screen.getByText(`(${auth.getSnapshot()?.userId ?? ''})`)).to.not.be.null
+    expect(screen.getByText(`(${auth.getSnapshot()?.user_id ?? ''})`)).to.not.be.null
   })
 
   it("signs in from the keyboard too", async () => {
@@ -67,7 +67,7 @@ describe("SessionBar", () => {
   it("says what a username is when one will not do, and stays signed out", async () => {
     const { auth } = renderBar()
     signInAs('not a label')
-    await screen.findByText(/A username is 2-64 letters/)
+    await screen.findByText(/A username is 2 to 40 lowercase letters/)
     expect(auth.getSnapshot()).to.be.null
   })
 
@@ -90,17 +90,17 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     await TH.expectProbeState('locked')
-    const deleted = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+    const deleted = await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))
     expect(deleted).to.not.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     expect(dbStore.read('account:acme:margo')).to.be.null
-    // This provider's userId is not the auth's: it stays on u1, and still asks for nothing anew.
+    // This provider's user_id is not the auth's: it stays on u1, and still asks for nothing anew.
     await TH.expectProbeState('none')
     await new Promise((resolve) => { setTimeout(resolve, 50) })
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
   })
 
   it("keeps the account and says why when the vault cannot be deleted", async () => {
@@ -114,10 +114,10 @@ describe("SessionBar", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     expect(await screen.findByText('The vault storage could not be reached: try again shortly.')).to.not.be.null
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
-  it("keeps the account and its vault, and says so, when the provider's own dialog declines the deletion, as it does for now", async () => {
+  it("deletes the account and its vault through the provider's own dialog, proven by the passphrase", async () => {
     const { world, auth } = renderBar()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     signInAs('margo')
@@ -125,9 +125,41 @@ describe("SessionBar", () => {
     await TH.expectProbeState('locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-    expect(await screen.findByText(/declined/)).to.not.be.null
+    await screen.findByRole('dialog', { name: 'Delete your vault' })
+    await TH.answerPassphraseDialog()
+    await screen.findByPlaceholderText('username')
+    expect(auth.getSnapshot()).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+  })
+
+  it("keeps the account and its vault, saying nothing, when the user cancels the deletion's dialog", async () => {
+    const { world, auth } = renderBar()
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('locked')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByRole('dialog', { name: 'Delete your vault' })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    await TH.wakeupAtNextTick()
+    expect(document.querySelector('.gripe')).to.be.null
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+  })
+
+  it("deletes an account whose vault has no passphrase yet without asking: there is nothing in it, and nothing to prove its deletion", async () => {
+    const { world, auth } = renderBar()
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbeState('novel')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByPlaceholderText('username')
+    expect(screen.queryByRole('dialog')).to.be.null
+    expect(auth.getSnapshot()).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {

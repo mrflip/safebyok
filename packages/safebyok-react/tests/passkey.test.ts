@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type PasskeyWayinSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse, type PrfSalt, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -25,16 +25,25 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
   throw new Error(`expected a VaultError of kind '${kind}', but nothing was thrown`)
 }
 
-/** The vault's passkey as its snapshot has it, for `proof`. */
-const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
-  wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_tok: 'vault-tok-u1',
-  credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
+/** The vault's passkey as its snapshot's gate has it, for `proof`. */
+const passkeySparseOf = (proof: PasskeyAnswer): PasskeyWayinSparse => ({
+  wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
+  credential_id: proof.credential_id, prf_salt_b64: proof.prf_salt_b64 as PrfSalt,
 })
+
+/** The vault's gate as its snapshot has it, holding `passkey`. */
+const gateWith = (passkey: PasskeyWayinSparse | null): GateSparse => ({
+  passphrase: { wayinkind: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) },
+  passkey,
+})
+
+/** The vault's gate as its snapshot has it, its passkey made for `proof`. */
+const gateOf = (proof: PasskeyAnswer): GateSparse => gateWith(passkeySparseOf(proof))
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
   const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
+  const open = async () => await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
   const vault = await open()
   await TH.unlock(vault, 'pw')
   return { vault, open }
@@ -56,11 +65,11 @@ describe("createPasskey", () => {
     install()
     const passkey = await createPasskey(passkeyOpts)
     expect(passkey).to.not.be.null
-    expect(fromB64(passkey?.prfSaltB64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
+    expect(fromB64(passkey?.prf_salt_b64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
     expect(passkey?.prfBytes).to.have.lengthOf(32)
     const again = await createPasskey(passkeyOpts)
-    expect(again?.prfSaltB64).to.not.eq(passkey?.prfSaltB64)
-    expect(again?.credentialId).to.not.eq(passkey?.credentialId)
+    expect(again?.prf_salt_b64).to.not.eq(passkey?.prf_salt_b64)
+    expect(again?.credential_id).to.not.eq(passkey?.credential_id)
   })
 
   it("asks for user verification, under a random user handle, with the host's names", async () => {
@@ -114,17 +123,18 @@ describe("askPasskey", () => {
     const fake = install()
     const laptop = await createPasskey(passkeyOpts)
     if (laptop === null) { throw new Error('the fake authenticator made no passkey') }
-    const answered = await askPasskey(summaryOf(laptop), { rpId: 'acme.example' })
+    const answered = await askPasskey(gateOf(laptop), { rpId: 'acme.example' })
     expect(answered).to.deep.equal(laptop)
     const request = fake.calls.get[0]?.publicKey
     expect(request?.allowCredentials).to.have.lengthOf(1)
     expect(request?.rpId).to.eq('acme.example')
     expect(request?.userVerification).to.eq('required')
-    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([laptop.credentialId])
+    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([laptop.credential_id])
   })
 
-  it("refuses as absent_wayin a vault with no passkey, before the browser is asked", async () => {
+  it("refuses as absent_wayin a vault with no passkey, or no gate yet, before the browser is asked", async () => {
     const fake = install()
+    await expectRefusal(askPasskey(gateWith(null)), 'absent_wayin')
     await expectRefusal(askPasskey(null), 'absent_wayin')
     expect(fake.calls.get).to.have.lengthOf(0)
   })
@@ -138,8 +148,8 @@ describe("askPasskey", () => {
   for (const [field, val, blurb] of DamagedCases) {
     it(`refuses as damaged_wayin a passkey stored with ${blurb}, before the browser is asked`, async () => {
       const fake = install()
-      const damaged = { ...summaryOf(await TH.passkeyOf('laptop')), [field]: val }
-      await expectRefusal(askPasskey(damaged), 'damaged_wayin')
+      const damaged = { ...passkeySparseOf(await TH.passkeyOf('laptop')), [field]: val }
+      await expectRefusal(askPasskey(gateWith(damaged)), 'damaged_wayin')
       expect(fake.calls.get).to.have.lengthOf(0)
     })
   }
@@ -149,19 +159,19 @@ describe("askPasskey", () => {
     const laptop = await createPasskey(passkeyOpts)
     if (laptop === null) { throw new Error('the fake authenticator made no passkey') }
     fake.refuseNext('NotAllowedError')
-    expect(await askPasskey(summaryOf(laptop))).to.be.null
+    expect(await askPasskey(gateOf(laptop))).to.be.null
     const elsewhere = await TH.passkeyOf('elsewhere')
-    expect(await askPasskey(summaryOf(elsewhere))).to.be.null
+    expect(await askPasskey(gateOf(elsewhere))).to.be.null
   })
 
   it("refuses as passkey_unavailable a passkey that gives no answer, and a browser without WebAuthn", async () => {
     const laptop = await TH.passkeyOf('laptop')
-    await expectRefusal(askPasskey(summaryOf(laptop)), 'passkey_unavailable')
+    await expectRefusal(askPasskey(gateOf(laptop)), 'passkey_unavailable')
     const fake = install({ prf: false })
     await expectRefusal(createPasskey(passkeyOpts), 'passkey_unavailable')
-    const [credentialId = ''] = fake.credentialIds()
-    const stray = { ...await TH.passkeyOf('stray'), credentialId }
-    await expectRefusal(askPasskey(summaryOf(stray)), 'passkey_unavailable')
+    const [credential_id = ''] = fake.credentialIds()
+    const stray = { ...await TH.passkeyOf('stray'), credential_id }
+    await expectRefusal(askPasskey(gateOf(stray)), 'passkey_unavailable')
   })
 })
 
@@ -172,11 +182,11 @@ describe("a passkey unlock, end to end", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const answer = await createPasskey(passkeyOpts)
     if (answer !== null) { await TH.putWayin(vault, 'pw', answer) }
-    expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credentialId)
+    expect(vault.getSnapshot().gate?.passkey?.credential_id).to.eq(answer?.credential_id)
 
     const elsewhere = await open()
-    expect(elsewhere.getSnapshot().state).to.eq('locked')
-    const passkey = await askPasskey(elsewhere.getSnapshot().passkey)
+    expect(TH.stateOf(elsewhere.getSnapshot())).to.eq('locked')
+    const passkey = await askPasskey(elsewhere.getSnapshot().gate)
     if (passkey !== null) { await TH.unlock(elsewhere, passkey) }
     expect(await elsewhere.getWhisper('anthropic')).to.eq('sk-fake')
   })
@@ -188,7 +198,7 @@ describe("a passkey unlock, end to end", () => {
     const answer = await createPasskey(passkeyOpts)
     expect(answer).to.be.null
     if (answer !== null) { await TH.putWayin(vault, 'pw', answer) }
-    expect(vault.getSnapshot().passkey).to.be.null
+    expect(vault.getSnapshot().gate?.passkey).to.be.null
   })
 
   it("a passkey added again takes the first's place: askPasskey asks only the new one", async () => {
@@ -198,9 +208,9 @@ describe("a passkey unlock, end to end", () => {
     const [first = ''] = fake.credentialIds()
     await TH.putWayin(vault, 'pw', await madePasskey())
     const elsewhere = await open()
-    const { passkey } = elsewhere.getSnapshot()
-    expect(passkey?.credential_id).to.not.eq(first)
-    const asked = await askPasskey(passkey)
-    expect(asked?.credentialId).to.eq(passkey?.credential_id)
+    const { gate } = elsewhere.getSnapshot()
+    expect(gate?.passkey?.credential_id).to.not.eq(first)
+    const asked = await askPasskey(gate)
+    expect(asked?.credential_id).to.eq(gate?.passkey?.credential_id)
   })
 })

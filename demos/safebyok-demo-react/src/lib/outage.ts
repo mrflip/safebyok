@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultPropsExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type GatelessVaultProps, type StoredVault, type Tombstone, type VaultProps, type VaultRecords, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -73,22 +73,22 @@ export class OutageVaultDB extends VaultDB {
 
   // The inner adapter's records verbs hand on each box as stored, which this adapter's own checks
   // read as its listing does.
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     this.refuseWhileDown()
     return storedVaultOf(valOf(await this.inner.getVaultRecords(scope)))
   }
 
-  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     this.refuseWhileDown()
     return storedVaultOf(valOf(await this.inner.ensureVaultRecords(draft)))
   }
 
   // The inner adapter's public verbs refuse a failed expectation as stale_write themselves, and a
   // refusal thrown here passes through this adapter's verbs untouched: so reaching the end means
-  // it landed, and the vault props as the inner adapter stored them are the answer.
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
+  // it landed, and the vault record as the inner adapter stored it is the answer.
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.putVaultProps(vaultProps, expected))
+    return valOf(await this.inner.putVaultRecord(vaultRecord, expected))
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
@@ -117,10 +117,10 @@ export class OutageVaultDB extends VaultDB {
     return valOf(await this.inner.delVault(scope, expected))
   }
 
-  // The one public verb this adapter hands on itself: deleting a vault whose props are damaged
+  // The one public verb this adapter hands on itself: deleting a vault whose record is damaged
   // needs the record as stored, which this adapter's own doGetVault never sees, as the inner
   // verbs refuse it. The inner adapter does the checking and the deleting.
-  override delDamagedVault(scope: VaultScope): Promise<Outcome<Tombstone | null>> {
+  override delDamagedVault(scope: VaultScope): Promise<Outcome<VaultTombstone | null>> {
     return this.outage.isDown() ? outcomeOf(() => { this.refuseWhileDown(); return null }) : this.inner.delDamagedVault(scope)
   }
 
@@ -135,9 +135,9 @@ export class OutageVaultDB extends VaultDB {
   }
 }
 
-/** A vault as another VaultDB's records verbs hand it on, or null for none, as this adapter's half hands it up: each box under the boxlabel it holds. */
-const storedVaultOf = (records: VaultRecords | null): StoredVault => (
-  records === null
-    ? { vaultProps: null, boxes: [] }
-    : { vaultProps: records.vaultProps, boxes: records.boxes.map((box) => ({ boxlabel: (box as { boxlabel: string }).boxlabel, box })) }
-)
+/** A vault as another VaultDB's records verbs hand it on, checked and split, or null for none, as this adapter's half answers: its record as `vault`, beside its boxes. */
+const storedVaultOf = (records: (VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null): VaultReadResponse => {
+  if (records === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
+  const { boxes, damagedBoxes, ...vault } = records
+  return { vault, boxes, damagedBoxes }
+}

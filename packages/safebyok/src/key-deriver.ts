@@ -14,6 +14,12 @@ type KeyDeriverBase = {
    * logger hearing only the kind of a VaultError you threw.
    */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
+  /** Fetch or build what the deriver needs before it can derive, such as a WebAssembly module: each bank's `hello()` runs it, so call it early only to warm up.
+   * Make it cost nothing once it has succeeded, and forget a failure, so the next call tries
+   * again. One that fails refuses the hello 'unexpected_error', what it threw the cause, as it
+   * heard no passphrase.
+   */
+  load?:             (() => void | Promise<void>) | undefined
 }
 
 /** A key deriver running Argon2id, carrying its whole {@link KeyDeriverSpec}, as {@link argon2idDeriver}'s do.
@@ -35,6 +41,8 @@ export type CustomKeyDeriver = KeyDeriverBase & {
 /** What turns a passphrase into passphraseKey bytes: an {@link Argon2idKeyDeriver} or a {@link CustomKeyDeriver}.
  * Use {@link argon2idWebV1Deriver}, or {@link argon2idDeriver} for a spec of your own. The seam lets
  * tests use a cheap deriver, and a host plug in a faster build of the same spec (WebAssembly, native).
+ * Make it once, before any bank, and hand the same one to each: a deriver costly to set up carries
+ * that setup as `load`, which each bank's `hello()` runs.
  *
  * A vault unlocks only through a deriver carrying the `key_deriver_label` its wayin stores, so
  * plugging in your own commits every user's vault to it. A deriver wearing a supplied spec's label

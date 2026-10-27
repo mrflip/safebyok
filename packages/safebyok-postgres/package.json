@@ -2,7 +2,7 @@
   "name": "safebyok-postgres",
   "private": false,
   "version": "0.4.0",
-  "description": "Postgres storage for safebyok: the tables that hold vault props and boxes as ciphertext, and the server-side VaultDB over them, with no driver of its own.",
+  "description": "Postgres storage for safebyok: the tables that hold vault records and boxes as ciphertext, and the server-side VaultDB over them, with no driver of its own.",
   "keywords": [
     "safebyok",
     "postgres",

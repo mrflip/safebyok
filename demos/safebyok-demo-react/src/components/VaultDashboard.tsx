@@ -5,7 +5,7 @@ import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { Sidecar, Whisper } from 'safebyok'
+import type { BoxDamaged, BoxSparse, Sidecar, Whisper, VaultSnapshot } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
@@ -41,7 +41,8 @@ export const VaultDashboard = () => {
   // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
   const refusal = entry?.err ?? null
   if (entry !== null && refusal !== null && bank !== null) {
-    const choice = { userId: entry.scope.user_id, vaultlabel: entry.scope.vaultlabel }
+    // The entry's scope names the vault to the bank as it is: the bank is this user's.
+    const choice = entry.scope
     const askAgain = () => { void bank.tryEnsureVault(choice) }
     // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
     // and start over, which asks first, as it takes every box in the vault with it.
@@ -120,8 +121,7 @@ export const VaultDashboard = () => {
       await vault.delBox(boxlabel)
     } catch (err) {
       // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
-      // the user deleted to start over from the passphrase dialog, its Vault object gone with it
-      // -- is what was asked for.
+      // the user deleted, its Vault object gone with it -- is what was asked for.
       if (isVaultError(err, 'vault_locked') || isVaultError(err, 'vault_gone')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
@@ -151,11 +151,46 @@ export const VaultDashboard = () => {
     }
   }
 
+  // A damaged box can't be read, used or edited -- only removed, or stored over afresh while it
+  // names its revision: one damaged beyond naming putBox() refuses. One a newer safebyok wrote is
+  // the app's to update, not the user's to remove.
+  const damagedRow = (box: BoxDamaged) => (
+    <tr key={box.boxlabel} className="damaged">
+      <td><code>{box.boxlabel}</code></td>
+      <td colSpan={3} className="gripe">{box.damage === 'newer_format' ? "written by a newer version of this app: update the app to read it" : "damaged: its stored record can't be read"}</td>
+      <td className="row">
+        {box.damage === 'damaged' && box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
+        {box.damage === 'damaged' && <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>}
+      </td>
+    </tr>
+  )
+
+  const soundRow = (box: BoxSparse) => {
+    const viewed = shown[box.boxlabel]
+    return (
+      <tr key={box.boxlabel}>
+        <td><code>{box.boxlabel}</code></td>
+        <td className="whisper-cell">
+          {viewed === undefined
+            ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
+            : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
+        </td>
+        <td className="quiet">{noteOf(box.sidecar)}</td>
+        <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
+        <td className="row">
+          <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
+          <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
+          <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
+        </td>
+      </tr>
+    )
+  }
+
   return (
     <section className="vault-dashboard">
       <div className="row spread">
         <h2>Vault dashboard <span className="quiet">vault “{snapshot.vaultlabel}”</span></h2>
-        <LockChip state={snapshot.state} askPassphraseAt={snapshot.askPassphraseAt} onLock={() => { void vault.lock() }} />
+        <LockChip snapshot={snapshot} onLock={() => { void vault.lock() }} />
       </div>
 
       <p className="quiet">
@@ -163,48 +198,15 @@ export const VaultDashboard = () => {
         sees none of it, and clearing this site&apos;s data removes it.
       </p>
 
-      {snapshot.boxes.length === 0 && <p className="quiet">No boxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
+      {snapshot.boxes.length === 0 && snapshot.damagedBoxes.length === 0 && <p className="quiet">No boxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
 
-      {snapshot.boxes.length > 0 && (
+      {(snapshot.boxes.length > 0 || snapshot.damagedBoxes.length > 0) && (
         <table>
           <thead>
             <tr><th>label</th><th>whisper</th><th>note</th><th>written</th><th></th></tr>
           </thead>
           <tbody>
-            {snapshot.boxes.map((box) => {
-              // A damaged box can't be read, used or edited -- only removed, or stored over afresh
-              // while it names its revision: one damaged beyond naming putBox() refuses.
-              if (box.damaged) {
-                return (
-                  <tr key={box.boxlabel} className="damaged">
-                    <td><code>{box.boxlabel}</code></td>
-                    <td colSpan={3} className="gripe">{"damaged: its stored record can't be read"}</td>
-                    <td className="row">
-                      {box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
-                      <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
-                    </td>
-                  </tr>
-                )
-              }
-              const viewed = shown[box.boxlabel]
-              return (
-                <tr key={box.boxlabel}>
-                  <td><code>{box.boxlabel}</code></td>
-                  <td className="whisper-cell">
-                    {viewed === undefined
-                      ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
-                      : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
-                  </td>
-                  <td className="quiet">{noteOf(box.sidecar)}</td>
-                  <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
-                  <td className="row">
-                    <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
-                    <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
-                    <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
-                  </td>
-                </tr>
-              )
-            })}
+            {[...snapshot.boxes, ...snapshot.damagedBoxes].toSorted(byBoxlabel).map((box) => ('damage' in box ? damagedRow(box) : soundRow(box)))}
           </tbody>
         </table>
       )}
@@ -254,16 +256,20 @@ export const VaultDashboard = () => {
   )
 }
 
-const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassphraseAt: number | null, onLock: () => void }) => {
-  if (state === 'unlocked') {
-    return (
-      <span className="row">
-        <span className="chip unlocked">🔓 unlocked{asksAgain(askPassphraseAt)}</span>
-        <button className="mini" onClick={onLock}>lock now</button>
-      </span>
-    )
-  }
-  if (state === 'locked') { return <span className="chip locked">🔒 locked</span> }
-  if (state === 'novel') { return <span className="chip">no vault yet</span> }
-  return <span className="chip">…</span>
+/** The vault's lock, as its snapshot shows it: no gate yet, a gate and no lease on this device, or unlocked until `ask_passphrase_at`. */
+const LockChip = ({ snapshot, onLock }: { snapshot: VaultSnapshot, onLock: () => void }) => {
+  if (snapshot.gate === null) { return <span className="chip">no vault yet</span> }
+  if (snapshot.ask_passphrase_at === null) { return <span className="chip locked">🔒 locked</span> }
+  return (
+    <span className="row">
+      <span className="chip unlocked">🔓 unlocked{asksAgain(snapshot.ask_passphrase_at)}</span>
+      <button className="mini" onClick={onLock}>lock now</button>
+    </span>
+  )
+}
+
+/** Boxes, sound and damaged alike, in boxlabel order, as the vault lists each kind: by code unit. */
+const byBoxlabel = (one: { boxlabel: string }, two: { boxlabel: string }): number => {
+  if (one.boxlabel === two.boxlabel) { return 0 }
+  return one.boxlabel < two.boxlabel ? -1 : 1
 }

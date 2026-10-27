@@ -1,7 +1,7 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, TombstoneFields, recordOf, selectionOf } from './fields'
+import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 
 /** What graphqlVaultDB needs of an urql Client: its three ways to send an operation.
  * The Client your app already has is one, whatever its exchanges.
@@ -47,7 +47,7 @@ const ServerMaxNameBytes = 640
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
- *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB })   // as the user signs in
  * @example
  *   const vaultDB = graphqlVaultDB({ client, maxBoxes: 250 })  // the server's postgresVaultDB holds 250
  */
@@ -74,37 +74,40 @@ const isUrqlClient = (client: unknown): client is GraphqlVaultClient => {
 
 // ---------------------------------------------------------------------------------- the operations
 
-const Scope = '$scope: SafebyokVaultScopeInput!'
-const VaultPropsSelection = selectionOf(VaultPropsFields)
+// A vault's three names, each an argument of its own: the server's VaultDB holds `user_id` to the
+// user its own auth signed in.
+const ScopeVariables = '$applabel: String!, $user_id: String!, $vaultlabel: String!'
+const ScopeArgs = 'applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel'
+const VaultRecordSelection = selectionOf(VaultRecordFields)
 
-const VaultSelection = `vaultProps { ${VaultPropsSelection} } boxes { ${selectionOf(ListedBoxFields)} }`
+const VaultSelection = `vault { ${VaultRecordSelection} } boxes { ${selectionOf(BoxSparseFields)} } damagedBoxes { ${selectionOf(BoxDamagedFields)} }`
 
-const GetVaultDoc = `query SafebyokGetVault(${Scope}) {
-  safebyokGetVault(scope: $scope) { ${VaultSelection} }
+const GetVaultDoc = `query SafebyokGetVault(${ScopeVariables}) {
+  safebyokGetVault(${ScopeArgs}) { ${VaultSelection} }
 }`
-const EnsureVaultDoc = `mutation SafebyokEnsureVault($draft: SafebyokVaultPropsInput!) {
+const EnsureVaultDoc = `mutation SafebyokEnsureVault($draft: SafebyokVaultRecordInput!) {
   safebyokEnsureVault(draft: $draft) { ${VaultSelection} }
 }`
-const GetBoxDoc = `query SafebyokGetBox(${Scope}, $boxlabel: String!, $expected: SafebyokBoxGetExpectationInput!) {
-  safebyokGetBox(scope: $scope, boxlabel: $boxlabel, expected: $expected) { ${selectionOf(BoxFields)} }
+const GetBoxDoc = `query SafebyokGetBox(${ScopeVariables}, $boxlabel: String!, $expected: SafebyokBoxGetExpectationInput!) {
+  safebyokGetBox(${ScopeArgs}, boxlabel: $boxlabel, expected: $expected) { ${selectionOf(BoxFields)} }
 }`
-const GetCapacityDoc = `query SafebyokGetCapacity(${Scope}) {
-  safebyokGetCapacity(scope: $scope) { boxes { used max } bytes { used max } }
+const GetCapacityDoc = `query SafebyokGetCapacity(${ScopeVariables}) {
+  safebyokGetCapacity(${ScopeArgs}) { boxes { used max } bytes { used max } }
 }`
-const PutVaultPropsDoc = `mutation SafebyokPutVaultProps($vaultProps: SafebyokVaultPropsInput!, $expected: SafebyokVaultPropsExpectationInput!) {
-  safebyokPutVaultProps(vaultProps: $vaultProps, expected: $expected) { landed refusalkind message vault_props_stored }
+const PutVaultRecordDoc = `mutation SafebyokPutVaultRecord($vaultRecord: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
+  safebyokPutVaultRecord(vaultRecord: $vaultRecord, expected: $expected) { landed refusalkind message vault_stored }
 }`
-const PutBoxDoc = `mutation SafebyokPutBox(${Scope}, $box: SafebyokBoxInput!, $expected: SafebyokBoxExpectationInput!) {
-  safebyokPutBox(scope: $scope, box: $box, expected: $expected) { landed refusalkind message box_stored capacity { boxes { used max } bytes { used max } } }
+const PutBoxDoc = `mutation SafebyokPutBox(${ScopeVariables}, $box: SafebyokBoxInput!, $expected: SafebyokBoxExpectationInput!) {
+  safebyokPutBox(${ScopeArgs}, box: $box, expected: $expected) { landed refusalkind message box_stored capacity { boxes { used max } bytes { used max } } }
 }`
-const DelBoxDoc = `mutation SafebyokDelBox(${Scope}, $boxlabel: String!, $expected: SafebyokBoxDelExpectationInput!) {
-  safebyokDelBox(scope: $scope, boxlabel: $boxlabel, expected: $expected) { outcome }
+const DelBoxDoc = `mutation SafebyokDelBox(${ScopeVariables}, $boxlabel: String!, $expected: SafebyokBoxDelExpectationInput!) {
+  safebyokDelBox(${ScopeArgs}, boxlabel: $boxlabel, expected: $expected) { outcome }
 }`
-const DelVaultDoc = `mutation SafebyokDelVault(${Scope}, $expected: SafebyokVaultDelExpectationInput!) {
-  safebyokDelVault(scope: $scope, expected: $expected) { ${selectionOf(TombstoneFields)} }
+const DelVaultDoc = `mutation SafebyokDelVault(${ScopeVariables}, $expected: SafebyokVaultDelExpectationInput!) {
+  safebyokDelVault(${ScopeArgs}, expected: $expected) { ${selectionOf(VaultTombstoneFields)} }
 }`
-const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
-  safebyokVaultChanged(scope: $scope) { ${selectionOf(ScopeFields)} }
+const VaultChangedDoc = `subscription SafebyokVaultChanged(${ScopeVariables}) {
+  safebyokVaultChanged(${ScopeArgs}) { ${selectionOf(ScopeFields)} }
 }`
 
 /** Every operation graphqlVaultDB sends, by the root field it asks for: the documents to register with a server that allows only listed operations.
@@ -119,7 +122,7 @@ export const VaultOperations = {
   safebyokEnsureVault:      EnsureVaultDoc,
   safebyokGetBox:           GetBoxDoc,
   safebyokGetCapacity:      GetCapacityDoc,
-  safebyokPutVaultProps:    PutVaultPropsDoc,
+  safebyokPutVaultRecord:   PutVaultRecordDoc,
   safebyokPutBox:           PutBoxDoc,
   safebyokDelBox:           DelBoxDoc,
   safebyokDelVault:         DelVaultDoc,
@@ -148,35 +151,36 @@ class UrqlVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes
   }
 
-  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in one step.
-  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
-    const { safebyokGetVault } = await this.asked(GetVaultDoc, { scope: scopeOut(scope) })
-    return storedVaultOf(safebyokGetVault)
+  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in
+  // one step, and splits its boxes, which this VaultDB's base class checks again.
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+    const { safebyokGetVault } = await this.asked(GetVaultDoc, scopeOut(scope))
+    return vaultReadOf(safebyokGetVault)
   }
 
-  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
-    const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultPropsFields) })
-    return storedVaultOf(safebyokEnsureVault)
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+    const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultRecordFields) })
+    return vaultReadOf(safebyokEnsureVault)
   }
 
-  // A write that lands answers with the vault props as the server's storage holds them; a stale
+  // A write that lands answers with the vault record as the server's storage holds it; a stale
   // one answers in the body, not landed, with what stands, which the base class checks: it is
   // refused here as the VaultError the server's VaultDB made of it.
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
-    checkInts('vault props record', vaultProps)
-    checkInts('vault props expectation', expected)
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+    checkInts('vault record', vaultRecord)
+    checkInts('vault record expectation', expected)
     const { vault_tok, gate_epoch } = expected
-    const { safebyokPutVaultProps } = await this.told(PutVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_tok, gate_epoch } })
-    const answer = safebyokPutVaultProps as WriteAnswer
-    if (answer.landed) { return recordOf(answer.vault_props_stored, VaultPropsFields) }
-    throw refusalOfAnswer(answer, 'vault_props_stored')
+    const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultRecord: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
+    const answer = safebyokPutVaultRecord as WriteAnswer
+    if (answer.landed) { return recordOf(answer.vault_stored, VaultRecordFields) }
+    throw refusalOfAnswer(answer, 'vault_stored')
   }
 
-  // A read whose vault props are not the ones expected refuses on the server, in the step that
+  // A read whose vault record is not the one expected refuses on the server, in the step that
   // reads the box, and crosses as its kind.
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     const { vault_tok } = expected
-    const { safebyokGetBox } = await this.asked(GetBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_tok } })
+    const { safebyokGetBox } = await this.asked(GetBoxDoc, { ...scopeOut(scope), boxlabel, expected: { vault_tok } })
     return recordOf(safebyokGetBox, BoxFields)
   }
 
@@ -186,7 +190,7 @@ class UrqlVaultDB extends VaultDB {
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     checkInts('box', box)
     const { vault_tok, revision_tok } = expected
-    const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_tok, revision_tok } })
+    const { safebyokPutBox } = await this.told(PutBoxDoc, { ...scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_tok, revision_tok } })
     const answer = safebyokPutBox as WriteAnswer
     if (answer.landed) { return recordOf(answer.box_stored, BoxFields) }
     throw refusalOfAnswer(answer, 'box_stored')
@@ -194,7 +198,7 @@ class UrqlVaultDB extends VaultDB {
 
   // How full the vault is, as the server's storage reckons it: the base class checks it.
   protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
-    const { safebyokGetCapacity } = await this.asked(GetCapacityDoc, { scope: scopeOut(scope) })
+    const { safebyokGetCapacity } = await this.asked(GetCapacityDoc, scopeOut(scope))
     return safebyokGetCapacity
   }
 
@@ -202,7 +206,7 @@ class UrqlVaultDB extends VaultDB {
   // with what the server's storage removed.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     const { vault_tok, revision_tok } = expected
-    const { safebyokDelBox } = await this.told(DelBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_tok, revision_tok } })
+    const { safebyokDelBox } = await this.told(DelBoxDoc, { ...scopeOut(scope), boxlabel, expected: { vault_tok, revision_tok } })
     return safebyokDelBox
   }
 
@@ -211,13 +215,13 @@ class UrqlVaultDB extends VaultDB {
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     checkInts('delete expectation', expected)
     const { vault_tok, gate_epoch } = expected
-    const { safebyokDelVault } = await this.told(DelVaultDoc, { scope: scopeOut(scope), expected: { vault_tok, gate_epoch } })
-    return recordOf(safebyokDelVault, TombstoneFields)
+    const { safebyokDelVault } = await this.told(DelVaultDoc, { ...scopeOut(scope), expected: { vault_tok, gate_epoch } })
+    return recordOf(safebyokDelVault, VaultTombstoneFields)
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
     const trouble = this.watchTrouble("This vault's GraphQL subscription failed, so other devices' changes may not show until the vault next reads. The vault reads again now, and meets the trouble itself.")
-    const subscription = this.client.subscription(VaultChangedDoc, { scope: scopeOut(scope) }).subscribe((result) => {
+    const subscription = this.client.subscription(VaultChangedDoc, scopeOut(scope)).subscribe((result) => {
       if (result.error) {
         trouble.failed(result.error)
         onChange()
@@ -240,20 +244,28 @@ class UrqlVaultDB extends VaultDB {
   }
 }
 
-const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
+// The three names as the operations take them, each a variable of its own.
+const scopeOut = ({ applabel, user_id, vaultlabel }: VaultScope) => ({ applabel, user_id, vaultlabel })
 
-/** Listed boxes as the server sent them, rebuilt as the VaultDB's half hands them up: each under the boxlabel it carries. */
-const storedBoxesOf = (sent: unknown): StoredBox[] => (sent as unknown[]).map((listed) => {
-  const box = recordOf(listed, ListedBoxFields)
-  return { boxlabel: (box as { boxlabel: string }).boxlabel, box }
-})
-
-/** A vault as the server sent it, or null for none, rebuilt as the VaultDB's half hands it up: its vault props and its boxes. */
-const storedVaultOf = (sent: unknown): StoredVault => {
-  if (sent === null || sent === undefined) { return { vaultProps: null, boxes: [] } }
-  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: unknown }
-  return { vaultProps: recordOf(vaultProps, VaultPropsFields), boxes: storedBoxesOf(boxes) }
+/** A vault as the server sent it, or null for none, passed through as the VaultDB's half answers: its vault record, its sound boxes and its damaged ones.
+ * Each record is rebuilt from its own fields alone, so GraphQL's `__typename` stays behind before
+ * the base class's strict checks; a list that is no list goes up as it came, for them to refuse.
+ * A field the answer leaves out altogether is no answer, as from a server that does not serve
+ * safebyok-graphql's schema and checks no operation against its own.
+ */
+const vaultReadOf = (sent: unknown): VaultReadResponse => {
+  if (sent === undefined) { throw new Error('The GraphQL server answered without the vault it was asked for: is it serving safebyok-graphql?') }
+  if (sent === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
+  const { vault, boxes, damagedBoxes } = sent as Record<string, unknown>
+  return {
+    vault:        recordOf(vault, VaultRecordFields),
+    boxes:        recordsOf(boxes, BoxSparseFields),
+    damagedBoxes: recordsOf(damagedBoxes, BoxDamagedFields),
+  } as VaultReadResponse
 }
+
+/** Each record of `sent`, rebuilt from `fields` alone; `sent` as it came when it is no list. */
+const recordsOf = (sent: unknown, fields: Parameters<typeof recordOf>[1]): unknown => (Array.isArray(sent) ? sent.map((record) => recordOf(record, fields)) : sent)
 
 /** The most a GraphQL `Int` carries, a signed 32-bit integer, where the core takes any safe integer. */
 const GraphqlIntMax = 2_147_483_647
@@ -309,13 +321,13 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-/** What a box write or an update of the vault props answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_props_stored` or `capacity`). */
+/** What a box write or an update of the vault record answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_stored` or `capacity`). */
 type WriteAnswer = {
   landed:              boolean
   refusalkind?:        unknown
   message?:            unknown
   box_stored?:         unknown
-  vault_props_stored?: unknown
+  vault_stored?:       unknown
   capacity?:           unknown
 }
 
@@ -324,7 +336,7 @@ type WriteAnswer = {
  * checks a record, and a `vault_full`'s as `getCapacity` checks its answer. An answer that says
  * neither a kind nor a message is the server's bug, `corrupt_record`.
  */
-const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_props_stored'): VaultError => {
+const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_stored'): VaultError => {
   const { refusalkind, message, capacity } = answer
   if (typeof message !== 'string' || ! isKind(refusalkind)) {
     return new VaultError('corrupt_record', "The GraphQL server refused a write without saying why: is it serving safebyok-graphql of the same version as this app's client? Serve VaultSchemaSdl and vaultResolvers from it.")

@@ -1,10 +1,11 @@
-import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
+import type { BoxDamaged, BoxRecord } from './box'
+import type { Capacity, WayinSummary } from './types/types'
+import type { VaultRecord } from './vault-record'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
  *
- * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
+ * * **Misuse**: a programming error, the host developer's to fix. `bad_scope`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`,
  *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`, `passphrase_required`. Let it reach an error boundary
  *   or the dev overlay.
@@ -27,8 +28,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   Either way the user deletes a box, or the host raises `maxBoxes` where the backend allows.
  * * `whisper_too_large`: the whisper with its sidecar over `maxWhisperBytes`. `box_too_large`: the
  *   whisper and sidecar together over what storage holds in one record.
- * * `bad_label`: a label the app passed that fails the vault's check. Check a label the user types
- *   first, with `Label` or the host's own `validators.boxlabel`.
+ * * `bad_scope`: a name the app passed (an applabel, a user_id, a vaultlabel or a boxlabel) that
+ *   fails its check. Check a name the user types first, with `label` or `user_id`.
  * * `identity_revoked`: storage no longer serves the user this vault was opened for (signed out,
  *   or another user signed in). The vault locks as it refuses. The user signs in again, and the
  *   host opens the vault for whoever that is.
@@ -36,8 +37,8 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   again will not help.
  * * **A record that fails its checks** is named for who is at fault, by a VaultDB and a vault
  *   alike. One read from storage that fails them, or a box that will not open under the lease in
- *   hand, is damaged: `damaged_vault` for vault props, `damaged_box` for a box (a listing shows it
- *   as a `DamagedBox` instead, and tells it as `damaged_box` news), Zod's own error its `cause`
+ *   hand, is damaged: `damaged_vault` for a vault record, `damaged_box` for a box (a listing shows it
+ *   among its `damagedBoxes` instead, and tells it as `damaged_box` news), Zod's own error its `cause`
  *   where a check failed. One the host hands in is `bad_record` (a box handed to a VaultDB's
  *   `putBox`, `invalid_box`). A storage adapter that answers in a shape its protocol does not
  *   allow -- a box write's echo, a stale or full refusal missing what it must carry, a deletion's
@@ -72,7 +73,7 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
  * * `vault_mismatch`: from a `VaultDB.putBox` or `VaultDB.getBox` called directly, a box
- *   written or read under vault props that no longer stand (the vault deleted, remade under
+ *   written or read under a vault record that no longer stands (the vault deleted, remade under
  *   another `vault_tok`, or its vaultKey replaced). Nothing was written or read, and the device
  *   that expected them is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
@@ -103,7 +104,7 @@ export const RefusalKindVals = [
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
-  'bad_label',           // a label, or the userId, that fails the vault's check for it
+  'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
@@ -112,7 +113,7 @@ export const RefusalKindVals = [
   'bad_record',          // a record or expectation the host handed in that is not one this package builds
   'invalid_box',         // a box handed to a VaultDB's putBox that is not one this package builds, or not for its expectation
   'corrupt_record',      // a storage adapter answered in a shape its protocol does not allow: a bug in the adapter
-  'damaged_vault',       // the vault's props, read from storage, failed their checks, so no way in can be tried
+  'damaged_vault',       // the vault's record, read from storage, failed its checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
   'damaged_box',         // a box read from storage failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
@@ -120,7 +121,7 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box read's or write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
+  'vault_mismatch',      // a box read's or write's vault record is not the one standing -- another vault_tok, or none -- so it was refused
   'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
@@ -159,7 +160,7 @@ export const RefusalFamilyForKind = {
   absent_box:          'condition',
   absent_vault:        'condition',
   absent_wayin:        'condition',
-  bad_label:           'misuse',
+  bad_scope:           'misuse',
   bad_whisper:         'misuse',
   whisper_too_large:   'condition',
   box_too_large:       'condition',
@@ -199,24 +200,26 @@ export const RefusalFamilyForKind = {
 export type RefusalMeta = {
   /** `stale_write` from a box write: what stands under the boxlabel, read in the step that refused.
    * It is the winning box's whole record, so the caller can open it or write over it with no second
-   * read. It is a {@link DamagedBox} when what stands does not read back as a box, and null when
+   * read. It is a {@link BoxDamaged} when what stands does not read back as a box, and null when
    * nothing stands there.
    */
-  box_stored?:   BoxRecord | DamagedBox | null
-  /** `stale_write` from an update of the vault props: the vault props standing, read in the step that refused, or null when none stand.
+  box_stored?:   BoxRecord | BoxDamaged | null
+  /** `stale_write` from an update of the vault record: the vault record standing, read in the step that refused, or null when none stands.
    * They are the winner's whole record, checked as a read checks one, so the caller can take them
    * up with no second read.
    */
-  vault_props_stored?: VaultProps | null
+  vault_stored?: VaultRecord | null
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
-   * `vault.capacity` before storage is asked.
+   * `vault.snapshot.capacity` before storage is asked.
    */
   capacity?:     Capacity
-  /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
-  box_listed?:   DamagedBox
-  /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot shows it. */
+  /** `damaged_box` told of a listing: the box as the listing shows it among `damagedBoxes`, its boxlabel, the revision it names, and its `damage`. */
+  box_listed?:   BoxDamaged
+  /** `damaged_wayin` told of a read of the vault record: the way in as the snapshot shows it. */
   wayin_listed?: WayinSummary
+  /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
+  fieldnames?:   readonly string[]
 }
 
 /** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */

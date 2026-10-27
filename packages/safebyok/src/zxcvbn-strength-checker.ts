@@ -1,6 +1,6 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
 import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
-import type { VaultScope } from './types'
+import type { VaultScope } from './types/types'
 
 /** The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked.
  * NIST SP 800-63B asks for length, and against composition rules, which make passphrases harder to
@@ -10,7 +10,7 @@ export const MinPassphraseChars = 12
 
 /** The least zxcvbn score, of 0 to 4, {@link zxcvbnStrengthChecker} admits.
  * zxcvbn calls 3 safely unguessable: it holds against an offline attack on a slow hash, which is
- * what a copy of the vault props meets under Argon2id.
+ * what a copy of the vault record meets under Argon2id.
  */
 export const MinZxcvbnScore = 3
 
@@ -114,7 +114,7 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
  *   always passes it.
  *
  * @example
- *   const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })  // brings it in
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })  // brings it in
  * @example await zxcvbnStrengthChecker('correct horse battery staple')  // { strong: true }
  * @example await zxcvbnStrengthChecker('password1234')                  // { strong: false, reason: 'That is very like a commonly used password: add a few more words, less common ones.' }
  * @example await zxcvbnStrengthChecker('hunter2')                       // { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }

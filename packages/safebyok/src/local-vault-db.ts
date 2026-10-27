@@ -1,12 +1,13 @@
-import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import type { GatelessVaultProps, VaultScope, VaultProps } from './types'
+import type { VaultScope } from './types/types'
+import type { VaultRecord, VaultDraft } from './vault-record'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
-import * as Ckeys from './ckeys'
+import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { Validator } from './checks/validator'
+import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type VaultReadResponse, splitStoredBoxes, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -18,7 +19,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
 }
 
 /**
- * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives, names
+ * VaultDB over a {@link StringStore}: rows as JSON text under the scopepaths `Scopepath` gives, names
  * joined on `^`. A host backs one with localStorage, for a vault that lives on this device alone;
  * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
  * reach -- rows stay on this device instead of syncing through a shared database.
@@ -52,15 +53,10 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
-/** What localVaultDB must be handed: a store carrying a StringStore's five calls. Checked only. */
-const localVaultDBOptsShape = Z.object({
-  store: Z.object({
-    read:      Z.custom(isFunction),
-    write:     Z.custom(isFunction),
-    erase:     Z.custom(isFunction),
-    ckeys:     Z.custom(isFunction),
-    subscribe: Z.custom(isFunction),
-  }),
+/** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
+const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
+  const call = custom(isFunction)
+  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, ckeys: call, subscribe: call }) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {
@@ -71,7 +67,7 @@ class StringStoreVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   // Nor does it count boxes: the vault's own maxBoxes is the only limit.
   readonly maxBoxes = Infinity
-  // A ckey holds a name of any length the floor admits.
+  // A scopepath holds a name of any length the checks admit.
   readonly maxNameBytes = Infinity
 
   private readonly store: StringStore
@@ -84,58 +80,61 @@ class StringStoreVaultDB extends VaultDB {
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
-  // read of a vault reads its props and its boxes in one such step.
-  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
-    return soon(() => ({ vaultProps: readJson(this.store, Ckeys.vaultProps(scope)), boxes: this.storedBoxesOf(scope) }))
+  // read of a vault reads its record and its boxes in one such step.
+  protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
-  protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+  protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     return soon(() => {
-      const ckey = Ckeys.vaultProps(draft)
-      const standing = readJson(this.store, ckey)
+      const vaultScopepath = Scopepath.vault(draft)
+      const standing = readJson(this.store, vaultScopepath)
       const life = Expectations.newLifeOf(draft, standing)
-      if (life) { this.store.write(ckey, JSON.stringify(life)) }
-      return { vaultProps: life ?? standing, boxes: this.storedBoxesOf(draft) }
+      if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
+      return { vault: (life ?? standing) as VaultReadResponse['vault'], ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
+  protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
-      const ckey = Ckeys.vaultProps(vaultProps)
-      const standing = readJson(this.store, ckey)
-      const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
+      const vaultScopepath = Scopepath.vault(vaultRecord)
+      const standing = readJson(this.store, vaultScopepath)
+      const refusal = Expectations.vaultRecordRefusalOf(standing, expected)
       if (refusal) { throw refusal }
-      this.store.write(ckey, JSON.stringify(Expectations.vaultPropsPutOf(vaultProps, standing)))
-      return readJson(this.store, ckey)
+      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, standing)))
+      return readJson(this.store, vaultScopepath)
     })
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { throw Refusals.vaultMismatch() }
-      return readJson(this.store, Ckeys.box(scope, boxlabel))
+      if (! Expectations.vaultMeets(readJson(this.store, Scopepath.vault(scope)), expected)) { throw Refusals.vaultMismatch() }
+      return readJson(this.store, Scopepath.box({ ...scope, boxlabel }))
     })
   }
 
-  /** Every box row of `scope`, read in the synchronous step that calls it. */
+  /** Every box row of `scope`, read in the synchronous step that calls it: each under the boxlabel its scopepath names. */
   private storedBoxesOf(scope: VaultScope): StoredBox[] {
     return this.store.ckeys()
-      .filter(Ckeys.isBoxIn(scope))
-      .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
-      // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
-      .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
-      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
+      .filter(Scopepath.withinVaultScopepathPred(scope))
+      // A row under the vault's prefix that is no box's scopepath holds no box a verb can reach: it is passed over.
+      .filter((scopepath) => Scopepath.isBox(scopepath))
+      .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
+      // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
+      .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
+      // A row is handed to the split as stored, whatever it holds: the split judges it.
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) as StoredBox['box'] }))
   }
 
   // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
-      const ckey = Ckeys.box(scope, box.boxlabel)
-      const standingText = this.store.read(ckey)
-      const refusal = Expectations.boxRefusalOf(readJson(this.store, Ckeys.vaultProps(scope)), standingText === null ? null : jsonOrText(standingText), expected)
+      const boxScopepath = Scopepath.box({ ...scope, boxlabel: box.boxlabel })
+      const standingText = this.store.read(boxScopepath)
+      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), standingText === null ? null : jsonOrText(standingText), expected)
       if (refusal) { throw refusal }
-      this.store.write(ckey, JSON.stringify(box))
-      return readJson(this.store, ckey)
+      this.store.write(boxScopepath, JSON.stringify(box))
+      return readJson(this.store, boxScopepath)
     })
   }
 
@@ -143,8 +142,8 @@ class StringStoreVaultDB extends VaultDB {
   protected doGetCapacity(scope: VaultScope): Promise<unknown> {
     return soon(() => {
       const texts = this.store.ckeys()
-        .filter(Ckeys.isBoxIn(scope))
-        .map((ckey) => this.store.read(ckey))
+        .filter(Scopepath.withinVaultScopepathPred(scope))
+        .map((scopepath) => this.store.read(scopepath))
         .filter((text): text is string => text !== null)
       const bytesUsed = texts.reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
       return { boxes: { used: texts.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
@@ -153,28 +152,29 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
-      const ckey = Ckeys.box(scope, boxlabel)
+      if (! Expectations.vaultMeets(readJson(this.store, Scopepath.vault(scope)), expected)) { return null }
+      const boxScopepath = Scopepath.box({ ...scope, boxlabel })
       // A row that is not JSON is still deleted, and reported as holding no revision.
-      const text = this.store.read(ckey)
+      const text = this.store.read(boxScopepath)
       const deletion = Expectations.deletionOf(text === null ? null : jsonOrText(text), expected)
-      this.store.erase(ckey)
+      this.store.erase(boxScopepath)
       return deletion
     })
   }
 
-  // The tombstone takes the place of the vault props, in their row, so a scope holds one or the other.
+  // The tombstone takes the place of the vault record, in its row, so a scope holds one or the other.
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return soon(() => {
-      const ckey = Ckeys.vaultProps(scope)
-      const tombstone = Expectations.tombstoneOf(readJson(this.store, ckey), scope, expected)
+      const vaultScopepath = Scopepath.vault(scope)
+      const tombstone = Expectations.tombstoneOf(readJson(this.store, vaultScopepath), scope, expected)
       if (tombstone === null) { return null }
-      const isBox = Ckeys.isBoxIn(scope)
-      for (const boxCkey of this.store.ckeys()) {
-        if (isBox(boxCkey)) { this.store.erase(boxCkey) }
+      // Every row under the vault's prefix goes, a box's or not.
+      const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
+      for (const ckey of this.store.ckeys()) {
+        if (isWithinVault(ckey)) { this.store.erase(ckey) }
       }
-      this.store.write(ckey, JSON.stringify(tombstone))
-      return readJson(this.store, ckey)
+      this.store.write(vaultScopepath, JSON.stringify(tombstone))
+      return readJson(this.store, vaultScopepath)
     })
   }
 
@@ -194,8 +194,8 @@ const jsonOrText = (text: string): unknown => {
   }
 }
 
-/** The row under `ckey` as {@link jsonOrText} reads it, or null when there is none. */
-const readJson = (store: StringStore, ckey: string): unknown => {
-  const text = store.read(ckey)
+/** The row under `scopepath` as {@link jsonOrText} reads it, or null when there is none. */
+const readJson = (store: StringStore, scopepath: string): unknown => {
+  const text = store.read(scopepath)
   return text === null ? null : jsonOrText(text)
 }

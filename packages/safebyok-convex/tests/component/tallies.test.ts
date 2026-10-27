@@ -11,7 +11,7 @@ describe("the limits every vault is held to", () => {
     expect(MaxVaultBoxes).to.eq(8000)
   })
 
-  it("holds at most 7 MiB less 1 KiB of boxes: half the read budget, less a whole document of vault props and room for the tally", () => {
+  it("holds at most 7 MiB less 1 KiB of boxes: half the read budget, less a whole document of vault record and room for the tally", () => {
     expect(MaxVaultBoxBytes).to.eq((7 * MiB) - 1024)
   })
 })

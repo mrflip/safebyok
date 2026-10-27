@@ -8,8 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Outcome, type PasskeyAnswer, type PasskeyWayinSummary, type Vault, type VaultState } from 'safebyok'
-import { heldDialog, scopeOf, settledVault, type BornVaultOpts } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok'
+import { answering, asKind, heldDialog, scopeOf, settledVault, stateOf, type BornVaultOpts } from 'safebyok/testing'
 import type { PassphraseGating } from '../src/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -35,39 +35,41 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 
 /** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
 export type StubVaultOpts = {
-  state?:           VaultState
-  passkey?:         PasskeyWayinSummary | null
-  leaseMillis?:     number
-  checkPassphrase?: Vault['checkPassphrase']
-  tryHello?:        Vault['tryHello']
+  /** Whether the vault has its passphrase yet: `novel` shows no gate. Default 'locked'. */
+  state?:            'novel' | 'locked'
+  /** The gate's passkey, when the vault has one. Default none. */
+  passkey?:          PasskeyWayinSparse | null
+  tryCheckStrength?: Vault['tryCheckStrength']
+  tryHello?:         Vault['tryHello']
 }
 
-/** A stub vault's `checkPassphrase` unless the test hands it another: every passphrase is strong. */
-const admitsEvery: Vault['checkPassphrase'] = () => Promise.resolve({ strong: true })
+/** A stub vault's `tryCheckStrength` unless the test hands it another: every passphrase is strong. */
+const admitsEvery: Vault['tryCheckStrength'] = () => Promise.resolve({ ok: true, val: undefined })
 
 /** The lease, in milliseconds, of a vault opened with the default leaseHours. */
 export const DefaultLeaseMillis = LeaseHours * 3_600_000
 
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
- * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
- * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven
- * days), a subscribe that never calls back, and a `checkPassphrase` admitting every passphrase and
+ * never changes (locked, with a gate holding a passphrase and `passkey`, or novel, with no gate,
+ * as `state` says; the scope of `u1`'s `main` vault in the `acme` app, as `scopeOf` has it, its
+ * fields beside it), a subscribe that never calls back, and a `tryCheckStrength` admitting every passphrase and
  * a `tryHello` settling at once unless the test hands it others. What it does when the user
  * answers is its gating's: see {@link gatingOf}.
  *
  * @example const vault = TH.stubVault({ state: 'novel' })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
-  const snapshot = { state: opts.state ?? 'locked', passkey: opts.passkey ?? null, ...scopeOf('u1') }
+  const passphrase = { wayinkind: 'passphrase', device_id: 'device-u1', registered_at: Date.UTC(2026, 9, 14) } as const
+  const gate = opts.state === 'novel' ? null : { passphrase, passkey: opts.passkey ?? null }
+  const snapshot: Pick<VaultSnapshot, 'applabel' | 'user_id' | 'vaultlabel' | 'gate' | 'ask_passphrase_at'> = { ...scopeOf('u1'), gate, ask_passphrase_at: null }
   const stub = {
     ...scopeOf('u1'),
-    getSnapshot:     () => snapshot,
-    subscribe:       () => unsubscribeFromNothing,
-    leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,
-    checkPassphrase: opts.checkPassphrase ?? admitsEvery,
+    getSnapshot:      () => snapshot,
+    subscribe:        () => unsubscribeFromNothing,
+    tryCheckStrength: opts.tryCheckStrength ?? admitsEvery,
     // Settles at once, reading nothing.
-    tryHello:        opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
+    tryHello:         opts.tryHello ?? (() => Promise.resolve({ ok: true, val: stub })),
   } as unknown as Vault
   return stub
 }
@@ -83,6 +85,8 @@ export type GatingOfOpts = {
   lockLanded?: Promise<void>
   /** By default `initialize_gate` for a vault shown novel, `unlock_vault` otherwise. */
   gatingkind?: PassphraseGating['gatingkind']
+  /** How long an unlock the gating grants lasts, as it tells the dialog: by default {@link DefaultLeaseMillis}, seven days. */
+  leaseMillis?: number
 }
 
 /** A promise that never settles: a lock that never lands. */
@@ -103,7 +107,7 @@ const gatingsMade = new WeakMap<Vault, PassphraseGating>()
  * @example const landing = TH.held(); const gating = TH.gatingOf(vault, { lockLanded: landing.promise })
  */
 export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGating => {
-  const plain = opts.attempt === undefined && opts.lockLanded === undefined && opts.gatingkind === undefined
+  const plain = opts.attempt === undefined && opts.lockLanded === undefined && opts.gatingkind === undefined && opts.leaseMillis === undefined
   const kept = plain ? gatingsMade.get(vault) : undefined
   if (kept !== undefined) { return kept }
   const attempt = opts.attempt ?? (() => Promise.resolve())
@@ -111,8 +115,8 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
     const { ok, err } = await outcomeOf(() => attempt(cleartext), unexpectedError)
     return ok ? { ok, val: vault } : { ok, err }
   }
-  const common = { vault, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }
-  const gatingkind = opts.gatingkind ?? (vault.getSnapshot().state === 'novel' ? 'initialize_gate' : 'unlock_vault')
+  const common = { vault, leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis, lockLanded: opts.lockLanded ?? never, decline: () => { /* a stub declines nothing */ } }
+  const gatingkind = opts.gatingkind ?? (stateOf(vault.getSnapshot()) === 'novel' ? 'initialize_gate' : 'unlock_vault')
   const gating: PassphraseGating = gatingkind === 'initialize_gate'
     ? { ...common, gatingkind, attempt: tried }
     : { ...common, gatingkind, attemptPassphrase: tried, attemptPasskey: tried }
@@ -126,8 +130,8 @@ export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGatin
  * @example const gating = TH.stubGating({ state: 'novel', attempt: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
  */
 export const stubGating = (opts: StubVaultOpts & GatingOfOpts = {}): PassphraseGating => {
-  const { attempt, lockLanded, gatingkind, ...vaultOpts } = opts
-  return gatingOf(stubVault(vaultOpts), { ...(attempt && { attempt }), ...(lockLanded && { lockLanded }), ...(gatingkind && { gatingkind }) })
+  const { attempt, lockLanded, gatingkind, leaseMillis, ...vaultOpts } = opts
+  return gatingOf(stubVault(vaultOpts), { ...(attempt && { attempt }), ...(lockLanded && { lockLanded }), ...(gatingkind && { gatingkind }), ...(leaseMillis !== undefined && { leaseMillis }) })
 }
 
 /**
@@ -163,10 +167,46 @@ export const gatedBy = async (opts: BornVaultOpts) => {
   return { vault, gating, ensuring, close: dialog.close }
 }
 
+/**
+ * The gating of kind `gatingkind` that `raise` has `vault` raise, held open as a host's dialog
+ * holds it until the test closes it: `gating`, narrowed to its kind; `raising`, the outcome of the
+ * call that raised it; and `close`, which resolves the request, declining the gating if still
+ * open. `vault` answers through `TH.scriptedRequestCleartext`, as `settledVault` makes it by
+ * default. Throws when the vault raises another kind.
+ *
+ * @example
+ *   const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+ *   render(<GatingModal gating={gating} onDone={noop} />)
+ */
+export const heldGatingOf = async <KindT extends GatingKind, OutcomeT>(vault: Vault, raise: (vault: Vault) => Promise<OutcomeT>, gatingkind: KindT) => {
+  const handed = held<Gating>()
+  const closing = held()
+  answering(vault, async (gating) => {
+    handed.resolve(gating)
+    await closing.promise
+  })
+  const raising = raise(vault)
+  const gating = asKind(await handed.promise, gatingkind)
+  return { gating, raising, close: () => { closing.resolve(undefined) } }
+}
+
 /** Types the passphrase in the dialog and presses Unlock. */
 export const submitPassphrase = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Unlock'))
+}
+
+/**
+ * Types a new passphrase into the dialog twice: into the field whose placeholder is `fieldlabel`,
+ * and into its confirmation, 'confirm ' and that label. A `confirming` other than `passphrase`
+ * types a mismatch.
+ *
+ * @example TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase', confirming: 'a new passprase' })
+ */
+export const typeNewPassphrase = (passphrase: string, opts: { fieldlabel?: string, confirming?: string } = {}) => {
+  const { fieldlabel = 'vault passphrase', confirming = passphrase } = opts
+  fireEvent.change(screen.getByPlaceholderText(fieldlabel), { target: { value: passphrase } })
+  fireEvent.change(screen.getByPlaceholderText(`confirm ${fieldlabel}`), { target: { value: confirming } })
 }
 
 /** Stands in for a settler until the promise hands over its own. */
@@ -313,12 +353,12 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     calls.get.push(options)
     refuseIfTold()
     const offered = (options.publicKey?.allowCredentials ?? []).map((descriptor) => b64Of(descriptor.id))
-    const credentialId = offered.find((candidate) => secrets.has(candidate) && (touched === null || candidate === touched))
-    const secretBytes = credentialId === undefined ? undefined : secrets.get(credentialId)
-    if (credentialId === undefined || secretBytes === undefined) { throw new DOMException('None of these passkeys is here.', 'NotAllowedError') }
-    const rawId = fromB64(credentialId) as Uint8Array<ArrayBuffer>
+    const credential_id = offered.find((candidate) => secrets.has(candidate) && (touched === null || candidate === touched))
+    const secretBytes = credential_id === undefined ? undefined : secrets.get(credential_id)
+    if (credential_id === undefined || secretBytes === undefined) { throw new DOMException('None of these passkeys is here.', 'NotAllowedError') }
+    const rawId = fromB64(credential_id) as Uint8Array<ArrayBuffer>
     const prf = options.publicKey?.extensions?.prf
-    const salt = prf?.evalByCredential?.[credentialId]?.first ?? prf?.eval?.first
+    const salt = prf?.evalByCredential?.[credential_id]?.first ?? prf?.eval?.first
     if (! offersPrf || salt === undefined) { return credentialOf(rawId, undefined) }
     return credentialOf(rawId, { results: { first: await prfOf(secretBytes, salt) } })
   }
@@ -332,7 +372,7 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
     refuseNext:    (errname: string) => { refusal = errname },
     /** Answer the next `get`s with this credential (base64url id) only, as the user touching it. */
-    touch:         (credentialId: string) => { touched = credentialId },
+    touch:         (credential_id: string) => { touched = credential_id },
     uninstall:     uninstallFakeAuthenticator,
   }
 }

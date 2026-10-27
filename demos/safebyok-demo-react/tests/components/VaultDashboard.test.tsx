@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Ckeys, VaultError, localVaultDB, memoryStore } from 'safebyok'
+import { Scopepath, VaultError, localVaultDB, memoryStore } from 'safebyok'
 import { VaultDashboard } from '../../src/components/VaultDashboard'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 import * as TH from '../test-helpers'
 
 /** The ckey of `u1`'s `openai_api_key` box, for planting damage in storage. */
-const openaiCkey = Ckeys.box(TH.scopeOf('u1'), 'openai_api_key')
+const openaiScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'openai_api_key' })
 
 /** The box form's fields, by their labels. */
 const fillForm = (fields: { boxlabel?: string, whisper?: string, note?: string }) => {
@@ -69,10 +69,10 @@ describe("VaultDashboard, opening", () => {
     const startNew = await screen.findByRole('button', { name: 'Start a new vault' })
     expect(screen.getByText(/This vault was deleted/)).to.not.be.null
     await TH.wakeupAtNextTick()
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.be.null
     fireEvent.click(startNew)
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("offers to accept an older copy storage serves, accepting it only once the user confirms", async () => {
@@ -101,9 +101,9 @@ const damagedWorld = async () => {
   const store = memoryStore()
   const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
-  const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
-  const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-  store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
+  const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
+  const vaultRecord = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
+  store.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   return { store, world }
 }
 
@@ -118,7 +118,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
     confirming.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])
+    expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
   })
 
   it("says why deleting it failed, and keeps offering it", async () => {
@@ -272,7 +272,7 @@ describe("VaultDashboard, its boxes", () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
-    store.write(openaiCkey, '{"not": json')
+    store.write(openaiScopepath, '{"not": json')
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/damaged: its stored record can't be read/)
     const damagedRow = rowOf('openai_api_key')
@@ -284,8 +284,19 @@ describe("VaultDashboard, its boxes", () => {
     fireEvent.click(within(damagedRow).getByRole('button', { name: 'remove' }))
     await TH.answerPassphraseDialog()
     await waitFor(() => { expect(screen.queryByText('openai_api_key')).to.be.null })
-    expect(store.read(openaiCkey)).to.be.null
+    expect(store.read(openaiScopepath)).to.be.null
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
+  })
+
+  it("lists damaged boxes among the sound ones, in boxlabel order", async () => {
+    const store = memoryStore()
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key', zed_api_key: 'zed-test-not-a-real-key' })
+    store.write(openaiScopepath, '{"not": json')
+    world.renderInVault(<VaultDashboard />)
+    await screen.findByText(/damaged: its stored record can't be read/)
+    const shown = screen.getAllByRole('row').slice(1).map((row) => row.querySelector('code')?.textContent)
+    expect(shown).to.deep.equal(['anthropic_api_key', 'openai_api_key', 'zed_api_key'])
   })
 
   it("replaces a damaged box that names its revision with a fresh whisper", async () => {
@@ -293,8 +304,8 @@ describe("VaultDashboard, its boxes", () => {
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ openai_api_key: 'sk-test-not-a-real-key' })
     // A record with no sidecar: damaged, but its record still names its revision.
-    const row = JSON.parse(store.read(openaiCkey) ?? '{}') as object
-    store.write(openaiCkey, JSON.stringify({ ...row, sidecar: undefined }))
+    const row = JSON.parse(store.read(openaiScopepath) ?? '{}') as object
+    store.write(openaiScopepath, JSON.stringify({ ...row, sidecar: undefined }))
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'replace' }))
     expect(screen.getByLabelText<HTMLInputElement>(/^label/).disabled).to.be.true

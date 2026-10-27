@@ -53,7 +53,7 @@ key deriver and the device store:
 import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ applabel: 'acme', vaultDB, ...browserOpts() })
+const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })
 ```
 
 It is a good checker: at least 12 characters, then a zxcvbn score of at least 3 of 4, which turns
@@ -95,8 +95,9 @@ const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: id
 ```
 
 Ask the vault's checker from your passphrase field as the user types, so they hear the reason
-before they submit: `vault.checkPassphrase(typed)` is yours, held to the contract above, so
-the field and the vault decide alike. `safebyok-react`'s dialog does so by default.
+before they submit: `vault.tryCheckStrength(typed)` is yours, held to the contract above, its
+`weak_passphrase` refusal carrying the reason as its message, so the field and the vault decide
+alike. `safebyok-react`'s dialog does so by default.
 
 ### Asking an AI for help
 

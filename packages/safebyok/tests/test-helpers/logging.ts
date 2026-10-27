@@ -85,17 +85,17 @@ export const leafTexts = (val: unknown): string[] => {
  * fields, as a plain object, and nothing a private field or a getter holds. For a test of what a
  * model shows of itself.
  *
- * @param obj - A box, a way in, a lease, or any object.
+ * @param obj - A Vault object, a box, a way in, a lease, or any object.
  * @returns Its own enumerable fields, in their order.
  *
- * @example expect(TH.shownOf(box)).to.deep.equal(box.toJSON())
+ * @example expect(TH.shownOf(model)).to.deep.equal({ label: 'shown', count: 2 })   // no private field, no getter
  */
 export const shownOf = (obj: object): Record<string, unknown> => Object.fromEntries(Object.entries(obj))
 
 /**
  * What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
  *
- * @example expect(Object.keys(TH.jsonOf(box))).to.deep.equal(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok'])
+ * @example expect(TH.jsonOf(model)).to.deep.equal({ label: 'shown' })   // through its toJSON, where it has one
  */
 export const jsonOf = (val: unknown): Record<string, unknown> => {
   const written = JSON.stringify(val)

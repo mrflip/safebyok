@@ -54,6 +54,13 @@ In order. A later item that depends on an earlier one says so.
 
 Straightforward, likely to be done, not needed yet. Each is a thread cut from `main`.
 
+* **The dialogs' phrases, sent in by the host.** The Coach, 2026-10-24 (on
+  [#265](https://github.com/mrflip/safebyok/pull/265), ruling that what the user types to open the
+  vault shows as "Vault unlocker"): "TODO: an i18n friendly way to send in phrases displayed".
+  Every word safebyok-react shows is in `src/messages.ts`, English only, each varying sentence a
+  frame around its part; give a host a way to hand in its own (a locale's bag of phrases through
+  `BankProvider` and the dialogs, say), so a translation, or a house term in place of "Vault
+  unlocker", needs no fork.
 * **One test container for every backend.** The Coach (2026-10-16): a big container serving
   Convex (its local backend), Postgres, and each backend added later, used by CI as a service
   container and by a contributor locally. It is what the race battery
@@ -230,6 +237,28 @@ parameter: `safebyok-graphql` hands the refusal on as its `GraphQLError`'s `caus
 server's logs, so an in-process GraphQL host logs the chain whole. Offer options that redact it
 -- a `cause` dropped, or cut to its class and message, at `vaultResolvers` or the logger -- on by
 default, so a host gets the safe log without writing a formatter of its own.
+
+### A redacting or wrapped logger for what touches key material
+
+The Coach (2026-10-24, on [#264](https://github.com/mrflip/safebyok/pull/264) dropping a key
+deriver's throw as its refusal's `cause`): "It's fine. We will need to add something like redact or
+to offer a wrapped logger for anything that touches the derived, cleartext, key or prf". Anything
+that handles a derived key, cleartext, a key or a PRF answer -- a key deriver, a passkey's PRF, the
+gating's dialogs -- may throw, or log, something that carries it. Decide between a redaction step
+and a wrapped logger handed to such code, and what each strips. *"Add "sensitive" and "host" flags
+to refusals"*, above, stays open beside it: the flags say which refusals heard secret material,
+this says what a log line of them may carry.
+
+### A trial write at startup: `vault.probe`
+
+The Coach (2026-10-24, accepting that opening a vault now writes, in Postgres
+([#258](https://github.com/mrflip/safebyok/pull/258)): a birth's `vaultDB.ensureVault` clears a
+tombstone in the same statement, so a role without write grants can no longer open one): "TODO: add
+a customer vault.probe API call that the user can use to do a harmless trial write, read, and
+delete so that db error messages are given at startup". Decide where the trial lands so it is
+harmless (a scope of its own, never a real vault's), whether it is the Vault object's or the
+bank's, and which refusals it reports (`not_permitted`, `storage_unavailable`). The Postgres
+README's *Your database's own rules* already lists the grants a role needs to open a vault.
 
 ### Call-time work that could be composed once or memoized
 

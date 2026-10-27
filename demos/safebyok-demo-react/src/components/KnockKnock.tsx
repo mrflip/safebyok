@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isVaultError } from 'safebyok'
+import { isVaultError, type BoxDamaged } from 'safebyok'
 import { WhisperField, useVault, useVaultSnapshot } from 'safebyok-react'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 
@@ -31,8 +31,9 @@ export const KnockKnock = () => {
   // No Vault object until its birth has read storage, and with it the boxes it lists.
   if (vault === null || snapshot === null) { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
+  const damagedKeyBox = snapshot.damagedBoxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
-  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
+  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined
 
   const knock = async () => {
     setTelling(true)
@@ -70,7 +71,7 @@ export const KnockKnock = () => {
       {telling && <p className="quiet">Claude is clearing its throat…</p>}
       {joke !== null && <blockquote className="joke">{joke}</blockquote>}
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} replaceable={keyBox?.revision_tok !== null} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
+      <ApiKeySlot haveKeyBox={keyBox !== undefined || damagedKeyBox !== undefined} damage={damagedKeyBox?.damage ?? null} replaceable={damagedKeyBox?.revision_tok !== null} savedAt={keyBox?.written_at} />
     </section>
   )
 }
@@ -82,11 +83,12 @@ export const SavedFlashMillis = 2000
  * The facility for entering (or replacing) the Anthropic API key, stored as a box. A damaged
  * key box -- its stored record unreadable -- is offered for replacing while it names its
  * revision: storing over it writes it afresh. One damaged beyond naming, which putBox() refuses,
- * is offered for removing instead, and then for adding anew.
+ * is offered for removing instead, and then for adding anew. One a newer version of the app
+ * wrote is offered for neither: the app is the one to update, as the dashboard says.
  * A save flashes "saved" a moment, then relaxes to when the key was last saved -- any save, the
  * same key saved again included.
  */
-const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox: boolean, damaged: boolean, replaceable: boolean, savedAt?: number | undefined }) => {
+const ApiKeySlot = ({ haveKeyBox, damage, replaceable, savedAt }: { haveKeyBox: boolean, damage: BoxDamaged['damage'] | null, replaceable: boolean, savedAt?: number | undefined }) => {
   const vault = useVault('main')?.vault ?? null
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
@@ -109,6 +111,9 @@ const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox:
       </p>
     )
   }
+  if (damage === 'newer_format') {
+    return <p className="api-key-slot gripe">{"The stored Anthropic key was written by a newer version of this app: update the app to read it."}</p>
+  }
   const remove = async () => {
     setGripe(null)
     try {
@@ -118,7 +123,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox:
     }
   }
 
-  if (damaged && ! editing) {
+  if (damage === 'damaged' && ! editing) {
     return (
       <p className="api-key-slot gripe">
         {"The stored Anthropic key is damaged and can't be read."}{' '}

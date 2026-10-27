@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  Capacity, GatelessVaultProps, VaultAnswer, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultPropsAnswer, Tombstone, VaultProps, VaultScope, VaultSignature,
+  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -48,7 +48,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getVault, ensureVault, putVaultProps, getBox, putBox, getCapacity, delBox, delVault, watchVault,
+ *     getVault, ensureVault, putVaultRecord, getBox, putBox, getCapacity, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -82,88 +82,88 @@ export class SafebyokComponent {
     const publicQuery: QueryBuilder<DataModel, 'public'> = queryGeneric
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
-    /** Refuses unless the caller is signed in as `userId`, the vault's own user. */
-    const mustBe = async (ctx: GenericQueryCtx<DataModel>, userId: string): Promise<void> => {
+    /** Refuses unless the caller is signed in as `user_id`, the vault's own user. */
+    const mustBe = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
       // Called as a method of the host's bag, so a getUserId that leans on `this` works.
       const callerId = await opts.getUserId(ctx)
       if (! callerId) {
         throw identityRevoked('No one is signed in, so this vault cannot be reached: sign in, then try again.')
       }
-      if (callerId !== userId) {
+      if (callerId !== user_id) {
         throw identityRevoked('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
       }
     }
 
     return {
       getVault: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: v.nullable(VaultAnswer),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },
       }),
       ensureVault: publicMutation({
-        args:    { draft: GatelessVaultProps },
+        args:    { draft: NovelVaultRecord },
         returns: VaultAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.draft.user_id)
           return await ctx.runMutation(vaults.ensureVault, args)
         },
       }),
-      putVaultProps: publicMutation({
-        args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
-        returns: PutVaultPropsAnswer,
+      putVaultRecord: publicMutation({
+        args:    { vaultRecord: VaultRecord, expected: VaultRecordExpectation },
+        returns: PutVaultRecordAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.putVaultProps, args)
+          await mustBe(ctx, args.vaultRecord.user_id)
+          return await ctx.runMutation(vaults.putVaultRecord, args)
         },
       }),
       getBox: publicQuery({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxGetExpectation },
+        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
         returns: GetBoxAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getBox, args)
         },
       }),
       putBox: publicMutation({
-        args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
+        args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
         returns: PutBoxAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.putBox, args)
         },
       }),
       getCapacity: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: Capacity,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getCapacity, args)
         },
       }),
       delBox: publicMutation({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
         returns: v.nullable(BoxDeletion),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delBox, args)
         },
       }),
       delVault: publicMutation({
-        args:    { scope: VaultScope, expected: VaultDelExpectation },
-        returns: v.nullable(Tombstone),
+        args:    { ...VaultScope.fields, expected: VaultDelExpectation },
+        returns: v.nullable(VaultTombstone),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       watchVault: publicQuery({
-        args:    { scope: VaultScope },
+        args:    { ...VaultScope.fields },
         returns: VaultSignature,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.scope.user_id)
+          await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.watchVault, args)
         },
       }),

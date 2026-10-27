@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
-import { VaultPropsFields, ListedBoxFields, BoxFields, recordOf, selectionOf } from '../src/fields'
+import { VaultRecordFields, BoxSparseFields, BoxFields, recordOf, selectionOf } from '../src/fields'
 
 describe("selectionOf", () => {
   it("asks for each field, a ciphered one by its two halves", () => {
     expect(selectionOf([['boxlabel', 'plain'], ['whisper_ciphered', 'ciphered']])).to.eq('boxlabel whisper_ciphered { cipher_iv_b64 ciphertext_b64 }')
   })
 
+  it("asks for a vault record's gate by its two ways in, as its second example shows", () => {
+    expect(selectionOf([['gate', 'gate']])).to.eq('gate { passphrase passkey }')
+    expect(selectionOf(VaultRecordFields)).to.eq('format applabel user_id vaultlabel vault_tok registered_at vault_epoch gate_epoch gate { passphrase passkey }')
+  })
+
   it("asks for a listed box without either ciphered field", () => {
-    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar registered_at written_at')
+    expect(selectionOf(BoxSparseFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar registered_at written_at')
   })
 })
 
 describe("recordOf", () => {
   it("keeps the fields asked for, a null one as null, leaving out a GraphQL client's __typename, as its example shows", () => {
-    expect(recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_tok', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_tok: 'v1', passkey: null })
+    expect(recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultRecord' }, [['vault_tok', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_tok: 'v1', passkey: null })
   })
 
   it("leaves out a field asked for that was not sent", () => {
@@ -28,10 +33,17 @@ describe("recordOf", () => {
     expect(recordOf(answered, BoxFields)).to.deep.equal(box)
   })
 
-  it("gives back the vault props' passphrase and passkey as they were, never looked inside", () => {
-    const vaultProps = TH.vaultPropsOf('u1', { passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') })
-    expect(recordOf(vaultProps, VaultPropsFields)).to.deep.equal(vaultProps)
-    expect(recordOf(TH.vaultPropsOf('u1'), VaultPropsFields)).to.deep.equal(TH.vaultPropsOf('u1'))
+  it("gives back the vault record's gate as it was, its ways in never looked inside, and a novel vault's null gate as null", () => {
+    const vaultRecord = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') }) })
+    expect(recordOf(vaultRecord, VaultRecordFields)).to.deep.equal(vaultRecord)
+    expect(recordOf(TH.vaultRecordOf('u1'), VaultRecordFields)).to.deep.equal(TH.vaultRecordOf('u1'))
+    expect(recordOf(TH.gatelessOf('u1'), VaultRecordFields)).to.deep.equal(TH.gatelessOf('u1'))
+  })
+
+  it("leaves a GraphQL client's __typename out of a gate, keeping its two ways in alone", () => {
+    const vaultRecord = TH.vaultRecordOf('u1')
+    const answered = { ...vaultRecord, gate: { ...vaultRecord.gate, __typename: 'SafebyokGate' } }
+    expect(recordOf(answered, VaultRecordFields)).to.deep.equal(vaultRecord)
   })
 
   it("carries a box's sidecar as the JSON object it was written as, an empty one among them", () => {

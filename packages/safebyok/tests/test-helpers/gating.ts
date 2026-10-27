@@ -1,7 +1,8 @@
 import { vi } from 'vitest'
 import type { Gating, GatingKind, RequestCleartext } from '../../src/gating'
 import { type Outcome, good, valOf } from '../../src/outcome'
-import type { PasskeyAnswer, WayinSummary } from '../../src/types'
+import type { PasskeyAnswer } from '../../src/types/types'
+import type { PasskeyWayinSparse, PassphraseWayinSparse } from '../../src/vault-record'
 import type { Vault } from '../../src/vault'
 import { eventually } from './timing'
 
@@ -66,14 +67,14 @@ export const unlock = async (vault: Vault, cleartext: string | PasskeyAnswer): P
   valOf(await tryUnlock(vault, cleartext))
 }
 
-/** Put a way into `vault` as a user would: `putWayin` of `newProof`'s slot, its gating answered with `passphrase` and `newProof`, resolving the new way in's summary as the snapshot then shows it.
+/** Put a way into `vault` as a user would: `putWayin` of `newProof`'s slot, its gating answered with `passphrase` and `newProof`, resolving the new way in as the snapshot's gate then shows it.
  * A novel vault's `initialize_gate` takes `passphrase` as its first, and `newProof` beside it when
  * it is a passkey's answer.
  *
  * @example const summary = await TH.putWayin(vault, passphrase, 'a new passphrase')
  * @example await TH.putWayin(vault, passphrase, await TH.passkeyOf('laptop'))
  */
-export const tryPutWayin = async (vault: Vault, passphrase: string, newProof: string | PasskeyAnswer): Promise<Outcome<WayinSummary>> => {
+export const tryPutWayin = async (vault: Vault, passphrase: string, newProof: string | PasskeyAnswer): Promise<Outcome<PassphraseWayinSparse | PasskeyWayinSparse>> => {
   let attempted: Outcome<Vault> | null = null
   answering(vault, async (gating) => { attempted = await putAttempt(gating, passphrase, newProof) })
   const slotlabel = typeof newProof === 'string' ? 'passphrase' : 'passkey'
@@ -82,13 +83,14 @@ export const tryPutWayin = async (vault: Vault, passphrase: string, newProof: st
   const made = attempted as Outcome<Vault> | null
   if (made !== null && ! made.ok) { return made }
   if (! put.ok) { return put }
-  const summary = slotlabel === 'passphrase' ? vault.passphrase : vault.passkey
-  if (summary === null) { throw new Error('putWayin resolved, but the snapshot shows no way in at its slot.') }
+  const { gate } = vault.snapshot
+  const summary = slotlabel === 'passphrase' ? gate?.passphrase : gate?.passkey
+  if (summary === undefined || summary === null) { throw new Error('putWayin resolved, but the snapshot shows no way in at its slot.') }
   return good(summary)
 }
 
 /** {@link tryPutWayin}, throwing its refusal. */
-export const putWayin = async (vault: Vault, passphrase: string, newProof: string | PasskeyAnswer): Promise<WayinSummary> => valOf(await tryPutWayin(vault, passphrase, newProof))
+export const putWayin = async (vault: Vault, passphrase: string, newProof: string | PasskeyAnswer): Promise<PassphraseWayinSparse | PasskeyWayinSparse> => valOf(await tryPutWayin(vault, passphrase, newProof))
 
 /** Take `vault`'s passkey away as a user would: `delWayin('passkey')`, its gating answered with `passphrase`.
  *

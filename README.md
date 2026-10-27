@@ -32,15 +32,15 @@ This repository is a pnpm workspace. Its packages:
 ### Backend (VaultDB)
 
 Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
-Holds vault​s and box​es scoped by applabel, userId, vaultlabel and boxlabel.
+Holds vault​s and box​es scoped by applabel, user_id, vaultlabel and boxlabel.
 * A box holds a sidecar under the app's control and an encrypted whisper​
-* verbs: vault: getVault (props and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultProps, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
+* verbs: vault: getVault (record and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultRecord, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
 
 ### Browser
 
 * a vault​ object
-  - Bank.make({ applabel, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async
-  - bank.ensureVault({ userId, vaultlabel }): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
+  - Bank.make({ applabel, user_id, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async, one per signed-in user
+  - bank.ensureVault({ vaultlabel }, { vaultDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
   - vault.hello() (reads storage once its picture has aged; never asks the user)
   - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
   - a gating, handed to the app's requestCleartext, is the one place the user is asked for the passphrase or passkey
@@ -48,6 +48,6 @@ Holds vault​s and box​es scoped by applabel, userId, vaultlabel and boxlabel
 * a DeviceDB​ safely holding and managing access to the boxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)
 
-assume initially that the app provides and guarantees the userId, and that the vaultDB can access all and only the records needed to support this.
+assume initially that the app provides and guarantees the user_id, and that the vaultDB can access all and only the records needed to support this.
 the app interface is to call  non-async At the app level, whisper is anything JSONable.
 for concreteness of discussion, assume a postgres backing store,

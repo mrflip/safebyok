@@ -8,8 +8,8 @@ import type { KeyDeriver } from '../src/key-deriver'
 import { heldLeaseOf } from '../src/held-lease'
 import type { Vault } from '../src/vault'
 import * as TH from './test-helpers'
-import { MinuteMillis } from '../src/types'
-import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultPropsOf, SevenDaysMillis } from './vault/world'
+import { MinuteMillis } from '../src/consts'
+import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultRecordOf, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: World, lockedVaultIn, weakIsWeak, deletingUnderThrowingDialog
 
@@ -61,10 +61,10 @@ describe("a gating, kind by kind", () => {
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     expect(await TH.expectGood(gating.attempt('pw'))).to.eq(vault)
     expect(await TH.expectGood(ensuring)).to.eq(vault)
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.passphrase).to.not.be.null
-    expect(vault.passkey).to.be.null
-    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 1 })
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    expect(vault.snapshot.gate?.passphrase).to.not.be.null
+    expect(vault.snapshot.gate?.passkey).to.be.null
+    expect(storedVaultRecordOf(world)).to.include({ gate_epoch: 1 })
   })
 
   it("initialize_gate sets a passkey beside the first passphrase when given one, and the passkey unlocks it later", async () => {
@@ -75,14 +75,14 @@ describe("a gating, kind by kind", () => {
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     await TH.expectGood(gating.attempt('pw', await TH.passkeyOf('laptop')))
     await TH.expectGood(ensuring)
-    expect(vault.passphrase).to.not.be.null
-    expect(vault.passkey).to.not.be.null
+    expect(vault.snapshot.gate?.passphrase).to.not.be.null
+    expect(vault.snapshot.gate?.passkey).to.not.be.null
     await vault.lock()
     const unlocking = vault.tryEnsureUnlocked()
     const unlock = TH.asKind(await dialog.asked(1), 'unlock_vault')
     await TH.expectGood(unlock.attemptPasskey(await TH.passkeyOf('laptop')))
     await TH.expectGood(unlocking)
-    expect(vault.state).to.eq('unlocked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
   it("unlock_vault unlocks by the passphrase, as TH.heldDialog's example shows", async () => {
@@ -113,13 +113,13 @@ describe("a gating, kind by kind", () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
-    const before = vault.gate_epoch
+    const before = TH.madeUnderOf(vault).gate_epoch
     const putting = vault.tryPutWayin('passphrase')
     const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
     await TH.expectGood(gating.attempt('pw', 'pw two'))
     expect(await TH.expectGood(putting)).to.eq(vault)
-    expect(vault.gate_epoch).to.eq(before + 1)
-    expect(vault.state).to.eq('unlocked')
+    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     await vault.lock()
     const unlocking = vault.tryEnsureUnlocked()
     const unlock = TH.asKind(await dialog.asked(1), 'unlock_vault')
@@ -135,8 +135,8 @@ describe("a gating, kind by kind", () => {
     const gating = TH.asKind(await dialog.asked(), 'put_passkey')
     await TH.expectGood(gating.attempt('pw', await TH.passkeyOf('laptop')))
     await TH.expectGood(putting)
-    expect(vault.passkey).to.not.be.null
-    expect(vault.state).to.eq('unlocked')
+    expect(vault.snapshot.gate?.passkey).to.not.be.null
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
   it("del_passkey removes the passkey, proven by the passphrase", async () => {
@@ -148,8 +148,8 @@ describe("a gating, kind by kind", () => {
     const gating = TH.asKind(await dialog.asked(), 'del_passkey')
     await TH.expectGood(gating.attempt('pw'))
     await TH.expectGood(removing)
-    expect(vault.passkey).to.be.null
-    expect(storedVaultPropsOf(world)).to.include({ passkey: null })
+    expect(vault.snapshot.gate?.passkey).to.be.null
+    expect(storedVaultRecordOf(world)['gate']).to.include({ passkey: null })
   })
 
   it("del_vault deletes the vault, proven by the passphrase, settling with success, and then the vault locks and goes", async () => {
@@ -160,7 +160,7 @@ describe("a gating, kind by kind", () => {
     const gating = TH.asKind(await dialog.asked(), 'del_vault')
     await TH.expectGood(gating.attempt('pw'))
     await TH.expectGood(deleting)
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
     expect(heldLeaseOf(vault)).to.be.null
     expect(await world.getLease()).to.be.null
     await TH.expectRefusal(vault.hello(), 'vault_gone')
@@ -208,7 +208,7 @@ describe("an attempt the user can correct", () => {
     const removing = vault.tryDelWayin('passkey')
     const gating = TH.asKind(await dialog.asked(), 'del_passkey')
     await TH.delWayin(maker, 'pw')
-    const writes = vi.spyOn(world.vaultDB, 'putVaultProps')
+    const writes = vi.spyOn(world.vaultDB, 'putVaultRecord')
     await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
     await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
     dialog.close()
@@ -267,7 +267,7 @@ describe("a gating's attempts", () => {
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(elsewhere, 'pw there')
-    const writes = vi.spyOn(world.vaultDB, 'putVaultProps')
+    const writes = vi.spyOn(world.vaultDB, 'putVaultRecord')
     await TH.expectBad(gating.attempt('pw here'), 'gate_made_elsewhere')
     await TH.expectBad(ensuring, 'gate_made_elsewhere')
     expect(writes).not.toHaveBeenCalled()
@@ -289,9 +289,9 @@ describe("a step of an attempt's chain failing", () => {
       return {}
     }, 'unlock', 'the key deriver throwing'],
     ['stale_write', (world) => {
-      vi.spyOn(world.vaultDB, 'putVaultProps').mockResolvedValueOnce(bad(new VaultError('stale_write', 'The vault props changed in storage.')))
+      vi.spyOn(world.vaultDB, 'putVaultRecord').mockResolvedValueOnce(bad(new VaultError('stale_write', 'The vault record changed in storage.')))
       return {}
-    }, 'change', 'putVaultProps refusing stale_write'],
+    }, 'change', 'putVaultRecord refusing stale_write'],
     ['storage_unavailable', (world) => {
       vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
       return {}
@@ -315,7 +315,7 @@ describe("a step of an attempt's chain failing", () => {
       expect(err.message).to.not.include('pw')
       await TH.expectBad(calling, refusalkind)
       await TH.expectBad(attempt(), 'gating_landed')
-      expect(vault.state).to.eq('locked')
+      expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     })
   }
 })
@@ -361,6 +361,48 @@ describe("a host function that hears the passphrase throwing, quoting it", () =>
 })
 // --
 
+// == [Declining]: a declined gating's refusal, worded by kind
+
+/** Each kind of gating, the call that raises it on a vault made as `made` says, and what its decline's message says stands. */
+const DeclineCases = [
+  ['initialize_gate',   'novel',   (vault: Vault) => vault.tryEnsureUnlocked(),         /first passphrase.*still has no passphrase/],
+  ['unlock_vault',      'locked',  (vault: Vault) => vault.tryEnsureUnlocked(),         /unlock it.*stays locked/],
+  ['change_passphrase', 'locked',  (vault: Vault) => vault.tryPutWayin('passphrase'),   /change the vault's passphrase.*passphrase is unchanged/],
+  ['put_passkey',       'locked',  (vault: Vault) => vault.tryPutWayin('passkey'),      /put a passkey.*No vault unlocker was changed/],
+  ['del_passkey',       'passkey', (vault: Vault) => vault.tryDelWayin('passkey'),      /remove the vault's passkey.*passkey stays/],
+  ['del_vault',         'locked',  async (vault: Vault) => await vault.tryDel(),       /delete the vault.*Nothing was deleted/],
+] as const
+
+/** `u1`'s vault in a fresh world, made as `made` says -- novel, locked, or locked with a passkey -- and born under `overrides`. */
+const vaultMade = async (made: 'novel' | 'locked' | 'passkey', overrides: Partial<TH.BornVaultOpts>) => {
+  const world = makeWorld()
+  if (made === 'novel') { return await world.open(overrides) }
+  const maker = await world.openUnlocked('pw')
+  if (made === 'passkey') { await TH.putWayin(maker, 'pw', await TH.passkeyOf('laptop')) }
+  await maker.lock()
+  TH.closeVault(maker)
+  return await world.open(overrides)
+}
+
+describe("a declined gating's refusal", () => {
+  for (const [gatingkind, made, raise, says] of DeclineCases) {
+    it(`words a declined ${gatingkind} for what it asked, as vault_locked`, async () => {
+      const vault = await vaultMade(made, {})
+      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      expect(err.message).to.match(says)
+      expect(err.message).to.match(/declined/)
+    })
+
+    it(`words a ${gatingkind} with no requestCleartext to ask for what it needed, as vault_locked`, async () => {
+      const vault = await vaultMade(made, { requestCleartext: null })
+      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      expect(err.message).to.match(says)
+      expect(err.message).to.match(/no requestCleartext/)
+    })
+  }
+})
+// --
+
 // == [Landing]: a lock or a decline landing mid-chain
 
 describe("a lock or a decline landing during an attempt", () => {
@@ -368,19 +410,19 @@ describe("a lock or a decline landing during an attempt", () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
-    const before = vault.gate_epoch
+    const before = TH.madeUnderOf(vault).gate_epoch
     const putting = vault.tryPutWayin('passphrase')
     const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
-    const writing = TH.holdNextAnswer(world.vaultDB, 'putVaultProps')
+    const writing = TH.holdNextAnswer(world.vaultDB, 'putVaultRecord')
     const attempting = gating.attempt('pw', 'pw two')
     await writing.reached
     await vault.lock()
     await TH.expectBad(putting, 'vault_locked')
     writing.release()
     await TH.expectBad(attempting, 'gating_landed')
-    expect(vault.gate_epoch).to.eq(before + 1)
-    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: before + 1 })
-    expect(vault.state).to.eq('locked')
+    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
+    expect(storedVaultRecordOf(world)).to.include({ gate_epoch: before + 1 })
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null
     expect(await world.getLease()).to.be.null
   })
@@ -400,7 +442,7 @@ describe("a lock or a decline landing during an attempt", () => {
       writing.release()
       await TH.expectBad(attempting, 'gating_landed')
       await TH.expectBad(calling, 'vault_locked')
-      expect(vault.state).to.eq('locked')
+      expect(TH.stateOf(vault.snapshot)).to.eq('locked')
       expect(world.logged.filter((heard) => heard.level === 'warn')).to.have.lengthOf(0)
     })
   }
@@ -429,11 +471,11 @@ describe("a lock or a decline landing during an attempt", () => {
     const ensuring = vault.tryEnsureUnlocked()
     const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
     // A listener that locks the moment the vault shows unlocked: inside holdLease, before the chain returns.
-    const unsubscribe = vault.subscribe(() => { if (vault.state === 'unlocked') { void vault.lock() } })
+    const unsubscribe = vault.subscribe(() => { if (TH.stateOf(vault.snapshot) === 'unlocked') { void vault.lock() } })
     await TH.expectBad(gating.attemptPassphrase('pw'), 'vault_locked')
     unsubscribe()
     await TH.expectBad(ensuring, 'vault_locked')
-    expect(vault.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
   it("leaves a deletion whose own write a read finds landed, before it answered, to settle by its chain: lockLanded stays unsettled, so a dialog closing on it declines nothing, and del() resolves", async () => {
@@ -451,7 +493,7 @@ describe("a lock or a decline landing during an attempt", () => {
     writing.release()
     await TH.expectGood(attempting)
     await TH.expectGood(deleting)
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
   for (const [landing, blurb] of [
@@ -471,7 +513,7 @@ describe("a lock or a decline landing during an attempt", () => {
       writing.release()
       await TH.expectGood(attempting)
       await TH.expectGood(deleting)
-      expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+      expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
       await TH.expectRefusal(vault.hello(), 'vault_gone')
     })
   }
@@ -498,7 +540,7 @@ describe("a lock or a decline landing during an attempt", () => {
       await TH.expectBad(deleting, 'vault_locked')
       await TH.wakeupAtNextTick()
       expect(lockLanded).to.eq(landsLock)
-      expect(storedVaultPropsOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
+      expect(storedVaultRecordOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
     })
   }
 
@@ -536,21 +578,21 @@ describe("a lock or a decline landing during an attempt", () => {
     writing.release()
     await TH.expectGood(attempting)
     await TH.expectGood(deleting)
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
   it("leaves a deletion whose write was sent to settle by its chain when requestCleartext throws: del() resolves, and storage holds the tombstone", async () => {
     const { world, attempting, deleting } = await deletingUnderThrowingDialog(false)
     await TH.expectGood(attempting)
     await TH.expectGood(deleting)
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 
   it("refuses del() unexpected_error when requestCleartext throws while the deletion's write is sent and storage refuses it, as the throw would have", async () => {
     const { world, attempting, deleting } = await deletingUnderThrowingDialog(true)
     await TH.expectBad(attempting, 'gating_landed')
     await TH.expectBad(deleting, 'unexpected_error')
-    expect(storedVaultPropsOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.not.include({ format: 'safebyok-tombstone-v1' })
   })
 
   for (const [landing, blurb] of [
@@ -570,7 +612,7 @@ describe("a lock or a decline landing during an attempt", () => {
       leasing.release()
       await TH.expectBad(attempting, 'gating_landed')
       await TH.expectBad(ensuring, 'vault_locked')
-      expect(vault.state).to.eq('locked')
+      expect(TH.stateOf(vault.snapshot)).to.eq('locked')
       expect(heldLeaseOf(vault)).to.be.null
     })
   }
@@ -603,8 +645,8 @@ describe("the strength check's wait, in a chain", () => {
     held.gate.release()
     await TH.expectBad(attempting, 'gating_landed')
     await TH.expectBad(ensuring, 'vault_locked')
-    expect(vault.state).to.eq('novel')
-    expect(storedVaultPropsOf(world)).to.include({ gate_epoch: 0 })
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
+    expect(storedVaultRecordOf(world)).to.include({ gate_epoch: 0 })
   })
 
   it("refuses a change_passphrase attempt as the vault gone when it is deleted, and made anew, elsewhere while the strength is checked, writing nothing over the new one", async () => {
@@ -624,7 +666,7 @@ describe("the strength check's wait, in a chain", () => {
     held.gate.release()
     await TH.expectBad(attempting, 'vault_gone')
     await TH.expectBad(putting, 'vault_gone')
-    expect(storedVaultPropsOf(world)).to.include({ vault_tok: reborn.vault_tok, gate_epoch: 0 })
+    expect(storedVaultRecordOf(world)).to.include({ vault_tok: reborn.vault_tok, gate_epoch: 0 })
   })
 })
 // --
@@ -657,7 +699,7 @@ describe("joining a gating, by kind", () => {
     const put = TH.asKind(await dialog.asked(1), 'put_passkey')
     await TH.expectGood(put.attempt('pw', await TH.passkeyOf('laptop')))
     await TH.expectGood(putting)
-    expect(vault.passkey).to.not.be.null
+    expect(vault.snapshot.gate?.passkey).to.not.be.null
   })
 
   it("has ensureUnlocked() wait out a put_passkey gating standing, unlocked by its attempt and asking nothing more", async () => {
@@ -671,7 +713,7 @@ describe("joining a gating, by kind", () => {
     await TH.expectGood(putting)
     await TH.expectGood(ensuring)
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
-    expect(vault.state).to.eq('unlocked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
   it("has ensureUnlocked() wait out a put_passkey gating the user declines, then raise its own unlock_vault: the decline refuses putWayin alone", async () => {
@@ -686,7 +728,7 @@ describe("joining a gating, by kind", () => {
     const unlock = TH.asKind(await dialog.asked(1), 'unlock_vault')
     await TH.expectGood(unlock.attemptPassphrase('pw'))
     expect(await TH.expectGood(reading)).to.eq('sk-fake')
-    expect(vault.passkey).to.be.null
+    expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
   it("has ensureUnlocked({ renewMinutes: 60 }) join an unlock_vault gating whose consult takes up a lease ending within the hour, then raise its own, asking the user once", async () => {
@@ -707,7 +749,7 @@ describe("joining a gating, by kind", () => {
     await TH.expectGood(unlock.attemptPassphrase('pw'))
     await TH.expectGood(renewing)
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
-    expect(vault.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
+    expect(vault.snapshot.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("has putWayin('passkey') on a novel vault refuse absent_vault while an initialize_gate stands, joining nothing: the first passphrase alone is no passkey", async () => {
@@ -735,7 +777,7 @@ describe("joining a gating, by kind", () => {
     const del = TH.asKind(await dialog.asked(1), 'del_vault')
     await TH.expectGood(del.attempt('pw'))
     await TH.expectGood(deleting)
-    expect(storedVaultPropsOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
+    expect(storedVaultRecordOf(world)).to.include({ format: 'safebyok-tombstone-v1' })
   })
 })
 // --
@@ -749,11 +791,11 @@ describe("an unlock's consult of this device's store", () => {
     const vault = await lockedVaultIn(world, { requestCleartext })
     const otherTab = await world.open()
     await TH.unlock(otherTab, 'pw')
-    expect(vault.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(await vault.ensureUnlocked()).to.eq(vault)
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('unlocked')
-    expect(vault.askPassphraseAt).to.eq(otherTab.askPassphraseAt)
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    expect(vault.snapshot.ask_passphrase_at).to.eq(otherTab.snapshot.ask_passphrase_at)
   })
 
   it("takes nothing up when a lock() lands during the consult, and refuses vault_locked without asking", async () => {
@@ -769,7 +811,7 @@ describe("an unlock's consult of this device's store", () => {
     reading.release()
     await TH.expectBad(ensuring, 'vault_locked')
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null
   })
 })

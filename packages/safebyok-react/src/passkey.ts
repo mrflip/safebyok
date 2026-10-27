@@ -1,13 +1,13 @@
-import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type PasskeyWayinSummary } from 'safebyok'
+import { PasskeySaltBytes, VaultError, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
  * new passkey and asks it for its first answer, `askPasskey` asks the vault's passkey for its
- * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`putWayin`, `unlock`), or
- * null when the user dismissed the prompt. Nothing here imports React: any framework's host may use
- * them.
+ * answer again. Both hand back a {@link PasskeyAnswer} for a gating's attempt (`put_passkey`'s,
+ * `unlock_vault`'s), or null when the user dismissed the prompt. Nothing here imports React: any
+ * framework's host may use them.
  *
  * These passkeys are not logins. Each is a fresh credential of its own, made under a random user
  * handle so it never replaces a passkey the host's sign-in uses; its challenge is random and no
@@ -48,8 +48,9 @@ export type AskPasskeyOpts = {
 }
 
 /**
- * A new passkey, and its first answer over a fresh salt: what `vault.putWayin` takes, beside the
- * vault's passphrase, to put the vault's passkey. The browser asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
+ * A new passkey, and its first answer over a fresh salt: what a `put_passkey` gating's attempt
+ * takes, beside the vault's passphrase, to put the vault's passkey (and an `initialize_gate`'s,
+ * beside the first). The browser asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
  * that answer only when asked again, to touch it once more.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out). Refuses with kind
@@ -80,9 +81,9 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
     },
   }))
   if (created === null) { return null }
-  const credentialId = toB64(new Uint8Array(created.rawId))
+  const credential_id = toB64(new Uint8Array(created.rawId))
   const { prf } = created.getClientExtensionResults()
-  if (prf?.results !== undefined) { return answerOf(credentialId, prfSaltBytes, prf.results.first) }
+  if (prf?.results !== undefined) { return answerOf(credential_id, prfSaltBytes, prf.results.first) }
   if (prf?.enabled !== true) { throw noPrf() }
   // Many authenticators turn PRF on as they make the passkey, and answer only when asked again.
   const asked = await askAuthenticator(() => navigator.credentials.get({
@@ -98,27 +99,27 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
-  return answerOf(credentialId, prfSaltBytes, answer)
+  return answerOf(credential_id, prfSaltBytes, answer)
 }
 
-/**
- * The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes. `passkey`
- * is the snapshot's, as it stands (`vault.getSnapshot().passkey`); the browser asks the user to
- * touch it, and asks it for its answer over its own salt.
+/** The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes.
+ * `gate` is the snapshot's, as it stands (`vault.getSnapshot().gate`); the browser asks the user to
+ * touch its passkey, and asks it for its answer over its own salt.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out, or has not that passkey
- * at hand). Refuses with kind 'absent_wayin' when `passkey` is null, the vault having none;
+ * at hand). Refuses with kind 'absent_wayin' when the vault has no passkey (or no gate yet);
  * 'damaged_wayin' when it is stored damaged -- its `credential_id` or `prf_salt_b64` not
  * base64url, or its salt not `PasskeySaltBytes` long, which the vault would refuse;
  * 'passkey_unavailable' when the browser has no WebAuthn or the passkey gives no PRF answer; and
  * 'bad_option' when `opts.rpId` does not fit this page.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().passkey)
+ *   const passkey = await askPasskey(vault.getSnapshot().gate)
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }
  */
-export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
+export const askPasskey = async (gate: GateSparse | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   checkAvailable()
+  const passkey = gate?.passkey ?? null
   if (passkey === null) {
     throw new VaultError('absent_wayin', Messages.noPasskeyToAsk)
   }
@@ -133,27 +134,27 @@ export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskP
       allowCredentials: [{ type: 'public-key', id: asking.credentialBytes }],
       userVerification: 'required',
       ...optional('timeout', opts.timeout),
-      extensions:       { prf: { evalByCredential: { [asking.credentialId]: { first: asking.saltBytes } } } },
+      extensions:       { prf: { evalByCredential: { [asking.credential_id]: { first: asking.saltBytes } } } },
     },
   }))
   if (asked === null) { return null }
-  const credentialId = toB64(new Uint8Array(asked.rawId))
+  const credential_id = toB64(new Uint8Array(asked.rawId))
   const answer = asked.getClientExtensionResults().prf?.results?.first
   // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
-  if (answer === undefined || credentialId !== asking.credentialId) { throw noPrf() }
-  return answerOf(credentialId, asking.saltBytes, answer)
+  if (answer === undefined || credential_id !== asking.credential_id) { throw noPrf() }
+  return answerOf(credential_id, asking.saltBytes, answer)
 }
 
 /**
  * The vault's passkey, its credential id and salt as bytes for WebAuthn; null when either is
  * not base64url, or the salt is not `PasskeySaltBytes` long.
  */
-const askable = (passkey: PasskeyWayinSummary) => {
+const askable = (passkey: PasskeyWayinSparse) => {
   try {
     const saltBytes = fromB64(passkey.prf_salt_b64) as Uint8Array<ArrayBuffer>
     if (saltBytes.length !== PasskeySaltBytes) { return null }
     return {
-      credentialId:    passkey.credential_id,
+      credential_id:   passkey.credential_id,
       credentialBytes: fromB64(passkey.credential_id) as Uint8Array<ArrayBuffer>,
       saltBytes,
     }
@@ -162,11 +163,11 @@ const askable = (passkey: PasskeyWayinSummary) => {
   }
 }
 
-/** A PasskeyAnswer of the credential `credentialId`, answering `answer` over `saltBytes`. */
-const answerOf = (credentialId: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
-  credentialId,
-  prfSaltB64: toB64(saltBytes),
-  prfBytes:   bytesOf(answer),
+/** A PasskeyAnswer of the credential `credential_id`, answering `answer` over `saltBytes`. */
+const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
+  credential_id,
+  prf_salt_b64: toB64(saltBytes),
+  prfBytes:     bytesOf(answer),
 })
 
 /** A copy of `source`'s bytes, whichever kind of buffer the browser handed back. */

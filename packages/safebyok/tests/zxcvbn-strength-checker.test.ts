@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from '../src/zxcvbn-strength-checker'
-import type { VaultScope } from '../src/types'
+import type { VaultScope } from '../src/types/types'
 import * as TH from './test-helpers'
 
 /** The reason a verdict gives, or '' for a strong one. */
@@ -174,20 +174,20 @@ describe("zxcvbnStrengthChecker's loading", () => {
       import('../src/bank'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
     ])
     const vaultDB = localVaultDB({ store: memoryStore() })
-    const { userId, vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() })
+    const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() })
     const bank = FreshBank.make(bankOpts)
     try {
       // The fresh copy's VaultError is a class of its own: told by kind.
-      const refused = await bank.tryEnsureVault({ userId, vaultlabel })
+      const refused = await bank.tryEnsureVault({ vaultlabel })
       if (refused.ok) { throw new Error('the birth was not refused') }
       expect(refused.err.refusalkind).to.eq('unexpected_error')
       expect(refused.err.cause).to.be.instanceOf(Error)
       expect(bank.getSnapshot().status).to.eq('refused')
-      expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
-      const vault = await bank.ensureVault({ userId, vaultlabel })
-      expect(vault.getSnapshot().state).to.eq('novel')
+      expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
+      const vault = await bank.ensureVault({ vaultlabel })
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
       await TH.unlock(vault, 'correct horse battery staple')
-      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     } finally {
       bank.closeVaults()
     }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecKept, parseKeyDeriverSpec } from '../src/key-deriver-spec'
+import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecKept, loadKeyDeriver, parseKeyDeriverSpec } from '../src/key-deriver-spec'
 import { isVaultError } from '../src/errors'
+import { argon2idWebV1Deriver } from '../src/key-deriver'
+import * as TH from './test-helpers'
 
 describe("Argon2idWebV1", () => {
   it("carries its keyDeriverLabel, as the stored format records it", () => {
@@ -99,6 +101,23 @@ describe("the reserved label namespace", () => {
 
   it("is spelled, as a constant, the way the label begins", () => {
     expect(Argon2idWebV1.key_deriver_label.startsWith(ReservedLabelPrefix)).to.be.true
+  })
+})
+
+describe("loadKeyDeriver", () => {
+  it("resolves at once for a deriver that carries no load, as its example shows", async () => {
+    const loading = loadKeyDeriver(argon2idWebV1Deriver)
+    await loading   // resolves at once: it carries no load
+    expect(argon2idWebV1Deriver).to.not.have.property('load')
+  })
+
+  it("runs a deriver's load, and refuses its failure 'unexpected_error', what it threw the cause", async () => {
+    let loads = 0
+    await loadKeyDeriver({ load: () => { loads += 1 } })
+    expect(loads).to.eq(1)
+    const thrown = new Error('the module would not load')
+    const err = await TH.expectRefusal(loadKeyDeriver({ load: () => Promise.reject(thrown) }), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
   })
 })
 

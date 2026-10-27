@@ -113,7 +113,7 @@ describe("RefusalFamilyForKind", () => {
 
 const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
-  ["bad_label",           "misuse",    'a label the app chose that breaks the rules is a bug'],
+  ["bad_scope",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_whisper",         "misuse",    'storing what JSON cannot carry is a bug'],
   ["bad_option",          "misuse",    'a Bank.make option out of range is a bug'],
   ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
@@ -172,7 +172,7 @@ const ConditionCases = [
   [new VaultError('identity_revoked', 'Sign in to reach this vault.'),               true,  'a signed-out refusal, bad news the app shows'],
   [new VaultError('damaged_box', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
   [new VaultError('not_permitted', 'You may not change this vault.'),                true,  'a refusal of the signed-in user'],
-  [new VaultError('bad_label', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
+  [new VaultError('bad_scope', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
   [new VaultError('unexpected_error', 'Something threw that is no refusal.'),       false, 'an unexpected error, misuse too'],
   [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],
   [{ refusalkind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],

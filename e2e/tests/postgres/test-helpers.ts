@@ -4,7 +4,7 @@ import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import type { Outcome, VaultDBOpts } from 'safebyok'
-import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok/testing'
+import { boxOf, vaultRecordOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -223,7 +223,7 @@ export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, d
       await turnstile.pass()
       return await listenHere(channel, onNotify)
     }
-  return (userId: string | null) => postgresVaultDB({ ...vaultDBOpts, client, userId, listen, maxBoxes })
+  return (user_id: string | null) => postgresVaultDB({ ...vaultDBOpts, client, user_id, listen, maxBoxes })
 }
 
 /**
@@ -237,7 +237,7 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
   await db.empty()
   return ({ maxBoxes }) => {
     const vaultDBFor = deviceOver(db, turnstile, { maxBoxes })
-    return perUser((userId) => vaultDBFor(userId))
+    return perUser((user_id) => vaultDBFor(user_id))
   }
 }
 
@@ -264,9 +264,9 @@ export const untilBlockedBy = async (db: FileDatabase, blocker: Client): Promise
   }, { timeout: 2000, interval: 10 })
 }
 
-/** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
+/** Makes the u1 vault the helpers' vault record stands for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
-  await ensureGated(vaultDB, vaultPropsOf('u1'))
+  await ensureGated(vaultDB, vaultRecordOf('u1'))
   for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
 }
 

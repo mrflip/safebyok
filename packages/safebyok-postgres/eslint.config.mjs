@@ -219,18 +219,18 @@ export default defineConfig([
     },
   },
 
-  // And it costs the host only what it uses. src/ validates with zod/mini, whose builders a host's
-  // bundler drops when nothing reaches them; classic zod's it cannot, so one import of classic
-  // would put all of it in every host's bundle.
+  // And it costs the host little: Zod comes in as `zod`, classic, the flavour the core is built
+  // on, so a host bundles one Zod. `zod/mini` would bundle a second beside it, some 7 kB gzipped
+  // more; named and star imports shake alike.
   {
-    name: 'safebyok-postgres/tree-shaking',
+    name: 'safebyok-postgres/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
-        paths: ['zod', 'zod/v4', 'zod/v3'].map((classicPath) => ({
-          name:    classicPath,
-          message: "Import zod/mini (`import * as Z from 'zod/mini'`): classic zod does not tree-shake, and would ride along in every host's bundle.",
+        paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
+          name:    otherPath,
+          message: "Import zod as `zod` (`import { object as obj } from 'zod'`): the core is built on classic Zod, and a second flavour would bundle beside it.",
         })),
       }],
     },

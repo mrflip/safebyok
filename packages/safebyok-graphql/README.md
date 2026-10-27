@@ -50,18 +50,18 @@ import { listen } from './listen'   // safebyok-postgres's README: one pg connec
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 /** What each request's resolvers know of it: the user your own auth signed in, or null. */
-type VaultContext = { userId: string | null }
+type VaultContext = { user_id: string | null }
 
 const schema = createSchema<VaultContext>({
   typeDefs:  [appTypeDefs, VaultSchemaSdl],
-  resolvers: [appResolvers, vaultResolvers({ vaultDBFor: ({ userId }: VaultContext) => postgresVaultDB({ client: pool, userId, listen }) })],
+  resolvers: [appResolvers, vaultResolvers({ vaultDBFor: ({ user_id }: VaultContext) => postgresVaultDB({ client: pool, user_id, listen }) })],
 })
 
 const { handleRequest } = createYoga<object, VaultContext>({
   schema,
   graphqlEndpoint: '/api/graphql',
   // Made per request, for the user your own auth signed in -- never one the request names.
-  context:         async ({ request }) => ({ userId: await signedInUserId(request) }),
+  context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
   fetchAPI:        { Response },
 })
 
@@ -77,8 +77,8 @@ import { Client, fetchExchange } from '@urql/core'
 import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const bank = Bank.make({ ...browserOpts(), applabel: 'acme', vaultDB: graphqlVaultDB({ client }) })
-const vault = await bank.ensureVault({ userId, vaultlabel: 'main' })
+const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB: graphqlVaultDB({ client }) })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is
@@ -96,7 +96,7 @@ Your app's own Client serves, cache exchange and all: every query the vault send
 ## The server half
 
 ```ts
-vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId: context.userId, listen }) })
+vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, user_id: context.user_id, listen }) })
 ```
 
 * **`vaultDBFor(context)`** makes the VaultDB for one request, from your server's context for it.
@@ -118,10 +118,10 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   crosses as `storage_unavailable`.
 * **What a refusal learned crosses in the mutation's body, not in the error.** GraphQL servers,
   gateways and APM tools commonly log an error's `extensions`, and a stale write learns the
-  winning vault props (both ways in, their salts and wrapped vaultKeys) or a winning box. So
-  `safebyokPutVaultProps` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
+  winning vault record (both ways in, its salts and wrapped vaultKeys) or a winning box. So
+  `safebyokPutVaultRecord` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
   for a `vault_full` box write), `landed: false` with the `refusalkind`, the `message`, and
-  `vault_props_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
+  `vault_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
   VaultError from it. Those fields are in the response's `data`: take care that your server's
   logging of responses, where it has any, does not write them down. Upgrade the client and the
   server together; a client and a server of different versions refuse each other's operations
@@ -147,15 +147,17 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault's boxes as stored
-records, their two ciphered fields left out. A VaultDB's own `getVault` and `ensureVault` give
-summaries instead -- the shape a vault shows, without `format` -- which the browser's VaultDB may
-not hand back from its own listing. A
-vault read is one query, its props and its boxes from one step of the server's VaultDB.
+`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault checked and split:
+its record, its sound boxes without their two ciphered fields, and its damaged boxes apart. The
+resolvers carry it as `SafebyokVault`, `{ vault, boxes, damagedBoxes }`, the shape a VaultDB's half
+answers, so the browser's VaultDB passes it through (rebuilding each record from its own fields,
+which leaves GraphQL's `__typename` behind), and its base class checks each sound box again and
+parses the server's word on each damaged one. A vault read is one query, its record and its boxes
+from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
-Every stored field is non-null in the schema but the vault props' `passphrase` and `passkey`,
-both null while a vault has no gate. A listing of yours that hands back a record missing
+Every stored field is non-null in the schema but the vault record's `gate`, null while a vault
+has none, and its `passkey`, null when the vault has none. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
 `storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.
@@ -183,12 +185,11 @@ through the recipe, that line included.
   an error may quote the variables. Anything else
   -- the network down, a server not serving this schema -- refuses with kind
   `storage_unavailable`, urql's own error as its `cause`.
-* **It holds a record to 1 MiB**, and a name to 640 bytes of UTF-8, as the Postgres VaultDB
-  behind it does, and a vault to no size of its own.
+* **It holds a record to 1 MiB**, as the Postgres VaultDB behind it does, and a vault to no size
+  of its own. Its names are labels and user_ids, checked by the package (`VAULTDB.md`, *Names*).
 * **The server checks** who may reach which vault, that each write is atomic, and that each
-  record has its shape and each name is above the floor and within its storage's limits (the
-  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
-  vault's own `validators`, nor what a box's sidecar holds.
+  record has its shape and each name passes its check and fits its storage's limits (the
+  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never what a box's sidecar holds.
 * **It declares the box limit your server holds a vault to**: none (`Infinity`), as the
   Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
   (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's
@@ -214,17 +215,20 @@ through the recipe, that line included.
 Every record crosses **field by field**, each its own GraphQL field under the name it is stored
 by, exactly as safebyok wrote it:
 
-| Type                 | Carries                                                           |
-| -------------------- | ----------------------------------------------------------------- |
-| `SafebyokVaultProps` | every field of the `VaultProps`                                   |
-| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
-| `SafebyokTombstone`  | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
-| `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
+| Type                     | Carries                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `SafebyokVaultRecord`    | every field of the `VaultRecord`; its `gate` a `SafebyokGate`, null while the vault is novel |
+| `SafebyokGate`           | the vault's ways in: its `passphrase` and its `passkey` or null   |
+| `SafebyokBox`            | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
+| `SafebyokVaultTombstone` | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
+| `SafebyokBoxSparse`  | a sound box as a listing has it: every field but the two encrypted ones |
+| `SafebyokBoxDamaged` | a box whose record does not read back, as a listing has it: its boxlabel, revision and `damage` |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
-| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
+| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`, as a subscription sends it |
 
-Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
-of its own.
+Each record has an input type twin (`SafebyokVaultRecordInput`, `SafebyokGateInput`, and so on), and each expectation
+one of its own. A vault's scope is no input type: a root field aimed at a vault takes its
+`applabel`, `user_id` and `vaultlabel` as three `String!` arguments of its own, beside the rest.
 
 * **Text is a `String`**, a count (`gate_epoch`, `vault_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
@@ -232,7 +236,7 @@ of its own.
   change to a vault's ways in, and `vault_epoch`, which goes up with it and with a deletion. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
+* **The gate's two ways in**, `passphrase` (always there) and `passkey` (null when the
   vault has none), are each a `SafebyokWayin`, one opaque JSON, its `wayinkind` saying its shape:
   the adapter carries a way in as it is, never looking inside, as the Postgres table stores each
   as one `jsonb`. A change inside a way in reaches the browser with no change here. That is by

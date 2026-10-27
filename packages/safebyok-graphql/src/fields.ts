@@ -1,9 +1,9 @@
-import type { BoxRecord, Tombstone, VaultProps, VaultScope } from 'safebyok'
+import type { BoxDamaged, BoxRecord, VaultRecord, VaultScope, VaultTombstone } from 'safebyok'
 
-/** How one field crosses the wire: `plain`, as it is, or `ciphered`, a Ciphered sent as its own two fields.
- * A plain field is text, a number, or one of the vault props' two ways in, each one opaque JSON.
+/** How one field crosses the wire: `plain`, as it is; `ciphered`, a Ciphered sent as its own two fields; or `gate`, a vault record's gate sent as its two ways in.
+ * A plain field is text, a number, or a way in, opaque JSON. A gate may be null, for a novel vault.
  */
-export type FieldKind = 'plain' | 'ciphered'
+export type FieldKind = 'plain' | 'ciphered' | 'gate'
 
 /** One field of a record: its name, the same in the record and the schema, and how it crosses. */
 export type Field<FieldT extends string = string> = readonly [field: FieldT, kind: FieldKind]
@@ -27,22 +27,21 @@ export const ScopeFields = everyFieldOf<VaultScope>()([
   ['vaultlabel', 'plain'],
 ] as const)
 
-/** Every field of a VaultProps, as `SafebyokVaultProps` has them: the one place naming them for the wire. */
-export const VaultPropsFields = everyFieldOf<VaultProps>()([
+/** Every field of a VaultRecord, as `SafebyokVaultRecord` has them: the one place naming them for the wire. */
+export const VaultRecordFields = everyFieldOf<VaultRecord>()([
   ['format',           'plain'],
   ['applabel',         'plain'],
   ['user_id',          'plain'],
   ['vaultlabel',       'plain'],
   ['vault_tok',        'plain'],
+  ['registered_at',    'plain'],
   ['vault_epoch',      'plain'],
   ['gate_epoch',       'plain'],
-  ['passphrase',       'plain'],
-  ['passkey',          'plain'],
-  ['registered_at',    'plain'],
+  ['gate',             'gate'],
 ] as const)
 
-/** Every field of a Tombstone, as `SafebyokTombstone` has them: what a deleted vault leaves. */
-export const TombstoneFields = everyFieldOf<Tombstone>()([
+/** Every field of a VaultTombstone, as `SafebyokVaultTombstone` has them: what a deleted vault leaves. */
+export const VaultTombstoneFields = everyFieldOf<VaultTombstone>()([
   ['format',           'plain'],
   ['applabel',         'plain'],
   ['user_id',          'plain'],
@@ -64,40 +63,52 @@ export const BoxFields = everyFieldOf<BoxRecord>()([
   ['written_at',             'plain'],
 ] as const)
 
-/** A box as a listing carries it, as `SafebyokListedBox` has it: every field but the two ciphered ones. */
-export const ListedBoxFields = BoxFields.filter(([_field, kind]) => kind !== 'ciphered')
+/** A sound box as a listing carries it, as `SafebyokBoxSparse` has it: every field but the two ciphered ones. */
+export const BoxSparseFields = BoxFields.filter(([_field, kind]) => kind !== 'ciphered')
 
-/** The two halves of a Ciphered, as `SafebyokCiphered` has them. */
-const CipheredHalves = ['cipher_iv_b64', 'ciphertext_b64'] as const
+/** Every field of a BoxDamaged, as `SafebyokBoxDamaged` has them: a box whose record does not read back, as a listing carries it. */
+export const BoxDamagedFields = everyFieldOf<BoxDamaged>()([
+  ['boxlabel',     'plain'],
+  ['revision_tok', 'plain'],
+  ['damage',       'plain'],
+] as const)
 
-/** The fields as a GraphQL document asks for them, a ciphered one by its two halves.
+/** The parts each kind of field crosses as, by name: a Ciphered's two halves, as `SafebyokCiphered` has them, and a gate's two ways in, as `SafebyokGate` has them; none for a plain field. */
+const PartsOfKind = {
+  plain:    [],
+  ciphered: ['cipher_iv_b64', 'ciphertext_b64'],
+  gate:     ['passphrase', 'passkey'],
+} as const satisfies Readonly<Record<FieldKind, readonly string[]>>
+
+/** The fields as a GraphQL document asks for them, a ciphered one by its two halves and a gate by its two ways in.
  *
  * @example selectionOf([['boxlabel', 'plain'], ['whisper_ciphered', 'ciphered']])  // 'boxlabel whisper_ciphered { cipher_iv_b64 ciphertext_b64 }'
+ * @example selectionOf([['gate', 'gate']])                                          // 'gate { passphrase passkey }'
  */
 export const selectionOf = (fields: readonly Field[]): string => fields.map(([field, kind]) => (
-  kind === 'ciphered' ? `${field} { ${CipheredHalves.join(' ')} }` : field
+  kind === 'plain' ? field : `${field} { ${PartsOfKind[kind].join(' ')} }`
 )).join(' ')
 
 /** The record `sent` carries, rebuilt from `fields` alone, so whatever else rode along stays behind: a `__typename`, a stray field.
- * A null field stays null, a missing one is left out, and a ciphered one keeps only its two
- * halves. Nothing is checked here: the VaultDB on each side validates what it is handed. What is
- * not an object comes back as it is, for that validation to refuse.
+ * A null field stays null, a missing one is left out, a ciphered one keeps only its two halves,
+ * and a gate only its two ways in. Nothing is checked here: the VaultDB on each side validates
+ * what it is handed. What is not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_tok', 'plain'], ['passkey', 'plain']])  // { vault_tok: 'v1', passkey: null }
+ * @example recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultRecord' }, [['vault_tok', 'plain'], ['passkey', 'plain']])  // { vault_tok: 'v1', passkey: null }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }
   return Object.fromEntries(fields.flatMap(([field, kind]) => {
     const val = sent[field]
     if (val === undefined) { return [] }
-    return [[field, kind === 'ciphered' ? halvesOf(val) : val]]
+    return [[field, kind === 'plain' ? val : partsOf(val, PartsOfKind[kind])]]
   }))
 }
 
-/** A Ciphered's two halves, and nothing else; what is not an object, as it is. */
-const halvesOf = (ciphered: unknown): unknown => {
-  if (! isBag(ciphered)) { return ciphered }
-  return Object.fromEntries(CipheredHalves.map((half) => [half, ciphered[half]]))
+/** A Ciphered's two halves or a gate's two ways in, and nothing else; what is not an object (a novel vault's null gate), as it is. */
+const partsOf = (nested: unknown, parts: readonly string[]): unknown => {
+  if (! isBag(nested)) { return nested }
+  return Object.fromEntries(parts.map((part) => [part, nested[part]]))
 }
 
 const isBag = (val: unknown): val is Record<string, unknown> => typeof val === 'object' && val !== null && ! Array.isArray(val)

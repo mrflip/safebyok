@@ -1,45 +1,44 @@
 import { describe, it, expect, vi } from 'vitest'
 import { memoryDeviceDB } from '../../src/device-db'
+import { MinuteMillis } from '../../src/consts'
 import type { Vault } from '../../src/vault'
 import { heldLeaseOf } from '../../src/held-lease'
 import type { Gating } from '../../src/gating'
 import * as TH from '../test-helpers'
-import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxCkey } from './world'
+import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxScopepath } from './world'
 
 /** Delete the vault from another device and make it anew there under 'pw two': a new life, of another vault_tok. */
 const remakeElsewhere = async (world: ReturnType<typeof makeWorld>) => {
   const there = await world.open({ deviceDB: memoryDeviceDB() })
   await TH.del(there, 'pw')
-  const anew = await TH.bankOf(there).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+  const anew = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
   await TH.unlock(anew, 'pw two')
   return anew
 }
 
-// == [The stamp]: vault.stamp
+// == [Made under]: what a thing the vault makes is made under
 
-describe("vault.stamp", () => {
-  it("is never null: a novel vault's is its scope and vault_tok, at gate_epoch 0", async () => {
+describe("what the vault makes things under", () => {
+  it("is its scope and vault_tok while novel, at gate_epoch 0", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(vault.state).to.eq('novel')
-    expect(vault.stamp).to.deep.include({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, gate_epoch: 0 })
-    expect(Object.isFrozen(vault.stamp)).to.be.true
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
+    expect(TH.madeUnderOf(vault)).to.deep.include({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, gate_epoch: 0 })
   })
 
-  it("is the scope, and the vault_tok, vault_epoch and gate_epoch of the vault held, frozen", async () => {
+  it("is the vault record held but for its gate: its stamp, the Vault object's own fields, and its vault_epoch and gate_epoch", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    expect(vault.stamp).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, vault_epoch: 1, gate_epoch: 1 })
-    expect(Object.isFrozen(vault.stamp)).to.be.true
+    expect(TH.madeUnderOf(vault)).to.deep.equal({ ...TH.shownOf(vault), vault_epoch: 1, gate_epoch: 1 })
   })
 
-  it("moves up by one on every change to the ways in, as its example shows", async () => {
+  it("moves up by one on every change to the ways in", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const before = vault.stamp.gate_epoch
+    const before = TH.madeUnderOf(vault).gate_epoch
     await TH.putWayin(vault, 'pw', 'pw two')
-    expect(vault.stamp.gate_epoch).to.eq(before + 1)
-    expect(vault.stamp.vault_epoch).to.eq(2)
+    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.madeUnderOf(vault).vault_epoch).to.eq(2)
   })
 })
 // --
@@ -84,66 +83,66 @@ describe("vault.demandConsistentWith", () => {
   it("drops a lease it finds ended, as the expiry would, when lease-bound", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { leaseHours: 1 })
-    const { stamp } = vault
+    const madeUnder = TH.madeUnderOf(vault)
     world.advance(60 * 60 * 1000)
-    expect(vault.state).to.eq('unlocked')
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith(stamp, { leaseBound: true }) }, 'vault_locked')
-    expect(vault.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leaseBound: true }) }, 'vault_locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
-  it("refuses a stamp of another gate_epoch as 'gate_moved', as its third example shows", async () => {
+  it("refuses a thing of another gate_epoch as 'gate_moved', as its third example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...stamp, gate_epoch: 0 }) }, 'gate_moved')
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...stamp, gate_epoch: stamp.gate_epoch + 1 }) }, 'gate_moved')
+    const madeUnder = TH.madeUnderOf(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 }) }, 'gate_moved')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: madeUnder.gate_epoch + 1 }) }, 'gate_moved')
   })
 
   it("takes a vault_epoch at or below the vault's, and refuses one past it as 'gate_moved'", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await TH.putWayin(vault, 'pw', 'pw two')
-    const { stamp } = vault
-    expect(() => { vault.demandConsistentWith({ vault_tok: stamp.vault_tok, vault_epoch: stamp.vault_epoch - 1 }) }).to.not.throw()
-    expect(() => { vault.demandConsistentWith({ vault_tok: stamp.vault_tok, vault_epoch: stamp.vault_epoch }) }).to.not.throw()
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: stamp.vault_tok, vault_epoch: stamp.vault_epoch + 1 }) }, 'gate_moved')
+    const madeUnder = TH.madeUnderOf(vault)
+    expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch - 1 }) }).to.not.throw()
+    expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch }) }).to.not.throw()
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch + 1 }) }, 'gate_moved')
   })
 
   it("refuses a thing of another scope as 'vault_remade', whatever its vault_tok", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...stamp, user_id: 'u2' }) }, 'vault_remade')
+    const madeUnder = TH.madeUnderOf(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, user_id: 'u2' }) }, 'vault_remade')
   })
 
   it("refuses 'vault_gone' once the bank lets the vault go", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
+    const madeUnder = TH.madeUnderOf(vault)
     TH.closeVault(vault)
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith(stamp) }, 'vault_gone')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder) }, 'vault_gone')
   })
 
   it("refuses a thing carrying no vault_tok, or an option it does not take, as 'bad_option', quoting none of it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
-    const sloppy: unknown[] = [null, 'a vault_tok', 42, { gate_epoch: 1 }, { vault_tok: 7 }, { vault_tok: stamp.vault_tok, gate_epoch: 'one' }]
+    const madeUnder = TH.madeUnderOf(vault)
+    const sloppy: unknown[] = [null, 'a vault_tok', 42, { gate_epoch: 1 }, { vault_tok: 7 }, { vault_tok: madeUnder.vault_tok, gate_epoch: 'one' }]
     for (const thing of sloppy) {
       const err = TH.expectSyncRefusal(() => { vault.demandConsistentWith(thing as never) }, 'bad_option')
       expect(err.message).to.not.include('a vault_tok')
     }
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith(stamp, { leasebound: true } as never) }, 'bad_option')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leasebound: true } as never) }, 'bad_option')
   })
 
   it("tells the logger the kind and the call it refused, never the thing's fields", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
-    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...stamp, gate_epoch: 0 }) }, 'gate_moved')
+    const madeUnder = TH.madeUnderOf(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: 0 }) }, 'gate_moved')
     expect(world.logged).to.have.lengthOf(1)
     expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'demandConsistentWith', refusalkind: 'gate_moved' } })
-    expect(TH.loggedText(world.logged)).to.not.include(stamp.vault_tok)
+    expect(TH.loggedText(world.logged)).to.not.include(madeUnder.vault_tok)
   })
 
 })
@@ -152,10 +151,10 @@ describe("vault.consistentWith", () => {
   it("answers the demand's question without refusing: true while the thing stands, false once the vault moved on", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const { stamp } = vault
-    expect(vault.consistentWith(stamp)).to.be.true
-    expect(vault.consistentWith({ ...stamp, gate_epoch: 0 })).to.be.false
-    expect(vault.consistentWith({ ...stamp, vault_tok: 'vault-tok-other' })).to.be.false
+    const madeUnder = TH.madeUnderOf(vault)
+    expect(vault.consistentWith(madeUnder)).to.be.true
+    expect(vault.consistentWith({ ...madeUnder, gate_epoch: 0 })).to.be.false
+    expect(vault.consistentWith({ ...madeUnder, vault_tok: 'vault-tok-other' })).to.be.false
     expect(world.logged).to.have.lengthOf(0)
   })
 
@@ -174,11 +173,11 @@ describe("vault.consistentWith", () => {
   it("asks for a lease in hand that has not ended when lease-bound, dropping none it finds ended", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { leaseHours: 1 })
-    const { stamp } = vault
-    expect(vault.consistentWith(stamp, { leaseBound: true })).to.be.true
+    const madeUnder = TH.madeUnderOf(vault)
+    expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.true
     world.advance(60 * 60 * 1000)
-    expect(vault.consistentWith(stamp, { leaseBound: true })).to.be.false
-    expect(vault.consistentWith(stamp)).to.be.true
+    expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.false
+    expect(vault.consistentWith(madeUnder)).to.be.true
     expect(heldLeaseOf(vault)).to.not.be.null
   })
 
@@ -186,7 +185,7 @@ describe("vault.consistentWith", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     TH.expectSyncRefusal(() => vault.consistentWith({} as never), 'bad_option')
-    TH.expectSyncRefusal(() => vault.consistentWith(vault.stamp, { leasebound: true } as never), 'bad_option')
+    TH.expectSyncRefusal(() => vault.consistentWith(vault, { leasebound: true } as never), 'bad_option')
   })
 })
 // --
@@ -235,17 +234,17 @@ describe("the refresh's judgment", () => {
     // A read starts as the change is about to write: storage serves it before the change lands,
     // and its answer is held until after.
     const reading: { served?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
-    TH.beforeNextCall(deaf, 'putVaultProps', async () => {
+    TH.beforeNextCall(deaf, 'putVaultRecord', async () => {
       reading.served = TH.holdNextAnswer(deaf, 'getVault')
       reading.done = vault.hello({ staleMinutes: 0 })
       await reading.served.reached
     })
     await TH.putWayin(vault, 'pw', 'pw two')
-    expect(vault.gate_epoch).to.eq(2)
+    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
     reading.served?.release()
     await reading.done
-    expect(vault.gate_epoch).to.eq(2)
-    expect(vault.state).to.eq('unlocked')
+    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     expect(world.logged).to.have.lengthOf(0)
   })
 
@@ -253,11 +252,53 @@ describe("the refresh's judgment", () => {
     const world = makeWorld()
     const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const otherTab = await world.open()
-    expect(otherTab.state).to.eq('unlocked')
+    expect(TH.stateOf(otherTab.snapshot)).to.eq('unlocked')
     await otherTab.lock()
-    expect(thisTab.state).to.eq('unlocked')
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
     await thisTab.refresh()
-    expect(thisTab.state).to.eq('locked')
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('locked')
+  })
+
+  it("keeps its own lease when another tab's renewal writes one ending later: it never shows 'locked' for it, and takes the renewed one up, unasked, once its own ends", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), leaseHours: 1 })
+    const own = thisTab.snapshot.ask_passphrase_at
+    if (own === null) { throw new Error("The unlock left this tab no lease") }
+    world.advance(30 * MinuteMillis)
+    const otherTab = await world.open({ leaseHours: 1 })
+    expect(TH.stateOf(otherTab.snapshot)).to.eq('unlocked')
+    TH.answering(otherTab, async (gating) => { if (gating.gatingkind === 'unlock_vault') { await gating.attemptPassphrase('pw') } })
+    await otherTab.ensureUnlocked({ renewMinutes: 45 })
+    const renewed = await world.getLease()
+    expect(renewed?.ask_passphrase_at).to.be.above(own)
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+    expect(thisTab.snapshot.ask_passphrase_at).to.eq(own)
+    world.advance(own - world.clock.now())
+    await thisTab.ensureUnlocked()
+    expect(thisTab.snapshot.ask_passphrase_at).to.eq(renewed?.ask_passphrase_at)
+  })
+
+  it("keeps its own lease when another tab's lock and unlock both land before it reads: the store holds a lease under the same gate", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const otherTab = await world.open()
+    await otherTab.lock()
+    world.advance(MinuteMillis)
+    await TH.unlock(otherTab, 'pw')
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+  })
+
+  it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault record read still shows the old", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const kept = await world.getLease()
+    if (kept === null) { throw new Error("The unlock left no lease in this device's store") }
+    vi.spyOn(world.deviceDB, 'getLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
+    await vault.refresh()
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+    expect(await world.getLease()).to.deep.eq(kept)
   })
 
   it("keeps a lease granted after a read began, though that read found none in this device's store", async () => {
@@ -275,7 +316,7 @@ describe("the refresh's judgment", () => {
     await TH.unlock(vault, 'pw')
     reading.answered?.release()
     await reading.done
-    expect(vault.state).to.eq('unlocked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
   it("drops the lease from memory, erasing nothing, when the ways in changed elsewhere", async () => {
@@ -284,7 +325,7 @@ describe("the refresh's judgment", () => {
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     await TH.putWayin(there, 'pw', 'pw two')
     await vault.refresh()
-    expect(vault.state).to.eq('locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     const kept = await world.getLease()
     expect(kept?.gate_epoch).to.eq(1)
   })
@@ -298,9 +339,9 @@ describe("the refresh's judgment", () => {
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_remade')
     const kept = await world.getLease()
     expect(kept?.vault_tok).to.eq(formerTok)
-    const reborn = await TH.bankOf(vault).ensureVault({ userId: 'u1', vaultlabel: 'main' })
+    const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(reborn.vault_tok).to.eq(anew.vault_tok)
-    expect(reborn.state).to.eq('locked')
+    expect(TH.stateOf(reborn.snapshot)).to.eq('locked')
     const stillKept = await world.getLease()
     expect(stillKept?.vault_tok).to.eq(formerTok)
   })
@@ -314,9 +355,9 @@ describe("the refresh's judgment", () => {
     const otherTab = await world.open()
     await TH.unlock(otherTab, 'pw')
     await thisTab.refresh()
-    expect(thisTab.state).to.eq('locked')
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('locked')
     await thisTab.ensureUnlocked()
-    expect(thisTab.state).to.eq('unlocked')
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 })
@@ -329,11 +370,11 @@ describe("vault.lock, at once", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const heard: string[] = []
-    vault.subscribe(() => { heard.push(vault.getSnapshot().state) })
+    vault.subscribe(() => { heard.push(TH.stateOf(vault.getSnapshot())) })
     const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
     const locking = vault.lock()
-    expect(vault.state).to.eq('locked')
-    expect(vault.askPassphraseAt).to.be.null
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+    expect(vault.snapshot.ask_passphrase_at).to.be.null
     expect(heard).to.deep.equal(['locked'])
     await erasing.reached
     expect(await world.getLease()).to.not.be.null
@@ -410,7 +451,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     sealing.release()
     await TH.expectRefusal(putting, 'vault_locked')
-    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
@@ -438,7 +479,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     deleting.release()
     await removing
-    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 })
