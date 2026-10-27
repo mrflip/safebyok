@@ -239,7 +239,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
     return ['box', applabel, user_id, vaultlabel, boxlabel].join(ScopepathDelimiter)
   }
 
-  export const boxscope = (boxScopepath: BoxScopepath): Boxscope => {
+  export const boxscopeOf = (boxScopepath: BoxScopepath): Boxscope => {
     const [_scopepathkind, applabel, user_id, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
     return               { applabel, user_id, vaultlabel, boxlabel }
   }

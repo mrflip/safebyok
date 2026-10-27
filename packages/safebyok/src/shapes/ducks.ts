@@ -29,7 +29,7 @@ export const { vaultKin } = Validator('bad_scope', ({ obj, oneof, uint }) => ({
 
 // == [Scopes]: bankScopeDuck, vaultScopeDuck, boxscopeDuck
 
-/** A scope taken from whatever carries it, frozen: a scope, a Vault object, a box, or any record of the vault's {@link VaultKin}. Each refuses 'bad_scope'.
+/** A scope taken from whatever carries it, frozen: a scope, a Vault object, a box, or any record of the vault's {@link vaultKin}. Each refuses 'bad_scope'.
  * Every field the thing holds is checked, and one none of the kin carries refuses: a store, an
  * option, a misspelt name. A wider scope passes as a narrower, a box's as its vault's.
  *
