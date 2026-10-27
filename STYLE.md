@@ -11,14 +11,6 @@ The core's `eslint.config.mjs` (`packages/safebyok/`) is the source of truth for
 mechanically enforceable; where it and this document disagree, the linter wins and this document
 is a bug.
 
-This guide says how to write code from now on, and some of what it names is still being built
-into `src/`: the `Validator` factory (`src/checks/validator.ts`), the shared primitives
-(`src/checks/primitives.ts`), `Phrases` (`src/utils/phrases.ts`), `src/utils/consts.ts` and
-`Scopepath`. Until one lands, its worked example is the file of the same name in
-`whiteboard/20261025-restyle/good/`. A module not yet converted keeps its older form (`zod/mini`,
-`Ckeys`, a hand-written type beside its schema): leave it so unless your task is to convert it.
-While the linter still holds `src/` to `zod/mini`, so does new code.
-
 ## Imports
 
 * Import paths carry no extension (`./key-deriver-spec`, not `./key-deriver-spec.ts`): the bundler resolves
@@ -143,19 +135,18 @@ key material, a model's verb resolves its summary: `vault.putWayin()` resolves t
 `vault.snapshot.gate` then shows the way in as stored; `VaultDB.putBox()` resolves the record.
 
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
-else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
-That holds wherever the object is the stored record, the facades a record passes through
-included: a key deriver's `key_deriver_label` is written into a wayin as it is. **A host-facing
-field that is a stored field takes its stored spelling**: one name for one thing, everywhere, so
-`user_id` in a host's options, a snapshot and storage alike, never `userId` for the same value.
-The tag smushing above is for a label that names a thing (`boxlabel`); `keyDeriverLabel` is the
-concept "the label of the key deriver", and stays camelCase.
+else's database, and stay one spelling from the wire to the code. **One name for one thing,
+everywhere**: a field holding a stored value keeps its stored spelling wherever it goes, in the
+facades a record passes through, a host's options and a snapshot alike. A key deriver's
+`key_deriver_label` is written into a wayin as it is, and `user_id` is never `userId`. Other
+names are camelCase: a field with no stored counterpart (a snapshot's `damagedBoxes`), a verb
+(`getUserId`), a concept (`keyDeriverLabel`, "the label of the key deriver").
+The tag smushing above is for a label that names a thing (`boxlabel`).
 
-**A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`,
-`askPassphraseAt`), in a stored record, a snapshot, a test fixture and the demo alike: never an
-ISO string, never a `Date`. The clock seam (`Clock.now()`) already yields it, every index sorts
-it, and one convention means no parsing at any boundary. A field named `*_at` holds one, checked
-by `EpochMillis`.
+**A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
+record, a snapshot, a test fixture and the demo alike: never an ISO string, never a `Date`. The
+clock seam (`Clock.now()`) already yields it, every index sorts it, and one convention means no
+parsing at any boundary. A field named `*_at` holds one, checked by `EpochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
@@ -231,7 +222,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   on the text; don't parse it into a scope to join it again.
 * **Take one form of input.** A function taking a scope *or* its scopepath branches on its
   argument and trusts one branch; take the scope.
-* **Constants shared across modules** (`ScopepathDelimiter`) live in `utils/consts.ts`, which
+* **Constants shared across modules** (`ScopepathDelimiter`) live in `consts.ts`, which
   imports nothing, so any module can name them without a cycle.
 * **Familiar over cute.** When a function already spans lines, a named target and `===` beats an
   equality-predicate factory: `const target = Scopepath.vault(thing)`, then
@@ -352,7 +343,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 
 **What a refusal says.**
 
-* **Every sentence a check says lives in `utils/phrases.ts`**, star-imported as `Phrases`, so
+* **Every sentence a check says lives in `phrases.ts`**, star-imported as `Phrases`, so
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal is as informative as it can be without leaking**: every failing field, each with
   where and what (`applabel: A label is ...; written_at: Too small: ...`), and the paths in
@@ -514,7 +505,7 @@ integer-like keys first.
 ## Scopepaths
 
 A **scopepath** is where a store files a scope's record (VOCABULARY.md): the kind first, then the
-scope's names in order, joined on `ScopepathDelimiter` (`^`, from `utils/consts.ts`), such as
+scope's names in order, joined on `ScopepathDelimiter` (`^`, from `consts.ts`), such as
 `box^acme^u1^main^openai`. `Scopepath` is a public module: a host's own key-value adapter files
 rows with it.
 
