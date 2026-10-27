@@ -93,7 +93,8 @@ keep the Zod parse beside them wherever it still does useful work.
 * **Validators are made inside a `Validator(kind, kit => { ... }, sources?)` call**, which
   hands the builder Zod's makers under short names (`obj`, `arr`, `tuple`, `rec`, `oneof`,
   `union`, `discrim`, `lit`), its scalars ready made (`str`, `num`, `int`, `uint`, `bool`,
-  `unk`), the whole of Zod as `zod` for the rare rest, and the shared primitives (`label`,
+  `unk`), `lazy` and `custom` for the rare rest (a maker the kit lacks comes in by a named
+  import from `zod`), and the shared primitives (`label`,
   `user_id`, ...); and wraps each schema it returns so a failed `parse` throws a `VaultError` of
   the call's one `kind`, its message from `Phrases`. Modules of validators in `sources` (star
   imports, `[FooValidators]`) are spread into the kit beneath it, so a kit name wins. A file makes
@@ -214,6 +215,7 @@ just the scope.
 * **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
   only own enumerable fields: a getter on the prototype is lost (`{ ...vault }` drops it while
   TypeScript types it as present), and every other own field comes along.
+  To show or copy a thing's fields, a getter hands out a frozen shallow copy of them.
 * **Strip before crossing into host code.** A host's store, callback or checker gets plain data
   picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's store
   the Vault object, `lock()` and all. Nothing that crosses needs a method.

@@ -593,7 +593,7 @@ on the sprint doc's Cleanup tab.
   record as it is in storage now, open for the gating open on a vault, live for a Vault object
   not gone or a lease in force (`#checkStanding` → `#checkLive`), `StandInGating`, current for
   "the standing passphrase". About 240 lines; one commit. Skip it unless the ruling has come.
-* **Small leftovers:** the format snapshot test's comment ("never rewrite a standing format's
+* **Small leftovers:** `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
   `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
