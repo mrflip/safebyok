@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-26
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-26).
-* **Status:** **paused at the Coach's request, 2026-10-26** (usage), threads 1 to 12 filed ([#272](https://github.com/mrflip/safebyok/pull/272) to [#283](https://github.com/mrflip/safebyok/pull/283)); thread 13 not started (`human/20261026-sprint_restyle_paused.md`); thread 14 (the Coach's rulings of 2026-10-26) planned.
+* **Status:** **resumed 2026-10-27.** Threads 2 to 12 merged ([#273](https://github.com/mrflip/safebyok/pull/273) to [#283](https://github.com/mrflip/safebyok/pull/283)) with the primitives line; [#272](https://github.com/mrflip/safebyok/pull/272) (thread 1) open, reworked onto main beside thread 13; threads 13 to 15 cut from `origin/main`, serial. Workers may run `gh pr` commands but never merge or close a PR (the Coach, 2026-10-27).
 * **Review level:** `medium`. **Threads at once:** 3 by the cap, 2 in practice: thread 1 runs
   beside the line, and the line (threads 2 to 13) is serial, each rewriting files the one before
   touched.
@@ -95,6 +95,24 @@ as [#272](https://github.com/mrflip/safebyok/pull/272), still a draft based on #
 `gh pr edit --base main` and `gh pr ready` were denied by the permission classifier (an Open Matter).
 It handed thread 2 the eslint tree-shaking comment (NEWSTYLE §11) and thread 9 VOCABULARY's `ctx`,
 **visible** and **unencrypted** rows.
+
+*Orchestrator, 2026-10-27: the rework.* The line merged without #272, and main has since trimmed
+CLAUDE.md from 204 to 126 lines (#285, the Coach's), moving reviewer-fixable conventions to
+STYLE.md. A worker rebases `20261026-guidance` onto `origin/main`, resolving every conflict in
+#285's favour (its trim is the Coach's newer intent: a line #272 added to a section #285 removed
+goes where #285 sent that section's lines, or to STYLE.md), sets #272's base to `main` and takes
+it out of draft. Then, on top, the guidance the line left for it (`restyle-progress.md`, *From
+thread 8* to *From thread 12*, each section's guidance items): VOCABULARY's and STYLE.md's edits
+threads 8, 9, 11 and 12 asked for; STYLE.md drops the camelCase-everywhere rule and its
+`askPassphraseAt` example, as NEWSTYLE's one-name rule says; VOCABULARY's `registeredAt` and
+`writtenAt` rows become `registered_at` and `written_at`; strike every "src/ is only partly
+converted" sentence and pointer to `good/` (the line has merged). The Coach's rulings: **keep** the
+"never spread a thing to take a part of it" line in CLAUDE.md, placed where #285's structure
+puts such a line; **add** one line saying validators are made in a `Validator` call, never plain
+Zod; **drop** `zod` from the Validator kit's list in NEWSTYLE and STYLE.md (the kit adds `lazy`
+and `custom` instead); NEWSTYLE's redundant-alias example stands (thread 15 turns that lint rule
+off), and its `{ ...vault }` example becomes "a getter hands out a frozen shallow copy" without a
+name, which thread 15 picks. Weigh every CLAUDE.md line by context cost.
 
 ### 2. The Validator factory and scope checks (Preplan Phase 1, first half) -- `validator`
 
@@ -510,47 +528,73 @@ changeset (`.changeset/20261026-snapshot.md`) and the core README's *The snapsho
 `demandConsistentWith(snapshot)` checks the scope, the `vault_tok` and whether the Vault object
 is gone, and no longer catches a change to the ways in. Reuse `keptIfSame` (vault.ts) for
 `bank.snapshot.vaults`. `Bank`'s `getSnapshot`/`subscribe` are prototype getters already (thread
-11); the bank's status is `#libs.status` (`made | starting | timely | refused`, thread 7). **Depends on:** thread 12. **Size:** medium.
+11); the bank's status is `#libs.status` (`made | starting | timely | refused`, thread 7). **Depends on:** thread 12, merged: cut from `origin/main`. **Size:** medium.
 
-### 14. The Coach's rulings of 2026-10-26 -- `rulings`
+### 14. Refusals say less; validators go public -- `rulings`
 
-*Orchestrator:* no Coach text of its own. The thread gathers the code rulings the Coach gave in
-the sprint doc's Open Matters on 2026-10-26, quoted below from its *Resolved* tab, and the
-error-handler audit (`error-handlers-audit.md` in this directory).
+*Orchestrator:* no Coach text of its own. The Coach's rulings in the sprint doc on 2026-10-26
+and 2026-10-27, quoted, and the error-handler audit (`error-handlers-audit.md` in this
+directory; read it whole). The Coach's model: a catch-and-rethrow block, or anything turning a
+failed parse into a refusal, only aligns the kind and attaches context, never throws, and never
+sifts broken input to explain it.
 
 * **Cut the key sifting.** "Is someone sifting through all the keys to find out why a strict
-  mode error was thrown? If so ... remove that. Beware complicated logic in a handler." With the
-  audit's list: delete `isSayable`, its two regexes and `MaxSayableChars` (checks/validator.ts);
-  a refusal for unknown fields says how many and lists the names the bag takes, never the names
-  it was given; `refusalOf` joins the first issues' messages; drop `checkMakeBankOpts`'s pre-scan
-  and `RenamedMakeBankOpts` and let `.strict()` speak; `checkNoStoresIn` names no key;
-  `parseKeyDeriverSpec` gives one fixed sentence (drop `SpecLimitForField`); drop `optionsCheck`'s
-  `isPlainBag` hint. The six catch blocks stay. Add a test that no refusal repeats a value from
-  its input.
+  mode error was thrown? If so ... remove that. Beware complicated logic in a handler." And: "If
+  there's code sifting through extra keys to mind-read them, remove it. Validate options in strict
+  mode. Getting the store wrong is a hard-to-miss error." Per the audit: delete `isSayable`, its
+  two regexes and `MaxSayableChars` (checks/validator.ts); a refusal for unknown fields says how
+  many and lists the names the bag takes, never the names it was given; `refusalOf` joins the
+  first issues' messages; drop `checkMakeBankOpts`'s pre-scan and `RenamedMakeBankOpts` and let
+  `.strict()` speak; delete `checkNoStoresIn` and the store-named-key check in the vault bag
+  (the vault bag still keeps only its scope, ignoring other fields, as ruled; every options bag
+  is strict); `parseKeyDeriverSpec` gives one fixed sentence (drop `SpecLimitForField`); drop
+  `optionsCheck`'s `isPlainBag` hint. The six catch blocks stay. Add a test that no refusal
+  repeats a value or key from its input.
 * **Nothing fine-grained on broken data.** "Do not make fine grained decisions on broken data,
   especially in an exception handler." `Wayin.make`'s failure is our `bad_record`, nothing
   compared or re-parsed.
-* **Validator is public.** "No, public: we need pr's." Export it from the main entry; the
-  IndexedDB package makes its option checks with it.
+* **Validators go public.** "No, public: we need pr's" (of `Validator`), and "Any validator
+  touching an external interface should be exported. My guess is that will be close enough to
+  most that you should export the lot." Export `Validator` and every validator from the main
+  entry (a namespace, if the entry would otherwise grow by dozens of names: say which); the
+  IndexedDB package makes its option checks with `Validator`. A public-surface change: the
+  changeset says so.
 * **Convex imports the core.** "Why would it not import most of what it does from core?
   Validators, the checks you mentioned -- having a separation sounds like a terrible plan.
   Explain and/or fix." Make the component import the core's validators and checks; if Convex's
-  component bundling forbids it, report the constraint instead.
+  component bundling forbids it, report the constraint instead, in the PR and the thread file.
 * **Adapters' box rows unbranded.** What an adapter hands `splitStoredBoxes` is the unbranded
   input type, so no adapter casts.
+
+**Depends on:** thread 13. **Size:** medium to large; if the Convex import runs long, file what
+is done and say so: it becomes its own thread.
+
+### 15. Names and small rulings -- `tidy`
+
+*Orchestrator:* the rest of the Coach's rulings of 2026-10-26 and 2026-10-27, and the leftovers
+on the sprint doc's Cleanup tab.
+
 * **The redundant-alias lint rule goes.** "Reject the first rule, it's stupid. Make a getter
   .props returning a shallow copy or whatever the best equivalent of spreading it is." Turn off
   `redundant-type-aliases`; give the Vault object a getter handing out a frozen shallow copy of
-  its fields, named per VOCABULARY ("props" is retired: look up the name before choosing).
-  `no-misused-spread` stays.
+  its fields, named per VOCABULARY ("props" is retired: look up the name first), and put that
+  name in NEWSTYLE's and STYLE.md's example. `no-misused-spread` stays.
 * **A test helper for the epochs.** "cheatGetVaultEpoch(vault) says everything I need to know."
   Tests read epochs through `TH.cheatGetVaultEpoch(vault)`, not `vaultRecordHeldBy`.
-* **Small leftovers** (the Cleanup tab): restore the passphrase refusal's full stop (#275); one
-  sentence in VAULTDB.md that an adapter enforcing `maxBoxes` from capacity counts rows the
-  listing skips; `.claude/agents/documentarian.md`'s example names `bad_label`, now `bad_scope`.
+* **"Listed" becomes "sparse".** "converge names saying 'listed' to say 'sparse' if they're the
+  same thing." Where a name or doc says "listed" for what VOCABULARY calls the sparse shape,
+  rename it; where it means something else, leave it and say which in the thread file.
+* **`Gate.of(vault, vaultProps)`.** "Explain why this makes sense (vault but also vaultProps???),
+  or fix." *Orchestrator:* see the explanation on the sprint doc; at least the retired "props"
+  name goes.
+* **Small leftovers:** the format snapshot test's comment ("never rewrite a standing format's
+  snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
+  passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
+  `maxBoxes` from capacity counts rows the listing skips; `.claude/agents/documentarian.md`'s
+  example names `bad_label`, now `bad_scope`; a TODO.md entry, "allow async passphrase checking",
+  unless a host's passphrase checker may already be async (check first; say which).
 
-**Depends on:** thread 13. **Size:** medium; split the Convex import into its own thread if it
-runs long.
+**Depends on:** thread 14. **Size:** medium.
 
 ## Not in this sprint
 
