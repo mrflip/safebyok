@@ -1610,7 +1610,7 @@ export class Vault implements VaultStamp {
     return await this.#readBox(label, call)
   }
 
-  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the vault demanded after the read, then the lease.
+  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the vault demanded after `getBox`, then the lease.
    * A box another device wrote is what storage holds, not drift. The demand on what the read was
    * made under cannot see a lock, which moves no `vault_tok`, so the lease is demanded again before
    * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
@@ -1741,7 +1741,7 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Update the box listing with `stored`, the record a box write just landed in this vault, resolving the box it makes under the picture in hand. */
+  /** Update the box listing with `stored`, the record `#writeOver` just landed in this vault, resolving the box it makes under the picture in hand. */
   #updateBoxListingOf(stored: BoxRecord): Box {
     const box = Box.make(this, stored, vaultSparseOf(this.#vaultRecord))
     const entry = boxSparseOf(stored)
