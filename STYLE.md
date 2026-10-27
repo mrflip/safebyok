@@ -79,6 +79,8 @@ thing's stage in its life is its `lifecycle`.
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`).
+A shape's validator is the exception: it takes its type's name (`export const { BoxSparse } =
+...`, `type BoxSparse = Z.infer<typeof BoxSparse>`), for it checks no one parameter.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
 spreads a narrower: `export const WayinKindVals = [...] as const`,
