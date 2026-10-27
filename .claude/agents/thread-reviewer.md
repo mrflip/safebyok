@@ -41,10 +41,12 @@ A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; t
    are confident of; at `high` or `max`, wider, uncertain findings included. Say which way the
    review ran.
 
-   **Style** is yours, as workers do not front-load it. Read STYLE.md whole -- the linter keeps
-   only part of it: braces, quotes, negation spacing, imports, naming, doc blocks and the shape of
-   tests are by hand -- and look up in VOCABULARY.md each term of the cast the diff names; then
-   check what the diff adds against them.
+   **Style** is delegated, as workers do not front-load it. Once `/code-review` has returned and
+   before you fix anything, spawn `style-reviewer` (`.claude/agents/style-reviewer.md`) in the
+   foreground with your worktree path, the branch and the same range. It fixes the hand-kept
+   mechanical rules and commits them in your worktree; the findings it leaves join yours in step
+   2, judged the same way. If it bails, do its job by hand: read STYLE.md whole and check what
+   the diff adds.
 2. **Judge each finding** against the files. Make a fix, by hand, when it mends a correctness bug
    or a hazard, is local, and stays within what the thread built. Leave a finding whose fix would
    - change a decision the worker or the plan recorded, or the thread's scope;

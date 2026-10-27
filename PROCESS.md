@@ -100,6 +100,8 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
   sprint to the orchestrator -- take it out of draft (`gh pr ready`), whatever the report says.
   It stays out of draft from then on: later fixes are pushed to it as it stands.
 * **Title**: plain language, saying what changed.
+* **Link each PR, branch or commit on first mention**, in chat, a PR body or a note:
+  `[#12](https://github.com/mrflip/safebyok/pull/12)`.
 * **Body**: what changed, in short paragraphs or bullets with **bold lead-ins**; a **Tests:**
   line naming what ran and the counts; "Stacked on #N" for an unmerged PR the branch stands on;
   and an *Open questions* list for what remains. Put those questions in chat and `human/` too: a
