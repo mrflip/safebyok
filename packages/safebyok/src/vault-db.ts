@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, type DamagedBoxRecord, boxSparseOf } from './box'
+import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse, boxSparseOf } from './box'
 import { Capacity, type VaultScope } from './types/types'
 import { type DamagedVaultRecord, VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './vault-record'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
@@ -93,12 +93,13 @@ export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultD
  * `boxlabel` is the label the row is filed under, from its scopepath or its column, which an
  * adapter always has. The record is whole, or without its two ciphered fields where the backend can
  * project, and may be damaged: its own `boxlabel` missing, or naming another label than its row's,
- * is damage the split finds. The row's boxlabel lets a damaged box still be named, and so deleted
+ * is damage the split finds. So `box` is whatever storage holds, typed `unknown`, and an adapter
+ * hands its row up as it read it, with no cast: the split's check is what brands it. The row's boxlabel lets a damaged box still be named, and so deleted
  * or written over.
  *
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow }
  */
-export type StoredBox = { boxlabel: string, box: BoxRecord | BoxSparse | DamagedBoxRecord }
+export type StoredBox = { boxlabel: string, box: unknown }
 
 /** One vault as a VaultDB's `doGetVault` and `doEnsureVault` answer it, read in one atomic step: its vault record exactly as stored, and its boxes split into the sound and the damaged.
  * `vault` is the record as stored: a vault record, one damaged, a tombstone (where a store keeps
