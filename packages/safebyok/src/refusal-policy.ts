@@ -5,7 +5,7 @@ import type { VaultDB } from './vault-db'
 /** What a vault does with a refusal from storage beyond throwing it: lock, or nothing more. */
 export type RefusalResponse = 'lock' | 'none'
 
-/** What a vault does about a storage refusal beyond throwing it: the one place that decides.
+/** What a vault does about a storage refusal beyond throwing it.
  * `identity_revoked` and `vault_behind` answer `lock`: storage the vault cannot trust to serve this
  * user's own vault locks it, as `lock()` does, removing nothing stored. Every other kind answers
  * `none`. No host option changes this.
@@ -16,6 +16,7 @@ export type RefusalResponse = 'lock' | 'none'
  * @example decide(new VaultError('vault_behind', 'An older copy.'))    // 'lock'
  * @example decide(new VaultError('not_permitted', 'Not yours.'))      // 'none'
  */
+// The one place that decides what a storage refusal does beyond throwing.
 export const decide = (refusal: unknown): RefusalResponse => (
   isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'vault_behind') ? 'lock' : 'none'
 )
@@ -30,10 +31,9 @@ type Thrown<VerbT> = VerbT extends (...args: infer ArgsT) => Promise<Outcome<inf
 export type HeededVaultDB = { [VerbT in HeededVerb]: Thrown<VaultDB[VerbT]> } & Pick<VaultDB, 'subscribe'>
 
 /** `vaultDB`'s verbs, each resolving its outcome's `val` or rejecting with its refusal once `onRefusal` has heard it.
- * So the vault meets every storage refusal, a background refresh's included. Each verb is looked
- * up on `vaultDB` as it is called, so a test's spy on one is heard. `subscribe` passes through.
- *
- * A refused verb waits for `onRefusal`: one that never settles holds the call with it.
+ * So the vault meets every storage refusal, a background refresh's included. A refused verb waits
+ * for `onRefusal`: one that never settles holds the call with it. Each verb is looked up on
+ * `vaultDB` as it is called, so a test's spy on one is heard. `subscribe` passes through.
  *
  * @param onRefusal - What the vault does about a refusal. Whatever it throws is dropped, so the
  *   caller hears the refusal itself.

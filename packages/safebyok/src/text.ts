@@ -9,7 +9,7 @@
  */
 export const codePointsOf = (text: string): string[] => text.match(/./gsu) ?? []
 
-/** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale.
+/** Compare two names by UTF-16 code unit, never by a locale, so they sort alike on every device.
  *
  * @example ['b', 'B', 'a'].toSorted(byCodeUnit)   // ['B', 'a', 'b']: capitals first, as their code units are lower
  */

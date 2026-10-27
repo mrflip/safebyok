@@ -1,3 +1,5 @@
+/** `safebyok/browser`: the answers nearly every browser app gives to `Bank.make`'s options, so an app that answers otherwise never ships them. */
+
 import { argon2idWebV1Deriver } from './key-deriver'
 import { idbDeviceDB, type IdbOpts } from './idb'
 import { parseDbName } from './idb-opts'
@@ -5,8 +7,6 @@ import type { MakeBankOpts } from './vault-opts'
 import { zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
 export { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
-
-/** `safebyok/browser`: the answers nearly every browser app gives to `Bank.make`'s options, so an app that answers otherwise never ships them. */
 
 /** The Bank.make options {@link browserOpts} supplies: spread them in beside your own. */
 export type BrowserOpts = Readonly<Pick<MakeBankOpts, 'keyDeriver' | 'deviceDB' | 'strengthChecker'>>
@@ -18,7 +18,8 @@ const bagsByDbName = new Map<string, BrowserOpts>()
 /** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, to spread into `Bank.make` beside your storage adapter.
  * They are {@link argon2idWebV1Deriver}, {@link idbDeviceDB} and {@link zxcvbnStrengthChecker}. A
  * field you pass after the spread wins. The same `dbName` always answers the same bag, so it is
- * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
+ * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text,
+ * or an option it does not take.
  *
  * @param opts - Where the device store keeps its records: `dbName`, default 'safebyok'.
  *

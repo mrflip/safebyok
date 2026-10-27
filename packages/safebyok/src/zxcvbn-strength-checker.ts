@@ -18,7 +18,7 @@ export const MinZxcvbnScore = 3
 /** A warning zxcvbn may give, by the key it gives it under. */
 type WarningKey = keyof TranslationKeys['warnings']
 
-/** What to say of each pattern zxcvbn warns of, in the vault's own words: never a composition rule. */
+/** The vault's own words for each pattern zxcvbn warns of: never a composition rule. */
 const SayingForWarning: Readonly<Record<WarningKey, string>> = {
   straightRow:       'That runs along a row of the keyboard, which guessers try early',
   keyPattern:        'That is a keyboard pattern, which guessers try early',
@@ -38,10 +38,10 @@ const SayingForWarning: Readonly<Record<WarningKey, string>> = {
   pwned:             'That has appeared in a data breach',
 }
 
-/** What to say when zxcvbn finds a passphrase weak but names no pattern. */
+/** The saying for a passphrase zxcvbn finds weak without naming a pattern. */
 const PlainSaying = 'That would be easy to guess'
 
-/** What to do, after whatever was said: more words, never a digit, a capital or a symbol. */
+/** The remedy every weak reason ends with: more words, never a digit, a capital or a symbol. */
 const Remedy = ': add a few more words, less common ones.'
 
 // zxcvbn and its dictionaries load at the bank's hello, or the first passphrase checked, never at
@@ -68,13 +68,14 @@ const estimatorOf = (): Promise<ZxcvbnFactory> => {
   return made.estimator
 }
 
-/** The verdict that admits, frozen; its own, so that browserOpts() brings in no validation code with it. */
+/** The verdict that admits, frozen. */
+// Its own, not StrongVerdict, so that browserOpts() brings in no validation code with it.
 const Strong: PassphraseVerdict = Object.freeze({ strong: true })
 
 /** The verdict on a passphrase shorter than {@link MinPassphraseChars}. */
 const TooShort: PassphraseVerdict = Object.freeze({ strong: false, reason: `A passphrase needs at least ${String(MinPassphraseChars)} characters: a few words together make one long enough, and easy to remember.` })
 
-/** What zxcvbn hears as the user's own words: each name in the scope whole, and each run of letters or digits in it. */
+/** The words zxcvbn hears as the user's own: each name in the scope whole, and each run of letters or digits in it. */
 const userInputsOf = (scope: VaultScope | undefined): string[] => {
   if (scope === undefined) { return [] }
   const names = [scope.applabel, scope.user_id, scope.vaultlabel]
@@ -105,8 +106,8 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
  * nothing, and sends nothing anywhere.
  *
  * zxcvbn and its dictionary, about 216 kB brotlied, are a chunk of their own in a bundled app. Its
- * `load` fetches them, as `bank.hello()` does, or else its first call. After that, a call takes a few
- * milliseconds, so a field may call it on every keystroke. A load that fails throws, failing the
+ * `load` fetches them, and `bank.hello()` runs it; failing that, its first call does. After that, a
+ * call takes a few milliseconds, so a field may call it on every keystroke. A load that fails throws, failing the
  * bank's hello, and the next load tries again.
  *
  * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. The vault

@@ -2,10 +2,10 @@ import type * as Z from 'zod'
 import { VaultError, isVaultError } from './errors'
 import { type KitWith, Validator } from './checks/validator'
 
-/** A check, made once, of a host's bag of options: it hands the bag back as given once it is left out, or holds only fields `fieldsOf` names that pass.
- * It refuses 'bad_option' otherwise, so a misspelt option is not quietly ignored. The refusal says
- * what failed, each field it judged by name, a field it does not take counted and never named,
- * quoting no value, then `said`.
+/** Make a check of a host's options bag, which hands the bag back as given when it is left out or every field passes `fieldsOf`.
+ * It refuses 'bad_option' otherwise, so a misspelt option is never quietly ignored. The message
+ * names each field it judged, counts a field it does not take without naming it, quotes no value,
+ * and ends with `said`.
  *
  * @param fieldsOf - Each field the bag may hold, and its schema, from the `Validator` kit; make
  *   one `.optional()` to let it be left out.

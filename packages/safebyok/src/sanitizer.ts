@@ -1,10 +1,11 @@
-import { VaultError, type RefusalKind } from './errors'
-
-/** What of a foreign error rides along on the refusal thrown in its place: an error safebyok did not make, which may quote a key it was handed.
+/** Refusals to throw in place of a foreign error: one safebyok did not make, which may quote a key it was handed.
  * Import it whole: `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
  */
 
+import { VaultError, type RefusalKind } from './errors'
+
 /** The VaultError of `kind`, saying `message`, to throw in place of `foreign`, carrying nothing of it: no `cause`, text or property.
+ *
  * @param _foreign - What code that is not safebyok's threw, such as a host's schema or a storage client.
  * @param message - What went wrong and what to do, calmly, quoting nothing.
  *

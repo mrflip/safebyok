@@ -1,4 +1,4 @@
-/** Helpers the package's own modules share: how a model attaches its vault and its record where no loop, spread, log line or `JSON.stringify` will find them, and how a call yields to the microtasks queued behind it.
+/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, and yielding to queued microtasks.
  * Not the `safebyok/utils` entry point (`utils.ts`), which is for the app around a vault.
  */
 
@@ -14,7 +14,7 @@ export const adorn = <VT>(obj: object, ckey: string, val: VT): VT => {
   return val
 }
 
-/** `obj`, with each of `hidden`'s own entries attached as {@link adorn} attaches one: what a model's constructor calls before it freezes itself.
+/** `obj`, with each of `hidden`'s own entries attached as {@link adorn} attaches one. Call it in a model's constructor, before it freezes itself.
  *
  * @example decorate(proving, { vault, header })   // proving.vault reads; JSON.stringify(proving) leaves both out
  */
@@ -25,9 +25,8 @@ export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT =>
   return obj
 }
 
-/** Yield execution to the end of the current microtask queue.
- * Batches simultaneous initialization or requests arriving in the same event loop: what was queued
- * before the call runs before it resolves.
+/** Yield to the end of the current microtask queue: what was queued before the call runs before it resolves.
+ * Await it to batch requests made in the same task.
  *
  * @example await nextMicrotask()   // every promise settled earlier in this task has run its handlers
  */

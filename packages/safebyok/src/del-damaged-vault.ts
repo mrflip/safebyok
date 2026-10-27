@@ -11,15 +11,15 @@ import { type MakeBankOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-o
 export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'vaultDB' | 'deviceDB'> & Pick<VaultScope, 'vaultlabel'>
 
 /** Delete a vault whose birth refuses it as `damaged_vault`: its vault record, every box, and this device's lease of it.
- * There is no Vault object to `del()` it with, so this is how to clear it and start over. It takes
- * the options `Bank.make` took beside the vault's `vaultlabel`, and refuses misuse as
- * they do, before touching storage. What the vault held is gone for good: ask the user first. Goes
- * through `VaultDB.delDamagedVault`, then the DeviceDB's `delLease`, and raises this device's
- * record of the scope to the tombstone's `vault_epoch` with `raiseDeviceRecord`.
+ * There is no Vault object to `del()` it with, so this is how to clear it and start over. What
+ * the vault held is gone for good: ask the user first. It takes the options `Bank.make` took
+ * beside the vault's `vaultlabel`, and refuses misuse as they do, before touching storage.
+ * Reaches `VaultDB.delDamagedVault`, then the DeviceDB's `delLease` and `raiseDeviceRecord`, which
+ * raises this device's record of the scope to the tombstone's `vault_epoch`.
  *
  * Storage decides, by the checks it alone can make: `VaultDB.delDamagedVault` deletes only a vault
  * record that fails its checks and still names its `vault_tok`. So no bank need have opened the
- * vault, or refused it, first, and nothing here asks for an unlock or a passphrase.
+ * vault, or refused it, first, and nothing here asks for a passphrase.
  *
  * Once it resolves, storage holds no vault in the scope and this device holds no lease of it. With
  * no vault stored it only clears the lease, so a call cut short can be made again.
@@ -45,7 +45,7 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
   await delDamagedVaultIn(scope, vaultDB, parseDeviceDB(opts.deviceDB))
 }
 
-/** {@link delDamagedVault}'s work, for a scope and stores already checked: what `bank.delDamagedVault` calls too. */
+/** {@link delDamagedVault}'s work, for a scope and stores already checked. */
 export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDB: DeviceDB): Promise<void> => {
   if (typeof vaultDB.delDamagedVault !== 'function') {
     throw new VaultError('bad_option', "vaultDB has no delDamagedVault: a storage adapter that hands each call on to another's must hand this one on too.")
