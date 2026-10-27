@@ -597,10 +597,18 @@ on the sprint doc's Cleanup tab.
   argument only repeats three names the record holds, so two sources could disagree. Make it
   `Gate.of(vaultRecord, kit)` (4 call sites in gating.ts and vault.ts, gate.test.ts, the doc
   examples). `Gate.make` keeps its vault argument.
-* **"Standing", if the Coach rules it** (a matter on the sprint doc, 2026-10-27): stored for the
-  record as it is in storage now, open for the gating open on a vault, live for a Vault object
-  not gone or a lease in force (`#checkStanding` → `#checkLive`), `StandInGating`, current for
-  "the standing passphrase". About 240 lines; one commit. Skip it unless the ruling has come.
+* **The vault's private bundles.** The Coach (2026-10-27), on `ProvingInside` and
+  `GatingInside`: "call it VaultPrivateTools. If they are mostly the same, and the differences
+  are incidental, make them the same. (Giving one of them the ability to grant a lease which they
+  otherwise could not would be non-incidental)". Rename to `VaultPrivateTools`; merge the two
+  into one type and one hand-over where the difference is incidental; where a member would hand
+  the gating a power it lacks today (granting a lease), keep them apart and say why in the PR.
+* **`utils.ts` and `nextMicrotask`.** The Coach (2026-10-27): "move adorn and decorate into a
+  file utils.ts" (they are in `src/adorn.ts`), and "add a function nextMicrotask to utils":
+  `/** Yield execution to the end of the current microtask queue.` with a body line "Batches
+  simultaneous initialization or requests arriving in the same event loop", `export function
+  nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }`. Use it for the
+  `await Promise.resolve()` in `bank.ts` (about line 464), whose comment says why it waits.
 * **Small leftovers:** `safebyok-graphql/tests/vault-resolvers.test.ts:264` skips a slot with a hole (`_rootField`, as line 254 names it); `src/scopepath.ts:26` still says "The scopepath of a vault's props"; the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
@@ -609,6 +617,20 @@ on the sprint doc's Cleanup tab.
   unless a host's passphrase checker may already be async (check first; say which).
 
 **Depends on:** thread 14. **Size:** medium.
+
+### 16. Retire "standing" -- `retire_standing`
+
+The Coach's prompt, verbatim, is `unstanding.md` in this directory (2026-10-27): retire
+"standing" as a term of art, each of its five meanings with its own name (stored, held,
+pending, in force, `#demandNotGone`, `OutsideGating`), a row in `notes/old_vocabulary.md`, scope,
+done-when grep and open questions as it says.
+
+*Gloss:* the prompt's line numbers are as of `da294a43`; threads 13 to 15 move them, so grep. Its
+*Placement* asks for it after the threads that edit `vault.ts`, `vault-db.ts`, `expectations.ts`
+and the adapters: hence last, cut from thread 15's tip once it files (or `origin/main` if 15 has
+merged). Thread 15's merged bundle (`VaultPrivateTools`) and its gating names are what this
+thread finds. **Depends on:** thread 15. **Size:** medium, mechanical but wide (about 240 lines,
+25 files).
 
 ## Not in this sprint
 
