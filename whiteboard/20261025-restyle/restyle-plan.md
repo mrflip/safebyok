@@ -585,8 +585,14 @@ on the sprint doc's Cleanup tab.
   same thing." Where a name or doc says "listed" for what VOCABULARY calls the sparse shape,
   rename it; where it means something else, leave it and say which in the thread file.
 * **`Gate.of(vault, vaultProps)`.** "Explain why this makes sense (vault but also vaultProps???),
-  or fix." *Orchestrator:* see the explanation on the sprint doc; at least the retired "props"
-  name goes.
+  or fix." *Orchestrator:* on main it is `Gate.of(vault, vaultRecord, kit)`; the first
+  argument only repeats three names the record holds, so two sources could disagree. Make it
+  `Gate.of(vaultRecord, kit)` (4 call sites in gating.ts and vault.ts, gate.test.ts, the doc
+  examples). `Gate.make` keeps its vault argument.
+* **"Standing", if the Coach rules it** (a matter on the sprint doc, 2026-10-27): stored for the
+  record as it is in storage now, open for the gating open on a vault, live for a Vault object
+  not gone or a lease in force (`#checkStanding` → `#checkLive`), `StandInGating`, current for
+  "the standing passphrase". About 240 lines; one commit. Skip it unless the ruling has come.
 * **Small leftovers:** the format snapshot test's comment ("never rewrite a standing format's
   snapshot") reworded for pre-1.0, where a layout may change under the same format; restore the
   passphrase refusal's full stop (#275); one sentence in VAULTDB.md that an adapter enforcing
