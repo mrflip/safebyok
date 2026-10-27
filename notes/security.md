@@ -74,7 +74,7 @@ added or folded into through the subagent, and no other entry changes.
   a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
   field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
   its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
-  pieces, such as `BaseShape`, `LeaseGrant`, `ReadAnswer`, `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
+  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `ReadAnswer`, `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
   `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
   `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
@@ -167,6 +167,16 @@ added or folded into through the subagent, and no other entry changes.
   `LeaseRecord` less `lease_key` and `vault_key_lease_wrapped` (`lease.ts`). A field its schema fixes (`format`, `whisper_codec` `json_v1`,
   `whisper_schema_version` 1) is a literal in the strict record, so a stamp holding another value is refused `bad_record` at its parse, before
   `cipherCtx` is called: a ctx is built only from a parsed stamp.
+  (7) Amended 2026-10-27 (validator_ducks): **a Box or box record handed in as the vault's stamp would pass, and bind the box's own
+  `registered_at` as the vault's; considered, and declined.** `wayinCtxOf` (`wayin.ts`) and `leaseCtxOf`, `boxCtxOf` (`lease.ts`) take the
+  vault's stamp by a plain strip parse (`VaultStamp`, `VaultStampButFormat`, `LeaseStamp`, each stripping unknown fields): whatever carries the
+  stamp (a Vault object, a vault record) passes, and only the stamp's fields are bound. A Box or a box record carries the vault's scope and
+  `vault_tok` and a `registered_at` of its own, so it passes too, and the box's (when it was first stored) is bound into a ctx as the vault's
+  (when the vault was made). No caller passes one. A guard was built and withdrawn (2026-10-27): the Coach's direction is that a shape taken from
+  a thing accepts whatever is legitimately offered, with strict checks only where they are genuinely needed, rather than defending against a
+  future caller's mistake. A box's own stamp (`BoxStamp`, in `boxCtxOf`) stays strict: every field a box shows is bound, and a field beside
+  them would be shown but not bound. The format-less vault stamp a box or lease binds takes any vault format, so a new vault format leaves them
+  open; the wayin's ctx, which binds the format, refuses another.
 * 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
   an old flat vault reads as damaged under an unbumped format; a device record is strict, frozen and built from the scope's names alone.**
   (1) `VaultRecord` (`packages/safebyok/src/vault-record.ts`) is `{ format, applabel, user_id, vaultlabel, vault_tok, registered_at, vault_epoch,
@@ -199,7 +209,7 @@ added or folded into through the subagent, and no other entry changes.
   (1) `Bank.make({ applabel, user_id, ... })`. Every bank call naming a vault (`ensureVault`, `reopenVault`, `closeVault`,
   `clearCachedVault`, `delDamagedVault`, `entryOf`) takes a bag whose `vaultlabel` is required. An `applabel` or `user_id` the bag carries
   must equal the bank's (`bank.demandConsistentWith`), else the call refuses `bad_scope`, naming the differing fields in `meta.fieldnames`
-  and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is (amended 2026-10-27 (thread 17, validators_trim): the bag is strict, holding `vaultlabel` and optionally the bank's own `applabel` and `user_id` and nothing else, and any other field is refused `bad_scope` before storage is touched, the message counting the fields and never naming them or quoting their values; a Vault object, its snapshot, a `BankVault` or a vault record can no longer be handed in as the bag, and a host names the vault as `{ vaultlabel: vault.vaultlabel }`; this covers `ensureVault`, `reopenVault`, `clearCachedVault`, `delDamagedVault`, their `try` forms, `closeVault`, `vaultOf` and `bankVaultOf`; `bank.demandConsistentWith(thing)` is unchanged and still judges a thing carrying a scope, leaving out every other field). Sign-out is
+  and never quoting their values. Other fields in the bag are stripped, so a Vault object or snapshot can be passed as is (amended 2026-10-27 (thread 17, validators_trim): the bag is strict, holding `vaultlabel` and optionally the bank's own `applabel` and `user_id` and nothing else, and any other field is refused `bad_scope` before storage is touched, the message counting the fields and never naming them or quoting their values; a Vault object, its snapshot, a `BankVault` or a vault record can no longer be handed in as the bag, and a host names the vault as `{ vaultlabel: vault.vaultlabel }`; this covers `ensureVault`, `reopenVault`, `clearCachedVault`, `delDamagedVault`, their `try` forms, `closeVault`, `vaultOf` and `bankVaultOf`; `bank.demandConsistentWith(thing)` is unchanged and still judges a thing carrying a scope, leaving out every other field; amended 2026-10-27 (thread validator_ducks): the bag is no longer strict, and `vaultBag` takes whatever carries the vault's label (a plain bag, a Vault object, its snapshot, a `BankVault`) and leaves every other field out, except a `vaultDB` or `deviceDB`, which still refuses `bad_scope` before any store is touched: a store belongs in the second bag, the options, and would otherwise be dropped unseen, so a host never believes a vault was born from a store it was not; the refusal still quotes no field or value; the Coach's direction was that a shape taken from a thing accepts whatever is legitimately offered, with a strict check only where genuinely needed, and the store in the bag is the mistake this bag needs it for, so the `{ vaultlabel: vault.vaultlabel }` form is no longer required). Sign-out is
   expected to call `bank.closeVaults()` and drop the bank; `safebyok-react`'s `BankProvider` does so when its `user_id` prop changes or goes
   null. Amended 2026-10-27 (security_notes), PR [#278](https://github.com/mrflip/safebyok/pull/278): the scope a call acts on is never the bag's.
   `#vaultScopeOf` (`bank.ts`) parses the bag, refuses an `applabel` or `user_id` other than the bank's, and then builds the scope from the bank's own
@@ -243,7 +253,7 @@ added or folded into through the subagent, and no other entry changes.
   quoting nothing) and passes on only the parsed value. A host's `KeyDeriver.deriveKeyBytes` still takes a plain string. The
   cleartext check accepts a blank passphrase; whether a blank one is wrong is the gating's to say, as before.
   (4) A salt's check in the record stays its shape only (non-empty text). Its length and base64url form are still judged per wayin
-  (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt`), so a salt of the wrong length or not base64url leaves that wayin
+  (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt` (amended 2026-10-27 (validator_ducks): now `freshPasskeyAnswer.parse`, `src/proving.ts`, run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses)), so a salt of the wrong length or not base64url leaves that wayin
   `damaged_wayin` while the vault's other wayin still opens, where checking it in the record would make the whole vault record damaged.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
   with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
@@ -328,7 +338,7 @@ added or folded into through the subagent, and no other entry changes.
   a proving. A host's `requestCleartext` that throws, or rejects, is refused `unexpected_error` and is never
   logged, because it heard the passphrase. Amended 2026-10-23 (thread 9b, gating_followups, PR #262): **the refusal carries no `cause`.**
   It once kept the throw, so a host error such as "invalid: <typed value>" reached every waiting call's error and any error
-  tracker; now `parseRequestCleartext` (`src/vault-opts.ts`) refuses every waiting call with nothing of the throw, as the
+  tracker; now `parseRequestCleartext` (amended 2026-10-27 (validator_ducks): `guardRequestCleartext`, `src/vault-opts.ts`, a guard only; the shape check is part of `Bank.make`'s one options parse) refuses every waiting call with nothing of the throw, as the
   strength checker's guard already does. The host's logger hears only that it threw, with `{ call: 'requestCleartext',
   refusalkind }` (the `refusalkind` only when the throw was a `VaultError`, else null). A gating still open when `requestCleartext` resolves is declined
   (`vault_locked`); a malformed argument is `bad_option`, quoting none of it. One gating is pending per vault; a second attempt
@@ -737,7 +747,7 @@ added or folded into through the subagent, and no other entry changes.
   (no wrap under it is ever written). The trade: the core holds no UI and calls no host code inside
   the change. A new passkey's salt is checked at the call's door, before any key derivation
   (amended 2026-10-21 (wayin_rules): `checkFreshSalt` in `wayin.ts` is now `checkSaltShape` in `proof.ts`, called once, in
-  `newProofOf`; the repeat inside `Wayin.seal`'s passkey keying is gone, so `Wayin.seal` called
+  `newProofOf` (amended 2026-10-27 (validator_ducks): the check is now `freshPasskeyAnswer.parse` in `src/proving.ts`, still run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses); the repeat inside `Wayin.seal`'s passkey keying is gone, so `Wayin.seal` called
   directly no longer refuses a misshapen salt, and such a way in would read as damaged at every later
   unlock. It checks shape only: a `prfSaltB64` that is base64url of exactly 32 bytes, `bad_option`
   otherwise. There is no list of salts and nothing checks freshness; the host mints the salt.) (2) A
@@ -3176,7 +3186,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-23 (proving_gate): the zeroing is in `src/proving.ts` (`passphraseKeyOf`, as before), and
   `PasskeyProving.seal` likewise zeroes the answer's PRF bytes (`prfBytes.fill(0)`) in a `finally` once the HKDF key is
   imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
-  Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
+  Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswerShape.parse`, `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
