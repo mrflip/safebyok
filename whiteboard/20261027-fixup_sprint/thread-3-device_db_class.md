@@ -1,6 +1,6 @@
 # Thread 3: device_db_class (2026-10-27)
 
-Branch `20261027-device_db_class`, PR #TBD, cut from `origin/main` (802c91f9). Justify: running.
+Branch `20261027-device_db_class`, PR [#298](https://github.com/mrflip/safebyok/pull/298), cut from `origin/main` (802c91f9). Justify: green: core 3397 passed, 37 skipped; react 309; indexeddb 167; convex 350; postgres 322; graphql 344; fastkey 49; e2e 107; demo 229; root 266. No size budget moved (Bank 54.6, idbDeviceDB 28.3, browserOpts 34.0 kB).
 
 `fixup-preplan.md` item 4, whole: DeviceDB becomes an abstract base class, as VaultDB is.
 
