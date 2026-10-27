@@ -118,10 +118,8 @@ describe("deviceRecordFor", () => {
   }
 })
 
-/**
- * A DeviceDB whose every `do*` method answers as `answer` says, synchronously, its name logged in
- * `calls` as it is made: for the base class's own tests. A throw from `answer` is a store that
- * throws before its promise.
+/** A DeviceDB whose every `do*` method answers as `answer` says, synchronously, its name logged in `calls` as it is made: for the base class's own tests.
+ * A throw from `answer` is a store that throws before its promise.
  */
 class ScriptedDeviceDB extends DeviceDB {
   readonly calls: string[] = []

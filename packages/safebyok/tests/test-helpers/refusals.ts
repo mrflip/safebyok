@@ -147,10 +147,8 @@ export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => 
   return rest as Bag
 }
 
-/**
- * A spy on the `do*` method behind `deviceDB`'s `verb` (`doPutLease` behind `putLease`), so a test
- * has the store itself fail, and hears what the verb then answers. A DeviceDB's verbs never
- * reject: a spy on one that rejects tests a store that cannot exist.
+/** A spy on the `do*` method behind `deviceDB`'s `verb` (`doPutLease` behind `putLease`), so a test has the store itself fail, and hears what the verb then answers.
+ * A DeviceDB's verbs never reject: a spy on one that rejects tests a store that cannot exist.
  *
  * @example TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
  */
