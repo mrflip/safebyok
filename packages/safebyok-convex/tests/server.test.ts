@@ -288,7 +288,7 @@ describe("SafebyokComponent.api, with the scope nested as it was before the argu
   it("leaves the vault as it was after every call nesting its scope", async () => {
     const CVX = await seeded()
     const asU1 = CVX.withIdentity({ subject: 'u1' })
-    for (const [, call] of NestedCalls) { await expect(call(asU1)).rejects.toThrow('Validator error') }
+    for (const [_fnName, call] of NestedCalls) { await expect(call(asU1)).rejects.toThrow('Validator error') }
     const left = await asU1.query(api.safebyok.getVault, { ...u1 })
     expect(left?.vault).to.deep.equal(TH.gatelessOf('u1'))
     expect(left?.boxes.map((box) => box.revision_tok)).to.deep.equal(['rev-a1'])
