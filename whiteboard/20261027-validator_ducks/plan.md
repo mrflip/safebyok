@@ -71,22 +71,30 @@ of behaviour. Catches that a caller further up handles as well go.
     #175, `safebyok-graphql`'s client check matches it, and each call site is already one line.
   - Item 5 of the catches survey (`Lease.make` as control flow) belongs to `vault_params`.
 
+## Round 2 (2026-10-27, the Coach's corrections)
+
+The Coach, on round 1: the ducks should be first-class Zod checkers written out, not machinery;
+pre-1.0 nothing exported is a contract to preserve; a validator is the principal means of, in one
+line, extracting and validating local data; accept everything legitimately offered, strict only
+where it truly matters. `sweep-rules.md` holds the rules as handed to the sweeps.
+
+* `d8c2ed1d`: the ducks are the shapes themselves. Scope, stamp and sparse shapes strip;
+  `Kit.duck`, `VaultKin`, `shapes/ducks.ts` and the `*Picked`/`VisibleShape` copies go. `BoxStamp`
+  stays strict. `vaultBag` takes any carrier and refuses only a store.
+* `83eebb51`, `09b260de`: STYLE.md states the norm; notes/security.md and #293's changeset say
+  what now stands.
+* Sweep A (`142dd605`, `54fd659d`, `fed6ec4d`): vault, vault-db, bank, delDamagedVault, docs;
+  `VaultMadeUnder` one validator; listener throws heard out in the bank and the vault.
+* Sweep B (`7cfc39e3` and the two after it): box, lease, proving, gating, the options; `SealBoxProps`;
+  `Kit.bytes` by tag; `vaultDBShape` names `delDamagedVault`.
+* `24f6af2b`: the sweeps' meeting points, and the budgets by the rule.
+* Still as round 1 left them: catches items 1 and 3 (reasons above), and the `vault_params` members.
+
 ## Open questions (for the PR)
 
-* `Kit.fn` costs `idb` 43 B and `utils` 56 B (any kit entry rides in every bundle with a
-  validator), and both `fn` and `duck` are public, since `Kit` is exported.
+* The scope validators' case: `vaultScope` and `VaultScope`, one validator under two names.
+* Retire `invalid_box` for `bad_record`? One bug-only failure, checked twice on the box write path.
 * `VaultBag`, `BankBag` and `BoxListing` appear in public signatures but are not exported.
   `BoxListing` and `VaultOfBox` (`box.ts`) are first-guess names.
-* `passkeyAnswerShape` checks `prfBytes` by `instanceof Uint8Array`, refusing bytes from another
-  realm; `lease.ts`'s `checkedBytes` judges by tag.
-
-* The scope validators' case (`vaultScope` and `VaultScope`, one validator under two names).
-* `vaultBag` taking a Vault object, a snapshot or a BankVault: the duck contract says yes,
-  and #293 just made it strict.
-* Retiring `invalid_box` for `bad_record` (survey-catches item 2).
-* `VaultMadeUnder` checking labels and whole epochs; `VaultDraft` requiring `vault_epoch: 0`;
-  `vaultDBShape` requiring `delDamagedVault` and `getCapacity`.
-* A per-schema sentence in `Validator`, which would fold the ~30 safeParse-then-throw sites.
-* `Box.seal` and `putBox`, each checked by a cascade of validators with two kinds.
 * The host interfaces (`MakeBankOpts`, `VaultLogger`, `KeyDeriver`, `Clock`, `StrengthChecker`)
   as `Z.infer`, at the cost of per-member docs in a host's editor.
