@@ -303,7 +303,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **the put_passkey dialog makes the passkey before the passphrase is checked.**
   `GatingModal`'s `PutPasskeyForm` (`packages/safebyok-react/src/gating-modal.tsx`) calls `createPasskey()` at each submit, straight
   from the submit's user gesture as WebAuthn requires, then hands the passphrase and the new passkey's PRF answer to the
-  `put_passkey` gating's attempt; the core checks the passphrase (`checkWayin`) before it seals the passkey proving. After a wrong
+  `put_passkey` gating's attempt; the core checks the passphrase (`demandOpens`) before it seals the passkey proving. After a wrong
   passphrase the core leaves the PRF answer unspent, but the dialog keeps none across attempts (a secret answer is not held in React
   state between submits), so a typo leaves an unused credential on the authenticator (useless to the vault) and the next submit makes
   another. One submit runs at a time (a ref guard), so one press never makes two passkeys. The relying party is named for the vault's
@@ -365,7 +365,7 @@ added or folded into through the subagent, and no other entry changes.
   passphrase another device has replaced opens nothing here; a vault whose gate another device set while the user typed
   refuses a first gate `gate_made_elsewhere` without trying the typed text against the winner's gate.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the order of checks and seals within a chain.** `change_passphrase` seals and checks
-  the current passphrase (`checkWayin`) before it derives the next; `put_passkey` seals and checks the passphrase before it
+  the current passphrase (`demandOpens`) before it derives the next; `put_passkey` seals and checks the passphrase before it
   seals (and zeroes) the new passkey's answer, so a typo returns to the dialog with the answer unspent; the strength check
   runs before any derivation. `same_passphrase` compares the two strings the user typed in this tab with `===`: no
   attacker observes it, and no constant time is used (the spec has it so). The seals of a chain share no junction.
@@ -1152,7 +1152,7 @@ added or folded into through the subagent, and no other entry changes.
   `src/proving.ts` replaces `src/proof.ts`, and no object holds the secret or hands out the wayinKey.** A
   `PassphraseProving` or `PasskeyProving`, made by its `seal`, holds the wayinKey as a non-extractable CryptoKey in a
   private `#wayinKey` field, never handed out, and the vaultKey it unwraps never crosses out of its methods
-  (`checkWayin`, `resealWayinFor`, `sealWayins`, `grantLease`). `tryOpen`'s returned vaultKey pair (session and
+  (`demandOpens`, `resealWayinFor`, `sealWayins`, `grantLease`). `tryOpen`'s returned vaultKey pair (session and
   transient) no longer exists.
 * 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**

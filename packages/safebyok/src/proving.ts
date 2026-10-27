@@ -165,12 +165,13 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault.stamp, visible)))
   }
 
-  /** Check that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
-   * It demands on the proving before and after its one wait.
+  /** Demand that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
+   * It demands on the proving before and after its one wait, so a gate that moved meanwhile refuses
+   * as the demand does, never as a wrong proof.
    *
-   * @example await proving.checkWayin()   // a passphrase proven before the passkey goes
+   * @example await proving.demandOpens()   // a passphrase proven before the passkey goes
    */
-  async checkWayin(): Promise<void> {
+  async demandOpens(): Promise<void> {
     demandOn(this.tools, this, this.gating)
     await this.#unwrap(CheckUsage)
   }
@@ -178,7 +179,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** A Wayin for `newProving`'s slot: the vaultKey from this proving's wayin, wrapped under `newProving` and bound to its header.
    * The vaultKey is not kept. It demands on this proving before and after its waits, refusing
    * 'gate_moved' for a passphrase another device has since replaced, and on `newProving` after
-   * them. It refuses as {@link Proving.checkWayin} does for a proving that does not open its wayin.
+   * them. It refuses as {@link Proving.demandOpens} does for a proving that does not open its wayin.
    *
    * @example const wayin = await currentProving.resealWayinFor(newProving)
    */
