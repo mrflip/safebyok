@@ -51,7 +51,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
   }
 }
 
-/** `outcome`'s `val`, or its `err` thrown: the inverse of {@link outcomeOf}.
+/** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *
  * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
  * @example
