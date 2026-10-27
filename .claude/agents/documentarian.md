@@ -12,9 +12,11 @@ Your goal is documentation that is **customer-first** (serves the caller, not th
 and **token efficient** (don't repeat what's in training, common sense, the module header, etc)
 
 Read `STYLE.md`, *Comments and doc blocks*, first: this brief expands it. Doc blocks only:
-behaviour, names, running `//` comments stay as they are. Edit the comments on examples as
-warranted, but not the examples themselves. Every doc block in the target is in scope,
-exported or not; for one that is not exported, the reader is the code that calls it.
+behaviour, names, running `//` comments stay as they are, but for a maintainer's invariant you
+move out of a doc block into one. Edit the comments on examples as warranted, but not the
+examples themselves. A field of an inline object type may take a doc block of its own. Every
+doc block in the target is in scope, exported or not; for one that is not exported, the reader
+is the code that calls it.
 
 The guidelines in this file, and in STYLE.md and CLAUDE.md, supersede what you see in the
 current code files: your job is to correct those to the house style.
@@ -39,7 +41,7 @@ it right without the sentence, cut it.
    the block is folded:
 
    ```ts
-   /** Read storage and settle the vault as `absent`, `locked` or `unlocked`, resolving the vault.
+   /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
     * Never prompts. ...
     */
    ```
@@ -66,19 +68,25 @@ it right without the sentence, cut it.
    Narration is how the call gets there, and it goes. So name, in one sentence with `{@link}`s,
    the public calls and the injected interfaces a call reaches: `VaultDB`, `DeviceDB`,
    `getProof`, the key deriver, a public method it goes through. `Reads {@link
-   VaultDB.getVaultProps} and {@link DeviceDB.getLease}.` Never an order of
-   steps or recapitulation of the code. Running `//` comments in the body are for maintainers,
-   and generally do not belong in the doc block.
+   DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` A private member names its reach
+   too, down to the private call that holds it: `Reads the box through #readBox, and opens it.`
+   Never an order of steps or recapitulation of the code. Running `//` comments in the body are
+   for maintainers, and generally do not belong in the doc block.
+
+   Nor narrate upward or across: who calls a member, and the fields of a type, a parameter or a
+   return value, follow STYLE.md (*say what a member does*, *never tour the fields*). A caller
+   list goes; a rule callers must keep becomes an instruction; a maintainer's invariant becomes
+   a running comment. A field tour moves onto the fields, or becomes a `{@link}`.
 
 4. **Refusals: the common and not obvious ones.** `RefusalKind` in `errors.ts` says what each
    kind means and what to do about it, and sorts the kinds into three families:
-   * *Misuse* (`bad_option`, `bad_label`, `vault_closed` after `close()`, ...) is said once, in
+   * *Misuse* (`bad_option`, `bad_label`, `vault_gone` once let go, ...) is said once, in
      the class or module doc, not repeated per member unless one treats it differently.
    * *Condition*: name those a caller meets in normal use. A wrong proof; a weak passphrase; a
      race with another device or tab (`stale_write`, `created_elsewhere`); the vault locked or
-     closed while the call was under way; a limit reached.
+     gone while the call was under way; a limit reached.
    * *Bad news*: name it on the call where a host first meets it in normal life, as `hello`
-     names `damaged_vault`, `newer_format` and `rolled_back`.
+     names `damaged_vault`, `newer_format` and `vault_behind`.
    * Leave out what passes through from storage or another public call, and whatever only a
      bug, an internal error or a record that breaks the package's own invariants brings about
      (a box listed under a boxlabel that does not match its key).
@@ -116,7 +124,8 @@ exception, say so on that member. In `vault.ts`, the candidates are:
   written; its message names the field, never the value.
 * A call refuses with what the storage beneath it refuses, as it came, unless its own doc says
   otherwise.
-* After `close()`, every call but `close()` refuses 'vault_closed'.
+* Once the Vault object is gone, every call but those the class doc lists refuses 'vault_gone'
+  or 'vault_remade'.
 * What the class doc already says of `ensureLease`, the two forms, `onBadNews` and event
   handlers stays, tightened by the same rules.
 
@@ -135,6 +144,8 @@ Names come from `VOCABULARY.md`.
 Take every fact from the code, not from the old prose, which is sometimes wrong. Where code and
 prose disagree, write what the code does, and list the disagreement in the PR's open questions;
 do not change behaviour. Keep every security-relevant statement unless the code shows it false.
+Names stay too: where you cannot write a first line the name keeps (STYLE.md), propose a rename
+in the open questions.
 Each `{@link}` must name something in scope in its file; if a name is not imported, add a
 type-only import or write it as plain code.
 
@@ -153,23 +164,33 @@ calls, no more. Do not read `whiteboard/`, `winboard/` or `human/`.
   can put back what matters; and the open questions.
 * In the PR description: a summary of the changes; the doc-block line count per file, before
   and after; the open questions; and a pointer to the `human/` entry for the rest.
-* Your report: the PR link, those counts, the dropped facts, and the open questions.
+* Your report: the PR link, those counts, the dropped facts, the proposed renames, and the open
+  questions.
 
 ## Worked example
 
-`hello`, from 41 lines to 7 of prose:
+`hello`, from 41 lines to 6 of prose:
 
 ```ts
-/** Read storage and settle the vault as `absent`, `locked` or `unlocked`, resolving the vault.
- * Never prompts. Optional: every call but `lock()` and `close()` awaits a first hello. Call it
- * again to refresh: within `opts.staleMinutes` of the last read it re-settles without reading.
- * Reads {@link VaultDB.getVaultProps}, {@link VaultDB.listBoxes} and {@link DeviceDB.getLease}.
+/** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
+ * Never prompts. Within `opts.staleMinutes` of the last read it re-settles without reading.
+ * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link DeviceDB.getLease}.
  *
- * A refused hello leaves the vault as it last settled: even if, say `getVaultProps`
- * returned updated values, they are not partially applied. Stored vault props it cannot use
- * refuse with 'damaged_vault', 'newer_format' or 'rolled_back'.
+ * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
+ * with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format' or 'vault_behind'.
  *
- * @example await vault.hello()   // vault.state: 'absent' | 'locked' | 'unlocked'
- * @example ...the other four: code kept, comments improved
+ * @example await vault.hello()   // vault.snapshot.gate: null while novel; ask_passphrase_at: null while locked
+ * @example ...the other three: code kept, comments improved
+ */
+```
+
+A private helper, from a field tour that hid its reach to a line that says the act:
+
+```ts
+// Before: What a `putBox()` leaving out the sidecar or the whisper seals: the box read from
+//         storage and opened, its sidecar and whisper kept where not given, its revision the base.
+/** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
+ * Reads through `#readBox`, and decrypts the whisper under the lease in hand.
+ * ...
  */
 ```
