@@ -60,6 +60,9 @@ export default defineConfig([
     '**/dist/**',
     // Agents' worktrees: another checkout's code, linted there if anywhere.
     '.claude/worktrees/**',
+    // Thread folders: plans and playgrounds, kept as they stood, not code that ships.
+    'whiteboard/**',
+    'winboard/**',
     // Workspace packages: each lints itself, with its own config.
     'packages/**',
     'demos/**',
