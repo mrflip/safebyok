@@ -184,13 +184,26 @@ export type VaultStamp = Z.infer<typeof VaultStamp>
  */
 export type VaultStampButFormat = Z.infer<typeof VaultStampButFormat>
 
+/** The check of what a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: a `vault_tok`, and each of the scope's labels and epochs the thing carries checked as the vault record checks it. Its `parse` refuses 'bad_option', naming each failing field.
+ * Taken out of whatever carries it, it strips the rest: a box's own `format` or `registered_at`
+ * is no part of it.
+ *
+ * @example VaultMadeUnder.parse(box)                          // { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
+ * @example VaultMadeUnder.parse({ gate_epoch: 1 })            // throws 'bad_option', "vault_tok: ..."
+ */
+export const { VaultMadeUnder } = Validator('bad_option', () => ({
+  VaultMadeUnder: VaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
+    .partial({ applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true }),
+}))
+
 /** What a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: the vault's `vault_tok`, and whichever of its scope and epochs the thing carries.
  * A Box, a Lease, a Gate, a Proving, a snapshot and a vault record are each one. A field the
  * thing has of its own beside these, a box's `format` or `registered_at`, is no part of it.
  *
- * @example vault.demandConsistentWith({ vault_tok: box.vault_tok, gate_epoch: box.gate_epoch })
+ * @example vault.demandConsistentWith(box)
+ * @example vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 })   // throws 'gate_moved' for a vault with a way in
  */
-export type VaultMadeUnder = Pick<VaultSparse, 'vault_tok'> & Partial<Pick<VaultSparse, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_epoch' | 'gate_epoch'>>
+export type VaultMadeUnder = Z.infer<typeof VaultMadeUnder>
 
 /** A vault record whose gate is made: what {@link isGated} tells apart, and what every gating but a vault's first works on. */
 export type GatedVaultRecord = VaultRecord & { gate: GateRecord }

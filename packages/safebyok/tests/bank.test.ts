@@ -1107,6 +1107,28 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
     TH.expectSyncRefusal(() => bank.subscribe('listen' as unknown as () => void), 'bad_option')
   })
 
+  it("hears out a listener that throws: the hello and the birth it heard of resolve, every other listener is told, and what it threw is logged and reported", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const world = makeWorld()
+      const bank = bankIn(world)
+      const thrown = new Error('a listener that throws')
+      bank.subscribe(() => { throw thrown })
+      const heard = vi.fn()
+      bank.subscribe(heard)
+      await bank.hello()
+      const vault = await bank.ensureVault(Main)
+      expect(bank.vaultOf(Main)).to.eq(vault)
+      expect(heard).toHaveBeenCalled()
+      expect(reported.length).to.be.greaterThan(0)
+      expect(reported.every((err) => err === thrown)).to.be.true
+      expect(world.logged.some((call) => call.level === 'error' && call.story?.['call'] === 'subscribe')).to.be.true
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("reads a vault's lifecycle, or undefined for a vault not asked for, as bankVaultOf's example shows; a bad name or another user's bag refuses 'bad_scope'", async () => {
     const bank = bankIn(makeWorld())
     expect(bank.bankVaultOf({ vaultlabel: 'main' })?.lifecycle).to.be.undefined

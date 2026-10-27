@@ -774,7 +774,7 @@ describe("a new passphrase's strength", () => {
     const vault = await world.open({ strengthChecker: checker })
     for (const misfit of [42, undefined, null, { passphrase: 'pw' }]) {
       const err = await TH.expectRefusal(vault.checkStrength(misfit as unknown as string), 'bad_option')
-      expect(err.message).to.match(/checkStrength takes the passphrase/)
+      expect(err.message).to.match(/A passphrase is the text the user typed/)
     }
     expect(checker).not.toHaveBeenCalled()
   })

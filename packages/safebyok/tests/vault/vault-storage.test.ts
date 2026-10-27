@@ -38,9 +38,31 @@ describe("the snapshot and its subscribers", () => {
   it("refuses a listener that is not a function as it subscribes, so no later change meets it", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
+    expect(() => vault.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /A listener or callback is a function/)
     await TH.unlock(vault, 'pw')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
+  })
+
+  it("hears out a listener that throws: the call that changed the snapshot resolves, every other listener is told, and what it threw is logged and reported", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const world = makeWorld()
+      const vault = await world.open()
+      const thrown = new Error('a listener that throws')
+      vault.subscribe(() => { throw thrown })
+      const heard = vi.fn()
+      vault.subscribe(heard)
+      await TH.unlock(vault, 'pw')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+      expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+      expect(heard).toHaveBeenCalled()
+      expect(reported.length).to.be.greaterThan(0)
+      expect(reported.every((err) => err === thrown)).to.be.true
+      expect(world.logged.some((call) => call.level === 'error' && call.story?.['call'] === 'subscribe')).to.be.true
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it("keeps its identity until something changes", async () => {

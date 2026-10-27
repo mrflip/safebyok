@@ -5,12 +5,11 @@ import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
 import { BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel } from '../src/box'
 import { LeaseGrant } from '../src/lease'
-import { PasskeyWayinHeader, PassphraseWayinHeader, VaultStampButFormat, passphraseCleartext, wayinkind } from '../src/shapes/vault'
+import { PasskeyWayinHeader, PassphraseWayinHeader, VaultMadeUnder, VaultStampButFormat, passphraseCleartext, wayinkind } from '../src/shapes/vault'
 import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
 import { CipheredShape, whisperBag } from '../src/shapes/box'
 import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
 import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
-import { vaultMadeUnderShape } from '../src/vault'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
 import { parseKeyDeriverSpec } from '../src/key-deriver-spec'
@@ -23,7 +22,7 @@ const InPackage = {
   BaseShape, MadeShape, MadeUnderShape, SealedUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, VaultStampButFormat, whisperBag,
   PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
   passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
-  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,
+  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, VaultMadeUnder,
 }
 
 /** Every validator the package makes, the namespace's and its own. */

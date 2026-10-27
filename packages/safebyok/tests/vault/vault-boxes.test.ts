@@ -584,12 +584,15 @@ describe("the sidecar", () => {
   it("refuses a prop beside `boxlabel` and `sidecar`, or props that are no object, as 'bad_option', writing nothing: a note is kept in the sidecar, not beside it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const misfits = [{ boxlabel: 'anthropic', note: 'work account' }, { boxlabel: 'anthropic', sidcar: { note: 'work account' } }, { boxlabel: 'anthropic', sidecar: {}, note: 'work account' }, 'work account']
+    const misfits = [{ boxlabel: 'anthropic', note: 'work account' }, { boxlabel: 'anthropic', sidcar: { note: 'work account' } }, { boxlabel: 'anthropic', sidecar: {}, note: 'work account' }]
     for (const props of misfits) {
-      const err = await TH.expectRefusal(vault.putBox(props as never, 'sk-fake'), 'bad_option')
-      expect(err.message).to.include('sidecar')
+      const err = await TH.expectRefusal(vault.putBox(props, 'sk-fake'), 'bad_option')
+      expect(err.message).to.include('it takes only boxlabel, sidecar')
       expect(err.message).to.not.include('work account')
     }
+    const unbagged = await TH.expectRefusal(vault.putBox('work account' as never, 'sk-fake'), 'bad_option')
+    expect(unbagged.message).to.include('expected object')
+    expect(unbagged.message).to.not.include('work account')
     expect(world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))).to.have.lengthOf(0)
     await vault.putBox({ boxlabel: 'anthropic', sidecar: undefined }, 'sk-fake')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({})
@@ -1181,7 +1184,7 @@ describe("useWhisper", () => {
     const world = makeWorld()
     const vault = await world.open()
     const err = await TH.expectRefusal(vault.useWhisper('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
-    expect(err.message).to.include('callback function')
+    expect(err.message).to.include('A listener or callback is a function')
   })
 })
 // --

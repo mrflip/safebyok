@@ -135,6 +135,23 @@ describe("vault.demandConsistentWith", () => {
     TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leasebound: true } as never) }, 'bad_option')
   })
 
+  it("refuses a thing whose names or epochs are not as a vault record holds them as 'bad_option', naming the field, as consistentWith does", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    const misshapen = [
+      [{ ...madeUnder, vaultlabel: 'Main' },  'vaultlabel'],
+      [{ ...madeUnder, user_id: '' },         'user_id'],
+      [{ ...madeUnder, gate_epoch: 1.5 },     'gate_epoch'],
+      [{ ...madeUnder, vault_epoch: -1 },     'vault_epoch'],
+    ] as const
+    for (const [thing, fieldname] of misshapen) {
+      const err = TH.expectSyncRefusal(() => { vault.demandConsistentWith(thing) }, 'bad_option')
+      expect(err.meta?.fieldnames).to.deep.equal([fieldname])
+      TH.expectSyncRefusal(() => { vault.consistentWith(thing) }, 'bad_option')
+    }
+  })
+
   it("tells the logger the kind and the call it refused, never the thing's fields", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')

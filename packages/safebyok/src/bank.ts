@@ -16,7 +16,8 @@ import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf }
 import { Vault, bear, goneBy, letGo } from './vault'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
-import { type VaultDB, byCodeUnit } from './vault-db'
+import { type VaultDB, byCodeUnit, callback } from './vault-db'
+import { asError } from './logger'
 
 // == [Public types]: BankVault, BankSnapshot
 
@@ -135,7 +136,7 @@ export class Bank {
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each snapshot change.') }
+    callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -197,7 +198,7 @@ export class Bank {
   /** The bank {@link Bank.make} makes. */
   private constructor(opts: MakeBankOpts) {
     this.#parts = parseMakeBankOpts(opts)
-    this.#scope = Object.freeze({ applabel: this.#parts.applabel, user_id: this.#parts.user_id })
+    this.#scope = CX.bankScope.parse(this.#parts)
     this.#snapshot = this.#picture()
   }
 
@@ -385,7 +386,7 @@ export class Bank {
   }
   // --
 
-  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, relist, vaultScopeOf, demandSameScope
+  // == [Options and state]: parts, scope, entries, listeners, libs, listing, snapshot, picture, publish, heedListener, relist, vaultScopeOf, demandSameScope
 
   readonly #parts: ParsedBankOpts
   readonly #scope: BankScope
@@ -407,7 +408,17 @@ export class Bank {
   /** Publish the snapshot the private state makes now, and tell every listener: the one place the snapshot is swapped. Callers call it only once something changed. */
   #publish() {
     this.#snapshot = this.#picture()
-    this.#listeners.forEach((listener) => { listener() })
+    this.#listeners.forEach((listener) => { this.#heedListener(listener) })
+  }
+
+  /** Call `listener`, a host's, as the snapshot changes: what it throws reaches no call, and is logged as an error and reported to the platform, as a Vault object's listener's is. */
+  #heedListener(listener: () => void) {
+    try {
+      listener()
+    } catch (err) {
+      this.#parts.logger.error("A listener passed to the bank's subscribe threw as it heard of a snapshot change. The change stands, the call that made it went on as it would have, and every other listener was called; the listener is the host's to mend.", { call: 'subscribe' }, asError(err))
+      reportToPlatform(err)
+    }
   }
 
   /** List the entries anew, each its view, and publish: what every change to an entry calls, so the listing is a new array exactly when an entry changed. */
@@ -421,7 +432,7 @@ export class Bank {
   #vaultScopeOf(bag: VaultBag): VaultScope {
     const { vaultlabel, ...names } = parseVaultBag(bag)
     this.#demandSameScope(names)
-    return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
+    return Object.freeze({ ...this.#scope, vaultlabel })
   }
 
   /** Refuse 'bad_scope' for `names`, already checked, holding an `applabel` or `user_id` other than the bank's: the one comparison {@link Bank.demandConsistentWith} and every call naming a vault make. */
@@ -635,16 +646,10 @@ const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
 }
 
 /** The vault `scope` names as the bank lists it at `lifecycle`, frozen: its names picked out, so whatever else `scope` carries stays out. */
-const frozenBankVault = (scope: VaultScope, lifecycle: 'starting' | 'ready'): BankVault => {
-  const { applabel, user_id, vaultlabel } = scope
-  return Object.freeze({ applabel, user_id, vaultlabel, lifecycle })
-}
+const frozenBankVault = (scope: VaultScope, lifecycle: 'starting' | 'ready'): BankVault => Object.freeze({ ...CX.vaultScope.parse(scope), lifecycle })
 
 /** The vault `scope` names as the bank lists it once refused, `err` saying why, frozen. */
-const refusedBankVault = (scope: VaultScope, err: VaultError): BankVault => {
-  const { applabel, user_id, vaultlabel } = scope
-  return Object.freeze({ applabel, user_id, vaultlabel, lifecycle: 'refused', err })
-}
+const refusedBankVault = (scope: VaultScope, err: VaultError): BankVault => Object.freeze({ ...CX.vaultScope.parse(scope), lifecycle: 'refused', err })
 
 /** Refuse 'bad_option' unless `parts` names the stores `held` was born from, the same objects: one scope lives in one place, and a vault read from one store and written to another is no vault at all.
  * Stores are compared by identity, never by what they reach: a vaultDB made afresh for each call
@@ -654,11 +659,10 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
   if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
 }
 
-/** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
-const draftOf = (scope: VaultScope, now: number): VaultDraft => {
-  const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
-  return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
-}
+/** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`, a scope already parsed: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
+const draftOf = (scope: VaultScope, now: number): VaultDraft => (
+  { format: VaultFormat, ...scope, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
+)
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 
