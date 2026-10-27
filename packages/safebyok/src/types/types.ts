@@ -113,7 +113,9 @@ export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_
 /** A wayin of either kind as a log line shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
-/** A passkey's answer when asked for a vault's PRF: the cleartext a gating's `attemptPasskey` takes. `safebyok-react`'s `askPasskey` makes one.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
+ * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
+ * it in `attempt`, beside the passphrase.
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
