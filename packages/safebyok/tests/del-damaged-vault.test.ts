@@ -50,11 +50,11 @@ describe("delDamagedVault", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const before = world.dbStore.scopepaths().map((ckey) => [ckey, world.dbStore.read(ckey)])
+    const before = world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)])
     const lease = await world.getLease()
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'bad_option')
     expect(err.message).to.include('del()')
-    expect(world.dbStore.scopepaths().map((ckey) => [ckey, world.dbStore.read(ckey)])).to.deep.equal(before)
+    expect(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)])).to.deep.equal(before)
     expect(await world.getLease()).to.deep.equal(lease)
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
@@ -65,7 +65,7 @@ describe("delDamagedVault", () => {
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'damaged_vault')
     expect(err.message).to.include('nothing was removed')
     expect(world.dbStore.read(u1VaultScopepath)).to.eq('{"format":"safebyok-vault-v1"}')
-    expect(world.dbStore.scopepaths().some((ckey) => isU1Box(ckey))).to.eq(true)
+    expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
 
@@ -78,7 +78,7 @@ describe("delDamagedVault", () => {
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'newer_format')
     expect(err.message).to.include('newer version')
     expect(world.dbStore.read(u1VaultScopepath)).to.eq(newer)
-    expect(world.dbStore.scopepaths().some((ckey) => isU1Box(ckey))).to.eq(true)
+    expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
 
@@ -115,7 +115,7 @@ describe("delDamagedVault", () => {
       },
     })
     await TH.expectRefusal(delDamagedVault(world.optsWith({ vaultDB: replacing })), 'stale_write')
-    expect(world.dbStore.scopepaths().some((ckey) => isU1Box(ckey))).to.eq(true)
+    expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
 
@@ -140,7 +140,7 @@ describe("delDamagedVault", () => {
     }
     const withoutTheVerb = Object.fromEntries(VaultDBVerbsUsed.map((verb) => [verb, () => Promise.resolve(null)])) as unknown as VaultDB
     await TH.expectRefusal(delDamagedVault(world.optsWith({ vaultDB: withoutTheVerb })), 'bad_option')
-    expect(world.dbStore.scopepaths().some((ckey) => isU1Box(ckey))).to.eq(true)
+    expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
 

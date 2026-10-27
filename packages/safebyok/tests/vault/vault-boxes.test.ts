@@ -191,7 +191,7 @@ describe("putBox, the box it seals and stores", () => {
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }), 'no_whisper')
     const leftOut: Whisper | undefined = undefined
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, leftOut), 'no_whisper')
-    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))).to.have.lengthOf(0)
   })
 
   it("refuses 'damaged_box' when the whisper is left out and the box will not open, writing nothing: there is no whisper to keep", async () => {
@@ -576,7 +576,7 @@ describe("the sidecar", () => {
       expect(err.message).to.include('sidecar')
       expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
     }
-    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))).to.have.lengthOf(0)
   })
 
   it("refuses a prop beside `boxlabel` and `sidecar`, or props that are no object, as 'bad_option', writing nothing: a note is kept in the sidecar, not beside it", async () => {
@@ -588,7 +588,7 @@ describe("the sidecar", () => {
       expect(err.message).to.include('sidecar')
       expect(err.message).to.not.include('work account')
     }
-    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))).to.have.lengthOf(0)
     await vault.putBox({ boxlabel: 'anthropic', sidecar: undefined }, 'sk-fake')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({})
   })
@@ -721,7 +721,7 @@ describe("the box limit", () => {
     expect(err.message).to.include('2 boxes')
     expect(err.message).to.not.include('secret_project_x')
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
-    expect(world.dbStore.scopepaths().filter((ckey) => ckey.includes('secret_project_x'))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((scopepath) => scopepath.includes('secret_project_x'))).to.have.lengthOf(0)
   })
 
   it("holds MaxBoxes, 100, unless told otherwise", async () => {
