@@ -102,8 +102,8 @@ export type VaultSnapshot = Readonly<{
    */
   capacity:          Readonly<{ boxes: Readonly<Capacity['boxes']>, bytes: Readonly<Capacity['bytes']> }>
   /** Epoch ms from which the vault asks for a proof again, while unlocked on this device; null while it is locked, or has no passphrase yet.
-   * It is `leaseHours` after a proof last unlocked the vault, or a passphrase last proved a change
-   * to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
+   * Null with a `gate` is the host's cue to offer to unlock the vault. It is `leaseHours` after a
+   * proof last unlocked the vault, or a passphrase last proved a change to its ways in. A vault that stays unlocked until `lock()` reads {@link FarFuture} (in 2255):
    * compare with `>= FarFuture - MinuteMillis`, never for equality. Show it with `Intl`'s
    * `DateTimeFormat` or `RelativeTimeFormat`, and as "until locked" at or past that mark.
    *
@@ -182,10 +182,11 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * `bank.clearCachedVault`, which erases the record, and asks the bank for the vault again. Any other
  * read older than the vault record in hand is ignored, refusing nothing.
  *
- * Every call comes in two forms. `tryPutBox()` and the rest resolve an {@link Outcome}, never
- * thrown: the form for code that branches on `refusalkind`. `putBox()` and the rest resolve its
- * `val` or throw its `err`: the form for code that reports failure by throwing, as a TanStack
- * `queryFn` does. Bad news is told to `onBadNews` once, whichever form met it. `subscribe()` and
+ * Every call comes in two forms. `tryPutBox()` and the rest resolve an {@link Outcome},
+ * `{ ok: true, val }` or `{ ok: false, err }`, never thrown: the form for code that branches on
+ * `refusalkind`. `putBox()` and the rest resolve its `val` or throw its `err`: the form for code
+ * that reports failure by throwing, as a TanStack `queryFn` does. A refusal a member's doc names
+ * comes as `err` from its `try` form. Bad news is told to `onBadNews` once, whichever form met it. `subscribe()` and
  * `useWhisper()` come in the throwing form alone.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
@@ -533,7 +534,8 @@ export class Vault implements VaultStamp {
    * Once it resolves, the box holds this whisper, and the snapshot lists its new revision. It goes
    * through {@link Vault.ensureUnlocked}, which may prompt, only once the boxlabel, sidecar and
    * whisper have passed their checks: a store that cannot land never prompts. It is one write, with
-   * `VaultDB.putBox`, over the revision the box was sealed from; `registered_at` keeps the first.
+   * `VaultDB.putBox`, over the revision the box was sealed from. Every store stamps `written_at`,
+   * the same whisper stored again included; `registered_at` keeps the first.
    *
    * Given both the sidecar and the whisper, it reads nothing: it writes over the revision the
    * snapshot lists, or as a new box when none is listed. Leave either out to keep the box's own: it
