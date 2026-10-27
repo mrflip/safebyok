@@ -88,7 +88,7 @@ export abstract class DeviceDB {
    * In one transaction of the store's: where a record of the scope is stored, it keeps its
    * `device_id` and the higher of the two `highest_vault_epoch`s, so a tab that saw less never
    * lowers what another saw; where none is, or one that fails its check, `record` is stored as it
-   * came. {@link raisedDeviceRecord} is that rule.
+   * came.
    */
   raiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
     return deviceOutcomeOf('raiseDeviceRecord', async () => {
