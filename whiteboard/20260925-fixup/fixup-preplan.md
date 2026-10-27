@@ -3,8 +3,8 @@
 The changes the questions in `fixup-changes.md` point to, and what an audit for more of the same
 found (items 5 and 8). Line numbers are as of `da294a43`.
 
-* **Ready to build:** items 1–3, 5 and 8.
-* **Needs a Coach's ruling first:** item 4, a design proposal.
+* **Ready to build:** items 1–5 and 8. The Coach accepted every proposal here, and item 4 was
+  ruled in on 2026-10-27.
 * **Its own PRs:** items 6 and 7 edit STYLE.md and the lint config. Item 7 touches nearly every
   file, so it runs after the restyle sprint lands.
 
@@ -65,16 +65,15 @@ Item 7's conversion gives each its own lines.
 * **`unexpectedError` moves to `refusals.ts`**, beside `storageUnavailable`. It is a refusal
   builder like the others there. `index.ts` re-exports it from the new place under the same
   name, so its public name doesn't change.
-* **`isOutcomeShaped` leaves outcome.ts.** Its one remaining caller is `guarded` in
-  `device-db.ts:196`. That check is legitimate: it validates a host's DeviceDB at the point the
-  core first touches it.
-  * Replace it with a zod/mini schema in device-db.ts, beside `guarded`: a discriminated union on
-    `ok`, with `val` on the true side and `err` on the false side.
-  * Note: `Z.unknown()` accepts a missing `val`, so `{ ok: true }` would start to pass. That's
-    fine for the void verbs. Check `describeDeviceDB` still says what it meant to.
-  * If item 4 is ruled in, this check goes away entirely.
+* **`isOutcomeShaped` goes.** After item 2, its one remaining caller is `guarded` in
+  `device-db.ts:196`, and item 4 removes `guarded`. If item 4 lands after this item, the interim
+  replacement is a zod/mini schema beside `guarded`, not a hand-written check.
 
-## 4. DeviceDB becomes a base class, as VaultDB is (needs a ruling)
+## 4. DeviceDB becomes a base class, as VaultDB is (ruled in)
+
+The Coach ruled this in, on condition that it causes no new problems. The checks below find none
+that block it. They do find three constraints the builder must keep, and one probable bug that
+the change fixes.
 
 **What's asymmetric today:**
 * The two stores extend differently. `VaultDB` is an abstract base class. The base does the
@@ -99,13 +98,50 @@ Item 7's conversion gives each its own lines.
 * What stays with each store: the promise that "calls land in the order they were made". A base
   class can't keep it without a queue, and a queue isn't proposed.
 
-**Contract:** `DeviceDB`, `deviceOutcomeOf` and the README's custom DeviceDB example all change.
-A host with its own DeviceDB rewrites it as a subclass. This is allowed before 1.0, with a
-changeset.
+**Constraints the base must keep:**
 
-**Against it:** a DeviceDB is small and stays on the device, and an object literal is the
-lightest thing a host can write. The asymmetry may have been on purpose. Nothing in `notes/`
-says so, but `notes/security.md` wasn't read.
+1. **Each verb calls its `do*` hook synchronously, before any `await`.** Today the store sees
+   calls in the order the vault made them. A base that awaits anything before calling the hook
+   could reorder them. Checking the caller's input before the hook is synchronous, so it is fine.
+2. **A row that won't read is discarded in one atomic step by the store, and only while it still
+   won't read.** Today idb's `discardedIfUnreadable` (`idb.ts:154`) re-reads the lease row inside
+   the transaction that deletes it, so a lease a later `putLease` wrote survives. The base
+   decides that a row is unreadable, but it can't do the discard itself: by then a later call may
+   have landed. So give the store a hook that does the conditional delete atomically, for example
+   `doDiscardUnless(scopepath, isReadable)`. The base passes the record schema's check as
+   `isReadable`. The memory store does it synchronously.
+3. **`raiseDeviceRecord` stays one atomic read-modify-write in the store.** Two tabs raising at
+   once must never lower each other's record. The base can own the rule (`raisedDeviceRecord`)
+   and pass the store an updater, but the read and write stay in one store transaction.
+
+idb's change bell and its sweep of stray rows stay in idb's own hooks.
+
+**A probable bug this fixes** (not tested; for the PR body):
+* idb's `getDeviceRecord` (`idb.ts:113`) deletes an unreadable record without any condition, in a
+  transaction that only starts once the read has resolved.
+* Suppose a `raiseDeviceRecord` is made after that read but lands before the delete. The delete
+  then erases the record the raise just wrote, including its `highest_vault_epoch`.
+* With constraint 2 applied to both kinds of record, that can't happen.
+
+**Option checks:** `parseDeviceDB` (`vault-opts.ts:266`) checks a DeviceDB's shape today. It
+becomes an `instanceof DeviceDB` check plus that shape check, the way `vaultDB` is checked at
+`vault-opts.ts:259`. The trade-off of `instanceof` when two copies of the package are installed
+is the one VaultDB has already accepted.
+
+**What changes with it:**
+* `deviceTroubleAsConditions` goes, along with its three uses: `bank.ts:309` and `:495`,
+  `vault.ts:814`, `del-damaged-vault.ts:53`.
+* `memoryDeviceDB` and `idbDeviceDB` become subclasses, made by the same factory functions.
+* The object-literal DeviceDBs in the test worlds become subclasses: `tests/vault/world.ts`,
+  `safebyok-react/tests/bank-provider/world.tsx`, and `tests/del-damaged-vault.test.ts`.
+* `describeDeviceDB` runs against both stores as it does today. It gains a test for the race
+  above.
+* The README's custom-DeviceDB section becomes a subclass example, believable as production code.
+
+**Contract:** `DeviceDB` becomes a class, and `deviceOutcomeOf` leaves the exports (or stays
+only inside the package). A host with its own DeviceDB rewrites it as a subclass. This is allowed
+before 1.0. The changeset says what to change, and that the stores now discard unreadable
+records the same way.
 
 ## 5. Parameters every caller fills from the object's own state
 
@@ -143,10 +179,12 @@ against that same record, so it can never fail. Delete both.
 
 * The `#demandLease` that follows in `#readBox` stays: it catches a lock that landed during the
   read.
-* **For a Coach:** `#storedBase` (1698) calls `#demandAfterWait(read, { vault_tok })` right after
-  `#readBox`, which already made the same demand after its own wait. The only gap between the two
-  is the microtask on which `#readBox` resolves. Whether that counts as a junction is a question
-  for the demand model, so the builder leaves it alone.
+* **Kept, by the Coach's ruling (2026-10-27): where there is a question, the check stays.**
+  `#storedBase` (1698) calls `#demandAfterWait(read, { vault_tok })` right after `#readBox`, which
+  already made the same demand after its own wait. The only gap between the two is the microtask
+  on which `#readBox` resolves, and whether that counts as a junction is an open question. So the
+  check stays. The two demands above go because nothing at all runs between each box being made
+  and its demand, so there is no question.
 
 ### c. `#unwrap(wrapped, visible, usage)` (`proving.ts:260`)
 
@@ -185,8 +223,8 @@ Four call sites (235, 250, 308, 344) repeat this whole expression.
   rule is off (`@typescript-eslint/consistent-type-definitions`).
 * Most shapes are inferred from Zod schemas, and those are types already. An interface also
   allows declaration merging, which no exported shape here should allow.
-* **Change:** turn the rule on as `['error', 'type']`, convert `MaskOpts`, and convert
-  `DeviceDB` unless item 4 makes it a class.
+* **Change:** turn the rule on as `['error', 'type']` and convert `MaskOpts`. Item 4 makes
+  `DeviceDB` a class.
 
 ## 7. STYLE: `function` declarations outside React (own PR, after the restyle sprint)
 
@@ -265,14 +303,21 @@ the box's entry in the listing, and both refuse a damaged entry that names no re
   Behaviour is unchanged.
 * `#listedRevisionOf` and `#isListedDamaged` keep their other caller, `delBox`.
 
-### e. Counting code points, written twice
+### e. Text helpers get a module of their own
 
-`codePointsOf` (`mask.ts:57`) and `codePointCount` (`zxcvbn-strength-checker.ts:71`) both
-compute `text.match(/./gsu) ?? []`.
+* `codePointsOf` (`mask.ts:57`) and `codePointCount` (`zxcvbn-strength-checker.ts:71`) both
+  compute `text.match(/./gsu) ?? []`.
+* `byCodeUnit`, a string comparator, is exported from vault-db.ts. Its only other user is
+  vault.ts, and it has nothing to do with storage.
 
-* **Change:** keep one `codePointsOf` in `utils.ts`, written `[...text]`. The string iterator
-  yields code points, as `/./su` matches them.
-* `zxcvbn-strength-checker.ts` takes `.length` of it.
+**Change:**
+* Put one `codePointsOf`, written `[...text]`, and `byCodeUnit` in a new internal module,
+  `src/text.ts`. The string iterator yields code points, as `/./su` matches them.
+* `zxcvbn-strength-checker.ts` takes `.length` of `codePointsOf`.
+* `src/text.ts` must be internal, not `utils.ts`: `utils.ts` is the `safebyok/utils` entry point,
+  so anything in it is exported.
+* `jsonBytes` stays in vault-db.ts: it's how a record is weighed against storage's limits, which
+  is part of the VaultDB contract.
 
 ### f. Considered and kept
 
