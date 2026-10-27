@@ -971,7 +971,7 @@ export class Vault implements VaultStamp {
    * A Vault object let go meanwhile ignores it. The vault deleted, or made anew under another
    * `vault_tok`, makes this Vault object gone, refusing 'vault_gone' or 'vault_remade'. A read below
    * the record's highest `vault_epoch` is `behind`. A read older than the picture but not below the
-   * record ({@link isOlderPicture}) is ignored.
+   * record (`isOlderPicture`) is ignored.
    */
   #judgeRead(read: (VaultRecord & Listing) | null, record: DeviceRecord | null): (VaultRecord & Listing) | 'ignore' | 'behind' {
     if (this.#goneBy !== null) { return 'ignore' }
@@ -993,7 +993,7 @@ export class Vault implements VaultStamp {
   /** Replace the picture with what one read found, and publish it: vault record and listing together, never a vault beside another's boxes.
    * The lease in hand is dropped, in memory only, when it no longer fits the vault record's ways in.
    * It is dropped too when this device's store holds no lease (a lock in another tab), or one under
-   * another gate ({@link leavesInForce}), unless the read began before the lease in hand was taken.
+   * another gate (`leavesInForce`), unless the read began before the lease in hand was taken.
    * None is taken up here. A read finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
@@ -1069,7 +1069,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Demand `thing` right after a wait whose answer is `settled`, before anything is made of that answer, a refusal included.
-   * A refusal from storage about the vault itself ({@link UntrustedStorageKinds}) comes as it came:
+   * A refusal from storage about the vault itself (`UntrustedStorageKinds`) comes as it came:
    * heeding it is what moved the picture. A lease-bound demand asks for the lease only of an answer
    * that came: a lease that refused its own use ('damaged_lease') has dropped itself.
    */
@@ -1337,7 +1337,7 @@ export class Vault implements VaultStamp {
    * That is a user no longer signed in, or an older copy of the vault. The pending gating's waiters
    * hear `refusal` itself, and the lease is erased with {@link DeviceDB.delLease}: a device store
    * that will not erase it is only logged, as the refusal is what the caller must hear. Storage it
-   * cannot trust ({@link UntrustedStorageKinds}) has the next hello read afresh.
+   * cannot trust (`UntrustedStorageKinds`) has the next hello read afresh.
    */
   async #heedRefusal(refusal: VaultError) {
     if (UntrustedStorageKinds.some((kind) => isVaultError(refusal, kind))) { this.#readAt = FarPast }
