@@ -320,15 +320,14 @@ describe("bank.ensureVault", () => {
     expect(births).not.toHaveBeenCalled()
   })
 
-  it("refuses a store in the bag 'bad_scope', naming neither the field nor its value, before either store is touched: a vault's own stores go in the second bag", async () => {
+  it("refuses a store in the bag 'bad_scope', naming neither the field nor its value, before either store is touched", async () => {
     const world = makeWorld()
     const elsewhere = makeWorld()
     const births = [vi.spyOn(world.vaultDB, 'ensureVault'), vi.spyOn(elsewhere.vaultDB, 'ensureVault')]
     const bank = bankIn(world)
     for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }, { ...Main, vaultDb: elsewhere.vaultDB }]) {
       const refusal = await TH.expectRefusal(bank.ensureVault(bag), 'bad_scope')
-      expect(refusal.message).to.include("In the bag naming the vault: There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel")
-      expect(refusal.message).to.include("a vault's own stores go in the second bag").and.not.match(/vaultDB|deviceDB|vaultDb/u)
+      expect(refusal.message).to.include("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel").and.not.match(/vaultDB|deviceDB|vaultDb/u)
     }
     for (const birth of births) { expect(birth).not.toHaveBeenCalled() }
     expect(bank.vaults).to.deep.equal([])
@@ -1238,7 +1237,7 @@ describe("bank.demandConsistentWith", () => {
     const bank = bankIn(makeWorld())
     const err = TH.expectSyncRefusal(() => { bank.demandConsistentWith({ user_id: 'u2' }) }, 'bad_scope')
     expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
-    expect(err.message).to.include('a bank serves one app and one signed-in user')
+    expect(err.message).to.include("which serves one app and one signed-in user. Name the vault by its vaultlabel.")
     expect(err.message).to.not.include('u2')
   })
 

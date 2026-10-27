@@ -91,7 +91,7 @@ export const VaultScope = vaultScope
  * an element of the bank's listing), so everything else the thing carries is left out.
  *
  * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
- * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
+ * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': a field it does not take
  * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
  */
 export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {

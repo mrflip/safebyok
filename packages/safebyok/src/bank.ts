@@ -420,7 +420,7 @@ export class Bank {
 
   /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise. */
   #vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel, ...names } = parseVaultBag(bag)
+    const { vaultlabel, ...names } = vaultBag.parse(bag)
     this.#demandSameScope(names)
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
@@ -614,17 +614,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
-
-/** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
-const parseVaultBag = (bag: unknown): VaultBag => {
-  try {
-    return vaultBag.parse(bag)
-  } catch (err) {
-    if (! isVaultError(err, 'bad_scope')) { throw err }
-    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like; a vault's own stores go in the second bag, its options. Name the vault of a Vault object or a BankVault by its label: { vaultlabel: vault.vaultlabel }.`, err.meta === undefined ? {} : { meta: err.meta })
-  }
-}
+// == [Helpers]: loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
@@ -665,8 +655,8 @@ const goneError = () => new VaultError('vault_gone', 'The app let this vault go 
 
 const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
 
-/** The refusal of a bag naming another app or user than the bank's, naming the fields that differ, never their values. */
-const otherScopeError = (fieldnames: readonly string[]) => new VaultError('bad_scope', `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`, { meta: { fieldnames } })
+/** The refusal of a bag naming another applabel or user_id than the bank's, naming the fields that differ, never their values. */
+const otherScopeError = (fieldnames: readonly string[]) => new VaultError('bad_scope', `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Name the vault by its vaultlabel.`, { meta: { fieldnames } })
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --
