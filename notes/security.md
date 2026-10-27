@@ -2167,7 +2167,21 @@ added or folded into through the subagent, and no other entry changes.
   `unlock_epoch` and a sidecar's length are checked by the client's Zod records, not on the
   server. A signed-in user can therefore store malformed rows in their own vaults, which their
   own clients then refuse as `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box` or
-  `damaged_vault`).
+  `damaged_vault`). Amended 2026-10-27 (thread 18, convex_helpers; the Coach's yes for the dependency):
+  the component's argument, return and table validators are now made from the core's exported Zod
+  validators (`Validators.VaultRecord`, `BoxRecord`, the expectations, `Capacity`, `VaultTombstone`,
+  `VaultDraft`, `boxscope`) by `zodToConvex` from `convex-helpers/server/zod4`. `convex-helpers`
+  (^0.1.128) and `zod` are peer dependencies the host installs, so their code now runs inside the
+  component's server functions, bundled by the host's Convex CLI; it holds no key material and only
+  shapes validators. Where Convex has no check, the component is looser than the core: names and
+  tokens are any text, epochs and counts any number, the vault record's rule tying a null `gate` to
+  `gate_epoch` 0 is dropped, and a box's `sidecar` is `v.any()` where it was
+  `v.record(v.string(), v.any())`, so the component accepts a sidecar that is no object.
+  `packages/safebyok-convex/src/component/validators.ts` lists these places and
+  `tests/component/validators.test.ts` tests them. The component runs no core parse on a write; the
+  core's VaultDB checks every record on every write and read (a box whose sidecar fails reads back as
+  damaged), and the auth wrapper still scopes every call to the signed-in `user_id`. Convex objects
+  stay strict where the core strips (the expectations): extra fields are refused, as before.
 * 2026-10-15: the Convex component checks each update's and deletion's expectation by reading the
   stored rows inside the same mutation that writes, relying on Convex's serializable
   transactions; a failed expectation resolves `false` rather than throwing. `ensureVaultProps` is a
