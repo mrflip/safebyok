@@ -79,14 +79,14 @@ describe("OutageVaultDB, deleting a damaged vault", () => {
     const { store, vaultDB } = await damagedOver()
     await TH.expectBad(vaultDB.getVault(scope), 'damaged_vault')
     await TH.expectingGood(vaultDB).delDamagedVault(scope)
-    expect(store.ckeys(), 'a tombstone in the place of the vault record').to.deep.equal([Scopepath.vault(scope)])
+    expect(store.scopepaths(), 'a tombstone in the place of the vault record').to.deep.equal([Scopepath.vault(scope)])
   })
 
   it("refuses while the pretend backend is down, deleting nothing", async () => {
     const { store, outage, vaultDB } = await damagedOver()
     outage.setDown(true)
     await TH.expectBad(vaultDB.delDamagedVault(scope), 'storage_unavailable')
-    expect(store.ckeys()).to.have.lengthOf(2)
+    expect(store.scopepaths()).to.have.lengthOf(2)
   })
 })
 

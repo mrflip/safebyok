@@ -110,7 +110,7 @@ export const storedVaultRecordOf = (world: ReturnType<typeof makeWorld>): Record
 
 /** The ckeys of every row `user_id`'s vault has in storage: its vault record and its boxes. */
 export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => (
-  world.dbStore.ckeys().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
+  world.dbStore.scopepaths().filter((ckey) => ckey === Scopepath.vault(TH.scopeOf(user_id)) || Scopepath.withinVaultScopepathPred(TH.scopeOf(user_id))(ckey))
 )
 
 /** u1's stored vault record in `world`, its gate's way in of `wayinkind` spoiled by `spoil`. */

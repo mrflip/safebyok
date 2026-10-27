@@ -14,7 +14,7 @@ otherwise write itself.
   for it (`bank.ensureVault`) when it lists none; `null` while nobody is signed in, until its
   birth lands, and once refused. Its own fields are fixed for its life; render what changes from
   the snapshot, and read `vault.snapshot` live in an event handler.
-* `useBankVault(vaultlabel)` -- that vault as the bank lists it (`bank.snapshot.vaults`): its
+* `useListedVault(vaultlabel)` -- that vault as the bank lists it (`bank.snapshot.vaults`): its
   scope and its `lifecycle`, `starting`, `ready`, or `refused` with why, in `err`; it asks as
   `useVault` does. Render a refusal from it.
 * `useVaultSnapshot(vaultlabel)` -- that vault's live snapshot, through
@@ -114,7 +114,7 @@ unmounting. Under React's
 `StrictMode`, whose rehearsal in development asks for a vault and lets it go again at once, that
 rehearsal reads nothing from storage: only the vault kept is born.
 
-**A vault is asked for by the hook that names it.** `useVault('main')` (or `useBankVault('main')`)
+**A vault is asked for by the hook that names it.** `useVault('main')` (or `useListedVault('main')`)
 asks the bank for the user's `main` vault as it mounts, unless the bank lists it already, and
 renders from the bank's listing as it changes. Two components naming one vault share its one Vault object. The
 provider makes its bank in an effect, sets it as state from that effect -- what React's
@@ -122,7 +122,7 @@ provider makes its bank in an effect, sets it as state from that effect -- what 
 made twice under `StrictMode`, and one of the two never let go -- and the hook asks in an effect of
 its own. For your app:
 
-* `useBank()`, `useVault('main')`, `useBankVault('main')` and `useVaultSnapshot('main')` are
+* `useBank()`, `useVault('main')`, `useListedVault('main')` and `useVaultSnapshot('main')` are
   `null` for the renders after a user signs in, until the ask lands, and on the server, just as while nobody is signed in. Tell
   "signed out" from "not here yet" by your own session, so those frames show a spinner rather
   than a sign-in prompt.
@@ -143,7 +143,7 @@ const VaultPanel = () => {
 }
 
 const VaultStanding = () => {
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
   if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
   return <p>Your vault is open.</p>
@@ -164,7 +164,7 @@ refused. The vault is listed `starting` until it settles. What happens when `Ban
 birth is refused, depends on the error's family (safebyok's `RefusalFamilyForKind`): who has to
 act. The `safebyok` README's *Errors* section lists every kind, its family, and what it means.
 
-**A condition or bad news stays in place,** in the bank's listing: `useBankVault` hands down the
+**A condition or bad news stays in place,** in the bank's listing: `useListedVault` hands down the
 vault `refused`, its `err` a `VaultError`, and `useVault` no Vault object.
 Storage that cannot be reached (`storage_unavailable`), a user storage no longer
 serves (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a
@@ -181,7 +181,7 @@ not mend until the browser's settings or room change: say so, rather than offeri
 ```tsx
 const VaultPanel = () => {
   const bank = useBank()
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   const vault = useVault('main')
   if (bankVault?.lifecycle === 'refused') {
     return <p>{"Can't reach your vault."} <button onClick={() => { void bank?.tryEnsureVault(bankVault) }}>Retry</button></p>
@@ -237,7 +237,7 @@ user signed out, pass `user_id={null}`, which lets the vaults go.
 
 **Misuse goes to your error boundary.** A bad label or option -- a bug in the app's code -- is
 thrown while rendering, as is a birth refused as misuse, or with anything that is not a
-`VaultError`: `BankProvider` throws what `Bank.make` refuses, and `useVault` and `useBankVault`
+`VaultError`: `BankProvider` throws what `Bank.make` refuses, and `useVault` and `useListedVault`
 what the birth was refused with. Wrap the provider in an error boundary, keyed on the user's identity, so the dev
 overlay or the boundary's fallback shows it and a different user (or a sign-out and back in) gets
 a fresh attempt:

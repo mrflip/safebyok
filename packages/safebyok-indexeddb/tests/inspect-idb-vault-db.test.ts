@@ -7,7 +7,7 @@ import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'
 import * as TH from './test-helpers'
 
 describe("inspectIdbVaultDB", () => {
-  it("shows the raw rows sorted by ckey, hears writes, and wipes the shelf clean", async () => {
+  it("shows the raw rows sorted by scopepath, hears writes, and wipes the shelf clean", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     const inspector = inspectIdbVaultDB({ dbName })
@@ -17,7 +17,7 @@ describe("inspectIdbVaultDB", () => {
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     const rows = await inspector.rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.eq(3) })
 
     await inspector.wipe()
@@ -45,7 +45,7 @@ describe("inspectIdbVaultDB", () => {
   it("looks at 'safebyok' given no options", async () => {
     await TH.ensureGated(idbVaultDB(), TH.vaultRecordOf('inspected_u1'))
     const rows = await inspectIdbVaultDB().rows()
-    expect(rows.map((row) => row.ckey)).to.include('vault^acme^inspected_u1^main')
+    expect(rows.map((row) => row.scopepath)).to.include('vault^acme^inspected_u1^main')
   })
 
   it("refuses a dbName that is not non-empty text with kind 'bad_option'", () => {

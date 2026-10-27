@@ -65,8 +65,8 @@ export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['written_at',             'bigint'],
 ] as const)
 
-/** A box as a listing reads it: every column but the two ciphered ones. */
-export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_key_wrapped' && field !== 'whisper_ciphered')
+/** A box's sparse shape, as a listing reads it: every column but the two ciphered ones. */
+export const BoxSparseColumns = BoxColumns.filter(([field]) => field !== 'box_key_wrapped' && field !== 'whisper_ciphered')
 
 
 /** The columns' names, as an INSERT or an UPDATE lists them.

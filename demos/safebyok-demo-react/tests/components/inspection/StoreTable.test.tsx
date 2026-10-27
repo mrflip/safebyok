@@ -62,19 +62,19 @@ describe("useStoreRows", () => {
 
 describe("useIdbRows", () => {
   it("fetches a shelf's rows as display text, and again when the shelf rings", async () => {
-    const shelf = fakeInspector([{ ckey: 'vault:acme', row: { box_key_wrapped: { ciphertext_b64: 'ct' } } }])
+    const shelf = fakeInspector([{ scopepath: 'vault:acme', row: { box_key_wrapped: { ciphertext_b64: 'ct' } } }])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(1) })
     expect(result.current[0]).to.deep.equal({ ckey: 'vault:acme', text: '{"box_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
-    act(() => { shelf.put({ ckey: 'note:acme', row: 'plain text' }) })
+    act(() => { shelf.put({ scopepath: 'note:acme', row: 'plain text' }) })
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
   })
 
   it("shows a CryptoKey as the handle it is, and what JSON cannot write as String() has it", async () => {
     const leaseKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey'])
     const shelf = fakeInspector([
-      { ckey: 'lease:acme', row: { lease_key: leaseKey } },
-      { ckey: 'gone:acme',   row: undefined },
+      { scopepath: 'lease:acme', row: { lease_key: leaseKey } },
+      { scopepath: 'gone:acme',  row: undefined },
     ])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
@@ -102,7 +102,7 @@ describe("the wipe buttons", () => {
     render(<WipeStoreButton store={store} storeTitle="the fake auth accounts" />)
     fireEvent.click(screen.getByRole('button', { name: 'wipe' }))
     expect(confirming).toHaveBeenCalledWith('Wipe every row of the fake auth accounts?')
-    expect(store.ckeys()).to.have.lengthOf(0)
+    expect(store.scopepaths()).to.have.lengthOf(0)
   })
 
   it("WipeStoreButton leaves the store be when the user thinks better of it", () => {
@@ -111,7 +111,7 @@ describe("the wipe buttons", () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     render(<WipeStoreButton store={store} storeTitle="this device's session" />)
     fireEvent.click(screen.getByRole('button', { name: 'wipe' }))
-    expect(store.ckeys()).to.deep.equal(['session:acme'])
+    expect(store.scopepaths()).to.deep.equal(['session:acme'])
   })
 
   it("WipeIdbButton wipes its shelf only once the user confirms", () => {

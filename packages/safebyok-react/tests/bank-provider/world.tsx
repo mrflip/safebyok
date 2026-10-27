@@ -7,14 +7,14 @@ import { expect, vi } from 'vitest'
 import { Scopepath, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB } from 'safebyok'
 import * as TH from '../test-helpers'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { BankProvider, useBank, useBankVault, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
+import { BankProvider, useBank, useListedVault, useVault, useVaultSnapshot, type BankProviderProps } from '../../src/bank-provider'
 
 // == [Test helpers]: useProvided, Probe, grabber, makeWorld, madeWorld, damagedWorld, lockedWorld, watched, providerOf, VaultExample, BankVaultExample, BoxCount, countStoreCalls, others
 
 /** Everything the provider hands down for u1's `main` vault, through each of its hooks, as one bag: the bank, the bank's listing of the vault, its Vault object, if any, and its refusal, if any. */
 export const useProvided = () => {
   const bank = useBank()
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   const vault = useVault('main')
   return { bank, bankVault, vault, err: bankVault?.lifecycle === 'refused' ? bankVault.err : null }
 }
@@ -28,7 +28,7 @@ const saidOf = (err: VaultError) => (err.refusalkind === 'vault_locked' ? 'dismi
  */
 export const Probe = () => {
   const bank = useBank()
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   const vault = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const [outcome, setOutcome] = useState('')
@@ -211,9 +211,9 @@ export const VaultExample = () => {
   return <button onClick={() => { void vault.lock() }}>Lock</button>
 }
 
-/** useBankVault's @example, as a host would write it. */
+/** useListedVault's @example, as a host would write it. */
 export const BankVaultExample = () => {
-  const bankVault = useBankVault('main')
+  const bankVault = useListedVault('main')
   if (bankVault === null || bankVault.lifecycle === 'starting') { return <p>Opening your vault…</p> }
   if (bankVault.lifecycle === 'refused') { return <p>{"Can't open your vault: "}{bankVault.err.message}</p> }
   return <p>Your vault is open.</p>

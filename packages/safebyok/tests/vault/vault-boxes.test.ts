@@ -149,7 +149,7 @@ describe("putBox, the box it seals and stores", () => {
     const vault = await world.openUnlocked('pw')
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-fake')
     expect(box).to.be.instanceOf(Box)
-    expect(box).to.deep.include({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' }, vault_tok: vault.vault_tok, gate_epoch: TH.madeUnderOf(vault).gate_epoch })
+    expect(box).to.deep.include({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' }, vault_tok: vault.vault_tok, gate_epoch: TH.cheatGetVaultEpoch(vault).gate_epoch })
     expect(box.record).to.deep.equal(BoxRecord.parse(storedRowOf(world, 'anthropic_api_key')))
     expect(box.baseRevisionTok).to.be.null
     expect(await box.extractWhisper()).to.eq('sk-ant-fake')
@@ -191,7 +191,7 @@ describe("putBox, the box it seals and stores", () => {
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }), 'no_whisper')
     const leftOut: Whisper | undefined = undefined
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, leftOut), 'no_whisper')
-    expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 
   it("refuses 'damaged_box' when the whisper is left out and the box will not open, writing nothing: there is no whisper to keep", async () => {
@@ -576,7 +576,7 @@ describe("the sidecar", () => {
       expect(err.message).to.include('sidecar')
       expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
     }
-    expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 
   it("refuses a prop beside `boxlabel` and `sidecar`, or props that are no object, as 'bad_option', writing nothing: a note is kept in the sidecar, not beside it", async () => {
@@ -588,7 +588,7 @@ describe("the sidecar", () => {
       expect(err.message).to.include('sidecar')
       expect(err.message).to.not.include('work account')
     }
-    expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
     await vault.putBox({ boxlabel: 'anthropic', sidecar: undefined }, 'sk-fake')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({})
   })
@@ -721,7 +721,7 @@ describe("the box limit", () => {
     expect(err.message).to.include('2 boxes')
     expect(err.message).to.not.include('secret_project_x')
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
-    expect(world.dbStore.ckeys().filter((ckey) => ckey.includes('secret_project_x'))).to.have.lengthOf(0)
+    expect(world.dbStore.scopepaths().filter((ckey) => ckey.includes('secret_project_x'))).to.have.lengthOf(0)
   })
 
   it("holds MaxBoxes, 100, unless told otherwise", async () => {
@@ -1077,7 +1077,7 @@ describe("vault.getBox", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const box = await gotBox(vault)
     expect(TH.scopeOf('u1')).to.deep.include({ applabel: box.applabel, user_id: box.user_id, vaultlabel: box.vaultlabel })
-    expect({ vault_tok: box.vault_tok, vault_epoch: box.vault_epoch, gate_epoch: box.gate_epoch }).to.deep.equal({ vault_tok: TH.madeUnderOf(vault).vault_tok, vault_epoch: TH.madeUnderOf(vault).vault_epoch, gate_epoch: TH.madeUnderOf(vault).gate_epoch })
+    expect({ vault_tok: box.vault_tok, vault_epoch: box.vault_epoch, gate_epoch: box.gate_epoch }).to.deep.equal({ vault_tok: TH.cheatGetVaultEpoch(vault).vault_tok, vault_epoch: TH.cheatGetVaultEpoch(vault).vault_epoch, gate_epoch: TH.cheatGetVaultEpoch(vault).gate_epoch })
     vault.demandConsistentWith(box, { leaseBound: true })
   })
 
@@ -1204,7 +1204,7 @@ describe("box.extractWhisper, through a vault", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const record = storedBoxOf(world)
     const checks = vi.spyOn(BoxRecord, 'safeParse')
-    const box = Box.make(vault, record, TH.madeUnderOf(vault))
+    const box = Box.make(vault, record, TH.cheatGetVaultEpoch(vault))
     expect(checks).toHaveBeenCalledTimes(1)
     checks.mockClear()
     expect(await box.extractWhisper()).to.eq('sk-fake')
@@ -1218,7 +1218,7 @@ describe("box.extractWhisper, through a vault", () => {
     const vault = await world.openUnlocked('pw', { requestCleartext })
     requestCleartext.mockClear()
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
-    const box = Box.make(vault, storedBoxOf(world), TH.madeUnderOf(vault))
+    const box = Box.make(vault, storedBoxOf(world), TH.cheatGetVaultEpoch(vault))
     const reads = (['getBox', 'getVault'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await box.extractWhisper()).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
@@ -1232,15 +1232,15 @@ describe("box.extractWhisper, through a vault", () => {
     const record = storedBoxOf(world)
     const other = await world.open()
     expect(TH.stateOf(other.snapshot)).to.eq('unlocked')
-    expect(await Box.make(vault, record, TH.madeUnderOf(vault)).extractWhisper()).to.eq('sk-fake')
-    expect(await Box.make(other, record, TH.madeUnderOf(other)).extractWhisper()).to.eq('sk-fake')
+    expect(await Box.make(vault, record, TH.cheatGetVaultEpoch(vault)).extractWhisper()).to.eq('sk-fake')
+    expect(await Box.make(other, record, TH.cheatGetVaultEpoch(other)).extractWhisper()).to.eq('sk-fake')
   })
 
   it("refuses as 'vault_remade' a box made under another vault_tok than the vault holds: one read before the vault was made anew", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const elder = Box.make(vault, storedBoxOf(world), { ...TH.madeUnderOf(vault), vault_tok: 'vault-tok-before' })
+    const elder = Box.make(vault, storedBoxOf(world), { ...TH.cheatGetVaultEpoch(vault), vault_tok: 'vault-tok-before' })
     await TH.expectRefusal(elder.extractWhisper(), 'vault_remade')
   })
 
@@ -1280,7 +1280,7 @@ describe("box.extractWhisper, through a vault", () => {
   it("refuses what is no box record as 'bad_record', before it opens anything", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    TH.expectSyncRefusal(() => Box.make(vault, { boxlabel: 'anthropic' } as unknown as BoxRecord, TH.madeUnderOf(vault)), 'bad_record')
+    TH.expectSyncRefusal(() => Box.make(vault, { boxlabel: 'anthropic' } as unknown as BoxRecord, TH.cheatGetVaultEpoch(vault)), 'bad_record')
   })
 
   it("refuses 'vault_locked' for a box made on a handle opened locked", async () => {
@@ -1291,7 +1291,7 @@ describe("box.extractWhisper, through a vault", () => {
     // Locking erases this device's lease, so no vault opened after it holds a key.
     await first.lock()
     const locked = await world.open()
-    await TH.expectRefusal(Box.make(locked, record, TH.madeUnderOf(locked)).extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(Box.make(locked, record, TH.cheatGetVaultEpoch(locked)).extractWhisper(), 'vault_locked')
   })
 
   it("refuses 'vault_gone' once the vault is let go", async () => {

@@ -6,7 +6,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
+  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
@@ -30,7 +30,7 @@ export const getVault = query({
   returns: v.nullable(VaultAnswer),
   handler: async (ctx, scope) => {
     const row = await findVaultRecordRow(ctx.db, scope)
-    return row && { vault: vaultRecordOfRow(row), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    return row && { vault: vaultRecordOfRow(row), boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
@@ -44,12 +44,12 @@ export const ensureVault = mutation({
   handler: async (ctx, { draft }) => {
     const scope = scopeOf(draft)
     const standing = await findVaultRecordRow(ctx.db, scope)
-    if (standing) { return { vault: vaultRecordOfRow(standing), boxes: listedOf(await vaultBoxRows(ctx.db, scope)) } }
+    if (standing) { return { vault: vaultRecordOfRow(standing), boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) } }
     const tombstone = await findTombstoneRow(ctx.db, scope)
     const life = Expectations.newLifeOf(draft, tombstone) ?? draft
     if (tombstone) { await ctx.db.delete('safebyok_vault_tombstones', tombstone._id) }
     await ctx.db.insert('safebyok_vaults', life)
-    return { vault: life, boxes: listedOf(await vaultBoxRows(ctx.db, scope)) }
+    return { vault: life, boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) }
   },
 })
 
@@ -261,10 +261,10 @@ const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
   return box
 }
 
-/** Box rows as a listing returns them: each record without its two ciphered fields. */
-const listedOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof ListedBox>[] => rows.map((row) => {
-  const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOfRow(row)
-  return listed
+/** Box rows as a listing returns them: each box's sparse shape, its record without its two ciphered fields. */
+const boxSparsesOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof BoxSparse>[] => rows.map((row) => {
+  const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...sparse } = boxOfRow(row)
+  return sparse
 })
 
 /** The row a box is stored as: its scope columns added. */
