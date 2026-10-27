@@ -26,6 +26,15 @@ export const Kit = {
   lazy:    Zod.lazy,
   /** A check Zod has no maker for, as a predicate: a function, a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
+  /** A duck of `fields`: an object holding each of them, any of `kin`'s, and nothing else, every field it holds checked whether used or not; parsed to `fields` alone, frozen.
+   * So a caller hands in whatever it has that carries them, a Vault object or a record, and the
+   * callee takes the fields it asked for. A getter is read for a field it names, and never counts
+   * as a field of its own.
+   */
+  duck:    <FieldsT extends Z.core.$ZodShape>(fields: Z.ZodObject<FieldsT>, kin: Z.ZodObject) => {
+    const carrier: Z.ZodType = kin.partial().extend(fields.shape).strict()
+    return carrier.pipe(fields.strip().readonly())
+  },
   unk:     Zod.unknown(),
   str:     Zod.string(),
   num:     Zod.number(),

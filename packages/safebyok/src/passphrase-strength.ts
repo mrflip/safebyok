@@ -1,6 +1,7 @@
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
 import type { VaultScope } from './shapes/scopes'
+import { vaultScopeDuck } from './shapes/ducks'
 
 /** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
  * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
@@ -89,7 +90,7 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
  */
 export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
-  const told = Object.freeze({ applabel: scope.applabel, user_id: scope.user_id, vaultlabel: scope.vaultlabel })
+  const told = vaultScopeDuck.parse(scope)
   const check = async (passphrase: string): Promise<PassphraseVerdict> => {
     if (! passphrase.trim()) { return BlankVerdict }
     let checked: ReturnType<typeof passphraseVerdict.safeParse>

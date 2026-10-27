@@ -6,8 +6,9 @@ import { sameScope } from './names'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
-import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './shapes/vault'
+import { LeaseFormat, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
+import type { VaultSparse, VaultStamp } from './shapes/vault'
+import { type VaultStampButFormat, leaseStampDuck, vaultStampButFormatDuck } from './shapes/ducks'
 import type { ConsistencyWith } from './types/type-aliases'
 import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './shapes/fields'
 import { FarFuture } from './consts'
@@ -21,15 +22,11 @@ import type { Vault } from './vault'
  * the write to the device store are the vault's.
  */
 
-/** The `format` a lease record carries, in its stamp. */
-const LeaseFormat = 'safebyok-lease-v1'
-
-/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's sparse fields, as {@link BoxSparse} has them; a box's two ciphered fields, as {@link BoxCiphered} has them; and a lease's own stamp, picked from whatever carries it, as its ctx takes it beside its vault's ({@link VaultStampButFormat}). Each refuses 'bad_record'. */
-export const { LeaseGrant, VisibleShape, CipheredShape, LeaseStampPicked } = Validator('bad_record', ({ obj }) => ({
+/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's sparse fields, as {@link BoxSparse} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
+export const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
   LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
   VisibleShape:        BoxSparse.strip(),
   CipheredShape:       obj({ box_key_wrapped, whisper_ciphered }),
-  LeaseStampPicked:    LeaseStamp.strip(),
 }))
 
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
@@ -39,7 +36,7 @@ export const { LeaseGrant, VisibleShape, CipheredShape, LeaseStampPicked } = Val
  * @example await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(vaultRecord, leaseRecord))
  */
 export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
-  cipherCtx([VaultStampButFormat.parse(vaultStamp), LeaseStampPicked.parse(leaseStamp)], 'vault_key_lease_wrapped')
+  cipherCtx([vaultStampButFormatDuck.parse(vaultStamp), leaseStampDuck.parse(leaseStamp)], 'vault_key_lease_wrapped')
 )
 
 /** The ctx one of a box's two ciphered fields is bound to: its vault's stamp but for the format, the box's own {@link BoxStamp}, and the purpose, which names the field.
@@ -51,7 +48,7 @@ export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseSta
  */
 export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
   const { sidecar, ...stamp } = BoxStamp.parse(boxStamp)
-  return cipherCtx([VaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
+  return cipherCtx([vaultStampButFormatDuck.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
 }
 
 /** Reads a lease's record from inside this module, for {@link leaseRecordOf}: set once, by the class's static block. */

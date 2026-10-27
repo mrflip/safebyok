@@ -720,9 +720,12 @@ describe("the fixtures", () => {
   })
 
   it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
-    const { now, ...rest } = TH.vaultSliceOf('u1')
+    const { now, keyDeriver, leaseMillis, ...stamp } = TH.vaultSliceOf('u1')
     expect(now()).to.eq(TH.SliceNow)
-    expect(rest).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at, keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
+    expect([keyDeriver, leaseMillis]).to.deep.equal([TH.testDeriver, 7 * 24 * 60 * 60_000])
+    // Its own fields are its stamp alone, as a Vault object's are.
+    expect({ ...TH.vaultSliceOf('u1') }).to.deep.equal(stamp)
+    expect(stamp).to.deep.equal({ format: 'safebyok-vault-v6', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: TH.vaultRecordOf('u1').registered_at })
     const slice = TH.vaultSliceOf('u1', argon2idWebV1Deriver)
     expect(slice.keyDeriver).to.eq(argon2idWebV1Deriver)
     expect(Wayin.make(TH.vaultSliceOf('u1'), TH.passkeyWayinOf('laptop'), { keyDeriver: argon2idWebV1Deriver }).wayinkind).to.eq('passkey')

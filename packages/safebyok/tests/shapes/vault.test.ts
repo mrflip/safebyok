@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultStampPicked, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -122,12 +122,6 @@ describe("the vault record's shapes", () => {
   it("makes VaultStamp the six fields fixed for the vault's life, never an epoch, as its example shows", () => {
     const stamp = VaultStamp.parse(omit(record, ['gate', 'vault_epoch', 'gate_epoch']))
     expect(Object.keys(stamp)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'])
-  })
-
-  it("makes VaultStampButFormat the stamp but its format, picked from a whole record, as its example shows", () => {
-    expect(VaultStampButFormat.parse(record)).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
-    expect(VaultStampPicked.parse(record)).to.deep.equal({ format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at })
-    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
   })
 
   it("makes VaultTombstone the format, the scope and a vault_epoch of 1 or more, as its example shows", () => {

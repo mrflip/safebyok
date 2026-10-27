@@ -74,7 +74,8 @@ describe("raisedDeviceRecord", () => {
 
 describe("deviceRecordOf", () => {
   it("builds the record from the scope's parsed names alone, frozen: a Vault object passes as its scope, as its example shows", () => {
-    const holder = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', lock: () => undefined }
+    // A Vault object's methods are its prototype's: its own fields are its stamp.
+    const holder = Object.defineProperty({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, 'lock', { value: () => undefined })
     const record = deviceRecordOf(holder, 'device-one', 3)
     expect(record).to.deep.equal(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 }))
     expect(Object.isFrozen(record)).to.be.true

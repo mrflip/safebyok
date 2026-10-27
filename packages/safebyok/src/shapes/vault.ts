@@ -37,7 +37,7 @@ export const PasskeySaltBytes = 32
  * @example VaultRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampPicked, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse } = Validator('bad_record', ({ obj, str, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
+export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse } = Validator('bad_record', ({ obj, str, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
   const PassphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
@@ -101,16 +101,13 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
 
   const VaultSparse = vaultRecordFields.omit({ gate: true })
   const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true })
-  // The stamp picked from whatever carries it, a vault record, a Vault object or its sparse shape: a ctx takes its fields alone.
-  const VaultStampPicked = VaultStamp.strip()
-  const VaultStampButFormat = VaultStamp.omit({ format: true }).strip()
   const VaultTombstone = vaultRecordFields.pick({ applabel: true, user_id: true, vaultlabel: true }).extend({ format: lit(TombstoneFormat), vault_epoch: int.positive() }).strict()
 
   const PassphraseWayinSparse = PassphraseWayinRecord.omit({ key_deriver_label: true, salt_b64: true, vault_key_wayin_wrapped: true })
   const PasskeyWayinSparse = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
   const GateSparse = GateRecord.extend({ passphrase: PassphraseWayinSparse, passkey: PasskeyWayinSparse.nullable() })
 
-  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampPicked, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse }
+  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse }
 })
 
 /** A passphrase wayin as stored: the vaultKey wrapped under the passphraseKey the passphrase and this wayin's passphraseSalt make.
@@ -167,14 +164,6 @@ export type VaultSparse = Z.infer<typeof VaultSparse>
  * @example { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
  */
 export type VaultStamp = Z.infer<typeof VaultStamp>
-
-/** A vault's stamp as what lies in it binds it: every field of its {@link VaultStamp} but the format, so a new vault format leaves each box and lease open.
- * Its `parse` picks those fields from whatever carries them, a vault record or a Vault object, and
- * refuses 'bad_record' for one missing any; `VaultStampPicked` picks the whole stamp alike.
- *
- * @example { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
- */
-export type VaultStampButFormat = Z.infer<typeof VaultStampButFormat>
 
 /** What a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: the vault's `vault_tok`, and whichever of its scope and epochs the thing carries.
  * A Box, a Lease, a Gate, a Proving, a snapshot and a vault record are each one. A field the

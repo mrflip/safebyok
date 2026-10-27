@@ -4,8 +4,9 @@ import * as Zod from 'zod'
 import * as Validators from '../src/validators'
 import * as Primitives from '../src/checks/primitives'
 import { BaseShape, MadeShape, MadeUnderShape, sealBoxlabel } from '../src/box'
-import { CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape } from '../src/lease'
-import { VaultStampButFormat, VaultStampPicked, passphraseCleartext } from '../src/shapes/vault'
+import { CipheredShape, LeaseGrant, VisibleShape } from '../src/lease'
+import { passphraseCleartext } from '../src/shapes/vault'
+import { VaultKin, bankScopeDuck, boxscopeDuck, leaseStampDuck, vaultScopeDuck, vaultStampButFormatDuck, vaultStampDuck } from '../src/shapes/ducks'
 import { whisperBag } from '../src/shapes/box'
 import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
 import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
@@ -19,7 +20,8 @@ import { makeWorld } from './vault/world'
 
 /** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
 const InPackage = {
-  BaseShape, MadeShape, MadeUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, LeaseStampPicked, VisibleShape, VaultStampButFormat, VaultStampPicked, whisperBag,
+  BaseShape, MadeShape, MadeUnderShape, sealBoxlabel, CipheredShape, LeaseGrant, VisibleShape, whisperBag,
+  VaultKin, bankScopeDuck, vaultScopeDuck, boxscopeDuck, vaultStampDuck, vaultStampButFormatDuck, leaseStampDuck,
   passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
   declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultMadeUnderShape,
 }

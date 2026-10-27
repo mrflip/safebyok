@@ -4,7 +4,10 @@ import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
 import { vault_key_lease_wrapped, vault_tok } from './fields'
 
-// == [Lease]: LeaseRecord, LeaseStamp, LeaseSparse
+// == [Lease]: LeaseFormat, LeaseRecord, LeaseStamp, LeaseSparse
+
+/** The `format` a {@link LeaseRecord} carries, in its stamp. */
+export const LeaseFormat = 'safebyok-lease-v1'
 
 /** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
@@ -13,7 +16,7 @@ import { vault_key_lease_wrapped, vault_tok } from './fields'
  */
 export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
   LeaseRecord: obj({
-    format:            lit('safebyok-lease-v1'),
+    format:            lit(LeaseFormat),
     applabel,
     user_id,
     vaultlabel,
