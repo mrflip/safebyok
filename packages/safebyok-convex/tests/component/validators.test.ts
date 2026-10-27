@@ -10,7 +10,7 @@ import type {
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import {
-  VaultRecordExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, Gate, NovelVaultRecord, VaultRecord, VaultScope,
+  VaultRecordExpectation, Ciphered, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, Gate, NovelVaultRecord, VaultRecord, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -83,8 +83,6 @@ const convexShape = (validator: GenericValidator): Shape => {
   }
 }
 
-const listedZod = Records.BoxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true })
-
 // A novel vault's record, as `ensureVault` takes it: the core writes it out as a VaultRecord whose
 // gate is null, and checks its gate_epoch is 0.
 const novelVaultRecordZod = Records.VaultSparse.extend({ gate_epoch: Zod.literal(0), gate: Zod.null() })
@@ -96,7 +94,7 @@ const ShapeCases = [
   [Records.GateRecord,   Gate,       'Gate: the passphrase, and the passkey or null'],
   [novelVaultRecordZod,  NovelVaultRecord, 'NovelVaultRecord: every field, gate_epoch 0 and no gate'],
   [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as an object of any JSON values, both ciphered fields nested'],
-  [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
+  [Records.BoxSparse,    BoxSparse,  'BoxSparse: the record without its ciphered fields, format kept'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod records", () => {
@@ -114,9 +112,9 @@ describe("the Convex validators, field for field with the core's Zod records", (
     // A box's sidecar is an object of any values to Convex, which the core holds to JSON values on every read.
     // Convex holds what storage holds, a record as it goes into the core's check, before its ciphered fields are branded.
     expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Zod.input<typeof Records.BoxRecord>, 'sidecar'>>()
-    // A listing is the stored record less its ciphered fields, so it is the stored record's shape
-    // a listing must meet.
-    expectTypeOf<Omit<Infer<typeof ListedBox>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
+    // A box's sparse shape is the stored record less its ciphered fields, so it is the stored
+    // record's shape a listing must meet.
+    expectTypeOf<Omit<Infer<typeof BoxSparse>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
     expectTypeOf<Infer<typeof VaultRecordExpectation>>().toEqualTypeOf<CoreVaultRecordExpectation>()
     expectTypeOf<Infer<typeof BoxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
     expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()

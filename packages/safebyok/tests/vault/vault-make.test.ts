@@ -672,10 +672,30 @@ describe("the vault's fields, by the Contract", () => {
     expect(Object.isFrozen(vault)).to.be.true
   })
 
+  it("hands out its stamp as a frozen plain copy of its own fields, the same object each time, as the stamp getter's first example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const { vault_tok, registered_at } = vault.stamp
+    expect(vault.stamp).to.deep.equal(TH.shownOf(vault))
+    expect({ vault_tok, registered_at }).to.deep.equal({ vault_tok: vault.vault_tok, registered_at: vault.registered_at })
+    expect(Object.isFrozen(vault.stamp)).to.be.true
+    expect(Object.getPrototypeOf(vault.stamp)).to.eq(Object.prototype)
+    expect(vault.stamp).to.equal(vault.stamp)
+  })
+
+  it("spreads its stamp where a spread of the Vault object would carry the class along, as the stamp getter's second example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const shown = { ...vault.stamp, boxCount: vault.snapshot.boxes.length }
+    expect(shown).to.deep.equal({ ...TH.shownOf(vault), boxCount: 1 })
+    expect(Object.keys(vault.stamp)).to.not.include('stamp')
+  })
+
   it("writes its stamp alone as JSON, as the class's third example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    expect(TH.jsonOf(vault)).to.deep.equal(TH.shownOf(vault))
+    expect(TH.jsonOf(vault)).to.deep.equal(vault.stamp)
     for (const unshown of ['gate', 'snapshot', 'ask_passphrase_at', 'logger']) {
       expect(JSON.stringify(vault)).to.not.include(unshown)
     }

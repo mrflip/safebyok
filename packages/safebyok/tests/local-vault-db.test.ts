@@ -46,7 +46,7 @@ describe("localVaultDB", () => {
     expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
     await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
     expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
-    expect(store.ckeys()).to.have.members(earlier)
+    expect(store.scopepaths()).to.have.members(earlier)
   })
 
   it("reads boxes as written today, with a sidecar and with an empty one, and writes them back the same", async () => {
@@ -137,7 +137,7 @@ describe("localVaultDB", () => {
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.vaultRecordOf('u1')))
     expect(store.read(u1BoxScopepath('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
-    expect(store.ckeys()).to.have.members([u1VaultScopepath, u1BoxScopepath('anthropic')])
+    expect(store.scopepaths()).to.have.members([u1VaultScopepath, u1BoxScopepath('anthropic')])
   })
 
   it("refuses a mangled vault record row as damaged_vault, quoting none of it", async () => {
@@ -215,6 +215,6 @@ describe("localVaultDB, as it is made", () => {
     const vaultDB = localVaultDB({ store: full })
     const refusal = await TH.expectBad(vaultDB.ensureVault(TH.gatelessOf('u1')), 'storage_unavailable')
     expect(refusal.cause).to.eq(quota)
-    expect(store.ckeys()).to.have.lengthOf(0)
+    expect(store.scopepaths()).to.have.lengthOf(0)
   })
 })

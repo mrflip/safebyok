@@ -30,7 +30,7 @@ describe("browserOpts", () => {
     const dbName = TH.freshDbName()
     await TH.expectGood(browserOpts({ dbName }).deviceDB.putLease(await TH.leaseOf('u1')))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal(['lease^acme^u1^main'])
     expect(await TH.expectingGood(browserOpts().deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
   })
 

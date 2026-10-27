@@ -88,8 +88,8 @@ describe("idbVaultDB", () => {
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     expect(await inspectIdbVaultDB({ dbName }).rows()).to.deep.equal([
-      { ckey: 'box^acme^u1^main^anthropic', row: TH.boxOf('anthropic', 'one') },
-      { ckey: 'vault^acme^u1^main',         row: TH.vaultRecordOf('u1') },
+      { scopepath: 'box^acme^u1^main^anthropic', row: TH.boxOf('anthropic', 'one') },
+      { scopepath: 'vault^acme^u1^main',         row: TH.vaultRecordOf('u1') },
     ])
   })
 
@@ -224,7 +224,7 @@ describe("idbVaultDB", () => {
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u1'), TH.thisVault)
     const leftRows = await inspectIdbVaultDB({ dbName }).rows()
-    const left = leftRows.map((row) => [row.ckey, row.row])
+    const left = leftRows.map((row) => [row.scopepath, row.row])
     expect(left).to.deep.equal([[Scopepath.vault(TH.scopeOf('u1')), { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 2 }]])
     await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-reborn' }))
     const rebornRows = await inspectIdbVaultDB({ dbName }).rows()
@@ -340,7 +340,7 @@ describe("idbVaultDB, every verb one transaction", () => {
       wholeShelf.mockRestore()
     }
     const rows = await inspectIdbVaultDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([
       Scopepath.box({ ...lookalike, boxlabel: 'xx' }),
       Scopepath.box({ ...TH.scopeOf('u12'), boxlabel: 'anthropic' }),
       Scopepath.box({ ...TH.scopeOf('u2'), boxlabel: 'anthropic' }),

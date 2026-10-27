@@ -31,7 +31,7 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     gate.release()
     await unlocking
     await TH.expectRefusal(vault.hello(), 'vault_gone')
-    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
+    expect(world.dbStore.scopepaths(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.be.null
   })
 
@@ -264,7 +264,7 @@ describe("a first unlock that loses the race to create the vault", () => {
     const { world, there } = await raceLostToPwOne()
     await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
     expect(TH.stateOf(there.getSnapshot())).to.eq('novel')
-    expect(TH.madeUnderOf(there).gate_epoch).to.eq(0)
+    expect(TH.cheatGetVaultEpoch(there).gate_epoch).to.eq(0)
     expect(boxlabelsOf(there)).to.deep.equal([])
     await there.hello()
     const snapshot = there.getSnapshot()
@@ -334,7 +334,7 @@ const ringingRaceToPwOne = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const here = await world.open({ deviceDB: memoryDeviceDB() })
   const gateElsewhere = async () => {
     await TH.unlock(here, 'pw one')
-    await TH.eventually(() => TH.madeUnderOf(there).gate_epoch === 1)
+    await TH.eventually(() => TH.cheatGetVaultEpoch(there).gate_epoch === 1)
   }
   return { world, there, gateElsewhere }
 }
@@ -343,7 +343,7 @@ const ringingRaceToPwOne = async (overrides?: Partial<TH.BornVaultOpts>) => {
 const expectLostToPwOne = async (world: ReturnType<typeof makeRacingWorld>, there: Vault) => {
   expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
   expect(TH.stateOf(there.getSnapshot())).to.eq('locked')
-  expect(TH.madeUnderOf(there).gate_epoch).to.eq(1)
+  expect(TH.cheatGetVaultEpoch(there).gate_epoch).to.eq(1)
   expect(await world.getLease()).to.be.null
   await TH.unlock(there, 'pw one')
   expect(TH.stateOf(there.snapshot)).to.eq('unlocked')
@@ -391,7 +391,7 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     await unlocking
     expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
     expect(TH.stateOf(there.getSnapshot())).to.eq('locked')
-    expect(TH.madeUnderOf(there).gate_epoch).to.eq(1)
+    expect(TH.cheatGetVaultEpoch(there).gate_epoch).to.eq(1)
   })
 
   it("refuses as gate_made_elsewhere when the other device's gate lands while the first wayins are sealed", async () => {
@@ -420,7 +420,7 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     TH.beforeNextCall(crypto.subtle, 'unwrapKey', async () => {
       await TH.unlock(here, 'pw two')
       await TH.putWayin(here, 'pw two', 'pw three')
-      await TH.eventually(() => TH.madeUnderOf(there).gate_epoch === 2)
+      await TH.eventually(() => TH.cheatGetVaultEpoch(there).gate_epoch === 2)
     })
     await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_moved')
     expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 2 })
@@ -548,10 +548,10 @@ describe("a read that began before this device's own change to the ways in lande
       await listing.reached
     })
     await addLaptopPasskey(vault)
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     listing?.release()
     await reading
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(2)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
     expect(vault.snapshot.gate?.passkey).to.not.be.null
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     await vault.hello({ staleMinutes: 0 })
@@ -789,7 +789,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const next = await TH.bankOf(vaultOne).ensureVault(u1Main)
     expect(next.vault_tok).to.eq(vaultTwo.vault_tok)
     await TH.del(next, 'pw two')
-    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
+    expect(world.dbStore.scopepaths(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
   })
 
   it("del() aims at the vault seen when it was called, not one a change bell brings in while it runs", async () => {
@@ -839,7 +839,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     await TH.del(vaultTwo, 'pw one')
     await TH.expectRefusal(vaultOne.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-stale'), 'vault_gone')
     await TH.expectRefusal(vaultOne.hello({ staleMinutes: 0 }), 'vault_gone')
-    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
+    expect(world.dbStore.scopepaths(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
   })
 
   it("del() of a vault deleted elsewhere, and not remade, reads first and refuses vault_gone, deleting nothing; a hello finds the Vault object gone, and the bank's next life, novel, has nothing to delete", async () => {
@@ -855,7 +855,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const next = await TH.bankOf(vaultOne).ensureVault(u1Main)
     expect(TH.stateOf(next.getSnapshot())).to.eq('novel')
     await TH.expectRefusal(TH.del(next, 'pw'), 'absent_vault')
-    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
+    expect(world.dbStore.scopepaths(), 'the tombstone, and nothing else').to.deep.equal([u1VaultScopepath])
   })
 })
 
@@ -1214,7 +1214,7 @@ describe("the races the contract tests own, of a box write", () => {
     await TH.putWayin(here, 'shared pw', await TH.passkeyOf('laptop'))
     writing.release()
     const box = await putting
-    expect(box.gate_epoch).to.eq(TH.madeUnderOf(here).gate_epoch)
+    expect(box.gate_epoch).to.eq(TH.cheatGetVaultEpoch(here).gate_epoch)
     expect(boxlabelsOf(here)).to.deep.equal(['anthropic'])
     expect(await here.getWhisper('anthropic')).to.eq('sk-ant-fake')
   })

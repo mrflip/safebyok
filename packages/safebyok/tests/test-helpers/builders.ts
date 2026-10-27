@@ -122,11 +122,12 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
   return slice
 }
 
-/** What a thing the Vault object `vault` makes now is made under: the vault record it holds, but its gate, frozen. Read inside the package, as no getter of the Vault object shows its epochs.
+/** The vault record the Vault object `vault` holds, but its gate, frozen: its `vault_epoch` and `gate_epoch` beside its stamp, which is what a thing it makes now is made under. A cheat: no getter of the Vault object shows its epochs, so it reads them inside the package.
  *
- * @example Box.make(vault, record, TH.madeUnderOf(vault))
+ * @example expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)   // a gate set
+ * @example Box.make(vault, record, TH.cheatGetVaultEpoch(vault))
  */
-export const madeUnderOf = (vault: Vault): VaultSparse => vaultSparseOf(vaultRecordHeldBy(vault))
+export const cheatGetVaultEpoch = (vault: Vault): VaultSparse => vaultSparseOf(vaultRecordHeldBy(vault))
 
 /** Where a vault stands, as its snapshot's two fields tell it: `novel` with no gate, `locked` with a gate and no `ask_passphrase_at`, else `unlocked`. For a test that reads all three at once, as no snapshot names them.
  *

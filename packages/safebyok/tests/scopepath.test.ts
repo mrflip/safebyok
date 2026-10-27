@@ -168,7 +168,7 @@ describe("Scopepath.withinVaultScopepathPrefix and withinVaultScopepathPred", ()
     const others = [Scopepath.vault(u1), Scopepath.lease(u1), Scopepath.box({ ...TH.scopeOf('u2'), boxlabel: 'anthropic' }), Scopepath.box({ ...TH.scopeOf('u12'), boxlabel: 'anthropic' }), Scopepath.box({ ...TH.scopeOf('u1', 'main2'), boxlabel: 'anthropic' }), '["box","acme","u1","main","legacy"]']
     const boxes = [Scopepath.box({ ...u1, boxlabel: 'anthropic' }), Scopepath.box({ ...u1, boxlabel: 'openai' })]
     for (const scopepath of [...others, ...boxes]) { store.write(scopepath, '{}') }
-    expect(store.ckeys().filter(Scopepath.withinVaultScopepathPred(u1))).to.have.members(boxes)
+    expect(store.scopepaths().filter(Scopepath.withinVaultScopepathPred(u1))).to.have.members(boxes)
   })
 
   it("pass a row under the vault's prefix that no box is filed under, which isBox rejects: a test of the prefix alone", () => {

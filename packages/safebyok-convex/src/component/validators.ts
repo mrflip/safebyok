@@ -114,18 +114,18 @@ export const BoxRecord = v.object({
   written_at:             v.number(),
 })
 
-/** A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. */
-export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
+/** A box's sparse shape, as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. The core's `BoxSparse`. */
+export const BoxSparse = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
 
 /** A vault as one query or mutation reads it: its vault record, as `vault`, and every box without its two ciphered fields, in boxlabel order.
  * The client splits the boxes into the sound and the damaged, with `splitStoredBoxes`: the
  * component holds no judgment of a box's damage, which is safebyok's.
  *
- * @example { vault: vaultRecord, boxes: [listedBox] }
+ * @example { vault: vaultRecord, boxes: [boxSparse] }
  */
 export const VaultAnswer = v.object({
   vault: VaultRecord,
-  boxes: v.array(ListedBox),
+  boxes: v.array(BoxSparse),
 })
 
 /** What an update of the vault record was proven against: it lands only while the standing vault record has this `vault_tok` and `gate_epoch`.

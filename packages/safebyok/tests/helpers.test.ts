@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adorn, decorate } from '../src/adorn'
+import { adorn, decorate, nextMicrotask } from '../src/helpers'
 
 type Handle = { label: string, vault?: { vault_tok: string } }
 
@@ -73,5 +73,22 @@ describe("decorate", () => {
     const handle: Handle = { label: 'anthropic' }
     decorate(handle, {})
     expect(Object.getOwnPropertyNames(handle)).to.deep.equal(['label'])
+  })
+})
+
+describe("nextMicrotask", () => {
+  it("resolves once every microtask queued before it has run, as its example shows", async () => {
+    const heard: string[] = []
+    queueMicrotask(() => { heard.push('queued before') })
+    await nextMicrotask()
+    heard.push('after')
+    expect(heard).to.deep.equal(['queued before', 'after'])
+  })
+
+  it("resolves before a task queued ahead of it runs", async () => {
+    const heard: string[] = []
+    setTimeout(() => { heard.push('task') }, 0)
+    await nextMicrotask()
+    expect(heard).to.deep.equal([])
   })
 })

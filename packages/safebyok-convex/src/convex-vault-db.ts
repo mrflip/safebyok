@@ -4,7 +4,7 @@ import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
-import type { GetBoxAnswer, ListedBox, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
+import type { BoxSparse, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -185,8 +185,8 @@ const ConvexDocumentBytes = 1_048_576
 /** Convex's most for one function to read, in bytes: 16 MiB. */
 const ConvexTransactionReadBytes = 16_777_216
 
-/** Listed boxes as `splitStoredBoxes` takes them: each under its own boxlabel field, which is the column it is stored under. */
-const storedBoxesOf = (rows: readonly Infer<typeof ListedBox>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
+/** Sparse boxes as `splitStoredBoxes` takes them: each under its own boxlabel field, which is the column it is stored under. */
+const storedBoxesOf = (rows: readonly Infer<typeof BoxSparse>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
 
 /** What a write answered in a shape this client does not know says: whose version to fix. */
 const OutOfDateMessage = "The vault's Convex functions answered a write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."

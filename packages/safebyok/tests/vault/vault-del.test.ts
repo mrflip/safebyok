@@ -96,7 +96,7 @@ describe("delBox and del()", () => {
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_gone')
     const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(TH.stateOf(reborn.getSnapshot())).to.eq('novel')
-    expect(TH.madeUnderOf(reborn).gate_epoch).to.eq(0)
+    expect(TH.cheatGetVaultEpoch(reborn).gate_epoch).to.eq(0)
     expect(reborn.getSnapshot().boxes).to.have.lengthOf(0)
   })
 

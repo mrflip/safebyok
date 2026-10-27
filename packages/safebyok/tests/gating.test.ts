@@ -113,12 +113,12 @@ describe("a gating, kind by kind", () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
-    const before = TH.madeUnderOf(vault).gate_epoch
+    const before = TH.cheatGetVaultEpoch(vault).gate_epoch
     const putting = vault.tryPutWayin('passphrase')
     const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
     await TH.expectGood(gating.attempt('pw', 'pw two'))
     expect(await TH.expectGood(putting)).to.eq(vault)
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(before + 1)
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
     await vault.lock()
     const unlocking = vault.tryEnsureUnlocked()
@@ -410,7 +410,7 @@ describe("a lock or a decline landing during an attempt", () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
-    const before = TH.madeUnderOf(vault).gate_epoch
+    const before = TH.cheatGetVaultEpoch(vault).gate_epoch
     const putting = vault.tryPutWayin('passphrase')
     const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
     const writing = TH.holdNextAnswer(world.vaultDB, 'putVaultRecord')
@@ -420,7 +420,7 @@ describe("a lock or a decline landing during an attempt", () => {
     await TH.expectBad(putting, 'vault_locked')
     writing.release()
     await TH.expectBad(attempting, 'gating_landed')
-    expect(TH.madeUnderOf(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(before + 1)
     expect(storedVaultRecordOf(world)).to.include({ gate_epoch: before + 1 })
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null

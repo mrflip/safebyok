@@ -3,12 +3,12 @@ import { ChangeBell } from 'safebyok/idb'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
 
-/** One stored row, as {@link inspectIdbVaultDB} reports it: its ckey and its record, raw. */
-export type IdbRow = { ckey: string, row: unknown }
+/** One stored row, as {@link inspectIdbVaultDB} reports it: its scopepath and its record, raw. */
+export type IdbRow = { scopepath: string, row: unknown }
 
 /** A window onto the vault shelf, from {@link inspectIdbVaultDB}. */
 export type IdbVaultInspector = {
-  /** Every row on the shelf, of every vault and user in this database, sorted by ckey. */
+  /** Every row on the shelf, of every vault and user in this database, sorted by scopepath. */
   rows(): Promise<IdbRow[]>
   /** Calls `listener` after any write to the shelf, this tab or another; returns the unsubscribe. */
   subscribe(listener: () => void): () => void
@@ -32,12 +32,12 @@ export const inspectIdbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultInspector => {
   const dbName = parseDbName(opts, 'inspectIdbVaultDB')
   return {
     rows: async () => {
-      // Both reads in one transaction, so a ckey and its row are the same moment's.
-      const [ckeys, stored] = await shelfOf(dbName)('readonly', (store) => Promise.all([settle<IDBValidKey[]>(store.getAllKeys()), settle<unknown[]>(store.getAll())]))
-      return ckeys
-        .map((ckey, idx): IdbRow => ({ ckey: ckey as string, row: stored[idx] }))
-        .filter((row) => typeof row.ckey === 'string')
-        .toSorted((one, two) => one.ckey.localeCompare(two.ckey))
+      // Both reads in one transaction, so a scopepath and its row are the same moment's.
+      const [scopepaths, stored] = await shelfOf(dbName)('readonly', (store) => Promise.all([settle<IDBValidKey[]>(store.getAllKeys()), settle<unknown[]>(store.getAll())]))
+      return scopepaths
+        .map((scopepath, idx): IdbRow => ({ scopepath: scopepath as string, row: stored[idx] }))
+        .filter((row) => typeof row.scopepath === 'string')
+        .toSorted((one, two) => one.scopepath.localeCompare(two.scopepath))
     },
     subscribe: (listener) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }

@@ -242,7 +242,7 @@ describe("idbDeviceDB", () => {
       vi.restoreAllMocks()
     }
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("sweeps them at an erase too, keeping every lease it filed", async () => {
@@ -254,7 +254,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.delLease(TH.scopeOf('u3'))
     expect(await deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("discards a device's lease from before the rename, filed under unlock^, keeping its device record: the user proves once more", async () => {
@@ -266,7 +266,7 @@ describe("idbDeviceDB", () => {
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
     expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['device^acme^u1^main'])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal(['device^acme^u1^main'])
     expect(await deviceDB.getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal(TH.deviceRecordOf('u1'))
   })
 
@@ -278,7 +278,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
   })
 
   it("sweeps a lease or device record filed under a name no scope check passes, which no read would ever reach", async () => {
@@ -291,7 +291,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.putLease(await TH.leaseOf('u2'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.lease(TH.scopeOf('u2'))])
   })
 
   it("sweeps a device mark an earlier version filed under mark^ at the first read, keeping the device record", async () => {
@@ -302,7 +302,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
   })
 
   it("reads a device record that does not pass its check as none, and drops it", async () => {
@@ -377,7 +377,7 @@ describe("inspectIdbDeviceDB", () => {
 
     await deviceDB.putLease(await TH.leaseOf('u1'))
     const rows = await inspector.rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
+    expect(rows.map((row) => row.scopepath)).to.deep.equal(['lease^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.be.greaterThan(0) })
 
     await inspector.wipe()

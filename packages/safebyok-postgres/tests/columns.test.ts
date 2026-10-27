@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
 import * as Columns from '../src/columns'
-import { VaultRowColumns, ListedBoxColumns, BoxColumns, rowOfVaultRecord, vaultRecordOfRow } from '../src/columns'
+import { VaultRowColumns, BoxSparseColumns, BoxColumns, rowOfVaultRecord, vaultRecordOfRow } from '../src/columns'
 import type { Column } from '../src/columns'
 
 const Pair: Column[] = [['vault_tok', 'text'], ['registered_at', 'bigint']]
@@ -91,9 +91,9 @@ describe("Columns.recordOf", () => {
   })
 })
 
-describe("ListedBoxColumns", () => {
+describe("BoxSparseColumns", () => {
   it("is every box column but the two ciphered ones", () => {
-    expect(ListedBoxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'registered_at', 'written_at'])
+    expect(BoxSparseColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'registered_at', 'written_at'])
   })
 })
 
