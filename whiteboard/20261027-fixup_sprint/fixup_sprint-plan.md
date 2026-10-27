@@ -5,7 +5,12 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** planned. Threads 1 and 3 starting.
+* **Status:** threads 1 and 3 building, from `origin/main` (`802c91f9`).
+* **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
+  `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
+  `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
+  body `86fa9d65-1e5f`) and Resolved (`630d659a-da81`, body `a5b56f19-aedb`). The State enum is
+  `f86ea45e-9957`.
 
 The Coach's request, verbatim:
 
