@@ -174,7 +174,7 @@ describe("hello", () => {
     it(`reads afresh once a write is refused as '${kind}': ${blurb}`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
-      vi.spyOn(world.vaultDB, 'putBox').mockResolvedValueOnce(bad(new VaultError(kind, 'Storage cannot be trusted as it stands.')))
+      vi.spyOn(world.vaultDB, 'putBox').mockResolvedValueOnce(bad(new VaultError(kind, 'Storage cannot be trusted as it is now.')))
       await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake'), kind)
       const reads = vi.spyOn(world.vaultDB, 'getVault')
       await vault.hello()
@@ -852,7 +852,7 @@ describe("vault.hello, by the Contract", () => {
     expect(vault.snapshot.trouble).to.eq(refusal)
   })
 
-  it("refuses damaged_vault, a vault record that fails its checks, told to onBadNews and returned, the vault standing as its last read left it (Contract: vault.hello, Refuses)", async () => {
+  it("refuses damaged_vault, a vault record that fails its checks, told to onBadNews and returned, the vault record in hand as its last read left it (Contract: vault.hello, Refuses)", async () => {
     const { told, onBadNews } = newsKeeper()
     const { vault } = await bornThenDamaged({ onBadNews })
     const err = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault')
@@ -1073,7 +1073,7 @@ const holdLeaseAfterWrite = (world: ReturnType<typeof makeWorld>) => {
   return gate
 }
 
-/** Have `vault`, unlocked, ask again for its passphrase `pw` though its lease stands: `tryEnsureUnlocked()` with a `renewMinutes` one minute short of the whole lease, so a lease more than a minute old ends within it. */
+/** Have `vault`, unlocked, ask again for its passphrase `pw` though its lease is in force: `tryEnsureUnlocked()` with a `renewMinutes` one minute short of the whole lease, so a lease more than a minute old ends within it. */
 const tryRenewing = (vault: Vault) => {
   TH.answering(vault, async (gating) => { if (gating.gatingkind === 'unlock_vault') { await gating.attemptPassphrase('pw') } })
   return vault.tryEnsureUnlocked({ renewMinutes: (SevenDaysMillis / MinuteMillis) - 1 })
@@ -1114,8 +1114,8 @@ describe("a lease read a key change overtakes", () => {
     leaseRead.release()
     await hello
     expect(vault.snapshot.ask_passphrase_at).to.eq(fresher).and.to.not.eq(older)
-    const standing = await world.getLease()
-    expect(standing?.ask_passphrase_at).to.eq(fresher)
+    const stored = await world.getLease()
+    expect(stored?.ask_passphrase_at).to.eq(fresher)
   })
 
   it("keeps a fresher unlock's lease when a hello reads the run-out one while the fresh one is written", async () => {
@@ -1137,8 +1137,8 @@ describe("a lease read a key change overtakes", () => {
     leaseWritten.release()
     await unlocking
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
-    const standing = await world.getLease()
-    expect(standing?.ask_passphrase_at).to.eq(vault.snapshot.ask_passphrase_at).and.to.eq(world.clock.now() + SevenDaysMillis)
+    const stored = await world.getLease()
+    expect(stored?.ask_passphrase_at).to.eq(vault.snapshot.ask_passphrase_at).and.to.eq(world.clock.now() + SevenDaysMillis)
   })
 })
 
@@ -1156,7 +1156,7 @@ const expectOutdatedLeaseRefused = async (world: ReturnType<typeof makeWorld>, v
 }
 
 /**
- * A world whose `u1` vault stands, made with `pw`; a Vault object born on it locked; this device's
+ * A world whose `u1` vault is stored, made with `pw`; a Vault object born on it locked; this device's
  * lease, granted since by another tab that has been let go; and `other`, a second device unlocked
  * over an adapter of its own, so that holding this device's reads holds none of its. The Vault
  * object's `ensureUnlocked()` is held as its gating's pantry consult, the take-up, reads that lease,
@@ -1208,7 +1208,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await expectOutdatedLeaseRefused(world, vault)
   })
 
-  it("leaves a later change elsewhere standing over this device's own change to the ways in, read as it notes its own", async () => {
+  it("keeps a later change elsewhere over this device's own change to the ways in, read as it notes its own", async () => {
     const world = makeWorld()
     // A device that hears no change bells: its reads are the test's to make.
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
@@ -1227,7 +1227,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
-  it("leaves a change elsewhere standing over the gate this device just set, read as it notes its own", async () => {
+  it("keeps a change elsewhere over the gate this device just set, read as it notes its own", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     const other = await world.open({ deviceDB: memoryDeviceDB() })

@@ -86,7 +86,7 @@ let recordOf: (lease: Lease) => LeaseRecord
  * and the vault drops it as `lock()` does, erasing it from the device store: a hello does not
  * mend it, and a new unlock does.
  *
- * Anyone who can use this browser profile while a lease stands can open the vault: `leaseHours`
+ * Anyone who can use this browser profile while a lease is in force can open the vault: `leaseHours`
  * is that tradeoff, and `lock()` erases the lease at once.
  *
  * @example
@@ -265,7 +265,7 @@ export class Lease implements LeaseSparse {
     }
   }
 
-  /** Drop this lease, damaged, as `lock()` drops it, when it is the one its vault holds, and say so as 'damaged_lease': a newer lease, granted meanwhile, stands. */
+  /** Drop this lease, damaged, as `lock()` drops it, when it is the one its vault holds, and say so as 'damaged_lease': a newer lease, granted meanwhile, is kept. */
   #dropDamaged(): VaultError {
     if (heldLeaseOf(this.#vault) === this) { void this.#vault.tryLock() }
     return damagedLease()
@@ -284,7 +284,7 @@ export class Lease implements LeaseSparse {
  */
 export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
 
-/** A lease record for the vault `standing` is, under a new non-extractable leaseKey, around `vaultKey`, which a proof just opened against `standing`, the vault record whose stamp its wrap binds and whose `gate_epoch` it is granted under.
+/** A lease record for the vault of `held`, the vault record in hand, under a new non-extractable leaseKey, around `vaultKey`, which a proof just opened against `held`: the record whose stamp its wrap binds and whose `gate_epoch` it is granted under.
  * It ends `grant.leaseMillis` (the vault's lease length) after `grant.now`, never past
  * {@link FarFuture}, which is how `leaseHours: Infinity` reads. It writes nothing: the vault puts
  * the record in the device store, and makes its Lease from what was stored. `vaultKey` must be
@@ -293,18 +293,18 @@ export const leaseRecordOf = (lease: Lease): LeaseRecord => recordOf(lease)
  *
  * @example const record = await sealLeaseRecord(vaultRecord, vaultKey, { leaseMillis, now })   // record.ask_passphrase_at: leaseMillis from now
  */
-export const sealLeaseRecord = async (standing: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey, grant: { leaseMillis: number, now: number }): Promise<LeaseRecord> => {
+export const sealLeaseRecord = async (held: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey, grant: { leaseMillis: number, now: number }): Promise<LeaseRecord> => {
   const granted = LeaseGrant.parse({
-    applabel:          standing.applabel,
-    user_id:           standing.user_id,
-    vaultlabel:        standing.vaultlabel,
-    vault_tok:         standing.vault_tok,
-    gate_epoch:        standing.gate_epoch,
+    applabel:          held.applabel,
+    user_id:           held.user_id,
+    vaultlabel:        held.vaultlabel,
+    vault_tok:         held.vault_tok,
+    gate_epoch:        held.gate_epoch,
     ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture),
   })
   const stamp = { format: LeaseFormat, ...granted } as const
   const leaseKey = await makeLeaseKey()
-  const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(standing, stamp))
+  const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(held, stamp))
   return { ...stamp, lease_key: leaseKey, vault_key_lease_wrapped: vault_key_lease_wrapped.parse(wrapped) }
 }
 
@@ -349,4 +349,4 @@ const checkSealProps = (props: unknown): { whisper: Uint8Array } => {
 const damagedLease = () => new VaultError('damaged_lease', "This device's lease would not open: it may have been damaged where it is kept. It was erased, and the vault is locked: unlock it again to carry on. Reading the vault again does not mend it; a new unlock does.")
 
 /** The refusal of a box that will not open under the vaultKey, naming nothing of it. */
-const damagedBox = () => new VaultError('damaged_box', "That box would not open under this vault's key, so it is damaged: altered in storage, moved there from somewhere else, or sealed by a vault deleted and made anew on another device since this one read it. It was left as it is. Read the vault again, with hello({ staleMinutes: 0 }), to see what stands: a vault made anew elsewhere locks this device, to be unlocked afresh. If the box still will not open, remove it, or store its whisper again over it.")
+const damagedBox = () => new VaultError('damaged_box', "That box would not open under this vault's key, so it is damaged: altered in storage, moved there from somewhere else, or sealed by a vault deleted and made anew on another device since this one read it. It was left as it is. Read the vault again, with hello({ staleMinutes: 0 }), to see what is stored: a vault made anew elsewhere locks this device, to be unlocked afresh. If the box still will not open, remove it, or store its whisper again over it.")

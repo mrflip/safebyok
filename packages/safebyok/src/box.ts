@@ -190,7 +190,7 @@ export class Box implements Boxscope, BoxSparse {
   readonly written_at:             number
 
   private constructor(vault: ConsistencyWith<VaultStamp>, madeUnder: MadeUnder, record: BoxRecord, baseRevisionTok: string | null) {
-    // The record is the check's own copy, which nothing else holds: frozen where it stands.
+    // The record is the check's own copy, which nothing else holds: frozen in place.
     this.#record          = deepFreeze(record)
     this.#vault           = vault
     this.#baseRevisionTok = baseRevisionTok
@@ -216,7 +216,7 @@ export class Box implements Boxscope, BoxSparse {
     return this.#record
   }
 
-  /** The revision this box was sealed over, which its write expects to stand: the box read or listed before it, or null for a new box. Null for a box read or stored. */
+  /** The revision this box was sealed over, which its write expects still stored: the box read or listed before it, or null for a new box. Null for a box read or stored. */
   get baseRevisionTok(): string | null {
     return this.#baseRevisionTok
   }
@@ -316,7 +316,7 @@ export class Box implements Boxscope, BoxSparse {
       if (lease === null) { throw lockedError() }
       const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
       const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
-      // What the decipher brought, a refusal included, is used only while the box still stands as it was made.
+      // What the decipher brought, a refusal included, is used only while the vault in hand is still the one the box was made under.
       try {
         // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
         this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
@@ -342,7 +342,7 @@ export class Box implements Boxscope, BoxSparse {
 // == [Listing]: boxSparseOf
 
 /** `record` as a listing shows a sound box, frozen through: every field but its two ciphered ones, which it may hold or not.
- * Its sidecar is the record's own, frozen where it stands, never parsed again.
+ * Its sidecar is the record's own, frozen in place, never parsed again.
  *
  * @example vault.getSnapshot().boxes[0].sidecar.note = 'changed'   // throws in strict code; the vault's own copy is untouched either way
  */

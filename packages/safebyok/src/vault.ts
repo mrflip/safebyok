@@ -115,8 +115,8 @@ export type VaultSnapshot = Readonly<{
    */
   ask_passphrase_at: number | null
   /** How far to trust what the vault shows: see {@link VaultFreshness}.
-   * The vault keeps working whatever it says: every write still lands only where storage stands as
-   * this device last read it. It is reckoned when the snapshot is replaced, so `aged` shows at the
+   * The vault keeps working whatever it says: every write still lands only where storage still holds what
+   * this device last read. It is reckoned when the snapshot is replaced, so `aged` shows at the
    * next change, or the next `hello()`.
    */
   freshness:         VaultFreshness
@@ -175,10 +175,10 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * `bank.clearCachedVault`, which erases the record, and asks the bank for the vault again.
  *
  * Storage alone settles a race, and the vault argues with none. A write storage refuses as stale
- * is refused as it came: the vault reads nothing after it, and `hello()` shows what stands. Every
+ * is refused as it came: the vault reads nothing after it, and `hello()` shows what is stored. Every
  * thing a Vault object hands out was made under the vault as it stood then (its scope, `vault_tok`
- * and epochs), and each call demands, at each of its steps, that the vault still stands as the
- * thing it holds was made under: a call that finds
+ * and epochs), and each call demands, at each of its steps, that the vault record in hand is
+ * still the one the thing it holds was made under: a call that finds
  * the vault deleted, made anew, its ways in changed, or locked meanwhile refuses 'vault_gone',
  * 'vault_remade', 'gate_moved' or 'vault_locked' (see {@link Vault.demandConsistentWith}). A box
  * that will not open under the lease in hand is 'damaged_box' at once, with no read of storage
@@ -268,12 +268,12 @@ export class Vault implements VaultStamp {
    * A hello takes no lease up: the vault's birth took up this device's, and another tab's unlock
    * shows here at the next {@link Vault.ensureUnlocked}. It drops the lease in hand, erasing nothing,
    * once this device's store no longer holds it (another tab locked), or holds one under other ways
-   * in, or the vault's ways in changed; another tab's unlock or renewal leaves it standing until it
+   * in, or the vault's ways in changed; another tab's unlock or renewal leaves it in force until it
    * ends. A read served before a write of this device's own, and answered after it, is ignored:
    * nothing is taken from it, and nothing refused. It raises this device's record of the vault to
    * what it read.
    *
-   * A refused hello applies no partial read: the vault stands as its last read left it. A stored
+   * A refused hello applies no partial read: the vault in hand stays as its last read left it. A stored
    * vault record it cannot use refuses with 'damaged_vault' (`delDamagedVault` clears it), 'newer_format'
    * or 'vault_behind'. Finding the vault deleted, it refuses 'vault_gone'; deleted and made anew,
    * 'vault_remade': either way this Vault object is gone for good, and the bank hands out the next.
@@ -289,12 +289,12 @@ export class Vault implements VaultStamp {
   /** Read storage and settle the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.hello}. */
   async tryHello(given?: { staleMinutes?: number | undefined }): Promise<Outcome<Vault>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       const helloOpts = checkHelloOpts(given)
       const staleMillis = helloOpts?.staleMinutes === undefined ? this.#staleMillis : parseStaleMinutes(helloOpts.staleMinutes, 'hello')
       await this.#helloWithin(staleMillis)
       // The bank may have let the vault go while storage was read.
-      this.#checkStanding()
+      this.#demandNotGone()
       return good(this)
     } catch (err) { return this.#badOutcome(err) }
   }
@@ -311,24 +311,24 @@ export class Vault implements VaultStamp {
   /** Read storage now, as an {@link Outcome}: the non-throwing form of {@link Vault.refresh}. */
   async tryRefresh(): Promise<Outcome<Vault>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       await this.#helloWithin(0)
       // The bank may have let the vault go while storage was read.
-      this.#checkStanding()
+      this.#demandNotGone()
       return good(this)
     } catch (err) { return this.#badOutcome(err) }
   }
 
   /** Have the vault unlocked, asking the user through `requestCleartext` only when it must, resolving the vault.
    * Every call that needs a whisper goes through it; call it yourself to unlock ahead of time, on a
-   * button. Once it resolves, the vault is unlocked under a lease that stands. It awaits a hello
+   * button. Once it resolves, the vault is unlocked under a lease in force. It awaits a hello
    * first. Unlocked, under a lease of the ways in the vault holds that does not end within
    * `opts.renewMinutes` (0 when left out), it resolves at once, with no prompt and no write.
    * Otherwise it raises a gating, `unlock_vault` (`initialize_gate` while the vault is `novel`), or
-   * joins the one standing when that one unlocks (`unlock_vault`, `initialize_gate`), hearing what
+   * joins the pending one when that one unlocks (`unlock_vault`, `initialize_gate`), hearing what
    * it settles with: one dialog answers every call waiting on it. A gating of another kind -- a
    * change to the ways in, a deletion -- it waits out, whatever that settles with, and asks again;
-   * so does a joined gating's success that leaves no lease standing past this call's
+   * so does a joined gating's success that leaves no lease in force past this call's
    * `renewMinutes`. The call raises at most one gating of its own. A gating it raises first
    * consults this device's store, and takes up a lease another tab granted when it fits -- of the
    * ways in held, ending past `renewMinutes` from now, and no later than `leaseHours` from now --
@@ -337,7 +337,7 @@ export class Vault implements VaultStamp {
    *
    * A `renewMinutes` as long as the lease or longer refuses 'bad_option': every call would prompt.
    * Refuses 'vault_locked' when the user declines, when there is no `requestCleartext`, when a
-   * `lock()` lands while the gating stands, or when the lease is gone by the time it settles;
+   * `lock()` lands while the gating is pending, or when the lease is gone by the time it settles;
    * 'vault_gone' when the vault is deleted meanwhile, or the bank lets it go ('vault_remade' for
    * one made anew); and with what the gating's attempt refused, when it settled the gating. A first
    * passphrase set when this device's store would not keep the unlock refuses as the store did,
@@ -353,7 +353,7 @@ export class Vault implements VaultStamp {
   /** Have the vault unlocked, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureUnlocked}. */
   async tryEnsureUnlocked(given?: { renewMinutes?: number | undefined }): Promise<Outcome<Vault>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       const unlockOpts = checkEnsureUnlockedOpts(given)
       const renewMillis = parseRenewMinutes(unlockOpts?.renewMinutes)
       if (renewMillis > 0 && renewMillis >= this.#leaseMillis) { throw renewPastLease() }
@@ -366,7 +366,7 @@ export class Vault implements VaultStamp {
 
   // == [Vault: demand]: demandConsistentWith, consistentWith
 
-  /** Refuse unless `thing` is consistent with the vault as it stands now: what each call asks before and after each wait.
+  /** Refuse unless `thing` is consistent with the vault record in hand now: what each call asks before and after each wait.
    * `thing` is something the vault handed out (a box, a lease, a listing's entry), its snapshot, or
    * a {@link VaultSparse}: anything carrying the `vault_tok` it was made under ({@link VaultMadeUnder}).
    * Each of the scope, `vault_tok` and epochs it carries is compared with the vault record in hand,
@@ -388,7 +388,7 @@ export class Vault implements VaultStamp {
     this.#demand(checkedMadeUnder(thing), { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
 
-  /** True while `thing` is consistent with the vault as it stands now: the question {@link Vault.demandConsistentWith} refuses on, asked without refusing.
+  /** True while `thing` is consistent with the vault record in hand now: the question {@link Vault.demandConsistentWith} refuses on, asked without refusing.
    * It compares as the demand does, and with `opts.leaseBound` asks also for a lease in hand that
    * has not ended. It changes nothing, not even an ended lease, and logs nothing. A thing missing
    * its `vault_tok`, or an option it does not take, throws 'bad_option', as misuse.
@@ -405,7 +405,7 @@ export class Vault implements VaultStamp {
 
   /** Forget the unlock, in memory and on this device: the vault is `locked` at once, storage reachable or not.
    * All a caller can see happens before it returns, synchronously: the lease is dropped and its
-   * expiry disarmed; a gating standing ends, every call waiting on it refusing 'vault_locked' and
+   * expiry disarmed; a pending gating ends, every call waiting on it refusing 'vault_locked' and
    * its `lockLanded` settling; and the snapshot reads `locked`. What it returns is this
    * device's lease being erased, with {@link DeviceDB.delLease}. It awaits no hello.
    *
@@ -435,7 +435,7 @@ export class Vault implements VaultStamp {
   /** Forget the unlock, as an {@link Outcome}: the non-throwing form of {@link Vault.lock}. */
   async tryLock(): Promise<Outcome<void>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       valOf(await this.#lockNow())
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
@@ -487,13 +487,13 @@ export class Vault implements VaultStamp {
    * call costs the same however many there are. The gating's attempt writes with
    * `VaultDB.putVaultRecord`.
    *
-   * A gating of the same kind standing is joined; one of another kind is waited out first. Once it
+   * A pending gating of the same kind is joined; one of another kind is waited out first. Once it
    * resolves, the change is in storage. The gate epoch moves, so every other device locks, and asks
    * again at its next look. This device is left unlocked, its lease starting again from now.
    *
    * Refuses 'bad_option' for a slotlabel other than `'passphrase'` or `'passkey'`; 'absent_vault'
    * for `'passkey'` on a vault with no passphrase yet; 'vault_locked'
-   * when the user declines or a `lock()` lands while the gating stands; and with what the gating's
+   * when the user declines or a `lock()` lands while the gating is pending; and with what the gating's
    * attempt refused when it settled it: 'stale_write' or 'gate_moved' when the vault changed
    * first, here or elsewhere. A wrong or weak passphrase, the same one again, or a way in stored
    * damaged ('damaged_wayin'), the dialog meets in place.
@@ -510,7 +510,7 @@ export class Vault implements VaultStamp {
   /** Put a way into the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.putWayin}. */
   async tryPutWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       checkSlotlabel(slotlabel, 'putWayin')
       await this.#helloWithin(this.#staleMillis)
       const kindNow = (): GatingKind => {
@@ -540,13 +540,13 @@ export class Vault implements VaultStamp {
   /** Take away a way in, as an {@link Outcome}: the non-throwing form of {@link Vault.delWayin}. */
   async tryDelWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       checkSlotlabel(slotlabel, 'delWayin')
       if (slotlabel === 'passphrase') {
         throw new VaultError('passphrase_required', "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed.")
       }
       await this.#helloWithin(this.#staleMillis)
-      this.#checkStanding()
+      this.#demandNotGone()
       const kindNow = (): GatingKind => {
         if (! isGated(this.#vaultRecord) || this.#vaultRecord.gate.passkey === null) {
           throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
@@ -570,7 +570,7 @@ export class Vault implements VaultStamp {
    * Given both the sidecar and the whisper, it reads nothing: it writes over the revision the
    * snapshot lists under the boxlabel, keeping its `registered_at`, or as a new box when none is
    * listed. Leave either out to keep the box's own: it reads the box first, opens it (so what it
-   * keeps is proven unaltered), and writes over the revision it read. With none standing, a sidecar
+   * keeps is proven unaltered), and writes over the revision it read. With no box stored, a sidecar
    * left out is `{}`, and a whisper left out refuses 'no_whisper': at once, asking nobody, for a
    * box a locked vault's listing does not show.
    *
@@ -583,8 +583,8 @@ export class Vault implements VaultStamp {
    *
    * Refuses 'stale_write' when another call, here or on another device, wrote, created or deleted
    * this box since the revision it was sealed from: nothing was written, and the refusal's
-   * `meta.box_stored` is what stands. A whole store over a listing a moment stale refuses so too: a
-   * hello shows what stands, or leave out the sidecar to read the box first. A vault deleted or made
+   * `meta.box_stored` is the box stored now. A whole store over a listing a moment stale refuses so too: a
+   * hello shows what is stored, or leave out the sidecar to read the box first. A vault deleted or made
    * anew elsewhere refuses 'stale_write' too, writing nothing. A lock landing while the call waits
    * on a gating, reads and opens the box (`VaultDB.getBox`, `box.extractWhisper()`), or seals it
    * (`Box.seal`) refuses 'vault_locked', writing nothing. Once `VaultDB.putBox` is
@@ -614,7 +614,7 @@ export class Vault implements VaultStamp {
   /** Seal and store the box `props.boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.putBox}. */
   async tryPutBox(props: PutBoxProps, whisper?: Whisper): Promise<Outcome<Box>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       const { boxlabel, sidecar } = putBoxPropsOf(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
@@ -636,7 +636,7 @@ export class Vault implements VaultStamp {
    *
    * Refuses 'damaged_box' when its record fails its checks. It does not open the whisper, so a
    * whisper that will not open shows only at `extractWhisper()` or `getWhisper()`. A vault deleted
-   * or made anew elsewhere refuses 'vault_gone', reading no box of the vault that stands now, and
+   * or made anew elsewhere refuses 'vault_gone', reading no box of the vault stored now, and
    * this Vault object is gone with it: ask the bank for the vault again (`bank.ensureVault`).
    * Deleted or made anew while storage is read, it refuses
    * 'vault_gone' or 'vault_remade', as when the bank lets the vault go; a lock landing then refuses
@@ -686,7 +686,7 @@ export class Vault implements VaultStamp {
     return await callback(whisper)
   }
 
-  /** Remove the box `boxlabel`, whatever revision of it stands, resolving what was removed: a damaged one too, as deleting is its remedy.
+  /** Remove the box `boxlabel`, whatever revision of it is stored, resolving what was removed: a damaged one too, as deleting is its remedy.
    * Once it resolves, storage holds no box under `boxlabel`. It asks for a proof, and refuses
    * 'absent_box' at once for a box the snapshot does not list, or 'bad_scope', as {@link Vault.getBox}
    * does; 'absent_box' too when another device or tab deleted it first. Writes with
@@ -694,7 +694,7 @@ export class Vault implements VaultStamp {
    *
    * The delete lands only in the vault this device last read. If that vault was deleted, or made
    * anew, elsewhere, nothing is removed, and the call refuses 'stale_write': `hello()` to see what
-   * stands. Within that vault the delete wins: a revision another device or tab wrote meanwhile
+   * is stored. Within that vault the delete wins: a revision another device or tab wrote meanwhile
    * is deleted all the same, its `outcome` 'deleted_other', and the logger warns. Deleted is gone: a
    * later `putBox()` from a device that never saw the delete is refused as stale. A lock landing
    * while the call waits on a gating refuses 'vault_locked', removing nothing. Once `VaultDB.delBox`
@@ -708,12 +708,12 @@ export class Vault implements VaultStamp {
   /** Remove the box `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.delBox}. */
   async tryDelBox(boxlabel: string): Promise<Outcome<DeletedBox>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       const label = this.#checkedBoxlabel(boxlabel)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
       if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { throw absentBox() }
       this.#demandLease('delBox')
-      // Lands only in the vault this device holds a lease for, whatever revision of the box stands:
+      // Lands only in the vault this device holds a lease for, whatever revision of the box is stored:
       // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
       // lets storage say whether it removed that one or another.
       const expected = { vault_tok: this.vault_tok, revision_tok: this.#listedRevisionOf(label) }
@@ -747,8 +747,8 @@ export class Vault implements VaultStamp {
    * out a new one, `novel`, when asked for the vault again. A device store that cannot erase the
    * lease is only logged: the vault is deleted all the same.
    *
-   * A gating of another kind standing is waited out first. Refuses 'vault_locked' when the user
-   * declines or a `lock()` lands while the gating stands, unless the attempt has sent its write: a
+   * A pending gating of another kind is waited out first. Refuses 'vault_locked' when the user
+   * declines or a `lock()` lands while the gating is pending, unless the attempt has sent its write: a
    * deletion that lands then resolves, as storage decides. Refuses with what the attempt refused
    * when it settled it: 'stale_write' when the vault changed in storage first, or as
    * {@link Vault.demandConsistentWith} finds it moved on. It awaits a hello first: a vault still
@@ -761,10 +761,10 @@ export class Vault implements VaultStamp {
   /** Delete the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.del}. */
   async tryDel(): Promise<Outcome<void>> {
     try {
-      this.#checkStanding()
+      this.#demandNotGone()
       // Judged on a picture within staleMinutes, as putWayin's and delWayin's are: a stale novel one may be gated by now.
       await this.#helloWithin(this.#staleMillis)
-      this.#checkStanding()
+      this.#demandNotGone()
       this.#gatedRecord()
       await this.#gatingFor(() => 'del_vault', 'del')
       return good(undefined)
@@ -774,7 +774,7 @@ export class Vault implements VaultStamp {
   /** The bank lets this Vault object go: it is gone, every call refusing 'vault_gone', as `bank.closeVault` says. Not a lock: nothing stored is erased, and the lease stays for the next Vault object. */
   [letGo](): void { this.#letGo(null) }
 
-  /** What every call on this Vault object refuses with once it is gone, or null while it stands: the bank's look at a Vault object whose read found the vault deleted or made anew before its birth settled. */
+  /** What every call on this Vault object refuses with once it is gone, or null while it is not: the bank's look at a Vault object whose read found the vault deleted or made anew before its birth settled. */
   get [goneBy](): VaultError | null { return this.#goneBy?.() ?? null }
   // --
 
@@ -910,22 +910,22 @@ export class Vault implements VaultStamp {
   // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
   // and the vault record they are bound to, never change under it.
   readonly #modelled = new WeakMap<GateRecord, HeldWayins>()
-  #wayinsOf(standing: GatedVaultRecord): HeldWayins {
-    const { gate } = standing
+  #wayinsOf(held: GatedVaultRecord): HeldWayins {
+    const { gate } = held
     const known = this.#modelled.get(gate)
     if (known !== undefined) { return known }
     const kit = { keyDeriver: this.#keyDeriver }
     const wayins = Object.freeze({
-      passphrase: Wayin.make(standing, gate.passphrase, kit),
-      passkey:    gate.passkey === null ? null : Wayin.make(standing, gate.passkey, kit),
+      passphrase: Wayin.make(held, gate.passphrase, kit),
+      passkey:    gate.passkey === null ? null : Wayin.make(held, gate.passkey, kit),
     })
     this.#modelled.set(gate, wayins)
     return wayins
   }
-  /** The ways in of `standing`, the passphrase's first, as a list: none for a novel vault's record. */
-  #wayinListOf(standing: VaultRecord | null): readonly (PassphraseWayin | PasskeyWayin)[] {
-    if (standing === null || ! isGated(standing)) { return [] }
-    const { passphrase, passkey } = this.#wayinsOf(standing)
+  /** The ways in of `held`, the passphrase's first, as a list: none for a novel vault's record. */
+  #wayinListOf(held: VaultRecord | null): readonly (PassphraseWayin | PasskeyWayin)[] {
+    if (held === null || ! isGated(held)) { return [] }
+    const { passphrase, passkey } = this.#wayinsOf(held)
     return passkey === null ? [passphrase] : [passphrase, passkey]
   }
   // Whether the last read of storage failed, as the snapshot's freshness says; and whether the
@@ -1048,7 +1048,7 @@ export class Vault implements VaultStamp {
    * It is dropped too when this device's store holds no lease (a lock in another tab), or one under
    * another gate, unless the read began before the lease in hand was taken: a read older than the
    * lease, which changes nothing. A lease another tab's unlock or renewal wrote under the same gate
-   * leaves it standing. None is taken up here. Bad news is told once the snapshot shows it.
+   * leaves it in force. None is taken up here. Bad news is told once the snapshot shows it.
    */
   #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
@@ -1059,13 +1059,13 @@ export class Vault implements VaultStamp {
     this.#damagedBoxes = Object.freeze([...listing.damagedBoxes])
     this.#readRefused = false
     this.#readAt = found.readAt
-    // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
+    // A read with no damaged box or way in clears the trouble: nothing amiss remains. The listing is
     // published before its news is told, so a handler reading the vault sees what it lists.
     const damagedWayins = this.#wayinListOf(fresh).filter((wayin) => wayin.isDamaged())
     if (this.#damagedBoxes.length === 0 && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
-    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! standsBeside(found.leaseKept, held)
+    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! leavesInForce(found.leaseKept, held)
     if (outdated || revoked) { this.#dropLease() }
     this.#replaceSnapshot()
     this.#tellListingNews(shown)
@@ -1101,10 +1101,10 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Demand]: checkStanding, demand, demandAfterWait, inconsistencyWith, provingInconsistency, leaseRefusal, demandLease, gatedRecord
+  // == [Demand]: demandNotGone, demand, demandAfterWait, inconsistencyWith, provingInconsistency, leaseRefusal, demandLease, gatedRecord
 
   /** Refuse once this Vault object is gone, 'vault_remade' for a vault made anew and 'vault_gone' otherwise: what every call asks first, and again after a wait it has no thing in hand for. */
-  #checkStanding() {
+  #demandNotGone() {
     if (this.#goneBy !== null) { throw this.#goneBy() }
   }
 
@@ -1150,7 +1150,7 @@ export class Vault implements VaultStamp {
 
   /** Why `proving` is not consistent with the gate in hand: its header is in no wayin of the gate, which moved since it was sealed (`moved`, 'gate_moved' or 'gate_made_elsewhere'), or its gating landed ('gating_landed').
    * A fresh header is in no gate until the one carrying it is stored: until then the gate it was
-   * sealed under must stand.
+   * sealed under must still be the gate in hand.
    */
   #provingInconsistency(proving: Proving, moved: () => VaultError): VaultError | null {
     const held = this.#vaultRecord
@@ -1166,7 +1166,7 @@ export class Vault implements VaultStamp {
     return lockedError()
   }
 
-  /** The lease in hand, for `call` about to use it: demanded to stand, consistent with the picture, and not ended, or 'vault_locked'. */
+  /** The lease in hand, for `call` about to use it: demanded consistent with the picture, and not ended, or 'vault_locked'. */
   #demandLease(call: VaultCall): Lease {
     const lease = this.#lease
     if (lease === null) { throw lockedError() }
@@ -1185,14 +1185,14 @@ export class Vault implements VaultStamp {
 
   // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
 
-  // The gating standing now, if any: one per vault, and every call that needs the user waits on it
+  // The pending gating, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
   #gating: RaisedGating | null = null
   // What a gating reaches of this Vault object, which no getter shows: see GatingTools.
   readonly #gatingTools: GatingTools
 
-  /** Have the vault unlocked: at once while a lease of the ways in held stands past `renewMillis` from now, else once the gating standing or raised now settles.
-   * See {@link Vault.ensureUnlocked}. An unlocking gating standing (`unlock_vault`,
+  /** Have the vault unlocked: at once while a lease of the ways in held is in force past `renewMillis` from now, else once the pending gating, or one raised now, settles.
+   * See {@link Vault.ensureUnlocked}. A pending unlocking gating (`unlock_vault`,
    * `initialize_gate`) is joined: its refusal is this call's, as one dialog answers every call
    * waiting on it, and its success is checked again, since it may have taken up a lease ending
    * within this call's `renewMillis`. Any other kind is waited out, whatever it settles with, and
@@ -1206,23 +1206,23 @@ export class Vault implements VaultStamp {
   async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
     await this.#helloWithin(this.#staleMillis)
     // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
-    this.#checkStanding()
+    this.#demandNotGone()
     for (;;) {
       if (this.#leaseLastsPast(renewMillis)) { return true }
       // The threshold is the truth: a lease past its deadline goes now, should its timer run late.
       if (this.#lease !== null && this.#leaseInForce() === null) { this.#dropLease() }
-      const standing = this.#gating
-      if (standing !== null && ! UnlockingKinds.has(standing.gatingkind)) {
-        await standing.settled
-        this.#checkStanding()
+      const pending = this.#gating
+      if (pending !== null && ! UnlockingKinds.has(pending.gatingkind)) {
+        await pending.settled
+        this.#demandNotGone()
         continue
       }
       if (shouldAsk?.() === false) { return false }
-      const settled = await (standing ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
+      const settled = await (pending ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
-      this.#checkStanding()
+      this.#demandNotGone()
       valOf(settled)
-      if (standing === null) { return true }
+      if (pending === null) { return true }
     }
   }
 
@@ -1233,27 +1233,27 @@ export class Vault implements VaultStamp {
     return fitsLease(this.#vaultRecord, held) && ! held.endsBy(this.#clockNow() + renewMillis)
   }
 
-  /** Join the gating standing when it is of the kind `kindNow` names, else wait it out and raise one of that kind, for `call`; resolve once it settled with success.
+  /** Join the pending gating when it is of the kind `kindNow` names, else wait it out and raise one of that kind, for `call`; resolve once it settled with success.
    * `kindNow` judges the picture in hand each time round, and may refuse.
    */
   async #gatingFor(kindNow: () => GatingKind, call: GatingCall): Promise<void> {
     for (;;) {
-      this.#checkStanding()
+      this.#demandNotGone()
       const gatingkind = kindNow()
-      const standing = this.#gating
-      if (standing !== null && standing.gatingkind !== gatingkind) {
-        await standing.settled
+      const pending = this.#gating
+      if (pending !== null && pending.gatingkind !== gatingkind) {
+        await pending.settled
         continue
       }
-      const settled = await (standing ?? this.#raiseGating(gatingkind, call, null)).settled
+      const settled = await (pending ?? this.#raiseGating(gatingkind, call, null)).settled
       // A deletion that settled leaves the Vault object gone, by design; any other waiter hears a let-go as gone.
-      if (call !== 'del' || ! settled.ok) { this.#checkStanding() }
+      if (call !== 'del' || ! settled.ok) { this.#demandNotGone() }
       valOf(settled)
       return
     }
   }
 
-  /** Raise a gating of `gatingkind` for `call`, standing until it settles: with `renewMillis`, it consults this device's store first. */
+  /** Raise a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it consults this device's store first. */
   #raiseGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
     const raised: RaisedGating = RaisedGating.raise(gatingkind, call, this, this.#gatingTools, () => {
       if (this.#gating === raised) { this.#gating = null }
@@ -1263,26 +1263,26 @@ export class Vault implements VaultStamp {
     return raised
   }
 
-  /** A `lock()` has landed, or the vault went gone: the gating standing, if any, refuses its waiters, 'vault_locked' or `told`, and settles `lockLanded`.
-   * It stops standing as it settles. A deletion whose write is sent stands until its chain settles
+  /** A `lock()` has landed, or the vault went gone: the pending gating, if any, refuses its waiters, 'vault_locked' or `told`, and settles `lockLanded`.
+   * It is no longer pending once it settles. A deletion whose write is sent stays pending until its chain settles
    * it, so no call raises a gating over a vault being deleted.
    */
   #landGating(told?: VaultError) {
     this.#gating?.landLock(told)
   }
 
-  /** An attempt's first step: storage read now through the refresh join, the Vault object demanded to stand and `gating` not to have landed, resolving the vault record in hand. */
+  /** An attempt's first step: storage read now through the refresh join, the Vault object demanded not gone and `gating` not to have landed, resolving the vault record in hand. */
   async #freshen(gating: RaisedGating): Promise<VaultRecord> {
-    this.#checkStanding()
+    this.#demandNotGone()
     await this.#helloWithin(0)
-    this.#checkStanding()
+    this.#demandNotGone()
     if (gating.landed) { throw gatingLandedError() }
     return this.#vaultRecord
   }
 
   /** Delete the vault `proving` proved, within its gating's hold, with `VaultDB.delVault` expecting the `vault_tok` and `gate_epoch` in hand, resolving the tombstone's `vault_epoch`.
-   * It demands on the proving before the write. A deletion storage refused is told as the vault now
-   * stands; one that landed is this vault's, by its expectation, whatever a read has made of it
+   * It demands on the proving before the write. A deletion storage refused is told as the vault is now
+   * stored; one that landed is this vault's, by its expectation, whatever a read has made of it
    * meanwhile.
    */
   async #delVault(proving: PassphraseProving): Promise<number> {
@@ -1315,13 +1315,13 @@ export class Vault implements VaultStamp {
    * It demands on the gate before and after the write. The picture takes what was stored, unless
    * a read has already taken a later copy, and the device record is raised to its `vault_epoch`.
    * A first gate losing to another device's refuses 'gate_made_elsewhere', and the next hello reads
-   * the gate that stands; any other stale write refuses 'stale_write', naming nothing stored.
+   * the gate stored; any other stale write refuses 'stale_write', naming nothing stored.
    */
   async #putGate(gate: Gate, call: GatingCall): Promise<Gate> {
     const firstGate = gate.base_epoch === 0
     this.#demand(gate, { call, firstGate })
     const held = this.#vaultRecord
-    // `vault_epoch` is the one the store will set, the standing one plus one; the store ignores what it is handed.
+    // `vault_epoch` is the one the store will set, the one in hand plus one; the store ignores what it is handed.
     const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
     const written = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }))
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
@@ -1337,11 +1337,11 @@ export class Vault implements VaultStamp {
     return stored
   }
 
-  /** What a refused write of `gate` refuses with, as storage's refusal `err` shows what stands.
-   * Another `vault_tok` standing, or none, is the vault made anew or deleted elsewhere: the Vault
+  /** What a refused write of `gate` refuses with, as storage's refusal `err` shows what is stored.
+   * Another `vault_tok` stored, or none, is the vault made anew or deleted elsewhere: the Vault
    * object goes for good, as a refresh finding it so does ('vault_remade', 'vault_gone'). A first
-   * gate losing to another device's is 'gate_made_elsewhere', and the next hello reads the gate that
-   * stands. Any other stale write is 'stale_write', naming nothing stored. A refusal naming no
+   * gate losing to another device's is 'gate_made_elsewhere', and the next hello reads the gate
+   * stored. Any other stale write is 'stale_write', naming nothing stored. A refusal naming no
    * stored vault record passes as it came.
    */
   #gateWriteRefusal(gate: Gate, err: VaultError): VaultError {
@@ -1353,7 +1353,7 @@ export class Vault implements VaultStamp {
       return told
     }
     if (gate.base_epoch === 0 && isGated(winner)) {
-      // The gate that stands is another device's: the next hello reads it, whatever staleMinutes says.
+      // The gate stored is another device's: the next hello reads it, whatever staleMinutes says.
       this.#readAt = FarPast
       return gateMadeElsewhereError()
     }
@@ -1381,7 +1381,7 @@ export class Vault implements VaultStamp {
 
   // == [Locking and expiry]: lockNow, heedRefusal, letGo, dropLease, armExpiry, disarmExpiry
 
-  /** Lock, all a caller can see at once and in this order: the lease and its expiry dropped, the gating standing landed on, the snapshot replaced; then the erase, whose promise it returns.
+  /** Lock, all a caller can see at once and in this order: the lease and its expiry dropped, the pending gating landed on, the snapshot replaced; then the erase, whose promise it returns.
    * Every lock goes through here. Nothing is awaited before the erase is issued, so the device
    * store applies it after any lease write already issued: a grant under way when it lands is
    * erased behind it, and holds nothing, its gating landed. A pantry consult under way takes
@@ -1407,7 +1407,7 @@ export class Vault implements VaultStamp {
       ? 'Storage handed back an older copy of the vault than this device has seen'
       : 'Storage no longer serves the user this vault was opened for -- signed out, or another user signed in --'
     const wasUnlocked = this.#lease !== null
-    // A lock: the gating standing lands, its waiters hearing the refusal itself, so a pantry
+    // A lock: the pending gating lands, its waiters hearing the refusal itself, so a pantry
     // consult under way takes nothing up.
     this.#landGating(refusal)
     this.#dropLease()
@@ -1482,7 +1482,7 @@ export class Vault implements VaultStamp {
    */
   async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
     const kept = await this.#deviceDB.getLease(this.#scope)
-    this.#checkStanding()
+    this.#demandNotGone()
     if (gating.landed) { return false }
     const record = valOf(kept)
     if (record === null) { return false }
@@ -1602,7 +1602,7 @@ export class Vault implements VaultStamp {
 
   /** The box under `boxlabel`, once the vault is unlocked for it; null when there is none, or when a locked vault's listing shows none, asking nobody. */
   async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<Box | null> {
-    this.#checkStanding()
+    this.#demandNotGone()
     const label = this.#checkedBoxlabel(boxlabel)
     // Checked before the user is asked for anything: a box the listing does not show is none.
     if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { return null }
@@ -1610,7 +1610,7 @@ export class Vault implements VaultStamp {
     return await this.#readBox(label, call)
   }
 
-  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the vault demanded after `getBox`, then the lease.
+  /** The box under `boxlabel` as storage holds it in this vault, or null when none is stored; the vault demanded after `getBox`, then the lease.
    * A box another device wrote is what storage holds, not drift. The demand on what the read was
    * made under cannot see a lock, which moves no `vault_tok`, so the lease is demanded again before
    * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
@@ -1636,7 +1636,7 @@ export class Vault implements VaultStamp {
    */
   #boxReadRefusal(err: VaultError): VaultError {
     if (! isVaultError(err, 'vault_mismatch')) { return err }
-    const gone = new VaultError('vault_gone', 'The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what stands now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what stands.', { cause: err })
+    const gone = new VaultError('vault_gone', 'The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored.', { cause: err })
     this.#letGo(gone)
     return gone
   }
@@ -1672,7 +1672,7 @@ export class Vault implements VaultStamp {
     return this.#updateBoxListingOf(valOf(written))
   }
 
-  /** What a whole `putBox()` seals over, reading nothing: the listing's entry for `boxlabel`, its revision and `registered_at` adopted as they stand, or none for a box it does not show, which is a new box.
+  /** What a whole `putBox()` seals over, reading nothing: the listing's entry for `boxlabel`, its revision and `registered_at` adopted as listed, or none for a box it does not show, which is a new box.
    * A box listed damaged gives its revision alone; one naming none refuses 'damaged_box'.
    */
   #listedBase(boxlabel: string): BoxBase | null {
@@ -1689,7 +1689,7 @@ export class Vault implements VaultStamp {
   /** What a `putBox()` leaving out the sidecar or the whisper seals: the box read from storage, opened, its sidecar and whisper kept where not given, and its revision the base.
    * Opening it proves what is kept unaltered. A box that will not read or open is written over as
    * new, keeping nothing, when the whisper is given, and refuses 'damaged_box' when it is not; none
-   * standing refuses 'no_whisper' when the whisper is not given.
+   * stored refuses 'no_whisper' when the whisper is not given.
    */
   async #storedBase(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
     const read = await outcomeOf(() => this.#readBox(boxlabel, 'putBox'))
@@ -1713,7 +1713,7 @@ export class Vault implements VaultStamp {
     return { base: stored, sidecar: givenSidecar ?? stored.sidecar, whisper: givenWhisper ?? opened.val }
   }
 
-  /** What a store seals over a box storage refused as damaged: the revision the listing names, or none for a box it does not show yet, which storage refuses while one stands; 'damaged_box' for one listed with none.
+  /** What a store seals over a box storage refused as damaged: the revision the listing names, or none for a box it does not show yet, which storage refuses while one is stored; 'damaged_box' for one listed with none.
    * It is `#listedBase`'s revision alone: a box that will not read vouches for none of its fields.
    * The next hello lists it, with its revision for the next store.
    */
@@ -1722,8 +1722,8 @@ export class Vault implements VaultStamp {
     return listed === null ? null : { revision_tok: listed.revision_tok }
   }
 
-  /** Write `box` over `expected`, as `putBox()` does, resolving the record as stored: one write, which storage refuses unless the revision `expected` names still stands.
-   * A stale refusal comes as storage gave it, the box that stands as its `meta.box_stored`.
+  /** Write `box` over `expected`, as `putBox()` does, resolving the record as stored: one write, which storage refuses unless the revision `expected` names is still stored.
+   * A stale refusal comes as storage gave it, the box stored as its `meta.box_stored`.
    * Storage's 'invalid_box' becomes 'bad_record', as this vault sealed the box, and its
    * 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
    */
@@ -1735,7 +1735,7 @@ export class Vault implements VaultStamp {
         throw new VaultError('bad_record', 'Storage refused the box this vault sealed as one this package would not build, so nothing was written. This is a bug: report it, with this error.', { cause: err })
       }
       if (isVaultError(err, 'vault_mismatch')) {
-        throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what stands now.', { cause: err })
+        throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: err })
       }
       throw err
     }
@@ -1765,7 +1765,7 @@ export class Vault implements VaultStamp {
 
   // Watch the backend so boxes written elsewhere (another tab, the inspector's reset button) show
   // up without a manual refresh, through the refresh, joining one under way. A failure here has
-  // nobody to throw to, so it leaves the snapshot standing and tells any bad news it met. It
+  // nobody to throw to, so it leaves the snapshot as it was and tells any bad news it met. It
   // leaves the snapshot's freshness `refused`, and warns once for a failing streak; the next read
   // that succeeds says so once. A read that finds the vault gone has made the Vault object gone,
   // and told the bank.
@@ -1877,9 +1877,9 @@ const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is dam
 
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again.')
 
-const goneError = () => new VaultError('vault_gone', 'This Vault object is gone -- the vault was deleted, here or on another device, or the app let this Vault object go -- so nothing more was read or written. Ask the bank for the vault again (bank.ensureVault) to see what stands now.')
+const goneError = () => new VaultError('vault_gone', 'This Vault object is gone -- the vault was deleted, here or on another device, or the app let this Vault object go -- so nothing more was read or written. Ask the bank for the vault again (bank.ensureVault) to see what is stored now.')
 
-const remadeError = () => new VaultError('vault_remade', 'The vault this call was working on was deleted and made anew on another device, so nothing more was read or written: what the call held belongs to the vault that was deleted. Ask the bank for the vault again (bank.ensureVault), and unlock the one that stands now.')
+const remadeError = () => new VaultError('vault_remade', 'The vault this call was working on was deleted and made anew on another device, so nothing more was read or written: what the call held belongs to the vault that was deleted. Ask the bank for the vault again (bank.ensureVault), and unlock the one stored now.')
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage.")
 
@@ -1889,7 +1889,7 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // --
 
-// == [Vocabulary]: BirthRead, frozenVaultRecord, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
+// == [Vocabulary]: BirthRead, frozenVaultRecord, isOlderPicture, fitsLease, leavesInForce, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
 /** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. */
 type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>
@@ -1929,15 +1929,15 @@ const keptIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => 
   shown !== undefined && stableJsonify(shown) === stableJsonify(next) ? shown : next
 )
 
-/** True when `lease` was granted under the vault and ways in `standing` holds. */
-const fitsLease = (standing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, lease: Lease): boolean => lease.vault_tok === standing.vault_tok && lease.gate_epoch === standing.gate_epoch
+/** True when `lease` was granted under the vault and ways in `vaultRecord` holds. */
+const fitsLease = (vaultRecord: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, lease: Lease): boolean => lease.vault_tok === vaultRecord.vault_tok && lease.gate_epoch === vaultRecord.gate_epoch
 
-/** True when `kept`, what this device's store held as its lease when a read looked, leaves `held`, the lease in hand, standing: a lease of the same vault and ways in.
+/** True when `kept`, what this device's store held as its lease when a read looked, leaves `held`, the lease in hand, in force: a lease of the same vault and ways in.
  * Its deadline is not compared: another tab's unlock or renewal writes a lease ending later, and
  * this tab keeps its own until it ends. None (a lock in another tab), or one under another gate,
  * does not.
  */
-const standsBeside = (kept: unknown, held: Lease): boolean => {
+const leavesInForce = (kept: unknown, held: Lease): boolean => {
   if (typeof kept !== 'object' || kept === null) { return false }
   const record: Partial<Record<keyof LeaseSparse, unknown>> = kept
   return record.vault_tok === held.vault_tok && record.gate_epoch === held.gate_epoch
@@ -1947,7 +1947,7 @@ const standsBeside = (kept: unknown, held: Lease): boolean => {
 type VaultCall = 'birth' | 'hello' | 'refresh' | 'del' | 'untrustedStorage' | 'ensureUnlocked' | 'demandConsistentWith'
   | 'putWayin' | 'delWayin' | 'putBox' | 'delBox' | 'getBox' | 'getWhisper'
 
-/** The refusals that say storage cannot be trusted as it stands: 'identity_revoked' and 'vault_behind', which lock the vault, and 'newer_format'.
+/** The refusals that say what storage now holds cannot be trusted: 'identity_revoked' and 'vault_behind', which lock the vault, and 'newer_format'.
  * Each asks something of the caller that a stale write does not: the user to sign in again,
  * storage to be looked at, or the app to be updated. Each has the next hello read afresh.
  */
@@ -1969,7 +1969,7 @@ const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.o
 const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done.")
 
 /** What `demandConsistentWith()`'s options may hold: `leaseBound`, a boolean, and nothing else. */
-const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand.")
+const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force.")
 
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
 export const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
@@ -2021,10 +2021,10 @@ const checkSlotlabel = (given: unknown, call: 'putWayin' | 'delWayin'): void => 
 const passkeyBeforePassphrase = () => new VaultError('absent_vault', "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey.")
 
 // The refusal never quotes the boxlabel: a label may still be a key pasted by mistake.
-const absentBox = () => new VaultError('absent_box', 'No box stands under that boxlabel in this vault: its snapshot lists the ones it holds.')
+const absentBox = () => new VaultError('absent_box', 'No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds.')
 
 /** The refusal of a `putBox()` that left out the whisper, to keep the one stored, where none is stored. */
-const noWhisper = () => new VaultError('no_whisper', 'No box stands under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store.')
+const noWhisper = () => new VaultError('no_whisper', 'No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store.')
 
 // --
 

@@ -84,7 +84,7 @@ export type MakeDevices<DeviceT, DeviceOptsT = void> = (turnstile: Turnstile) =>
 export type Race<DeviceT> = {
   /** Fresh devices over one fresh, empty backend: see {@link MakeDevices}. */
   makeDevices: MakeDevices<DeviceT>
-  /** What stands before the race, made through the first device. */
+  /** What is stored before the race, made through the first device. */
   setup?: ((first: DeviceT) => Promise<unknown>) | undefined
   /** Each device's move, a device to each: the first move on the first device, and so on. Two or more. */
   moves: readonly ((device: DeviceT) => Promise<unknown>)[]
@@ -106,7 +106,7 @@ export type Race<DeviceT> = {
  * reaches, and at every round trip through the turnstile; they cannot split a round trip itself,
  * which is the backend's to make atomic.
  *
- * @param race - The devices, what stands before, each device's move, and the verdict.
+ * @param race - The devices, what is stored before, each device's move, and the verdict.
  * @returns The title of each schedule run, in order; it rejects, naming the schedule, on the
  *   first verdict that fails, device that waits too long, or move that does not finish.
  *

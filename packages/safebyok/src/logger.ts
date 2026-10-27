@@ -96,7 +96,7 @@ const GuardedConsole = guarded(consoleLogger)
 /** Where the default logger says things now: the console, or what the host last handed setDefaultLogger. */
 const defaults: { target: VaultLogger } = { target: GuardedConsole }
 
-/** A logger that hands each call on to `defaults.target` as it stands when called; kept as guarded, its target being so. */
+/** A logger that hands each call on to `defaults.target` as it is when called; kept as guarded, its target being so. */
 const forwarding = (): VaultLogger => {
   const forwarder: VaultLogger = {
     log:   (message, story, err) => { defaults.target.log(message, story, err) },

@@ -55,7 +55,7 @@ export type MakeBankOpts = {
   /** How many minutes `hello()` trusts the vault's last read of storage, when its own call does not say. Default: {@link StaleMinutes}, 5.
    * A hello within that many minutes settles the picture it has without reading. Zero or more,
    * fractions too (0.5 is thirty seconds). `0` has every hello read; `Infinity` has a hello read
-   * only when no read has succeeded yet, or what it read may no longer stand.
+   * only when no read has succeeded yet, or what it read may no longer be what is stored.
    */
   staleMinutes?: number | undefined
   /** Told each piece of bad news the vault learns, once, before the call that learned it settles; it changes nothing that call gets.
@@ -105,7 +105,7 @@ export type MakeBankOpts = {
   logger?: VaultLogger | null | undefined
   /** The check every new passphrase must pass, as a {@link StrengthChecker}: in the `initialize_gate` gating that sets the first, and in each `change_passphrase`.
    * It runs before any key derivation, handed the passphrase and the vault's scope; never on a
-   * passphrase that unlocks a vault that stands. A passphrase it finds weak refuses 'weak_passphrase', its
+   * passphrase that unlocks a vault. A passphrase it finds weak refuses 'weak_passphrase', its
    * reason the message. Left out, every new passphrase refuses so, the message saying a checker
    * must be chosen (CUSTOMIZATION.md). In a browser, `browserOpts()` supplies
    * `zxcvbnStrengthChecker`.

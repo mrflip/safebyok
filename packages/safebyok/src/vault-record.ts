@@ -209,7 +209,7 @@ export type GateSparse = Z.infer<typeof GateSparse>
  */
 export const isGated = <RecordT extends Pick<VaultRecord, 'gate'>>(record: RecordT): record is RecordT & { gate: GateRecord } => record.gate !== null
 
-/** `record` without its gate, frozen: its {@link VaultSparse}, every other field as it stands.
+/** `record` without its gate, frozen: its {@link VaultSparse}, every other field as it is.
  *
  * @example vaultSparseOf(record).gate_epoch === record.gate_epoch   // true, and no gate to read
  */

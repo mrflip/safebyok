@@ -110,7 +110,7 @@ export type Lifecycled<OT, LifecycleT extends string = 'starting' | 'ready'> = O
  */
 export type Refused<OT> = OT & { readonly lifecycle: 'refused', readonly err: VaultError }
 
-/** `OT`, and the vault's `demandConsistentWith`: what a collaborator of a Vault object takes, to demand at each of its junctions that the vault still stands where it did.
+/** `OT`, and the vault's `demandConsistentWith`: what a collaborator of a Vault object takes, to demand at each of its junctions that it is still consistent with the vault record in hand.
  *
  * @example const make = (vault: ConsistencyWith<VaultScope>) => { vault.demandConsistentWith(thing) }
  */

@@ -708,7 +708,7 @@ describe("an unlock this device cannot keep a lease for", () => {
   ]
 
   for (const [refusalkind, trouble] of UnkeptFirstUnlocks) {
-    it(`sets the first passphrase though the device store refuses the lease: the first gate stands, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
+    it(`sets the first passphrase though the device store refuses the lease: the first gate is stored, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
       const world = makeWorld()
       const vault = await world.open()
       TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble())
@@ -869,7 +869,7 @@ const unlockAsked = async (dialog: ReturnType<typeof TH.heldDialog>) => TH.asKin
 /** A strength checker that finds `pw` weak, and every other passphrase strong. */
 const pwIsWeak: StrengthChecker = (passphrase) => (passphrase === 'pw' ? { strong: false, reason: 'Found in a breach: pick another.' } : { strong: true })
 
-/** A world whose `u1` vault stands, made with `pw`, with a Vault object on it born locked under `overrides`. */
+/** A world whose `u1` vault is stored, made with `pw`, with a Vault object on it born locked under `overrides`. */
 const lockedVaultWith = async (overrides: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const maker = await world.openUnlocked('pw')
@@ -919,7 +919,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(vault.snapshot.gate?.passphrase).to.not.be.null
   })
 
-  it("raises unlock_vault on a vault that stands, with no lease on this device (Contract: ensureUnlocked, Does 3)", async () => {
+  it("raises unlock_vault on a stored vault, with no lease on this device (Contract: ensureUnlocked, Does 3)", async () => {
     const requestCleartext = typingPw()
     const { vault } = await lockedVaultWith({ requestCleartext })
     await vault.ensureUnlocked()
@@ -945,7 +945,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(twilight?.ask_passphrase_at).to.be.below(world.clock.now() + HourMillis)
   })
 
-  it("raises one gating at a time: a second caller that finds one standing waits on it (Contract: ensureUnlocked, Does 3.1, and Guarantees)", async () => {
+  it("raises one gating at a time: a second caller that finds one pending waits on it (Contract: ensureUnlocked, Does 3.1, and Guarantees)", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const first = vault.ensureUnlocked()
@@ -978,7 +978,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
-  it("hands requestCleartext a gating: the standing vault, its gatingkind, its attempts, decline and lockLanded (Contract: ensureUnlocked, Does 3.3)", async () => {
+  it("hands requestCleartext a gating: the vault it gates, its gatingkind, its attempts, decline and lockLanded (Contract: ensureUnlocked, Does 3.3)", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
@@ -1025,7 +1025,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
-  it("refuses vault_locked when the user declines a gating raised as the lease nears its end, and does not lock: the lease in hand stands, its deadline unmoved (Contract: ensureUnlocked, Does 3.6)", async () => {
+  it("refuses vault_locked when the user declines a gating raised as the lease nears its end, and does not lock: the lease in hand stays in force, its deadline unmoved (Contract: ensureUnlocked, Does 3.6)", async () => {
     const world = makeWorld()
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext, leaseHours: 1 })
@@ -1045,13 +1045,13 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     [async (vault: Vault) => { await vault.lock() }, 'a lock()', 'vault_locked'],
     [async (vault: Vault, world: ReturnType<typeof makeWorld>) => { await deleteElsewhere(world); await vault.tryRefresh() }, 'a deletion on another device', 'vault_gone'],
   ] as const) {
-    it(`refuses every waiter ${refusalkind} at once and settles lockLanded when ${blurb} lands while the gating stands (Contract: ensureUnlocked, Does 3.7)`, async () => {
+    it(`refuses every waiter ${refusalkind} at once and settles lockLanded when ${blurb} lands while the gating is pending (Contract: ensureUnlocked, Does 3.7)`, async () => {
       const dialog = TH.heldDialog()
       const { world, vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
       const first = vault.tryEnsureUnlocked()
       const gating = await unlockAsked(dialog)
       const second = vault.tryGetWhisper('anthropic')
-      // Let the second caller reach the gating standing, and wait on it.
+      // Let the second caller reach the pending gating, and wait on it.
       await TH.wakeupAtNextTick()
       let landed = false
       void gating.lockLanded.then(() => { landed = true })
@@ -1141,7 +1141,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(heldLeaseOf(vault)).to.be.null
   })
 
-  it("stays locked, with no lease, when the user declines during an attempt and the app then locks: the decline stands the attempt down (Contract: Gating, attempt refuses: gating_landed)", async () => {
+  it("stays locked, with no lease, when the user declines during an attempt and the app then locks: the decline ends the attempt (Contract: Gating, attempt refuses: gating_landed)", async () => {
     const dialog = TH.heldDialog()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1295,13 +1295,13 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(await vault.ensureUnlocked()).to.eq(vault)
   })
 
-  it("refuses every waiter vault_gone at once and settles lockLanded when the bank lets the vault go while the gating stands (Contract: ensureUnlocked, Does 3.7)", async () => {
+  it("refuses every waiter vault_gone at once and settles lockLanded when the bank lets the vault go while the gating is pending (Contract: ensureUnlocked, Does 3.7)", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const first = vault.tryEnsureUnlocked()
     const gating = await unlockAsked(dialog)
     const second = vault.tryGetWhisper('anthropic')
-    // Let the second caller reach the gating standing, and wait on it.
+    // Let the second caller reach the pending gating, and wait on it.
     await TH.wakeupAtNextTick()
     let landed = false
     void gating.lockLanded.then(() => { landed = true })

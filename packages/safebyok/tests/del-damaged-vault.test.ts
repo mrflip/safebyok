@@ -45,7 +45,7 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u2')).to.not.deep.equal([])
   })
 
-  it("refuses a vault that stands sound, removing nothing from storage or the device: that one is del()'s", async () => {
+  it("refuses a sound vault, removing nothing from storage or the device: that one is del()'s", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')

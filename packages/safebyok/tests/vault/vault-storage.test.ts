@@ -414,7 +414,7 @@ describe("the logger", () => {
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
     expect(world.logged[0]?.story).to.deep.equal({ call: 'refresh' })
     expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('damaged_vault')
-    expect(vault.getSnapshot().boxes).to.have.lengthOf(1)  // the snapshot stands as it was
+    expect(vault.getSnapshot().boxes).to.have.lengthOf(1)  // the snapshot is as it was
   })
 
   it("never breaks a lock, a hello, a refresh or a refused hello when it throws", async () => {
@@ -766,7 +766,7 @@ describe("vault record behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
-  it("refuses an older copy at unlock as vault_behind, the newer in hand standing, so a removed way in stays removed on this device", async () => {
+  it("refuses an older copy at unlock as vault_behind, the newer in hand kept, so a removed way in stays removed on this device", async () => {
     const { world, vault, older } = await rolledBackWorld()
     await vault.lock()
     const deaf = await world.open({ vaultDB: world.deafVaultDB() })
@@ -778,7 +778,7 @@ describe("vault record behind this device's record", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("refuses an older copy met by a background refresh as vault_behind, taking nothing from it: the newer in hand stands, the vault locks, and a birth made anew refuses it too", async () => {
+  it("refuses an older copy met by a background refresh as vault_behind, taking nothing from it: the newer in hand is kept, the vault locks, and a birth made anew refuses it too", async () => {
     const { world, vault, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultScopepath, older)
     await TH.expectRefusal(vault.refresh(), 'vault_behind')
@@ -820,7 +820,7 @@ describe("vault record behind this device's record", () => {
     expect(reopened.getSnapshot().gate?.passkey).to.be.null
   })
 
-  it("takes an older copy under a raised vault_epoch as it stands, its removed way in opening again", async () => {
+  it("takes an older copy under a raised vault_epoch as it is, its removed way in opening again", async () => {
     const { world, vault, older } = await rolledBackWorld()
     TH.closeVault(vault)
     world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...(JSON.parse(older) as object), vault_epoch: 9 }))
@@ -856,7 +856,7 @@ describe("vault record behind this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
-  it("is not caught on a device that never saw the newer copy, which takes the older as it stands", async () => {
+  it("is not caught on a device that never saw the newer copy, which takes the older as it is", async () => {
     const { world, older } = await rolledBackWorld()
     world.dbStore.write(u1VaultScopepath, older)
     const stranger = await world.open({ deviceDB: memoryDeviceDB() })

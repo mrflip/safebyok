@@ -307,7 +307,7 @@ describe("Box.seal", () => {
     expect(await box.extractWhisper()).to.eq('sk-ant-fake')
   })
 
-  it("stamps the box with the vault as it stood at the seal, the lease's vault_tok among it", async () => {
+  it("stamps the box with the vault as it was at the seal, the lease's vault_tok among it", async () => {
     const { vault, box } = await sealedOf()
     expect(madeUnderOf(box)).to.deep.equal(omit(vault.madeUnder, ['format', 'registered_at']))
     expect(box.vault_tok).to.eq(vault.lease?.vault_tok)

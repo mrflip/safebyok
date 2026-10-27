@@ -15,7 +15,7 @@ import { Validator } from './checks/validator'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
 
 /** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
- * A Proving is sealed over a wayin's header: the current wayin's, to prove what stands, or a
+ * A Proving is sealed over a wayin's header: the current wayin's, to prove the gate in hand, or a
  * fresh one it mints, to become a new way in. The cleartext goes no further than `seal`; the
  * wayinKey it makes is non-extractable and never leaves the Proving, and no method hands back a
  * vaultKey. What crosses a method's boundary is a Proving, a Wayin, a Lease or a wrapped key.
@@ -35,7 +35,7 @@ export type ProvingGating = { readonly landed: boolean, readonly call?: ProvingC
 export type ProvingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del' | 'demandConsistentWith'
 
 /** The gating of a proving made outside any gating, which never lands: a test hands it to `seal`. Every vault call's proving is made for a real gating. */
-export const StandingGating: ProvingGating = Object.freeze({ landed: false })
+export const OutsideGating: ProvingGating = Object.freeze({ landed: false })
 
 /** What a Vault object hands its gatings and its provings inside the package, which no getter of the Vault object shows: the tools both use.
  * Each adds its own powers: a proving's ({@link ProvingTools}) store and hold the lease it grants,
@@ -47,7 +47,7 @@ export type VaultPrivateTools = {
   keyDeriver:  KeyDeriver
   /** How long a lease the vault grants lasts, in whole milliseconds. */
   leaseMillis: number
-  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate standing is the first gate made elsewhere ('gate_made_elsewhere'). */
+  /** The vault's demand on `thing`, a refusal logged as `call`'s; with `opts.firstGate`, a gate in the vault record in hand is the first gate made elsewhere ('gate_made_elsewhere'). */
   demand:      (thing: VaultMadeUnder, call: ProvingCall, opts?: { firstGate: boolean }) => void
 }
 
@@ -202,7 +202,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return Wayin.make(this.#vaultStamp, record, { keyDeriver: toolsOf(this.vault).keyDeriver })
   }
 
-  /** Grant this device a lease on the vault, by the wayin this proving opens in the gate that stands, resolving the Lease as stored and held.
+  /** Grant this device a lease on the vault, by the wayin this proving opens in the gate in hand, resolving the Lease as stored and held.
    * In order: a demand on the proving; the vaultKey unwrapped from its wayin; a fresh leaseKey,
    * and the vaultKey wrapped under it ({@link sealLeaseRecord}); a demand on the proving and on the
    * gate the lease names, with nothing awaited between it and the store, so a lock or a gating's
@@ -217,9 +217,9 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async grantLease(): Promise<Lease> {
     const tools = toolsOf(this.vault)
     this.#demand()
-    const standing = tools.vaultRecord()
+    const held = tools.vaultRecord()
     const vaultKey = await this.#unwrap(RewrapUsage)
-    const record = await sealLeaseRecord(standing, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
+    const record = await sealLeaseRecord(held, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     this.#demand()
     tools.demand(madeUnderOfLease(record), this.#call())
@@ -241,7 +241,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** The demand on this proving, through its vault, a refusal logged as its gating's call.
    * While it is `sealing`, before any gate is written to carry it, a proving made on a vault with no
-   * gate is for the first: a gate standing then was made elsewhere ('gate_made_elsewhere').
+   * gate is for the first: a gate in the vault record in hand then was made elsewhere ('gate_made_elsewhere').
    */
   #demand(opts?: { sealing: boolean }) {
     toolsOf(this.vault).demand(this, this.#call(), { firstGate: opts?.sealing === true && this.gate_epoch === 0 })
@@ -292,7 +292,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     Object.freeze(this)
   }
 
-  /** The proving `passphrase` makes over `header`: the current passphrase wayin's visible fields, to prove what stands, or `{ slotlabel: 'passphrase' }`, for a fresh header whose salt it mints.
+  /** The proving `passphrase` makes over `header`: the current passphrase wayin's visible fields, to prove the gate in hand, or `{ slotlabel: 'passphrase' }`, for a fresh header whose salt it mints.
    * One key derivation, its bytes zeroed once imported. A fresh header names the vault's key
    * deriver, a fresh salt, this device's id, and the time now. Over a current header it refuses,
    * deriving nothing: 'unknown_key_deriver' for another deriver's wayin, 'damaged_wayin' for a salt
@@ -300,7 +300,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    * strength: {@link Vault.checkStrength} does. It refuses 'bad_option' for a passphrase that is not
    * text, and as {@link passphraseKeyOf} does. It demands on the proving after the derivation.
    *
-   * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link StandingGating}.
+   * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link OutsideGating}.
    *
    * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })
@@ -370,7 +370,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * 'damaged_wayin' for a salt its kind never makes and 'wrong_passkey' for another credential's
    * answer or one over another salt, deriving nothing. It demands on the proving after the HKDF.
    *
-   * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link StandingGating}.
+   * @param opts.gating - The gating it is made for: every vault call passes its own, and a test {@link OutsideGating}.
    *
    * @example await PasskeyProving.seal(vault, headerOf(vaultRecord.gate.passkey), await askPasskey(vault.snapshot.gate), { gating })
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
@@ -507,7 +507,7 @@ const madeUnderOfLease = (record: LeaseRecord): VaultMadeUnder => ({
 const gateMovedPast = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
 
 /** The demand after a seal's derivation failed, with no proving yet to demand on: the vault on `madeUnder`, as it stood when the seal began, and `gating` not landed ('gating_landed').
- * A seal begun on a vault with no gate was for the first: a gate standing now was made elsewhere ('gate_made_elsewhere').
+ * A seal begun on a vault with no gate was for the first: a gate in the vault record in hand now was made elsewhere ('gate_made_elsewhere').
  */
 const demandAfterFailedSeal = (vault: Vault, madeUnder: VaultSparse, gating: ProvingGating) => {
   toolsOf(vault).demand(madeUnder, gating.call ?? 'demandConsistentWith', { firstGate: madeUnder.gate_epoch === 0 })

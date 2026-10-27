@@ -55,7 +55,7 @@ export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, dev
   const tombstone = valOf(await vaultDB.delDamagedVault(scope))
   valOf(await deviceDB.delLease(scope))
   if (tombstone === null) { return }
-  // The device_id is kept where a record stands: raising keeps the first one stored.
+  // The device_id is kept where a record is stored: raising keeps the first one stored.
   const raising = deviceRecordOf(scope, randomId(), tombstone.vault_epoch)
   valOf(await deviceDB.raiseDeviceRecord(raising))
 }

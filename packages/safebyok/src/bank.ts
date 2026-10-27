@@ -359,7 +359,7 @@ export class Bank {
    * no vault stored it erases only this device's lease, and resolves. The vault let go is the one
    * the bank lists for the scope once storage answers, whichever stores it was born from: on
    * success, and the next {@link Bank.ensureVault} births a new life, `novel`; and on
-   * 'stale_write', so the next ask births the vault that stands. Any other refusal keeps it listed.
+   * 'stale_write', so the next ask births the vault stored now. Any other refusal keeps it listed.
    *
    * @example
    *   const bankVault = bank.bankVaultOf({ vaultlabel: 'main' })
@@ -380,7 +380,7 @@ export class Bank {
         await delDamagedVaultIn(scope, parts.vaultDB, parts.deviceDB)
       } catch (err) {
         // Made anew elsewhere meanwhile: the listed refusal is out of date, so it goes, and the
-        // next ask births the vault that stands. The caller still hears why nothing was deleted.
+        // next ask births the vault stored now. The caller still hears why nothing was deleted.
         if (isVaultError(err, 'stale_write')) { this.#letGoOf(vaultScopepath) }
         throw err
       }
@@ -401,7 +401,7 @@ export class Bank {
   #listing: readonly BankVault[] = Object.freeze([])
   #snapshot: BankSnapshot
 
-  /** The snapshot the private state makes now, frozen, on the listing as it stands. */
+  /** The snapshot the private state makes now, frozen, on the listing as it is now. */
   #picture(): BankSnapshot {
     const libs = this.#libs
     const { applabel, user_id } = this.#scope
@@ -683,7 +683,7 @@ const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
   if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
 }
 
-/** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault stands, as a new life with a fresh `vault_tok`. */
+/** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault is stored, as a new life with a fresh `vault_tok`. */
 const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }

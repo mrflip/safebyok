@@ -375,7 +375,7 @@ describe("settledVault", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
-    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault stands from birth').to.not.be.null
+    expect(await TH.vaultRecordIn(opts.vaultDB, TH.scopeOf('u1')), 'born of vaultDB.ensureVault: the vault is stored from birth').to.not.be.null
     expect(TH.bankOf(vault).vaultOf({ user_id: 'u1', vaultlabel: 'main' })).to.eq(vault)
   })
 
@@ -1255,7 +1255,7 @@ class RoundTripBackend {
   }
 }
 
-/** A write taken apart: its check of what stands, and the write itself, each on the rows. */
+/** A write taken apart: its check of what is stored, and the write itself, each on the rows. */
 type WritePlan = { check: (rows: Rows) => boolean, write: (rows: Rows) => void }
 
 /** How an adapter makes a write's check and the write itself: together, or not. */
@@ -1415,7 +1415,7 @@ class RoundTripVaultDB extends VaultDB {
 
   protected doGetCapacity(scope: VaultScope) { return this.backend.atomically((rows) => capacityIn(rows, scope, this.maxBoxes)) }
 
-  // What it removed is what the write found standing, in the same step.
+  // What it removed is what the doDelBox found stored, in the same step.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) {
     const boxScopepath = Scopepath.box({ ...scope, boxlabel })
     const removed: { box?: unknown } = {}

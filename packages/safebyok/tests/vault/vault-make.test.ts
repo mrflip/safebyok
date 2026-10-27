@@ -516,7 +516,7 @@ describe("the key deriver seam", () => {
       expect(heard).to.deep.equal([])
     })
 
-    it("is heard by TH.spyLogger as nothing, so a test's own count of what the vault said stands", async () => {
+    it("is heard by TH.spyLogger as nothing, so a test's own count of what the vault said stays exact", async () => {
       const world = makeWorld()
       await world.open()
       expect(world.logged).to.deep.equal([])

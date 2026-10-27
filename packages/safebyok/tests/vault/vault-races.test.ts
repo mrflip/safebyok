@@ -58,7 +58,7 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     const gate = world.holdNextLease()
     const changing = TH.expectRefusal(TH.putWayin(vault, 'pw one', 'pw two'), 'vault_gone')
     await gate.reached
-    // The change stands in storage: the tab proves the deletion with the new passphrase.
+    // The change is stored: the tab proves the deletion with the new passphrase.
     await TH.del(tab, 'pw two')
     await TH.wakeupAtNextTick()
     gate.release()
@@ -277,13 +277,13 @@ describe("a first unlock that loses the race to create the vault", () => {
     expect(await there.getWhisper('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 
-  it("tells a second wrong passphrase as wrong_passphrase: the vault now stands, and gate_made_elsewhere is only for the first unlock", async () => {
+  it("tells a second wrong passphrase as wrong_passphrase: the vault now has its gate, and gate_made_elsewhere is only for the first unlock", async () => {
     const { there } = await raceLostToPwOne()
     await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
     await TH.expectRefusal(TH.unlock(there, 'pw three'), 'wrong_passphrase')
   })
 
-  it("refuses as gate_made_elsewhere when another device gates the vault between this unlock's look and its gate, leaving the winner's gate standing", async () => {
+  it("refuses as gate_made_elsewhere when another device gates the vault between this unlock's look and its gate, leaving the winner's gate stored", async () => {
     const world = makeWorld()
     const deafDB = world.deafVaultDB()
     const there = await world.open({ vaultDB: deafDB })
@@ -339,7 +339,7 @@ const ringingRaceToPwOne = async (overrides?: Partial<TH.BornVaultOpts>) => {
   return { world, there, gateElsewhere }
 }
 
-/** What stands once B's first unlock lost midway: A's gate, which B's picture holds, B locked under it with no lease, and A's passphrase unlocking B. */
+/** What is true once B's first unlock lost midway: A's gate, which B's picture holds, B locked under it with no lease, and A's passphrase unlocking B. */
 const expectLostToPwOne = async (world: ReturnType<typeof makeRacingWorld>, there: Vault) => {
   expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
   expect(TH.stateOf(there.getSnapshot())).to.eq('locked')
@@ -354,7 +354,7 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     const latch = TH.makeLatch()
     const strengthChecker = async () => {
       await latch.pass()
-      return { strong: false as const, reason: "Too short to stand." }
+      return { strong: false as const, reason: "Too short." }
     }
     const { world, there, gateElsewhere } = await ringingRaceToPwOne({ strengthChecker })
     const unlocking = TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
@@ -521,7 +521,7 @@ const gatingWorld = async () => {
 }
 
 describe("a first unlock's gate, and a read while it is under way", () => {
-  it("taken up by a read meanwhile, and still standing: the gate unlocks", async () => {
+  it("taken up by a read meanwhile, and still stored: the gate unlocks", async () => {
     const { world, vault, noting } = await gatingWorld()
     const unlocking = TH.unlock(vault, 'pw')
     await noting.reached
@@ -609,7 +609,7 @@ describe("a lock in another handle on this device", () => {
     const otherTab = await world.openUnlocked('pw one')
     const thisTab = await world.open()
     await otherTab.lock()
-    // This tab hears of the lock at its next read: until then its lease stands, and an unlock tries nothing.
+    // This tab hears of the lock at its next read: until then its lease is in force, and an unlock tries nothing.
     await thisTab.hello({ staleMinutes: 0 })
     expect(TH.stateOf(thisTab.getSnapshot())).to.eq('locked')
     await TH.unlock(thisTab, 'pw one')
@@ -989,7 +989,7 @@ describe("versioned updates: two devices writing at once", () => {
     await TH.expectRefusal(there.getWhisper('anthropic'), 'absent_box')
   })
 
-  it("a store of a box that did not exist, and is created meanwhile elsewhere, is refused as stale: theirs stands", async () => {
+  it("a store of a box that did not exist, and is created meanwhile elsewhere, is refused as stale: theirs is kept", async () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     beforeNextWrite('putBox', () => there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs'))
     const putBox = vi.spyOn(hereDB, 'putBox')
@@ -1167,7 +1167,7 @@ describe("versioned updates: two devices writing at once", () => {
     for (const unsaid of [damagedRevision, theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
   })
 
-  it("a passphrase change racing another device's is refused gate_moved once this device heard of it; theirs stands", async () => {
+  it("a passphrase change racing another device's is refused gate_moved once this device heard of it; theirs is kept", async () => {
     const { here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     beforeNextWrite('putVaultRecord', async () => { await TH.putWayin(there, 'shared pw', 'their pw') })

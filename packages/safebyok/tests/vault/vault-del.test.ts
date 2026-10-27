@@ -109,7 +109,7 @@ describe("delBox and del()", () => {
     expect(deviceRecord?.highest_vault_epoch).to.eq(tombstoneEpoch)
   })
 
-  it("del() from a novel picture of a vault gated elsewhere since refuses absent_vault, deleting nothing: 'delete my vault' never reports success over one standing", async () => {
+  it("del() from a novel picture of a vault gated elsewhere since refuses absent_vault, deleting nothing: 'delete my vault' never reports success while one is stored", async () => {
     const world = makeWorld()
     const stale = await world.open({ vaultDB: world.deafVaultDB() })
     expect(TH.stateOf(stale.getSnapshot())).to.eq('novel')
