@@ -355,7 +355,7 @@ describe("the logger", () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: 'soon' }))
+    device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
     expect(world.logged).to.have.lengthOf(1)
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'hello' }, err: undefined })
@@ -380,11 +380,11 @@ describe("the logger", () => {
     expect(valOf(kept)).to.be.null
   })
 
-  it("leaves an unreadable lease where it lies at birth: no erase is tried, and the vault is born locked", async () => {
+  it("leaves a lease of another scope where it lies at birth: no erase is tried, and the vault is born locked", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: 'soon' }))
+    device.spoilRow((row) => ({ ...row, vaultlabel: 'spare' }))
     const erasing = vi.spyOn(device.deviceDB, 'delLease')
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('locked')
     expect(erasing).not.toHaveBeenCalled()
@@ -436,7 +436,7 @@ describe("the logger", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     // a birth that warns of an unreadable lease
     await TH.unlock(vault, 'pw')
-    device.spoilRow(() => 'not a record')
+    device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')
     // a birth refused
     vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
@@ -451,11 +451,12 @@ describe("the logger", () => {
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'FAKESECRET note' } }, whisper)
     // every call site: a change whose record could not be raised (its error carrying the device
-    // store's as its cause), a lease unreadable, a background refresh refused
-    vi.spyOn(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
+    // store's as its cause), a lease that reads but is another scope's, its wrap and all, a
+    // background refresh refused
+    TH.spyOnDeviceHook(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await TH.putWayin(vault, passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
-    device.spoilRow((row) => ({ ...row, ask_passphrase_at: `${passphrase} ${whisper}` }))
+    device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     const reopened = await world.open({ deviceDB: device.deviceDB })
     TH.closeVault(reopened)
     world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), registered_at: whisper }))
@@ -557,7 +558,7 @@ describe("when storage says the user is no longer signed in", () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw one'))
     const stuck = new Error('the device store is read-only')
-    vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
     vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(world.open(), 'identity_revoked')
     expect(await world.getLease()).to.not.be.null
@@ -584,7 +585,7 @@ describe("when storage says the user is no longer signed in", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const stuck = new Error('the device store is read-only')
-    vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')

@@ -26,5 +26,5 @@ export type { VaultDBContractLine, VaultDBVerbs, MakeVaultDB, DescribeVaultDBOpt
 export { describeDeviceDB } from './test-helpers/device-db-conformance'
 export { scriptedRequestCleartext, answering, tryUnlock, unlock, tryPutWayin, putWayin, tryDelWayin, delWayin, tryDel, del, heldDialog, asKind } from './test-helpers/gating'
 export type { GatingAnswer } from './test-helpers/gating'
-export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad, good, bad, omitting } from './test-helpers/refusals'
+export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad, good, bad, omitting, spyOnDeviceHook } from './test-helpers/refusals'
 export type { ExpectingGood } from './test-helpers/refusals'

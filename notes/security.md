@@ -573,6 +573,18 @@ added or folded into through the subagent, and no other entry changes.
   unreadable only inside one readwrite transaction that re-checks the row is still unreadable, so a lock's
   `delLease` or a newer `putLease` made after the read is never undone by that read's late discard (an undone lock
   would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
+  Amended 2026-10-27 (device_db_class): **one conditional discard now serves both records and both stores,
+  and `DeviceDB` is an abstract base class, as `VaultDB` is, not an interface.** The base class parses every lease and device record a store hands
+  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnreadable(scopepath, isReadable)`
+  hook, which deletes the row only if `isReadable` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
+  host's own `DeviceDB` discard alike. The base class files each row under its Scopepath and calls the store's `do*` hook before awaiting anything,
+  so a store sees one scope's calls in the order the vault made them. The race it closes: `idbDeviceDB.getDeviceRecord` deleted an unreadable device
+  record unconditionally, in a transaction that began only after its read resolved, so a `raiseDeviceRecord` made after that read but landing before
+  the delete had its raised record (its `highest_vault_epoch`, the watermark that refuses a vault served behind what this device has seen) erased by
+  it; `describeDeviceDB` now tests the race for each kind of record against both stores. A host's own `DeviceDB` used to hand back unchecked rows,
+  which the vault left in place with a logger warning; now such a row is discarded silently, and the vault's warning ("lease could not be read ...
+  left where it lies") remains only for a lease that reads but names another scope (`Lease.make` still checks it, and `deviceRecordFor` still
+  checks a device record's scope).
 
 * 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
   travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
@@ -906,7 +918,14 @@ added or folded into through the subagent, and no other entry changes.
   naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
   `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
-  `bad_option`. Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
+  `bad_option` (amended 2026-10-27 (device_db_class): `deviceOutcomeOf`, `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone.
+  `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `VaultDB` is, and its public verbs (`getLease`, `putLease`, `delLease`,
+  `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`) make each Outcome themselves: a throw from the store's `do*` hook becomes
+  `deviceTrouble`'s condition, `storage_blocked` for a `SecurityError`, `QuotaExceededError` or `NotSupportedError` and otherwise
+  `storage_unavailable`, naming no scope and quoting no record, and a `VaultError` passes as it came; a scopepath the base class cannot file a row
+  under is refused `bad_scope` before the store sees the call. `parseDeviceDB` (`vault-opts.ts`) requires `instanceof DeviceDB` plus the verbs'
+  shape, as `parseVaultDB` does for `VaultDB`, so a host's own store extends the base class and no longer hands the vault a bare object).
+  Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
   (the take-up's AbortController -- amended 2026-10-23 (thread 9, gating): gone --, the grant standing a take-up down before it writes, an overtaken
   grant erasing its own lease) is where it was, in the vault. Amended 2026-10-21 (thread b_fixes):
   `#grantLease` erases the lease it just wrote not only when an ask's prompt ended during the write
@@ -1453,7 +1472,8 @@ added or folded into through the subagent, and no other entry changes.
   read as a lease: `idbDeviceDB` sweeps the old rows itself, silently, at the next lease read or
   erase (`src/idb.ts`), the 0.3.0 device mark along with the lease; a host's own DeviceDB that
   hands back an old `safebyok-mark-v1` mark sees it read as none, with the vault's one logger
-  warning. So the device mark is not kept from 0.3.0: rollback-check state starts afresh. Nothing
+  warning (amended 2026-10-27 (device_db_class): the `DeviceDB` base class now discards a row that fails its record check silently, with no
+  logger warning). So the device mark is not kept from 0.3.0: rollback-check state starts afresh. Nothing
   old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
   refuses the new schema until its tables are cleared; Postgres hosts must run the summary
   changeset's Postgres steps before the new table SQL.
@@ -1612,7 +1632,7 @@ added or folded into through the subagent, and no other entry changes.
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
-  scope refuses no vault `vault_behind`. Reading as none weakens the rollback check until the next raise, the same
+  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnreadable`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
   failure as a lost record. Amended 2026-10-21 (trust_lines): the mark keeps `vault_id` and the highest
   `unlock_epoch` only (`safebyok-mark-v5`); `vault_key_epoch` is removed, so the refusal of a lower one,
   the wayin check on it and the rotation case below no longer exist, and older vault props of the same
@@ -2213,7 +2233,8 @@ added or folded into through the subagent, and no other entry changes.
   written (an unchecked over-long sidecar once made every later `hello()` refuse the vault as
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
   against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
-  lease. `VaultDB`'s write verbs check labels and scope only, not the records the
+  lease (amended 2026-10-27 (device_db_class): the `DeviceDB` base class parses each lease record a store hands back and discards one that fails
+  through the store's `doDelUnreadable`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
   (Bound since: the sweep entry below.)
@@ -3502,7 +3523,7 @@ added or folded into through the subagent, and no other entry changes.
   after a successful catch-up; a failed catch-up keeps its own message.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
   kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
-  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`) says a failure
+  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`; amended 2026-10-27 (device_db_class): both are gone, the `DeviceDB` base class's public verbs make the same mapping through `deviceTrouble`) says a failure
   named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
   retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it

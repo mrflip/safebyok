@@ -1,5 +1,6 @@
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
 import { type RefusalKind, VaultError } from '../../src/errors'
+import type { DeviceDB, DeviceVerb } from '../../src/device-db'
 import type { Outcome } from '../../src/outcome'
 
 export { good, bad } from '../../src/outcome'
@@ -145,3 +146,14 @@ export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => 
   const { [ckey]: _omitted, ...rest } = bag
   return rest as Bag
 }
+
+/**
+ * A spy on the `do*` method behind `deviceDB`'s `verb` (`doPutLease` behind `putLease`), so a test
+ * has the store itself fail, and hears what the verb then answers. A DeviceDB's verbs never
+ * reject: a spy on one that rejects tests a store that cannot exist.
+ *
+ * @example TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+ */
+export const spyOnDeviceHook = (deviceDB: DeviceDB, verb: DeviceVerb) => (
+  vi.spyOn(deviceDB as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>, `do${verb.charAt(0).toUpperCase()}${verb.slice(1)}`)
+)

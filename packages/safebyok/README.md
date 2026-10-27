@@ -374,37 +374,69 @@ Your `do*` methods take any name the base class passed: every public verb holds 
 check (`label`, or `user_id`) and to your adapter's declared `maxNameBytes`. So an adapter that hands its calls on to
 another VaultDB's public verbs passes each call through as it came.
 
-A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keeps two records per
-scope. `putLease` replaces the scope's lease, resolving the record as stored. The device record
-is raised, never lowered: `raiseDeviceRecord(record)` reads what the scope holds and writes the
-higher of the two in one transaction -- keeping the first `device_id` stored and the higher
-`highest_vault_epoch` -- resolving what it stored, so a tab that saw less never lowers what
-another saw. The exported `raisedDeviceRecord(stored, record)` is that rule: call it inside your
-transaction, handing it the row as read. `getDeviceRecord(scope)` reads the record, and
-`delDeviceRecord(scope)` erases it (`bank.clearCachedVault` calls it). `deviceRecordOf(scope,
-device_id, highest_vault_epoch)` builds a record from a scope's names alone. The device record is
-strict, and one that fails its check reads as none: so a field added to it moves its `format` on,
-and a device whose safebyok predates the field discards the record, its watermark with it, until
-its next read raises it again. One scope's calls
-take effect in the order they were made, awaited or not (a `putLease` then a `delLease` leaves no
-lease: the lock that erases a lease must beat the grant that wrote it); `describeDeviceDB` checks
-it. Each verb resolves an `Outcome`, as a VaultDB's do:
-`{ ok: true, val }`, the record or null for a read, or `{ ok: false, err }` holding a
-`VaultError`, and never rejects. Answer each through `deviceOutcomeOf`, which says what your
-store throws as the vault's conditions: a browser's refusal that holds until something outside
-the app changes (`SecurityError`, `QuotaExceededError`, `NotSupportedError`) as `storage_blocked`,
-which a host shows without offering a retry, and anything else as `storage_unavailable`:
+A device store of your own extends `DeviceDB`, as a vault store extends `VaultDB`, and
+implements its `do*` methods: `idbDeviceDB` from `safebyok/idb` covers a browser, and your own
+suits, say, an app that keeps its rows in an IndexedDB database of its own. It keeps two records
+per scope, the lease and the device record. The base class files each under its `Scopepath`,
+refusing `bad_scope` for a scope whose names fail their checks, so each `do*` method is handed a
+scopepath and the record as it is: a lease holds a non-extractable `CryptoKey`, so the store must
+keep records by structured clone, never as JSON.
+
+* **Reads hand back the row as stored**, or `undefined` for none. The base class checks it: one
+  that fails its check reads as none, and the base class has `doDelUnreadable` discard it. That
+  deletes the row only if `isReadable` is still false of it as read in the same transaction, so
+  a record written since the read is never lost.
+* **The device record is raised, never lowered.** `doRaiseDeviceRecord(scopepath, raisedFrom)`
+  reads the row, hands it to `raisedFrom` and writes what comes back, all in one transaction, so
+  two tabs raising at once never lower each other's record.
+* **Calls land in the order they were made.** Each verb calls its `do*` method before awaiting
+  anything, so a store that starts each call's work in the order it is called keeps that order,
+  awaited or not: a lock's `delLease`, made after a grant's `putLease`, must erase it.
+* **What your store throws is a condition.** A browser's refusal that holds until something
+  outside the app changes (`SecurityError`, `QuotaExceededError`, `NotSupportedError`) becomes
+  `storage_blocked`, which a host shows without offering a retry, and anything else
+  `storage_unavailable`, what was thrown its `cause`. Every verb resolves an `Outcome` and never
+  rejects.
 
 ```ts
-const deviceDB: DeviceDB = {
-  getLease: (scope) => deviceOutcomeOf('getLease', () => myStore.read(leaseCkeyOf(scope))),
-  putLease: (record) => deviceOutcomeOf('putLease', () => { myStore.write(leaseCkeyOf(record), record); return record }),
-  // ...and the rest of the seven verbs alike
+import { openDB } from 'idb'
+import { Bank, DeviceDB, type DeviceRecord, type LeaseRecord } from 'safebyok'
+
+// The app's own database, with an object store set aside for safebyok's rows.
+const appDB = openDB('acme', 3, { upgrade: (db) => { db.createObjectStore('safebyok_device') } })
+
+class AcmeDeviceDB extends DeviceDB {
+  protected async doGetLease(leaseScopepath: string) { return (await appDB).get('safebyok_device', leaseScopepath) }
+  protected async doPutLease(leaseScopepath: string, record: LeaseRecord) { await (await appDB).put('safebyok_device', record, leaseScopepath) }
+  protected async doDelLease(leaseScopepath: string) { await (await appDB).delete('safebyok_device', leaseScopepath) }
+  protected async doGetDeviceRecord(deviceScopepath: string) { return (await appDB).get('safebyok_device', deviceScopepath) }
+  protected async doDelDeviceRecord(deviceScopepath: string) { await (await appDB).delete('safebyok_device', deviceScopepath) }
+  protected async doDelAll() { await (await appDB).clear('safebyok_device') }
+
+  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
+    const tx = (await appDB).transaction('safebyok_device', 'readwrite')   // the read and the write, in one transaction
+    await tx.store.put(raisedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
+    await tx.done
+  }
+
+  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
+    const tx = (await appDB).transaction('safebyok_device', 'readwrite')
+    if (! isReadable(await tx.store.get(scopepath))) { await tx.store.delete(scopepath) }
+    await tx.done
+  }
 }
+
+const bank = Bank.make({ ...opts, deviceDB: new AcmeDeviceDB() })
 ```
 
-`describeDeviceDB` from `safebyok/testing` checks all of this; hand it a second factory, an
-adapter over a store the browser withholds, and it checks each verb answers `storage_blocked`.
+Change the database and object store names to your app's. `Bank.make` refuses (`bad_option`)
+a `deviceDB` that does not extend `DeviceDB`. `deviceRecordOf(scope, device_id,
+highest_vault_epoch)` builds a device record from a scope's names alone. The device record is
+strict, and one that fails its check reads as none: so a field added to it moves its `format`
+on, and a device whose safebyok predates the field discards the record, its watermark with it,
+until its next read raises it again. `describeDeviceDB` from `safebyok/testing` checks all of
+this; hand it a second factory, an adapter over a store the browser withholds, and it checks
+each verb answers `storage_blocked`.
 
 Every refresh -- after each of the vault's own writes, and at each change your adapter's
 `subscribe` reports -- reads the vault with every box in it (`getVault`), one at a time per Vault object, so its cost

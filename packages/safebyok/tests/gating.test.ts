@@ -293,7 +293,7 @@ describe("a step of an attempt's chain failing", () => {
       return {}
     }, 'change', 'putVaultRecord refusing stale_write'],
     ['storage_unavailable', (world) => {
-      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+      TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
       return {}
     }, 'unlock', 'putLease failing'],
     ['unexpected_error', () => ({ strengthChecker: () => { throw new Error('checker broke on pw two') } }), 'change', 'the strength checker throwing'],
@@ -434,7 +434,7 @@ describe("a lock or a decline landing during an attempt", () => {
       const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
       const calling = flavor === 'unlock' ? vault.tryEnsureUnlocked() : vault.tryPutWayin('passphrase')
       const gating = await dialog.asked()
-      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+      TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
       const writing = TH.holdNextCall(world.deviceDB, 'putLease')
       const attempting = flavor === 'unlock' ? TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw') : TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw two')
       await writing.reached

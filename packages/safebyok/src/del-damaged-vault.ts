@@ -1,7 +1,7 @@
 import * as CX from './checks/core-checks'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
-import { type DeviceDB, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordOf } from './device-db'
 import { randomId } from './crypto'
 import type { VaultScope } from './types/types'
 import type { VaultDB } from './vault-db'
@@ -46,11 +46,10 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
 }
 
 /** {@link delDamagedVault}'s work, for a scope and stores already checked: what `bank.delDamagedVault` calls too. */
-export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDBGiven: DeviceDB): Promise<void> => {
+export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDB: DeviceDB): Promise<void> => {
   if (typeof vaultDB.delDamagedVault !== 'function') {
     throw new VaultError('bad_option', "vaultDB has no delDamagedVault: a storage adapter that hands each call on to another's must hand this one on too.")
   }
-  const deviceDB = deviceTroubleAsConditions(deviceDBGiven)
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   const tombstone = valOf(await vaultDB.delDamagedVault(scope))

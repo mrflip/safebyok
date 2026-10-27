@@ -19,7 +19,7 @@ import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type BadNewsHandler, type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { Lease, type LeaseSparse } from './lease'
 import { registerLeaseReader } from './held-lease'
@@ -821,7 +821,7 @@ export class Vault implements VaultStamp {
     this.#stamp = Object.freeze({ format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at })
     this.#scope = CX.vaultScope.parse(parts)
     this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
-    this.#deviceDB = deviceTroubleAsConditions(parts.deviceDB)
+    this.#deviceDB = parts.deviceDB
     this.#leaseMillis = parts.leaseMillis
     this.#staleMillis = parts.staleMillis
     this.#onBadNews = parts.onBadNews

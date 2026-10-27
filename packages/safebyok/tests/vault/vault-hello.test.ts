@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { VaultScope, StaleMinutes } from '../../src/types/types'
 import { MinuteMillis } from '../../src/consts'
 import { VaultError, isVaultError } from '../../src/errors'
-import { deviceTroubleAsConditions, memoryDeviceDB } from '../../src/device-db'
+import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { Bank } from '../../src/bank'
 import { type Vault } from '../../src/vault'
@@ -349,7 +349,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const trouble = new Error('the device store broke: disk full')
-    vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
     expect(await vault.hello({ staleMinutes: 0 })).to.eq(vault)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
@@ -416,7 +416,7 @@ describe("a hello that fails", () => {
     const vault = await world.open()
     const before = vault.getSnapshot()
     const trouble = new Error('device storage is unavailable')
-    vi.spyOn(world.deviceDB, 'getLease').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'getLease').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'storage_unavailable')
     expect(err.cause).to.eq(trouble)
     expect({ ...vault.getSnapshot(), freshness: 'timely' }).to.deep.equal(before)
@@ -429,7 +429,7 @@ describe("a hello that fails", () => {
     const world = makeWorld()
     await seedVault(world)
     const trouble = new Error('device storage is unavailable')
-    vi.spyOn(world.deviceDB, 'getDeviceRecord').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(world.open(), 'storage_unavailable')
     expect(err.cause).to.eq(trouble)
   })
@@ -438,7 +438,7 @@ describe("a hello that fails", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const trouble = new Error('device storage is unavailable')
-    vi.spyOn(world.deviceDB, 'delLease').mockImplementationOnce(() => { throw trouble })
+    TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockImplementationOnce(() => { throw trouble })
     const err = await TH.expectRefusal(vault.lock(), 'storage_unavailable')
     expect(err.cause).to.eq(trouble)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
@@ -459,8 +459,8 @@ describe("a hello that fails", () => {
     it(`says what failed, ${blurb}, as 'storage_unavailable', with what to do and its error the cause`, async () => {
       const deviceDB = memoryDeviceDB()
       const trouble = new Error('device storage is unavailable')
-      vi.spyOn(deviceDB, verb).mockRejectedValueOnce(trouble)
-      const err = await TH.expectBad(callOf(deviceTroubleAsConditions(deviceDB), verb), 'storage_unavailable')
+      TH.spyOnDeviceHook(deviceDB, verb).mockRejectedValueOnce(trouble)
+      const err = await TH.expectBad(callOf(deviceDB, verb), 'storage_unavailable')
       expect(err.cause).to.eq(trouble)
       expect(err.message).to.match(said)
       expect(err.message).to.match(/try again/)
@@ -484,8 +484,8 @@ describe("a hello that fails", () => {
     it(`says a device store's ${errName} as '${kind}': ${blurb}`, async () => {
       const deviceDB = memoryDeviceDB()
       const trouble = new DOMException('The browser refused.', errName)
-      vi.spyOn(deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
-      const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).raiseDeviceRecord(TH.deviceRecordOf('u1')), kind)
+      TH.spyOnDeviceHook(deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
+      const err = await TH.expectBad(deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')), kind)
       expect(err.cause).to.eq(trouble)
       expect(err.message).to.match(/writing its record of this vault/)
       expect(err.message).to.match(kind === 'storage_blocked' ? /will not help until that changes/ : /try again/)
@@ -494,8 +494,8 @@ describe("a hello that fails", () => {
 
   it("keeps a verb's own way forward in its 'storage_blocked' message: a lease that will not read leaves a passphrase or passkey", async () => {
     const deviceDB = memoryDeviceDB()
-    vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new DOMException('The operation is insecure.', 'SecurityError'))
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_blocked')
+    TH.spyOnDeviceHook(deviceDB, 'getLease').mockRejectedValueOnce(new DOMException('The operation is insecure.', 'SecurityError'))
+    const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.message).to.match(/reading the lease it keeps/)
     expect(err.message).to.match(/will not help until that changes: unlock with a vault unlocker \(the passphrase or passkey\) instead\./)
     expect(err.message).to.not.match(/try again/i)
@@ -503,16 +503,16 @@ describe("a hello that fails", () => {
 
   it("keeps it in its 'storage_unavailable' message too, beside trying again", async () => {
     const deviceDB = memoryDeviceDB()
-    vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_unavailable')
+    TH.spyOnDeviceHook(deviceDB, 'getLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+    const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), 'storage_unavailable')
     expect(err.message).to.match(/try again, or unlock with a vault unlocker \(the passphrase or passkey\)\./)
   })
 
   it("tells a blocked store by its error's name, so one from another frame, no instance of this one's Error, is told alike", async () => {
     const deviceDB = memoryDeviceDB()
     const trouble = { name: 'SecurityError', message: 'The operation is insecure.' }
-    vi.spyOn(deviceDB, 'getLease').mockRejectedValueOnce(trouble)
-    const err = await TH.expectBad(deviceTroubleAsConditions(deviceDB).getLease(TH.scopeOf('u1')), 'storage_blocked')
+    TH.spyOnDeviceHook(deviceDB, 'getLease').mockRejectedValueOnce(trouble)
+    const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.cause).to.eq(trouble)
   })
 
@@ -520,7 +520,7 @@ describe("a hello that fails", () => {
     const world = makeWorld()
     await seedVault(world)
     const trouble = new DOMException('The operation is insecure.', 'SecurityError')
-    vi.spyOn(world.deviceDB, 'getDeviceRecord').mockRejectedValue(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockRejectedValue(trouble)
     const err = await TH.expectRefusal(world.open(), 'storage_blocked')
     expect(err.cause).to.eq(trouble)
     expect(err.message).to.not.match(/try again/i)
@@ -531,7 +531,7 @@ describe("a hello that fails", () => {
     const world = makeWorld()
     await seedVault(world)
     const refusal = new VaultError('not_permitted', 'This device may not read its records.')
-    vi.spyOn(world.deviceDB, 'getLease').mockRejectedValueOnce(refusal)
+    TH.spyOnDeviceHook(world.deviceDB, 'getLease').mockRejectedValueOnce(refusal)
     expect(await TH.expectRefusal(world.open(), 'not_permitted')).to.eq(refusal)
   })
 

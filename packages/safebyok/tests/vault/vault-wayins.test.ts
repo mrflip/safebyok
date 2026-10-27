@@ -1231,7 +1231,7 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
   it("logs no passphrase, old or new, nor a passkey's answer, even when this device cannot keep its lease (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a memorable old passphrase')
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValue(new Error('device storage is full'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValue(new Error('device storage is full'))
     const phone = await TH.passkeyOf('phone')
     await TH.putWayin(vault, 'a memorable old passphrase', 'a memorable new passphrase')
     await TH.putWayin(vault, 'a memorable new passphrase', phone)

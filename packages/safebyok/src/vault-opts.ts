@@ -4,7 +4,7 @@ import { MinuteMillis, ForeverMillis, FarPast, FarFuture, MaxSaltBytes } from '.
 import { VaultError, isVaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
-import type { DeviceDB } from './device-db'
+import { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
 import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthChecker, guardStrengthChecker, strengthChecker } from './passphrase-strength'
@@ -245,10 +245,10 @@ export const parseVaultDB = (candidate: VaultDB): VaultDB => {
   return candidate
 }
 
-/** `candidate`, once it carries a {@link DeviceDB}'s verbs: 'bad_option' otherwise. */
+/** `candidate`, once it is a {@link DeviceDB} carrying its verbs: 'bad_option' otherwise. */
 export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
-  if (! deviceDBShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', "deviceDB is not a DeviceDB: in a browser, spread browserOpts() from 'safebyok/browser' into Bank.make's options; elsewhere, pass memoryDeviceDB().")
+  if (! (candidate instanceof DeviceDB) || ! deviceDBShape.safeParse(candidate).success) {
+    throw new VaultError('bad_option', "deviceDB is not a DeviceDB: in a browser, spread browserOpts() from 'safebyok/browser' into Bank.make's options; elsewhere, pass memoryDeviceDB(), or your own device store, which extends the DeviceDB class.")
   }
   return candidate
 }

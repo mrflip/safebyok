@@ -11,7 +11,7 @@ import type { BankScope } from './checks/core-checks'
 import type * as Z from 'zod'
 import { Validator } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
-import { type DeviceDB, deviceRecordFor, deviceRecordOf, deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
@@ -338,9 +338,8 @@ export class Bank {
     try {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
-      const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
-      valOf(await deviceDB.delDeviceRecord(scope))
-      valOf(await deviceDB.delLease(scope))
+      valOf(await parts.deviceDB.delDeviceRecord(scope))
+      valOf(await parts.deviceDB.delLease(scope))
       // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
       // reads neither.
       this.#letGoOf(Scopepath.vault(scope))
@@ -540,22 +539,22 @@ export class Bank {
    */
   async #bear(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
     valOf(await this.#initialize())
-    const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
     try {
-      return await this.#bearFrom(vaultScopepath, parts, deviceDB)
+      return await this.#bearFrom(vaultScopepath, parts)
     } catch (err) {
-      if (RefusalPolicy.decide(err) === 'lock') { await this.#revokeLease(parts, deviceDB) }
+      if (RefusalPolicy.decide(err) === 'lock') { await this.#revokeLease(parts) }
       throw err
     }
   }
 
-  /** {@link Bank.#bear}'s read, judgment and raise, from `deviceDB`, the device store's trouble as conditions.
+  /** {@link Bank.#bear}'s read, judgment and raise, from `parts`' stores.
    * The device record is read first, so a raise another tab's own write made is never held against
    * a read served before that write landed. Each record the device store hands back is checked
    * ({@link deviceRecordFor}): one that fails reads as none. Nothing is born below the record:
    * 'vault_behind'.
    */
-  async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts, deviceDB: DeviceDB): Promise<Vault> {
+  async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, parts: VaultParts): Promise<Vault> {
+    const { deviceDB } = parts
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
     const readAt = Math.floor(parts.clock.now())
@@ -572,8 +571,8 @@ export class Bank {
   }
 
   /** Erase this device's lease of `parts`' scope, after a birth refused for storage it cannot trust: a device store that will not erase it is warned of, as the refusal is what the caller must hear. */
-  async #revokeLease(parts: VaultParts, deviceDB: DeviceDB) {
-    const erased = await deviceDB.delLease(CX.vaultScope.parse(parts))
+  async #revokeLease(parts: VaultParts) {
+    const erased = await parts.deviceDB.delLease(CX.vaultScope.parse(parts))
     if (erased.ok) { return }
     parts.logger.warn("Storage could not be trusted with this vault as it was opened, but this device's lease of it could not be revoked: the next time the vault is opened on this device, as at the next page load, it may take it up.", { call: 'untrustedStorage' }, erased.err)
   }

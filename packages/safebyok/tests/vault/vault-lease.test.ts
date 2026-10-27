@@ -414,6 +414,7 @@ describe("the vault's ask_passphrase_at", () => {
   })
 })
 
+// Rows that fail the lease's check: the DeviceDB base class reads each as none, and discards it.
 const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  "a record under the format tag from before the package's rename"],
   [({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }: Record<string, unknown>) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }), 'a record from before the lease, under safebyok-unlock-v1'],
@@ -426,6 +427,10 @@ const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: FarFuture + 1 }),          'a deadline past FarFuture'],
   [({ ask_passphrase_at: kept, ...row }: Record<string, unknown>) => ({ ...row, ask_passphrase_at: (kept as number) - 0.5 }), 'a deadline with a fraction of a millisecond'],
   [() => 'not a record at all',                                                               'a row that is not a record'],
+] as const
+
+// Leases that read, but are no lease of this scope: the vault's own check refuses them.
+const ForeignLeases = [
   [(row: Record<string, unknown>) => ({ ...row, user_id: 'u2' }),                             "a record naming another user's vault"],
   [(row: Record<string, unknown>) => ({ ...row, applabel: 'other_app' }),                     "a record naming another app's vault"],
   [(row: Record<string, unknown>) => ({ ...row, vaultlabel: 'spare' }),                       'a record naming another of the same user\'s vaults'],
@@ -440,6 +445,20 @@ describe("the lease, from a host's own DeviceDB", () => {
   })
 
   for (const [spoil, blurb] of SpoiledWayins) {
+    it(`reads ${blurb} as no lease at birth, and the DeviceDB discards it, saying nothing`, async () => {
+      const world = makeWorld()
+      const device = uncheckingDeviceDB()
+      await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
+      device.spoilRow(spoil)
+      const later = await world.open({ deviceDB: device.deviceDB })
+      expect(TH.stateOf(later.getSnapshot())).to.eq('locked')
+      expect(later.getSnapshot().ask_passphrase_at).to.be.null
+      expect(device.rows.size).to.eq(0)
+      expect(world.logged).to.have.lengthOf(0)
+    })
+  }
+
+  for (const [spoil, blurb] of ForeignLeases) {
     it(`reads ${blurb} as no lease at birth, and leaves it where it lies`, async () => {
       const world = makeWorld()
       const device = uncheckingDeviceDB()
@@ -464,16 +483,6 @@ describe("the lease, from a host's own DeviceDB", () => {
     expect(world.logged[0]?.message).to.include('left where it lies')
   })
 
-  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, could not be read, and leaves it where it lies", async () => {
-    const world = makeWorld()
-    const device = uncheckingDeviceDB()
-    await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
-    device.spoilRow(({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }))
-    await world.open({ deviceDB: device.deviceDB })
-    expect(device.rows.size).to.eq(1)
-    expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(world.logged[0]?.message).to.include('could not be read')
-  })
 })
 // --
 
@@ -619,7 +628,7 @@ describe("a change to the ways in, once it has landed", () => {
     const vault = await world.openUnlocked('pw one')
     // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
     TH.beforeNextCall(world.vaultDB, 'putVaultRecord', () => {
-      vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
+      TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
       return Promise.resolve()
     })
     await TH.putWayin(vault, 'pw one', 'pw two')
@@ -635,7 +644,7 @@ describe("a change to the ways in, once it has landed", () => {
     // Deaf to storage's bell, so no refresh of its own write mends the picture first.
     const vault = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
     await TH.putWayin(vault, 'pw one', await TH.passkeyOf('laptop'))
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(heldLeaseOf(vault)).to.be.null
@@ -646,7 +655,7 @@ describe("a change to the ways in, once it has landed", () => {
   it("resolves though this device could not keep its lease, says so through the logger, and asks at the next open", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
     const put = await TH.putWayin(vault, 'pw one', await TH.passkeyOf('laptop'))
     expect(vault.getSnapshot().gate?.passkey).to.deep.equal(put)
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
@@ -675,7 +684,7 @@ describe("an unlock this device cannot keep a lease for", () => {
     const vault = await world.openUnlocked('pw one')
     await vault.lock()
     const trouble = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'storage_blocked')
     expect(err.cause).to.eq(trouble)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
@@ -688,7 +697,7 @@ describe("an unlock this device cannot keep a lease for", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     await vault.lock()
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
     await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'storage_unavailable')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
@@ -702,7 +711,7 @@ describe("an unlock this device cannot keep a lease for", () => {
     it(`sets the first passphrase though the device store refuses the lease: the first gate stands, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
       const world = makeWorld()
       const vault = await world.open()
-      vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble())
+      TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble())
       const err = await TH.expectRefusal(TH.unlock(vault, 'pw one'), refusalkind)
       expect(err.message).to.include('passphrase was set')
       expect(err.message).to.not.include('pw one')
@@ -716,7 +725,7 @@ describe("an unlock this device cannot keep a lease for", () => {
   it("sets the first passphrase through putWayin though the device store has no room for the lease: putWayin resolves, says so through the logger, and the vault is locked here", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
+    TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
     await TH.putWayin(vault, 'pw one', 'pw one')
     expect(storedVaultRecordOf(world)).to.include({ gate_epoch: 1 })
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])

@@ -1,5 +1,5 @@
-import { VaultScope, type LeaseRecord, type DeviceRecord } from '../../src/types/types'
-import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
+import type { LeaseRecord, DeviceRecord } from '../../src/types/types'
+import { DeviceDB, memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
@@ -61,36 +61,52 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
 /** Boxlabels in the snapshot, in order. */
 export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summary) => summary.boxlabel)
 
-/** Storage adapters Bank.make refuses: short of a verb the vault calls. */
+/** A good Outcome of null, as any verb of a device store might answer. */
+const answeredNull = () => Promise.resolve(TH.good(null))
+
+/** A device store as one was written before DeviceDB was a class: an object holding the seven verbs, each answering an Outcome. */
+const plainDeviceDB = () => {
+  const answered = answeredNull
+  return { getLease: answered, putLease: answered, delLease: answered, getDeviceRecord: answered, raiseDeviceRecord: answered, delDeviceRecord: answered, delAll: answered }
+}
+
+/** Storage adapters Bank.make refuses: short of a verb the vault calls, or no DeviceDB at all. */
 export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
   [{ vaultDB: { getVaultRecord: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
-  [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
-  [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getDeviceRecord') }, 'a deviceDB that keeps no device record'],
+  [{ deviceDB: Object.assign(memoryDeviceDB(), { delAll: 'never' }) }, 'a deviceDB whose delAll is no function'],
+  [{ deviceDB: Object.assign(memoryDeviceDB(), { getDeviceRecord: undefined }) }, 'a deviceDB that keeps no device record'],
+  [{ deviceDB: plainDeviceDB() as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB written as a plain object, every verb in place, that extends no DeviceDB'],
 ]
 
 export const HourMillis = 60 * 60 * 1000
 
 export const SevenDaysMillis = 7 * 24 * HourMillis
 
-export const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
 /**
- * A DeviceDB as a host might write its own: rows kept as handed in, and handed back unchecked, so
- * a test can reach in and spoil one the way a damaged store or an older version would.
+ * A DeviceDB as a host might write its own, a subclass over two maps: rows kept as handed in, so a
+ * test can reach in and spoil one the way a damaged store or an older version would. `rows` holds
+ * the leases, under their scopepaths.
  */
 export const uncheckingDeviceDB = () => {
   const rows = new Map<string, unknown>()
   const records = new Map<string, unknown>()
-  const deviceDB: DeviceDB = {
-    getLease: (scope) => { const kept = (rows.get(ckeyOf(scope)) ?? null) as LeaseRecord | null; return Promise.resolve(TH.good(kept)) },
-    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(record)) },
-    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    getDeviceRecord:   (scope) => { const kept = (records.get(ckeyOf(scope)) ?? null) as DeviceRecord | null; return Promise.resolve(TH.good(kept)) },
-    raiseDeviceRecord: (record) => { records.set(ckeyOf(record), record); return Promise.resolve(TH.good(record)) },
-    delDeviceRecord:   (scope) => { records.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    delAll:   () => { rows.clear(); records.clear(); return Promise.resolve(TH.good(undefined)) },
+  const rowsOf = (scopepath: string) => (Scopepath.isLease(scopepath) ? rows : records)
+  class UncheckingDeviceDB extends DeviceDB {
+    protected doGetLease(leaseScopepath: string) { return Promise.resolve(rows.get(leaseScopepath)) }
+    protected doPutLease(leaseScopepath: string, record: LeaseRecord) { rows.set(leaseScopepath, record); return Promise.resolve() }
+    protected doDelLease(leaseScopepath: string) { rows.delete(leaseScopepath); return Promise.resolve() }
+    protected doGetDeviceRecord(deviceScopepath: string) { return Promise.resolve(records.get(deviceScopepath)) }
+    protected doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, raisedFrom(records.get(deviceScopepath))); return Promise.resolve() }
+    protected doDelDeviceRecord(deviceScopepath: string) { records.delete(deviceScopepath); return Promise.resolve() }
+    protected doDelAll() { rows.clear(); records.clear(); return Promise.resolve() }
+    protected doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
+      if (! isReadable(rowsOf(scopepath).get(scopepath))) { rowsOf(scopepath).delete(scopepath) }
+      return Promise.resolve()
+    }
   }
-  /** Rewrite the one stored row through `spoil`. */
+  const deviceDB: DeviceDB = new UncheckingDeviceDB()
+  /** Rewrite the one stored lease through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {
     const [[ckey, row]] = [...rows] as [[string, Record<string, unknown>]]
     rows.set(ckey, spoil(row))
