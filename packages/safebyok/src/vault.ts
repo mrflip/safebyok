@@ -396,8 +396,7 @@ export class Vault implements VaultStamp {
    */
   consistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
-    const leaseStands = this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
-    return this.#inconsistencyWith(checkedMadeUnder(thing)) === null && (! leaseBound || leaseStands)
+    return this.#inconsistencyWith(checkedMadeUnder(thing)) === null && (! leaseBound || this.#leaseInForce() !== null)
   }
   // --
 
@@ -872,7 +871,7 @@ export class Vault implements VaultStamp {
   #clockNow(): number { return Math.floor(this.#clock.now()) }
   // --
 
-  // == [State and snapshot]: vaultRecord, lease, expiry, unlockStands, listeners, snapshot, picture, replaceSnapshot
+  // == [State and snapshot]: vaultRecord, lease, expiry, leaseInForce, listeners, snapshot, picture, replaceSnapshot
 
   // The vault record in hand, frozen: gateless while novel, and of one vault_tok for the Vault object's life.
   #vaultRecord: VaultRecord
@@ -901,9 +900,10 @@ export class Vault implements VaultStamp {
     if (this.#readRefused) { return 'refused' }
     return now - this.#readAt >= this.#staleMillis ? 'aged' : 'timely'
   }
-  /** True while a lease is held that has not ended by `now`. */
-  #unlockStands(now: number): boolean {
-    return this.#lease !== null && ! this.#lease.endsBy(now)
+  /** The lease in hand while it has not ended by `now`, else null. Drops nothing: an ended lease is dropped by its expiry, or by the call that finds it. */
+  #leaseInForce(now = this.#clockNow()): Lease | null {
+    const held = this.#lease
+    return held === null || held.endsBy(now) ? null : held
   }
   // The ways in of each gate the vault has held, made once per gate. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultRecord), so the ways in made of one,
@@ -954,7 +954,7 @@ export class Vault implements VaultStamp {
       boxes:             keptIfSame(shown?.boxes, this.#boxes),
       damagedBoxes:      keptIfSame(shown?.damagedBoxes, this.#damagedBoxes),
       capacity:          keptIfSame(shown?.capacity, this.#capacity()),
-      ask_passphrase_at: this.#unlockStands(now) ? this.#lease?.ask_passphrase_at ?? null : null,
+      ask_passphrase_at: this.#leaseInForce(now)?.ask_passphrase_at ?? null,
       freshness:         this.#freshness(now),
       trouble:           this.#trouble,
     })
@@ -1158,11 +1158,10 @@ export class Vault implements VaultStamp {
     return null
   }
 
-  /** Why the lease half refuses: no lease in hand, or one ended, which is dropped as its expiry drops it; null while one stands. */
+  /** Why the lease half refuses: no lease in hand, or one ended, which is dropped as its expiry drops it; null while one is in force. */
   #leaseRefusal(): VaultError | null {
-    if (this.#lease === null) { return lockedError() }
-    if (! this.#lease.endsBy(this.#clockNow())) { return null }
-    this.#dropLease()
+    if (this.#leaseInForce() !== null) { return null }
+    if (this.#lease !== null) { this.#dropLease() }
     return lockedError()
   }
 
@@ -1183,7 +1182,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseStandsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
+  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
 
   // The gating standing now, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
@@ -1208,9 +1207,9 @@ export class Vault implements VaultStamp {
     // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
     this.#checkStanding()
     for (;;) {
-      if (this.#leaseStandsPast(renewMillis)) { return true }
+      if (this.#leaseLastsPast(renewMillis)) { return true }
       // The threshold is the truth: a lease past its deadline goes now, should its timer run late.
-      if (this.#lease?.endsBy(this.#clockNow()) === true) { this.#dropLease() }
+      if (this.#lease !== null && this.#leaseInForce() === null) { this.#dropLease() }
       const standing = this.#gating
       if (standing !== null && ! UnlockingKinds.has(standing.gatingkind)) {
         await standing.settled
@@ -1227,7 +1226,7 @@ export class Vault implements VaultStamp {
   }
 
   /** True while the lease in hand fits the ways in the picture holds and does not end within `renewMillis` from now. */
-  #leaseStandsPast(renewMillis: number): boolean {
+  #leaseLastsPast(renewMillis: number): boolean {
     const held = this.#lease
     if (held === null) { return false }
     return fitsLease(this.#vaultRecord, held) && ! held.endsBy(this.#clockNow() + renewMillis)
