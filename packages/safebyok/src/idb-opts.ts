@@ -10,7 +10,7 @@ export type IdbOpts = {
 
 const DefaultDbName = 'safebyok'
 
-/** What the IndexedDB options hold, and nothing else: `dbName`, defaulted. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
+/** The check of {@link IdbOpts}: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
 export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }).strict() }))
 
 /** The database an adapter keeps its records in: `opts.dbName`, or 'safebyok'.
