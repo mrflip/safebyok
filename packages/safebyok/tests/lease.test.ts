@@ -87,8 +87,8 @@ describe("sealLeaseRecord", () => {
   it("binds its wrap to the vault's stamp but its format, and the lease's own stamp: its format, scope, vault_tok, gate_epoch and deadline", async () => {
     const { record } = await sealedRecord()
     const { gate_epoch: _gateEpoch, ...vaultStamp } = standing
-    const leaseStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline }
-    const leaseCtx = cipherCtx([vaultStamp, leaseStamp], 'vault_key_lease_wrapped')
+    const ownStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline }
+    const leaseCtx = cipherCtx([vaultStamp, ownStamp], 'vault_key_lease_wrapped')
     const unwrapped = await unwrapKeyUnder(record.lease_key, record.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
@@ -450,8 +450,8 @@ describe("the lease's wrap, by hand", () => {
   it("opens a record wrapped by hand under the ctx a lease is documented to bind: its vault's stamp but the format, its own format, scope, vault_tok, gate_epoch and deadline, and the purpose", async () => {
     const { vault, vaultKey, lease } = await leasedVault()
     const vaultStamp = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: vault.registered_at }
-    const leaseStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 1, ask_passphrase_at: Deadline }
-    const leaseCtx = cipherCtx([vaultStamp, leaseStamp], 'vault_key_lease_wrapped')
+    const ownStamp = { format: 'safebyok-lease-v1', ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 1, ask_passphrase_at: Deadline }
+    const leaseCtx = cipherCtx([vaultStamp, ownStamp], 'vault_key_lease_wrapped')
     const byHand = { ...leaseRecordOf(lease), vault_key_lease_wrapped: await wrapKeyUnder(leaseRecordOf(lease).lease_key, vaultKey, leaseCtx) }
     vault.lease = Lease.make(vault, byHand)
     const ciphered = await vault.lease.cipheredWith(bytesOf('1'), visibleOf())
