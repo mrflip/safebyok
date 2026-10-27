@@ -28,7 +28,7 @@ export type VaultRecordExpectation = Z.infer<typeof VaultRecordExpectation>
  */
 export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
 
-/** The vault a box write was sealed for, and the revision the writer read, null for none: {@link VaultDB.putBox} lands only while both are stored.
+/** The vault a box write was sealed for, and the revision the writer read, null for none: {@link VaultDB.putBox} lands only while both are stored (for null, while no box is).
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: prev?.revision_tok ?? null }
  */
