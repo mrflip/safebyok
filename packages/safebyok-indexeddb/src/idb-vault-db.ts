@@ -22,7 +22,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and tell
  * the user plainly that the vault lives only in this browser.
  *
- * @returns The VaultDB, to hand `Bank.make`. Kind 'bad_option' for a `dbName` that is not non-empty text.
+ * @returns The VaultDB, to hand `Bank.make`. Kind 'bad_option' for a `dbName` that is not non-empty text, or an option it does not take.
  *
  * @example
  *   const vaultDB = idbVaultDB({ dbName: 'acme' })   // once, at module level
@@ -160,7 +160,7 @@ class IdbVaultDB extends VaultDB {
 const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<VaultReadResponse> => {
   const range = boxRange(scope)
   const [vaultRecord, ckeys, rows] = await Promise.all([rowAt(store, Scopepath.vault(scope)), settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))])
-  return { vault: (vaultRecord ?? null) as VaultReadResponse['vault'], ...splitStoredBoxes(storedBoxesOf(ckeys, rows)) }
+  return { vault: vaultRecord ?? null, ...splitStoredBoxes(storedBoxesOf(ckeys, rows)) }
 }
 
 /** The scope's boxes from the keys and rows of its key range, read together: each under the boxlabel its scopepath names.
