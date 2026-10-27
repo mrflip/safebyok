@@ -1617,7 +1617,7 @@ export class Vault implements VaultStamp {
     return await this.#readBox(label, call)
   }
 
-  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the box demanded after the read, then the lease.
+  /** The box under `boxlabel` as storage holds it in this vault, or null when none stands; the vault demanded after the read, then the lease.
    * A box another device wrote is what storage holds, not drift. The demand on what the read was
    * made under cannot see a lock, which moves no `vault_tok`, so the lease is demanded again before
    * anything is handed back: a lock landing while storage is read refuses 'vault_locked', a box or none.
@@ -1632,7 +1632,6 @@ export class Vault implements VaultStamp {
       return null
     }
     const fetched = this.#boxUnder(read.val)
-    this.#demand(fetched, { call })
     this.#demandLease(call)
     return fetched
   }
@@ -1754,10 +1753,9 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Update the box listing with `stored`, the record a box write just landed in this vault, once the box it makes is demanded consistent: a lock meanwhile lets it land. Resolves that box. */
+  /** Update the box listing with `stored`, the record a box write just landed in this vault, resolving the box it makes under the picture in hand. */
   #updateBoxListingOf(stored: BoxRecord): Box {
     const box = this.#boxUnder(stored)
-    this.#demand(box, { call: 'putBox' })
     const entry = boxSparseOf(stored)
     this.#boxes = Object.freeze([...this.#boxes.filter((listed) => listed.boxlabel !== entry.boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel)))
     this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((listed) => listed.boxlabel !== entry.boxlabel))
