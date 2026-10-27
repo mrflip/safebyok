@@ -5,8 +5,8 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** threads 1 to 3 filed and restacked into one line, main → #297 → #299 → #298 (top
-  `9b780d04`, justify green); thread 4 building on it; thread 5 waits for thread 4.
+* **Status:** threads 1 to 4 filed in one line, main → #297 → #299 → #298 → #300 (top
+  `a35ec328`); thread 5's runs 5a, 5b and 5c building side by side from #300.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
@@ -223,6 +223,16 @@ test for it.
     its verb says it reads storage through `freshen`; its review asked for it.
   - Leave notes/security.md to a `sonnet` subagent, as the brief says, and name it in the PR's
     open questions.
+
+*Review:* [fixed](https://github.com/mrflip/safebyok/pull/300#issuecomment-6452564329), 4 fixes,
+0 significant. Fixed: `#putGate`'s comment (the store adds one to the *stored* epoch, not the held
+one); `tryExtractWhisper`'s comment names the demand's lease half; `#storedBase`'s "where no box is
+stored"; security.md's first-gate race entry (the loser's `gate_made_elsewhere` comes from the
+consistency demand, not `#demandNotGone`). Left, minor: `#raiseRecordAfter`'s log keeps "what it did
+stands" (kept idiom); graphql's `refusalOfAnswer` doc block names `storedField` (pre-existing shape);
+`OutsideGating` sorts out of order in four test imports; `MapVaultDB.storedVaultRecord` is a noun
+for a read (pre-existing); `#freshenGated` kept as ruled; the empty changeset and `OutsideGating`'s
+home are in the doc.
 
 ### 5. `docblocks_core`: a documentarian run on the core's `src/`
 
