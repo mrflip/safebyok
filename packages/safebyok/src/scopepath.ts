@@ -23,7 +23,7 @@ export { ScopepathDelimiter as Delimiter } from './consts'
 
 /** A bank's scopepath: `bank^acme^u1`. */
 export type BankScopepath = Z.input<typeof CX.bankScopepath>
-/** The scopepath of a vault's props: `vault^acme^u1^main`. */
+/** The scopepath of a vault's record: `vault^acme^u1^main`. */
 export type VaultScopepath = Z.input<typeof CX.vaultScopepath>
 /** The scopepath of a vault's lease, on a device: `lease^acme^u1^main`. */
 export type LeaseScopepath = Z.input<typeof CX.leaseScopepath>

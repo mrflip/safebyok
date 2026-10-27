@@ -74,7 +74,7 @@ export const useListedVault = (vaultlabel: string): BankVault | null => useListe
  *
  * @example
  *   const vault = useVault('main')
- *   if (vault === null) { return <p>Opening your vault…</p> }
+ *   if (vault === null) { return <p>Opening your vault…</p> }   // or refused: useListedVault says which
  *   return <button onClick={() => { void vault.lock() }}>Lock</button>
  */
 export const useVault = (vaultlabel: string): Vault | null => useVaultFor('useVault', vaultlabel)
@@ -110,7 +110,7 @@ const useListed = (hookname: string, vaultlabel: string): { bank: Bank | null, b
  *
  * @example
  *   const snapshot = useVaultSnapshot('main')
- *   if (snapshot === null) { return <p>Opening your vault…</p> }
+ *   if (snapshot === null) { return <p>Opening your vault…</p> }   // or refused: useListedVault says which
  *   return <p>{snapshot.boxes.length} keys stored</p>
  */
 export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
