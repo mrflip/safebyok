@@ -129,6 +129,21 @@ export type PasskeyAnswer = {
   prfBytes:      Uint8Array
 }
 
+/** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
+ * A device store hands back what it kept by structured clone, so a key that is extractable, of
+ * another algorithm, or for another use was not written by this package: its record reads as none.
+ *
+ * @example isLeaseKey(await makeLeaseKey())   // true
+ * @example isLeaseKey(await makeVaultKey())   // false: extractable
+ */
+export const isLeaseKey = (val: unknown): val is CryptoKey => (
+  val instanceof CryptoKey
+    && ! val.extractable
+    && val.algorithm.name === 'AES-GCM'
+    && val.usages.includes('unwrapKey')
+    && val.usages.every((usage) => usage === 'wrapKey' || usage === 'unwrapKey')
+)
+
 /** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
  * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
@@ -142,8 +157,8 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     vault_tok,
     /** The vault record's `gate_epoch` when this lease was granted: a mismatch voids it. */
     gate_epoch:        int.positive(),
-    /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable, usable only to unwrap what it wrapped. */
-    lease_key:         custom<CryptoKey>((val) => val instanceof CryptoKey, "a CryptoKey handle"),
+    /** This browser's leaseKey, a CryptoKey, never its bytes: non-extractable AES-GCM, usable only to wrap and unwrap, as {@link isLeaseKey} says. One kept otherwise reads as no lease. */
+    lease_key:         custom<CryptoKey>(isLeaseKey, "a non-extractable AES-GCM CryptoKey for wrapKey and unwrapKey"),
     /** The vaultKey, wrapped under the leaseKey. */
     vault_key_lease_wrapped,
     /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
