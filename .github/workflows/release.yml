@@ -1,16 +1,19 @@
 name: Release
 
-# Every push to main runs this, and changesets decides which of three things it does
-# (notes/releasing.md):
+# Every push to main runs this, and so does a nightly schedule, and the Coach, on main, from the
+# Actions tab or with `gh workflow run release.yml`. Changesets decides which of three things it
+# does (notes/releasing.md):
 #
-# * version -- changesets are waiting on main. `version` turns them into version bumps and
-#   CHANGELOG entries on the branch changeset-release/main, rebuilt from main's tip each time, and
-#   opens or updates the Version PR from it, named for the release it makes, as a draft when it
-#   is first opened. The Coach marks it ready to release it; a later push to main rebuilds it but
-#   leaves it as it is, so the Coach rereads a ready Version PR that main has moved under.
-#   Merging that PR is the release.
+# * version -- changesets are waiting on main, and the run is the nightly one or the Coach's: a
+#   push to main leaves the Version PR alone, since each rebuild runs CI and CodeQL over it again,
+#   and a run of merges would rebuild it after each one. `version` turns the changesets into
+#   version bumps and CHANGELOG entries on the branch changeset-release/main, rebuilt from main's
+#   tip each time, and opens or updates the Version PR from it, named for the release it makes, as
+#   a draft when it is first opened. The Coach marks it ready to release it; a later run rebuilds
+#   it but leaves it as it is, so the Coach rereads a ready Version PR rebuilt since. Merging that
+#   PR is the release.
 # * publish -- no changesets wait, and a public package's version is not yet on npm: the Version
-#   PR has just been merged. `pack` checks the lockstep group, lints, typechecks, tests and builds
+#   PR has just been merged, and the run is not the nightly one. `pack` checks the lockstep group, lints, typechecks, tests and builds
 #   every package, and packs each package to release with pnpm (which writes real ranges in place
 #   of `workspace:`). `publish` stages each tarball on npm (scripts/release.ts); the changesets
 #   action then tags each package staged (`safebyok@0.2.0`) and writes its GitHub release from its
@@ -39,6 +42,9 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '41 9 * * *'
 
 permissions: {}
 
@@ -48,7 +54,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Run by hand from another branch, it does nothing: a release is made from main alone. A
+  # scheduled run is always on main.
   select-mode:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -69,7 +78,7 @@ jobs:
 
   version:
     needs: select-mode
-    if: needs.select-mode.outputs.mode == 'version'
+    if: needs.select-mode.outputs.mode == 'version' && github.event_name != 'push'
     runs-on: ubuntu-latest
     environment: releasing
     # The App token does the writing; the GITHUB_TOKEN only reads.
@@ -110,7 +119,9 @@ jobs:
 
   pack:
     needs: select-mode
-    if: needs.select-mode.outputs.mode == 'publish'
+    # Never on the nightly run: a staged version the Coach rejected on npm would be staged again
+    # each night. A failed release is mended by re-running it, or by running the workflow by hand.
+    if: needs.select-mode.outputs.mode == 'publish' && github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
