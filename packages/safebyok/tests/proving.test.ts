@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import { type PasskeyAnswer, type GatedVaultRecord, vaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
 import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
@@ -13,7 +13,7 @@ import * as TH from './test-helpers'
 import { makeRacingWorld, makeWorld, storedVaultRecordOf, vaultWithPasskey } from './vault/world'
 
 /** The gated vault record `world` stores now. */
-const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
+const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => vaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
 
 /** A world holding `u1`'s vault with the passphrase `pw`, locked, and its stored vault record. */
 const lockedWorld = async () => {

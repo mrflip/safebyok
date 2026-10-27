@@ -78,34 +78,34 @@ describe("Scopepath, refusing a scope whose names fail their checks", () => {
 
 describe("Scopepath's inverses", () => {
   it("read a bank's scope back from its scopepath, as bankScope's example shows", () => {
-    expect(Scopepath.bankScope('bank^acme^u1')).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    expect(Scopepath.bankScopeOf('bank^acme^u1')).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
   })
 
   it("read a vault's scope back from its scopepath, as vaultScope's first example shows", () => {
-    expect(Scopepath.vaultScope('vault^acme^u1^main')).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+    expect(Scopepath.vaultScopeOf('vault^acme^u1^main')).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
   it("refuse another kind's scopepath as bad_scope, as vaultScope's second example shows", () => {
-    TH.expectSyncRefusal(() => Scopepath.vaultScope('lease^acme^u1^main'), 'bad_scope')
+    TH.expectSyncRefusal(() => Scopepath.vaultScopeOf('lease^acme^u1^main'), 'bad_scope')
   })
 
   it("refuse a scopepath with one name too many as bad_scope, as vaultScope's third example shows", () => {
-    TH.expectSyncRefusal(() => Scopepath.vaultScope('vault^acme^u1^main^extra'), 'bad_scope')
+    TH.expectSyncRefusal(() => Scopepath.vaultScopeOf('vault^acme^u1^main^extra'), 'bad_scope')
   })
 
   it("read a box's scope back from its scopepath, as boxscope's example shows", () => {
-    expect(Scopepath.boxscope('box^acme^u1^main^openai').boxlabel).to.eq('openai')
+    expect(Scopepath.boxscopeOf('box^acme^u1^main^openai').boxlabel).to.eq('openai')
   })
 
   it("undo each maker, for a user_id of every character it may hold", () => {
     const scope = { applabel: 'acme', user_id: 'auth0|a.b~c:d@e+f%20-_', vaultlabel: 'main_2' }
-    expect(Scopepath.bankScope(Scopepath.bank(scope))).to.deep.equal({ applabel: scope.applabel, user_id: scope.user_id })
-    expect(Scopepath.vaultScope(Scopepath.vault(scope))).to.deep.equal(scope)
-    expect(Scopepath.boxscope(Scopepath.box({ ...scope, boxlabel: 'openai' }))).to.deep.equal({ ...scope, boxlabel: 'openai' })
+    expect(Scopepath.bankScopeOf(Scopepath.bank(scope))).to.deep.equal({ applabel: scope.applabel, user_id: scope.user_id })
+    expect(Scopepath.vaultScopeOf(Scopepath.vault(scope))).to.deep.equal(scope)
+    expect(Scopepath.boxscopeOf(Scopepath.box({ ...scope, boxlabel: 'openai' }))).to.deep.equal({ ...scope, boxlabel: 'openai' })
   })
 
   it("refuse a box's scopepath whose boxlabel fails its check, quoting none of it", () => {
-    const refusal = TH.expectSyncRefusal(() => Scopepath.boxscope('box^acme^u1^main^Secret Key'), 'bad_scope')
+    const refusal = TH.expectSyncRefusal(() => Scopepath.boxscopeOf('box^acme^u1^main^Secret Key'), 'bad_scope')
     expect(TH.thrownText(refusal)).to.not.include('Secret')
   })
 })

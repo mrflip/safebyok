@@ -2,14 +2,13 @@ import { inspect } from 'node:util'
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Box, type SealBoxProps, boxSparseOf } from '../src/box'
-import { BoxDamaged, BoxRecord, BoxSparse, BoxStamp } from '../src/shapes/box'
+import { boxDamaged, boxRecord, type BoxRecord, boxSparse, boxStamp, type Whisper } from '../src/shapes/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
 import { stableJsonify } from '../src/stable-jsonify'
-import type { Whisper } from '../src/shapes/box'
 import type { VaultSparse } from '../src/shapes/vault'
 import { box_key_wrapped, whisper_ciphered } from '../src/shapes/fields'
 import { FarFuture } from '../src/consts'
@@ -55,20 +54,20 @@ const BoxCases = [
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso }, false, 'a box from before its times were named registered_at and changed_at'],
 ] as const
 
-describe("BoxRecord", () => {
+describe("boxRecord", () => {
   for (const [candidate, expected, blurb] of BoxCases) {
-    it(blurb, () => { expect(BoxRecord.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(boxRecord.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("refuses a field it does not know, such as the note a box once had, as 'bad_record', counting it and never naming it", () => {
-    const err = TH.expectSyncRefusal(() => BoxRecord.parse({ ...wholeBox, note: 'work account' }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...wholeBox, note: 'work account' }), 'bad_record')
     expect(err.message).to.match(/^There is a field it does not take \(its name is not repeated\): it takes only format, boxlabel, /)
     expect(err.message).to.not.include('note')
   })
 
   it("tells a row that is no box from one that is, as its example shows", () => {
-    expect(BoxRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.false
-    expect(BoxRecord.safeParse(wholeBox).success).to.be.true
+    expect(boxRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.false
+    expect(boxRecord.safeParse(wholeBox).success).to.be.true
   })
 })
 
@@ -137,25 +136,25 @@ const OwnFields = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'vault_epoc
 
 afterEach(() => { vi.restoreAllMocks() })
 
-describe("BoxSparse", () => {
+describe("boxSparse", () => {
   it("is every field of the box record but its two ciphered ones, as its example shows, and refuses a whole record or one missing a field", () => {
     const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = TH.boxOf('anthropic_api_key', 'a1')
-    expect(BoxSparse.parse(listed)).to.deep.equal(listed)
-    expect(Object.keys(BoxSparse.shape)).to.have.members(Object.keys(listed))
-    expect(BoxSparse.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success, 'a sparse box holds no ciphertext').to.be.false
-    expect(BoxSparse.safeParse(TH.omitting(listed, 'sidecar')).success).to.be.false
+    expect(boxSparse.parse(listed)).to.deep.equal(listed)
+    expect(Object.keys(boxSparse.shape)).to.have.members(Object.keys(listed))
+    expect(boxSparse.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success, 'a sparse box holds no ciphertext').to.be.false
+    expect(boxSparse.safeParse(TH.omitting(listed, 'sidecar')).success).to.be.false
   })
 })
 
-describe("BoxDamaged", () => {
+describe("boxDamaged", () => {
   it("is a damaged box's boxlabel, revision and damage, as its example lists one, and nothing else", () => {
     const damaged = { boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format' } as const
-    expect(BoxDamaged.parse(damaged)).to.deep.equal(damaged)
-    expect(BoxDamaged.safeParse({ ...damaged, revision_tok: 'rev-one', damage: 'damaged' }).success).to.be.true
-    expect(BoxDamaged.safeParse({ ...damaged, damage: 'broken' }).success, 'a damage no version names').to.be.false
-    expect(BoxDamaged.safeParse({ ...damaged, boxlabel: 'Anthropic' }).success, 'a boxlabel that is no label').to.be.false
-    expect(BoxDamaged.safeParse({ ...damaged, revision_tok: '' }).success, 'an empty revision').to.be.false
-    expect(BoxDamaged.safeParse({ ...damaged, sidecar: {} }).success, 'a field a damaged box never holds').to.be.false
+    expect(boxDamaged.parse(damaged)).to.deep.equal(damaged)
+    expect(boxDamaged.safeParse({ ...damaged, revision_tok: 'rev-one', damage: 'damaged' }).success).to.be.true
+    expect(boxDamaged.safeParse({ ...damaged, damage: 'broken' }).success, 'a damage no version names').to.be.false
+    expect(boxDamaged.safeParse({ ...damaged, boxlabel: 'Anthropic' }).success, 'a boxlabel that is no label').to.be.false
+    expect(boxDamaged.safeParse({ ...damaged, revision_tok: '' }).success, 'an empty revision').to.be.false
+    expect(boxDamaged.safeParse({ ...damaged, sidecar: {} }).success, 'a field a damaged box never holds').to.be.false
   })
 })
 
@@ -169,13 +168,13 @@ describe("boxSparseOf", () => {
   })
 })
 
-describe("BoxStamp", () => {
+describe("boxStamp", () => {
   it("is every field of the box record but its two ciphered ones, and the vault_tok of its vault, as its example shows", () => {
     const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...visible } = TH.boxOf('anthropic_api_key', 'a1')
-    const stamp = BoxStamp.parse({ ...visible, vault_tok: 'vault-tok-u1' })
+    const stamp = boxStamp.parse({ ...visible, vault_tok: 'vault-tok-u1' })
     expect(Object.keys(stamp)).to.have.members([...Object.keys(visible), 'vault_tok'])
-    expect(BoxStamp.safeParse(visible).success, 'a stamp names its vault').to.be.false
-    expect(BoxStamp.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), vault_tok: 'vault-tok-u1' }).success, 'a stamp holds no ciphertext').to.be.false
+    expect(boxStamp.safeParse(visible).success, 'a stamp names its vault').to.be.false
+    expect(boxStamp.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), vault_tok: 'vault-tok-u1' }).success, 'a stamp holds no ciphertext').to.be.false
   })
 })
 
@@ -270,7 +269,7 @@ describe("Box.make", () => {
   it("holds, spread, every field its BoxSparse holds, and its Boxscope: it passes for both (Contract: Box)", async () => {
     const box = boxIn(await vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
     expect(TH.shownOf(box)).to.deep.include(boxSparseOf(box.record))
-    expect(BoxSparse.strip().parse(box)).to.deep.equal(boxSparseOf(box.record))
+    expect(boxSparse.strip().parse(box)).to.deep.equal(boxSparseOf(box.record))
     expect(CX.boxscope.parse(box)).to.deep.equal({ ...TH.scopeOf('u1'), boxlabel: 'anthropic_api_key' })
   })
 

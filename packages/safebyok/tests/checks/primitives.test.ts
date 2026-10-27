@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { EpochMillis, LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/checks/primitives'
+import { epochMillis, LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/checks/primitives'
 import { FarFuture, FarPast } from '../../src/consts'
 
 const LabelCases = [
@@ -152,12 +152,12 @@ describe("UserIdPattern", () => {
 
 describe("label and user_id, inside a host's own Zod", () => {
   // A host on classic Zod holds them in its own schemas, as a form checking a box might.
-  const BoxForm = Zod.object({ boxlabel: label, user_id: Zod.optional(user_id) })
+  const boxForm = Zod.object({ boxlabel: label, user_id: Zod.optional(user_id) })
 
   it("compose into a host's schema and check as they do alone", () => {
-    expect(BoxForm.parse({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })).to.deep.equal({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })
-    expect(BoxForm.safeParse({ boxlabel: 'ANTHROPIC' }).success).to.be.false
-    expect(BoxForm.safeParse({ boxlabel: 'anthropic', user_id: 'u'.repeat(101) }).success).to.be.false
+    expect(boxForm.parse({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })).to.deep.equal({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })
+    expect(boxForm.safeParse({ boxlabel: 'ANTHROPIC' }).success).to.be.false
+    expect(boxForm.safeParse({ boxlabel: 'anthropic', user_id: 'u'.repeat(101) }).success).to.be.false
   })
 })
 
@@ -183,27 +183,27 @@ const EpochMillisCases = [
   [null,                      false,  'null'],
 ] as const
 
-describe("EpochMillis", () => {
+describe("epochMillis", () => {
   for (const [candidate, expected, blurb] of EpochMillisCases) {
     it(`${expected ? 'accepts' : 'refuses'} ${blurb}`, () => {
-      expect(EpochMillis.safeParse(candidate).success).to.eq(expected)
+      expect(epochMillis.safeParse(candidate).success).to.eq(expected)
     })
   }
 
   it("says which unit a refused number likely was", () => {
-    const tooSmall = EpochMillis.safeParse(NowMillis / 1000)
-    const tooLarge = EpochMillis.safeParse(NowMillis * 1000)
+    const tooSmall = epochMillis.safeParse(NowMillis / 1000)
+    const tooLarge = epochMillis.safeParse(NowMillis * 1000)
     expect(tooSmall.error?.issues[0]?.message).to.match(/epoch seconds/)
     expect(tooLarge.error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
+    expect(epochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
+    expect(epochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
   })
 
   it("passes a time through unchanged, as its examples show", () => {
-    expect(EpochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
-    expect(EpochMillis.safeParse(1_792_022_400).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
-    expect(EpochMillis.safeParse(Infinity).success).to.be.false
+    expect(epochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
+    expect(epochMillis.safeParse(1_792_022_400).success).to.be.false
+    expect(epochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
+    expect(epochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
+    expect(epochMillis.safeParse(Infinity).success).to.be.false
   })
 })

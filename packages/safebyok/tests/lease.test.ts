@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { BoxFormat, type BoxRecord, type BoxSparse } from '../src/shapes/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { Lease, leaseRecordOf, sealLeaseRecord } from '../src/lease'
-import { LeaseStamp, type LeaseRecord } from '../src/shapes/device'
+import { leaseStamp, type LeaseRecord } from '../src/shapes/device'
 import type { VaultSparse } from '../src/shapes/vault'
 import type { VaultStampButFormat } from '../src/shapes/ducks'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
@@ -129,12 +129,12 @@ describe("sealLeaseRecord", () => {
   })
 })
 
-describe("LeaseStamp", () => {
+describe("leaseStamp", () => {
   it("is the lease record but its key material, as its example shows: what a lease shows, and its format", async () => {
     const { lease_key: _leaseKey, vault_key_lease_wrapped: _wrapped, ...stamped } = await TH.leaseOf('u1')
-    expect(LeaseStamp.parse(stamped)).to.deep.equal(stamped)
+    expect(leaseStamp.parse(stamped)).to.deep.equal(stamped)
     expect(Object.keys(stamped)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'gate_epoch', 'ask_passphrase_at'])
-    expect(LeaseStamp.safeParse(await TH.leaseOf('u1')).success, 'a stamp holds no key material').to.be.false
+    expect(leaseStamp.safeParse(await TH.leaseOf('u1')).success, 'a stamp holds no key material').to.be.false
   })
 })
 
@@ -181,7 +181,7 @@ describe("Lease.make", () => {
     expect(Object.keys(lease)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(lease))).to.deep.equal(visible)
     expect(TH.jsonOf(lease)).to.deep.equal(TH.shownOf(lease))
-    expect(LeaseStamp.parse(TH.shownOf(lease))).to.deep.equal(TH.shownOf(lease))
+    expect(leaseStamp.parse(TH.shownOf(lease))).to.deep.equal(TH.shownOf(lease))
     expect(lease.format).to.eq('safebyok-lease-v1')
     const wrapped = leaseRecordOf(lease).vault_key_lease_wrapped
     for (const hidden of ['lease_key', 'vault_key_lease_wrapped', 'CryptoKey', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {

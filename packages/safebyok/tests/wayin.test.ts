@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { PasskeyProving, PassphraseProving, StandingGating, passphraseKeyOf } from '../src/proving'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, type PasskeyWayinRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import { type PasskeyAnswer, type GatedVaultRecord, type PasskeyWayinRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import * as Validators from '../src/validators'
 import { prf_salt_b64 } from '../src/shapes/fields'
 import type { Vault } from '../src/vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from '../src/wayin'
@@ -19,7 +20,7 @@ const vaultRecord = TH.vaultRecordOf('u1')
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 /** The gated vault record `world` stores now. */
-const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
+const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => Validators.vaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
 
 /** The passkey way in `stored` holds: the test's vault was given one. */
 const passkeyRecordOf = (stored: GatedVaultRecord): PasskeyWayinRecord => {
@@ -250,7 +251,7 @@ describe("a passphrase's way in, as a proving seals it", () => {
     const { passphrase: two } = await novelWayins()
     expect(one).to.be.instanceOf(PassphraseWayin)
     const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passphrase: one.record }) })
-    expect(VaultRecord.safeParse(record).success).to.be.true
+    expect(Validators.vaultRecord.safeParse(record).success).to.be.true
     expect(one.record).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
     expect(one.record.salt_b64).to.not.eq(two.record.salt_b64)
   })
@@ -309,7 +310,7 @@ describe("a passkey's way in, as a proving seals it", () => {
     const { passkey: wayin } = await novelPasskey(answer)
     expect(wayin).to.be.instanceOf(PasskeyWayin)
     const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: wayin.record }) })
-    expect(VaultRecord.safeParse(record).success).to.be.true
+    expect(Validators.vaultRecord.safeParse(record).success).to.be.true
     expect(wayin).to.include({ wayinkind: 'passkey', credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(JSON.stringify(wayin.record)).to.not.include(prfB64)
   })

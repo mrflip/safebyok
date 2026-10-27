@@ -36,7 +36,7 @@ describe("the names a host writes by hand", () => {
   })
 
   it("hand out EpochMillis as the same check the package keeps every time with", () => {
-    expect(Fields.EpochMillis).to.eq(Primitives.EpochMillis)
+    expect(Fields.epochMillis).to.eq(Primitives.epochMillis)
   })
 })
 

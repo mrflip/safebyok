@@ -11,7 +11,7 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
-      'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'BoxDamaged', 'BoxFormat', 'BoxRecord', 'BoxSparse', 'BoxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'LeaseStamp', 'GateRecord', 'GateSparse', 'PasskeyWayinSparse', 'PassphraseWayinSparse', 'VaultFormat', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'TombstoneFormat', 'VaultRecord', 'VaultScope', 'isGated', 'Whisper', 'wallClock',
+      'ciphered', 'deviceRecord', 'DeviceRecordFormat', 'epochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'boxDamaged', 'BoxFormat', 'boxRecord', 'boxSparse', 'boxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'passkeyWayinRecord', 'PasskeySaltBytes', 'passphraseWayinRecord', 'sidecar', 'StaleMinutes', 'wayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'leaseRecord', 'leaseStamp', 'gateRecord', 'gateSparse', 'passkeyWayinSparse', 'passphraseWayinSparse', 'VaultFormat', 'vaultSparse', 'vaultStamp', 'vaultTombstone', 'TombstoneFormat', 'vaultRecord', 'vaultScope', 'isGated', 'whisper', 'wallClock',
       'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'Validators',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'deviceRecordOf', 'raisedDeviceRecord',
@@ -27,17 +27,17 @@ describe("the package's entry point", () => {
   })
 
   it("exports the scopepaths an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
+    expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScopeOf', 'vaultScopeOf', 'boxscopeOf', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
   it("exports the validators a host or an adapter calls as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
     expect(Object.keys(safebyok.Validators)).to.have.members([
-      'EpochMillis', 'label', 'user_id',
-      'bankScope', 'vaultScope', 'boxscope', 'VaultScope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath',
-      'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped', 'Ciphered',
-      'PassphraseWayinRecord', 'PasskeyWayinRecord', 'WayinRecord', 'GateRecord', 'VaultRecord', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'VaultDraft', 'GateSparse', 'PassphraseWayinSparse', 'PasskeyWayinSparse',
-      'BoxRecord', 'BoxSparse', 'BoxDamaged', 'BoxStamp', 'LeaseRecord', 'LeaseStamp', 'DeviceRecord', 'Whisper', 'Sidecar', 'Capacity',
-      'VaultRecordExpectation', 'BoxGetExpectation', 'BoxExpectation', 'VaultDelExpectation', 'BoxDelExpectation', 'BoxDeletion',
+      'epochMillis', 'label', 'user_id',
+      'bankScope', 'vaultScope', 'boxscope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath',
+      'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped', 'ciphered',
+      'passphraseWayinRecord', 'passkeyWayinRecord', 'wayinRecord', 'gateRecord', 'vaultRecord', 'vaultSparse', 'vaultStamp', 'vaultTombstone', 'vaultDraft', 'gateSparse', 'passphraseWayinSparse', 'passkeyWayinSparse',
+      'boxRecord', 'boxSparse', 'boxDamaged', 'boxStamp', 'leaseRecord', 'leaseStamp', 'deviceRecord', 'whisper', 'sidecar', 'capacity',
+      'vaultRecordExpectation', 'boxGetExpectation', 'boxExpectation', 'vaultDelExpectation', 'boxDelExpectation', 'boxDeletion',
       'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
       'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswerShape',
     ])
@@ -45,7 +45,7 @@ describe("the package's entry point", () => {
       expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
     }
     const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
-    expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['VaultRecord', 'BoxRecord', 'Whisper', 'Sidecar', 'Ciphered', 'LeaseStamp', 'label'])
+    expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['vaultRecord', 'boxRecord', 'whisper', 'sidecar', 'ciphered', 'leaseStamp', 'label'])
     for (const [exportname, exported] of validatorsByName) {
       expect(safebyok.Validators[exportname as keyof typeof Validators], exportname).to.eq(exported)
     }

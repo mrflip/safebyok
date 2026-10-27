@@ -1,14 +1,14 @@
 import { hex } from '@scure/base'
 import { describe, expect, it } from 'vitest'
-import { BoxStamp } from '../src/shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder } from '../src/crypto'
 import { isVaultError } from '../src/errors'
-import { LeaseStamp } from '../src/shapes/device'
+import type { LeaseStamp } from '../src/shapes/device'
 import { boxCtxOf, leaseCtxOf } from '../src/lease'
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
-import { type GatedVaultRecord, VaultFormat, VaultRecord, VaultStamp, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import { type GatedVaultRecord, VaultFormat, type VaultStamp, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import * as Validators from '../src/validators'
 import { PasskeyProving, PassphraseProving, StandingGating, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
@@ -92,7 +92,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const whisperCtx = textBytes(`[${vaultText},${boxText},"whisper_ciphered"]`)
     const leaseCtx = textBytes(`[${vaultText},${leaseText},"vault_key_lease_wrapped"]`)
 
-    const { gate: { passphrase } } = VaultRecord.parse(vaultRecord) as GatedVaultRecord
+    const { gate: { passphrase } } = Validators.vaultRecord.parse(vaultRecord) as GatedVaultRecord
     const wayinKey = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), fromB64(passphrase.salt_b64), TH.spyLogger().logger)
     const wayinCtx = wayinCtxOf(vaultRecord, headerOf(passphrase))
     const vaultKey = await unwrapKeyUnder(wayinKey, passphrase.vault_key_wayin_wrapped, wayinCtx, { extractable: false, usage: ['unwrapKey'] })
@@ -152,9 +152,9 @@ const LeaseStampFields = ['format', 'applabel', 'user_id', 'vaultlabel', 'vault_
 
 describe("each ctx binds every field of its stamps", () => {
   it("names every field of each stamp below: a field a stamp gains fails here until it is listed", () => {
-    expect(Object.keys(VaultStamp.parse(vaultStamp))).to.have.members([...VaultStampFields])
-    expect(Object.keys(BoxStamp.parse(boxStamp))).to.have.members([...BoxStampFields])
-    expect(Object.keys(LeaseStamp.parse(leaseStamp))).to.have.members([...LeaseStampFields])
+    expect(Object.keys(Validators.vaultStamp.parse(vaultStamp))).to.have.members([...VaultStampFields])
+    expect(Object.keys(Validators.boxStamp.parse(boxStamp))).to.have.members([...BoxStampFields])
+    expect(Object.keys(Validators.leaseStamp.parse(leaseStamp))).to.have.members([...LeaseStampFields])
   })
 
   for (const field of VaultStampFields) {

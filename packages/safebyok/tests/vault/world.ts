@@ -1,4 +1,4 @@
-import { VaultScope } from '../../src/shapes/scopes'
+import type { VaultScope } from '../../src/shapes/scopes'
 import type { LeaseRecord, DeviceRecord } from '../../src/shapes/device'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'

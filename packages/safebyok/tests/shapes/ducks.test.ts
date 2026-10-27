@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
-import { VaultKin, bankScopeDuck, boxscopeDuck, leaseStampDuck, vaultScopeDuck, vaultStampButFormatDuck, vaultStampDuck } from '../../src/shapes/ducks'
+import { vaultKin, bankScopeDuck, boxscopeDuck, leaseStampDuck, vaultScopeDuck, vaultStampButFormatDuck, vaultStampDuck } from '../../src/shapes/ducks'
 import { VaultFormat } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
@@ -9,11 +9,11 @@ const scope = TH.scopeOf('u1')
 const record = TH.vaultRecordOf('u1')
 const box = { ...scope, ...TH.boxOf('openai', 'b1') }
 
-describe("VaultKin", () => {
+describe("vaultKin", () => {
   it("takes every record of the vault's kin, each field as its owner checks it, as its example shows", async () => {
     const lease = await TH.leaseOf('u1')
     for (const kin of [record, TH.gatelessOf('u1'), box, lease, TH.deviceRecordOf('u1'), { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }]) {
-      expect(VaultKin.partial().strict().safeParse(kin).success).to.be.true
+      expect(vaultKin.partial().strict().safeParse(kin).success).to.be.true
     }
   })
 })

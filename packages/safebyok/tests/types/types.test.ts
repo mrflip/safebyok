@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { BoxRecord, Sidecar, Whisper } from '../../src/shapes/box'
-import { DeviceRecord, LeaseRecord } from '../../src/shapes/device'
-import { VaultScope } from '../../src/shapes/scopes'
-import { VaultRecord, VaultTombstone } from '../../src/shapes/vault'
+import { boxRecord, sidecar, whisper } from '../../src/shapes/box'
+import { deviceRecord, leaseRecord } from '../../src/shapes/device'
+import { vaultScope } from '../../src/shapes/scopes'
+import { vaultRecord, vaultTombstone } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [
@@ -25,19 +25,19 @@ const WhisperCases = [
   [{ when: new Date() },              false,  'a class instance hiding inside an object'],
 ] as const
 
-describe("Whisper", () => {
+describe("whisper", () => {
   for (const [candidate, expected, blurb] of WhisperCases) {
-    it(blurb, () => { expect(Whisper.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(whisper.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("hands back the value unchanged when it passes", () => {
     const bag = { apiKey: 'fake', scopes: ['read', 'write'] }
-    expect(Whisper.parse(bag)).to.deep.equal(bag)
+    expect(whisper.parse(bag)).to.deep.equal(bag)
   })
 
   it("hands back a copy of an object or array, sharing none of the caller's own", () => {
     const bag = { apiKey: 'fake', scopes: ['read', { tier: 2 }] }
-    const checked = Whisper.parse(bag) as typeof bag
+    const checked = whisper.parse(bag) as typeof bag
     expect(checked).to.not.eq(bag)
     expect(checked.scopes[1]).to.not.eq(bag.scopes[1])
   })
@@ -59,9 +59,9 @@ const ScopeCases = [
   [{ applabel: 'acme', user_id: 'u1' },              false,  'a scope missing its vaultlabel'],
 ] as const
 
-describe("VaultScope", () => {
+describe("vaultScope", () => {
   for (const [candidate, expected, blurb] of ScopeCases) {
-    it(blurb, () => { expect(VaultScope.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(vaultScope.safeParse(candidate).success).to.eq(expected) })
   }
 })
 
@@ -82,32 +82,32 @@ const SidecarCases = [
   [() => 'nope',                      false,  'a function is not data'],
 ] as const
 
-describe("Sidecar", () => {
+describe("sidecar", () => {
   for (const [candidate, expected, blurb] of SidecarCases) {
-    it(blurb, () => { expect(Sidecar.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(sidecar.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("passes the examples its doc block shows", () => {
-    expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
-    expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
-    expect(Sidecar.safeParse('work account').success).to.be.false
+    expect(sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
+    expect(sidecar.safeParse({ when: new Date() }).success).to.be.false
+    expect(sidecar.safeParse('work account').success).to.be.false
   })
 
   it("hands back a copy, sharing none of the caller's own objects", () => {
-    const sidecar = { note: 'work account', tags: [{ team: 'atlas' }] }
-    const checked = Sidecar.parse(sidecar)
-    expect(checked).to.deep.equal(sidecar)
-    expect(checked).to.not.eq(sidecar)
-    expect(checked['tags']).to.not.eq(sidecar.tags)
+    const given = { note: 'work account', tags: [{ team: 'atlas' }] }
+    const checked = sidecar.parse(given)
+    expect(checked).to.deep.equal(given)
+    expect(checked).to.not.eq(given)
+    expect(checked['tags']).to.not.eq(given.tags)
   })
 })
 
-describe("LeaseRecord", () => {
+describe("leaseRecord", () => {
   it("takes a user_id up to a hundred characters, and refuses a longer one or one that is not text", async () => {
     const lease = await TH.leaseOf('u'.repeat(100))
-    expect(LeaseRecord.safeParse(lease).success).to.be.true
-    expect(LeaseRecord.safeParse({ ...lease, user_id: 'u'.repeat(101) }).success).to.be.false
-    expect(LeaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
+    expect(leaseRecord.safeParse(lease).success).to.be.true
+    expect(leaseRecord.safeParse({ ...lease, user_id: 'u'.repeat(101) }).success).to.be.false
+    expect(leaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
   })
 })
 
@@ -127,9 +127,9 @@ const DeviceRecordCases = [
   [TH.omitting(TH.deviceRecordOf('u1'), 'user_id'),                         false,  'a record that names no user'],
 ] as const
 
-describe("DeviceRecord", () => {
+describe("deviceRecord", () => {
   for (const [candidate, expected, blurb] of DeviceRecordCases) {
-    it(blurb, () => { expect(DeviceRecord.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(deviceRecord.safeParse(candidate).success).to.eq(expected) })
   }
 })
 
@@ -145,11 +145,11 @@ describe("DeviceRecord", () => {
 // `additionalProperties: false` and a stripping one does not, which output renders alike: so
 // strictness is guarded too.
 const StoredRecords = [
-  [VaultRecord.shape.format, VaultRecord],
-  [BoxRecord.shape.format, BoxRecord],
-  [LeaseRecord.shape.format, LeaseRecord],
-  [DeviceRecord.unwrap().shape.format, DeviceRecord],
-  [VaultTombstone.shape.format, VaultTombstone],
+  [vaultRecord.shape.format, vaultRecord],
+  [boxRecord.shape.format, boxRecord],
+  [leaseRecord.shape.format, leaseRecord],
+  [deviceRecord.unwrap().shape.format, deviceRecord],
+  [vaultTombstone.shape.format, vaultTombstone],
 ] as const
 
 describe("Stored record formats", () => {

@@ -8,7 +8,7 @@ import { VaultError, isVaultError } from '../src/errors'
 import { bad, good, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
-import { type BoxRecord, BoxSparse } from '../src/shapes/box'
+import { type BoxRecord, boxSparse, type BoxSparse } from '../src/shapes/box'
 import type { VaultScope } from '../src/shapes/scopes'
 import type { VaultRecord, VaultDraft } from '../src/shapes/vault'
 import * as Scopepath from '../src/scopepath'
@@ -1020,7 +1020,7 @@ describe("the abstract VaultDB, by what threw", () => {
 })
 
 /** A sound box's listing entry: its record but the two ciphered fields. */
-const sparseOf = (boxlabel: string, tag: string): BoxSparse => BoxSparse.parse(omit(TH.boxOf(boxlabel, tag), ['box_key_wrapped', 'whisper_ciphered']))
+const sparseOf = (boxlabel: string, tag: string): BoxSparse => boxSparse.parse(omit(TH.boxOf(boxlabel, tag), ['box_key_wrapped', 'whisper_ciphered']))
 
 describe("splitStoredBoxes", () => {
   it("splits the rows an adapter read into the sound and the damaged, each sorted by boxlabel, as its example hands them up", () => {
