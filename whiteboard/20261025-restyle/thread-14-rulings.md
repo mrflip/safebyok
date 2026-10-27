@@ -53,5 +53,9 @@ package and the e2e suite).
 * **Discoveries**: `VaultReadResponse.vault` is still cast by IndexedDB and local
   (`as VaultReadResponse['vault']`), the same pattern as the box rows; left, outside the thread.
   STYLE.md's *Validation* still speaks of `zod/mini` (lines 26, 190): thread 1's to fold.
-* **For the Coach**: the Convex derivation question above; `checkNoStoresIn`'s removal means a
-  store in the first bag is silently the bank's (your ruling: "a hard-to-miss error").
+* **For the Coach** (the PR's open questions):
+  * Derive Convex's validators from the core's Zod: `convex-helpers` (a dependency) or a converter
+    of our own? Recommend our own, as its own thread.
+  * `StoredBox.box: unknown` over the unbranded input type: recommend keep.
+  * A store in the first bag is now silently the bank's (your ruling: "a hard-to-miss error").
+  * `Validators` holds internals too (`LeaseGrant`, `BaseShape`, `ReadAnswer`): all semver surface now.
