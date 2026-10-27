@@ -26,24 +26,21 @@ when any of them is meant; otherwise say which call: `ensureVault`, `vault.refre
 **Empathy, safety and readability.** Empathy has three audiences: the end user typing a
 passphrase, the customer integrating the package, and the security reviewer reading the code.
 
-* **Never invent cryptography.** No home-made ciphers, padding, key stretching, comparisons or
-  randomness. Primitives come from WebCrypto or an audited, widely used library; constructions
-  follow those already in `src/` or a published standard. If a task seems to need something new,
-  stop and raise it.
+* **Never invent cryptography.** Primitives from WebCrypto or an audited library; constructions
+  from `src/` or a published standard; anything new, stop and raise it.
 * **Library first. Hand-rolling is a decision, not a default.** For any mechanism a library could
   own: an existing dependency, then a boring, widely used one (PROCESS.md, *Dependencies*), and
   only then our own code, with a Coach's yes before it exists. The pull to hand-roll is strongest
   exactly where it should be weakest: the small, done-a-thousand-times utility (a stable
-  stringify, a deep-equal, a debounce). "Twelve lines, cheap to read" is the trap: those twelve
-  lines have a proven npm package, and the search for it comes first. Each dependency is a
-  supply-chain decision for every app that installs us, so prefer a peer dependency for what the
-  host app likely already has. If you are banging rocks together, we have probably misdirected
-  you: say so.
+  stringify, a deep-equal, a debounce). If you are banging rocks together or confecting
+  machinery because something straightforward is not working well, we have probably
+  misdirected you: say so.
 * **Maintainability and legibility beat performance** unless it is shown to be slow where it
   matters. Cleverness is rarely called for; if it seems to be, propose it.
 * **Validate at module entrypoints**, then write confident, paranoia-free code past that boundary.
 * **Security first.** Where the stronger measure (Argon2id, say) is not available on every
   platform, implement it first anyway, and make it pluggable second.
+* **Secret material never leaves through a side door**: beware leakage via error objects or logging.
 
 ## What the package promises
 
@@ -64,19 +61,10 @@ govern how code is changed:
   refusal to handle, or a check added to catch it earlier. A data-integrity failure met in a
   consistent state (a record known to be irrecoverable) is a different thing, and is reported.
 
-## Non-negotiables
-
-* **Secret material never leaves through a side door**: not an error message, a thrown value's
-  properties, a log line, a `toString`, or a validation error quoting its input. Log through the
-  host's logger, never `console`.
-* Never handle a real secret in a test, fixture or example: generate one, or use an obvious fake
-  that validates. Credentials for anything (npm, GitHub) come from the environment, not a file.
-
 ## Commands
 
 ```sh
-pnpm install
-pnpm justify         # lint, typecheck, test, build, size budget, every package: green before every commit
+pnpm justify                       # lint, typecheck, test, build, size budget, every package: green before every commit
 pnpm --filter safebyok <task>      # lint, typecheck, test, build in one package, its dependencies built first
 pnpm --filter safebyok add <dep>   # a package's dependency; `pnpm add -w` is for root tooling only
 pnpm changeset                     # a PR's release note; `--empty` when it needs none (PROCESS.md)
@@ -84,58 +72,48 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 
 ## Layout
 
-* `packages/` -- the published packages, each with its own `package.json`, configs, `src/`,
-  `tests/` (mirroring `src/` path for path; `fixtures/` holds sample data) and `pnpm justify`:
-  `safebyok` (the core), `safebyok-react`, `safebyok-fastkey` (WASM key deriver), and the storage
-  adapters (convex, indexeddb, postgres, graphql). A consumer imports only `src/index.ts` and the
-  other entries in the package's `tsdown.config.ts` (`safebyok-convex`: its hand-written `exports`).
+* `packages/` -- `safebyok` (the core) and `safebyok-*` (clients, adapters, plugins).
 * Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
-  `e2e/` (adapter-by-framework checks, so no adapter lists a framework; its README says where a
-  new pairing goes).
+  `e2e/` (adapter-by-framework checks).
 * `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`, open and
-  done. They swamp a repo-wide search: search `packages/` and the root's docs, or pass
-  `--exclude-dir={whiteboard,winboard}`. Read only the folder of the thread you are working in or
-  your task names; where it disagrees with the code, the code wins.
+  done. Your own thread's folder is yours to read and search. Every other is a historic artifact:
+  exclude them from searches (`--exclude-dir={whiteboard,winboard}`) and open one only when your
+  task names it. Precedence: your instructions and plan, then your whiteboard, then the code.
 * `human/` -- from agents to Coaches. Progress notes, caveats and open questions go here or in the
   thread's whiteboard, never in doc blocks or comments. Write to it, never read it
   (`human/README.md`).
 * `notes/` -- durable notes. A decision a security reviewer should see goes into
   `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
-  yourself. `notes/wontfix.md`: behaviour left undefined on purpose. `notes/old_vocabulary.md`:
-  the names the Oct 2026 reform retired, for reading older code and records; nothing current
-  uses them.
+  yourself. `notes/wontfix.md`: behaviour left undefined on purpose.
 
 ## Reading
 
-What you read stays in your context and is paid for on every later turn: read for the task at
-hand, and never twice. Find with `grep -n`, then read the lines you need; read a file whole only
-when you will change it or need most of it. A file past about 800 lines is searched,
-never read through (a test folder keeps a theme per file: grep it, read the one file). The README
-is searched by its headings; a code file's section banners are its table of contents:
-`grep -n '// == '` (`// == [Name]: key names` opens a section, `// --` closes it), then read the
-range. The documents below are looked up by section.
+A file past about 800 lines is searched, never read through. Search .md files by headings.
+A code file's section banners are its table of contents:
+`grep -n '// == '` (`// == [Name]: key names` opens a section, `// --` closes it).
 
 ## Notable files
 
 * `PROCESS.md` -- threads, branches, commits, PRs, changesets, dependencies. **Read the section
-  you need before any git operation beyond a commit, and before adding a dependency.** The main
+  you need before any git operation beyond a commit, and before adding a dependency.** The base
   checkout is shared: a thread is built in a worktree of its own, cut by `scripts/cut-thread`
   (*A worktree per thread*).
 * `VOCABULARY.md` -- the cast: whisper, box, vault, passphrase, each key by role, and their
   encrypted forms. Its names are the only names for those things, in code, docs and stored
   fields. **Look up a term you do not recognize**, and look before naming a new thing in the cast.
 * `STYLE.md` -- naming (`val`, `ckey`, `bag`, `kind`, what `key` means here), layout, doc blocks,
-  validation and tests: specific, unguessable, and only partly linted. **Read *Naming* before
-  naming an export, a module, a stored field or a new tag; *Comments and doc blocks*, *Tests* or
-  *Validation* before writing a doc block, a test, or an entrypoint that takes a caller's input.**
+  validation and tests: specific, unguessable, and only partly linted. **Writing code, read
+  *Naming* once; read *Comments and doc blocks*, *Tests* or *Validation* when you write a doc
+  block, a test, or an entrypoint that takes a caller's input.**
   Every export has a doc block written for its caller and tests in proportion.
 * `packages/safebyok/eslint.config.mjs` -- the final authority on formatting; the other configs
   are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error` and
   `eslint-disable-line` are allowed as the correct compromise; **always report each one** in chat
   and in the PR's open questions.
 * `tsconfig.base.json` -- every strictness flag, extended by every tsconfig; its comments say why.
-* **Claude Docs** (a `claude.ai/.../artifact/<id>` link). To read one, spawn the `doc-tab-reader`
-  agent with the URL and follow its description; to edit one, load the docs skill.
+* **Claude Docs** (a `claude.ai/.../artifact/<id>` link). For a tab's text alone, spawn the
+  `doc-tab-reader` agent with the URL and follow its description. To edit or comment, or for what
+  markdown drops (diagrams, charts, highlights, comments), load the docs skill.
 
 ## Naming at a glance
 

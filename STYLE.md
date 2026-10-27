@@ -322,6 +322,8 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
 * **For anything that holds a secret, test what must not happen**: that the wrong passphrase is
   refused, that tampered ciphertext is refused, that an error does not carry the secret, that
   locking forgets the key.
+* **Never a real secret in a test, fixture or example**: generate one, or use an obvious fake
+  that validates. Credentials for anything (npm, GitHub) come from the environment, not a file.
 * Test an entrypoint with generous, sloppy input: that is its job. Code past the validation
   boundary is entitled to clean data; don't feed it garbage it will never see.
 * Once tests start to look alike, switch to a bulk example list, grouped by comments, with `"`
