@@ -1,4 +1,4 @@
-/** The check of a keyDeriverSpec, in a module of its own: a bundler keeps a module whole or drops it, so an app that imports only `argon2idWebV1Deriver` drops this one, and Zod with it. */
+/** The check of a keyDeriverSpec, kept apart: import it only where a spec is checked, so an app that uses only `argon2idWebV1Deriver` ships no Zod. */
 
 import { MaxSaltBytes, PassphraseKeyBytes } from '../consts'
 import { Validator } from './validator'

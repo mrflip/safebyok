@@ -1099,7 +1099,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Demand]: checkStanding, demand, demandAfterWait, inconsistencyWith, leaseRefusal, demandLease, gatedProps
+  // == [Demand]: checkStanding, demand, demandAfterWait, inconsistencyWith, provingInconsistency, leaseRefusal, demandLease, gatedRecord
 
   /** Refuse once this Vault object is gone, 'vault_remade' for a vault made anew and 'vault_gone' otherwise: what every call asks first, and again after a wait it has no thing in hand for. */
   #checkStanding() {

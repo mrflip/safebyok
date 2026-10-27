@@ -236,18 +236,20 @@ export class Bank {
    * An ask while a birth of the same vault is under way gets the same Vault object. The bank holds
    * it until it is let go (`closeVault`, `reopenVault`, `closeVaults`, `clearCachedVault`), deleted,
    * or found deleted or made anew, during its birth or after: then its {@link BankVault} is
-   * `refused`, and the next ask births anew. One scope lives in one place: an ask for a vault the bank holds, or is
-   * birthing, names in `opts` the stores it was born from (left out, the bank's own): the same
-   * objects, as stores are compared by identity, so make each store once.
+   * `refused`, and the next ask births anew.
+   *
+   * A vault's own stores, where not the bank's, go in `opts`: the bag naming the vault is read for
+   * its scope alone, so a store in it is left out. One scope lives in one place: an ask for a vault
+   * the bank holds, or is birthing, names in `opts` the stores it was born from (left out, the
+   * bank's own): the same objects, as stores are compared by identity, so make each store once.
    *
    * Refuses 'bad_scope' for a bag of another app or user than the bank's, or a name that fails its
    * check, and 'bad_option' for options amiss, each before storage is touched; and 'bad_option' for
    * options naming another `vaultDB` or `deviceDB` object than the vault held was born from, one
-   * made afresh over the same storage among them. The bag naming the vault is read for its scope
-   * alone: a store in it is not a vault's own, which go in `opts`. Refuses as storage refuses: 'damaged_vault' for a vault record it cannot use
-   * (`delDamagedVault` clears it), 'newer_format', 'identity_revoked', 'storage_unavailable'.
-   * Refuses 'vault_behind' for a vault below this device's record, as the class says. Its
-   * BankVault keeps the refusal; bad news among them is told to `onBadNews`.
+   * made afresh over the same storage among them. Refuses as storage refuses: 'damaged_vault' for a
+   * vault record it cannot use (`delDamagedVault` clears it), 'newer_format', 'identity_revoked',
+   * 'storage_unavailable'. Refuses 'vault_behind' for a vault below this device's record, as the
+   * class says. Its BankVault keeps the refusal; bad news among them is told to `onBadNews`.
    *
    * @example const vault = await bank.ensureVault({ vaultlabel: 'main' })
    * @example const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
