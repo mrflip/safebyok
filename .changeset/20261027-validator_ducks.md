@@ -1,0 +1,5 @@
+---
+"safebyok": minor
+---
+
+**`Kit` gains `duck` and `fn`.** `duck(fields, kin)` makes a validator that takes anything carrying `fields` (a Vault object, a record) and hands back those fields alone, frozen. It refuses a field that is not among `kin`'s, and a malformed one, whether it is used or not. `fn()` checks for a function. **A `VaultDB` verb checks the scope it is handed as a duck.** It still takes a scope, or one of safebyok's own records. A scope carrying anything else (a store, an option, a misspelt name) now refuses `bad_scope`, where before the extra field was dropped. So does a known field that is malformed: `{ ...scope, vault_tok: '' }`. **`vault.putBox` passes on a `VaultDB`'s `invalid_box` as storage said it**, where it said `bad_record`. From a vault, which sealed the box, either is a bug. Every exported name is unchanged. The validators and their types now live in `src/shapes/`, and the `safebyok/idb` and `safebyok/browser` entries are about 1.2 kB smaller. No stored shape changed.

@@ -57,7 +57,28 @@ of behaviour. Catches that a caller further up handles as well go.
 5. **Catches.** survey-catches items 1 (`corrupt_record` for missing meta), 2a (`#writeOver`'s
    `invalid_box` branch), 3 (`checkOutgoing`'s re-throw) and 4 (`bank.#badOutcome`).
 
+## Built (2026-10-27)
+
+* `eb806283` step 1, `2e197056` step 2, `3f222d28` step 3, `38051283` step 4, `fbe2a901` step 5.
+* **Departures from the steps above.**
+  - `deviceRecordOf` keeps the strip `vaultScope`. A duck there pulls the box and vault shapes
+    into the `idb` entry (+2.1 kB), and every caller hands it a parsed scope or a device record.
+  - `Scopepath.*` and the public validators keep their strip parse (contract, and the `idb` entry).
+  - Catches item 1 stays. Without the `corrupt_record` branch, a `stale_write` naming nothing
+    reads as "nothing stands", and the vault reports the vault gone and lets the Vault object go:
+    a misreport, not a coarser kind.
+  - Catches item 3 stays. `checkOutgoing`'s "Nothing was written" lead was added on purpose in
+    #175, `safebyok-graphql`'s client check matches it, and each call site is already one line.
+  - Item 5 of the catches survey (`Lease.make` as control flow) belongs to `vault_params`.
+
 ## Open questions (for the PR)
+
+* `Kit.fn` costs `idb` 43 B and `utils` 56 B (any kit entry rides in every bundle with a
+  validator), and both `fn` and `duck` are public, since `Kit` is exported.
+* `VaultBag`, `BankBag` and `BoxListing` appear in public signatures but are not exported.
+  `BoxListing` and `VaultOfBox` (`box.ts`) are first-guess names.
+* `passkeyAnswerShape` checks `prfBytes` by `instanceof Uint8Array`, refusing bytes from another
+  realm; `lease.ts`'s `checkedBytes` judges by tag.
 
 * The scope validators' case (`vaultScope` and `VaultScope`, one validator under two names).
 * `vaultBag` taking a Vault object, a snapshot or a BankVault: the duck contract says yes,

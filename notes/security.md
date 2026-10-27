@@ -145,7 +145,7 @@ added or folded into through the subagent, and no other entry changes.
   stamps first, then the purpose, then the header where there is one. A part, or a record field, that is undefined or null is refused
   `bad_option`, and so is an empty list of stamps. No new primitive, encoding or KDF step. Each stamp is taken from whatever carries it by
   parsing with its schema (Zod; unknown fields stripped for the vault's and the lease's, strict for the box's), so a stamp missing a field
-  refuses `bad_record`, never binds less.
+  refuses `bad_record`, never binds less. (Amended 2026-10-27 (validator_ducks): the vault's and the lease's are no longer stripped; see (7) below.)
   (5) No ciphertext written before this change opens: no format bump, pre-1.0, by the Coach's ruling. The same release already makes every
   older stored vault read as damaged (the strict vault record, below), so a host sees no new damage.
   (6) Amended 2026-10-27 (security_notes), PR [#280](https://github.com/mrflip/safebyok/pull/280): **binding `registered_at` reverses the
@@ -159,6 +159,18 @@ added or folded into through the subagent, and no other entry changes.
   `LeaseRecord` less `lease_key` and `vault_key_lease_wrapped` (`lease.ts`). A field its schema fixes (`format`, `whisper_codec` `json_v1`,
   `whisper_schema_version` 1) is a literal in the strict record, so a stamp holding another value is refused `bad_record` at its parse, before
   `cipherCtx` is called: a ctx is built only from a parsed stamp.
+  (7) Amended 2026-10-27 (validator_ducks, commit `3f222d28`): **the vault's stamp is taken through a duck, not a strip pick, so a box or
+  a wayin cannot stand in for it.** `wayinCtxOf` (`wayin.ts`) and `leaseCtxOf`, `boxCtxOf` (`lease.ts`) take the stamp through the "duck"
+  validators of `src/shapes/ducks.ts` (`vaultStampDuck`, `vaultStampButFormatDuck`, `leaseStampDuck`), which replace the strip picks
+  `VaultStampPicked`, `VaultStampButFormat` and `LeaseStampPicked`. A duck takes whatever the caller has in hand that carries the stamp (a
+  Vault object, a vault record, its sparse shape), checks every field it carries against the one schema its owners agree on, refuses
+  `bad_record` any field outside the vault's own shapes, and hands back exactly the stamp's fields, frozen. The strip picks would have accepted
+  a Box or a box record as the vault's stamp, since a box carries the vault's scope and `vault_tok` and a `registered_at` of its own: the box's
+  (when it was first stored) bound into a ctx as the vault's (when the vault was made). No caller passed one; nothing refused it. The
+  vault-stamp ducks tolerate only vault-shaped fields (the record's epochs and gate), so a box, a box record or a wayin is refused before any
+  bytes are bound. The bound bytes for every legitimate input are unchanged (`tests/ctx-bytes.test.ts` pins them). The format-less duck, which
+  a box's and a lease's ctx bind, takes a vault of any `format` string, so a new vault format still leaves boxes and leases open; the wayin's
+  ctx, which binds the format, still refuses another format.
 * 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
   an old flat vault reads as damaged under an unbumped format; a device record is strict, frozen and built from the scope's names alone.**
   (1) `VaultRecord` (`packages/safebyok/src/vault-record.ts`) is `{ format, applabel, user_id, vaultlabel, vault_tok, registered_at, vault_epoch,
