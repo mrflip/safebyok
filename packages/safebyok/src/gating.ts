@@ -5,6 +5,7 @@ import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, ty
 import type { PasskeyAnswer } from './types/types'
 import { type GatedVaultRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
 import { passphraseCleartext } from './types/type-aliases'
+import * as Phrases from './phrases'
 import type { Vault } from './vault'
 
 /** Gatings: one request for cleartext, raised by a vault call that needs the user's passphrase or passkey, and the chain each attempt at it runs.
@@ -434,9 +435,9 @@ export class RaisedGating implements ProvingGating {
 
 // == [Refusals]: checkText, checkTexts, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
-/** Refuse 'bad_option' for a passphrase that is not text, quoting none of it. */
+/** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
 const checkText = (given: unknown): void => {
-  passphraseCleartext.parse(given)
+  if (! passphraseCleartext.safeParse(given).success) { throw new VaultError('bad_option', `${Phrases.PassphraseNotText}.`) }
 }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
