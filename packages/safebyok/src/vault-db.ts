@@ -178,7 +178,8 @@ export type VaultDBOpts = {
  *    report, a capacity -- refuses 'corrupt_record': a bug in the adapter.
  *  * A VaultError your `do*` method throws passes through as it came. Anything else it throws
  *    refuses 'storage_unavailable', with what it threw as `cause`.
- *  * A `do*` method that answers with an Outcome, where it owes the bare answer, refuses 'bad_option'.
+ *  * A `do*` method that answers with an Outcome, where it owes the bare answer, gives an answer in
+ *    another shape: 'corrupt_record', or 'damaged_box' from `doGetBox`.
  *  * A throw from the base's own code that is no VaultError is a bug: 'unexpected_error', never to
  *    be retried.
  */
