@@ -1,10 +1,11 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
+import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import { BoxRecord, VaultTombstone, VaultRecord, VaultScope } from './validators'
 
 /** The component's own tables, isolated from the host app's: ciphertext and unencrypted fields only.
- * Each row is a record as the core writes it, in typed columns. `user_id` leads every index, so an
- * account's rows are one range.
+ * Each row is a record as the core writes it, in typed columns, a salt the core brands keeping its
+ * {@link $brand}. `user_id` leads every index, so an account's rows are one range.
  */
 export default defineSchema({
   /** One VaultRecord per vault, as-is. */

@@ -2,10 +2,11 @@ import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { ApiFromModules, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 import { VaultError } from 'safebyok'
+import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
+  Boxscope, Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -71,6 +72,8 @@ export class SafebyokComponent {
    * `identity_revoked` unless `getUserId` names the vault's own `user_id`, before it calls the
    * component. A refusal `getUserId` throws itself reaches the client as it was thrown. Kind
    * 'bad_option' at once, not on the first request, for options with no `getUserId` function.
+   * Each takes and returns the core's records as the component types them, a salt the core brands
+   * keeping its {@link $brand}.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
     if (typeof (opts as Partial<SafebyokApiOpts<DataModel>> | null | undefined)?.getUserId !== 'function') {
@@ -120,7 +123,7 @@ export class SafebyokComponent {
         },
       }),
       getBox: publicQuery({
-        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxGetExpectation },
+        args:    { ...Boxscope.fields, expected: BoxGetExpectation },
         returns: GetBoxAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
@@ -144,7 +147,7 @@ export class SafebyokComponent {
         },
       }),
       delBox: publicMutation({
-        args:    { ...VaultScope.fields, boxlabel: v.string(), expected: BoxDelExpectation },
+        args:    { ...Boxscope.fields, expected: BoxDelExpectation },
         returns: v.nullable(BoxDeletion),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
