@@ -5,7 +5,7 @@
 * **Review level:** `medium`.
 * **Threads at once:** 3.
 * **Issued by:** the Coach (flip), in the session that wrote `fixup-preplan.md`.
-* **Status:** threads 1 and 3 building, from `origin/main` (`802c91f9`).
+* **Status:** thread 3 filed (#298); thread 1 flagged, waiting on the Coach; threads 2 and 4 waiting.
 * **Sprint doc:** https://claude.ai/artifact/Qvwd1KJxaAJKZtMtgaMNBg (project
   `c1ca452e-aee4-4408-8f1b-0dbfab9cffaf`). Its tabs are Open Matters (`d2c7fb21-9f41`, body
   `08842204-eea3`), Cleanup (`a7071431-c56b`, body `7972c2d6-09f7`), Progress (`071f7f7e-aae6`,
@@ -158,6 +158,20 @@ test for it.
   conditional discard for both records, and the race it closes.
 * **Size budgets:** `idbDeviceDB` (28.2 of 32 kB) and `browserOpts` (33.8 of 37 kB) may move.
   If the rule gives a line another budget, run `pnpm size:budget --write`.
+
+*Review:* fixed ([#298](https://github.com/mrflip/safebyok/pull/298)).
+* **The reviewer fixed three things:**
+  - two test doc blocks' first lines;
+  - the README's own-store example, which recreated its object store on every upgrade;
+  - a doc link to the now-private `raisedDeviceRecord`.
+* **Its minor findings, by disposition:**
+  - The two vacuous "touches no device store" tests, the false name `uncheckingDeviceDB`, and
+    the `world.ts` leftovers: fixed by the worker in `5586d61d`.
+  - The lost verb guard: Open Matters.
+  - security.md's "`deviceOutcomeOf` gone": Cleanup, at the restack.
+  - The rest ride in the PR comment: unchecked `putLease` inputs (decided), the weaker
+    logger-leak plant, the narrower `doDelUnreadable` type, `#readableOf`'s name, the untested
+    `@example`s, the class doc's repetition, and the stale VOCABULARY.md row.
 
 ### 4. `retire_standing`: the unstanding brief
 
