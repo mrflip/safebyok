@@ -1,6 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinSparse, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
+import { type GatedVaultRecord, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, gateSparseOf, headerOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -196,6 +196,22 @@ describe("gateSparseOf", () => {
     const sparse = gateSparseOf(TH.gateOf('u1'))
     expect(sparse.passkey).to.be.null
     expect(Object.keys(sparse.passphrase)).to.have.members(['wayinkind', 'device_id', 'registered_at'])
+  })
+})
+
+describe("headerOf", () => {
+  it("is a wayin record without its wrap, as its example shows, each kind's header", () => {
+    const gate = TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
+    const passphrase = headerOf(gate.passphrase)
+    expect(passphrase).to.deep.equal(omit(gate.passphrase, ['vault_key_wayin_wrapped']))
+    expect(PassphraseWayinHeader.parse(passphrase)).to.deep.equal(passphrase)
+    const passkey = headerOf(TH.passkeyWayinOf('laptop'))
+    expect(passkey).to.not.have.property('vault_key_wayin_wrapped')
+    expect(PasskeyWayinHeader.parse(passkey)).to.deep.equal(passkey)
+  })
+
+  it("refuses a header that still holds its wrap, as a header is strict as its record is", () => {
+    expect(PassphraseWayinHeader.safeParse(TH.gateOf('u1').passphrase).success).to.be.false
   })
 })
 

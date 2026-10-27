@@ -7,17 +7,13 @@ import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
+import { revision_tok } from './shapes/fields'
 import { type VaultStamp, VaultSparse } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import type { Boxscope } from './shapes/scopes'
 import { Validator } from './checks/validator'
 
-// == [Box]: BoxBase, SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
-
-/** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
- * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
- */
-export type BoxBase = { revision_tok: string | null, registered_at?: number | undefined }
+// == [Box]: SealBoxProps, Box, record, baseRevisionTok, make, seal, extractWhisper
 
 /** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
 export type SealBoxProps = {
@@ -259,7 +255,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 }
 // --
 
-// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkedBase, MadeUnder, checkedMadeUnder, checkedMade, lockedError
+// == [Helpers]: whisperBytesOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, BaseShape, BoxBase, MadeUnder, SealedUnder, checkedBase, checkedMadeUnder, checkedMade, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
@@ -301,21 +297,27 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 }
 
 /** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; what a box is made under must show, the vault's scope, the `vault_tok` and both epochs, every other field dropped unread; and what a seal is made with, the vault's epochs and the time. */
-export const { BaseShape, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
+export const { BaseShape, MadeUnderShape, SealedUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
   const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
   const SealedUnderShape = VaultSparse.pick({ vault_epoch: true, gate_epoch: true }).strip()
   return {
-    BaseShape: obj({ revision_tok: BoxRecord.shape.revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
+    BaseShape: obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() }).loose().nullable(),
     MadeUnderShape,
+    SealedUnderShape,
     MadeShape: obj({ madeUnder: SealedUnderShape, now: epochMillis }),
   }
 })
+
+/** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
+ * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
+ */
+export type BoxBase = Pick<NonNullable<Z.infer<typeof BaseShape>>, 'revision_tok' | 'registered_at'>
 
 /** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
 type MadeUnder = Z.infer<typeof MadeUnderShape>
 
 /** What a seal is handed of the vault it seals in, beside the vault itself: its two epochs as it seals. A {@link VaultSparse} carries them. */
-type SealedUnder = Pick<MadeUnder, 'vault_epoch' | 'gate_epoch'>
+type SealedUnder = Z.infer<typeof SealedUnderShape>
 
 /** `base`, once it is a {@link BoxBase} or none: 'bad_option' otherwise, quoting none of it. */
 const checkedBase = (base: unknown): BoxBase | null => {

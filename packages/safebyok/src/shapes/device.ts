@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
-import { vault_key_lease_wrapped, vault_tok } from './fields'
+import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
 
 // == [Lease]: LeaseFormat, LeaseRecord, LeaseStamp, LeaseSparse
 
@@ -64,14 +64,14 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  *
  * @example { format: 'safebyok-device-v1', ...scope, device_id: 'Zm9vYmFy', highest_vault_epoch: 3 }
  */
-export const { DeviceRecord } = Validator('bad_record', ({ obj, str, uint, lit, applabel, user_id, vaultlabel }) => ({
+export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
   DeviceRecord: obj({
     format:              lit(DeviceRecordFormat),
     applabel,
     user_id,
     vaultlabel,
     /** This device's random id for the scope, minted the first time it births the vault there, and carried by every wayin it seals. */
-    device_id:           str.min(1),
+    device_id,
     /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */
     highest_vault_epoch: uint,
   }).strict().readonly(),

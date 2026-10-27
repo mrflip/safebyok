@@ -1,9 +1,9 @@
 import type * as Z from 'zod'
 import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse } from './shapes/box'
 import { boxSparseOf } from './box'
-import { BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGetExpectation, Capacity, ListedBox, ListingAnswer, ReadAnswer, type StoredBox, StoredRevision, StoredVaultTok, VaultDelExpectation, type VaultReadResponse, VaultRecordExpectation } from './shapes/vault-db'
+import { type BoxListing, BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGetExpectation, Capacity, ListedBox, ListingAnswer, ReadAnswer, type StoredBox, StoredRevision, StoredVaultTok, VaultDelExpectation, type VaultReadResponse, VaultRecordExpectation } from './shapes/vault-db'
 import type { VaultScope } from './shapes/scopes'
-import { VaultRecord, VaultSparse, VaultTombstone, VaultDraft } from './shapes/vault'
+import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone } from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import * as CX from './shapes/scopes'
@@ -166,7 +166,7 @@ export abstract class VaultDB {
    *   const { ok, val, err } = await vaultDB.getVault(scope)
    *   if (ok && val === null) { offerNewVault() }
    */
-  getVault(scope: VaultScope): Promise<Outcome<(VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null>> {
+  getVault(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
     return outcomeOf(() => this.readVault(scope))
   }
 
@@ -184,7 +184,7 @@ export abstract class VaultDB {
    *   const { ok, val } = await vaultDB.ensureVault(draft)
    *   if (ok && val.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
    */
-  ensureVault(draft: VaultDraft): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
+  ensureVault(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
     return outcomeOf(() => this.ensuredVault(draft))
   }
 
@@ -200,12 +200,12 @@ export abstract class VaultDB {
    *   const { boxes, damagedBoxes, ...vault } = val
    *   return { vault, boxes, damagedBoxes }   // what a server sends a browser's VaultDB
    */
-  getVaultRecords(scope: VaultScope): Promise<Outcome<(VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null>> {
+  getVaultRecords(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
     return outcomeOf(() => this.readVault(scope))
   }
 
   /** The vault as {@link VaultDB.ensureVault} ensures it: what a server relays to a browser's VaultDB, as its `doEnsureVault` answers. */
-  ensureVaultRecords(draft: VaultDraft): Promise<Outcome<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>> {
+  ensureVaultRecords(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
     return outcomeOf(() => this.ensuredVault(draft))
   }
 
@@ -238,7 +238,7 @@ export abstract class VaultDB {
   }
 
   /** The vault `doGetVault` reads for `scope`, its vault record and listing checked, frozen; or null for none. */
-  private async readVault(scope: VaultScope): Promise<(VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null> {
+  private async readVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
     const asked = heldScope(this, scope)
     const read = await adapterAnswer(() => this.doGetVault(asked))
     const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
@@ -247,7 +247,7 @@ export abstract class VaultDB {
   }
 
   /** The vault `doEnsureVault` ensures from `draft`, once the draft is checked, as {@link VaultDB.getVault} hands one back. */
-  private async ensuredVault(draft: VaultDraft): Promise<VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }> {
+  private async ensuredVault(draft: VaultDraft): Promise<VaultRecord & BoxListing> {
     const outgoing = checkDraft(draft)
     const asked = heldScope(this, outgoing)
     const read = await adapterAnswer(() => this.doEnsureVault(outgoing))
@@ -653,7 +653,7 @@ export const splitStoredBoxes = (rows: readonly StoredBox[]): { boxes: BoxSparse
  * A sound box that fails is listed as the split would list it, damaged under its own boxlabel. Both
  * lists come back sorted by boxlabel and frozen.
  */
-const checkedListing = (response: unknown): { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] } => {
+const checkedListing = (response: unknown): BoxListing => {
   const { boxes, damagedBoxes } = checkAnswer(ListingAnswer, response, 'a vault read')
   const sound = boxes.filter((box) => isNameable(box.boxlabel)).map((box) => judgedBox(box.boxlabel as string, box))
   const listing = listingOf([...sound, ...damagedBoxes.map((box) => Object.freeze(box))])
@@ -886,8 +886,7 @@ const mayBeNewer = (raw: unknown): boolean => {
   // This is all this version can tell from damage. So any change to what a stored record may hold
   // -- a field, a shape, a kind of way in, or a range a check accepts -- bumps `format`.
   const format = formatOf(raw)
-  const knownFormat = VaultSparse.shape.format.safeParse(format).success || VaultTombstone.shape.format.safeParse(format).success || OlderVaultRecordFormats.has(format)
-  return format !== undefined && ! knownFormat
+  return format !== undefined && format !== VaultFormat && format !== TombstoneFormat && ! OlderVaultRecordFormats.has(format)
 }
 
 /** The `format` a stored record names, of any type, or undefined for none, or for a record that is no object. */

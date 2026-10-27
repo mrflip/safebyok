@@ -1,4 +1,4 @@
-/** The checks for the fields of the stored records, each named for the field it checks: an encrypted value's halves, the tokens, the salts and the ciphered fields. */
+/** The checks for the fields of the stored records, each named for the field it checks: an encrypted value's halves, the tokens, the ids, the salts and the ciphered fields. */
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
@@ -18,10 +18,11 @@ export const { Ciphered } = Validator('bad_record', ({ obj, str }) => ({
 export type Ciphered = Z.infer<typeof Ciphered>
 // --
 
-// == [Record fields]: vault_tok, revision_tok, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
 
-/** The checks for the tokens, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` refuses 'bad_record', quoting none of it.
- * A token is plain text, as a host's adapter may write one by hand. A salt or a ciphered field is
+/** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` refuses 'bad_record', quoting none of it.
+ * A token is plain text, as a host's adapter may write one by hand. An id or a label is plain
+ * text too, not empty: a device's id, a key deriver's label, a passkey's credential id. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A salt's check is its shape, text
  * that is not empty. Its length is judged where its wayin is, so a salt of the wrong length is a
  * damaged wayin while the vault's other wayin still opens.
@@ -29,9 +30,12 @@ export type Ciphered = Z.infer<typeof Ciphered>
  * @example obj({ wayinkind: lit('passphrase'), salt_b64, vault_key_wayin_wrapped, ... })   // a record's fields, by the names they check
  * @example box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, ctx))               // a BoxKeyWrapped, where the box record is made
  */
-export const { vault_tok, revision_tok, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Validator('bad_record', ({ str }) => ({
+export const { vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Validator('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
   revision_tok:            str.min(1, Phrases.TokenMissing),
+  device_id:               str.min(1),
+  key_deriver_label:       str.min(1),
+  credential_id:           str.min(1),
   salt_b64:                str.min(1).brand<'PassphraseSalt'>(),
   prf_salt_b64:            str.min(1).brand<'PrfSalt'>(),
   whisper_ciphered:        Ciphered.brand<'WhisperCiphered'>(),

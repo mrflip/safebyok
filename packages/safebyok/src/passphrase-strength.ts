@@ -1,13 +1,8 @@
+import type * as Z from 'zod'
 import { VaultError } from './errors'
 import { Validator } from './checks/validator'
 import type { VaultScope } from './shapes/scopes'
 import { vaultScopeDuck } from './shapes/ducks'
-
-/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
- * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
- * vault's 'weak_passphrase' refusal carries it as its message.
- */
-export type PassphraseVerdict = { strong: true } | { strong: false, reason: string }
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
@@ -75,6 +70,12 @@ export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({
     obj({ strong: lit(false), reason: str.min(1) }),
   ]),
 }))
+
+/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
+ * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
+ * vault's 'weak_passphrase' refusal carries it as its message.
+ */
+export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })

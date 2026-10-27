@@ -4,6 +4,7 @@ import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
 import { BoxDamaged, BoxRecord, type BoxSparse } from './box'
 import { VaultSparse } from './vault'
+import { revision_tok } from './fields'
 
 // == [Expectations]: VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion
 
@@ -71,13 +72,12 @@ export type BoxDeletion = Z.infer<typeof BoxDeletion>
 export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
   const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true }).strip()
   const BoxGetExpectation = VaultSparse.pick({ vault_tok: true }).strip()
-  const revision_tok = BoxRecord.shape.revision_tok.nullable()
   return {
     VaultRecordExpectation,
     BoxGetExpectation,
-    BoxExpectation:        BoxGetExpectation.extend({ revision_tok }),
+    BoxExpectation:        BoxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
     VaultDelExpectation:   VaultRecordExpectation.extend({ gate_epoch: uint.nullable() }),
-    BoxDelExpectation:     BoxGetExpectation.extend({ revision_tok }),
+    BoxDelExpectation:     BoxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
     BoxDeletion:           obj({ outcome: oneof(['deleted', 'deleted_other', 'absent']) }),
   }
 })
@@ -103,7 +103,7 @@ export const { Capacity } = Validator('bad_record', ({ obj, union, int, uint, li
 export type Capacity = Z.infer<typeof Capacity>
 // --
 
-// == [Read answers]: StoredBox, VaultReadResponse, ListedBox, StoredRevision, ReadAnswer, ListingAnswer, StoredVaultTok
+// == [Read answers]: StoredBox, BoxListing, VaultReadResponse, ListedBox, StoredRevision, ReadAnswer, ListingAnswer, StoredVaultTok
 
 /** One box row as a VaultDB's `doGetVault` and `doEnsureVault` read it, as {@link splitStoredBoxes} takes it: the boxlabel the row is filed under, and its record exactly as stored.
  * Take `boxlabel` from the row's scopepath or column, never from its record: a damaged box is
@@ -114,6 +114,12 @@ export type Capacity = Z.infer<typeof Capacity>
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow }
  */
 export type StoredBox = { boxlabel: string, box: unknown }
+
+/** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. A vault read hands it back beside the vault record's fields. */
+export type BoxListing = Readonly<{
+  boxes:        readonly BoxSparse[]
+  damagedBoxes: readonly BoxDamaged[]
+}>
 
 /** One vault as a VaultDB's `doGetVault` and `doEnsureVault` answer it, read in one atomic step: its vault record exactly as stored, and its boxes split into the sound and the damaged.
  * `vault` is what storage holds in the vault record's place, exactly as read: a vault record, one
@@ -126,16 +132,12 @@ export type StoredBox = { boxlabel: string, box: unknown }
  *
  * @example { vault: storedRow ?? null, ...splitStoredBoxes(boxRows) }
  */
-export type VaultReadResponse = {
-  vault:        unknown
-  boxes:        readonly BoxSparse[]
-  damagedBoxes: readonly BoxDamaged[]
-}
+export type VaultReadResponse = BoxListing & { vault: unknown }
 
 /** A box as `doGetVault` may hand it up, whole or with its two ciphered fields left out, so a projecting backend is checked as one handing whole records; the one field of a damaged box the listing keeps, when the record holds it as text, what a write over it names; and a vault read's answer, an object holding its vault record as stored, and its listing, each sound box an object to judge, each damaged one a {@link BoxDamaged}. */
 export const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
   ListedBox:      BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
-  StoredRevision: obj({ revision_tok: BoxRecord.shape.revision_tok }),
+  StoredRevision: obj({ revision_tok }),
   ReadAnswer:     obj({ vault: unk }).loose(),
   ListingAnswer:  obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BoxDamaged) }).loose(),
 }))

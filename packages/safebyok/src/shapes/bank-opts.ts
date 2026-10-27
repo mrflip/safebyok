@@ -10,6 +10,7 @@ import type { VaultLogger } from '../logger'
 import { type StrengthChecker, DefaultStrengthChecker, strengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
 import { Validator } from '../checks/validator'
+import { key_deriver_label } from './fields'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock
 
@@ -239,7 +240,7 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
     clockReading:         num.gte(FarPast).lte(FarFuture),
     keyDeriverShape:      obj({
       algorithm:         str.optional(),
-      key_deriver_label: str.min(1),
+      key_deriver_label,
       salt_bytes:        int.gte(1).lte(MaxSaltBytes),
       deriveKeyBytes:    custom<KeyDeriver['deriveKeyBytes']>(isFunction),
       load:              custom<KeyDeriver['load']>(isFunction).optional(),

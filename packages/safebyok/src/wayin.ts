@@ -1,5 +1,5 @@
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord } from './shapes/vault'
+import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, type VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './shapes/fields'
 import { vaultStampDuck } from './shapes/ducks'
@@ -13,11 +13,6 @@ import { vaultStampDuck } from './shapes/ducks'
  * and its own visible header. A passkey's key is made with that same ctx as its HKDF `info`. The
  * record's epochs and the other wayin are not in it, so changing one wayin leaves the other open.
  */
-
-/** `RecordT` with every field but its wrap, member by member of a union. */
-type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayin_wrapped'> : never
-/** A wayin's visible header, every field but its wrap: what the wrap is bound to. */
-export type WayinHeader = HeaderOf<WayinRecord>
 
 /** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {
@@ -34,12 +29,6 @@ const PurposeForWayinkind = {
 export const wayinCtxOf = (vaultStamp: VaultStamp, header: WayinHeader): Uint8Array => (
   cipherCtx(vaultStampDuck.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
 )
-
-/** `record` without its wrap. */
-const headerOf = (record: WayinRecord): WayinHeader => {
-  const { vault_key_wayin_wrapped: _wrapped, ...header } = record
-  return header
-}
 
 /** A frozen copy of `record`, its wrap frozen with it: what a wayin holds as its `record`. */
 export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): RecordT => {

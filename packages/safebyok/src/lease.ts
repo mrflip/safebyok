@@ -1,4 +1,4 @@
-import { type BoxCiphered, BoxRecord, BoxSparse, BoxStamp } from './shapes/box'
+import { type BoxCiphered, BoxRecord, BoxSparse, BoxStamp, CipheredShape } from './shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
@@ -22,11 +22,10 @@ import type { Vault } from './vault'
  * the write to the device store are the vault's.
  */
 
-/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's sparse fields, as {@link BoxSparse} has them; and a box's two ciphered fields, as {@link BoxCiphered} has them. Each refuses 'bad_record'. */
-export const { LeaseGrant, VisibleShape, CipheredShape } = Validator('bad_record', ({ obj }) => ({
+/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; and a box record's sparse fields, as {@link BoxSparse} has them. Each refuses 'bad_record'. */
+export const { LeaseGrant, VisibleShape } = Validator('bad_record', () => ({
   LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
   VisibleShape:        BoxSparse.strip(),
-  CipheredShape:       obj({ box_key_wrapped, whisper_ciphered }),
 }))
 
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.

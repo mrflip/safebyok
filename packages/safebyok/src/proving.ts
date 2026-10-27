@@ -7,11 +7,11 @@ import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { PasskeySaltBytes, PrfAnswerBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import { PasskeySaltBytes, PrfAnswerBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinRecord, type PassphraseWayinRecord, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, vaultSparseOf, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
 import type { LeaseRecord } from './shapes/device'
 import { decorate } from './helpers'
 import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
-import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } from './wayin'
+import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from './wayin'
 
 /** Provings: a passphrase or a passkey's answer made into a wayinKey, held for one gating, which opens or seals the vault's ways in.
  * A Proving is sealed over a wayin's header: the current wayin's, to prove what stands, or a
@@ -19,11 +19,6 @@ import { PasskeyWayin, PassphraseWayin, Wayin, type WayinHeader, wayinCtxOf } fr
  * wayinKey it makes is non-extractable and never leaves the Proving, and no method hands back a
  * vaultKey. What crosses a method's boundary is a Proving, a Wayin, a Lease or a wrapped key.
  */
-
-/** A passphrase wayin's visible fields: its record but the wrap. */
-export type PassphraseWayinHeader = Omit<PassphraseWayinRecord, 'vault_key_wayin_wrapped'>
-/** A passkey wayin's visible fields: its record but the wrap. */
-export type PasskeyWayinHeader = Omit<PasskeyWayinRecord, 'vault_key_wayin_wrapped'>
 
 /** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more.
  * `call` is the vault call that raised it, which a demand's refusal names in the log.
@@ -381,18 +376,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 }
 
-// == [Headers]: headerOf, wayinRecordAt, checkedPasskeyAnswer, checkFreshSalt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
-
-/** `record`'s visible fields: the header a proving of the wayin it is seals over.
- *
- * @example await PassphraseProving.seal(vault, headerOf(vaultRecord.gate.passphrase), typed, { gating })
- */
-export function headerOf(record: PassphraseWayinRecord): PassphraseWayinHeader
-export function headerOf(record: PasskeyWayinRecord): PasskeyWayinHeader
-export function headerOf(record: PassphraseWayinRecord | PasskeyWayinRecord): PassphraseWayinHeader | PasskeyWayinHeader {
-  const { vault_key_wayin_wrapped: _wrapped, ...header } = record
-  return header
-}
+// == [Headers]: wayinRecordAt, checkedPasskeyAnswer, checkFreshSalt, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, madeUnderOfLease, gateMovedPast, demandAfterFailedSeal, sealLandedError
 
 /** The wayin record `vaultRecord`'s gate holds at `slotlabel`, or null: a novel vault's, or no passkey. */
 const wayinRecordAt = (vaultRecord: Pick<VaultRecord, 'gate'>, slotlabel: WayinKind): PassphraseWayinRecord | PasskeyWayinRecord | null => {

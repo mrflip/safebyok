@@ -1,8 +1,8 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
-import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultSparse, isGated, passphraseCleartext } from './shapes/vault'
+import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, checkFreshSalt, checkedPasskeyAnswer } from './proving'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultSparse, headerOf, isGated, passphraseCleartext } from './shapes/vault'
 import * as Phrases from './phrases'
 import type { Vault } from './vault'
 

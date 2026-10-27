@@ -65,7 +65,7 @@ export const { Sidecar } = Validator('bad_option', () => ({ Sidecar: whisperBag 
 export type Sidecar = Z.infer<typeof Sidecar>
 // --
 
-// == [The record]: BoxFormat, BoxRecord, BoxSparse, DamagedBoxRecord, BoxDamageVals, BoxDamaged, BoxStamp, BoxCiphered
+// == [The record]: BoxFormat, BoxRecord, BoxSparse, DamagedBoxRecord, BoxDamageVals, BoxDamaged, BoxStamp, CipheredShape, BoxCiphered
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
 export const BoxFormat = 'safebyok-box-v8'
@@ -157,6 +157,11 @@ export const { BoxStamp } = Validator('bad_record', () => ({
 }))
 export type BoxStamp = Z.infer<typeof BoxStamp>
 
+/** The check of a box's two ciphered fields, as {@link BoxCiphered} has them, every other field a box record holds dropped unread. Its `parse` refuses 'bad_record'. */
+export const { CipheredShape } = Validator('bad_record', ({ obj }) => ({
+  CipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
+}))
+
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
-export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>
+export type BoxCiphered = Z.infer<typeof CipheredShape>
 // --

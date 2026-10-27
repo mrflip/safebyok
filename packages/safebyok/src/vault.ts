@@ -1,4 +1,4 @@
-import type { Capacity, BoxExpectation } from './shapes/vault-db'
+import type { BoxListing, Capacity, BoxExpectation } from './shapes/vault-db'
 import type { Clock, BadNewsHandler } from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
 import { Whisper, Sidecar, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
@@ -1029,7 +1029,7 @@ export class Vault implements VaultStamp {
    * but not below the record (the same vault at a lower epoch: one served before this device's own
    * write, whose raise of the record came after the record was read) is ignored.
    */
-  #judgeRead(read: (VaultRecord & Listing) | null, record: DeviceRecord | null): (VaultRecord & Listing) | 'ignore' | 'behind' {
+  #judgeRead(read: (VaultRecord & BoxListing) | null, record: DeviceRecord | null): (VaultRecord & BoxListing) | 'ignore' | 'behind' {
     if (this.#goneBy !== null) { return 'ignore' }
     if (read === null) {
       const gone = goneError()
@@ -1053,7 +1053,7 @@ export class Vault implements VaultStamp {
    * lease, which changes nothing. A lease another tab's unlock or renewal wrote under the same gate
    * leaves it standing. None is taken up here. Bad news is told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
+  #takePicture(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1909,9 +1909,6 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // == [Vocabulary]: BirthRead, frozenVaultRecord, isOlderPicture, fitsLease, standsBeside, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
-/** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. */
-type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }>
-
 /** One read of storage and this device's store that a Vault object is born of, as `bank.ensureVault` made it.
  * `vaultRecord` and `listing` are what `vaultDB.ensureVault` resolved; `leaseKept` what
  * `deviceDB.getLease` found; `record` this device's record of the scope as raised at birth; and
@@ -1919,7 +1916,7 @@ type Listing = Readonly<{ boxes: readonly BoxSparse[], damagedBoxes: readonly Bo
  */
 export type BirthRead = Readonly<{
   vaultRecord: VaultRecord
-  listing:     Listing
+  listing:     BoxListing
   leaseKept:   LeaseRecord | null
   record:      DeviceRecord
   readAt:      number

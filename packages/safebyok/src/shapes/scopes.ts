@@ -83,7 +83,7 @@ export type Boxscope = Z.infer<typeof boxscope>
 export const VaultScope = vaultScope
 // --
 
-// == [Bags]: vaultBag, bankBag
+// == [Bags]: vaultBag, bankBag, VaultBag, BankBag
 
 /** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
  * `vaultBag` is strict, as a bag a person types is: a field other than its three names refuses,
@@ -98,4 +98,13 @@ export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, us
   const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
   return { bankBag, vaultBag: bankBag.extend({ vaultlabel }).strict() }
 })
+
+/** The bag naming one of a bank's vaults, as {@link vaultBag} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.
+ *
+ * @example bank.ensureVault({ vaultlabel: 'main' })
+ */
+export type VaultBag = Z.input<typeof vaultBag>
+
+/** What of a bank's scope a thing carries, as {@link bankBag} checks it: an `applabel` and a `user_id`, each optional. */
+export type BankBag = Z.input<typeof bankBag>
 // --

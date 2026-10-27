@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, passphraseCleartext } from '../src/shapes/vault'
-import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, headerOf, passphraseKeyOf } from '../src/proving'
+import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
+import { PasskeyProving, PassphraseProving, StandingGating, checkFreshSalt, checkedPasskeyAnswer, passphraseKeyOf } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
 import { leaseRecordOf } from '../src/lease'
@@ -296,14 +296,6 @@ describe("proving.wrappedWith", () => {
     const proving = await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, 'pw', { gating: StandingGating })
     const wrapped = await proving.wrappedWith(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['wrapKey']), proving.header)
     expect(wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
-  })
-})
-
-describe("headerOf", () => {
-  it("is a wayin record without its wrap, as its example shows", async () => {
-    const { stored } = await lockedWorld()
-    expect(headerOf(stored.gate.passphrase)).to.not.have.property('vault_key_wayin_wrapped')
-    expect(headerOf(stored.gate.passphrase)).to.include({ salt_b64: stored.gate.passphrase.salt_b64 })
   })
 })
 

@@ -1,4 +1,4 @@
-import { BoxRecord } from './shapes/box'
+import { revision_tok } from './shapes/fields'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
 import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './shapes/vault'
@@ -143,6 +143,6 @@ export const boxRefusalOf = (standingVaultRecord: unknown, standingBox: unknown,
  */
 export const deletionOf = (standingBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (standingBox === undefined || standingBox === null) { return { outcome: 'absent' } }
-  const standingRevision = BoxRecord.shape.revision_tok.safeParse(fieldOf(standingBox, 'revision_tok')).data ?? null
+  const standingRevision = revision_tok.safeParse(fieldOf(standingBox, 'revision_tok')).data ?? null
   return { outcome: standingRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
 }
