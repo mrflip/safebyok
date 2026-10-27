@@ -44,8 +44,8 @@ const vault = await bank.ensureVault({ vaultlabel: 'main' })
 * **`logger`**, when given, hears what the store has to say (a listener that threw, say); left
   out, the store uses the one `Bank.make` is given, else the console.
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
-  store one after another, across every tab of the origin, so a write lands only while what it
-  expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
+  store one after another, across every tab of the origin, so a write lands only while storage
+  still holds what it expects, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
   at once settle on one; deleting a vault takes its every box with it, or none of them.
 * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel, so a vault open in two tabs
   stays current in both. The bell says only that something changed; the vault reads again. Its
@@ -124,8 +124,8 @@ places:
 2. **`src/idb-vault-db.ts`: each verb, in one transaction of your store.** Extend `VaultDB` and
    write its `do*` methods, never its public verbs: the base class checks labels, scope, records
    and expectations on the way in, validates every record on the way out, and turns a `false`
-   into `stale_write` and anything you throw into `storage_unavailable`. A write reads what
-   stands, compares, and writes, all in one transaction (`src/shelf.ts`'s `inOneTransaction`);
+   into `stale_write` and anything you throw into `storage_unavailable`. A write reads what is
+   stored, compares, and writes, all in one transaction (`src/shelf.ts`'s `inOneTransaction`);
    a store with no transactions needs a conditional write instead (compare-and-set on the
    scopepath), or it cannot keep the promise.
 3. **`doSubscribe`: how your store tells listeners of a write.** Here, `ChangeBell` from
@@ -143,9 +143,9 @@ And keep, as they are:
   (`Expectations.vaultRecordMeets`, `vaultMeets`, `vaultTokMeets`), and a box read before it
   hands its box up (`vaultMeets`, else `Refusals.vaultMismatch()`), and for a box write, the
   refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
-  `stale_write` carrying the box that stands). An adapter
+  `stale_write` carrying the stored box). An adapter
   compares only the scope, `boxlabel`, `vault_tok`, `gate_epoch` and `revision_tok`, and a
-  standing row too damaged to show one of them fails the comparison.
+  stored row too damaged to show one of them fails the comparison.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a
   damaged row: safebyok validates everything it reads back.

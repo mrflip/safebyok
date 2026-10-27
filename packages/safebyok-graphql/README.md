@@ -89,7 +89,7 @@ Your app's own Client serves, cache exchange and all: every query the vault send
   (`identity_revoked` for anyone else's, or while signed out, on which the browser's vault locks
   itself).
 * **`fetchSubscriptions: true`** sends the vault's subscription over the same route, as
-  server-sent events, which Yoga serves as it stands. Without it, or another way to send
+  server-sent events, which Yoga serves out of the box. Without it, or another way to send
   subscriptions, nothing is pushed: the vault refreshes after its own writes, and learns of other
   devices' when it next reads.
 
@@ -154,7 +154,7 @@ answers, so the browser's VaultDB passes it through (rebuilding each record from
 which leaves GraphQL's `__typename` behind), and its base class checks each sound box again and
 parses the server's word on each damaged one. A vault read is one query, its record and its boxes
 from one step of the server's VaultDB.
-`safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
+`safebyok-postgres`'s VaultDB is already a ServedVaultDB; nothing here is tied to Postgres.
 
 Every stored field is non-null in the schema but the vault record's `gate`, null while a vault
 has none, and its `passkey`, null when the vault has none. A listing of yours that hands back a record missing
@@ -165,7 +165,7 @@ store of your own keeps every field it was handed.
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
 for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_tok` the
-box was sealed for and the revision it read, and your VaultDB lands it only while both stand,
+box was sealed for and the revision it read, and your VaultDB lands it only while storage still holds both,
 compared in the same atomic step as the write. `tests/yoga-recipe.test.ts` runs the shared suite
 through the recipe, that line included.
 

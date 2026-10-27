@@ -383,7 +383,7 @@ describe("postgresVaultDB, what it stores", () => {
     expect(await TH.expectingGood(vaultDB).getVault(u1)).to.deep.equal({ ...TH.vaultRecordOf('u1'), boxes: await TH.boxesOf(vaultDB, u1), damagedBoxes: [] })
   })
 
-  it("names the vault record standing when an update misses, from its one statement: the winner's, or none", async () => {
+  it("names the stored vault record when an update misses, from its one statement: the winner's, or none", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     const gone = await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 }), 'stale_write')
@@ -393,7 +393,7 @@ describe("postgresVaultDB, what it stores", () => {
     expect(late.meta).to.deep.equal({ vault_stored: TH.vaultRecordOf('u1', { gate_epoch: 2 }) })
   })
 
-  it("leaves no box standing when its vault record goes: deleting the vault takes its boxes in the same statement", async () => {
+  it("leaves no box stored when its vault record goes: deleting the vault takes its boxes in the same statement", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
@@ -418,12 +418,12 @@ const filledTo = async (db: PGlite, maxBoxes: number, boxlabels: readonly string
   return vaultDB
 }
 
-/** What InsertBoxSql answers when a first write does not land: whether its vault stood and was full, and the box standing, if any. */
-type Missed = { vault_stands: boolean, was_full: boolean, standing: BoxRecord | null, box_count?: number, bytes_used?: number }
+/** What InsertBoxSql answers when a first write does not land: whether its vault was stored and was full, and the stored box, if any. */
+type Missed = { vault_found: boolean, was_full: boolean, storedBox: BoxRecord | null, box_count?: number, bytes_used?: number }
 
-/** What InsertBoxSql answers, for a spy to say in place of the database: why a first write did not land, and what stands. */
-const missedBecause = ({ standing, ...why }: Missed) => (
-  (text: string) => (text.includes('INSERT INTO safebyok_boxes') ? Promise.resolve({ rows: [{ ...why, landed: standing === null ? null : false, ...standing }] }) : undefined)
+/** What InsertBoxSql answers, for a spy to say in place of the database: why a first write did not land, and what is stored. */
+const missedBecause = ({ storedBox, ...why }: Missed) => (
+  (text: string) => (text.includes('INSERT INTO safebyok_boxes') ? Promise.resolve({ rows: [{ ...why, landed: storedBox === null ? null : false, ...storedBox }] }) : undefined)
 )
 
 /** The foreign key violation Postgres raises for a box whose vault is gone, as a driver hands it up. */
@@ -441,7 +441,7 @@ describe("postgresVaultDB, its box limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.have.members(['openai', 'anthropic'])
   })
 
-  it("refuses a first write in a full vault of another vault_tok as vault_mismatch: the count is the standing vault's", async () => {
+  it("refuses a first write in a full vault of another vault_tok as vault_mismatch: the count is the stored vault's", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 1, ['openai'])
     await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-gone', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
@@ -455,20 +455,20 @@ describe("postgresVaultDB, its box limit", () => {
     expect(await TH.vaultRecordIn(vaultDB, u1)).to.be.null
   })
 
-  // The insert says why it missed, and what stands, from the one statement, so no second read is
+  // The insert says why it missed, and what is stored, from the one statement, so no second read is
   // asked. What a miss means is the adapter's to read; these answer the insert with each reason a
   // race can leave.
   const theirs = TH.boxOf('anthropic', 'theirs')
   const misses: [string, Missed, RefusalKind, unknown][] = [
-    ['the vault at its limit when the statement began', { vault_stands: true, was_full: true, standing: null, box_count: 1, bytes_used: 512 }, 'vault_full', { capacity: { boxes: { used: 1, max: 1 }, bytes: { used: 512, max: Number.MAX_SAFE_INTEGER } } }],
-    ['the vault gone or made anew', { vault_stands: false, was_full: false, standing: null }, 'vault_mismatch', undefined],
-    ['a vault gone, though it was counted full', { vault_stands: false, was_full: true, standing: null }, 'vault_mismatch', undefined],
-    ['the boxlabel already taken, in a vault at its limit: a replacement is never full', { vault_stands: true, was_full: true, standing: theirs }, 'stale_write', { box_stored: theirs }],
-    ['the boxlabel taken by a writer that committed after the statement began, with room in the vault', { vault_stands: true, was_full: false, standing: theirs }, 'stale_write', { box_stored: theirs }],
-    ['this very box, sent again and landed first by its other send: landed only where its own insert passed', { vault_stands: true, was_full: false, standing: TH.boxOf('anthropic', 'sk-fake') }, 'stale_write', { box_stored: TH.boxOf('anthropic', 'sk-fake') }],
+    ['the vault at its limit when the statement began', { vault_found: true, was_full: true, storedBox: null, box_count: 1, bytes_used: 512 }, 'vault_full', { capacity: { boxes: { used: 1, max: 1 }, bytes: { used: 512, max: Number.MAX_SAFE_INTEGER } } }],
+    ['the vault gone or made anew', { vault_found: false, was_full: false, storedBox: null }, 'vault_mismatch', undefined],
+    ['a vault gone, though it was counted full', { vault_found: false, was_full: true, storedBox: null }, 'vault_mismatch', undefined],
+    ['the boxlabel already taken, in a vault at its limit: a replacement is never full', { vault_found: true, was_full: true, storedBox: theirs }, 'stale_write', { box_stored: theirs }],
+    ['the boxlabel taken by a writer that committed after the statement began, with room in the vault', { vault_found: true, was_full: false, storedBox: theirs }, 'stale_write', { box_stored: theirs }],
+    ['this very box, sent again and landed first by its other send: landed only where its own insert passed', { vault_found: true, was_full: false, storedBox: TH.boxOf('anthropic', 'sk-fake') }, 'stale_write', { box_stored: TH.boxOf('anthropic', 'sk-fake') }],
   ]
   for (const [blurb, missed, kind, meta] of misses) {
-    it(`refuses ${kind} for ${blurb}, in the one statement, carrying what stands (Contract: VaultDB.putBox, Does)`, async () => {
+    it(`refuses ${kind} for ${blurb}, in the one statement, carrying what is stored (Contract: VaultDB.putBox, Does)`, async () => {
       const db = await TH.emptyDatabase()
       await filledTo(db, 1, [])
       const spy = TH.spyClient(db, missedBecause(missed))
@@ -514,7 +514,7 @@ describe("postgresVaultDB, its box limit", () => {
     for (const { text } of spy.sent) {
       expect(text).to.not.match(/FOR NO KEY UPDATE|FOR KEY SHARE|safebyok_vault_tallies/)
     }
-    // Each box write reads its vault row FOR SHARE, once, and locks the box standing FOR UPDATE, once; the delete locks nothing.
+    // Each box write reads its vault row FOR SHARE, once, and locks the stored box FOR UPDATE, once; the delete locks nothing.
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
     expect(spy.sent.map(({ text }) => text.match(/FOR UPDATE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
   })
@@ -863,14 +863,14 @@ describe("postgresVaultDB, subscribe", () => {
 })
 
 describe("PostgresClient and PostgresListen, as the drivers have them", () => {
-  it("is a pg Pool, Client or PoolClient, and a PGlite, as they stand", () => {
+  it("is a pg Pool, Client or PoolClient, and a PGlite, as they are", () => {
     expectTypeOf<Pool>().toExtend<PostgresClient>()
     expectTypeOf<Client>().toExtend<PostgresClient>()
     expectTypeOf<PoolClient>().toExtend<PostgresClient>()
     expectTypeOf<PGlite>().toExtend<PostgresClient>()
   })
 
-  it("takes a PGlite's listen as it stands", () => {
+  it("takes a PGlite's listen as it is", () => {
     expectTypeOf<PGlite['listen']>().toExtend<PostgresListen>()
   })
 })

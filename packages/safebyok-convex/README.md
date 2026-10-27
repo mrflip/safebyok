@@ -64,12 +64,12 @@ mistake for the first request.
   vault: throw it only for a user your app knows is gone. Anything else `getUserId` throws -- an
   auth provider that is down -- reaches the client as `storage_unavailable`, a passing fault.
 * **Writes that come too late.** An update (`putVaultRecord`, `putBox`) or a delete
-  (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_tok`,
+  (`delBox`, `delVault`) carries what its writer expects to be stored -- the vault's `vault_tok`,
   and the vault record's `gate_epoch`, or the box's `revision_tok` -- and checks it in the same
-  transaction it writes in. When that no longer stands, it writes nothing and resolves `false`
+  transaction it writes in. When storage no longer holds that, it writes nothing and resolves `false`
   (`putBox` and `delBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
   A `delBox` also carries the `revision_tok` its writer read, but only to say what it removed:
-  within the expected vault it removes whatever stands.
+  within the expected vault it removes whatever box is stored.
   An update of the vault record lands, too, only when the new vault record keeps the vault's
   `vault_tok` and moves its `gate_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `putBox` refuses, writing nothing, a box
@@ -78,7 +78,7 @@ mistake for the first request.
   tally stood, which the client turns into a `VaultError` of that kind carrying it as
   `meta.capacity`. The limits are the component's, not your app's or the client's to set.
 * **Reads from another vault.** A `getBox` carries the `vault_tok` of the vault its reader
-  holds the key for, and reads the box only while that vault record stands, in the same query.
+  holds the key for, and reads the box only while that vault record is stored, in the same query.
   Otherwise it resolves `{ read: false, refusalkind: 'vault_mismatch' }`, reading nothing more:
   the vault was deleted, or made anew, since the reader read it.
 * **One version, both ends.** A client meeting a `getBox` or `putBox` answer in a shape it does not know --
@@ -227,12 +227,12 @@ the core's own records, scopes and expectations.
 | Function                  | Kind     | Arguments                                                                   | Resolves                                                                                   |
 | ------------------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `getVault`                | query    | `{ ...scope }`                                                              | `{ vault, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order, for the client to split with `splitStoredBoxes`; or null |
-| `ensureVault`             | mutation | `{ draft }`, gateless vault record                                           | `{ vault, boxes }` standing afterwards: the draft, or another device's, with its boxes |
-| `putVaultRecord`          | mutation | `{ vaultRecord, expected: { vault_tok, gate_epoch } }`                      | `{ landed: true, vault_stored }`, the vault record as stored (its `vault_epoch` one up) if written; else `{ landed: false, vault_stored }`, the vault record standing or null |
-| `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault stands; else `{ read: false, refusalkind: 'vault_mismatch' }` |
-| `putBox`               | mutation | `{ ...scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
+| `ensureVault`             | mutation | `{ draft }`, gateless vault record                                           | `{ vault, boxes }` as stored afterwards: the draft, or another device's, with its boxes |
+| `putVaultRecord`          | mutation | `{ vaultRecord, expected: { vault_tok, gate_epoch } }`                      | `{ landed: true, vault_stored }`, the vault record as stored (its `vault_epoch` one up) if written; else `{ landed: false, vault_stored }`, the stored vault record or null |
+| `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault is the one expected; else `{ read: false, refusalkind: 'vault_mismatch' }` |
+| `putBox`               | mutation | `{ ...scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the stored box (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ ...scope }`                                                              | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
-| `delBox`               | mutation | `{ ...scope, boxlabel, expected: { vault_tok, revision_tok } }`             | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
+| `delBox`               | mutation | `{ ...scope, boxlabel, expected: { vault_tok, revision_tok } }`             | `{ outcome }` if the vault is the one expected -- `deleted`, `deleted_other` or `absent` -- null if not |
 | `delVault`             | mutation | `{ ...scope, expected: { vault_tok, gate_epoch } }`                         | the tombstone left (`{ format, ...scope, vault_epoch }`) if deleted, null if not          |
 | `watchVault`              | query    | `{ ...scope }`                                                              | `{ vault_tok, gate_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 

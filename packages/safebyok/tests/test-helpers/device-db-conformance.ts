@@ -82,7 +82,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal(stored)
     })
 
-    it("lands one scope's calls in the order they were made, awaited or not: the last of a put and an erase made together stands", async () => {
+    it("lands one scope's calls in the order they were made, awaited or not: the last of a put and an erase made together wins", async () => {
       const deviceDB = await makeDeviceDB()
       const first = await leaseOf('u1')
       const second = await leaseOf('u1', { gate_epoch: 2 })
@@ -92,7 +92,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
       await Promise.all([deviceDB.delLease(scopeOf('u1')), deviceDB.putLease(second)])
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
-      // A read made first sees what stood then; one made after a write sees the write.
+      // A read made first sees what was stored then; one made after a write sees the write.
       const [before, _putOutcome, after] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(first), deviceDB.getLease(scopeOf('u1'))])
       expect(before).to.deep.equal({ ok: true, val: second })
       expect(after).to.deep.equal({ ok: true, val: first })
@@ -100,7 +100,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
 
     // Each of these plants a record that fails its check through the verb that writes it: no verb
     // checks what it is handed, and a raise over nothing stores what it came with.
-    it("never discards a lease written after the unreadable row a getLease found: a putLease made as the read began stands", async () => {
+    it("never discards a lease written after the unreadable row a getLease found: a putLease made as the getLease began is kept", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')
       await deviceDB.putLease({ ...lease, lease_key: 'not a key handle' } as unknown as LeaseRecord)
@@ -110,7 +110,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
     })
 
-    it("never discards a device record raised after the unreadable row a getDeviceRecord found: a raiseDeviceRecord made as the read began stands", async () => {
+    it("never discards a device record raised after the unreadable row a getDeviceRecord found: a raiseDeviceRecord made as the getDeviceRecord began is kept", async () => {
       const deviceDB = await makeDeviceDB()
       const raising = deviceRecordOf('u1', { highest_vault_epoch: 3 })
       await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
@@ -159,7 +159,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
     })
 
-    it("never lowers a device record: a lower vault_epoch keeps the higher, and resolves the record as it stands", async () => {
+    it("never lowers a device record: a lower vault_epoch keeps the higher, and resolves the record as stored", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
       expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))

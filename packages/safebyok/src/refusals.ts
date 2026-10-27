@@ -44,7 +44,7 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   del: 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
-/** A `stale_write` refusal of a deletion: what it expected no longer stands, so nothing was removed.
+/** A `stale_write` refusal of a deletion: what it expected is no longer stored, so nothing was removed.
  * The `VaultDB` base class throws it when an adapter's deletion answers `false`, or `null` for a
  * box. An adapter that hands each call on to another VaultDB passes it on as it came.
  *
@@ -52,7 +52,7 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  */
 export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
 
-/** A `stale_write` refusal of a box write, carrying what stands under its boxlabel as `meta.box_stored`. Throw it from `doPutBox`.
+/** A `stale_write` refusal of a box write, carrying what is stored under its boxlabel as `meta.box_stored`. Throw it from `doPutBox`.
  * The `VaultDB` base class checks `boxStored` as `getBox` checks a record, so a caller meets a
  * box, a `BoxDamaged` or null. A `stale_write` from `doPutBox` carrying no `box_stored` is
  * refused as `corrupt_record`.
@@ -60,7 +60,7 @@ export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stal
  * @param boxStored - The record under the boxlabel, exactly as stored and damaged or not, read in
  *   the same atomic step that refused the write; null for none.
  *
- * @example throw Refusals.staleBox(standingRow ?? null)
+ * @example throw Refusals.staleBox(storedRow ?? null)
  */
 export const staleBox = (boxStored: unknown): VaultError => (
   // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
@@ -68,9 +68,9 @@ export const staleBox = (boxStored: unknown): VaultError => (
 )
 
 /** What a box write's `stale_write` says. */
-export const StaleBoxMessage = "That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
+export const StaleBoxMessage = "That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written. What is stored now is this error's meta.box_stored: write again over it, or leave it."
 
-/** A `stale_write` refusal of an update of the vault record, carrying the vault record standing as `meta.vault_stored`. Throw it from `doPutVaultRecord`.
+/** A `stale_write` refusal of an update of the vault record, carrying the stored vault record as `meta.vault_stored`. Throw it from `doPutVaultRecord`.
  * The `VaultDB` base class checks `vaultStored` as `getVault` checks a vault record, so a
  * caller meets a sound vault record or null; a damaged one refuses as a read of it would. A
  * `stale_write` from `doPutVaultRecord` carrying no `vault_stored` is refused as
@@ -79,7 +79,7 @@ export const StaleBoxMessage = "That box changed in storage since this call read
  * @param vaultStored - The vault record exactly as stored, read in the same atomic step
  *   that refused the write; null for none.
  *
- * @example throw Refusals.staleVaultRecord(standingRow ?? null)
+ * @example throw Refusals.staleVaultRecord(storedRow ?? null)
  */
 export const staleVaultRecord = (vaultStored: unknown): VaultError => (
   // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
@@ -87,10 +87,10 @@ export const staleVaultRecord = (vaultStored: unknown): VaultError => (
 )
 
 /** What an update of the vault record's `stale_write` says. */
-export const StaleVaultRecordMessage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_stored: read the vault again before retrying."
+export const StaleVaultRecordMessage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What is stored now is this error's meta.vault_stored: read the vault again before retrying."
 
 /** A `vault_mismatch` refusal of a box read or write, for a vault record that is not the one it expects. Throw it from `doGetBox` or `doPutBox`.
- * None stands, or it has another `vault_tok`. It carries nothing of the record that stands, as it
+ * None is stored, or it has another `vault_tok`. It carries nothing of the stored record, as it
  * holds every wayin.
  *
  * @example throw Refusals.vaultMismatch()
@@ -98,7 +98,7 @@ export const StaleVaultRecordMessage = "The vault changed in storage since this 
 export const vaultMismatch = (): VaultError => new VaultError('vault_mismatch', VaultMismatchMessage)
 
 /** What `vault_mismatch` says. */
-const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so the box was neither read nor written. Open the vault again to see what stands now."
+const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so the box was neither read nor written. Open the vault again to see what is stored now."
 
 /** A `not_permitted` refusal: a rule of the backend's refuses the signed-in user, still the vault's own, this one call.
  * It locks nothing.

@@ -52,7 +52,7 @@ const postedCall = async (request: Request): Promise<{ verb?: unknown, args?: un
 }
 
 /**
- * What a route answers, as JSON: `meta` always, the facts about what stands that a write's
+ * What a route answers, as JSON: `meta` always, the facts about what is stored that a write's
  * refusal learned (the record that won the race, how full the vault is) or nothing, and either
  * the `result` or a `refusal`. A refusal's own `meta` holds error information only (a damaged
  * record's listing), rebuilt from the fields a browser may see: no wrapped or ciphered field of
@@ -63,7 +63,7 @@ const answerOf = ({ ok, val = null, err }: Outcome<unknown>) => {
   if (ok) { return { result: val, meta: {} } }
   const { box_stored, vault_stored, capacity, box_listed, wayin_listed } = err.meta ?? {}
   const refusalMeta = { box_listed: box_listed && boxShown(box_listed), wayin_listed: wayin_listed && wayinShown(wayin_listed) }
-  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record stands.
+  // Never the refusal's cause, the driver's own error. JSON leaves out what is undefined, and keeps a null: no record is stored.
   return { refusal: { kind: err.refusalkind, message: err.message, meta: refusalMeta }, meta: { box_stored, vault_stored, capacity } }
 }
 
@@ -123,7 +123,7 @@ class RouteVaultDB extends VaultDB {
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
+  // A stale write refuses on the server and crosses as its kind, with what is stored (a full vault,
   // with how full it is), so a write that answers landed: an update of the vault record answers with
   // the vault record as the server's storage holds it, a box write with the box, a box deletion
   // with what it removed, and a vault deletion with the tombstone it left.
@@ -135,7 +135,7 @@ class RouteVaultDB extends VaultDB {
     })
     const answer = checkedAnswer(await response.json())
     if (answer.refusal) {
-      // What stands, or how full the vault is, from the main meta, beside the refusal's own: handed
+      // What is stored, or how full the vault is, from the main meta, beside the refusal's own: handed
       // on unchecked, for the VaultDB checks each.
       const meta = { ...answer.meta, ...answer.refusal.meta }
       throw new VaultError(answer.refusal.kind, answer.refusal.message, Object.keys(meta).length === 0 ? {} : { meta })
@@ -310,7 +310,7 @@ describe("the README route recipe's answer, which every call makes in one shape"
     const boxStored = { boxlabel: 'a', revision_tok: 'rev1', damage: 'damaged' } as const
     const stale = new VaultError('stale_write', 'Another device wrote first.', { meta: { box_stored: boxStored } })
     expect(await crossed(answerOf({ ok: false, err: stale }))).to.deep.equal({ refusal: { kind: 'stale_write', message: 'Another device wrote first.', meta: {} }, meta: { box_stored: boxStored } })
-    // A null is a fact too: no vault record stands.
+    // A null is a fact too: no vault record is stored.
     const none = new VaultError('stale_write', 'x', { meta: { vault_stored: null } })
     const noneSent = await crossed(answerOf({ ok: false, err: none }))
     expect(noneSent.meta).to.deep.equal({ vault_stored: null })

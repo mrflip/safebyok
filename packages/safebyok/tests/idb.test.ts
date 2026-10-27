@@ -88,7 +88,7 @@ describe("idbDeviceDB, reading a lease it cannot read", () => {
     expect(rows).to.deep.equal([])
   })
 
-  it("never discards a lease written after the unreadable row it found: a putLease made as the read began stands", async () => {
+  it("never discards a lease written after the unreadable row a getLease found: a putLease made as the getLease began is kept", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
     await set(Scopepath.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))

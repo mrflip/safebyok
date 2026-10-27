@@ -72,7 +72,7 @@ describe("putVaultRecord", () => {
     expect(await TH.storedVaultRecordIn(CVX, u1)).to.deep.equal({ ...rewrapped, vault_epoch: 2 })
   })
 
-  it("answers a miss with the vault record standing, from the same transaction, or null where none stand, as PutVaultRecordAnswer's second example shows", async () => {
+  it("answers a miss with the stored vault record, from the same transaction, or null where none is stored, as PutVaultRecordAnswer's second example shows", async () => {
     const CVX = await withVaultRecord()
     await CVX.mutation(TH.vaults.putVaultRecord, { vaultRecord: rewrapped, expected: ThisVaultAtOne })
     const late = TH.vaultRecordOf('u1', { gate_epoch: 2 })
@@ -85,7 +85,7 @@ describe("putVaultRecord", () => {
   // with every update -- so each is a client of another version's, or of none.
   const UnmovedCases = [
     [{ ...rewrapped, vault_tok: 'vault-tok-other' }, 'refuses a vault record naming another vault than the one it replaces'],
-    [{ ...rewrapped, gate_epoch: 1 },               'refuses a vault record that keeps the standing gate_epoch'],
+    [{ ...rewrapped, gate_epoch: 1 },               'refuses a vault record that keeps the stored gate_epoch'],
   ] as const
 
   for (const [vaultRecord, blurb] of UnmovedCases) {
@@ -105,7 +105,7 @@ describe("getBox and putBox", () => {
     expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
 
-  it("resolves a write whose box expectation failed as stale_write, with the box standing as a read returns it, writing nothing, as PutBoxAnswer's second example shows", async () => {
+  it("resolves a write whose box expectation failed as stale_write, with the stored box as a read returns it, writing nothing, as PutBoxAnswer's second example shows", async () => {
     const CVX = await withVaultRecord()
     await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
     expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: TH.noBoxYet })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: TH.boxOf('anthropic_api_key', 'a1') })

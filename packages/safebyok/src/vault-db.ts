@@ -16,15 +16,15 @@ import { byCodeUnit } from './text'
 // == [Expectations and records]: VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse
 
 /** What an update of the vault record was proven against: the vault, and the `gate_epoch` the writer read.
- * The update lands only while the standing vault record still has both. A `gate_epoch` of 0 is a
+ * The update lands only while the stored vault record still has both. A `gate_epoch` of 0 is a
  * novel vault's record, which the vault's first gate is written over.
  *
- * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
+ * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
 export type VaultRecordExpectation = Z.infer<typeof VaultRecordExpectation>
 
-/** The vault a box read means to read in: it finds the box only while the standing vault record has this `vault_tok`.
- * Otherwise it refuses `vault_mismatch`, reading nothing more: none stand, a tombstone stands, or
+/** The vault a box read means to read in: it finds the box only while the stored vault record has this `vault_tok`.
+ * Otherwise it refuses `vault_mismatch`, reading nothing more: no vault record is stored, only a tombstone, or
  * the vault was deleted and made anew under another `vault_tok`. So a box from another life of the
  * scope is never handed to a reader holding the key of this one.
  *
@@ -33,15 +33,15 @@ export type VaultRecordExpectation = Z.infer<typeof VaultRecordExpectation>
 export type BoxGetExpectation = Z.infer<typeof BoxGetExpectation>
 
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
- * The write lands only while the standing vault record has this `vault_tok` (else
- * `vault_mismatch`). It also needs the standing box at this `revision_tok`, or no box at all for
+ * The write lands only while the stored vault record has this `vault_tok` (else
+ * `vault_mismatch`). It also needs the stored box at this `revision_tok`, or no box at all for
  * null (else `stale_write`).
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: prev?.revision_tok ?? null }
  */
 export type BoxExpectation = Z.infer<typeof BoxExpectation>
 
-/** The vault a deletion means to remove whole: it lands only while the standing vault record has this `vault_tok` and `gate_epoch`.
+/** The vault a deletion means to remove whole: it lands only while the stored vault record has this `vault_tok` and `gate_epoch`.
  * So a delete proven against a gate another device has since changed refuses as stale: an old
  * passphrase in a stale tab cannot delete the vault. A `gate_epoch` of null means "check the
  * `vault_tok` alone": it is for `delDamagedVault`, whose vault record fails its checks and shows
@@ -53,8 +53,8 @@ export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
 
 /** What a box deletion was aimed at: the vault, and the `revision_tok` the deleter read.
  * The `revision_tok` is null for a box listed as damaged with no revision a read could take.
- * The deletion lands only while the standing vault record has this `vault_tok`. It then removes
- * whatever box stands under the boxlabel: within the right vault, a deletion wins over any write.
+ * The deletion lands only while the stored vault record has this `vault_tok`. It then removes
+ * whatever box is stored under the boxlabel: within the right vault, a deletion wins over any write.
  * The revision decides only what the {@link BoxDeletion} reports.
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok }
@@ -147,8 +147,8 @@ export type VaultDBOpts = {
  *  * **Never look inside.** Every secret field arrives encrypted, and nothing you hold opens a
  *    vault. You compare only a few unencrypted fields (`vault_tok`, `gate_epoch`, `revision_tok`)
  *    before a write.
- *  * **Write only as expected.** Each update and deletion carries an expectation of what stands in
- *    storage. Check it and write in one atomic step (a transaction, a conditional write). Each
+ *  * **Write only as expected.** Each update and deletion carries an expectation of what is
+ *    stored. Check it and write in one atomic step (a transaction, a conditional write). Each
  *    `do*` method says what it answers when the expectation fails.
  *  * **Enforce who may reach which rows.** safebyok's encryption protects the contents; your
  *    authorization decides who may fetch or overwrite them at all. When no one is signed in, or
@@ -256,7 +256,7 @@ export abstract class VaultDB {
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
-  /** The scope's vault record and box listing, read in one atomic step, or null when no vault stands.
+  /** The scope's vault record and box listing, read in one atomic step, or null when no vault is stored.
    * The vault comes back as its record, with `boxes` and `damagedBoxes` beside its fields: each
    * sound box's {@link BoxSparse}, without ciphertext, and each box whose record does not read back
    * as a {@link BoxDamaged}, never among the sound. Each list is sorted by boxlabel, and all of it
@@ -274,10 +274,10 @@ export abstract class VaultDB {
     return outcomeOf(() => this.readVault(scope))
   }
 
-  /** The vault of `draft`'s scope, as {@link VaultDB.getVault} reads it, created first from `draft` when no vault stands.
+  /** The vault of `draft`'s scope, as {@link VaultDB.getVault} reads it, created first from `draft` when no vault is stored.
    * The look, the create and the read are one atomic step, so two devices ensuring one new scope
    * settle on one vault, and both get it back. Compare its `vault_tok` with the draft's to tell
-   * whether this call made it. A vault record already standing comes back untouched, gated or not.
+   * whether this call made it. A vault record already stored comes back untouched, gated or not.
    * Over a tombstone it starts a new life: the draft's `vault_tok`, and `vault_epoch` carried on
    * from the vault deleted, so the counter never goes back.
    *
@@ -313,19 +313,19 @@ export abstract class VaultDB {
     return outcomeOf(() => this.ensuredVault(draft))
   }
 
-  /** Replace the vault record with `vaultRecord`, only while the standing one has the `vault_tok` and `gate_epoch` in `expected`, resolving the vault record as stored.
+  /** Replace the vault record with `vaultRecord`, only while the stored one has the `vault_tok` and `gate_epoch` in `expected`, resolving the vault record as stored.
    * The record and its gate are written in this one step. The store moves `vault_epoch` up by one
    * in the same step, whatever value `vaultRecord` carries, so what is resolved is the vault as it
-   * now stands. Otherwise it refuses `stale_write` and writes nothing, as it does when no vault
-   * record stands, or only a tombstone does. `err.meta.vault_stored` then holds what stands,
+   * is now stored. Otherwise it refuses `stale_write` and writes nothing, as it does when no vault
+   * record is stored, or only a tombstone is. `err.meta.vault_stored` then holds what is stored,
    * from the same atomic step, checked as {@link VaultDB.getVault} checks it, or null for none; a
-   * vault record standing that fails that check refuses as a read of it does. A vault's
+   * stored vault record that fails that check refuses as a read of it does. A vault's
    * `vault_tok` never changes, so `vaultRecord` must carry the one in `expected`: 'bad_record'
    * otherwise. A vault's first gate is such an update, written over its novel record expecting
    * `gate_epoch` 0.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putVaultRecord(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
+   *   const { ok, val, err } = await vaultDB.putVaultRecord(next, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_stored }   // what won
    */
   putVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<Outcome<VaultRecord>> {
@@ -362,9 +362,9 @@ export abstract class VaultDB {
 
   // == [Box verbs]: getBox, putBox
 
-  /** The box under `boxlabel`, validated, or null when there is none, read only while the standing vault record has `expected`'s `vault_tok`.
+  /** The box under `boxlabel`, validated, or null when there is none, read only while the stored vault record has `expected`'s `vault_tok`.
    * The vault record and the box are read in one atomic step. Refuses `vault_mismatch`, reading
-   * nothing more, when the standing vault record is another vault's, or none stands (the vault
+   * nothing more, when the stored vault record is another vault's, or none is stored (the vault
    * deleted, or deleted and made anew): what the reader holds a key for is gone. A box that fails
    * its checks refuses as `damaged_box`.
    *
@@ -384,17 +384,17 @@ export abstract class VaultDB {
   }
 
   /** Write `box` under its boxlabel in one atomic conditional write, resolving the box as storage now holds it.
-   * The write lands only while the standing vault record has the `vault_tok` in `expected`, and the
-   * standing box its `revision_tok` (for null, while no box stands). The box resolved comes from
+   * The write lands only while the stored vault record has the `vault_tok` in `expected`, and the
+   * stored box its `revision_tok` (for null, while no box is stored). The box resolved comes from
    * that same atomic step, checked as {@link VaultDB.getBox} checks one, at the revision written.
    * One that fails is the adapter's wrong answer, `corrupt_record`, though the write may have landed.
    *
    * Refuses, writing nothing:
    *
-   * * `vault_mismatch` when the standing vault record is not the one `expected` names, or none
-   *   stands. It carries nothing of them.
-   * * `stale_write` when the standing box is not the one `expected` names. `err.meta.box_stored`
-   *   holds what stands, from the same atomic step: the box that won, checked as `getBox` checks
+   * * `vault_mismatch` when the stored vault record is not the one `expected` names, or none
+   *   is stored. It carries nothing of them.
+   * * `stale_write` when the stored box is not the one `expected` names. `err.meta.box_stored`
+   *   holds what is stored, from the same atomic step: the box that won, checked as `getBox` checks
    *   one; a `BoxDamaged` (naming the revision it holds, if any); or null for none. Write over it
    *   naming that revision, or null. A damaged box that names no revision can only be removed,
    *   with {@link VaultDB.delBox}.
@@ -451,8 +451,8 @@ export abstract class VaultDB {
 
   // == [Delete verbs]: delBox, delVault, delDamagedVault, deletedVault
 
-  /** Remove the box under `boxlabel`, whatever revision stands, only while the standing vault record has `expected`'s `vault_tok`.
-   * Otherwise it refuses `stale_write` and removes nothing, as it does when no vault record stands.
+  /** Remove the box under `boxlabel`, whatever revision is stored, only while the stored vault record has `expected`'s `vault_tok`.
+   * Otherwise it refuses `stale_write` and removes nothing, as it does when no vault record is stored.
    * Resolves the {@link BoxDeletion} that the removal's own atomic step reports. One in another
    * shape refuses as `corrupt_record`, though the deletion may have landed. Deleted is gone:
    * nothing of the record is kept, and a `putBox` expecting the revision removed refuses
@@ -473,18 +473,18 @@ export abstract class VaultDB {
     })
   }
 
-  /** Remove the vault record and every box, only while the standing vault record has `expected`'s `vault_tok` and `gate_epoch`, leaving a tombstone, which it resolves.
+  /** Remove the vault record and every box, only while the stored vault record has `expected`'s `vault_tok` and `gate_epoch`, leaving a tombstone, which it resolves.
    * This is the backend's part of deleting a vault. The {@link VaultTombstone} holds the scope and
    * `vault_epoch` moved up by one; the next
    * {@link VaultDB.ensureVault} of the scope carries that counter into a new life. A deletion
    * proven against a gate another device has since changed refuses, so a stale tab's old
    * passphrase cannot delete the vault. Otherwise it refuses `stale_write` and removes nothing, as
-   * it does when no vault stands, or one made anew does. Sent again after it landed, a retry
+   * it does when no vault is stored, or one made anew is. Sent again after it landed, a retry
    * after a lost answer say, it refuses as stale too: a tombstone holds no `vault_tok` for an
    * expectation to name, and the vault is gone all the same.
    *
    * @example
-   *   const { ok, val } = await vaultDB.delVault(scope, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })
+   *   const { ok, val } = await vaultDB.delVault(scope, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
    *   if (ok) { rememberEpoch(val.vault_epoch) }
    */
   delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<Outcome<VaultTombstone>> {
@@ -577,7 +577,7 @@ export abstract class VaultDB {
 
   /** Log a listener's failure, and report it to the platform where it reports errors. */
   private listenerFailed(err: unknown): void {
-    this.logger.error("A listener passed to subscribe threw, or returned a promise that rejected. The write it heard of stands, and every other listener was called; the listener is the host's to mend.", { call: 'subscribe' }, asError(err))
+    this.logger.error("A listener passed to subscribe threw, or returned a promise that rejected. The write it heard of is kept, and every other listener was called; the listener is the host's to mend.", { call: 'subscribe' }, asError(err))
     reportToPlatform(err)
   }
 
@@ -610,7 +610,7 @@ export abstract class VaultDB {
   // --------------------------------------------------------------------------- the half you write
 
   /** The scope's vault record exactly as stored, and every box of it split by {@link splitStoredBoxes}, read in one atomic step: one statement, query or transaction.
-   * `vault` is the vault record, null when none stands. A store that keeps a tombstone in the vault
+   * `vault` is the vault record, null when none is stored. A store that keeps a tombstone in the vault
    * record's place (one row to a scope) may hand it up as `vault`: the base class reads it as none.
    * Hand each box row to `splitStoredBoxes` as a {@link StoredBox}, the boxlabel it is filed under
    * beside its record exactly as stored, whole, or without `box_key_wrapped` and
@@ -619,33 +619,33 @@ export abstract class VaultDB {
    * owes beyond them. An adapter relaying a server's `getVaultRecords` answers what it was sent.
    */
   protected abstract doGetVault(scope: VaultScope): Promise<VaultReadResponse>
-  /** Store `draft` if its scope holds no vault record, then read the vault record standing and every box, all in one atomic step, answering as {@link VaultDB.doGetVault} does.
+  /** Store `draft` if its scope holds no vault record, then read the stored vault record and every box, all in one atomic step, answering as {@link VaultDB.doGetVault} does.
    * The vault record is `draft` itself, or the one already there, untouched, exactly as stored.
-   * Over a tombstone the scope stands as no vault, and the new life is `draft` with its
+   * Over a tombstone the scope counts as holding no vault, and the new life is `draft` with its
    * `vault_epoch` set to the tombstone's: store that, and drop the tombstone in the same step. The
    * boxes are of the vault record it hands up. Two devices ensuring one scope at once settle on one
    * vault. `Expectations.newLifeOf` makes the record a key-value backend stores.
    */
   protected abstract doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse>
-  /** Replace the standing vault record with `vaultRecord` if, and only if, it has `expected.vault_tok` and `expected.gate_epoch`, resolving it as stored.
-   * Store `vaultRecord`, its gate with it, with its `vault_epoch` set to the standing one plus one,
+  /** Replace the stored vault record with `vaultRecord` if, and only if, it has `expected.vault_tok` and `expected.gate_epoch`, resolving it as stored.
+   * Store `vaultRecord`, its gate with it, with its `vault_epoch` set to the stored one plus one,
    * whatever it carries, and resolve the record as stored, read back in that same step: a key-value
    * backend asks `Expectations.vaultRecordPutOf`. Otherwise write nothing, and throw
-   * `Refusals.staleVaultRecord(standing)` from the same atomic step, `standing` the vault record
+   * `Refusals.staleVaultRecord(stored)` from the same atomic step, `stored` the vault record
    * exactly as stored, or null for none (a tombstone is none). A key-value backend asks
    * `Expectations.vaultRecordRefusalOf`. A server-side adapter also refuses a vault record that
-   * moves `gate_epoch` back or leaves it where it stands. How the record is laid out in storage
+   * moves `gate_epoch` back or leaves it where it is. How the record is laid out in storage
    * (columns, documents, one JSON value) is the adapter's own.
    */
   protected abstract doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown>
-  /** The stored box record under `boxlabel`, exactly as saved, or null for none, if, and only if, the standing vault record has `expected.vault_tok`.
+  /** The stored box record under `boxlabel`, exactly as saved, or null for none, if, and only if, the stored vault record has `expected.vault_tok`.
    * Compare the vault record in the same atomic step as the read of the box. Otherwise read
-   * nothing more, and throw `Refusals.vaultMismatch()` from that step: none stand, a tombstone
-   * stands, or another vault's. A key-value backend reads both rows and asks
-   * `Expectations.vaultMeets(standingVaultRecord, expected)`.
+   * nothing more, and throw `Refusals.vaultMismatch()` from that step: no vault record is stored,
+   * only a tombstone, or another vault's. A key-value backend reads both rows and asks
+   * `Expectations.vaultMeets(storedVaultRecord, expected)`.
    */
   protected abstract doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown>
-  /** Store `box` under its boxlabel if, and only if, the standing vault record and box are those `expected` names.
+  /** Store `box` under its boxlabel if, and only if, the stored vault record and box are those `expected` names.
    * That is a vault record with `expected.vault_tok`, and the box at `expected.revision_tok`, or no box
    * for null, all compared in the same atomic step as the write. Once written, resolve the record as
    * stored, read back in that same step (a `RETURNING`, a mutation's return value, a read in the
@@ -655,7 +655,7 @@ export abstract class VaultDB {
    *
    * * `Refusals.vaultMismatch()` when the vault record is not the expected one: none, or another
    *   vault's.
-   * * `Refusals.staleBox(standing)` when they are, but the box is not. `standing` is the record
+   * * `Refusals.staleBox(stored)` when they are, but the box is not. `stored` is the record
    *   under the boxlabel exactly as stored, damaged or not, or null for none.
    * * `Refusals.vaultFull(capacity)`, from a backend that keeps a limit, for a vault with no room.
    *
@@ -667,8 +667,8 @@ export abstract class VaultDB {
    * reports the same reckoning, with `Refusals.vaultFull(capacity)`.
    */
   protected abstract doGetCapacity(scope: VaultScope): Promise<unknown>
-  /** Remove the box under `boxlabel`, whatever revision stands, if, and only if, the standing vault record has `expected.vault_tok`.
-   * Compare in the same atomic step as the removal. Once that vault record stands, resolve a
+  /** Remove the box under `boxlabel`, whatever revision is stored, if, and only if, the stored vault record has `expected.vault_tok`.
+   * Compare in the same atomic step as the removal. While that vault record is stored, resolve a
    * {@link BoxDeletion} saying what that step removed: `deleted` for a record at
    * `expected.revision_tok`, `deleted_other` for any other, `absent` for none. For a null
    * `revision_tok`, `deleted` is a record holding no revision a read could take:
@@ -676,7 +676,7 @@ export abstract class VaultDB {
    * nothing.
    */
   protected abstract doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown>
-  /** Remove the vault record and every box of `scope` if, and only if, the standing vault record has `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone.
+  /** Remove the vault record and every box of `scope` if, and only if, the stored vault record has `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone.
    * Use one transaction, where the backend has them. Resolve the {@link VaultTombstone} as stored,
    * read back in that same step: the scope, and `vault_epoch` the vault's own plus one. Over a
    * tombstone, or no vault record, resolve null, removing nothing. So does any other miss.
@@ -853,7 +853,7 @@ const adapterAnswer = async <AnswerT>(hook: () => Promise<AnswerT>): Promise<Ans
 }
 
 /** What a box write resolves, or its refusal, with what a miss says of storage checked as a read checks it.
- * A stale write naming nothing standing, or a `vault_full` without a sound capacity, refuses as
+ * A stale write that does not say what is stored, or a `vault_full` without a sound capacity, refuses as
  * `corrupt_record`.
  */
 const withMissChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
@@ -866,11 +866,11 @@ const withMissChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): 
   }
 }
 
-/** A box write's `stale_write`, its `box_stored` checked; `corrupt_record` when it names nothing standing. */
+/** A box write's `stale_write`, its `box_stored` checked; `corrupt_record` when it does not say what is stored. */
 const staleChecked = (err: VaultError, boxlabel: string): VaultError => {
   const said = err.meta ?? {}
   if (! ('box_stored' in said)) {
-    return new VaultError('corrupt_record', "Storage refused a box write as stale, so nothing was written, but did not say what stands under its boxlabel. The storage adapter needs a developer's look: its doPutBox throws Refusals.staleBox(standing).", { cause: err })
+    return new VaultError('corrupt_record', "Storage refused a box write as stale, so nothing was written, but did not say what is stored under its boxlabel. The storage adapter needs a developer's look: its doPutBox throws Refusals.staleBox(stored).", { cause: err })
   }
   return remade(err, { box_stored: boxStoredOf(said.box_stored, boxlabel) })
 }
@@ -885,8 +885,8 @@ const fullChecked = (err: VaultError): VaultError => {
 }
 
 /** What an update of the vault record resolves, or its refusal, its `stale_write`'s `vault_stored` checked as a read checks it.
- * A vault record standing that fails that check refuses as the read does: 'damaged_vault' or
- * 'newer_format'. A stale write naming nothing standing refuses as `corrupt_record`.
+ * A stored vault record that fails that check refuses as the read does: 'damaged_vault' or
+ * 'newer_format'. A stale write that does not say what is stored refuses as `corrupt_record`.
  */
 const withStaleVaultRecordChecked = async <ValT>(writing: Promise<ValT>, scope: VaultScope): Promise<ValT> => {
   try {
@@ -895,20 +895,20 @@ const withStaleVaultRecordChecked = async <ValT>(writing: Promise<ValT>, scope: 
     if (! isVaultError(err, 'stale_write')) { throw err }
     const said = err.meta ?? {}
     if (! ('vault_stored' in said)) { throw unsaidVaultRecord({ cause: err }) }
-    const standing: unknown = said.vault_stored
-    throw remade(err, { vault_stored: standing === null || standing === undefined ? null : checkVaultRecord(standing, scope) })
+    const stored: unknown = said.vault_stored
+    throw remade(err, { vault_stored: stored === null || stored === undefined ? null : checkVaultRecord(stored, scope) })
   }
 }
 
-/** An update of the vault record refused without saying what stands: the adapter's bug, `corrupt_record`. */
-const unsaidVaultRecord = (opts?: ErrorOptions) => new VaultError('corrupt_record', "Storage refused an update of the vault record, so nothing was written, but did not say what stands. The storage adapter needs a developer's look: its doPutVaultRecord throws Refusals.staleVaultRecord(standing).", opts)
+/** An update of the vault record refused without saying what is stored: the adapter's bug, `corrupt_record`. */
+const unsaidVaultRecord = (opts?: ErrorOptions) => new VaultError('corrupt_record', "Storage refused an update of the vault record, so nothing was written, but did not say what is stored. The storage adapter needs a developer's look: its doPutVaultRecord throws Refusals.staleVaultRecord(stored).", opts)
 
 /** `err` made again with `meta`, its kind, message and cause kept. */
 const remade = (err: VaultError, meta: RefusalMeta): VaultError => (
   new VaultError(err.refusalkind, err.message, err.cause === undefined ? { meta } : { cause: err.cause, meta })
 )
 
-/** What stands under `boxlabel`, as a stale box write reports it: the box where `getBox` would take it, else a {@link BoxDamaged}, or null for none. */
+/** What is stored under `boxlabel`, as a stale box write reports it: the box where `getBox` would take it, else a {@link BoxDamaged}, or null for none. */
 const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | BoxDamaged | null => {
   if (raw === null || raw === undefined) { return null }
   const box = BoxRecord.safeParse(raw)
@@ -1060,7 +1060,7 @@ const checkAnswer = <AnswerT>(answerSchema: Z.ZodType<AnswerT>, raw: unknown, sa
  * For a write or deletion, `landed` says it may have landed all the same.
  */
 const wrongAnswer = (said: string, landed?: 'landed', opts?: ErrorOptions) => new VaultError('corrupt_record', landed === 'landed'
-  ? `Storage says ${said} landed, but answered with what this package cannot read back, so whether it did is not known: reading the vault again shows what stands. The storage adapter needs a developer's look: it wrote or reported something it should not have.`
+  ? `Storage says ${said} landed, but answered with what this package cannot read back, so whether it did is not known: reading the vault again shows what is stored. The storage adapter needs a developer's look: it wrote or reported something it should not have.`
   : `Storage answered ${said} in a shape this package does not know. The storage adapter needs a developer's look.`, opts)
 
 /** What `val` weighs as the UTF-8 bytes of its JSON: how the vault measures a record against its storage's limits.

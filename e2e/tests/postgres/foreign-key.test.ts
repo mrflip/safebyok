@@ -10,7 +10,7 @@ const getDb = TH.useFileDatabase()
 const u1 = TH.scopeOf('u1')
 
 TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real Postgres", () => {
-  // The insert's own count sees the vault standing, so only the foreign key's `23503` can refuse it here.
+  // The insert's own count sees the vault still stored, so only the foreign key's `23503` can refuse it here.
   it("refuses as vault_mismatch a box whose vault another connection deleted while its insert waited on the foreign key, and stores nothing", async () => {
     const db = getDb()
     await db.empty()
@@ -26,10 +26,10 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await write
 
     expect(await TH.vaultRecordIn(device, u1)).to.be.null
-    expect(await TH.boxesStanding(db)).to.eq(0)
+    expect(await TH.boxesStored(db)).to.eq(0)
   })
 
-  it("lands the box when the delete is rolled back instead: the foreign key is read against the vault row that stands", async () => {
+  it("lands the box when the delete is rolled back instead: the foreign key is read against the vault row as last committed", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, {})('u1')

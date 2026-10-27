@@ -283,9 +283,9 @@ export const insertRawBox = async (client: Client, boxlabel: string, like: strin
 }
 
 /** How many boxes the u1 vault holds, counted straight from the table. */
-export const boxesStanding = async (db: FileDatabase): Promise<number> => {
-  const { rows } = await db.host.query('SELECT count(*)::int AS standing FROM safebyok_boxes')
-  return (rows[0] as { standing: number }).standing
+export const boxesStored = async (db: FileDatabase): Promise<number> => {
+  const { rows } = await db.host.query('SELECT count(*)::int AS stored FROM safebyok_boxes')
+  return (rows[0] as { stored: number }).stored
 }
 
 /** How a write settled: `landed`, or the refusalkind it was refused with. */

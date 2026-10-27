@@ -114,7 +114,7 @@ class ConvexVaultDB extends VaultDB {
     return { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
-  // The component answers the record as stored, or what stands when an update misses, from the
+  // The component answers the record as stored, or what is stored when an update misses, from the
   // transaction that decided it: the base class checks it.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultRecord, { vaultRecord, expected }))
@@ -216,7 +216,7 @@ const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> =
   return refusalkind === 'vault_mismatch'
 }
 
-/** True when `answer` is an update of the vault record's answer as this version's component makes it: `landed` or not, carrying the vault record as stored or what stands. */
+/** True when `answer` is an update of the vault record's answer as this version's component makes it: `landed` or not, carrying the vault record it wrote, or the one it found stored. */
 const isPutVaultRecordAnswer = (answer: unknown): answer is Infer<typeof PutVaultRecordAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
   const { landed } = answer as { landed?: unknown }

@@ -40,11 +40,11 @@ describe("memoryDeviceDB", () => {
 describe("raisedDeviceRecord", () => {
   const record: DeviceRecord = TH.deviceRecordOf('u1')
 
-  it("stores the record as it came where none stands, as its first example shows", () => {
+  it("stores the record as it came where none is stored, as its first example shows", () => {
     expect(raisedDeviceRecord(undefined, record)).to.eq(record)
   })
 
-  it("keeps the higher highest_vault_epoch where a record stands, as its second example shows", () => {
+  it("keeps the higher highest_vault_epoch where a record is stored, as its second example shows", () => {
     expect(raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch).to.eq(5)
   })
 
@@ -55,12 +55,12 @@ describe("raisedDeviceRecord", () => {
   })
 
   it("throws 'bad_record' rather than raise a stored record to an epoch that fails its check, as its doc block says: no record the core hands it carries one", () => {
-    const standing = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
-    TH.expectSyncRefusal(() => raisedDeviceRecord(standing, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
+    const stored = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
+    TH.expectSyncRefusal(() => raisedDeviceRecord(stored, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
   })
 
   const GivesWayCases = [
-    // what may stand under the ckey that is no device record of this scope:
+    // what may be stored under the ckey that is no device record of this scope:
     [null,                                                       'a null left by a store'],
     [{ format: 'safebyok-device-v0', highest_vault_epoch: 9 },  'a row that fails its check'],
     [TH.deviceRecordOf('u2', { highest_vault_epoch: 9 }),        "another scope's record, filed where it should not be"],

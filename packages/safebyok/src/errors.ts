@@ -54,7 +54,7 @@ import type { VaultRecord } from './vault-record'
  * * `weak_passphrase`: a new passphrase (the one an `initialize_gate` attempt sets, or a
  *   `change_passphrase` attempt's next) that the `strengthChecker` finds too easy to guess, or a
  *   blank one. Its message is the checker's reason, fit to show beside the field. An unlock of a
- *   standing vault never raises it.
+ *   vault that has its passphrase never raises it.
  * * `insecure_context`: a page served over plain http (anywhere but localhost), where the browser
  *   withholds WebCrypto. The host serves it over https.
  * * `newer_format`: a stored vault in a form this version does not know, perhaps written by a newer
@@ -73,7 +73,7 @@ import type { VaultRecord } from './vault-record'
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
  * * `vault_mismatch`: from a `VaultDB.putBox` or `VaultDB.getBox` called directly, a box
- *   written or read under a vault record that no longer stands (the vault deleted, remade under
+ *   written or read under a vault record that is no longer stored (the vault deleted, remade under
  *   another `vault_tok`, or its vaultKey replaced). Nothing was written or read, and the device
  *   that expected them is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
@@ -121,18 +121,18 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box read's or write's vault record is not the one standing -- another vault_tok, or none -- so it was refused
+  'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
   'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
   'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
-  'vault_gone',          // the vault a call was working on no longer stands in storage: deleted, here or elsewhere
+  'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
   'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
-  'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box stands under that label
+  'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box is stored under that label
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
@@ -198,13 +198,13 @@ export const RefusalFamilyForKind = {
  * Records are as storage holds them, ciphertext and visible fields, never secret material.
  */
 export type RefusalMeta = {
-  /** `stale_write` from a box write: what stands under the boxlabel, read in the step that refused.
+  /** `stale_write` from a box write: what is stored under the boxlabel, read in the step that refused.
    * It is the winning box's whole record, so the caller can open it or write over it with no second
-   * read. It is a {@link BoxDamaged} when what stands does not read back as a box, and null when
-   * nothing stands there.
+   * read. It is a {@link BoxDamaged} when what is stored does not read back as a box, and null when
+   * nothing is stored there.
    */
   box_stored?:   BoxRecord | BoxDamaged | null
-  /** `stale_write` from an update of the vault record: the vault record standing, read in the step that refused, or null when none stands.
+  /** `stale_write` from an update of the vault record: the stored vault record, read in the step that refused, or null when none is stored.
    * They are the winner's whole record, checked as a read checks one, so the caller can take them
    * up with no second read.
    */

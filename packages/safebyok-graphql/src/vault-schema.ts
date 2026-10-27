@@ -166,7 +166,7 @@ type SafebyokVault {
   damagedBoxes: [SafebyokBoxDamaged!]!
 }
 
-"""What an update of the vault record was proven against: it lands only while the vault record standing has both."""
+"""What an update of the vault record was proven against: it lands only while the stored vault record has both."""
 input SafebyokVaultRecordExpectationInput {
   vault_tok:        String!
   gate_epoch:       Int!
@@ -201,7 +201,7 @@ input SafebyokVaultDelExpectationInput {
 
 """
 What a delete of a box was aimed at: it lands only while the vault has that vault_tok, and
-removes whatever box stands; the revision_tok its writer read (null for a box listed with
+removes whatever box is stored; the revision_tok its writer read (null for a box listed with
 none) only says whether what it removed was the one meant.
 """
 input SafebyokBoxDelExpectationInput {
@@ -236,8 +236,8 @@ type SafebyokCapacity {
 """
 What an update of the vault record answered. It \`landed\`, and \`vault_stored\` is the vault
 record as stored, its vault_epoch moved up by one; or it was refused and nothing was written:
-\`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_stored\` carries the vault
-record standing, whole, or null when none stands. It holds the ways in, so it rides in this body,
+\`refusalkind\` and \`message\` say why, and for a \`stale_write\` \`vault_stored\` carries the stored
+vault record, whole, or null when none is stored. It holds the ways in, so it rides in this body,
 never in an error's \`extensions\`.
 """
 type SafebyokPutVaultRecordAnswer {
@@ -249,7 +249,7 @@ type SafebyokPutVaultRecordAnswer {
 
 """
 What a box write answered. It \`landed\`, and \`box_stored\` is the box as stored; or it was refused and
-nothing was written: \`refusalkind\` and \`message\` say why, and \`box_stored\` is the box standing
+nothing was written: \`refusalkind\` and \`message\` say why, and \`box_stored\` is the box stored
 under that boxlabel for a \`stale_write\` (sound or damaged, or null for none), \`capacity\` how full
 the vault is for a \`vault_full\`. A refusal of any other kind crosses as a GraphQL error.
 """
@@ -271,11 +271,11 @@ type Query {
 }
 
 type Mutation {
-  """Stores the gateless draft if its vault has none, and answers with the vault standing afterwards, its record and every box, from one step: these, or another device's already standing. Over a tombstone it starts a new life, the counter carried on."""
+  """Stores the gateless draft if its vault has none, and answers with the vault as stored afterwards, its record and every box, from one step: these, or another device's already stored. Over a tombstone it starts a new life, the counter carried on."""
   safebyokEnsureVault(draft: SafebyokVaultRecordInput!): SafebyokVault!
-  """Replaces the vault record, its gate with it, only while the one standing is the one expected, and answers with the vault record as stored when it landed, or the one standing when it did not."""
+  """Replaces the vault record, its gate with it, only while the one stored is the one expected, and answers with the vault record as stored when it landed, or the one already stored when it did not."""
   safebyokPutVaultRecord(vaultRecord: SafebyokVaultRecordInput!, expected: SafebyokVaultRecordExpectationInput!): SafebyokPutVaultRecordAnswer!
-  """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored, or why it was refused and what stands."""
+  """Writes the box under its boxlabel, only while what is stored is what was expected, and answers with the box as stored, or why it was refused and what is stored."""
   safebyokPutBox(applabel: String!, user_id: String!, vaultlabel: String!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokPutBoxAnswer!
   """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
   safebyokDelBox(applabel: String!, user_id: String!, vaultlabel: String!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!

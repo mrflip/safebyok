@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS safebyok_vault_tombstones (
   PRIMARY KEY (applabel, user_id, vaultlabel)
 );
 
--- One box per boxlabel, beside its vault's scope and vault_tok. A box stands only while
--- its vault record does, under the same vault_tok: deleting the vault deletes its boxes with
+-- One box per boxlabel, beside its vault's scope and vault_tok. A box is stored only while
+-- its vault record is, under the same vault_tok: deleting the vault deletes its boxes with
 -- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON object,
 -- {} for none, kept as jsonb, so a server can query it: the box binds it with its keys sorted, so
 -- jsonb's own order changes nothing.

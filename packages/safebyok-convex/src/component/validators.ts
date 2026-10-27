@@ -128,9 +128,9 @@ export const VaultAnswer = v.object({
   boxes: v.array(BoxSparse),
 })
 
-/** What an update of the vault record was proven against: it lands only while the standing vault record has this `vault_tok` and `gate_epoch`.
+/** What an update of the vault record was proven against: it lands only while the stored vault record has this `vault_tok` and `gate_epoch`.
  *
- * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
+ * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
 export const VaultRecordExpectation = v.object({
   vault_tok:        v.string(),
@@ -147,7 +147,7 @@ export const BoxGetExpectation = v.object({
 })
 
 /** What a box write was sealed for and read: the vault record it lands beside, and the box it replaces.
- * It lands only while the scope's vault record has this `vault_tok`, and the standing box this
+ * It lands only while the scope's vault record has this `vault_tok`, and the stored box this
  * `revision_tok`, or, for null, there is no box.
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: null } // a box that was not there
@@ -168,7 +168,7 @@ export const Capacity = v.object({ boxes: Room, bytes: Room })
 
 /** What a box read answers, from its one query's snapshot: `read`, with the box, or the refusal that read nothing.
  * A read carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
- * `vault_mismatch`, when the scope's vault record is not the one expected, or none stands, carries
+ * `vault_mismatch`, when the scope's vault record is not the one expected, or none is stored, carries
  * nothing of it.
  *
  * @example { read: true, box_stored: stored }
@@ -180,7 +180,7 @@ export const GetBoxAnswer = v.union(
 )
 
 /** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.
- * A write that landed carries the box as stored. `stale_write` carries the box standing under the
+ * A write that landed carries the box as stored. `stale_write` carries the box stored under the
  * boxlabel as a read returns it (`box_stored`, whole; null for none). `vault_mismatch`, when the
  * scope's vault record is not the one the box was sealed for, carries nothing of it.
  * `vault_full`, for a write the vault has no room for, carries its {@link Capacity} as it found it.
@@ -197,9 +197,9 @@ export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
 )
 
-/** What an update of the vault record answers, from its one transaction: `landed` with the vault record as stored, or the vault record standing that it did not land over.
+/** What an update of the vault record answers, from its one transaction: `landed` with the vault record as stored, or the stored vault record that it did not land over.
  * A landed update carries it as stored, its `vault_epoch` moved up by one (`vault_stored`).
- * A miss carries what stands as a read returns it (`vault_stored`; null for none).
+ * A miss carries what is stored as a read returns it (`vault_stored`; null for none).
  *
  * @example { landed: true, vault_stored: stored }
  * @example { landed: false, vault_stored: winner }
@@ -236,7 +236,7 @@ export const VaultTombstone = v.object({
 })
 
 /** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none.
- * It lands only while the scope's vault record has this `vault_tok`, whatever revision stands, so a
+ * It lands only while the scope's vault record has this `vault_tok`, whatever revision is stored, so a
  * stale session never deletes from a vault made anew elsewhere. The revision only says whether
  * what it removed was the one meant, as a {@link BoxDeletion}.
  *

@@ -31,7 +31,7 @@ const ServerMaxNameBytes = 640
  *   in one name, `maxBoxes` boxes, and no limit on a vault's bytes.
  * * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
  *   message, the GraphQL error its `cause`. A stale write, and a box write into a full vault,
- *   come back in the mutation's body (`landed: false`) with what stands or how full the vault is,
+ *   come back in the mutation's body (`landed: false`) with what is stored or how full the vault is,
  *   never in an error's `extensions`, and are thrown here as the same VaultError, `meta` and all.
  *   A GraphQL error your server's own auth raises with `extensions.code` `FORBIDDEN` refuses with
  *   kind `not_permitted`. One with `UNAUTHENTICATED` is `storage_unavailable`, as a token expired
@@ -164,7 +164,7 @@ class UrqlVaultDB extends VaultDB {
   }
 
   // A write that lands answers with the vault record as the server's storage holds it; a stale
-  // one answers in the body, not landed, with what stands, which the base class checks: it is
+  // one answers in the body, not landed, with what is stored, which the base class checks: it is
   // refused here as the VaultError the server's VaultDB made of it.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     checkInts('vault record', vaultRecord)
@@ -184,7 +184,7 @@ class UrqlVaultDB extends VaultDB {
     return recordOf(safebyokGetBox, BoxFields)
   }
 
-  // A write that misses answers in the body, not landed -- a stale one with what stands, a full
+  // A write that misses answers in the body, not landed -- a stale one with what is stored, a full
   // vault with how full it is, which the base class checks -- and is refused here as the VaultError
   // the server's VaultDB made of it; one that landed answers with the box as the server's storage holds it.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
@@ -331,17 +331,17 @@ type WriteAnswer = {
   capacity?:           unknown
 }
 
-/** The VaultError a write's answer refused with, its kind and message as the server's VaultDB made them: a stale write's `standing` and a full vault's `capacity` as its meta.
- * What stands is handed on unchecked, null for none: the base class checks a `stale_write`'s as it
+/** The VaultError a write's answer refused with, its kind and message as the server's VaultDB made them: a stale write's `storedField` and a full vault's `capacity` as its meta.
+ * The stored record is handed on unchecked, null for none: the base class checks a `stale_write`'s as it
  * checks a record, and a `vault_full`'s as `getCapacity` checks its answer. An answer that says
  * neither a kind nor a message is the server's bug, `corrupt_record`.
  */
-const refusalOfAnswer = (answer: WriteAnswer, standing: 'box_stored' | 'vault_stored'): VaultError => {
+const refusalOfAnswer = (answer: WriteAnswer, storedField: 'box_stored' | 'vault_stored'): VaultError => {
   const { refusalkind, message, capacity } = answer
   if (typeof message !== 'string' || ! isKind(refusalkind)) {
     return new VaultError('corrupt_record', "The GraphQL server refused a write without saying why: is it serving safebyok-graphql of the same version as this app's client? Serve VaultSchemaSdl and vaultResolvers from it.")
   }
-  if (refusalkind === 'stale_write') { return new VaultError(refusalkind, message, { meta: { [standing]: answer[standing] ?? null } }) }
+  if (refusalkind === 'stale_write') { return new VaultError(refusalkind, message, { meta: { [storedField]: answer[storedField] ?? null } }) }
   if (refusalkind !== 'vault_full' || capacity === null || capacity === undefined) { return new VaultError(refusalkind, message) }
   return new VaultError(refusalkind, message, { meta: { capacity: capacity as Exclude<RefusalMeta['capacity'], undefined> } })
 }

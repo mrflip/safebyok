@@ -25,7 +25,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
       await db.endDevices()
       await db.empty()
       const first = TH.deviceOver(db, undefined, { maxBoxes: Cap })
-      await TH.filled(first('u1'), ['standing_one', 'standing_two', 'standing_three', 'standing_four'])
+      await TH.filled(first('u1'), ['stored_one', 'stored_two', 'stored_three', 'stored_four'])
       const racers = Array.from({ length: Racers }, (_slot, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
 
       const outcomes = await Promise.all(racers.map(({ boxlabel, vaultDB }) => vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf(boxlabel, 'sk-fake'))))
@@ -34,7 +34,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
       const refusedKinds = outcomes.flatMap((outcome) => (outcome.ok ? [] : outcome.err.refusalkind))
       expect(landed.length).to.be.within(1, Racers)
       expect(refusedKinds.filter((kind) => kind !== 'vault_full')).to.deep.equal([])
-      expect(await TH.boxesStanding(db)).to.eq(4 + landed.length)
+      expect(await TH.boxesStored(db)).to.eq(4 + landed.length)
       for (const { boxlabel } of landed) { expect(await TH.expectGood(first('u1').getBox(u1, boxlabel, TH.inThisVault))).to.not.be.null }
       expect(await listed(first)).to.have.lengthOf(4 + landed.length)
     }
@@ -52,7 +52,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     await TH.expectingGood(device).putBox(u1, TH.noBoxYet, TH.boxOf('also_fifth', 'sk-fake'))
     await racer.query('COMMIT')
 
-    expect(await TH.boxesStanding(db)).to.eq(Cap + 1)
+    expect(await TH.boxesStored(db)).to.eq(Cap + 1)
     expect(await TH.expectingGood(device).getBox(u1, 'also_fifth', TH.inThisVault)).to.not.be.null
     expect(await TH.expectingGood(device).getBox(u1, 'fifth_in_flight', TH.inThisVault)).to.not.be.null
   })
@@ -73,6 +73,6 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     await TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake')), 'vault_full')
     await TH.expectingGood(device).delBox(u1, 'two', TH.deleting('rev-sk-fake-two'))
     await TH.expectingGood(device).putBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake'))
-    expect(await TH.boxesStanding(db)).to.eq(Cap)
+    expect(await TH.boxesStored(db)).to.eq(Cap)
   })
 })

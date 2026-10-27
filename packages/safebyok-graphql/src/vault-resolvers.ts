@@ -70,7 +70,7 @@ export type VaultResolvers<ContextT> = {
  *   error carries nothing else: servers, gateways and APM tools log `extensions`. A stale write,
  *   and a box write into a full vault, are answered in the mutation's body instead, on failure
  *   as on success: `safebyokPutBox` and `safebyokPutVaultRecord` resolve `landed: false` with the
- *   `refusalkind`, the `message` and what stands (`box_stored`, `vault_stored`) or how full
+ *   `refusalkind`, the `message` and what is stored (`box_stored`, `vault_stored`) or how full
  *   the vault is (`capacity`), and the browser throws the same VaultError from them. The
  *   VaultError's `cause`, your driver's own error, which may name your database, stays on the
  *   server as the GraphQL error's `cause`, for your logs. Anything else a VaultDB throws crosses
@@ -231,7 +231,7 @@ const changesOf = (vaultDB: ServedVaultDB, scope: VaultScope): AsyncIterableIter
 const noUnsubscribing = (): void => undefined
 
 /** A refusal as the wire carries it: the VaultError's message and its kind as `extensions.kind`, and nothing more.
- * A GraphQL server sends its resolvers' GraphQLError as it stands, where it hides anything else
+ * A GraphQL server sends its resolvers' GraphQLError unchanged, where it hides anything else
  * behind "Unexpected error" (Yoga) or sends its message as it is (Apollo). The VaultError rides
  * along as the error's unenumerable `cause`, for the server's logs: no GraphQL server sends a cause.
  * What a refusal learned (a record, how full a vault is) never rides in `extensions`, which
@@ -246,10 +246,10 @@ const crossing = (err: unknown): GraphQLError => {
   return crossed
 }
 
-/** A refused write's answer, `landed` false with its kind and calm message, beside what the refusal learned, `standing`. */
-const refusedBody = (refusal: VaultError, standing: object) => ({ landed: false, refusalkind: refusal.refusalkind, message: refusal.message, ...standing })
+/** A refused write's answer, `landed` false with its kind and calm message, beside `learned`, what the refusal learned. */
+const refusedBody = (refusal: VaultError, learned: object) => ({ landed: false, refusalkind: refusal.refusalkind, message: refusal.message, ...learned })
 
-/** The body answering a box write refused as `stale_write` or `vault_full`, carrying what stands or how full the vault is, whole as a read would send it; undefined for any other refusal, which crosses as an error. */
+/** The body answering a box write refused as `stale_write` or `vault_full`, carrying the stored box or how full the vault is, whole as a read would send it; undefined for any other refusal, which crosses as an error. */
 const refusedBoxInBody = (refusal: VaultError): object | undefined => {
   const { box_stored: boxStored, capacity } = refusal.meta ?? {}
   if (boxStored !== undefined && refusal.refusalkind === 'stale_write') { return refusedBody(refusal, { box_stored: boxStored }) }
@@ -257,7 +257,7 @@ const refusedBoxInBody = (refusal: VaultError): object | undefined => {
   return undefined
 }
 
-/** The body answering an update of the vault record refused as `stale_write`, carrying the vault record standing, or null for none; undefined for any other refusal, which crosses as an error. */
+/** The body answering an update of the vault record refused as `stale_write`, carrying the stored vault record, or null for none; undefined for any other refusal, which crosses as an error. */
 const staleVaultRecordInBody = (refusal: VaultError): object | undefined => {
   const vaultStored = refusal.meta?.vault_stored
   if (vaultStored !== undefined && refusal.refusalkind === 'stale_write') { return refusedBody(refusal, { vault_stored: vaultStored }) }

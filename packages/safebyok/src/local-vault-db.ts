@@ -24,7 +24,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
  * reach -- rows stay on this device instead of syncing through a shared database.
  *
- * * **One tab.** Each write checks what stands and saves in one synchronous step, so nothing else
+ * * **One tab.** Each write checks what is stored and saves in one synchronous step, so nothing else
  *   in this tab runs in between: that is its atomic step. Two tabs sharing one localStorage are
  *   not held apart -- browsers do not lock it across tabs -- so a vault two tabs write at once may
  *   lose a write. For a vault several tabs keep, use `idbVaultDB` from `safebyok-indexeddb`, whose
@@ -88,20 +88,20 @@ class StringStoreVaultDB extends VaultDB {
   protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
-      const standing = readJson(this.store, vaultScopepath)
-      const life = Expectations.newLifeOf(draft, standing)
+      const stored = readJson(this.store, vaultScopepath)
+      const life = Expectations.newLifeOf(draft, stored)
       if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
-      return { vault: life ?? standing, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
+      return { vault: life ?? stored, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
 
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
-      const standing = readJson(this.store, vaultScopepath)
-      const refusal = Expectations.vaultRecordRefusalOf(standing, expected)
+      const stored = readJson(this.store, vaultScopepath)
+      const refusal = Expectations.vaultRecordRefusalOf(stored, expected)
       if (refusal) { throw refusal }
-      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, standing)))
+      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, stored)))
       return readJson(this.store, vaultScopepath)
     })
   }
@@ -126,12 +126,12 @@ class StringStoreVaultDB extends VaultDB {
       .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
   }
 
-  // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
+  // A row that is not JSON is taken as its text, so a stale write names it, damaged, as the listing does.
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
       const boxScopepath = Scopepath.box({ ...scope, boxlabel: box.boxlabel })
-      const standingText = this.store.read(boxScopepath)
-      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), standingText === null ? null : jsonOrText(standingText), expected)
+      const storedText = this.store.read(boxScopepath)
+      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), storedText === null ? null : jsonOrText(storedText), expected)
       if (refusal) { throw refusal }
       this.store.write(boxScopepath, JSON.stringify(box))
       return readJson(this.store, boxScopepath)
