@@ -12,7 +12,8 @@
 # The manual is notes/housekeeping.md, *Sweeping finished threads*; --help prints that section.
 #
 # Written for the bash macOS ships (3.2) as well as a current one: no associative arrays, no
-# mapfile, and no empty arrays under `set -u`.
+# mapfile, and no empty arrays under `set -u`. A pipeline keeps its first lines with `sed -n`, never
+# `head`: head quits early, the writer dies of SIGPIPE, and pipefail makes that fatal.
 #
 # Usage: scripts/git-survey.sh [--apply] [--against <ref>] [--retag <branch>]... [--idle <minutes>]
 #                              [--no-fetch] [--prs-from <file>]
@@ -151,8 +152,8 @@ judge() {
   tip="$(git rev-parse "refs/heads/${branch}")"
   held="$(worktreeOf "$branch")"
   tagged="$(git rev-parse --verify --quiet "refs/tags/closed/${branch}^{commit}" || true)"
-  opened="$(prsOf "$branch" OPEN | head -1)"
-  merged="$(prsOf "$branch" MERGED main | head -1)"
+  opened="$(prsOf "$branch" OPEN | sed -n 1p)"
+  merged="$(prsOf "$branch" MERGED main | sed -n 1p)"
   other="$(awk -F '\t' -v branch="$branch" '$3 == branch && ($2 == "CLOSED" || ($2 == "MERGED" && $5 != "main")) {
     printf "%s#%s %s into %s", (n++ ? ", " : ""), $1, tolower($2), $5 }' "${scratch}/prs")"
 
@@ -187,7 +188,7 @@ judge() {
     printf 'weird\t%s\t%s\t-\t%s\t%s\n' "$branch" "$tip" "$pr" "its merged head ${target:0:7} is not in ${against}"
     return
   fi
-  unmatched="$(unmatchedOf "$branch" | head -3 | paste -sd ';' -)"
+  unmatched="$(unmatchedOf "$branch" | sed -n '1,3p' | paste -sd ';' -)"
   if [[ -n "$unmatched" ]]; then
     printf 'weird\t%s\t%s\t%s\t%s\t%s\n' "$branch" "$tip" "$target" "$pr" "commits with no match on main: ${unmatched}"
     return
@@ -224,7 +225,7 @@ closingNote() {
 holdsOnlyHere() {
   local branch="$1" opened unpushed
   if [[ "$branch" == "(detached)" ]]; then return; fi
-  opened="$(prsOf "$branch" OPEN | head -1)"
+  opened="$(prsOf "$branch" OPEN | sed -n 1p)"
   if [[ -n "$opened" ]]; then
     echo "an open PR (#$(cut -f1 <<< "$opened"))"
     return
@@ -273,7 +274,7 @@ judgeTree() {
     if [[ "$busy" -gt 0 ]]; then why="${why}; $(counted "$busy" process processes) running in it"; fi
   fi
   recent="$(find "$where" \( -name node_modules -o -name .git -o -name dist \) -prune -o \
-    -type f -mmin "-${idle_mins}" -print 2> /dev/null | head -1)"
+    -type f -mmin "-${idle_mins}" -print 2> /dev/null | sed -n 1p)"
   if [[ -n "$recent" ]]; then why="${why}; files touched in the last $(counted "$idle_mins" minute)"; fi
   if [[ -n "$why" ]]; then
     printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its branch is finished, but: ${why#; }"
