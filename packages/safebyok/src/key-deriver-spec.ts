@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { Validator } from './checks/validator'
+import { keyDeriverSpec } from './checks/key-deriver-spec-checks'
 import type { KeyDeriver } from './key-deriver'
 
 /** A keyDeriverSpec: Argon2id's whole parameter set, under the keyDeriverLabel a vault records.
@@ -47,12 +47,6 @@ export const Argon2idWebV1 = Object.freeze({
 /** Every keyDeriverSpec safebyok supplies: a deriver wearing one's label carries its fields. */
 const SuppliedSpecs: readonly KeyDeriverSpec[] = [Argon2idWebV1]
 
-/** The most bytes `crypto.getRandomValues` hands out at once, and so the longest passphraseSalt. */
-export const MaxSaltBytes = 65_536
-
-/** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
-export const PassphraseKeyBytes = 32
-
 /** The label prefix reserved, in any case, for the specs safebyok supplies now and later: a host's own label may not begin with it. */
 export const ReservedLabelPrefix = 'argon2id_web_'
 
@@ -98,32 +92,6 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
   }
 }
 
-/** The fewest salt bytes Argon2id takes: its reference code and `@noble/hashes` refuse fewer. */
-const MinArgon2SaltBytes = 8
-
-/** The most memory `@noble/hashes` allocates for one Argon2 derivation, in KiB: 1 GiB. */
-const MaxMemoryKib = 1_048_576
-
-/** Argon2's least memory per lane, in KiB. */
-const MinMemoryKibPerLane = 8
-
-/** One past the largest 32-bit unsigned integer, Argon2's bound on its counts. */
-const Uint32Bound = 2 ** 32
-
-// Marked pure, and read only inside parseKeyDeriverSpec, so a bundler drops it, and Zod with it,
-// from an app that imports only argon2idWebV1Deriver: a destructured or exported member would keep it.
-const SpecChecks = /* @__PURE__ */ Validator('bad_option', ({ obj, str, int, lit }) => ({
-  keyDeriverSpec: obj({
-    algorithm:         lit('argon2id'),
-    key_deriver_label: str.min(1),
-    memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
-    iterations:        int.gte(1).lt(Uint32Bound),
-    parallelism:       int.gte(1),
-    salt_bytes:        int.gte(MinArgon2SaltBytes).lte(MaxSaltBytes),
-    output_bytes:      lit(PassphraseKeyBytes),
-  }).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }),
-}))
-
 /** What a refusal of a spec says, whichever field failed: every field and what it must be, quoting nothing handed in. */
 const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algorithm 'argon2id', the one key derivation function safebyok runs; key_deriver_label, a non-empty string of your own choosing; memory_kib, a whole number of KiB, at least 8 for each lane and at most 1048576 (1 GiB); iterations, a whole number of passes, at least 1 and below 2^32; parallelism, a whole number of lanes, at least 1; salt_bytes, a whole number of bytes from 8 to 65536; and output_bytes, 32, as the passphraseKey is a 256-bit key."
 
@@ -146,7 +114,7 @@ const SpecRefused = "Argon2id cannot run that keyDeriverSpec. A spec holds algor
  *   // throws 'bad_option': that label is reserved
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
-  const checked = SpecChecks.keyDeriverSpec.safeParse(candidate)
+  const checked = keyDeriverSpec.safeParse(candidate)
   if (! checked.success) { throw new VaultError('bad_option', SpecRefused) }
   checkSuppliedSpecKept(checked.data)
   return checked.data

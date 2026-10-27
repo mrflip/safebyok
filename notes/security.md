@@ -41,6 +41,37 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-27 (restyle sprint, thread 14, PR [#287](https://github.com/mrflip/safebyok/pull/287); the Coach's rulings 2026-10-26/27: "Is someone sifting
+  through all the keys to find out why a strict mode error was thrown? If so ... remove that. Beware complicated logic in a handler." and "Do not
+  make fine grained decisions on broken data, especially in an exception handler."): **no refusal repeats a key or value from its input; every
+  validator is public.**
+  (1) A refusal made by a `Validator`-made schema (`packages/safebyok/src/checks/validator.ts`) names each failing field by its Zod issue path, with
+  Zod's English sentence, forced through the parse's own error map whatever a host set with `z.config`. For fields an object does not take
+  (`unrecognized_keys`), the error map says how many, and lists the fields the object *takes*, read from the schema's own shape (`issue.inst`),
+  never the names it was handed. The key-shape gate (`isSayable`, `SnakeFieldname`, `CamelFieldname`, `MaxSayableChars`, `sayable`, the "(a name
+  not repeated here)" stand-in) is deleted: it leaked anyway, a lowercase secret of 32 characters or fewer passing it.
+  (2) A path holds only our field names and array indices. The kit hands out no record maker (`rec`), since a Zod record's keys enter the issue
+  path. The one record we had, the whisper/sidecar bag (`whisperBag`, `src/types/types.ts`), is a `custom` check that judges the object whole (a
+  record `safeParse` inside its predicate), so no whisper or sidecar key reaches a refusal; before, `Sidecar` refusals put a first-level key in
+  the path (`Whisper`'s union never did). A host's own `Validator` that imports Zod's `record` itself sees that record's keys in its refusals; the
+  `Kit` doc says so.
+  (3) The bank's misuse hints are gone. `Bank.make`'s pre-parse key scan and renamed-option map (`RenamedMakeBankOpts`) are deleted; its options
+  are a strict schema whose refusal counts unknown options and lists those it takes. `checkNoStoresIn` is deleted (see the bank_per_user entry
+  amended): a `vaultDB` or `deviceDB` in the bank's first bag is ignored, so the vault silently takes the bank's own stores. `optionsCheck`'s hint
+  chosen by whether the input was a plain object is gone.
+  (4) `parseKeyDeriverSpec` refuses in one fixed sentence listing every field's bounds, reading nothing of the failure (`SpecLimitForField` is
+  gone). Its check `keyDeriverSpec` moved to `src/checks/key-deriver-spec-checks.ts`, a module of its own, so a bundle of `argon2idWebV1Deriver`
+  alone still drops Zod.
+  (5) `Wayin.make` refuses with its schema's own `bad_record`, no cause, no re-labelling (`damagedWayinUnless` deleted); a damaged wayin met on
+  unlock is still `damaged_wayin`.
+  (6) Every validator is public: the main entry exports `Validators` (a namespace of every validator the package makes, about 95), `Validator` and
+  its `Kit`. A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
+  `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
+  (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
+  options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
+  asserts no refusal's message, stack, meta or cause holds it.
+  (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
+  `bad_option`, checked with the core's `Validator`.
 * 2026-10-26 (restyle sprint, thread 11, branch `20261026-vault_object`, PR [#282](https://github.com/mrflip/safebyok/pull/282)): **a Vault object shows its
   stamp alone and is frozen; a Box shows more than it did; the key deriver is reachable through no Vault object.**
   (1) A Vault object's own enumerable fields are `format`, `applabel`, `user_id`, `vaultlabel`, `vault_tok` and `registered_at`, and the object is
@@ -116,7 +147,8 @@ added or folded into through the subagent, and no other entry changes.
   two columns as the gate when it reads (`vaultRecordOfRow`, `columns.ts`): both null is no gate; a passkey stored without a passphrase is handed
   up as a gate with a null passphrase, so it reads as damaged, never as a novel vault (nothing is repaired).
   (5) `Wayin.make`'s `damaged_wayin` refusal carries the record check's own `bad_record` as its `cause`, which names each failing field and repeats
-  a key only when it is shaped as one of the package's field names, where it carried a raw ZodError, which could repeat an unknown key verbatim.
+  a key only when it is shaped as one of the package's field names, where it carried a raw ZodError, which could repeat an unknown key verbatim
+  (amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): `Wayin.make` refuses with its schema's own `bad_record`, no cause and no re-labelling (`damagedWayinUnless` deleted); a damaged wayin met on unlock is still `damaged_wayin`).
   (6) A device record is handed out frozen (its check is `.readonly()`), and `deviceRecordOf(scope, device_id, highest_vault_epoch)` builds one from
   the scope's parsed names alone, so nothing else a holder carries is stored. The device record is strict and one failing its check reads as
   none: a field added to it later would make an older build discard the record, and with it the `highest_vault_epoch` rollback watermark, until
@@ -137,7 +169,10 @@ added or folded into through the subagent, and no other entry changes.
   (2) A field in the bag named as a store is refused `bad_option`: `vaultDB`, `deviceDB`, or any field whose name ends `db` in any case (a
   misspelt `vaultDb` included). It is judged by name only, never by value, so a Vault object's own function fields still pass as a bag.
   It is refused, not ignored, since ignoring it would birth the vault in the bank's default store. A vault's own stores go in a second,
-  strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.)
+  strict bag (`BankVaultOpts`). (Amends the "one vault, one place" entry below.) amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): superseded; the refusal (`checkNoStoresIn`) is deleted.
+  The bag is read for its scope alone and every other field is ignored, so a host that puts its `vaultDB` in the first bag rather than the second
+  silently gets the bank's own stores, the vault born and filed in the default store; the Coach's ruling is that getting the store wrong is a
+  hard-to-miss error.
   (3) A `KeyDeriver` may carry an optional `load()`, as a strength checker can; each bank's `hello()` runs both before any vault is born.
   A failing deriver `load` refuses `unexpected_error` with what it threw kept as the error's `cause`, unlike `deriveKeyBytes`, whose throws
   are never kept: `load` is never handed a passphrase. `Bank.make` refuses a `load` that is not a function.
@@ -179,7 +214,7 @@ added or folded into through the subagent, and no other entry changes.
   was silently stripped. A lease or device record in this device's store holding an unknown field is discarded and read as absent, as any lease
   or device record failing its check already was; for the device record that drops its `highest_vault_epoch` rollback watermark. This leans on
   the rule that any change to a stored shape bumps `format`.
-  (2) A refusal repeats a key only when it is shaped as one of the package's own field names: snake_case words (`salt_b64`) or camelCase
+  (2) amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): superseded, no refusal repeats a key or value from its input; see the entry at the top. Stood until then: a refusal repeats a key only when it is shaped as one of the package's own field names: snake_case words (`salt_b64`) or camelCase
   (`maxWhisperBytes`, `vaultDB`), each word letters ending in at most three digits, 32 characters at most (`packages/safebyok/src/checks/validator.ts`:
   `isSayable`, `SnakeFieldname`, `CamelFieldname`, `sayable`); any other key in a failing path or an unknown-field list is said as "(a name not
   repeated here)". This replaced `/^[A-Za-z_]\w{0,63}$/`, which would have repeated a key like `ghp_` plus 36 characters. It is a shape heuristic: a
@@ -203,7 +238,7 @@ added or folded into through the subagent, and no other entry changes.
   the paths. It never quotes an input value: Zod 4.6.7's own messages name a type, a limit or the allowed values, and an issue
   carries `input` only under `reportInput`, which is never passed. Each parse passes Zod's English locale as a per-parse error
   map, so a host's global `z.config({ customError })`, which could quote the input, never shapes our messages. A path step or
-  unknown key is repeated only when it is shaped like one of our field names (`/^[A-Za-z_]\w{0,63}$/`; amended 2026-10-26 (zod_classic):
+  unknown key (amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): superseded, see the entry at the top; no key from the input is repeated) is repeated only when it is shaped like one of our field names (`/^[A-Za-z_]\w{0,63}$/`; amended 2026-10-26 (zod_classic):
   now `isSayable`, see the entry of that date); any other key could be the
   caller's data (a record's key, a pasted secret) and is said as "(a name not repeated here)". The refusal carries no `cause`,
   since the `ZodError` holds the input. `safeParse` and `parseAsync` stay Zod's own and are not refusals, so a host calling them
@@ -237,7 +272,7 @@ added or folded into through the subagent, and no other entry changes.
   failed leaves the vault showing locked and not unlocked under a lease from the previous gate.
 * 2026-10-23 (thread 9b, gating_followups, [#262](https://github.com/mrflip/safebyok/pull/262)): **one vault, one place.** `bank.ensureVault(draft)` refuses `bad_option` when
   the draft names a `vaultDB` or `deviceDB` other than the stores the held (or being-born) Vault object was born from
-  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any field in it named as a store (`vaultDB`, `deviceDB`, or a name ending `db` in any case) is refused `bad_option`; see the entry at the top)
+  (amended 2026-10-26 (bank_per_user): the bag may name neither, and any field in it named as a store (`vaultDB`, `deviceDB`, or a name ending `db` in any case) is refused `bad_option`; see the entry at the top; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): that refusal is gone, the bag's store-named fields are ignored)
   (`packages/safebyok/src/bank.ts`), so a vault read from one store is never written to another. A Vault object found
   gone (deleted or remade) in the microtasks before its birth was filed is never handed out.
 * 2026-10-23 (primitives sprint, thread 9, gating): **cleartext has one door: a gating's attempt.** No vault call takes a
@@ -629,7 +664,7 @@ added or folded into through the subagent, and no other entry changes.
   is used only to refuse, never to accept. (2) `vault.hello()` and `vault.ensureLease()` refuse, as
   `bad_option`, anything in place of their options that is not a plain object, an event above all, as
   when the method itself is passed to `addEventListener` or `onClick`; the message names the fix,
-  `() => { void vault.tryHello() }`. Before, an event was silently ignored and a handler passed bare
+  `() => { void vault.tryHello() }` (amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): the hint chosen by whether the input was a plain object is gone; `hello()` and `ensureUnlocked()` always say how to wrap them as an event handler). Before, an event was silently ignored and a handler passed bare
   would reject unheard.
 * 2026-10-19 (thread put_wayin, B4, branch 20261019-put_wayin, PR [#208](https://github.com/mrflip/safebyok/pull/208); the sprint contract): **one verb, `putWayin(passphrase, newProof)`, replaces
   `changePassphrase` and `addPasskey`; the host makes a passkey before the call, and the strength
@@ -1429,7 +1464,7 @@ added or folded into through the subagent, and no other entry changes.
   over the option names. Before, unknown keys were ignored, so a host still passing the retired
   `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
   The refusal names the unknown keys (the host's own field names, never a value; amended 2026-10-26 (zod_classic): `Bank.make`'s refusal
-  names a key only through `sayable`, and says any other as "(a name not repeated here)") and, from a small
+  names a key only through `sayable`, and says any other as "(a name not repeated here)"; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): `Bank.make`'s refusal counts the unknown options and lists the options it takes, naming none of those it was handed, and its renamed-option table (`RenamedMakeBankOpts`, the new name of a retired one) is deleted) and, from a small
   table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
   not know to `Vault.make`, so those reach the error boundary rather than being dropped (amended 2026-10-22 (bank_provider): `BankProvider` forwards them to `Bank.make`, and the refusal is thrown to the error boundary).
   (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
@@ -3040,7 +3075,7 @@ added or folded into through the subagent, and no other entry changes.
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
   collide with a label a host stored vaults under. It runs the Argon2id spec check
-  (`parseKeyDeriverSpec`) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
+  (`parseKeyDeriverSpec`; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): it refuses in one fixed sentence listing every field's bounds, reading nothing of the failure, `SpecLimitForField` gone) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
   cannot run fails at open with a kind, not at the first unlock as a library's plain Error. The
   supplied derivers (the core's and `safebyok-fastkey`'s) refuse a salt of another length than the
   spec's before deriving (`bad_option`, never quoting the salt): the stored-vault half of that
@@ -3454,7 +3489,7 @@ added or folded into through the subagent, and no other entry changes.
   safebyok now sets Zod's global locale; the per-call option checks no longer use Zod's `Unrecognized key: "..."` text, which quoted each
   unknown key raw). Zod's English names the type of a refused value, never
   the value; it does quote the options bag's field names (the host's code), where `optionsCheck`
-  formerly quoted nothing. No secret material reaches these bags.
+  formerly quoted nothing (amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): no longer; an unknown option is counted and the options taken are listed, see the entry at the top). No secret material reaches these bags.
 * 2026-10-17 (PR [#6](https://github.com/mrflip/safebyok/pull/6)): **the non-extractable vaultKey
   is not a defence against code running in the page while the vault is unlocked.** The session's
   vaultKey handle is a non-extractable WebCrypto `CryptoKey`, so page code cannot export its raw

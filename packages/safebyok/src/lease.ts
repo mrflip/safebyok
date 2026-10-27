@@ -40,7 +40,7 @@ export type BoxCiphered = Pick<BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'
 const LeaseFormat = 'safebyok-lease-v1'
 
 /** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold; a box record's sparse fields, as {@link BoxSparse} has them; a box's two ciphered fields, as {@link BoxCiphered} has them; and a lease's own stamp, picked from whatever carries it, as its ctx takes it beside its vault's ({@link VaultStampButFormat}). Each refuses 'bad_record'. */
-const { LeaseGrant, VisibleShape, CipheredShape, LeaseStampPicked } = Validator('bad_record', ({ obj }) => ({
+export const { LeaseGrant, VisibleShape, CipheredShape, LeaseStampPicked } = Validator('bad_record', ({ obj }) => ({
   LeaseGrant:          LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
   VisibleShape:        BoxSparse.strip(),
   CipheredShape:       obj({ box_key_wrapped, whisper_ciphered }),

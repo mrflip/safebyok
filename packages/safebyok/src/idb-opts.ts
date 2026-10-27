@@ -11,7 +11,7 @@ export type IdbOpts = {
 const DefaultDbName = 'safebyok'
 
 /** What the IndexedDB options hold, `dbName` defaulted, refusing 'bad_option'. */
-const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }) }))
+export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }) }))
 
 const badDbName = (said: string) => new VaultError('bad_option', `${said} takes an optional dbName, the name of the IndexedDB database to keep records in: non-empty text. Leave it out for '${DefaultDbName}'.`)
 

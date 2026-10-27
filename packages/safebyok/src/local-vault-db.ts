@@ -54,7 +54,7 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
 /** What localVaultDB must be handed, a store carrying a StringStore's five calls, refusing 'bad_option'. Checked only. */
-const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
+export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
   const call = custom(isFunction)
   return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, ckeys: call, subscribe: call }) }) }
 })

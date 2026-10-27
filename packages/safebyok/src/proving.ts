@@ -1,7 +1,7 @@
 import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
-import { PassphraseKeyBytes } from './key-deriver-spec'
+import { PassphraseKeyBytes } from './consts'
 import { type Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
@@ -334,7 +334,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 const PrfAnswerBytes = 32
 
 /** What a passkey's answer must carry. The refusal never quotes it: its bytes are secret. */
-const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
+export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, custom }) => ({
   passkeyAnswerShape: obj({
     credential_id: str.min(1),
     prf_salt_b64:  str.min(1),

@@ -31,3 +31,9 @@ export const MinuteMillis = 60_000
  * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
  */
 export const ForeverMillis = FarFuture - FarPast
+
+/** The most bytes `crypto.getRandomValues` hands out at once, and so the longest passphraseSalt. */
+export const MaxSaltBytes = 65_536
+
+/** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
+export const PassphraseKeyBytes = 32

@@ -606,7 +606,7 @@ export class Bank {
 // == [Helpers]: vaultBag, bankBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeError
 
 /** What names one of a bank's vaults as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`, and everything else the thing carries left out. Each refuses 'bad_scope'. */
-const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
   const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
   return { bankBag, vaultBag: bankBag.extend({ vaultlabel }) }
 })

@@ -1975,7 +1975,7 @@ const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s re
 const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in hand to stand.")
 
 /** What `demandConsistentWith()` judges, checked: a thing carrying a `vault_tok`, and, where it carries them, a scope's labels and epochs of the right types. */
-const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
+export const { vaultMadeUnderShape } = Validator('bad_option', ({ obj, str, num }) => ({
   vaultMadeUnderShape: obj({
     vault_tok,
     applabel:    str.optional(),

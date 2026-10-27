@@ -3,6 +3,7 @@ import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
 import * as safebyok from '../src/index'
 import * as Primitives from '../src/checks/primitives'
+import * as Validators from '../src/validators'
 
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
@@ -10,7 +11,7 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'BoxDamaged', 'BoxRecord', 'BoxSparse', 'BoxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'LeaseStamp', 'GateRecord', 'GateSparse', 'PasskeyWayinSparse', 'PassphraseWayinSparse', 'VaultFormat', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'TombstoneFormat', 'VaultRecord', 'VaultScope', 'isGated', 'Whisper', 'wallClock',
-      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'Validators',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'deviceOutcomeOf', 'deviceRecordOf', 'raisedDeviceRecord',
       'domStore', 'memoryStore',
@@ -26,6 +27,15 @@ describe("the package's entry point", () => {
 
   it("exports the scopepaths an adapter over a key-value store files rows under, as one namespace", () => {
     expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
+  })
+
+  it("exports every validator as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
+    expect(Object.keys(safebyok.Validators)).to.have.members(Object.keys(Validators))
+    for (const [valname, validator] of Object.entries(Validators)) {
+      expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
+    }
+    expect(safebyok.Validators.VaultRecord).to.eq(safebyok.VaultRecord)
+    expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {

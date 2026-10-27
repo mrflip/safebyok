@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecKept, loadKeyDeriver, parseKeyDeriverSpec } from '../src/key-deriver-spec'
+import { MaxSaltBytes, PassphraseKeyBytes } from '../src/consts'
+import { Argon2idWebV1, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecKept, loadKeyDeriver, parseKeyDeriverSpec } from '../src/key-deriver-spec'
 import { isVaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import * as TH from './test-helpers'

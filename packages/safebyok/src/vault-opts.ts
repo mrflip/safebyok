@@ -1,9 +1,9 @@
 import type * as Z from 'zod'
 import { type Clock, type VaultScope, MaxWhisperBytes, MaxLeaseHours, LeaseHours, StaleMinutes, wallClock, MaxBoxes } from './types/types'
-import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from './consts'
+import { MinuteMillis, ForeverMillis, FarPast, FarFuture, MaxSaltBytes } from './consts'
 import { VaultError, isVaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
-import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
+import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
@@ -140,7 +140,7 @@ export const isBag = (candidate: unknown) => typeof candidate === 'object' && ca
 /** Every option Bank.make takes, each checked here or by a parse of its own, and every field a {@link BankVaultOpts} holds, each likewise: each refuses any other, 'bad_option'.
  * `makeBankOpts` checks `strengthChecker`, handing the default back in its place when left out.
  */
-const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) => {
+export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) => {
   const anyOpt = unk.optional()
   const makeBankOpts = obj({
     applabel:               anyOpt,
@@ -201,7 +201,7 @@ const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 const HourMillis = 60 * MinuteMillis
 
 /** Bank.make's options and the adapters' declared limits, one validator each, every one refusing 'bad_option'; each parse below says what it is in its own words. Checked only, where an option is an object: Bank.make keeps what it was handed, prototype and all. */
-const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, custom, lit, str, num, int }) => {
+export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, custom, lit, str, num, int }) => {
   const verb = custom(isFunction)
   // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
   const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))

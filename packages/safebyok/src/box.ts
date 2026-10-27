@@ -124,7 +124,7 @@ export type SealBoxProps = {
 const checkSealProps = optionsCheck(({ unk }) => ({ boxlabel: unk, sidecar: unk.optional(), base: unk.optional() }), "Box.seal's props are `boxlabel`, `sidecar`, the box's own visible data, and `base`, the box it replaces.")
 
 /** The boxlabel a seal is handed, checked as a scope's names are: 'bad_scope' for one that is not a label. */
-const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBoxlabel: obj({ boxlabel }) }))
+export const { sealBoxlabel } = Validator('bad_scope', ({ obj, boxlabel }) => ({ sealBoxlabel: obj({ boxlabel }) }))
 
 /** One revision of one box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and what it was made under.
  * A box revision is never rewritten, so every field a Box shows is fixed for its life, its own and
@@ -394,7 +394,7 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 }
 
 /** What a {@link BoxBase} must show, a revision, or null for none, and a `registered_at` where it gives one; what a box is made under must show, the vault's scope, the `vault_tok` and both epochs, every other field dropped unread; and what a seal is made with, the vault's epochs and the time. */
-const { BaseShape, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
+export const { BaseShape, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, epochMillis }) => {
   const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).strip()
   const SealedUnderShape = VaultSparse.pick({ vault_epoch: true, gate_epoch: true }).strip()
   return {

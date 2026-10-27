@@ -1,7 +1,8 @@
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
 import { argon2idDeriver, argon2idWebV1Deriver } from '../src/key-deriver'
-import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, parseKeyDeriverSpec, type KeyDeriverSpec } from '../src/key-deriver-spec'
+import { Argon2idWebV1, parseKeyDeriverSpec, type KeyDeriverSpec } from '../src/key-deriver-spec'
+import { MaxSaltBytes, PassphraseKeyBytes } from '../src/consts'
 import { isVaultError } from '../src/errors'
 import * as TH from './test-helpers'
 

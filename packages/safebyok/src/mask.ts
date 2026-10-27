@@ -20,7 +20,7 @@ const Collapsed = '***...***'
 const MaxShown = 1000
 
 /** What `mask` takes as options, each defaulted, refusing 'bad_option'. */
-const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) => {
+export const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) => {
   const shownCount = uint.lte(MaxShown)
   const resultLen  = union([lit(Infinity), uint])
   return {

@@ -290,6 +290,29 @@ set exactly tight it may refuse a write that would just fit. A replacement weigh
 and is never refused as full. `maxWhisperBytes` is checked as a whisper is stored, never as one is
 read, so lowering it strands nothing.
 
+## Validators
+
+Every check the package makes is exported, under its own name, in the `Validators` namespace:
+the stored records (`Validators.VaultRecord`, `Validators.BoxRecord`), the scopes, each stored
+field (`Validators.vault_tok`), the options `Bank.make` and its stores take, and the expectations
+a `VaultDB` is handed. Each is Zod, made in a `Validator` call: its `parse` throws a `VaultError`
+of its kind (`bad_record`, `bad_scope`, `bad_option`, `bad_whisper`), and its `safeParse` is Zod's
+own. `label`, `user_id` and `EpochMillis` are plain Zod, the names they are all made of.
+
+```ts
+import { Validator, Validators } from 'safebyok'
+
+const { sidebarOpts } = Validator('bad_option', ({ obj, bool, vaultlabel }) => ({
+  sidebarOpts: obj({ vaultlabel, collapsed: bool.optional() }).strict(),
+}))
+sidebarOpts.parse({ vaultlabel: 'work', collapsed: true })
+Validators.vault_tok.safeParse(storedRow.vault_tok).success
+```
+
+A refusal names each failing field and says what it must be, in Zod's English, and never repeats
+what it was handed: not a value, and not the name of a field it does not take, which it counts,
+listing the fields it does take. Your own validators made with `Validator` refuse the same way.
+
 ## Your own storage adapter
 
 Extend `VaultDB` and implement its `do*` methods (`Bank.make` takes nothing but a `VaultDB`,
