@@ -310,7 +310,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Read the vault of `scope` through `doGetVault`, its vault record and listing checked and frozen; null for none, or a tombstone. */
+  /** Read the vault of `scope` through `doGetVault`, its vault record and listing checked and frozen; null for none or a tombstone. */
   private async readVault(scope: VaultScope): Promise<(VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null> {
     const asked = heldScope(this, scope)
     const read = await adapterAnswer(() => this.doGetVault(asked))
