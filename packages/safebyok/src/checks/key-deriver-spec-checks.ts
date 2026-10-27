@@ -15,7 +15,7 @@ const MinMemoryKibPerLane = 8
 /** One past the largest 32-bit unsigned integer, Argon2's bound on its counts. */
 const Uint32Bound = 2 ** 32
 
-/** A keyDeriverSpec Argon2id can run, holding nothing but a spec's fields, each within the bounds Argon2id and `@noble/hashes` keep: `parseKeyDeriverSpec` checks a spec through it. Its `parse` refuses 'bad_option', naming the field. */
+/** A keyDeriverSpec Argon2id can run: a spec's fields alone, each within the bounds Argon2id and `@noble/hashes` keep. Its `parse` refuses 'bad_option', naming the field. */
 export const { keyDeriverSpec } = Validator('bad_option', ({ obj, str, int, lit }) => ({
   keyDeriverSpec: obj({
     algorithm:         lit('argon2id'),
