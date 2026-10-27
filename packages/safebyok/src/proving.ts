@@ -9,7 +9,7 @@ import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, make
 import { RefusalFamilyForKind, VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './consts'
-import { type Lease, sealLeaseRecord } from './lease'
+import { Lease, sealLeaseRecord } from './lease'
 import type { VaultLogger } from './logger'
 import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
@@ -66,8 +66,8 @@ export type ProvingTools = VaultPrivateTools & {
   deviceId:    () => string
   /** Store `record` as this device's lease through the DeviceDB's `putLease`, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
   putLease:    (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
-  /** Hold `stored` as the vault's lease, its expiry armed, the snapshot replaced. */
-  holdLease:   (stored: LeaseRecord) => Lease
+  /** Hold `lease`, which this proving made of the record it just stored, as the vault's lease: its expiry armed, the snapshot replaced. */
+  holdLease:   (lease: Lease) => Lease
 }
 
 /** Each registered vault's proving tools: a weak map, so a vault let go is let go here too. */
@@ -203,7 +203,9 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** Grant this device a lease on the vault, by the wayin this proving opens in the gate held, resolving the Lease as stored and held.
    * It seals a lease record over the vaultKey ({@link sealLeaseRecord}) and stores it through the
-   * DeviceDB's `putLease`. Held, the lease's expiry is armed and the snapshot replaced.
+   * DeviceDB's `putLease`, then makes the Lease of the stored record, here, and has the vault hold
+   * it: its expiry armed, the snapshot replaced. No code but this, the Lease and the device store
+   * holds the record.
    *
    * It demands on the proving, and on the gate the lease names, with nothing awaited before the
    * store. A lock or a gating's end landing before then refuses ('gating_landed'); one landing
@@ -226,8 +228,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     this.#demand()
     tools.demand(madeUnderOfLease(put.ok ? put.val : record), this.#call())
-    const stored = valOf(put)
-    return tools.holdLease(stored)
+    return tools.holdLease(Lease.make(this.vault, valOf(put)))
   }
 
   /** Only its slotlabel: all JSON and a log line show of a proving. */

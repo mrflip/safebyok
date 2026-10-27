@@ -1,4 +1,4 @@
-import { type Capacity, type Clock, type VaultScope, Whisper, Sidecar, type DeviceRecord, type LeaseRecord, type WayinKind } from './types/types'
+import { type Capacity, type Clock, type VaultScope, Whisper, Sidecar, type DeviceRecord, type WayinKind } from './types/types'
 import { type GatedVaultRecord, type GateRecord, type GateSparse, type VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './vault-record'
 import { vault_tok } from './types/type-aliases'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
@@ -21,7 +21,7 @@ import { type BadNewsHandler, type GuardedRequestCleartext, type VaultParts, par
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { Lease, type LeaseSparse } from './lease'
+import { KeptLease, Lease } from './lease'
 import { registerLeaseReader } from './held-lease'
 import { type PassphraseProving, Proving, type VaultPrivateTools, registerProvingTools } from './proving'
 import { Gate } from './gate'
@@ -806,7 +806,7 @@ export class Vault implements VaultStamp {
       now:         () => this.#clockNow(),
       deviceId:    () => this.#deviceId,
       putLease:    (record) => this.#deviceDB.putLease(record),
-      holdLease:   (stored) => this.#holdLease(Lease.make(this, stored)),
+      holdLease:   (lease) => this.#holdLease(lease),
     })
     this.#gatingTools = {
       ...tools,
@@ -950,7 +950,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Read the vault record, listing and this device's lease, judge them against the picture in hand by `#judgeRead`, take what it finds new, and raise this device's record to it.
-   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link DeviceDB.getLease}.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.read}, the lease kept.
    * A read judged `behind` locks the vault as storage it cannot trust, and refuses 'vault_behind'.
    */
   async #takeStorage() {
@@ -959,7 +959,7 @@ export class Vault implements VaultStamp {
     // The device record is read first, so a raise this device's own write made is never held
     // against a read served before that write landed.
     const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.getDeviceRecord(this.#scope)))
-    const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), this.#deviceDB.getLease(this.#scope)])
+    const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), KeptLease.read(this.#deviceDB, this.#scope)])
     const verdict = this.#judgeRead(read, record)
     if (verdict === 'ignore') { return }
     if (verdict === 'behind') {
@@ -1003,7 +1003,7 @@ export class Vault implements VaultStamp {
    * None is taken up here. A read finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: LeaseRecord | null, readAt: number, leasesSeen: number }) {
+  #takePicture(found: { fresh: VaultRecord, listing: Listing, leaseKept: KeptLease | null, readAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1418,47 +1418,33 @@ export class Vault implements VaultStamp {
     return lease
   }
 
-  /** Take up the lease in this device's store, read with {@link DeviceDB.getLease}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
+  /** Take up the lease in this device's store, read with {@link KeptLease.read}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
    * Make it a gating's first step, before the host is asked. A gating landed while the store is
    * read takes nothing up. A lease that does not fit is left where it lies, never erased: it may be
-   * another tab's, and the next grant writes over it. A record that is no lease of this scope is
-   * warned of, and left too. Its wrap is not tried: a damaged one refuses at its first use,
-   * 'damaged_lease'.
+   * another tab's, and the next grant writes over it. A record that is no lease of this scope reads
+   * as none, warned of by the read, and is left too. Its wrap is not tried: a damaged one refuses
+   * at its first use, 'damaged_lease'.
    */
   async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
-    const kept = await this.#deviceDB.getLease(this.#scope)
+    const kept = await KeptLease.read(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
     this.#demandNotGone()
     if (gating.landed) { return false }
-    const record = valOf(kept)
-    if (record === null) { return false }
-    let lease: Lease
-    try {
-      lease = Lease.make(this, record)
-    } catch {
-      // Neither the record nor what it failed is told: the record holds key material.
-      this.#logger.warn("This device's lease could not be read, so it was not taken up, and the vault asks for the passphrase. It was left where it lies: the next unlock writes over it.", { call: 'ensureUnlocked' })
-      return false
-    }
+    const found = valOf(kept)
+    if (found === null) { return false }
+    const lease = found.leaseOn(this)
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
     this.#holdLease(lease)
     return true
   }
 
-  /** Take up `kept`, the lease the vault's birth found in this device's store, when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
-   * One that does not fit, or is no lease of this scope, is left where it lies, never erased: it may
-   * be another tab's, of another life, and a grant writes over it. Its wrap is not tried: a damaged
-   * one refuses at its first use, 'damaged_lease'.
+  /** Take up `kept`, the lease the vault's birth found in this device's store ({@link KeptLease.read}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
+   * One that does not fit is left where it lies, never erased: it may be another tab's, of another
+   * life, and a grant writes over it. Its wrap is not tried: a damaged one refuses at its first
+   * use, 'damaged_lease'.
    */
-  #takeUpAtBirth(kept: LeaseRecord | null) {
+  #takeUpAtBirth(kept: KeptLease | null) {
     if (kept === null) { return }
-    let lease: Lease
-    try {
-      lease = Lease.make(this, kept)
-    } catch {
-      // Neither the record nor what it failed is told: the record holds key material.
-      this.#logger.warn("This device's lease could not be read, so the vault was born locked, and asks for the passphrase again. It was left where it lies: the next unlock writes over it.", { call: 'hello' })
-      return
-    }
+    const lease = kept.leaseOn(this)
     if (! this.#fitsTakeUp(lease, 0)) { return }
     this.#holdLease(lease)
   }
@@ -1844,7 +1830,7 @@ export type BirthRead = Readonly<{
   /** The box listing `VaultDB.ensureVault` resolved beside it. */
   listing:     Listing
   /** The lease record {@link DeviceDB.getLease} found, or null. */
-  leaseKept:   LeaseRecord | null
+  leaseKept:   KeptLease | null
   /** This device's record of the scope, as raised at birth. */
   record:      DeviceRecord
   /** When the read began, by the bank's clock. */
@@ -1881,11 +1867,9 @@ const fitsLease = (vaultRecord: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, l
  * this tab keeps its own until it ends. None (a lock in another tab), or one under another gate,
  * does not.
  */
-const leavesInForce = (kept: unknown, held: Lease): boolean => {
-  if (typeof kept !== 'object' || kept === null) { return false }
-  const record: Partial<Record<keyof LeaseSparse, unknown>> = kept
-  return record.vault_tok === held.vault_tok && record.gate_epoch === held.gate_epoch
-}
+const leavesInForce = (kept: KeptLease | null, held: Lease): boolean => (
+  kept !== null && kept.vault_tok === held.vault_tok && kept.gate_epoch === held.gate_epoch
+)
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */
 type VaultCall = 'birth' | 'hello' | 'refresh' | 'del' | 'untrustedStorage' | 'ensureUnlocked' | 'demandConsistentWith'

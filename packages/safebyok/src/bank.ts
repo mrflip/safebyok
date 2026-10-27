@@ -17,6 +17,7 @@ import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
 import { type BankVaultOpts, type MakeBankOpts, type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
+import { KeptLease } from './lease'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
 import type { VaultDB } from './vault-db'
@@ -547,7 +548,7 @@ export class Bank {
     const scope = CX.vaultScope.parse(parts)
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), deviceDB.getLease(scope)])
+    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), KeptLease.read(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.

@@ -73,6 +73,8 @@ export type LeasedSlice = VaultSlice & {
   /** The vault record it holds but its gate: what a box sealed or made of it is made under. */
   madeUnder:            VaultSparse
   lease:                Lease | null
+  /** The record its lease was made from, leaseKey and wrap among it: what a test tampers with to make a damaged lease, as no Lease hands its record out. */
+  leaseRecord:          LeaseRecord
   /** True once the test has the vault gone: its demand then refuses 'vault_gone'. */
   gone:                 boolean
   demandConsistentWith: Vault['demandConsistentWith']
@@ -95,9 +97,12 @@ export type LeasedSlice = VaultSlice & {
  */
 export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overrides: Partial<VaultSlice> = {}): Promise<LeasedSlice> => {
   const base = vaultSliceOf(user_id, testDeriver, overrides)
+  const madeUnder: VaultSparse = Object.freeze({ format: base.format, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: base.vault_tok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 })
+  const leaseRecord = await sealLeaseRecord(madeUnder, vaultKey, { leaseMillis: base.leaseMillis, now: base.now() })
   const slice: LeasedSlice = {
     ...base,
-    madeUnder: Object.freeze({ format: base.format, applabel: base.applabel, user_id: base.user_id, vaultlabel: base.vaultlabel, vault_tok: base.vault_tok, registered_at: base.registered_at, vault_epoch: 1, gate_epoch: 1 }),
+    madeUnder,
+    leaseRecord,
     lease: null,
     gone:  false,
     locks: 0,
@@ -116,7 +121,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
     },
     making: () => ({ madeUnder: slice.madeUnder, now: slice.now() }),
   }
-  slice.lease = Lease.make(slice, await sealLeaseRecord(slice.madeUnder, vaultKey, { leaseMillis: slice.leaseMillis, now: slice.now() }))
+  slice.lease = Lease.make(slice, leaseRecord)
   // A box and a lease read the lease the slice holds as they read a Vault object's.
   registerLeaseReader(slice, () => slice.lease)
   return slice
