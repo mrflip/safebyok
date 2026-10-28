@@ -1,14 +1,30 @@
+# History on main is semi-linear (PROCESS.md, The history we keep): each pull request is rebased
+# onto main and lands as one merge commit. That holds only while checks run in place, on the pull
+# request itself, after Mergify has rebased it: a batch, or checks run in parallel, are tested on a
+# draft pull request, and each original then merges at its own head, rebased or not. So the queue
+# takes one pull request at a time.
+#
+# The Coach queues a pull request by labeling it `queue`; Merge Protections must be on for the
+# repository in Mergify's dashboard for the label to do anything. `@mergifyio queue` in a comment
+# queues one too.
+merge_protections_settings:
+  auto_merge_conditions:
+    - label = queue
 merge_queue:
-  skip_intermediate_results: true
-  max_parallel_checks: 5
+  max_parallel_checks: 1
 queue_rules:
   - name: default
     merge_method: merge
-    batch_size: { min: 1, max: 6 }
-    queue_conditions:            # gate to enter: cheap PR checks
-      - check-success = ci
-    merge_conditions:            # evaluated on Mergify's draft PR
-      - check-success = ci-full
+    update_method: rebase
+    batch_size: 1
+    # The `mainly main` ruleset's rules (an approval, review threads resolved, its required checks)
+    # join these by themselves; these name CI's jobs, each its own check.
+    merge_conditions:
+      - check-success = lint-typecheck
+      - check-success = test-build
+      - check-success = node-compat (22)
+      - check-success = node-compat (26)
+      - check-success = postgres
 scopes:
   source:
     files:

@@ -26,8 +26,9 @@ permissions:
 # stands beside these, with its own checkout and setup.
 jobs:
   # Lint first, as the likelier of the two to fail for a reason worth reading, then typecheck, then
-  # keep a pull request's history semi-linear (PROCESS.md): its branch may hold no merge commit;
-  # then a pull request's changeset, and last the workflows themselves.
+  # a pull request's changeset, and last the workflows themselves. A merge commit in a pull
+  # request's branch is not refused here: Mergify rebases each one onto main as it queues it
+  # (.mergify.yml), which keeps main's history semi-linear (PROCESS.md).
   lint-typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -44,18 +45,6 @@ jobs:
       - run: pnpm lint
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm typecheck
-      - name: Reject merge commits in the branch
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          merges=$(git rev-list --merges "$BASE_SHA..$HEAD_SHA")
-          if [ -n "$merges" ]; then
-            echo "::error::Branch contains merge commits. Rebase instead: git fetch origin && git rebase origin/main"
-            git log --oneline --merges "$BASE_SHA..$HEAD_SHA"
-            exit 1
-          fi
       # A pull request that changes a public package carries a changeset saying what its release
       # would say; one that needs no release carries an empty one (PROCESS.md, Releases). The Version
       # PR is where changesets are used up, so asking it for one is wrong by construction: it is

@@ -46,7 +46,11 @@ Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
   as one merge commit, so `git log --first-parent main` reads one line per PR and
   `git revert -m 1 <merge>` backs a PR out whole.
 * **Never merge `main` into a branch**, and never use GitHub's "Update branch" in merge mode:
-  rebase. CI rejects a PR branch holding a merge commit.
+  rebase.
+* **Mergify's queue lands each PR** (`.mergify.yml`): it rebases the PR onto `main`, waits for CI
+  on the rebased branch, and merges it, one PR at a time. The Coach queues a PR by labeling it
+  `queue`; an agent never adds that label. Once a PR is queued, Mergify owns its branch: push
+  to it only to fix what the queue refused.
 * **Every commit lands in main individually**, so each should pass `pnpm justify`. An
   intermediate red commit is allowed only when it isolates something, say a large mechanical
   change from the thoughtful repairs after it, and the PR says so.
@@ -54,7 +58,7 @@ Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
   the branch's tip when you took it, never one fetched since: a lease read off a fresh fetch
   always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
   thread's.
-* **Never merge a PR or enable auto-merge. The Coach merges.**
+* **Never merge a PR, enable auto-merge, or queue one. The Coach merges.**
 * Before a command that throws work away (`reset --hard`, `restore`, `clean`, `branch -D`), make
   what it would discard reachable first: commit it or put a branch on it. If you can't tell what
   it would discard, stop and ask.
