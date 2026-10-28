@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import * as ZClassic from 'zod'
 import { Box } from '../../src/box'
 import { BoxRecord, type Whisper, type Sidecar } from '../../src/shapes/box'
-import type { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/errors'
 import type { RequestCleartext } from '../../src/gating'
 import { valOf } from '../../src/outcome'
 import { Vault } from '../../src/vault'
@@ -1178,6 +1178,33 @@ describe("useWhisper", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await expect(vault.useWhisper('anthropic', () => Promise.reject(new Error('the API said no')))).rejects.toThrow('the API said no')
+  })
+
+  it("passes a callback's throw through as the same object, a VaultError of bad news included, telling onBadNews nothing and leaving the trouble clear", async () => {
+    const world = makeWorld()
+    const told: VaultError[] = []
+    const vault = await world.openUnlocked('pw', { onBadNews: (news) => { told.push(news) } })
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const hostsOwn = new VaultError('damaged_box', "The host's own refusal, of a kind the vault reports as bad news.")
+    const plain = new Error('the API said no')
+    for (const thrown of [hostsOwn, plain]) {
+      let caught: unknown = null
+      try {
+        await vault.useWhisper('anthropic', () => { throw thrown })
+      } catch (err) { caught = err }
+      expect(caught).to.eq(thrown)
+    }
+    expect(told).to.have.lengthOf(0)
+    expect(vault.snapshot.trouble).to.be.null
+  })
+
+  it("refuses 'vault_gone' once the Vault object is gone, before it checks the callback or reads anything", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const getBox = vi.spyOn(world.vaultDB, 'tryGetBox')
+    TH.closeVault(vault)
+    await TH.expectRefusal(vault.useWhisper('anthropic', 'not a callback' as unknown as () => void), 'vault_gone')
+    expect(getBox).not.toHaveBeenCalled()
   })
 
   it("refuses a callback that is not a function before it opens the box", async () => {

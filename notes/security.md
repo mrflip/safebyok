@@ -44,7 +44,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
-  `del-damaged-vault.ts`, `RefusalPolicy.heed`) calls the `try` forms. Each `DeviceDB` throwing verb wraps exactly its one
+  `del-damaged-vault.ts`) calls the `try` forms (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed` is gone). Each `DeviceDB` throwing verb wraps exactly its one
   `do*` store call in `storeAnswer(verb, hook)`: a `VaultError` passes as it came, anything else becomes `deviceTrouble`'s
   condition (`storage_blocked` where `isStorageBlocked` names the throw, else `storage_unavailable`, the throw its `cause`), so a
   host calling `deviceDB.getLease` directly never sees the store's raw error. The `try` form is the plain `outcomeOf` of the
@@ -382,7 +382,7 @@ added or folded into through the subagent, and no other entry changes.
   settled with, so an attempt never reports success over a gating a lock settled first. `seal` requires its `{ gating }`, with no
   default to a gating that never lands, so no later internal caller can reopen the hole by omitting it.
 * 2026-10-23 (primitives sprint, thread 9, gating): **each attempt reads storage afresh first.** `hello({ staleMinutes: 0 })`
-  through the refresh join (`#freshen`), then a demand that the Vault object is not gone and the gating has not landed, so a
+  through the refresh join (the `freshen` gating tool's closure in the Vault constructor; amended 2026-10-28 (vault_refresh): was `#freshen`, same behaviour), then a demand that the Vault object is not gone and the gating has not landed, so a
   passphrase another device has replaced opens nothing here; a vault whose gate another device set while the user typed
   refuses a first gate `gate_made_elsewhere` without trying the typed text against the winner's gate.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the order of checks and seals within a chain.** `change_passphrase` seals and checks
@@ -492,7 +492,7 @@ added or folded into through the subagent, and no other entry changes.
   drop the lease from memory and erase nothing, because an unconditional erase on a judgment could take another
   tab's fresh lease. A lease left in the pantry that names an old `gate_epoch` or `vault_tok` is never taken up
   (take-up checks both) and is discarded by the next take-up. `lock()` (and `del()`, which locks as it does) erases,
-  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`).
+  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`; amended 2026-10-28 (heed_inline): now `#onStorageRefusal`).
   Amended 2026-10-22 (bank): **`close()` and `vault_closed` are gone; `rolled_back` is now `vault_behind`.**
   `bank.closeVault`, `closeVaults` and `reopenVault` let a Vault object go with the same memory-only drop (the lease
   stays in the DeviceDB for the next birth), and every call on it then refuses `vault_gone`. `tryHello` / `tryRefresh`
@@ -518,7 +518,7 @@ added or folded into through the subagent, and no other entry changes.
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
   Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
-  The refresh (`#judgeStored` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  The refresh (`#doRefresh` / `#applyVault`, `packages/safebyok/src/vault.ts`; amended 2026-10-28 (vault_refresh): were `#judgeStored` / `#takePicture`) tests `vault_behind` (a read whose `vault_epoch` is below the
   device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
   epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
   `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
@@ -620,8 +620,8 @@ added or folded into through the subagent, and no other entry changes.
   the delete had its raised record (its `highest_vault_epoch`, the watermark that refuses a vault served behind what this device has seen) erased by
   it; `describeDeviceDB` now tests the race for each kind of record against both stores. A host's own `DeviceDB` used to hand back unchecked rows,
   which the vault left in place with a logger warning; now such a row is discarded silently, and the vault's warning ("lease could not be read ...
-  left where it lies") remains only for a lease that reads but names another scope (`Lease.make` still checks it, and `deviceRecordFor` still
-  checks a device record's scope).
+  left where it lies") remains only for a lease that reads but names another scope (`Lease.make` still checks it, and the `DeviceDB` base class
+  checks a device record's scope; amended 2026-10-28 (vault_refresh): `deviceRecordFor` is gone, see the rollback-check entry below).
 
 * 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
   travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
@@ -1611,7 +1611,7 @@ added or folded into through the subagent, and no other entry changes.
   vault deleted and made anew elsewhere (new `vault_id`), landing during the unwrap left this device
   unlocked under the new props with the old key, indefinitely, defeating the epoch's revocation. The
   lease is left for the next hello, which discards it as not fitting. Also 2026-10-19 (a_sec, #203):
-  a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
+  a storage read (`#doRefresh`; amended 2026-10-28 (vault_refresh): was `#takeStorage`) that finds the vault props changed from those held (a new
   `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
   before any further await: it drops the key, stands down any take-up, and (for a different
   `vault_id`) empties the box listing; only then does it erase the lease and list the boxes (amended 2026-10-22 (primitives sprint, thread 5 (demand)):
@@ -1664,12 +1664,12 @@ added or folded into through the subagent, and no other entry changes.
   contract). Deletions name no epoch. A box whose epoch is
   not the vault props' reads as `damaged_box`, its key never tried.
 * 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Amended 2026-10-22 (bank): **the device mark is replaced by the device record, and `rolled_back` by `vault_behind`; what follows describes the mark and no longer holds except where restated here.** Per scope, across the vault's lives, the DeviceDB holds `{ device_id, highest_vault_epoch }` (`packages/safebyok/src/device-db.ts`), written by `raiseDeviceRecord`: a store-side max in one transaction (IndexedDB: one readwrite transaction via idb-keyval `update`), so a tab that saw less never lowers it and the first `device_id` stored stays (the two-tabs write-back below no longer exists). It is raised at birth, after each refresh's take, after this device's own gate writes (first unlock, `putWayin`, `delWayin`) and after `del()` (to the tombstone's `vault_epoch`); `delDamagedVault` raises it to its tombstone's epoch instead of erasing it. The Coach's ruling (option A): one highest `vault_epoch` per scope, raised at each refresh too; `vault_epoch` is compared by <=, never bumped on reads. A birth (`bank.ensureVault`, `packages/safebyok/src/bank.ts`) whose fetched `vault_epoch` is below the record's highest births nothing; a refresh (`src/vault.ts`) refuses it as `vault_behind`, takes nothing, and locks (refusal policy 'lock', the lease erased as for `identity_revoked`). The refresh reads the record BEFORE `getVault`, and judges "older than the picture in hand" (same `vault_tok`, lower epoch: a late read of this tab's own write) BEFORE the behind check, so neither this tab's own write nor another tab's raise is a false `vault_behind`. The record spans lives, so a deletion's tombstone counter carries on in it, where the mark held one vault per scope. The only way out is `bank.clearCachedVault`, which erases the record and the lease and lets the Vault object go: a deliberate host action, never offered to the user as a prompt (the `delMark` recipe below is retired; amended 2026-10-22 (bank_provider): `useBank()` hands it to React hosts as the way past `vault_behind`; it weakens this check until the next birth, so it is for the user's or host's say only, and `BankProvider` never calls it) Residual: a device whose record was cleared, or that never saw the newer copy, cannot tell; a failed raise after a read or own write is a logger warning, not a refusal, so detection is weaker until a later read raises it. Amended 2026-10-22 (bank): **the device record is validated at the boundary.**
-  `deviceRecordFor(scope, answer)` (`packages/safebyok/src/device-db.ts`) checks every record a DeviceDB hands back
+  `deviceRecordFor(scope, answer)` (`packages/safebyok/src/device-db.ts`; amended 2026-10-28 (vault_refresh): now the `DeviceDB` base class's `getDeviceRecord` and `raiseDeviceRecord`, as amended below) checks every record a DeviceDB hands back
   (`tryGetDeviceRecord` at birth and at each refresh, and `tryRaiseDeviceRecord`'s answer at birth) against the
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
-  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnparsed`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
+  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnparsed`, only while it still will not read; `deviceRecordFor` still checks the scope; amended 2026-10-28 (vault_refresh): `deviceRecordFor` is no longer exported or called by the vault or the bank, and the scope check lives in the base class too: `DeviceDB.getDeviceRecord(scope)` resolves a checked `DeviceRecord | null`, and a record filed under the scope that names another reads as none and stays stored, not discarded; `DeviceDB.raiseDeviceRecord(record)` resolves the record it stored, checked the same way, or null when that fails, which only a host's own record can, and the bank's birth then gives way to the record it handed over, so no caller can skip the check). `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
   failure as a lost record. Amended 2026-10-21 (trust_lines): the mark keeps `vault_id` and the highest
   `unlock_epoch` only (`safebyok-mark-v5`); `vault_key_epoch` is removed, so the refusal of a lower one,
   the wayin check on it and the rotation case below no longer exist, and older vault props of the same
@@ -2093,9 +2093,14 @@ added or folded into through the subagent, and no other entry changes.
   of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
-  on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
-  hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
-  an interim shim until the vault's own calls are Outcome-shaped.
+  on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
+  and the `HeededVaultDB` wrapper are deleted; the vault holds a plain `VaultDB` and at each of its six call sites
+  (`tryDelBox`, `tryGetVault` in `#doRefresh` (amended 2026-10-28 (vault_refresh): was `#takeStorage`), `tryDelVault`, `tryPutVaultRecord`, `tryGetBox`, `tryPutBox`) calls the `try` form, and on a bad
+  Outcome awaits `#onStorageRefusal(refused)` before throwing it. `RefusalPolicy.decide` stays the one pure policy
+  (`identity_revoked` and `vault_behind` answer 'lock'), and the `behind` verdict in `#doRefresh` (amended 2026-10-28 (vault_refresh): was `#takeStorage`) goes through the same call.
+  The lock has landed and the lease erase has settled before the direct caller hears the throw, a background refresh's refusal
+  included, as before, now at each site by convention: a comment on `#vaultDB` says every site must call the `try` form,
+  and a vault test pins the order for each verb.)
   2026-10-19 (a_sec2, #206): `vault_props_stored` is removed from `RefusalMeta`. Nothing ever
   filled it. Filled, it would have put every passphrase's salt and every wrapped vaultKey into a
   refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
@@ -2820,7 +2825,7 @@ added or folded into through the subagent, and no other entry changes.
   tells newer from damaged). **The rule this rests on, which the Coach
   has ruled (2026-10-16): any change to what a stored record may hold -- a field, a shape, or a
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
-  `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
+  the vault's `#onStorageRefusal` (amended 2026-10-28 (heed_inline): formerly `RefusalPolicy.heed`): there is no handle to lock and no key in memory, so `whenIdentityRevoked`
   has nothing to act on, and the hatch's own last step is erasing the lease.
   Amended 2026-10-22 (bank_provider): **`bank.delDamagedVault(draft)` / `tryDelDamagedVault` run it over the bank's own
   vaultDB and deviceDB** (the shared `delDamagedVaultIn(scope, vaultDB, deviceDB)`), with the same refusals; the bank's

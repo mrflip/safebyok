@@ -771,8 +771,9 @@ says these things:
   changed, or locked -- and refused (`{ call, refusalkind }`): `vault_gone`, `vault_remade`,
   `gate_moved` or `vault_locked`. It never names what the call held.
 * `log`: storage the vault cannot trust -- its user signed out, or an older copy of the vault --
-  locked it (`{ call: 'untrustedStorage' }`); `warn` when this device's lease could not then be
-  revoked.
+  locked it (`{ call }`, the call that met it: `refresh` for a read the vault made of itself);
+  `warn` when this device's lease could not then be revoked (`{ call: 'untrustedStorage' }` when
+  the bank met it opening the vault).
 * `warn`: a change to the ways in landed in storage, but this device could not grant its lease
   afresh. The change is kept, and the call resolves.
 * `warn`: this device could not raise its device record to what a read, or a write of its own,

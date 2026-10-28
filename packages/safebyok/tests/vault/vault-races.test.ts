@@ -418,6 +418,8 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     const here = await world.open({ deviceDB: memoryDeviceDB() })
     // The first key the chain unwraps is the vaultKey, in grantLease, after its gate is stored.
     TH.beforeNextCall(crypto.subtle, 'unwrapKey', async () => {
+      // The other device unlocks the gate this one stored once its watch has read it in.
+      await TH.eventually(() => here.snapshot.gate !== null)
       await TH.unlock(here, 'pw two')
       await TH.putWayin(here, 'pw two', 'pw three')
       await TH.eventually(() => TH.cheatGetVaultEpoch(there).gate_epoch === 2)
@@ -1100,6 +1102,8 @@ describe("versioned updates: two devices writing at once", () => {
     TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
+      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
@@ -1127,6 +1131,8 @@ describe("versioned updates: two devices writing at once", () => {
       await there.delBox('anthropic')
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
+      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
