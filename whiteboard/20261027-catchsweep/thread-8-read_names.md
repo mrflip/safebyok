@@ -1,6 +1,6 @@
 # Thread 8: read_names (2026-10-28)
 
-Branch `20261028-read_names`, PR #TBD, stacked on #321 (thread 6, `20261028-store_trynames`, tip
+Branch `20261028-read_names`, PR #328, stacked on #321 (thread 6, `20261028-store_trynames`, tip
 496e3046), which stands on #324, #317 and #316. Justify: green (core 3475 pass, 37 skipped;
 indexeddb 167, postgres 322, fastkey 49, react 310, convex 367, graphql 344, demo 230, e2e 107,
 root scripts 266; every package lints, typechecks, builds and fits its size budget).
