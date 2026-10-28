@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as Primitives from '../../src/checks/primitives'
-import { Kit, Validator, consistent, demandConsistent, verifyConsistent } from '../../src/checks/validator'
-import { VaultError } from '../../src/errors'
+import { type ConsistencyRefusal, Kit, type Story, Validator, consistent, demandConsistent, verifyConsistent } from '../../src/checks/validator'
+import { type RefusalKind, VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
@@ -197,7 +197,7 @@ describe("Validator", () => {
     expect(caught).to.not.be.instanceOf(Zod.ZodError)
   })
 
-  it("frames a refusal as the saying asks, where before the failures and advice after, each ending the failures in a period, as its first example shows", () => {
+  it("frames a refusal as the story asks, where before the failures and advice after, each ending the failures in a period, as its first example shows", () => {
     const bad = { applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' }
     const plain = TH.expectSyncRefusal(() => vaultScope.parse(bad), 'bad_scope')
     const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the bag naming the vault' }), 'bad_scope')
@@ -210,14 +210,14 @@ describe("Validator", () => {
     for (const refusal of [plain, where, advice, both]) { expect(refusal.meta).to.deep.equal({ fieldnames: ['vaultlabel'] }) }
   })
 
-  it("parses with a saying as without one, and passes a saying of nothing by, framing a failure as the failures alone", () => {
+  it("parses with a story as without one, and passes a story of nothing by, framing a failure as the failures alone", () => {
     expect(vaultScope.parse(scope, { where: 'In the scope' })).to.deep.equal(scope)
     expect(vaultScope.parse(scope, {})).to.deep.equal(scope)
     const err = TH.expectSyncRefusal(() => vaultScope.parse(null, { where: undefined, advice: undefined }), 'bad_scope')
     expect(err.message).to.eq('Invalid input: expected object, received null')
   })
 
-  it("refuses 'bad_option' for a saying that is none, a Zod parse context among them, whatever the input", () => {
+  it("refuses 'bad_option' for a story that is none, a Zod parse context among them, whatever the input", () => {
     TH.expectSyncRefusal(() => vaultScope.parse(scope, { error: () => 'quoted' } as object), 'bad_option')
     TH.expectSyncRefusal(() => vaultScope.parse(null, { where: 7 } as object), 'bad_option')
   })
@@ -242,6 +242,11 @@ describe("Validator", () => {
     const { checked } = Validator('bad_option', ({ str }) => ({ checked: str }))
     expectTypeOf(BoxSparse.parseConsistent).returns.toEqualTypeOf<Zod.output<typeof BoxSparse>>()
     expectTypeOf(checked).not.toHaveProperty('parseConsistent')
+  })
+
+  it("types a Story as optional where and advice, and a ConsistencyRefusal as a kind and an optional message, each read off its shape", () => {
+    expectTypeOf<Story>().toEqualTypeOf<{ where?: string | undefined, advice?: string | undefined }>()
+    expectTypeOf<ConsistencyRefusal>().toEqualTypeOf<{ kind: RefusalKind, message?: string | ((fieldnames: readonly string[]) => string) | undefined }>()
   })
 })
 

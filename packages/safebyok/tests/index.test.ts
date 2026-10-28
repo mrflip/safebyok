@@ -12,9 +12,9 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'BoxDamaged', 'BoxFormat', 'BoxRecord', 'BoxSparse', 'BoxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'LeaseStamp', 'GateRecord', 'GateSparse', 'PasskeyWayinSparse', 'PassphraseWayinSparse', 'VaultFormat', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'TombstoneFormat', 'VaultRecord', 'VaultScope', 'isGated', 'Whisper', 'wallClock',
-      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'Validators',
-      'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'asStorageTrouble', 'outcomeOf', 'unexpectedError', 'valOf',
-      'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'consistent', 'demandConsistent', 'verifyConsistent', 'Validators',
+      'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'storageTroubleOf', 'outcomeOf', 'unexpectedError', 'valOf',
+      'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'HostErrorSanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -53,7 +53,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
-    expect(Object.keys(safebyok.Sanitizer)).to.have.members(['refusalFor'])
+    expect(Object.keys(safebyok.HostErrorSanitizer)).to.have.members(['refusalFor'])
   })
 
   it("exports the refusals an adapter throws and unexpectedError, and the comparisons a key-value adapter makes, each as one namespace", () => {
