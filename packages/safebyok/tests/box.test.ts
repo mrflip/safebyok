@@ -277,8 +277,8 @@ describe("Box.make", () => {
   it("makes a box from a record a VaultDB hands back, as its first example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    valOf(await vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')))
-    const record = valOf(await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic_api_key', TH.inThisVault))
+    valOf(await vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')))
+    const record = valOf(await vaultDB.tryGetBox(TH.scopeOf('u1'), 'anthropic_api_key', TH.inThisVault))
     if (record === null) { throw new Error('expected a box record') }
     const box = boxIn(await vaultOf(), record)
     expect(box.record).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))

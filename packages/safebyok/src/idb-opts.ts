@@ -1,5 +1,4 @@
 import { Validator } from './checks/validator'
-import { optionsRefusal } from './options'
 
 /** The options the IndexedDB device store and `browserOpts` share, and their parser. Only the type is public, through `safebyok/idb`. */
 
@@ -17,15 +16,9 @@ export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts:
  * It refuses 'bad_option' for a name that is not non-empty text, or a field the options do not
  * take, naming the call the host made, quoting none of it.
  *
- * @param said - The function the host called, as the refusal names it.
+ * @param callname - The function the host called, as the refusal names it.
  *
  * @example parseDbName({ dbName: 'acme' }, 'idbDeviceDB')  // 'acme'
  * @example parseDbName({ dbname: 'acme' }, 'browserOpts')  // throws 'bad_option': "In browserOpts's options: There is a field it does not take ..."
  */
-export const parseDbName = (opts: IdbOpts | undefined, said: string): string => {
-  try {
-    return idbOpts.parse(opts ?? {}).dbName
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In ${said}'s options: ${message}.`)
-  }
-}
+export const parseDbName = (opts: IdbOpts | undefined, callname: string): string => idbOpts.parse(opts ?? {}, { where: `In ${callname}'s options` }).dbName

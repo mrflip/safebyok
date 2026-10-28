@@ -125,7 +125,7 @@ export type AsyncVerbOf<Target> = {
  * @param meanwhile - What to run first, and wait for.
  *
  * @example
- *   TH.beforeNextCall(vaultDB, 'putBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
+ *   TH.beforeNextCall(vaultDB, 'tryPutBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
  */
 export const beforeNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void => {
   const method = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
@@ -184,7 +184,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const latch = TH.holdNextCall(vaultDB, 'getVault')
+ *   const latch = TH.holdNextCall(vaultDB, 'tryGetVault')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
  *   await latch.reached
  *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
@@ -209,7 +209,7 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const written = TH.holdNextAnswer(deviceDB, 'putLease')
+ *   const written = TH.holdNextAnswer(deviceDB, 'tryPutLease')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the store; the unlock has not heard
  *   await written.reached
  *   await vault.lock()                     // its erase lands after the write

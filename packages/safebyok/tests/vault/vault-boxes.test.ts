@@ -210,8 +210,8 @@ describe("putBox, the box it seals and stores", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const first = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-old')
-    const reads = vi.spyOn(world.vaultDB, 'getBox')
-    const writes = vi.spyOn(world.vaultDB, 'putBox')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetBox')
+    const writes = vi.spyOn(world.vaultDB, 'tryPutBox')
     world.advance(60_000)
     const box = await vault.putBox({ boxlabel: 'anthropic', sidecar: {} }, 'sk-new')
     expect(reads).not.toHaveBeenCalled()
@@ -222,7 +222,7 @@ describe("putBox, the box it seals and stores", () => {
   it("stores a whole box the listing does not show as a new one, over none", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const writes = vi.spyOn(world.vaultDB, 'putBox')
+    const writes = vi.spyOn(world.vaultDB, 'tryPutBox')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: {} }, 'sk-fake')
     expect(writes.mock.calls[0]?.[1]).to.deep.equal({ vault_tok: vault.vault_tok, revision_tok: null })
   })
@@ -789,7 +789,7 @@ describe("the box limit", () => {
     const there = await world.open()
     await there.delBox('openai')
     expect(boxlabelsOf(here)).to.deep.equal(['openai'])
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake'), 'vault_full')
     expect(reads).not.toHaveBeenCalled()
     await here.hello({ staleMinutes: 0 })
@@ -1129,7 +1129,7 @@ describe("vault.getBox", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const reading = TH.holdNextCall(world.vaultDB, 'getBox')
+    const reading = TH.holdNextCall(world.vaultDB, 'tryGetBox')
     const getting = TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
     await reading.reached
     await vault.lock()
@@ -1141,7 +1141,7 @@ describe("vault.getBox", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const reading = TH.holdNextCall(world.vaultDB, 'getBox')
+    const reading = TH.holdNextCall(world.vaultDB, 'tryGetBox')
     const getting = TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
     await reading.reached
     await vault.lock()
@@ -1154,7 +1154,7 @@ describe("vault.getBox", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const callback = vi.fn(() => 'used')
-    const reading = TH.holdNextCall(world.vaultDB, 'getBox')
+    const reading = TH.holdNextCall(world.vaultDB, 'tryGetBox')
     const using = TH.expectRefusal(vault.useWhisper('anthropic', callback), 'vault_locked')
     await reading.reached
     await vault.lock()
@@ -1376,13 +1376,13 @@ describe("what a vault hands its boxes", () => {
     const writer = await world.openUnlocked('pw')
     await writer.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
     TH.closeVault(writer)
-    const listings = vi.spyOn(world.vaultDB, 'ensureVault')
+    const listings = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const parses = vi.spyOn(JSON, 'parse')
     const stringifies = vi.spyOn(JSON, 'stringify')
     // Born anew, so its listing is its birth's read.
     const vault = await world.open()
     const sidecar = vault.snapshot.boxes[0]?.sidecar
-    const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['ensureVault']>)).boxes))
+    const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['tryEnsureVault']>)).boxes))
     expect(listed.some(([box]) => box !== undefined && box.sidecar === sidecar)).to.be.true
     expect(Object.isFrozen(sidecar)).to.be.true
     const sidecarText = '{"note":"work account"}'

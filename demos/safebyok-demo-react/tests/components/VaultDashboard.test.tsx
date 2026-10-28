@@ -52,7 +52,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
@@ -80,9 +80,9 @@ describe("VaultDashboard, opening", () => {
     // This device has seen a later epoch of the vault than storage serves: a restore from an older copy.
     await world.open()
     const scope = TH.scopeOf('u1')
-    const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
+    const record = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(scope))
     if (record === null) { throw new Error('the birth kept no device record') }
-    await TH.expectGood(world.deviceDB.raiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
+    await TH.expectGood(world.deviceDB.tryRaiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Accept this copy' }))
@@ -123,7 +123,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
 
   it("says why deleting it failed, and keeps offering it", async () => {
     const { world } = await damagedWorld()
-    vi.spyOn(world.vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
+    vi.spyOn(world.vaultDB, 'tryDelDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Remove and start over' }))

@@ -173,35 +173,35 @@ export class Box implements Boxscope, BoxSparse {
    * @example const box = await Box.seal(vault, { boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-...', { madeUnder, now })
    * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
-  static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> { return valOf(await this.trySeal(vault, props, whisper, made)) }
+  static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> {
+    const { boxlabel, sidecar, base } = SealBoxProps.parse(props)
+    const { madeUnder, now } = MadeShape.parse(made)
+    const whisperBytes = whisperBytesOf(whisper)
+    try {
+      vault.demandConsistentWith(madeUnder, { leaseBound: true })
+      const lease = heldLeaseOf(vault)
+      if (lease === null) { throw lockedError() }
+      const sealed = await lease.trySealProps({
+        format:                 BoxFormat,
+        boxlabel,
+        revision_tok:           randomId(),
+        whisper_codec:          'json_v1',
+        whisper_schema_version: 1,
+        sidecar,
+        registered_at:          base?.registered_at ?? now,
+        written_at:             now,
+      }, { whisper: whisperBytes })
+      // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
+      vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
+      return new Box(vault, madeUnder, BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
+    } finally {
+      whisperBytes.fill(0)
+    }
+  }
 
   /** A new box of `vault` holding `whisper`, as an {@link Outcome}: the non-throwing form of {@link Box.seal}. */
   static async trySeal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Outcome<Box>> {
-    return await outcomeOf(async () => {
-      const { boxlabel, sidecar, base } = SealBoxProps.parse(props)
-      const { madeUnder, now } = MadeShape.parse(made)
-      const whisperBytes = whisperBytesOf(whisper)
-      try {
-        vault.demandConsistentWith(madeUnder, { leaseBound: true })
-        const lease = heldLeaseOf(vault)
-        if (lease === null) { throw lockedError() }
-        const sealed = await lease.trySealProps({
-          format:                 BoxFormat,
-          boxlabel,
-          revision_tok:           randomId(),
-          whisper_codec:          'json_v1',
-          whisper_schema_version: 1,
-          sidecar,
-          registered_at:          base?.registered_at ?? now,
-          written_at:             now,
-        }, { whisper: whisperBytes })
-        // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
-        vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
-        return new Box(vault, madeUnder, BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
-      } finally {
-        whisperBytes.fill(0)
-      }
-    })
+    return await outcomeOf(() => this.seal(vault, props, whisper, made))
   }
 
   /** The whisper this box holds, deciphered through the held lease's `decipherWith`, then its JSON parsed.
@@ -216,38 +216,38 @@ export class Box implements Boxscope, BoxSparse {
    *
    * @example const whisper = await box.extractWhisper()
    */
-  async extractWhisper(): Promise<Whisper> { return valOf(await this.tryExtractWhisper()) }
+  async extractWhisper(): Promise<Whisper> {
+    this.#vault.demandConsistentWith(this, { leaseBound: true })
+    const lease = heldLeaseOf(this.#vault)
+    if (lease === null) { throw lockedError() }
+    const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
+    const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+    // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
+    try {
+      // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+      this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
+    } catch (err) {
+      if (deciphered.ok) { deciphered.val.fill(0) }
+      throw err
+    }
+    const whisperBytes = valOf(deciphered)
+    try {
+      const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+      if (! checked.success) {
+        throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
+      }
+      return checked.data
+    } finally {
+      whisperBytes.fill(0)
+    }
+  }
 
   /** The whisper this box holds, as an {@link Outcome}: the non-throwing form of {@link Box.extractWhisper}.
    *
    * @example const { ok, val: whisper, err } = await box.tryExtractWhisper()
    */
   async tryExtractWhisper(): Promise<Outcome<Whisper>> {
-    return await outcomeOf(async () => {
-      this.#vault.demandConsistentWith(this, { leaseBound: true })
-      const lease = heldLeaseOf(this.#vault)
-      if (lease === null) { throw lockedError() }
-      const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
-      const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
-      // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
-      try {
-        // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
-        this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
-      } catch (err) {
-        if (deciphered.ok) { deciphered.val.fill(0) }
-        throw err
-      }
-      const whisperBytes = valOf(deciphered)
-      try {
-        const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
-        if (! checked.success) {
-          throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
-        }
-        return checked.data
-      } finally {
-        whisperBytes.fill(0)
-      }
-    })
+    return await outcomeOf(() => this.extractWhisper())
   }
 }
 // --

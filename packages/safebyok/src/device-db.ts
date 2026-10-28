@@ -3,7 +3,7 @@ import { DeviceRecord, DeviceRecordFormat, LeaseRecord } from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
 import * as Scopepath from './scopepath'
-import { VaultError } from './errors'
+import { VaultError, isVaultError } from './errors'
 import { type Outcome, outcomeOf } from './outcome'
 import { isStorageBlocked } from './refusals'
 import { consistent } from './checks/validator'
@@ -15,18 +15,23 @@ import { consistent } from './checks/validator'
  * *Your own storage adapter* shows a third, and `describeDeviceDB` (from `safebyok/testing`) checks
  * one.
  *
- * The public verbs are the base class's; never override them. Each resolves an {@link Outcome} and
+ * The public verbs are the base class's; never override them. Each is a try pair: `getLease`
+ * resolves its answer or throws, and `tryGetLease` resolves the same as an {@link Outcome} and
  * never rejects. Each but `delAll` refuses 'bad_scope' for a scope whose names fail their checks
- * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A VaultError
- * your code throws passes as it came; anything else becomes 'storage_blocked' where
- * {@link isStorageBlocked} names it, else 'storage_unavailable', that throw its `cause`, naming no
- * scope and quoting no record. A record read back that fails its check reads as null, and is
- * discarded through `doDelUnreadable`.
+ * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A record read
+ * back that fails its check reads as null, and is discarded through `doDelUnreadable`.
+ *
+ * A VaultError your code throws passes as it came, from either form; anything else it throws
+ * becomes 'storage_blocked' where {@link isStorageBlocked} names it, else 'storage_unavailable',
+ * that throw its `cause`, naming no scope and quoting no record. A throw from the base class's own
+ * code that is no VaultError is a bug, which a `try` form resolves as 'unexpected_error' and a
+ * throwing form throws as it came.
  *
  * **Calls land in the order they were made.** Each verb calls its `do*` method before it awaits
  * anything, so a store that starts each call's work in the order it is called keeps one scope's
- * calls in the order the vault made them, awaited or not: a lock's `delLease`, made after a grant's
- * `putLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnreadable` each say what else they owe.
+ * calls in the order the vault made them, awaited or not: a lock's `tryDelLease`, made after a
+ * grant's `tryPutLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnreadable` each say what
+ * else they owe.
  *
  * @example
  *   class SecureStoreDeviceDB extends DeviceDB {
@@ -35,81 +40,118 @@ import { consistent } from './checks/validator'
  *   }
  */
 export abstract class DeviceDB {
-  // == [Lease verbs]: getLease, putLease, delLease
+  // == [Lease verbs]: getLease, putLease, delLease, their try forms
 
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.read`, which checks it and holds it closed; the vault judges whether it still fits.
+  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryRead`, which checks it and holds it closed; the vault judges whether it still fits.
    *
-   * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+   * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
-  getLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
-    return deviceOutcomeOf('getLease', async () => {
-      const leaseScopepath = Scopepath.lease(scope)
-      const raw = await this.doGetLease(leaseScopepath)
-      return await this.#readableOf(LeaseRecord, leaseScopepath, raw)
-    })
+  async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
+    const leaseScopepath = Scopepath.lease(scope)
+    const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
+    return await this.#readableOf('getLease', LeaseRecord, leaseScopepath, raw)
+  }
+
+  /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
+   *
+   * @example await deviceDB.tryGetLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+   */
+  tryGetLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
+    return outcomeOf(() => this.getLease(scope))
   }
 
   /** Store `record` as the lease of its vault, in place of any before, resolving the record as stored. */
-  putLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>> {
-    return deviceOutcomeOf('putLease', async () => {
-      await this.doPutLease(Scopepath.lease(record), record)
-      return record
-    })
+  async putLease(record: LeaseRecord): Promise<LeaseRecord> {
+    const leaseScopepath = Scopepath.lease(record)
+    await storeAnswer('putLease', () => this.doPutLease(leaseScopepath, record))
+    return record
+  }
+
+  /** The lease as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.putLease}. */
+  tryPutLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>> {
+    return outcomeOf(() => this.putLease(record))
   }
 
   /** Erase the lease of one vault. */
-  delLease(scope: VaultScope): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delLease', async () => { await this.doDelLease(Scopepath.lease(scope)) })
+  async delLease(scope: VaultScope): Promise<void> {
+    const leaseScopepath = Scopepath.lease(scope)
+    await storeAnswer('delLease', () => this.doDelLease(leaseScopepath))
+  }
+
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delLease}. */
+  tryDelLease(scope: VaultScope): Promise<Outcome<void>> {
+    return outcomeOf(() => this.delLease(scope))
   }
   // --
 
-  // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll
+  // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll, their try forms
 
   /** Read this device's record of one scope, or null for none. The bank judges what it says.
    *
-   * @example await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+   * @example await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
    */
-  getDeviceRecord(scope: VaultScope): Promise<Outcome<DeviceRecord | null>> {
-    return deviceOutcomeOf('getDeviceRecord', async () => {
-      const deviceScopepath = Scopepath.device(scope)
-      const raw = await this.doGetDeviceRecord(deviceScopepath)
-      return await this.#readableOf(DeviceRecord, deviceScopepath, raw)
-    })
+  async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
+    const deviceScopepath = Scopepath.device(scope)
+    const raw = await storeAnswer('getDeviceRecord', () => this.doGetDeviceRecord(deviceScopepath))
+    return await this.#readableOf('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
+  }
+
+  /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
+   *
+   * @example await deviceDB.tryGetDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+   */
+  tryGetDeviceRecord(scope: VaultScope): Promise<Outcome<DeviceRecord | null>> {
+    return outcomeOf(() => this.getDeviceRecord(scope))
   }
 
   /** Store `record` as this device's record of its scope, never lowering what is stored, resolving the record as stored.
    * The store keeps what {@link raisedDeviceRecord} makes of the stored record and `record`, in one
    * transaction, so a tab that saw less never lowers what another saw.
    */
-  raiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
-    return deviceOutcomeOf('raiseDeviceRecord', async () => {
-      let raised = record
-      await this.doRaiseDeviceRecord(Scopepath.device(record), (stored) => {
-        raised = raisedDeviceRecord(stored, record)
-        return raised
-      })
+  async raiseDeviceRecord(record: DeviceRecord): Promise<DeviceRecord> {
+    let raised = record
+    const deviceScopepath = Scopepath.device(record)
+    await storeAnswer('raiseDeviceRecord', () => this.doRaiseDeviceRecord(deviceScopepath, (stored) => {
+      raised = raisedDeviceRecord(stored, record)
       return raised
-    })
+    }))
+    return raised
+  }
+
+  /** The device record as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.raiseDeviceRecord}. */
+  tryRaiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
+    return outcomeOf(() => this.raiseDeviceRecord(record))
   }
 
   /** Erase this device's record of one scope. */
-  delDeviceRecord(scope: VaultScope): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delDeviceRecord', async () => { await this.doDelDeviceRecord(Scopepath.device(scope)) })
+  async delDeviceRecord(scope: VaultScope): Promise<void> {
+    const deviceScopepath = Scopepath.device(scope)
+    await storeAnswer('delDeviceRecord', () => this.doDelDeviceRecord(deviceScopepath))
+  }
+
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delDeviceRecord}. */
+  tryDelDeviceRecord(scope: VaultScope): Promise<Outcome<void>> {
+    return outcomeOf(() => this.delDeviceRecord(scope))
   }
 
   /** Erase every lease and device record this store keeps. */
-  delAll(): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delAll', async () => { await this.doDelAll() })
+  async delAll(): Promise<void> {
+    await storeAnswer('delAll', () => this.doDelAll())
   }
 
-  /** `raw`, a row read under `scopepath`, through `recordSchema`: the record, or null for none, or for one that fails, which it discards through `doDelUnreadable`. */
-  async #readableOf<RecordT>(recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delAll}. */
+  tryDelAll(): Promise<Outcome<void>> {
+    return outcomeOf(() => this.delAll())
+  }
+
+  /** `raw`, a row `verb` read under `scopepath`, through `recordSchema`: the record, or null for none, or for one that fails, which it discards through `doDelUnreadable`. */
+  async #readableOf<RecordT>(verb: DeviceVerb, recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
     if (raw === undefined || raw === null) { return null }
     const checked = recordSchema.safeParse(raw)
     if (checked.success) { return checked.data }
     // A record written since the read is newer than what was found, and stays: the store checks
     // the row again in the step that deletes it.
-    await this.doDelUnreadable(scopepath, (row) => recordSchema.safeParse(row).success)
+    await storeAnswer(verb, () => this.doDelUnreadable(scopepath, (row) => recordSchema.safeParse(row).success))
     return null
   }
   // --
@@ -144,16 +186,16 @@ export abstract class DeviceDB {
   // --
 }
 
-/** A verb of {@link DeviceDB}. */
-export type DeviceVerb = keyof DeviceDB
+/** A verb of {@link DeviceDB}, by its throwing form's name: `getLease`, whose `try` form is `tryGetLease`. */
+export type DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>
 
 /** A DeviceDB over a Map, which remembers nothing past the page: for tests, and wherever IndexedDB is missing or blocked.
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
- *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+ *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const memoryDeviceDB = (): DeviceDB => new MemoryDeviceDB()
 
@@ -236,7 +278,7 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
  * Read every device record through it, so a record misfiled under another scope, or malformed,
  * never reaches a way in.
  *
- * @example deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))   // the record, or null
+ * @example deviceRecordFor(scope, await deviceDB.getDeviceRecord(scope))          // the record, or null
  * @example deviceRecordFor(scope, { ...record, user_id: 'someone-else' })             // null
  */
 export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
@@ -245,12 +287,16 @@ export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecor
   return checked.data
 }
 
-// == [Device trouble]: deviceOutcomeOf, DeviceTroubleSaid, deviceTrouble
+// == [Device trouble]: storeAnswer, DeviceTroubleSaid, deviceTrouble
 
-/** The outcome of `body`, one verb of the device store: a VaultError it throws passes as it came, and anything else becomes the condition {@link deviceTrouble} makes of it. */
-const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => Promise<ValT>): Promise<Outcome<ValT>> => (
-  outcomeOf(body, (thrown) => deviceTrouble(verb, thrown))
-)
+/** Call the store's `hook`, one `do*` method of `verb`, resolving its answer: a VaultError it throws passes as it came, and anything else becomes the condition {@link deviceTrouble} makes of it. */
+const storeAnswer = async <AnswerT>(verb: DeviceVerb, hook: () => Promise<AnswerT>): Promise<AnswerT> => {
+  try {
+    return await hook()
+  } catch (err) {
+    throw isVaultError(err) ? err : deviceTrouble(verb, err)
+  }
+}
 
 /** For each device-store verb, what failed and what it leaves undone, and what the user may do instead of trying again, if anything. */
 const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }> = {

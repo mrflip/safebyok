@@ -60,7 +60,7 @@ describe("BankProvider", () => {
 
       const world = makeWorld()
       const refusal = unreachable()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(refusal))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(refusal))
       const reach = grabber()
       render(<BankProvider {...world.props} user_id="u1"><reach.Grab /></BankProvider>)
       await waitFor(() => { expect(reach.latest().err).to.eq(refusal) })
@@ -78,9 +78,9 @@ describe("BankProvider", () => {
       expect(bank.vaultOf({ vaultlabel: 'main' })).to.eq(vault)
       // The device has seen a later epoch than storage serves: a restore from an older copy.
       const scope = TH.scopeOf('u1')
-      const record = await TH.expectGood(world.deviceDB.getDeviceRecord(scope))
+      const record = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(scope))
       if (record === null) { throw new Error('the birth kept no device record') }
-      await TH.expectGood(world.deviceDB.raiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
+      await TH.expectGood(world.deviceDB.tryRaiseDeviceRecord({ ...record, highest_vault_epoch: 9 }))
       await act(async () => { await TH.expectRefusal(bank.reopenVault(vault), 'vault_behind') })
       await waitFor(() => { expect(grab.latest().err?.refusalkind).to.eq('vault_behind') })
       // useBank's example: the host, on the user's say, has this device accept what storage holds.

@@ -70,7 +70,7 @@ export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, pu
  * is that tradeoff, and `lock()` erases the lease at once.
  *
  * @example
- *   const record = valOf(await deviceDB.getLease(scope))   // null when this device holds none
+ *   const record = valOf(await deviceDB.tryGetLease(scope))   // null when this device holds none
  *   const lease = Lease.make(vault, record)                 // once it is not null
  *   lease.ask_passphrase_at               // when the vault asks again
  * @example JSON.stringify(lease)   // its format, scope, vault_tok, gate_epoch and ask_passphrase_at: no key material
@@ -141,31 +141,31 @@ export class Lease implements LeaseSparse {
    *
    * @example const { box_key_wrapped, whisper_ciphered } = await lease.cipheredWith(whisperBytes, visible)
    */
-  async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> { return valOf(await this.tryCipheredWith(serialized, visible)) }
+  async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> {
+    const bytes = serializedBytes.parse(serialized)
+    try {
+      const header = BoxSparse.parse(visible)
+      this.#demand()
+      const vaultKey = await this.#vaultKeyOrNull('wrapKey')
+      this.#demand()
+      if (vaultKey === null) { throw this.#dropDamaged() }
+      const sealing = await outcomeOf(async () => {
+        const boxKey = await makeBoxKey()
+        return {
+          box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped'))),
+          whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered'))),
+        }
+      })
+      this.#demand()
+      return valOf(sealing)
+    } finally {
+      bytes.fill(0)
+    }
+  }
 
   /** `serialized` ciphered and its boxKey wrapped, as an {@link Outcome}: the non-throwing form of {@link Lease.cipheredWith}. */
   async tryCipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<Outcome<BoxCiphered>> {
-    return await outcomeOf(async () => {
-      const bytes = serializedBytes.parse(serialized)
-      try {
-        const header = BoxSparse.parse(visible)
-        this.#demand()
-        const vaultKey = await this.#vaultKeyOrNull('wrapKey')
-        this.#demand()
-        if (vaultKey === null) { throw this.#dropDamaged() }
-        const sealing = await outcomeOf(async () => {
-          const boxKey = await makeBoxKey()
-          return {
-            box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped'))),
-            whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered'))),
-          }
-        })
-        this.#demand()
-        return valOf(sealing)
-      } finally {
-        bytes.fill(0)
-      }
-    })
+    return await outcomeOf(() => this.cipheredWith(serialized, visible))
   }
 
   /** The bytes `ciphered` holds, its boxKey unwrapped under the vaultKey, both bound to `visible`: the inverse of {@link Lease.cipheredWith}.
@@ -175,48 +175,48 @@ export class Lease implements LeaseSparse {
    *
    * @example const whisperBytes = await lease.decipherWith(ciphered, visible)
    */
-  async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> { return valOf(await this.tryDecipherWith(ciphered, visible)) }
+  async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> {
+    const sealed = CipheredShape.parse(ciphered)
+    const header = BoxSparse.parse(visible)
+    this.#demand()
+    const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
+    this.#demand()
+    if (vaultKey === null) { throw this.#dropDamaged() }
+    // WebCrypto's own refusal says nothing a caller can act on: a box that will not open is damaged.
+    const opened = await outcomeOf(async () => {
+      const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, this.#boxCtxOf(header, 'box_key_wrapped'), BoxKeyUsage)
+      return await decipherBytes(boxKey, sealed.whisper_ciphered, this.#boxCtxOf(header, 'whisper_ciphered'))
+    }, damagedBox)
+    try {
+      this.#demand()
+    } catch (err) {
+      if (opened.ok) { opened.val.fill(0) }
+      throw err
+    }
+    return valOf(opened)
+  }
 
   /** The bytes `ciphered` holds, as an {@link Outcome}: the non-throwing form of {@link Lease.decipherWith}. */
   async tryDecipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Outcome<Uint8Array>> {
-    return await outcomeOf(async () => {
-      const sealed = CipheredShape.parse(ciphered)
-      const header = BoxSparse.parse(visible)
-      this.#demand()
-      const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
-      this.#demand()
-      if (vaultKey === null) { throw this.#dropDamaged() }
-      // WebCrypto's own refusal says nothing a caller can act on: a box that will not open is damaged.
-      const opened = await outcomeOf(async () => {
-        const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, this.#boxCtxOf(header, 'box_key_wrapped'), BoxKeyUsage)
-        return await decipherBytes(boxKey, sealed.whisper_ciphered, this.#boxCtxOf(header, 'whisper_ciphered'))
-      }, damagedBox)
-      try {
-        this.#demand()
-      } catch (err) {
-        if (opened.ok) { opened.val.fill(0) }
-        throw err
-      }
-      return valOf(opened)
-    })
+    return await outcomeOf(() => this.decipherWith(ciphered, visible))
   }
 
   /** A box record: `visible`, beside the two ciphered fields {@link Lease.cipheredWith} makes of `props.whisper`. It refuses as `cipheredWith` does.
    *
    * @example const record = await lease.sealProps(visible, { whisper: whisperBytes })
    */
-  async sealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<BoxRecord> { return valOf(await this.trySealProps(visible, props)) }
+  async sealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<BoxRecord> {
+    const { whisper } = LeaseSealProps.parse(props)
+    const header = BoxSparse.parse(visible)
+    const ciphered = await this.tryCipheredWith(whisper, header)
+    // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+    this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
+    return { ...header, ...valOf(ciphered) }
+  }
 
   /** The record `visible` makes with its whisper sealed, as an {@link Outcome}: the non-throwing form of {@link Lease.sealProps}. */
   async trySealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<Outcome<BoxRecord>> {
-    return await outcomeOf(async () => {
-      const { whisper } = LeaseSealProps.parse(props)
-      const header = BoxSparse.parse(visible)
-      const ciphered = await this.tryCipheredWith(whisper, header)
-      // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
-      this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
-      return { ...header, ...valOf(ciphered) }
-    })
+    return await outcomeOf(() => this.sealProps(visible, props))
   }
 
   /** Demand, lease-bound, that this lease is consistent with its vault. Ask it before and after each wait. */
@@ -245,12 +245,12 @@ export class Lease implements LeaseSparse {
   }
 }
 
-/** A lease as this device's store kept it, read but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.read} hands the bank's birth read and the vault's refresh and pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
+/** A lease as this device's store kept it, read but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.tryRead} hands the bank's birth read and the vault's refresh and pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
  * Its own fields are its {@link LeaseSparse}, which a revocation check compares; the leaseKey and
  * the wrap stay inside, for the Lease that {@link KeptLease.leaseOn} makes once a Vault object takes
  * it up. Frozen, and shown in a spread, JSON or a log line by its sparse fields alone.
  *
- * @example const kept = valOf(await KeptLease.read(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
+ * @example const kept = valOf(await KeptLease.tryRead(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
  * @example const lease = kept.leaseOn(vault)   // Lease.make, of the record kept inside
  */
 export class KeptLease implements LeaseSparse {
@@ -284,7 +284,7 @@ export class KeptLease implements LeaseSparse {
     Object.freeze(this)
   }
 
-  /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.getLease`, its answer checked as a {@link LeaseRecord} of `scope`.
+  /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.tryGetLease`, its answer checked as a {@link LeaseRecord} of `scope`.
    * What the store hands back that is no lease of this scope reads as none, left where it lies:
    * another vault's, or a host store's mistake, which the next grant writes over. A read about to
    * take the lease up passes `told`, and its logger is warned once under `told.call`, quoting
@@ -292,11 +292,11 @@ export class KeptLease implements LeaseSparse {
    * stands beside it, passes none and says nothing. The store's own refusal comes through as the
    * outcome.
    *
-   * @example const kept = valOf(await KeptLease.read(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
-   * @example const beside = valOf(await KeptLease.read(deviceDB, scope))   // the refresh's look, told to no one
+   * @example const kept = valOf(await KeptLease.tryRead(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
+   * @example const beside = valOf(await KeptLease.tryRead(deviceDB, scope))   // the refresh's look, told to no one
    */
-  static async read(deviceDB: Pick<DeviceDB, 'getLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
-    const kept = await deviceDB.getLease(scope)
+  static async tryRead(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
+    const kept = await deviceDB.tryGetLease(scope)
     if (! kept.ok) { return kept }
     if (kept.val === null) { return good(null) }
     const checked = LeaseRecord.safeParse(kept.val)

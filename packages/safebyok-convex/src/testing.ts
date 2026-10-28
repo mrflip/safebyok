@@ -1,4 +1,5 @@
 import { ConvexClient } from 'convex/browser'
+import type { ConvexClientOptions } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
@@ -22,6 +23,14 @@ import type { JSONValue, Value } from 'convex/values'
  *   `signOut()` signs every one out.
  * * There is no reconnecting, no ping, no chunked transition, and no action.
  *
+ * Its clients log nowhere unless told to. A real client prints each mutation a function refuses
+ * on the console, and a test that provokes a refusal on purpose would print it every run; pass
+ * `logger` to hear what the clients say instead, or `true` for the console as a client has it.
+ *
+ * @param host - The host app to run: its `api` and a backend that runs its functions.
+ * @param opts - `logger`: `false` (the default), `true`, or an object with `log`, `warn` and `error`
+ *   functions (a `logVerbose` too, if you want the client's verbose lines) that every client made
+ *   here is given. A logger typed for `safebyok`'s `VaultLogger` fits.
  * @returns The deployment: connect clients to it, and `close()` it after the test.
  *
  * @example
@@ -36,8 +45,25 @@ import type { JSONValue, Value } from 'convex/values'
  *   const deployment = fakeDeployment(host)
  *   const reactClient = deployment.connectWith('u1', (address, opts) => new ConvexReactClient(address, opts))
  *   await reactClient.mutation(deployment.api.safebyok.ensureVault, { draft })
+ *
+ * @example
+ *   const heard = spyLogger()
+ *   const deployment = fakeDeployment(host, { logger: heard.logger })
+ *   await deployment.client(null).mutation(deployment.api.safebyok.ensureVault, { draft }).catch(() => undefined)
+ *   heard.calls.map((call) => call.level)   // => ['error']: the refusal the client would have printed
  */
-export const fakeDeployment = <Host extends FakeHost>(host: Host): FakeDeployment<Host> => new FakeDeployment(host)
+export const fakeDeployment = <Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> => new FakeDeployment(host, opts)
+
+/** What the clients of a {@link FakeDeployment} are given for `logger`: what they log, and where. */
+export type FakeClientLogger = Pick<ConvexLogger, 'log' | 'warn' | 'error'> & Partial<Pick<ConvexLogger, 'logVerbose'>>
+
+/** The options of {@link fakeDeployment}. */
+export type FakeDeploymentOpts = {
+  /** `false` to log nowhere (the default), `true` for the console, or a logger to hear each client's lines. */
+  logger?: boolean | FakeClientLogger
+}
+
+type ConvexLogger = Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>
 
 /** What {@link fakeDeployment} needs of a host: its `api`, and a backend that runs its functions. */
 export type FakeHost = {
@@ -52,8 +78,10 @@ export type FakeBackend = {
   withIdentity: (identity: { subject: string }) => FakeBackend
 }
 
-/** What a Convex client's constructor is given: the address, and the options that plug it into the fake. */
-export type FakeClientOpts = { webSocketConstructor: typeof WebSocket, unsavedChangesWarning: false }
+/** What a Convex client's constructor is given: the address, and the options that plug it into the fake, its `logger` the deployment's.
+ * Hand them on as they come, `new ConvexReactClient(address, opts)`, and the client logs as the deployment was told.
+ */
+export type FakeClientOpts = { webSocketConstructor: typeof WebSocket, unsavedChangesWarning: false, logger: boolean | ConvexLogger }
 
 /** The fake deployment's handle on one connected socket: the user it is signed in as, its watches. */
 type Session = {
@@ -74,6 +102,16 @@ type QueryModification =
   | { type: 'QueryFailed', queryId: number, errorMessage: string, errorData?: JSONValue, logLines: string[], journal: null }
   | { type: 'QueryRemoved', queryId: number }
 
+// A client wants all four calls of a logger. Each given one is bound to its logger, so a logger built as a class keeps its `this`; verbose lines go nowhere unless it has them.
+const loggerFor = (logger: boolean | FakeClientLogger): boolean | ConvexLogger => (
+  typeof logger === 'boolean' ? logger : {
+    log:        logger.log.bind(logger),
+    warn:       logger.warn.bind(logger),
+    error:      logger.error.bind(logger),
+    logVerbose: logger.logVerbose?.bind(logger) ?? (() => undefined),
+  }
+)
+
 // Any address will do: no socket ever reaches it.
 const FakeAddress = 'https://fake-deployment-123.convex.cloud'
 
@@ -84,12 +122,14 @@ export class FakeDeployment<Host extends FakeHost> {
   private readonly backend: FakeBackend
   private readonly sessions = new Map<FakeSocket, Session>()
   private readonly clients: { close(): Promise<void> }[] = []
+  private readonly logger: boolean | ConvexLogger
   private ts = 1
   private work: Promise<void> = Promise.resolve()
 
-  constructor(host: Host) {
+  constructor(host: Host, opts: FakeDeploymentOpts) {
     this.api = host.api
     this.backend = host.createTest()
+    this.logger = loggerFor(opts.logger ?? false)
   }
 
   /** A real `ConvexClient` on this deployment, signed in as `subject`, or as no one. */
@@ -102,7 +142,7 @@ export class FakeDeployment<Host extends FakeHost> {
    * connects, without this module importing React.
    */
   connectWith<Client extends { close: () => Promise<void> }>(subject: string | null, make: (address: string, opts: FakeClientOpts) => Client): Client {
-    const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false })
+    const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false, logger: this.logger })
     this.clients.push(client)
     return client
   }

@@ -71,8 +71,8 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
-    const gate = TH.holdNextAnswer(world.vaultDB, 'putVaultRecord')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
+    const gate = TH.holdNextAnswer(world.vaultDB, 'tryPutVaultRecord')
     const changing = TH.putWayin(vault, 'old passphrase', 'new passphrase')
     await gate.reached
     await vault.lock()
@@ -172,9 +172,9 @@ describe("a read in flight when a lock lands", () => {
       const vault = await world.openUnlocked('pw one')
       await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
-      const getBox = world.vaultDB.getBox.bind(world.vaultDB)
+      const getBox = world.vaultDB.tryGetBox.bind(world.vaultDB)
       // Storage answers with the box, but only once the vault is gone and this handle has heard.
-      vi.spyOn(world.vaultDB, 'getBox').mockImplementationOnce(async (...args) => {
+      vi.spyOn(world.vaultDB, 'tryGetBox').mockImplementationOnce(async (...args) => {
         const answer = await getBox(...args)
         await TH.del(there, 'pw one')
         await TH.wakeupAtNextTick()
@@ -216,7 +216,7 @@ const raceLostToPwOne = async () => {
   const deafDB = world.deafVaultDB()
   const there = await world.open({ vaultDB: deafDB })
   const here = await world.open({ deviceDB: memoryDeviceDB() })
-  TH.beforeNextCall(deafDB, 'putVaultRecord', async () => {
+  TH.beforeNextCall(deafDB, 'tryPutVaultRecord', async () => {
     await TH.unlock(here, 'pw one')
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
   })
@@ -226,7 +226,7 @@ const raceLostToPwOne = async () => {
 describe("a vault another device made gateless, which sets no passphrase", () => {
   it("is born novel: gateless vault record holds no way in to try", async () => {
     const world = makeWorld()
-    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1'))
+    await TH.expectingGood(world.vaultDB).tryEnsureVault(TH.gatelessOf('u1'))
     const vault = await world.open()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     expect(vault.getSnapshot()).to.deep.include({ vault_tok: TH.gatelessOf('u1').vault_tok })
@@ -234,7 +234,7 @@ describe("a vault another device made gateless, which sets no passphrase", () =>
 
   it("takes a first unlock's passphrase as its gate: the vault the other device ensured is born here, and gated under its vault_tok, and unlocked", async () => {
     const world = makeWorld()
-    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-ensured-elsewhere' }))
+    await TH.expectingGood(world.vaultDB).tryEnsureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-ensured-elsewhere' }))
     const vault = await world.open()
     await TH.unlock(vault, 'pw one')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
@@ -288,7 +288,7 @@ describe("a first unlock that loses the race to create the vault", () => {
     const deafDB = world.deafVaultDB()
     const there = await world.open({ vaultDB: deafDB })
     const here = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'putVaultRecord', async () => { await TH.unlock(here, 'pw one') })
+    TH.beforeNextCall(deafDB, 'tryPutVaultRecord', async () => { await TH.unlock(here, 'pw one') })
     await TH.expectRefusal(TH.unlock(there, 'pw two'), 'gate_made_elsewhere')
     expect(TH.stateOf(there.getSnapshot())).to.eq('novel')
     expect(storedVaultRecordOf(world)).to.deep.include({ vault_tok: there.vault_tok, gate_epoch: 1 })
@@ -302,7 +302,7 @@ describe("a first unlock that loses the race to create the vault", () => {
     const deafDB = world.deafVaultDB()
     const there = await world.open({ vaultDB: deafDB })
     const here = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'putVaultRecord', async () => {
+    TH.beforeNextCall(deafDB, 'tryPutVaultRecord', async () => {
       await TH.unlock(here, 'pw one')
       await there.hello({ staleMinutes: 0 })
     })
@@ -516,7 +516,7 @@ const gatingWorld = async () => {
   const world = makeWorld()
   const deafDB = world.deafVaultDB()
   const vault = await world.open({ vaultDB: deafDB })
-  const noting = TH.holdNextAnswer(deafDB, 'putVaultRecord')
+  const noting = TH.holdNextAnswer(deafDB, 'tryPutVaultRecord')
   return { world, vault, noting }
 }
 
@@ -542,8 +542,8 @@ describe("a read that began before this device's own change to the ways in lande
     let reading: Promise<Vault> | undefined
     // The read starts as the change is about to write, and is held at its listing, the vault record
     // it read the older copy, while the change lands.
-    TH.beforeNextCall(deaf, 'putVaultRecord', async () => {
-      listing = TH.holdNextCall(deaf, 'getVault')
+    TH.beforeNextCall(deaf, 'tryPutVaultRecord', async () => {
+      listing = TH.holdNextCall(deaf, 'tryGetVault')
       reading = vault.hello({ staleMinutes: 0 })
       await listing.reached
     })
@@ -564,7 +564,7 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
   it("deleted: the Vault object is gone, as the read found it, the change refuses vault_gone, and nothing is unlocked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    const landed = TH.holdNextAnswer(world.vaultDB, 'putVaultRecord')
+    const landed = TH.holdNextAnswer(world.vaultDB, 'tryPutVaultRecord')
     const changing = TH.putWayin(vault, 'pw one', 'pw two')
     await landed.reached
     const there = await world.open({ deviceDB: memoryDeviceDB() })
@@ -583,7 +583,7 @@ describe("a change to the ways in whose vault moves elsewhere as the change land
     // Deaf, so the deletion is not heard before the remake.
     const deafDB = world.deafVaultDB()
     const vault = await world.openUnlocked('pw one', { vaultDB: deafDB })
-    const landed = TH.holdNextAnswer(deafDB, 'putVaultRecord')
+    const landed = TH.holdNextAnswer(deafDB, 'tryPutVaultRecord')
     const changing = TH.putWayin(vault, 'pw one', 'pw two')
     await landed.reached
     const there = await world.open({ deviceDB: memoryDeviceDB() })
@@ -662,10 +662,10 @@ describe("letting a Vault object go", () => {
   it("leaves a lease and the device record as they stood", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const recordBefore = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    const recordBefore = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     TH.closeVault(vault)
     expect(await world.getLease()).to.not.be.null
-    expect(await TH.expectingGood(world.deviceDB).getDeviceRecord(TH.scopeOf('u1'))).to.deep.equal(recordBefore)
+    expect(await TH.expectingGood(world.deviceDB).tryGetDeviceRecord(TH.scopeOf('u1'))).to.deep.equal(recordBefore)
   })
 
   it("a second let-go does nothing: the storage watch is ended once", async () => {
@@ -725,7 +725,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
   it("getWhisper() of a box the reborn vault wrote refuses as vault_gone at once, never damaged_box, reading no vault record; the Vault object is gone with it, and the next hello refuses vault_gone, reading nothing", async () => {
     const { vaultOne, deafDB } = await rebornWorld()
     expect(TH.stateOf(vaultOne.getSnapshot())).to.eq('unlocked')
-    const getVaultRecord = vi.spyOn(deafDB, 'getVault')
+    const getVaultRecord = vi.spyOn(deafDB, 'tryGetVault')
     const err = await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'vault_gone')
     expect(err.message).to.include('bank.ensureVault')
     expect(err.cause).to.have.property('refusalkind', 'vault_mismatch')
@@ -744,7 +744,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const wrapped = row['whisper_ciphered'] as { cipher_iv_b64: string, ciphertext_b64: string }
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, whisper_ciphered: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }))
     await TH.wakeupAtNextTick()
-    const getVaultRecord = vi.spyOn(world.vaultDB, 'getVault')
+    const getVaultRecord = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(getVaultRecord).not.toHaveBeenCalled()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
@@ -759,7 +759,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    const getVaultRecord = vi.spyOn(deafDB, 'getVault').mockResolvedValue(bad(down))
+    const getVaultRecord = vi.spyOn(deafDB, 'tryGetVault').mockResolvedValue(bad(down))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(getVaultRecord).not.toHaveBeenCalled()
     expect(vault.getSnapshot().freshness).to.eq('timely')
@@ -781,7 +781,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
 
   it("del() reads first, finds the vault made anew, and refuses vault_remade, deleting nothing: the reborn vault survives, and the bank's next Vault object deletes it", async () => {
     const { world, vaultOne, vaultTwo } = await rebornWorld()
-    const delVault = vi.spyOn(world.vaultDB, 'delVault')
+    const delVault = vi.spyOn(world.vaultDB, 'tryDelVault')
     await TH.expectRefusal(TH.del(vaultOne, 'pw one'), 'vault_remade')
     expect(delVault).not.toHaveBeenCalled()
     expect(await vaultTwo.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
@@ -796,9 +796,9 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const world = makeWorld()
     const vaultOne = await world.openUnlocked('pw one')
     const vaultTwo = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
-    const delVault = vi.spyOn(world.vaultDB, 'delVault')
+    const delVault = vi.spyOn(world.vaultDB, 'tryDelVault')
     let reborn: Vault | null = null
-    TH.beforeNextCall(world.vaultDB, 'delVault', async () => {
+    TH.beforeNextCall(world.vaultDB, 'tryDelVault', async () => {
       await TH.del(vaultTwo, 'pw one')
       // Let vaultOne's background refresh, rung by the deletion, find the vault deleted.
       await TH.wakeupAtNextTick()
@@ -848,7 +848,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const vaultOne = await world.openUnlocked('pw one', { vaultDB: deafDB })
     const vaultTwo = await world.open()
     await TH.del(vaultTwo, 'pw one')
-    const delVault = vi.spyOn(deafDB, 'delVault')
+    const delVault = vi.spyOn(deafDB, 'tryDelVault')
     await TH.expectRefusal(TH.del(vaultOne, 'pw one'), 'vault_gone')
     expect(delVault).not.toHaveBeenCalled()
     await TH.expectRefusal(vaultOne.hello({ staleMinutes: 0 }), 'vault_gone')
@@ -930,9 +930,9 @@ describe("versioned updates: two devices writing at once", () => {
     const here = await world.openUnlocked('shared pw', { vaultDB: hereDB })
     const there = await world.openUnlocked('shared pw', { deviceDB: memoryDeviceDB() })
     await here.putBox({ boxlabel: 'anthropic', sidecar: { note: 'first' } }, 'sk-ant-fake-one')
-    TH.beforeNextCall(hereDB, 'putBox', () => there.putBox({ boxlabel: 'anthropic', sidecar: { note: 'theirs' } }, 'sk-ant-fake-theirs'))
-    const putBox = vi.spyOn(hereDB, 'putBox')
-    const reads = vi.spyOn(hereDB, 'getVault')
+    TH.beforeNextCall(hereDB, 'tryPutBox', () => there.putBox({ boxlabel: 'anthropic', sidecar: { note: 'theirs' } }, 'sk-ant-fake-theirs'))
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
+    const reads = vi.spyOn(hereDB, 'tryGetVault')
     const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(err.message).to.match(/^That box changed in storage since this call read it -- another call, here or on another device, wrote or removed it -- so this write was refused and nothing was written\./)
     // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
@@ -953,7 +953,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a store refused as stale carries storage's word on what won as meta.box_stored: the box, whole, as storage holds it", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     beforeNextWrite('putBox', () => there.putBox({ boxlabel: 'anthropic', sidecar: { note: 'theirs' } }, 'sk-ant-fake-theirs'))
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
@@ -962,7 +962,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a store whose box storage refuses as invalid_box is refused as storage said it, listing nothing: from a vault, which sealed the box, it is a bug", async () => {
     const { hereDB, here } = await twoDeviceWorld()
     const refused = new VaultError('invalid_box', 'Nothing was written: that box is not one this package builds.')
-    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(refused))
+    vi.spyOn(hereDB, 'tryPutBox').mockResolvedValueOnce(bad(refused))
     const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'invalid_box')
     expect(err).to.eq(refused)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
@@ -970,7 +970,7 @@ describe("versioned updates: two devices writing at once", () => {
 
   it("a store whose box storage refuses as vault_mismatch is refused as stale_write, never as storage's own word", async () => {
     const { hereDB, here } = await twoDeviceWorld()
-    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(new VaultError('vault_mismatch', 'The vault changed.')))
+    vi.spyOn(hereDB, 'tryPutBox').mockResolvedValueOnce(bad(new VaultError('vault_mismatch', 'The vault changed.')))
     const err = await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(err.message).to.match(/^The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written\./)
     expect(err.cause).to.have.property('refusalkind', 'vault_mismatch')
@@ -981,7 +981,7 @@ describe("versioned updates: two devices writing at once", () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     beforeNextWrite('putBox', () => there.delBox('anthropic'))
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
@@ -992,7 +992,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a store of a box that did not exist, and is created meanwhile elsewhere, is refused as stale: theirs is kept", async () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     beforeNextWrite('putBox', () => there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs'))
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(boxlabelsOf(here)).to.deep.equal(['anthropic'])
@@ -1010,8 +1010,8 @@ describe("versioned updates: two devices writing at once", () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
     })
-    const delBox = vi.spyOn(hereDB, 'delBox')
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const delBox = vi.spyOn(hereDB, 'tryDelBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(delBox).not.toHaveBeenCalled()
     expect(putBox).toHaveBeenCalledTimes(1)
@@ -1025,8 +1025,8 @@ describe("versioned updates: two devices writing at once", () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
-    const getVault = hereDB.getVault.bind(hereDB)
-    const listBoxes = vi.spyOn(hereDB, 'getVault').mockImplementation(async (...args) => {
+    const getVault = hereDB.tryGetVault.bind(hereDB)
+    const listBoxes = vi.spyOn(hereDB, 'tryGetVault').mockImplementation(async (...args) => {
       const read = valOf(await getVault(...args))
       return good(read === null ? null : { ...read, boxes: [], damagedBoxes: [] })
     })
@@ -1036,8 +1036,8 @@ describe("versioned updates: two devices writing at once", () => {
     expect(here.getSnapshot().damagedBoxes).to.have.lengthOf(0)
     listBoxes.mockRestore()
     const damagedRevision = storedRowOf(world, 'anthropic')['revision_tok']
-    const delBox = vi.spyOn(hereDB, 'delBox')
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const delBox = vi.spyOn(hereDB, 'tryDelBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(putBox.mock.calls[0]?.[1].revision_tok).to.be.null
@@ -1051,7 +1051,7 @@ describe("versioned updates: two devices writing at once", () => {
 
   it("a deletion refused as stale is thrown at once, never tried again, saying the vault it was in was deleted", async () => {
     const { hereDB, here, there } = await rebornUnheard()
-    const delBox = vi.spyOn(hereDB, 'delBox')
+    const delBox = vi.spyOn(hereDB, 'tryDelBox')
     const err = await TH.expectRefusal(here.delBox('anthropic'), 'stale_write')
     expect(err.message).to.match(/^The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused/)
     // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
@@ -1066,7 +1066,7 @@ describe("versioned updates: two devices writing at once", () => {
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-old')
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.del(there, 'pw one')
-    const getBox = vi.spyOn(world.vaultDB, 'getBox')
+    const getBox = vi.spyOn(world.vaultDB, 'tryGetBox')
     const err = await TH.expectRefusal(here.delBox('anthropic'), 'stale_write')
     expect(err.message).to.match(/it was deleted, or deleted and made anew, elsewhere/)
     expect(getBox).not.toHaveBeenCalled()
@@ -1075,8 +1075,8 @@ describe("versioned updates: two devices writing at once", () => {
   it("a deletion of a box another device deleted first is absent_box, as storage answers it, reading no box beforehand", async () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
-    TH.beforeNextCall(hereDB, 'delBox', async () => { await there.delBox('anthropic') })
-    const getBox = vi.spyOn(hereDB, 'getBox')
+    TH.beforeNextCall(hereDB, 'tryDelBox', async () => { await there.delBox('anthropic') })
+    const getBox = vi.spyOn(hereDB, 'tryGetBox')
     await TH.expectRefusal(here.delBox('anthropic'), 'absent_box')
     expect(getBox).not.toHaveBeenCalled()
     expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
@@ -1086,7 +1086,7 @@ describe("versioned updates: two devices writing at once", () => {
     const { world, hereDB, here } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     const shown = here.getSnapshot().boxes[0]?.revision_tok
-    const delBox = vi.spyOn(hereDB, 'delBox')
+    const delBox = vi.spyOn(hereDB, 'tryDelBox')
     await here.delBox('anthropic')
     expect(delBox.mock.calls[0]?.[2]).to.deep.equal({ vault_tok: storedVaultRecordOf(world)['vault_tok'], revision_tok: shown })
     expect(world.logged.filter((heard) => heard.story?.['call'] === 'delBox')).to.have.lengthOf(0)
@@ -1097,7 +1097,7 @@ describe("versioned updates: two devices writing at once", () => {
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
     const shown = String(here.getSnapshot().boxes[0]?.revision_tok)
     const theirs = { revisionTok: '' }
-    TH.beforeNextCall(hereDB, 'delBox', async () => {
+    TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
     })
@@ -1122,7 +1122,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     expect(there.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     const theirs = { revisionTok: '' }
-    TH.beforeNextCall(hereDB, 'delBox', async () => {
+    TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       // A store over a box damaged beyond naming is refused, so theirs deletes it first.
       await there.delBox('anthropic')
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
@@ -1150,11 +1150,11 @@ describe("versioned updates: two devices writing at once", () => {
     expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: damagedRevision, damage: 'damaged' }])
     expect(there.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: damagedRevision, damage: 'damaged' }])
     const theirs = { revisionTok: '' }
-    TH.beforeNextCall(hereDB, 'delBox', async () => {
+    TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
     })
-    const delBox = vi.spyOn(hereDB, 'delBox')
+    const delBox = vi.spyOn(hereDB, 'tryDelBox')
     await here.delBox('anthropic')
     expect(delBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: damagedRevision })
     expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
@@ -1185,7 +1185,7 @@ describe("the races the contract tests own, of a box write", () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic', sidecar: { note: 'mine' } }, 'sk-ant-fake-one')
     beforeNextWrite('putBox', () => there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs'))
-    const putBox = vi.spyOn(hereDB, 'putBox')
+    const putBox = vi.spyOn(hereDB, 'tryPutBox')
     await TH.expectRefusal(here.putBox({ boxlabel: 'anthropic', sidecar: { note: 'renamed' } }), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(await there.getWhisper('anthropic')).to.eq('sk-ant-fake-theirs')
@@ -1194,7 +1194,7 @@ describe("the races the contract tests own, of a box write", () => {
 
   it("a renewal landing while a box write is in flight lets the write succeed, the listing taking the box", async () => {
     const { world, hereDB, here } = await twoDeviceWorld()
-    const writing = TH.holdNextCall(hereDB, 'putBox')
+    const writing = TH.holdNextCall(hereDB, 'tryPutBox')
     const putting = here.putBox({ boxlabel: 'anthropic', sidecar: {} }, 'sk-ant-fake')
     await writing.reached
     world.advance(60_000)
@@ -1208,7 +1208,7 @@ describe("the races the contract tests own, of a box write", () => {
 
   it("a passkey added on this device while a box write is in flight lets the write succeed, the box stamped with the new ways in", async () => {
     const { hereDB, here } = await twoDeviceWorld()
-    const writing = TH.holdNextCall(hereDB, 'putBox')
+    const writing = TH.holdNextCall(hereDB, 'tryPutBox')
     const putting = here.putBox({ boxlabel: 'anthropic', sidecar: {} }, 'sk-ant-fake')
     await writing.reached
     await TH.putWayin(here, 'shared pw', await TH.passkeyOf('laptop'))
@@ -1224,9 +1224,9 @@ describe("refreshes, one at a time", () => {
   it("joins refreshes asked for while one runs: three rings at once cost one read, never two beside each other", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const getVault = world.vaultDB.getVault.bind(world.vaultDB)
+    const getVault = world.vaultDB.tryGetVault.bind(world.vaultDB)
     const tally = { inFlight: 0, most: 0 }
-    const reads = vi.spyOn(world.vaultDB, 'getVault').mockImplementation(async (...args) => {
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault').mockImplementation(async (...args) => {
       tally.inFlight += 1
       tally.most = Math.max(tally.most, tally.inFlight)
       try {
@@ -1276,7 +1276,7 @@ describe("the races the contract tests own, of a gate change", () => {
     const vault = await world.openUnlocked('pw')
     const there = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
     await TH.unlock(there, 'pw')
-    const writing = TH.holdNextCall(world.vaultDB, 'putVaultRecord')
+    const writing = TH.holdNextCall(world.vaultDB, 'tryPutVaultRecord')
     const changing = TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     await writing.reached
     await TH.putWayin(there, 'pw', 'pw theirs')
@@ -1295,7 +1295,7 @@ describe("the races the contract tests own, of a gate change", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(there, 'pw')
-    const writing = TH.holdNextCall(deafDB, 'putVaultRecord')
+    const writing = TH.holdNextCall(deafDB, 'tryPutVaultRecord')
     const changing = TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     await writing.reached
     await TH.putWayin(there, 'pw', 'pw theirs')
@@ -1310,7 +1310,7 @@ describe("the races the contract tests own, of a gate change", () => {
     const vault = await world.openUnlocked('pw')
     const there = await world.open({ deviceDB: memoryDeviceDB(), vaultDB: world.deafVaultDB() })
     await TH.unlock(there, 'pw')
-    const putVaultRecord = vi.spyOn(world.vaultDB, 'putVaultRecord')
+    const putVaultRecord = vi.spyOn(world.vaultDB, 'tryPutVaultRecord')
     const deriving = world.holdNextDerive()
     const changing = TH.putWayin(vault, 'pw', await TH.passkeyOf('laptop'))
     await deriving.reached

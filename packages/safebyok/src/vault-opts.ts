@@ -6,12 +6,12 @@ import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLa
 import { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, loggerShape, parseLogger } from './logger'
+import * as Sanitizer from './sanitizer'
 import { type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from './passphrase-strength'
 import * as CX from './shapes/scopes'
 import type { Gating, RequestCleartext } from './gating'
 import * as Phrases from './phrases'
 import { Validator } from './checks/validator'
-import { optionsRefusal } from './options'
 
 /** True for any object but null, an array included. */
 export const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
@@ -54,12 +54,8 @@ export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => deviceDBGiven.pa
 /** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise, naming the call. Its stores are checked by {@link vaultPartsOf}. */
 const checkBankVaultOpts = (opts: BankVaultOpts | undefined): BankVaultOpts => {
   if (opts === undefined) { return {} }
-  try {
-    bankVaultOpts.parse(opts)
-    return opts
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In bank.ensureVault's options: ${message}.`)
-  }
+  bankVaultOpts.parse(opts, { where: "In bank.ensureVault's options" })
+  return opts
 }
 
 /** How many bytes of storage a vault reserves for each byte of whisper and sidecar: two.
@@ -93,22 +89,10 @@ const DeclaredLimitFor = {
  *
  * @example parseStaleMinutes(0.5, 'hello')   // 30000
  */
-export const parseStaleMinutes = (candidate: unknown, where: string): number => {
-  try {
-    return staleMinutesAsMillis.parse(candidate)
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In ${where}'s options: staleMinutes: ${message}.`)
-  }
-}
+export const parseStaleMinutes = (candidate: unknown, where: string): number => staleMinutesAsMillis.parse(candidate, { where: `In ${where}'s options: staleMinutes` })
 
 /** `ensureUnlocked()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
-export const parseRenewMinutes = (candidate: unknown): number => {
-  try {
-    return renewMinutesAsMillis.parse(candidate)
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In ensureUnlocked's options: renewMinutes: ${message}.`)
-  }
-}
+export const parseRenewMinutes = (candidate: unknown): number => renewMinutesAsMillis.parse(candidate, { where: "In ensureUnlocked's options: renewMinutes" })
 
 /** The host's {@link RequestCleartext}, guarded: it resolves once the host's resolves, and refuses 'unexpected_error' for whatever the host's throws, carrying none of it, so no refusal of the host's is mistaken for the vault's. */
 export type GuardedRequestCleartext = (gating: Gating) => Promise<void>
@@ -127,13 +111,13 @@ const guardRequestCleartext = (host: RequestCleartext | null, logger: VaultLogge
       // A bug in the host's dialog, a VaultError it let escape too: never a refusal of the call
       // that asked, and never its cause, which may quote what the user typed.
       logger.error("The requestCleartext handed to Bank.make threw: the call that asked refuses 'unexpected_error'. What it threw is left out, as the dialog hears the passphrase.", { call: 'requestCleartext', refusalkind: listedKindOf(err) })
-      throw requestThrewError()
+      throw requestThrewRefusal(err)
     }
   }
 }
 
-/** The refusal of a call whose `requestCleartext` threw: nothing of the throw, which may quote the passphrase. */
-const requestThrewError = () => new VaultError('unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
+/** The refusal in place of what `requestCleartext` threw, carrying nothing of it, as its dialog hears the passphrase. */
+const requestThrewRefusal = (thrown: unknown): VaultError => Sanitizer.refusalFor(thrown, 'unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
 
 /** Refuse 'bad_option' for a clock, its shape checked, that throws when read once, or reads outside 1981 to 2255. */
 const checkClockReads = (clock: Clock): void => {
@@ -247,13 +231,7 @@ export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
 }
 
 /** `opts` read by {@link bankOptsRead}, its refusal led by the call the host made. */
-const readBankOpts = (opts: MakeBankOpts) => {
-  try {
-    return bankOptsRead.parse(opts)
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In Bank.make's options: ${message}.`)
-  }
-}
+const readBankOpts = (opts: MakeBankOpts) => bankOptsRead.parse(opts, { where: "In Bank.make's options" })
 
 /** What each vault is made of, frozen: the bank's parts, its own scope's names as fields of its own, its own stores, and its limits as held to its own vaultDB.
  * It carries the scope flat, so it duck-types as one; a store is handed the scope picked out of it,

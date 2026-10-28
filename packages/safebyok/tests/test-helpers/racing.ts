@@ -114,8 +114,8 @@ export type Race<DeviceT> = {
  *   await TH.raceEveryWay({
  *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), user_id: 'u1' }),
  *     setup:       (first) => first.ensureVaultRecord(TH.vaultRecordOf('u1')),
- *     moves:       [(one) => one.delVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))],
- *     verdict:     async (outcomes, [one]) => { expect(await one.getVault(TH.scopeOf('u1'))).to.have.lengthOf(0) },
+ *     moves:       [(one) => one.tryDelVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))],
+ *     verdict:     async (outcomes, [one]) => { expect(await one.tryGetVault(TH.scopeOf('u1'))).to.have.lengthOf(0) },
  *   })
  */
 export const raceEveryWay = async <DeviceT>(race: Race<DeviceT>): Promise<string[]> => {

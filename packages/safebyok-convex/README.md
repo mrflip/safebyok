@@ -264,8 +264,10 @@ for the tests of anything that holds one: this adapter, a binding, your app. `fa
 takes a host app built with `convex-test`'s `defineTestApp(...).defineModules(...)`, as below,
 and answers a client's queries and mutations over a fake WebSocket, running your functions and the
 component under them. `deployment.client(subject)` is a signed-in `ConvexClient`;
-`deployment.connectWith(subject, make)` connects any other, such as a `ConvexReactClient`. It
-imports `convex` and nothing else. Its doc block says what it cannot prove: the network and a real
+`deployment.connectWith(subject, make)` connects any other, such as a `ConvexReactClient`: hand
+`make`'s options to the client's constructor as they come. The clients log nowhere, where a real one
+prints each refused mutation on the console; `fakeDeployment(host, { logger })` gives every client
+a logger of yours to hear them, or `true` for the console. It imports `convex` and nothing else. Its doc block says what it cannot prove: the network and a real
 server, among them.
 
 ```ts

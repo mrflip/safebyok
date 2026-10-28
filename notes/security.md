@@ -41,6 +41,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
+  forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
+  value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
+  `del-damaged-vault.ts`, `RefusalPolicy.heed`) calls the `try` forms. Each `DeviceDB` throwing verb wraps exactly its one
+  `do*` store call in `storeAnswer(verb, hook)`: a `VaultError` passes as it came, anything else becomes `deviceTrouble`'s
+  condition (`storage_blocked` where `isStorageBlocked` names the throw, else `storage_unavailable`, the throw its `cause`), so a
+  host calling `deviceDB.getLease` directly never sees the store's raw error. The `try` form is the plain `outcomeOf` of the
+  throwing one; only a bug in the base class's own lines is `unexpected_error` from a `try` form, or thrown raw from a throwing
+  form. No refusal, log line or cause carries anything new.
 * 2026-10-27 (ci_pacing): in `ci.yml` and `codeql.yml`, pushes to main share one concurrency group
   and run one at a time; a run waiting is replaced by a newer push, so a commit merged while
   another waited gets no CI or CodeQL run of its own, and the next commit's run covers it. Pull
@@ -112,13 +121,13 @@ added or folded into through the subagent, and no other entry changes.
   no entry point exports; `PassphraseProving.seal` and `PasskeyProving.seal` read `vault[provingTools]` once and refuse 'bad_option' for an object
   without it, and a Proving keeps the tools in a non-enumerable protected field. A host holding a Vault object can find the getter with
   `Object.getOwnPropertySymbols(Vault.prototype)` and so reach `ProvingTools`: `vaultRecord()` (the vault record in hand, gate wraps included),
-  `demand`, `keyDeriver`, `logger`, `leaseMillis`, `now()`, `deviceId()`, `putLease(record)` (writes a lease record to the host's own DeviceDB) and
-  `holdLease(lease)` (takes a `Lease` object that `Proving.grantLease` made with `Lease.make(this.vault, valOf(put))` from the record `putLease`
+  `demand`, `keyDeriver`, `logger`, `leaseMillis`, `now()`, `deviceId()`, `tryPutLease(record)` (writes a lease record to the host's own DeviceDB, resolving an Outcome) and
+  `holdLease(lease)` (takes a `Lease` object that `Proving.grantLease` made with `Lease.make(this.vault, valOf(put))` from the record `tryPutLease`
   stored, and has the vault hold it, expiry armed and snapshot replaced; rebased onto #305, the lease record does not cross into `src/vault.ts`).
   The lease registry in `src/held-lease.ts` stays a WeakMap, as
   `tests/vault/vault-boxes.test.ts` "the Vault object's public surface" walks symbol-keyed getters and asserts no Lease is reachable from a Vault
   object without a method call; amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
-  `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `putLease` and `holdLease`, the power to grant
+  `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `tryPutLease` and `holdLease`, the power to grant
   a lease, and `GatingTools`, handed to each gating by its constructor, alone holds `putGate`, `delVault` and `takeUp`; a merged bundle would give
   each the other's powers).
   (3) A Box now shows, as own enumerable frozen fields, its scope, the `vault_tok`, `vault_epoch` and `gate_epoch` it was made under, and every field of
@@ -355,7 +364,7 @@ added or folded into through the subagent, and no other entry changes.
   while one runs refuses `attempt_in_flight`. Entries below that name `unlock()`, `putWayin()` with a passphrase, `Ask`, `attempt(proof)`
   or `getProof` describe the calls this replaced.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the pantry consult is the unlocking gating's first step, before the host is asked,
-  and a lease that does not fit is left in the pantry.** The vault reads `deviceDB.getLease`; then the gating must not have
+  and a lease that does not fit is left in the pantry.** The vault reads `deviceDB.tryGetLease`; then the gating must not have
   landed (a lock, a decline or a let-go during the read takes nothing up); then the one take-up predicate (`#fitsTakeUp`,
   `src/vault.ts`): the same `vault_tok` and `gate_epoch` as the gate in hand, a deadline past now + `renewMinutes`, and no
   later than now + `leaseHours`. A lease that fails it is never erased (no erase on a judgment: it may be another tab's), and
@@ -366,7 +375,7 @@ added or folded into through the subagent, and no other entry changes.
   `gating_landed` before and after the write; a lock landing then is also erased behind the write in the device store's
   order. A gate already stored stays stored: the change to the ways in landed, the lease did not.
   Amended 2026-10-23 (thread 9b, gating_followups, PR #262): **a lock wins over a failed wait.** `grantLease` takes the device store's
-  `putLease` answer as an Outcome and demands on the proving (and on the record's stamp) before acting on a failure, so a
+  `tryPutLease` answer as an Outcome and demands on the proving (and on the record's stamp) before acting on a failure, so a
   `lock()` or decline landing while the lease is written refuses `gating_landed`, never the device store's refusal. A key
   deriver's or HKDF's failure during `PassphraseProving.seal` or `PasskeyProving.seal` is demanded on likewise (the vault's stamp
   at the seal's start, and the gating not landed) before it is thrown. A gating's attempt resolves with whatever its gating
@@ -388,7 +397,7 @@ added or folded into through the subagent, and no other entry changes.
   remains for props that fail their checks, and `safebyok-react`'s start over is off pending a ruling.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device store refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
-  from `putLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
+  from `tryPutLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
   device; a grant stopped by `gating_landed`, or by the vault moving on, still throws. The warning carries the call and the
   refusal, no key material. Amended 2026-10-23 (thread 9b, gating_followups, PR #262): the demand on the gating now comes first, so a
   lock landing during the write is `gating_landed`, no longer a refusal swallowed as this warning over a gating already settled
@@ -423,7 +432,7 @@ added or folded into through the subagent, and no other entry changes.
   removed.** A review found it handed out `lease_key` (non-extractable, but usable to `unwrapKey`) and
   `vault_key_lease_wrapped`, so a holder of the Vault object could, through the public `vault.lease`, unwrap the
   vaultKey extractable and export it. A Lease now yields its record through no getter, field, spread or JSON; the
-  vault puts the record that `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered
+  vault puts the record that `sealLeaseRecord` returns and makes its Lease from what `deviceDB.tryPutLease` answered
   (amended 2026-10-22 (lease_box review): no file in `src/` calls the module-internal `leaseRecordOf(lease)`, which
   only tests use and no package entry point exports). A test walks every field and getter reachable from an unlocked Vault object (its lease and snapshot
   included) and finds no CryptoKey and no wrapped key. `box.record` still hands out the box's wrapped boxKey and
@@ -467,14 +476,14 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **`lock()` acts before it returns, and the device's erase of
   the lease is issued last.** In order, with nothing awaited between: the lease in memory is dropped and its expiry
   disarmed, a lease take-up under way is stood down (amended 2026-10-23 (thread 9, gating): by the gating landing, no abort controller), the prompt up (if any) is landed on, and the snapshot swaps to
-  locked; only then is the pantry's erase (`DeviceDB.delLease`) issued, and its promise is what `lock()` awaits
+  locked; only then is the pantry's erase (`DeviceDB.tryDelLease`) issued, and its promise is what `lock()` awaits
   (`#lockNow`; `del()` locks through it too). Because a device store applies one scope's calls in the order made, a
   lease write already issued by an unlock under way is erased behind it. The grant demands the vault's stamp and its
   prompt immediately before and after that write, and no longer erases its own lease. Amended 2026-10-22 (box_seal):
   **a lock stops a `putBox()` or `delBox()` at each wait named here, and not the write.** A `putBox()` refuses
-  `vault_locked`, writing nothing, when a lock lands while it waits on `getProof` (amended 2026-10-23 (thread 9, gating): now the gating handed to `requestCleartext`, here and at the `delBox()` wait below), `VaultDB.getBox` /
+  `vault_locked`, writing nothing, when a lock lands while it waits on `getProof` (amended 2026-10-23 (thread 9, gating): now the gating handed to `requestCleartext`, here and at the `delBox()` wait below), `VaultDB.tryGetBox` /
   `box.extractWhisper()`, or `Box.seal`; a `delBox()` when it lands while it waits on `getProof`. Once
-  `VaultDB.putBox` / `VaultDB.delBox` is sent a lock does not stop it: it lands or refuses as storage decides, and a
+  `VaultDB.tryPutBox` / `VaultDB.tryDelBox` is sent a lock does not stop it: it lands or refuses as storage decides, and a
   stale `putBox()` still refuses `stale_write` and never lands. (Amended 2026-10-22 (box_seal): this once said "at every
   step before its write"; `#ensureUnlocked`'s pre-prompt hello and lease take-up are not among the named waits.)
 * 2026-10-22 (primitives sprint, thread 5 (demand)): **drops are memory-only; only a lock erases the pantry's
@@ -914,8 +923,8 @@ added or folded into through the subagent, and no other entry changes.
   bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
   the lease or its record is that key; amended 2026-10-21 (trust_lines): a granted or opened lease
   keeps the pair's non-extractable session handle, the vaultKey, in an ES private field, and none of
-  the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): not a getter; once `lease.props`; amended 2026-10-22 (lease_box review): `#grantLease` puts the record `sealLeaseRecord` returns and makes its Lease from what `deviceDB.putLease` answered, and no file in `src/` calls `leaseRecordOf`, which only `tests/lease.test.ts` uses)
-  through `deviceDB.putLease`. leaseCtx (amended 2026-10-26 (cipher_ctx): see the entry of that date) is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
+  the extractable transient), and writes nothing: the vault puts the lease's record (amended 2026-10-22 (lease_box rework): not a getter; once `lease.props`; amended 2026-10-22 (lease_box review): `#grantLease` puts the record `sealLeaseRecord` returns and makes its Lease from what `deviceDB.tryPutLease` answered, and no file in `src/` calls `leaseRecordOf`, which only `tests/lease.test.ts` uses)
+  through `deviceDB.tryPutLease`. leaseCtx (amended 2026-10-26 (cipher_ctx): see the entry of that date) is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
   applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
   'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
   still open. `Lease.make(vault, record)` checks a record through the `LeaseRecord` Zod schema
@@ -941,14 +950,14 @@ added or folded into through the subagent, and no other entry changes.
   gone, and the Lease holds no vaultKey between calls: each `lease.cipheredWith` and `lease.decipherWith` unwraps it
   for that call alone, see the 2026-10-14 leaseKey entry). **`DeviceDB`'s verbs
   (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
-  `Outcome` and never reject.** `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
+  `Outcome` and never reject** (amended 2026-10-28 (store_trynames): those are now the `try` forms, `tryGetLease` and the rest; see the entry at the top). `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
   failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause`, the message
   naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
   `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
-  `bad_option` (amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone, and `deviceOutcomeOf` is off the package's exports; amended 2026-10-27 (retire_standing): it is still a module-private helper of `src/device-db.ts`, which the `DeviceDB` verbs call.
-  `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `VaultDB` is, and its public verbs (`getLease`, `putLease`, `delLease`,
-  `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`) make each Outcome themselves: a throw from the store's `do*` hook becomes
+  `bad_option` (amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone, and `deviceOutcomeOf` is off the package's exports; amended 2026-10-27 (retire_standing): it is still a module-private helper of `src/device-db.ts`, which the `DeviceDB` verbs call; amended 2026-10-28 (store_trynames): `deviceOutcomeOf` is gone, the throwing verbs map through `storeAnswer` and `deviceTrouble`.
+  `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `VaultDB` is, and its public `try` verbs (`tryGetLease`, `tryPutLease`, `tryDelLease`,
+  `tryGetDeviceRecord`, `tryRaiseDeviceRecord`, `tryDelDeviceRecord`, `tryDelAll`) make each Outcome themselves (amended 2026-10-28 (store_trynames): each has a throwing form without the `try`, which makes the same `deviceTrouble` condition for a store's throw, so both forms give `VaultError`s; see the entry at the top): a throw from the store's `do*` hook becomes
   `deviceTrouble`'s condition, `storage_blocked` for a `SecurityError`, `QuotaExceededError` or `NotSupportedError` and otherwise
   `storage_unavailable`, naming no scope and quoting no record, and a `VaultError` passes as it came; a scopepath the base class cannot file a row
   under is refused `bad_scope` before the store sees the call. `parseDeviceDB` (`vault-opts.ts`) requires `instanceof DeviceDB` plus the verbs'
@@ -1656,7 +1665,7 @@ added or folded into through the subagent, and no other entry changes.
   not the vault props' reads as `damaged_box`, its key never tried.
 * 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Amended 2026-10-22 (bank): **the device mark is replaced by the device record, and `rolled_back` by `vault_behind`; what follows describes the mark and no longer holds except where restated here.** Per scope, across the vault's lives, the DeviceDB holds `{ device_id, highest_vault_epoch }` (`packages/safebyok/src/device-db.ts`), written by `raiseDeviceRecord`: a store-side max in one transaction (IndexedDB: one readwrite transaction via idb-keyval `update`), so a tab that saw less never lowers it and the first `device_id` stored stays (the two-tabs write-back below no longer exists). It is raised at birth, after each refresh's take, after this device's own gate writes (first unlock, `putWayin`, `delWayin`) and after `del()` (to the tombstone's `vault_epoch`); `delDamagedVault` raises it to its tombstone's epoch instead of erasing it. The Coach's ruling (option A): one highest `vault_epoch` per scope, raised at each refresh too; `vault_epoch` is compared by <=, never bumped on reads. A birth (`bank.ensureVault`, `packages/safebyok/src/bank.ts`) whose fetched `vault_epoch` is below the record's highest births nothing; a refresh (`src/vault.ts`) refuses it as `vault_behind`, takes nothing, and locks (refusal policy 'lock', the lease erased as for `identity_revoked`). The refresh reads the record BEFORE `getVault`, and judges "older than the picture in hand" (same `vault_tok`, lower epoch: a late read of this tab's own write) BEFORE the behind check, so neither this tab's own write nor another tab's raise is a false `vault_behind`. The record spans lives, so a deletion's tombstone counter carries on in it, where the mark held one vault per scope. The only way out is `bank.clearCachedVault`, which erases the record and the lease and lets the Vault object go: a deliberate host action, never offered to the user as a prompt (the `delMark` recipe below is retired; amended 2026-10-22 (bank_provider): `useBank()` hands it to React hosts as the way past `vault_behind`; it weakens this check until the next birth, so it is for the user's or host's say only, and `BankProvider` never calls it) Residual: a device whose record was cleared, or that never saw the newer copy, cannot tell; a failed raise after a read or own write is a logger warning, not a refusal, so detection is weaker until a later read raises it. Amended 2026-10-22 (bank): **the device record is validated at the boundary.**
   `deviceRecordFor(scope, answer)` (`packages/safebyok/src/device-db.ts`) checks every record a DeviceDB hands back
-  (`getDeviceRecord` at birth and at each refresh, and `raiseDeviceRecord`'s answer at birth) against the
+  (`tryGetDeviceRecord` at birth and at each refresh, and `tryRaiseDeviceRecord`'s answer at birth) against the
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
@@ -2055,7 +2064,7 @@ added or folded into through the subagent, and no other entry changes.
   whatever the backend's client threw, unfiltered. As of 2026-10-19 every public verb
   (`getVaultProps`, `ensureVaultProps`, `putVaultProps`, `delVault`, `delDamagedVault`,
   `listBoxes`, `listBoxRecords`, `getBox`, `putBox`, `delBox`) resolves an `Outcome`
-  (`{ ok: true, val }` or `{ ok: false, err }`) and never rejects; the adapter's `do*` hooks still
+  (`{ ok: true, val }` or `{ ok: false, err }`) and never rejects (amended 2026-10-28 (store_trynames): that is the `try` form of each, `tryGetVault`, `tryPutBox` and the rest; the form without `try` throws what the `try` form resolves; see the entry at the top); the adapter's `do*` hooks still
   throw, and the one catch is `outcomeOf` (`src/outcome.ts`). Amended 2026-10-27 (outcome_default):
   `outcomeOf`'s default for a throw that is no `VaultError` is now `unexpected_error` (family `misuse`,
   never retried), the throw still its `cause`; it was `storage_unavailable`. An adapter's throw is still
@@ -2827,7 +2836,7 @@ added or folded into through the subagent, and no other entry changes.
   `vault_tok` refuse `damaged_vault`; an unknown format `newer_format`; a vault replaced meanwhile `stale_write`). A backend
   whose server validates what it reads (safebyok-graphql) refuses it as `damaged_vault` and keeps the record. The bank's
   entry for the scope is let go on success and on `stale_write`; any other refusal keeps it. `bank.clearCachedVault` touches
-  only this device's store (`DeviceDB.delDeviceRecord`, then `DeviceDB.delLease`), calls no `VaultDB` verb, needs no unlock or
+  only this device's store (`DeviceDB.tryDelDeviceRecord`, then `DeviceDB.tryDelLease`), calls no `VaultDB` verb, needs no unlock or
   passphrase, and refuses nothing for a vault the bank holds no entry for or storage does not hold. It rests on the device
   store being no stronger a boundary than the browser's own site data, which anyone at the device can clear; its effect
   (weakening the `vault_behind` check until the next birth, dropping the lease so the next open asks for the passphrase) is
@@ -3087,7 +3096,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-22 (bank): **a birth refused for storage the device cannot trust erases the lease.** When
   `bank.ensureVault`'s birth is refused `identity_revoked` (signed out of the backend) or `vault_behind` (storage
   serves an older copy than this device's record), the two refusals `RefusalPolicy.decide` maps to `lock`,
-  `Bank.#bear` (`packages/safebyok/src/bank.ts`) erases this device's lease for the scope (`deviceDB.delLease`), as a
+  `Bank.#bear` (`packages/safebyok/src/bank.ts`) erases this device's lease for the scope (`deviceDB.tryDelLease`), as a
   refused open did before the bank; a device store that will not erase it is a logger warning, the refusal still
   thrown. A birth never erases a lease it judges unfit (another life's, or ended): that one is left where it lies,
   as it may be another tab's.
@@ -3560,7 +3569,7 @@ added or folded into through the subagent, and no other entry changes.
   after a successful catch-up; a failed catch-up keeps its own message.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
   kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
-  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`; amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` is gone and `deviceOutcomeOf` is off the exports, the `DeviceDB` base class's public verbs make the same mapping through `deviceTrouble`; amended 2026-10-27 (retire_standing): `deviceOutcomeOf` remains as a module-private helper of `device-db.ts`) says a failure
+  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`; amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` is gone and `deviceOutcomeOf` is off the exports, the `DeviceDB` base class's public `try` verbs make the same mapping through `deviceTrouble` (amended 2026-10-28 (store_trynames): so do the throwing verbs, through `storeAnswer`, and `deviceOutcomeOf` is gone; see the entry at the top); amended 2026-10-27 (retire_standing): `deviceOutcomeOf` remains as a module-private helper of `device-db.ts`) says a failure
   named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
   retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it

@@ -35,10 +35,10 @@ const bankOptsOf = (world: World, overrides?: Partial<TH.BornVaultOpts>): MakeBa
 const bankIn = (world: World, overrides?: Partial<TH.BornVaultOpts>): Bank => Bank.make(bankOptsOf(world, overrides))
 
 /** This device's record of u1's vault in `world`'s device store, or null for none. */
-const recordOf = (world: World) => TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+const recordOf = (world: World) => TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
 
 /** What `vaultDB.getVault` answers for u1's vault in `world`: null for none stored. */
-const gotVaultOf = (world: World) => TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
+const gotVaultOf = (world: World) => TH.expectGood(world.vaultDB.tryGetVault(TH.scopeOf('u1')))
 
 /** The highest `vault_epoch` this device's record of u1's vault in `world` has seen, or null for no record. */
 const highestEpochOf = async (world: World) => {
@@ -61,11 +61,11 @@ const stepsOf = (lifecycles: readonly (string | undefined)[]) => lifecycles.filt
 /** A strength checker admitting any passphrase, whose `load` is `load`. */
 const checkerLoading = (load: () => void | Promise<void>) => Object.assign(vi.fn(TH.anyStrengthChecker), { load: vi.fn(load) })
 
-/** The tombstones `vaultDB.delVault` resolves from now on, kept in a list as they land. */
-const keptTombstones = (vaultDB: Pick<VaultDB, 'delVault'>): VaultTombstone[] => {
+/** The tombstones `vaultDB.tryDelVault` resolves from now on, kept in a list as they land. */
+const keptTombstones = (vaultDB: Pick<VaultDB, 'tryDelVault'>): VaultTombstone[] => {
   const kept: VaultTombstone[] = []
-  const delVault = vaultDB.delVault.bind(vaultDB)
-  vi.spyOn(vaultDB, 'delVault').mockImplementation(async (scope, expected) => {
+  const delVault = vaultDB.tryDelVault.bind(vaultDB)
+  vi.spyOn(vaultDB, 'tryDelVault').mockImplementation(async (scope, expected) => {
     const deleted = await delVault(scope, expected)
     if (deleted.ok) { kept.push(deleted.val) }
     return deleted
@@ -232,7 +232,7 @@ describe("bank.hello", () => {
 
   it("has ensureVault refuse while the load fails, birthing nothing", async () => {
     const world = makeWorld()
-    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const births = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const bank = bankIn(world, { strengthChecker: checkerLoading(() => Promise.reject(new Error('offline'))) })
     const err = await TH.expectRefusal(bank.ensureVault(Main), 'unexpected_error')
     expect(births).not.toHaveBeenCalled()
@@ -296,7 +296,7 @@ describe("bank.ensureVault", () => {
 
   it("refuses a bag of another user or app than the bank's 'bad_scope', naming the field and quoting neither, before storage is touched", async () => {
     const world = makeWorld()
-    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const births = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const bank = bankIn(world)
     const other = await TH.expectRefusal(bank.ensureVault({ ...Main, user_id: 'u2' }), 'bad_scope')
     expect(other.meta?.fieldnames).to.deep.equal(['user_id'])
@@ -309,7 +309,7 @@ describe("bank.ensureVault", () => {
 
   it("refuses a bag or options amiss before storage is touched: 'bad_scope' for no bag or a name that fails, 'bad_option' for options it does not take", async () => {
     const world = makeWorld()
-    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const births = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const bank = bankIn(world)
     for (const bag of [undefined, null, 'main', {}, { ...Main, user_id: '' }, { vaultlabel: 'not-a-label' }]) {
       await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
@@ -323,7 +323,7 @@ describe("bank.ensureVault", () => {
   it("refuses a store in the bag 'bad_scope', naming neither the field nor its value, before either store is touched: a vault's own stores go in the second bag", async () => {
     const world = makeWorld()
     const elsewhere = makeWorld()
-    const births = [vi.spyOn(world.vaultDB, 'ensureVault'), vi.spyOn(elsewhere.vaultDB, 'ensureVault')]
+    const births = [vi.spyOn(world.vaultDB, 'tryEnsureVault'), vi.spyOn(elsewhere.vaultDB, 'tryEnsureVault')]
     const bank = bankIn(world)
     for (const bag of [{ ...Main, vaultDB: elsewhere.vaultDB }, { ...Main, deviceDB: elsewhere.deviceDB }]) {
       const refusal = await TH.expectRefusal(bank.ensureVault(bag as unknown as typeof Main), 'bad_scope')
@@ -391,7 +391,7 @@ describe("bank.ensureVault", () => {
 
   it("hands two asks at once one Vault object, calling vaultDB.ensureVault once, and a third ask, once ready, the same", async () => {
     const world = makeWorld()
-    const births = vi.spyOn(world.vaultDB, 'ensureVault')
+    const births = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const bank = bankIn(world)
     const [first, second] = await Promise.all([bank.ensureVault(Main), bank.ensureVault(Main)])
     expect(second).to.eq(first)
@@ -489,7 +489,7 @@ describe("a vault served behind this device's record", () => {
     expect(await world.getLease()).to.not.be.null
     const asked: Promise<Vault>[] = []
     bank.subscribe(() => { if (bank.bankVaultOf(Main) === null && asked.length === 0) { asked.push(bank.ensureVault(Main)) } })
-    const gate = TH.holdNextCall(world.deviceDB, 'delLease')
+    const gate = TH.holdNextCall(world.deviceDB, 'tryDelLease')
     const clearing = bank.clearCachedVault(Main)
     await gate.reached
     await TH.wakeupAtNextTick()
@@ -504,7 +504,7 @@ describe("a vault served behind this device's record", () => {
   it("accepts the vault storage holds once support confirms the restore, as clearCachedVault's example shows", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
-    await TH.expectGood(world.deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
+    await TH.expectGood(world.deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
     const bank = bankIn(world)
     const err = await TH.expectRefusal(bank.ensureVault(Main), 'vault_behind')
     if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
@@ -550,10 +550,10 @@ describe("bank.clearCachedVault", () => {
     const bank = bankIn(world)
     await bank.ensureVault(Main)
     const otherDeviceDB = memoryDeviceDB()
-    await TH.expectGood(otherDeviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1')))
+    await TH.expectGood(otherDeviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')))
     await bank.clearCachedVault(Main, { deviceDB: otherDeviceDB })
     expect(bank.bankVaultOf(Main)).to.be.null
-    const otherRecord = await TH.expectGood(otherDeviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    const otherRecord = await TH.expectGood(otherDeviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     expect(otherRecord).to.be.null
     expect(await recordOf(world)).to.not.be.null
   })
@@ -562,7 +562,7 @@ describe("bank.clearCachedVault", () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
-    vi.spyOn(world.deviceDB, 'delLease').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The device store could not be reached: try again shortly.')))
+    vi.spyOn(world.deviceDB, 'tryDelLease').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The device store could not be reached: try again shortly.')))
     await TH.expectRefusal(bank.clearCachedVault(Main), 'storage_unavailable')
     expect(bank.vaultOf(Main)).to.eq(vault)
     expect(await recordOf(world)).to.be.null
@@ -598,8 +598,8 @@ describe("bank.delDamagedVault", () => {
     const bank = bankIn(world)
     await TH.expectRefusal(bank.ensureVault(Main), 'damaged_vault')
     const elsewhere = bankIn(world, { deviceDB: memoryDeviceDB() })
-    const delDamagedVault = world.vaultDB.delDamagedVault.bind(world.vaultDB)
-    vi.spyOn(world.vaultDB, 'delDamagedVault').mockImplementationOnce(async (scope) => {
+    const delDamagedVault = world.vaultDB.tryDelDamagedVault.bind(world.vaultDB)
+    vi.spyOn(world.vaultDB, 'tryDelDamagedVault').mockImplementationOnce(async (scope) => {
       await TH.expectGood(delDamagedVault(scope))
       await elsewhere.ensureVault(Main)
       return TH.bad(new VaultError('stale_write', 'The vault was made anew elsewhere while it was being deleted.'))
@@ -615,7 +615,7 @@ describe("bank.delDamagedVault", () => {
     const world = await damagedVaultWorld()
     const bank = bankIn(world)
     await TH.expectRefusal(bank.ensureVault(Main), 'damaged_vault')
-    vi.spyOn(world.vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
+    vi.spyOn(world.vaultDB, 'tryDelDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
     await TH.expectRefusal(bank.delDamagedVault(Main), 'storage_unavailable')
     expect(bank.bankVaultOf(Main)?.lifecycle).to.eq('refused')
     await bank.delDamagedVault(Main)
@@ -629,7 +629,7 @@ describe("bank.delDamagedVault", () => {
     const bank = bankIn(world)
     const vault = await bank.ensureVault(Main)
     await TH.expectRefusal(bank.delDamagedVault(Main), 'bad_option')
-    const stored = await TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
+    const stored = await TH.expectGood(world.vaultDB.tryGetVault(TH.scopeOf('u1')))
     expect(stored).to.not.be.null
     expect(bank.vaultOf(Main)).to.eq(vault)
     await TH.expectRefusal(bank.delDamagedVault({ vaultlabel: 'Not A Label' }), 'bad_scope')
@@ -743,7 +743,7 @@ describe("this device's record of the vault", () => {
     const tab = await world.openUnlocked('pw')
     const deaf = world.deafVaultDB()
     const otherTab = await world.open({ vaultDB: deaf })
-    const served = TH.holdNextAnswer(deaf, 'getVault')
+    const served = TH.holdNextAnswer(deaf, 'tryGetVault')
     const refreshing = otherTab.tryRefresh()
     await served.reached
     await TH.putWayin(tab, 'pw', 'new phrase')
@@ -901,7 +901,7 @@ describe("bank.closeVault", () => {
   it("refuses a birth under way 'vault_gone' when it lands during the birth's read", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const reading = TH.holdNextCall(world.vaultDB, 'ensureVault')
+    const reading = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     expect(bank.bankVaultOf(Main)?.lifecycle).to.eq('starting')
@@ -915,9 +915,9 @@ describe("bank.closeVault", () => {
   it("writes nothing more for a birth let go during its first read: no vault record ensured, no device record raised", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const reading = TH.holdNextCall(world.deviceDB, 'getDeviceRecord')
-    const ensuring = vi.spyOn(world.vaultDB, 'ensureVault')
-    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const reading = TH.holdNextCall(world.deviceDB, 'tryGetDeviceRecord')
+    const ensuring = vi.spyOn(world.vaultDB, 'tryEnsureVault')
+    const raising = vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
@@ -930,8 +930,8 @@ describe("bank.closeVault", () => {
   it("raises no device record and births no Vault object for a birth let go during its read of storage", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const reading = TH.holdNextCall(world.vaultDB, 'ensureVault')
-    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const reading = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
+    const raising = vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord')
     const subscribing = vi.spyOn(world.vaultDB, 'subscribe')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
@@ -988,7 +988,7 @@ describe("a let-go landing mid-call", () => {
     const requestCleartext = vi.fn()
     const vault = await world.open({ requestCleartext })
     // The hello within staleMinutes of the birth reads nothing: this device's store is next read by the take-up.
-    const takingUp = TH.holdNextCall(world.deviceDB, 'getLease')
+    const takingUp = TH.holdNextCall(world.deviceDB, 'tryGetLease')
     const leasing = vault.tryEnsureUnlocked()
     await takingUp.reached
     TH.closeVault(vault)
@@ -1071,7 +1071,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
 
   it("births once when a listener asks for the vault as each change lands: every ask, the bank's own 'starting' and the entry's among them, joins the birth under way", async () => {
     const world = makeWorld()
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const bank = bankIn(world)
     const asked: Promise<Vault>[] = []
     bank.subscribe(() => { if (bank.bankVaultOf(Main)?.lifecycle !== 'ready') { asked.push(bank.ensureVault(Main)) } })
@@ -1084,8 +1084,8 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
 
   it("reads nothing for a birth let go in the task that asked for it, its caller refused 'vault_gone'", async () => {
     const world = makeWorld()
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
-    const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
+    const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
+    const getDeviceRecord = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord')
     const bank = bankIn(world)
     const asked = bank.ensureVault(Main)
     bank.closeVault(Main)
@@ -1098,7 +1098,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
   it("moves an entry from starting to refused when its birth is refused, the refusal kept", async () => {
     const world = makeWorld()
     const unreachable = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(unreachable))
     const bank = bankIn(world)
     const lifecycles: (string | undefined)[] = []
     bank.subscribe(() => { lifecycles.push(bank.bankVaultOf(Main)?.lifecycle) })
@@ -1215,7 +1215,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
     const world = makeWorld()
     const first = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')
     const second = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(first)).mockResolvedValueOnce(TH.bad(second))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(first)).mockResolvedValueOnce(TH.bad(second))
     const bank = bankIn(world)
     await TH.expectRefusal(bank.ensureVault(Main), 'storage_unavailable')
     const listed = bank.vaults
@@ -1227,7 +1227,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
   it("tells a refused vault by its lifecycle, its err why, as BankVault's example shows", async () => {
     const world = makeWorld()
     const unreachable = new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(unreachable))
     const bank = bankIn(world)
     await bank.tryEnsureVault(Main)
     const showTrouble = vi.fn()
@@ -1265,7 +1265,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
 
   it("filters the listing for the refused, as vaults' example shows", async () => {
     const world = makeWorld()
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'Storage could not be reached: try again shortly.')))
     const bank = bankIn(world)
     await bank.tryEnsureVault({ vaultlabel: 'work' })
     await bank.ensureVault(Main)

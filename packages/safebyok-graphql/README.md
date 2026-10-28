@@ -146,8 +146,8 @@ it meets nothing of yours.
 
 ### Serving a VaultDB of your own
 
-The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault checked and split:
+The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, in their `try` forms, and
+`tryGetVaultRecords(scope)` and `tryEnsureVaultRecords(draft)`, which hand on a vault checked and split:
 its record, its sound boxes without their two ciphered fields, and its damaged boxes apart. The
 resolvers carry it as `SafebyokVault`, `{ vault, boxes, damagedBoxes }`, the shape a VaultDB's half
 answers, so the browser's VaultDB passes it through (rebuilding each record from its own fields,

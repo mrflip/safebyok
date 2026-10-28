@@ -109,7 +109,7 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     await TH.expectProbeState('locked')
-    vi.spyOn(world.vaultDB, 'delVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
+    vi.spyOn(world.vaultDB, 'tryDelVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     expect(await screen.findByText('The vault storage could not be reached: try again shortly.')).to.not.be.null

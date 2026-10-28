@@ -146,7 +146,8 @@ throws. A method named `try` always resolves an `Outcome`; one whose result make
 outcome is renamed. The doc block lives on the throwing half, and the `try` half's one line points
 to it. The implementation lives on whichever half is easier to write, and `valOf` or one
 try/catch derives the other, never a second implementation; a method whose `Outcome` carries
-`meta` is implemented on the `try` side. A VaultDB adapter's verbs resolve `Outcome`s alone.
+`meta` is implemented on the `try` side. A VaultDB's and a DeviceDB's public verbs are try pairs too
+(`getBox` and `tryGetBox`); the `do*` hooks an adapter implements throw, and have one form.
 
 **A check is a triplet, not a pair** (the Coach, 2026-10-22): "an ensureConsistent() and get
 consistent() triplet ... get foo(), demandFoo() and sometimes ensureFoo()". A synchronous yes/no
@@ -382,10 +383,10 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 * **Every sentence a check says lives in `phrases.ts`**, star-imported as `Phrases`, so
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
-  made in a `Validator` call does (`src/checks/validator.ts`), and a check of options catches its
-  refusal only to prefix the call's name and say what to do (`optionsCheck`, `optionsRefusal`).
-  Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
-  the value.
+  made in a `Validator` call does (`src/checks/validator.ts`), and a check of options names the
+  call and says what to do in the parse's own saying, `parse(opts, { where, advice })`, never in a
+  catch that rethrows (`optionsCheck`, `readBankOpts`). Never `Z.config`, which is the host's
+  Zod too. Zod's English names a refused value's type, never the value.
 * **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
   fields involved, in its message and `meta.fieldnames`: a field that failed its check, or that
   disagrees with another bag (the Coach, 2026-10-27, loosening "no key" until the package is more
