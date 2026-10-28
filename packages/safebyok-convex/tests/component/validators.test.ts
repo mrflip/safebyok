@@ -52,8 +52,8 @@ const zodLiteralShape = ({ def }: ZodLike): Shape | null => {
 }
 
 /** The core's half: its schema as Convex can check it. Refinements (min, max, regex, int, a record's rule
- * across its fields) are set aside: Convex has none. A custom check is any value, and a transform
- * or a frozen copy is what it takes in.
+ * across its fields) are set aside: Convex has none. A custom check is any value under a box's
+ * sidecar and has no shape anywhere else; a transform or a frozen copy is what it takes in.
  */
 const zodShape = (schema: ZodLike, fieldname?: string): Shape => {
   const { def } = schema
