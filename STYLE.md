@@ -92,6 +92,8 @@ spreads a narrower: `export const WayinKindVals = [...] as const`,
 (`BoxSparse`), never `-Listing`, which reads as the list or what holds it, nor `-Listed`: a sparse
 shape turns up well beyond listings. What an adapter hands up unchecked is `Stored-` and what it
 holds (`StoredVault`, `StoredBox`): named for what storage holds, not for the call that read it.
+The prefix names what storage holds, checked or not, so a validator of it keeps it
+(`StoredVaultTok`, `StoredRevision`).
 
 **The stamp is the bound fields.** Say *stamp* for the fields a thing's cryptography is bound to,
 where you would write "the bound fields", "what the tag authenticates" or "the binding".
@@ -384,7 +386,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
   made in a `Validator` call does (`src/checks/validator.ts`), and a check of options names the
-  call and says what to do in the parse's own saying, `parse(opts, { where, advice })`, never in a
+  call and says what to do in the parse's own story, `parse(opts, { where, advice })`, never in a
   catch that rethrows (`optionsCheck`, `readBankOpts`). Never `Z.config`, which is the host's
   Zod too. Zod's English names a refused value's type, never the value.
 * **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
@@ -454,6 +456,17 @@ the scope.
   `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
 * **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
   validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
+* **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
+  there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
+  and module-local and good idea to put it near where used); use Validator; namespace it, using
+  Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
+  hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
+  local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
+  namespaced as the object a `Validator` call returns (`Checks.StoryShape`), or through its
+  module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
+  `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
+  type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
+  the `Z.infer`, whose members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
@@ -593,8 +606,8 @@ rows with it.
   function leads with what it is or returns: `/** The fields written to storage: the visible
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
   that will be written to the database */`. A function that reads storage, decrypts, asks the
-  user or writes leads with that verb: `/** Read and open the box stored under boxlabel, ...`.
-  "Read" means a storage read: a lookup in memory leads with what it returns. Never open on "What
+  user or writes leads with that verb: `/** Get and open the box stored under boxlabel, ...`.
+  "Get" here is a storage read: a lookup in memory leads with what it returns. Never open on "What
   a ..." or "What ... does": name the thing, or say the act.
 * **Read the member's name against that first line** (*Naming*).
 * **Name the shape and say *stamp*.** A block says which shape it takes or hands back
@@ -696,7 +709,7 @@ A private helper whose block toured its return value and hid its reach. Before:
 After, and renamed from `#storedBase`, as the line showed the name was wrong:
 
 ```ts
-/** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
+/** Get and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
  * Gets through `#getBox`, and decrypts the whisper under the lease in hand. The put then
  * lands only over the revision read.
  */

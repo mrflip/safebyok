@@ -30,8 +30,8 @@ these guarantees until shown otherwise.
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
 (`passphrase-strength.ts`, `guardStrengthChecker`) and `requestCleartext` (`vault-opts.ts`,
-`guardRequestCleartext`). Each guard hands what it caught to `Sanitizer.refusalFor`
-(`sanitizer.ts`), the one function that stands a refusal in for a foreign throw, and it reads
+`guardRequestCleartext`). Each guard hands what it caught to `HostErrorSanitizer.refusalFor`
+(`host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, and it reads
 nothing of it. The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque.
 
 ## The construction
@@ -243,7 +243,7 @@ message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates 
 a limit or a field name. Every validator's refusal quotes no input: `tests/validators.test.ts`, *no
 refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
-replaced by `Sanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
+replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
 logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). A WebCrypto
 failure is caught and replaced (`wrongProof`, `damaged_lease`, `damaged_box`). `unexpectedError`
 keeps a foreign throw as `cause` only where the thrower heard no secret: storage adapters and the

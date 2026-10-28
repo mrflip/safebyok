@@ -1,5 +1,5 @@
 /** The refusal to throw in place of a foreign throw: one safebyok did not make, which may quote a secret it was handed.
- * Import it whole: `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
+ * Import it whole: `import { HostErrorSanitizer } from 'safebyok'`, then `HostErrorSanitizer.refusalFor(...)`.
  * Call it from a catch that holds what a host's function threw after hearing the passphrase (a
  * `keyDeriver`, `strengthChecker`, `requestCleartext` or a dialog's `passphraseAdvice`), or what
  * a storage client threw, which may quote the call it was handed.
@@ -18,11 +18,11 @@ import { VaultError, type RefusalKind } from './errors'
  *
  * @example
  *   try { handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes) } catch (err) {
- *     throw Sanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
+ *     throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
  *   }
  * @example
  *   try { return await client.mutation(fnRef, args) } catch (err) {
- *     throw Sanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
+ *     throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
  *   }
  */
 export const refusalFor = (_foreign: unknown, kind: RefusalKind, message: string): VaultError => new VaultError(kind, message)

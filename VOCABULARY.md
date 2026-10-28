@@ -159,6 +159,7 @@ percent-encoded (RFC 3986), never checked by a host's own rule.
 | **scopepath**                   | Where a store files a scope's record: its kind, then the scope's names in order, joined on `^`, which no name may contain (`vault^acme^u1^main`, `box^acme^u1^main^anthropic`; `Scopepath`). A host's own key-value adapter files its rows by them, a `StringStore` keeps text by them, and an inspector's `IdbRow` names its row's. |
 | **ckey**                        | A generic map key: an entry's name in a map, or an index in an array. Never a storage address, which is a scopepath. |
 | **clock**, **logger**           | Two options your app may pass to `Bank.make`: a source of the time (`Clock`), and a place for the vault to say what it has no one to throw to (`VaultLogger`).          |
+| **story**                       | A controlled record of what is happening, suitable for logs or refusals (`Story`). A validator's `parse(val, story?)` takes one, `{ where, advice }`: `where` the input was judged, said before the failures it names, and `advice`, what to do, said after them. Neither quotes the input. |
 
 ## Shapes
 
