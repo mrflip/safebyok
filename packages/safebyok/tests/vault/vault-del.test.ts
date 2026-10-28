@@ -105,7 +105,7 @@ describe("delBox and del()", () => {
     const vault = await world.openUnlocked('pw')
     await TH.del(vault, 'pw')
     const tombstoneEpoch = storedVaultRecordOf(world)['vault_epoch']
-    const deviceRecord = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    const deviceRecord = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     expect(deviceRecord?.highest_vault_epoch).to.eq(tombstoneEpoch)
   })
 
@@ -257,7 +257,7 @@ describe("damaged boxes", () => {
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: revisionTok, damage: 'damaged' }])
     const writes = WriteVerbs.map((verb) => [verb, vi.spyOn(world.vaultDB, verb)] as const)
-    const putBox = vi.spyOn(world.vaultDB, 'putBox')
+    const putBox = vi.spyOn(world.vaultDB, 'tryPutBox')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-ant-new')
     const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
     expect(callsOf).to.deep.equal({ ensureVault: 0, putVaultRecord: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })

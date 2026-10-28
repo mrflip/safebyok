@@ -54,13 +54,13 @@ describe("App", () => {
     await screen.findByText(/No boxes yet/)
     const shown = await screen.findByText(/^\(user_/)
     const scope = { applabel: Applabel, user_id: shown.textContent.slice(1, -1), vaultlabel: 'main' }
-    const born = await vaultDB.getVault(scope)
+    const born = await vaultDB.tryGetVault(scope)
     expect(born.ok && born.val !== null).to.be.true
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     await screen.findByPlaceholderText('username')
     expect(screen.queryByRole('dialog')).to.be.null
-    const kept = await vaultDB.getVault(scope)
+    const kept = await vaultDB.tryGetVault(scope)
     expect(kept.ok && kept.val !== null).to.be.true
   })
 

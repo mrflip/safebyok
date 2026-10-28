@@ -70,7 +70,7 @@ export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, pu
  * is that tradeoff, and `lock()` erases the lease at once.
  *
  * @example
- *   const record = valOf(await deviceDB.getLease(scope))   // null when this device holds none
+ *   const record = valOf(await deviceDB.tryGetLease(scope))   // null when this device holds none
  *   const lease = Lease.make(vault, record)                 // once it is not null
  *   lease.ask_passphrase_at               // when the vault asks again
  * @example JSON.stringify(lease)   // its format, scope, vault_tok, gate_epoch and ask_passphrase_at: no key material
@@ -284,7 +284,7 @@ export class KeptLease implements LeaseSparse {
     Object.freeze(this)
   }
 
-  /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.getLease`, its answer checked as a {@link LeaseRecord} of `scope`.
+  /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.tryGetLease`, its answer checked as a {@link LeaseRecord} of `scope`.
    * What the store hands back that is no lease of this scope reads as none, left where it lies:
    * another vault's, or a host store's mistake, which the next grant writes over. A read about to
    * take the lease up passes `told`, and its logger is warned once under `told.call`, quoting
@@ -295,8 +295,8 @@ export class KeptLease implements LeaseSparse {
    * @example const kept = valOf(await KeptLease.read(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
    * @example const beside = valOf(await KeptLease.read(deviceDB, scope))   // the refresh's look, told to no one
    */
-  static async read(deviceDB: Pick<DeviceDB, 'getLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
-    const kept = await deviceDB.getLease(scope)
+  static async read(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
+    const kept = await deviceDB.tryGetLease(scope)
     if (! kept.ok) { return kept }
     if (kept.val === null) { return good(null) }
     const checked = LeaseRecord.safeParse(kept.val)

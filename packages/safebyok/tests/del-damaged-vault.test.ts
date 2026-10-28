@@ -40,7 +40,7 @@ describe("delDamagedVault", () => {
     await theirs.putBox({ boxlabel: 'anthropic' }, 'theirs')
     await delDamagedVault(world.optsWith())
     expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
-    expect(await TH.expectingGood(world.deviceDB).getLease(TH.scopeOf('u2'))).to.not.be.null
+    expect(await TH.expectingGood(world.deviceDB).tryGetLease(TH.scopeOf('u2'))).to.not.be.null
     expect(rowsOf(world, 'u2')).to.not.deep.equal([])
   })
 
@@ -113,7 +113,7 @@ describe("delDamagedVault", () => {
 
   it("checks the scope as Bank.make and bank.ensureVault do, handing the VaultDB's verb the scope alone", async () => {
     const world = await damagedVaultWorld()
-    const verb = vi.spyOn(world.vaultDB, 'delDamagedVault')
+    const verb = vi.spyOn(world.vaultDB, 'tryDelDamagedVault')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ user_id: 'alice smith' })), 'bad_scope')
     expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
     expect(verb).not.toHaveBeenCalled()
@@ -154,10 +154,10 @@ describe("delDamagedVault", () => {
 
   it("raises this device's record to the tombstone's vault_epoch, keeping its device_id, so a restored copy of the damaged vault is behind", async () => {
     const world = await damagedVaultWorld()
-    const before = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    const before = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     await delDamagedVault(world.optsWith())
     const tombstone = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as { vault_epoch: number }
-    const after = await TH.expectGood(world.deviceDB.getDeviceRecord(TH.scopeOf('u1')))
+    const after = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     expect(after?.highest_vault_epoch).to.eq(tombstone.vault_epoch)
     expect(after?.device_id).to.eq(before?.device_id)
   })

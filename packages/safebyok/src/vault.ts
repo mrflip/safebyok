@@ -260,8 +260,8 @@ export class Vault implements VaultStamp {
   /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
    * Never prompts. Within `staleMinutes` of the last read it re-settles without reading, unless that
    * read failed or found storage it could not trust. One that reads while a read is under way
-   * shares it. Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside
-   * {@link DeviceDB.getLease}.
+   * shares it. Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside
+   * {@link DeviceDB.tryGetLease}.
    *
    * It takes no lease up: another tab's unlock shows here at the next {@link Vault.ensureUnlocked}.
    * It drops the lease in hand, erasing nothing, once this device's store no longer holds it
@@ -398,7 +398,7 @@ export class Vault implements VaultStamp {
    * All a caller can see happens before it returns, synchronously: the lease is dropped and its
    * expiry disarmed; a pending gating ends, every call waiting on it refusing 'vault_locked' and
    * its `lockLanded` settling; and the snapshot reads `locked`. What it returns is this device's
-   * lease being erased, with {@link DeviceDB.delLease}. It awaits no hello.
+   * lease being erased, with {@link DeviceDB.tryDelLease}. It awaits no hello.
    *
    * A call under way meets the lock as {@link Vault} says. A gating's attempt under way, of
    * whatever kind, holds no lease once the lock lands: it refuses 'gating_landed' at its next step,
@@ -820,7 +820,7 @@ export class Vault implements VaultStamp {
       logger:      this.#logger,
       now:         () => this.#clockNow(),
       deviceId:    () => this.#deviceId,
-      putLease:    (record) => this.#deviceDB.putLease(record),
+      tryPutLease: (record) => this.#deviceDB.tryPutLease(record),
       holdLease:   (lease) => this.#holdLease(lease),
     }
     this.#gatingTools = {
@@ -975,7 +975,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Read the vault record, listing and this device's lease, judge them against the picture in hand by `#judgeRead`, take what it finds new, and raise this device's record to it.
-   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.read}, the lease kept.
+   * Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.read}, the lease kept.
    * A read judged `behind` locks the vault as storage it cannot trust, and refuses 'vault_behind'.
    */
   async #takeStorage() {
@@ -983,7 +983,7 @@ export class Vault implements VaultStamp {
     const leasesSeen = this.#leasesHeld
     // The device record is read first, so a raise this device's own write made is never held
     // against a read served before that write landed.
-    const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.getDeviceRecord(this.#scope)))
+    const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.tryGetDeviceRecord(this.#scope)))
     // Let go meanwhile: read no more, as the judgment would ignore what came.
     if (this.#goneBy !== null) { return }
     const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), KeptLease.read(this.#deviceDB, this.#scope)])
@@ -1070,12 +1070,12 @@ export class Vault implements VaultStamp {
 
   // == [Device record]: raiseRecordAfter
 
-  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.raiseDeviceRecord}: never a refusal.
+  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryRaiseDeviceRecord}: never a refusal.
    * A device store that fails to keep it is warned of: a missed raise only weakens the check for a
    * vault served behind what this device has seen, until a later read raises it.
    */
   async #raiseRecordAfter(vaultEpoch: number, call: VaultCall): Promise<void> {
-    const raised = await this.#deviceDB.raiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
+    const raised = await this.#deviceDB.tryRaiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
     if (raised.ok) { return }
     this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, raised.err)
   }
@@ -1364,18 +1364,18 @@ export class Vault implements VaultStamp {
   // store applies it after any lease write already issued: a grant under way when it lands is
   // erased behind it, and holds nothing, its gating landed. A pantry consult under way takes
   // nothing up, for the same reason.
-  /** Lock at once: drop the lease and its expiry, land the lock on the pending gating, and replace the snapshot; then erase this device's lease with {@link DeviceDB.delLease}, returning the erase's promise. */
+  /** Lock at once: drop the lease and its expiry, land the lock on the pending gating, and replace the snapshot; then erase this device's lease with {@link DeviceDB.tryDelLease}, returning the erase's promise. */
   #lockNow(): Promise<Outcome<void>> {
     this.#lease = null
     this.#disarmExpiry()
     this.#landGating()
     this.#replaceSnapshot()
-    return this.#deviceDB.delLease(this.#scope)
+    return this.#deviceDB.tryDelLease(this.#scope)
   }
 
   /** Do what the refusal policy says of `refusal` before it is thrown: lock, as `lock()` does, for storage the vault cannot trust.
    * That is a user no longer signed in, or an older copy of the vault. The pending gating's waiters
-   * hear `refusal` itself, and the lease is erased with {@link DeviceDB.delLease}: a device store
+   * hear `refusal` itself, and the lease is erased with {@link DeviceDB.tryDelLease}: a device store
    * that will not erase it is only logged, as the refusal is what the caller must hear. Storage it
    * cannot trust (`UntrustedStorageKinds`) has the next hello read afresh.
    */
@@ -1390,7 +1390,7 @@ export class Vault implements VaultStamp {
     // consult under way takes nothing up.
     this.#landGating(refusal)
     this.#dropLease()
-    const erased = await this.#deviceDB.delLease(this.#scope)
+    const erased = await this.#deviceDB.tryDelLease(this.#scope)
     if (! erased.ok) {
       this.#logger.warn(`${why} so the vault locked, but this device's lease could not be revoked: the next Vault object born on this device, as at the next page load, may take it up.`, { call: 'untrustedStorage' }, erased.err)
     }
@@ -1858,7 +1858,7 @@ export type BirthRead = Readonly<{
   vaultRecord: VaultRecord
   /** The box listing `VaultDB.ensureVault` resolved beside it. */
   listing:     BoxListing
-  /** The lease record {@link DeviceDB.getLease} found, or null. */
+  /** The lease record {@link DeviceDB.tryGetLease} found, or null. */
   leaseKept:   KeptLease | null
   /** This device's record of the scope, as raised at birth. */
   record:      DeviceRecord

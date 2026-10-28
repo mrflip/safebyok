@@ -368,24 +368,24 @@ export const vaultRecordOf = (user_id: string, overrides: Partial<GatedVaultReco
  * @example const stored = await ensureGated(vaultDB, vaultRecordOf('u1'))   // stored.vault_epoch is 1
  * @example await ensureGated(vaultDB, vaultRecordOf('u1', { gate_epoch: 2 }))
  */
-export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultRecord'>, vaultRecord: GatedVaultRecord): Promise<GatedVaultRecord> => {
-  const ensured = recordOfRead(valOf(await vaultDB.ensureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })))
+export const ensureGated = async (vaultDB: Pick<VaultDB, 'tryEnsureVault' | 'tryPutVaultRecord'>, vaultRecord: GatedVaultRecord): Promise<GatedVaultRecord> => {
+  const ensured = recordOfRead(valOf(await vaultDB.tryEnsureVault({ ...vaultRecord, vault_epoch: 0, gate_epoch: 0, gate: null })))
   if (ensured.gate_epoch > 0) { return ensured as GatedVaultRecord }
-  return valOf(await vaultDB.putVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedVaultRecord
+  return valOf(await vaultDB.tryPutVaultRecord({ ...vaultRecord, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedVaultRecord
 }
 
 /** The vault record `scope` holds in `vaultDB`, as `getVault` reads it, or null for none. Throws the refusal of a read that is refused.
  *
  * @example expect(await vaultRecordIn(vaultDB, scopeOf('u1'))).to.deep.equal(vaultRecordOf('u1'))
  */
-export const vaultRecordIn = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<VaultRecord | null> => {
-  const read = valOf(await vaultDB.getVault(scope))
+export const vaultRecordIn = async (vaultDB: Pick<VaultDB, 'tryGetVault'>, scope: VaultScope): Promise<VaultRecord | null> => {
+  const read = valOf(await vaultDB.tryGetVault(scope))
   return read === null ? null : recordOfRead(read)
 }
 
 /** A vault read's record alone, as `getVault` or `ensureVault` resolves it, its listing left out.
  *
- * @example expect(TH.recordOfRead(valOf(await vaultDB.ensureVault(draft)))).to.deep.equal(TH.gatelessOf('u1'))
+ * @example expect(TH.recordOfRead(valOf(await vaultDB.tryEnsureVault(draft)))).to.deep.equal(TH.gatelessOf('u1'))
  */
 export const recordOfRead = (read: VaultRecord & { boxes: unknown, damagedBoxes: unknown }): VaultRecord => {
   const { boxes: _boxes, damagedBoxes: _damagedBoxes, ...record } = read
@@ -396,16 +396,16 @@ export const recordOfRead = (read: VaultRecord & { boxes: unknown, damagedBoxes:
  *
  * @example expect(await boxesOf(vaultDB, scopeOf('u1'))).to.have.lengthOf(2)
  */
-export const boxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<readonly BoxSparse[]> => (
-  valOf(await vaultDB.getVault(scope))?.boxes ?? []
+export const boxesOf = async (vaultDB: Pick<VaultDB, 'tryGetVault'>, scope: VaultScope): Promise<readonly BoxSparse[]> => (
+  valOf(await vaultDB.tryGetVault(scope))?.boxes ?? []
 )
 
 /** The damaged boxes `scope`'s vault lists in `vaultDB`, as `getVault` reads them: empty where no vault is stored. Throws the refusal of a read that is refused.
  *
  * @example expect(await damagedBoxesOf(vaultDB, scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
  */
-export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: VaultScope): Promise<readonly BoxDamaged[]> => (
-  valOf(await vaultDB.getVault(scope))?.damagedBoxes ?? []
+export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'tryGetVault'>, scope: VaultScope): Promise<readonly BoxDamaged[]> => (
+  valOf(await vaultDB.tryGetVault(scope))?.damagedBoxes ?? []
 )
 
 /** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
@@ -413,7 +413,7 @@ export const damagedBoxesOf = async (vaultDB: Pick<VaultDB, 'getVault'>, scope: 
  * `vault_epoch`, it is no draft but the new life a store makes of one over a tombstone, the counter
  * carried on.
  *
- * @example vaultDB.ensureVault(gatelessOf('u1'))
+ * @example vaultDB.tryEnsureVault(gatelessOf('u1'))
  * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
  * @example gatelessOf('u1', { vault_epoch: 2 })   // a new life, as a read over a tombstone shows it
  */
@@ -462,14 +462,14 @@ export const OddLabels = Object.freeze([
  * What a write into {@link vaultRecordOf}('u1')'s vault expects when its box is not there yet:
  * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
  *
- * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+ * @example vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
 export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
 
 /** What a box read in {@link vaultRecordOf}('u1')'s vault expects: that vault.
  * Frozen, since every test shares it.
  *
- * @example vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
+ * @example vaultDB.tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
  */
 export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
 
@@ -477,7 +477,7 @@ export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
  * What a deletion of {@link vaultRecordOf}('u1')'s vault expects: that vault, at its first gate.
  * Frozen, since every test shares it.
  *
- * @example vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault)
+ * @example vaultDB.tryDelVault(TH.scopeOf('u1'), TH.thisVault)
  */
 export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 1 } as const)
 
@@ -486,14 +486,14 @@ export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 
  * the revision the deleting device read -- `rev-` and its tag, for a box {@link boxOf} made --
  * or null, for one listed with none.
  *
- * @example vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))
+ * @example vaultDB.tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))
  */
 export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
 
 /** A shape-valid DeviceRecord for device-storage tests: `user_id`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
  * Any field as `overrides` says otherwise.
  *
- * @example await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1'))
+ * @example await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
  * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
  */
 export const deviceRecordOf = (user_id: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({

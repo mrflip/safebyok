@@ -28,10 +28,11 @@ Three layers share the work, and each guarantee below belongs to one of them.
   before your code sees it, turns a `false` from you (from a box deletion, a `null`) into
   `stale_write`, and turns
   anything you throw that is not a
-  `VaultError` into `storage_unavailable`, your error as its cause. Every verb resolves an
-  `Outcome` and never rejects: `{ ok: true, val }`, or `{ ok: false, err }` with the refusal as
-  a `VaultError`, whether the base class refused or your code threw. It holds every name to its
-  check and to what your adapter declares (*Names*, below).
+  `VaultError` into `storage_unavailable`, your error as its cause. Every verb is a try pair:
+  `getBox` resolves its answer or throws the refusal, a `VaultError`, whether the base class refused
+  or your code threw; `tryGetBox` resolves the same as an `Outcome` and never rejects,
+  `{ ok: true, val }` or `{ ok: false, err }`. It holds every name to its check and to what your
+  adapter declares (*Names*, below).
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
   runs once, however often the host calls it. It judges your boxes' damage: your `doGetVault` and
@@ -75,13 +76,14 @@ The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
 failure (a `fetch` says the network failed with a `TypeError`): the `cause` carries your error, and
 an adapter that means a kind throws a `VaultError` of it. Whatever your code throws reaches the
-caller as a bad `Outcome`'s `err`, never as a rejection. A throw from the base class's own code
-that is not a `VaultError` is a bug in safebyok, not an outage: `unexpected_error`, never to be
-retried. An adapter that hands its calls on to another VaultDB unwraps each answer with `valOf`,
-returning its `val` and throwing its `err`. An answer handed back still wrapped as an `Outcome` is
-an answer in the wrong shape: `corrupt_record`, or `damaged_box` from `doGetBox`, never read as a
-record or a write landed. `subscribe`, which answers at once with the
-unsubscribe, is the one verb that throws its refusal rather than resolving it.
+caller as a bad `Outcome`'s `err` from a `try` form, never as a rejection, and as the throwing
+form's throw. A throw from the base class's own code that is not a `VaultError` is a bug in
+safebyok, not an outage: `unexpected_error` from a `try` form, never to be retried. An adapter
+that hands its calls on to another VaultDB calls that VaultDB's throwing verbs (`inner.getBox`),
+which answer with the record and throw the refusal, as `valOf` does of an `Outcome`. An answer
+handed back still wrapped as an `Outcome` is an answer in the wrong shape: `corrupt_record`, or
+`damaged_box` from `doGetBox`, never read as a record or a write landed. `subscribe`, which answers
+at once with the unsubscribe, is the one verb with one form: it throws its refusal.
 
 ## The baseline
 
@@ -432,8 +434,9 @@ box's checks or holds another boxlabel or revision, a `Refusals.staleBox`, `Refu
 or `Refusals.vaultFull` missing what it must carry, a deletion's report, a tombstone or the vault record an update stored, or a capacity, in another shape -- is
 `corrupt_record`: the adapter's bug, and the one thing that kind means. An adapter does not
 refuse a damaged record itself (line 1.3): it hands it up, and the base class names it. Each message says calmly what went wrong and what to do
-about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
-and never rejects: the refusal is its `err`, whoever made it.
+about it, and a caller branches on the kind, never the message. Every `try` verb resolves an
+`Outcome` and never rejects: the refusal is its `err`, whoever made it; the throwing verb throws
+that same refusal.
 
 **5.2. A stale write means an expectation failed, and nothing else.** `stale_write` says the vault
 changed under the writer, and the writer should read it again. Contention is never dressed up as

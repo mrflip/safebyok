@@ -49,7 +49,7 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
     await TH.unlock(vault, passphrase)
     return vault
   }
-  const getLease = () => TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
+  const getLease = () => TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)
@@ -66,14 +66,14 @@ const answeredNull = () => Promise.resolve(TH.good(null))
 
 /** A device store as one was written before DeviceDB was a class: an object holding the seven verbs, each answering an Outcome. */
 const plainDeviceDB = () => ({
-  getLease: answeredNull, putLease: answeredNull, delLease: answeredNull, getDeviceRecord: answeredNull, raiseDeviceRecord: answeredNull, delDeviceRecord: answeredNull, delAll: answeredNull,
+  tryGetLease: answeredNull, tryPutLease: answeredNull, tryDelLease: answeredNull, tryGetDeviceRecord: answeredNull, tryRaiseDeviceRecord: answeredNull, tryDelDeviceRecord: answeredNull, tryDelAll: answeredNull,
 })
 
 /** Storage adapters Bank.make refuses: short of a verb the vault calls, or no DeviceDB at all. */
 export const MisfitStores: readonly (readonly [Partial<TH.BornVaultOpts>, string])[] = [
   [{ vaultDB: { getVaultRecord: () => Promise.resolve(null) } as unknown as TH.BornVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
-  [{ deviceDB: Object.assign(memoryDeviceDB(), { delAll: 'never' }) }, 'a deviceDB whose delAll is no function'],
-  [{ deviceDB: Object.assign(memoryDeviceDB(), { getDeviceRecord: undefined }) }, 'a deviceDB that keeps no device record'],
+  [{ deviceDB: Object.assign(memoryDeviceDB(), { tryDelAll: 'never' }) }, 'a deviceDB whose tryDelAll is no function'],
+  [{ deviceDB: Object.assign(memoryDeviceDB(), { tryGetDeviceRecord: undefined }) }, 'a deviceDB that keeps no device record'],
   [{ deviceDB: plainDeviceDB() as unknown as TH.BornVaultOpts['deviceDB'] }, 'a deviceDB written as a plain object, every verb in place, that extends no DeviceDB'],
 ]
 
@@ -144,7 +144,7 @@ export const damagedVaultWorld = async () => {
 }
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'delDamagedVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['tryGetVault', 'tryEnsureVault', 'tryPutVaultRecord', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'tryDelVault', 'tryDelDamagedVault', 'subscribe'] as const
 
 /** Every verb of a DeviceDB, by name: a class instance's verbs are on its prototype, where `Object.keys` never finds them. */
 export const DeviceDBVerbs = ['getLease', 'putLease', 'delLease', 'getDeviceRecord', 'raiseDeviceRecord', 'delDeviceRecord', 'delAll'] as const satisfies readonly DeviceVerb[]
@@ -174,11 +174,11 @@ export const vaultWithPasskey = async () => {
 export const makeRacingWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
   const keyDeriver: KeyDeriver = { ...TH.testDeriver }
   const world = makeWorld({ keyDeriver, ...defaults })
-  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVault')
+  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'tryGetVault')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
   // Held once the store has the lease: the device store applies one scope's calls in the order made.
-  const holdNextLease = () => TH.holdNextAnswer(world.deviceDB, 'putLease')
-  const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'getBox')
+  const holdNextLease = () => TH.holdNextAnswer(world.deviceDB, 'tryPutLease')
+  const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'tryGetBox')
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 

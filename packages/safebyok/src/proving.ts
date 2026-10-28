@@ -60,8 +60,8 @@ export type ProvingTools = VaultPrivateTools & {
   now:         () => number
   /** This device's id for the vault, from the bank's device record: what a fresh header carries. */
   deviceId:    () => string
-  /** Store `record` as this device's lease through the DeviceDB's `putLease`, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
-  putLease:    (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
+  /** Store `record` as this device's lease through the DeviceDB's `tryPutLease`, resolving the record as stored, or the refusal, as an outcome for the demand that follows. */
+  tryPutLease: (record: LeaseRecord) => Promise<Outcome<LeaseRecord>>
   /** Hold `lease`, which this proving made of the record it just stored, as the vault's lease: its expiry armed, the snapshot replaced. */
   holdLease:   (lease: Lease) => Lease
 }
@@ -69,7 +69,7 @@ export type ProvingTools = VaultPrivateTools & {
 /** The key of a Vault object's getter of its {@link ProvingTools}: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it. No entry point exports it.
  * A class accessor is non-enumerable, and a symbol key is passed by anyway: `JSON.stringify`,
  * `Object.keys`, a spread and `for...in` all leave it out. What it reaches is no key and yields
- * none: `putLease`, `holdLease`, and what a seal reads.
+ * none: `tryPutLease`, `holdLease`, and what a seal reads.
  *
  * @example get [provingTools](): ProvingTools { return this.#provingTools }
  */
@@ -193,7 +193,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** Grant this device a lease on the vault, by the wayin this proving opens in the gate held, resolving the Lease as stored and held.
    * It seals a lease record over the vaultKey ({@link sealLeaseRecord}) and stores it through the
-   * DeviceDB's `putLease`, then makes the Lease of the stored record, here, and has the vault hold
+   * DeviceDB's `tryPutLease`, then makes the Lease of the stored record, here, and has the vault hold
    * it: its expiry armed, the snapshot replaced. No code but this, the Lease and the device store
    * holds the record.
    *
@@ -214,7 +214,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     // Nothing is awaited between these demands and the write.
     demandOn(tools, this, gating)
     demandOn(tools, VaultMadeUnder.parse(record), gating)
-    const put = await tools.putLease(record)
+    const put = await tools.tryPutLease(record)
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     demandOn(tools, this, gating)
     demandOn(tools, VaultMadeUnder.parse(put.ok ? put.val : record), gating)

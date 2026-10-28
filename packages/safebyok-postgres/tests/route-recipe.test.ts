@@ -22,14 +22,14 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
  * VaultDB checks again.
  */
 const served = new Map<string, Served>([
-  ['getVault',         (vaultDB, [scope]) => relayed(vaultDB.getVaultRecords(scope as VaultScope))],
-  ['ensureVault',      (vaultDB, [draft]) => relayed(vaultDB.ensureVaultRecords(draft as VaultDraft))],
-  ['putVaultRecord',    (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
-  ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
-  ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
-  ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
-  ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
-  ['delVault',         (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
+  ['getVault',         (vaultDB, [scope]) => relayed(vaultDB.tryGetVaultRecords(scope as VaultScope))],
+  ['ensureVault',      (vaultDB, [draft]) => relayed(vaultDB.tryEnsureVaultRecords(draft as VaultDraft))],
+  ['putVaultRecord',    (vaultDB, [vaultRecord, expected]) => vaultDB.tryPutVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
+  ['getBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.tryGetBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
+  ['getCapacity',      (vaultDB, [scope]) => vaultDB.tryGetCapacity(scope as VaultScope)],
+  ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.tryPutBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
+  ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.tryDelBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
+  ['delVault',         (vaultDB, [scope, expected]) => vaultDB.tryDelVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
 
 /** A vault as the VaultDB read it, as the browser's VaultDB answers from its half: its record as `vault`, null for none, beside its boxes, sound and damaged. */
@@ -260,7 +260,7 @@ describe("the README route recipe", () => {
     session.user_id = null
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
-    expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(deviceDB).tryGetLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
     session.user_id = 'u1'
     await TH.unlock(vault, 'correct horse battery staple')
@@ -278,7 +278,7 @@ describe("the README route recipe", () => {
     const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultRecord", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
-    await TH.expectBad(broken.getVault(TH.scopeOf('u1')), 'storage_unavailable')
+    await TH.expectBad(broken.tryGetVault(TH.scopeOf('u1')), 'storage_unavailable')
   })
 
   it("never sends the driver's own error to the browser", async () => {
@@ -358,7 +358,7 @@ describe("the README route recipe's answer, which every call makes in one shape"
     ]
     for (const body of bodies) {
       const broken = new RouteVaultDB(() => Promise.resolve(Response.json(body)))
-      await TH.expectBad(broken.getVault(TH.scopeOf('u1')), 'storage_unavailable')
+      await TH.expectBad(broken.tryGetVault(TH.scopeOf('u1')), 'storage_unavailable')
     }
   })
 

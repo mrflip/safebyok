@@ -267,7 +267,7 @@ export const untilBlockedBy = async (db: FileDatabase, blocker: Client): Promise
 /** Makes the u1 vault the helpers' vault record stands for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
   await ensureGated(vaultDB, vaultRecordOf('u1'))
-  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
+  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).tryPutBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
 }
 
 /**

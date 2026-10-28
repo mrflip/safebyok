@@ -20,7 +20,7 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
+    const write = TH.expectBad(device.tryPutBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
     await TH.untilBlockedBy(db, eraser)
     await eraser.query('COMMIT')
     await write
@@ -38,11 +38,11 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
+    const write = device.tryPutBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
     await TH.untilBlockedBy(db, eraser)
     await eraser.query('ROLLBACK')
     await TH.expectGood(write)
 
-    expect(await TH.expectingGood(device).getBox(u1, 'anthropic', TH.inThisVault)).to.not.be.null
+    expect(await TH.expectingGood(device).tryGetBox(u1, 'anthropic', TH.inThisVault)).to.not.be.null
   })
 })
