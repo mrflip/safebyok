@@ -46,8 +46,8 @@ export const Kit = {
 /** The kit a builder gets: {@link Kit}, with the given modules' exports spread in beneath it. */
 export type KitWith<SourcesT extends readonly object[]> = Omit<Merged<SourcesT>, keyof typeof Kit> & typeof Kit
 
-/** Every module in `SourcesT` merged into one, a later one's name over an earlier one's. */
-type Merged<SourcesT extends readonly object[]> =
+/** Every module in `SourcesT` merged into one, a later one's name over an earlier one's: what {@link KitWith} lays the kit over. */
+export type Merged<SourcesT extends readonly object[]> =
   SourcesT extends readonly [infer HeadT extends object, ...infer RestT extends readonly object[]] ? Omit<HeadT, keyof Merged<RestT>> & Merged<RestT> : unknown
 // --
 
