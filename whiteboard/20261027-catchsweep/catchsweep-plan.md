@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), each PR's base `main`: merging #321 merges all four. 2 (#325, on #316) reviewed and flagged, waits unfiled for the Coach; 3 (#330), 7 (#327) and 8 (#328) ready on #321 and in review; 9 (saying_story) queued. Nine threads.
+**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), each PR's base `main`; 7 (#327, on #321) reviewed clean and filing, so merging #327 will merge all five. 2 (#325, on #316) reviewed and flagged, waits unfiled for the Coach; 3 (#330) and 8 (#328) on #321 in review; 9 (saying_story) queued. Nine threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -243,6 +243,12 @@ the throwing form. The `Vault[provingTools]` route that hands `#badOutcome` to a
 note) follows the same one-catch form. Empty changeset unless a refusal changes. Size: medium,
 mechanical but wide. Depends on: thread 6 (it renames the store calls inside these same bodies): cut
 from thread 6's tip once it files.
+
+*Review:* (medium, 2026-10-28) clean: every body moved whole, bad news told once on both paths
+(`#hearBadNews` dedupes on `#told`), the gating's catches hand the proving the same Outcome, gating.ts
+keeps G1 and G8. Minor, left (Cleanup, after the restack): `clearCachedVault`'s `valOf` over the device
+store's try forms; `lock()`/`hello()`'s Outcome round trips through `#lockNow`/`#initialize`; no test of a
+throwing form rejecting with `unexpected_error`.
 
 ### 8. read_names: no operation is a `read` or a `write`
 
