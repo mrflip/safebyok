@@ -1259,8 +1259,10 @@ export class Vault implements VaultStamp {
   // What a proving reaches of this Vault object, through its [provingTools] getter: see ProvingTools.
   readonly #provingTools: ProvingTools
 
-  /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, judged by the picture in hand: refresh it first, and demand the Vault object not gone after, so no gating is raised over a gone one.
-   * It demands nothing once unlocked: demand the lease before using it.
+  /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, judged by the picture in hand: join an unlocking gating or raise one, waiting out any other.
+   * It neither refreshes nor demands the Vault object not gone before it starts: refresh through
+   * `#refreshIfStale` and demand not gone first, so no gating is raised over a gone one. It demands
+   * nothing once unlocked: demand the lease before using it.
    */
   async #ensureUnlocked(renewMillis: number): Promise<void> {
     for (;;) {
