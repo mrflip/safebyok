@@ -57,6 +57,8 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   until a full read of the tab on the Coach's word; a sweep that comes back empty now ends with a full read.
 * The Coach merged #327, #330 and #328 at 02:56 (2026-10-28); main is `f84d61bb`. Threads 9, 2 and 10
   stand on commits in main's history; each catches up onto main at filing.
+* Closed 2026-10-28: the last line is main → #333 → #331 → #325 → #314; thirty rulings swept into
+  `catchsweep-resolutions.md`; what is still open is in `human/20261028-sprint_catchsweep_done.md`.
 
 ## Discoveries by thread
 

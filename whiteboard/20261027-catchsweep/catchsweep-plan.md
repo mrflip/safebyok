@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. The last line, each PR's base `main`: #333 (`0c2a6278`, on main) → #331 (`ce9769fe`); merging #331 merges both. 2 (#325, `7b4c99ed`, second review fixed) is filing with its catch-up and the sprint's two folds (bank.ts `refusalOf` onto outcome.ts's; the DeviceDB doc's cause clause), then restacks onto #331 as the top. Ten threads.
+**Status:** done 2026-10-28. Merged to main: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56). The last line, each PR's base `main`: main (`f84d61bb`) → #333 (`0c2a6278`) → #331 (`ce9769fe`) → #325 (`ff1d2965`) → #314 (this sprint PR, squashed on top): merging #314 merges everything. Ten threads; rulings in `catchsweep-resolutions.md`; what is still open in `human/20261028-sprint_catchsweep_done.md`.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
