@@ -77,8 +77,11 @@ is a bug.
 * **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
   its types come in under `Z`: `import type * as Z from 'zod'`. A module that builds outside a
   `Validator` call (the kit's own primitives) imports the builders under the same short names.
-* Tree-shaking is no reason to choose either: named and star imports shake identically (esbuild
-  0.27, rolldown 1.2).
+* Tree-shaking is no reason to choose either. Where a star import is reached only through its
+  members (`CX.bankScope`), it shakes as named imports do (esbuild 0.27, rolldown 1.2). One passed
+  as a value, as `[FX]` is to a `Validator` call, keeps the module's namespace object, and with it
+  every export the namespace names: about 0.2 kB in idbDeviceDB (`fields_exports` in
+  `dist/shapes/fields.js`). That cost is accepted for what the source buys the builder.
 * **Picking named fields needs no library**: destructure them from the parsed output. No
   `es-toolkit/compat` in this library. Where a pick by a list of names is truly needed, write
   `fieldnames.map((fieldname) => scope[fieldname])`: es-toolkit's core `pick` returns an object,
