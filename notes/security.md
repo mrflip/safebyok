@@ -1806,13 +1806,14 @@ added or folded into through the subagent, and no other entry changes.
   pins on `graphql-yoga` and `@graphql-tools/schema` became ranges again: the rule now does what
   they did). Dependabot's `cooldown` is 7 days to match. Amended 2026-10-28 (20261028-helpers_bump;
   the Coach approved taking it early): the first exception. `convex-helpers@0.1.129` (published
-  2026-10-21T23:13Z) is exempted by exact version in `minimumReleaseAgeExclude` and pinned exactly
+  2026-10-21T23:13Z) was exempted by exact version in `minimumReleaseAgeExclude` and pinned exactly
   as a devDependency of `safebyok-convex` and `e2e` (the peer range is ^0.1.129), about 23 hours
-  before it passes seven days (2026-10-28 23:13 UTC). It is a build and test-time dependency (its
+  before it passed seven days (2026-10-28 23:13 UTC). It is a build and test-time dependency (its
   `zodToConvex` derives the component's Convex validators from the core's Zod) and a peer of
   `safebyok-convex`; 0.1.128's `.ts` sources broke `erasableSyntaxOnly`; with 0.1.129 TypeScript
-  resolves its imports to `.d.ts`. Once aged, the exclusion and both exact pins are deleted in one commit and the devDependency
-  returns to a range.
+  resolves its imports to `.d.ts`. Exception ended, amended 2026-10-28 (20261028-helpers_range, thread 28): the same day, ahead of
+  its seventh day, the `minimumReleaseAgeExclude` entry was deleted from `pnpm-workspace.yaml` and the exact devDependency pins in
+  `safebyok-convex` and `e2e` returned to `^0.1.129`; no exception is standing.
 * 2026-10-15: `mask` (`safebyok/utils`) takes a whisper and returns text meant for display: its
   first and last few characters (two and four by default, at the caller's choice) and, up to
   `maxLen` (15 by default), its length. Beyond `maxLen` the result is fixed-width
