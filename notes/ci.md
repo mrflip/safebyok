@@ -6,7 +6,7 @@ a check failed. A thread needs none of it: what a PR must carry is PROCESS.md, *
 ## On every pull request
 
 CI runs on every PR, over the root and every workspace package: `lint-typecheck` (lint, typecheck,
-no merge commits, a changeset, and `actionlint` over the workflows, by `scripts/actionlint.sh`,
+a changeset, and `actionlint` over the workflows, by `scripts/actionlint.sh`,
 which `pnpm justify` runs too, as `pnpm lint:workflows`) and `test-build` (tests with
 coverage, which builds every package with its package checks, then the size budgets) must pass;
 `node-compat` runs the tests on Node 22, the platform floor, which must pass too, and on the
