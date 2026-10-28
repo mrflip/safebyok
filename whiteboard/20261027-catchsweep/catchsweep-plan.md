@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** threads 1 (#316) and 4 (#317) filed, on main, #317 restacked onto #316 awaiting the Coach's push and merge; 5 (#324) and 6 (#321) in review; 2 building on 1; 3, 7 and 8 wait on 6. Eight threads.
+**Status:** threads 1 (#316) and 4 (#317, restacked onto #316 at `eed4c606`) filed: merging #317 merges both; 2 (#325, on #316), 5 (#324) and 6 (#321) in review; 3, 7 and 8 wait on 6. The line as threads file: #316, #317, then #321, #324, #325 on top. Eight threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they

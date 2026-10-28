@@ -60,6 +60,19 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   `notes/guarantees.md` names it under G8 and beneath the *Where the guarantees are kept* table;
   `guardRequestCleartext` replaces a stale `parseRequestCleartext` there. The react misuse-dialog test
   flaked once in threads 4, 5 and 6's justify runs; #320 (open) is its fix.
+* **Thread 2 (aead_narrow, #325), ready 2026-10-28:** a module-private `refusalOf(thrown)` in `outcome.ts`
+  (a VaultError as it came, else `unexpectedError`), not exported; the five Lease/Box throwing forms end
+  `catch (err) { throw refusalOf(err) }`, the catch before any zeroing `finally`. `Lease.#openedOrNull`
+  holds `unwrapKeyUnder` and `decipherBytes` each in its own catch. `deviceTrouble` carries no `cause`;
+  36 tests flipped. Two declared deviations, rows for the Coach: no inner catch in the cipher body (a
+  failing `wrapKeyUnder`/`cipherBytes` refuses `unexpected_error` before the post-wait demand); a vault
+  stamp failing its check refuses `bad_record` from `cipheredWith`/`decipherWith` where
+  `#vaultKeyOrNull` made it `damaged_lease` and locked the vault. **Thread 7's model**: `try { body }
+  catch (err) { throw refusalOf(err) }`; for Vault/Bank the catch also tells bad news, so `refusalOf`
+  sits inside their `#heardRefusal`-style helper; `vault.ts` `#badOutcome` (~l.1754) is the same
+  expression. **Restack of #321 with #325**: thread 2's `device-db.ts` change is `deviceTrouble` alone
+  (doc block and the two `new VaultError` calls); the `DeviceDB` class doc clause "that throw its
+  `cause`" (l.22) is dropped by whichever lands second.
 * **Thread 4 (where_prefix, #317), filed 2026-10-28 at `9f8fa55b`:** the catch-up over #301 also retired
   `optionsRefusal` (`options.ts`), the helper #301 had lifted the options catch-rewrap into, converting its
   three further callers (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`, `localVaultDB` in
