@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import * as Zod from 'zod'
 import { defineTestApp } from 'convex-test'
 import { defineSchema } from 'convex/server'
 import { v } from 'convex/values'
@@ -51,25 +52,26 @@ const zodLiteralShape = ({ def }: ZodLike): Shape | null => {
 }
 
 /** The core's half: its schema as Convex can check it. Refinements (min, max, regex, int, a record's rule
- * across its fields) are set aside: Convex has none. A custom check is any value, and a transform
- * or a frozen copy is what it takes in.
+ * across its fields) are set aside: Convex has none. A custom check is any value under a box's
+ * sidecar and has no shape anywhere else; a transform or a frozen copy is what it takes in.
  */
-const zodShape = (schema: ZodLike): Shape => {
+const zodShape = (schema: ZodLike, fieldname?: string): Shape => {
   const { def } = schema
   if (def.type === 'string' || def.type === 'number') { return { kind: def.type } }
-  // A box's sidecar: a check of a plain object of JSON values, which the core alone runs.
-  if (def.type === 'custom') { return { kind: 'any' } }
-  if (def.type === 'pipe' && def.in) { return zodShape(def.in) }
-  if (def.type === 'readonly' && def.innerType) { return zodShape(def.innerType) }
+  // A box's sidecar: a check of a plain object of JSON values, which the core alone runs. It alone
+  // converts to v.any(): a custom check on any other field has no shape here, so a new one fails.
+  if (fieldname === 'sidecar' && def.type === 'custom') { return { kind: 'any' } }
+  if (def.type === 'pipe' && def.in) { return zodShape(def.in, fieldname) }
+  if (def.type === 'readonly' && def.innerType) { return zodShape(def.innerType, fieldname) }
   if (def.type === 'object') {
     const fields = Object.entries(def.shape ?? {}).map(([ckey, field]) => {
       const optional = field.def.type === 'optional'
-      return [ckey, { optional, shape: zodShape(optional && field.def.innerType ? field.def.innerType : field) }] as const
+      return [ckey, { optional, shape: zodShape(optional && field.def.innerType ? field.def.innerType : field, ckey) }] as const
     })
     return { kind: 'object', fields: Object.fromEntries(fields) }
   }
   if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
-  if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType) } }
+  if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType, fieldname) } }
   if (def.type === 'union' && def.options) {
     const members = def.options.map((option) => zodShape(option))
     return literalsOf(members) ?? { kind: 'union', members }
@@ -132,6 +134,14 @@ describe("the Convex validators, field for field with the core's Zod validators 
       expect(convexShape(convexRecord)).to.deep.equal(zodShape(zodRecord as unknown as ZodLike))
     })
   }
+
+  it("reads a custom check as any value for the sidecar alone, so a second custom in a stored record fails here", () => {
+    const custom = Zod.custom<Record<string, unknown>>((val) => typeof val === 'object')
+    expect(zodShape(Zod.object({ sidecar: custom }) as unknown as ZodLike)).to.deep.equal(
+      { kind: 'object', fields: { sidecar: { optional: false, shape: { kind: 'any' } } } },
+    )
+    expect(() => zodShape(Zod.object({ note: custom }) as unknown as ZodLike)).to.throw('no shape for a Zod custom')
+  })
 
   it("type the same records, expectations and summaries as the core", () => {
     // What the core writes is what Convex takes: each record the core checks is one Convex's type takes.
