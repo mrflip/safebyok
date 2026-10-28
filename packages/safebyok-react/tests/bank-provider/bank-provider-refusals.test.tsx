@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Validators, Scopepath, VaultError, delDamagedVault, isVaultError, localVaultDB, memoryDeviceDB } from 'safebyok'
+import { Scopepath, VaultError, delDamagedVault, isVaultError, localVaultDB, label, memoryDeviceDB } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, BankVaultExample, hushConsole, noop } from './world'
@@ -32,7 +32,7 @@ describe("BankProvider", () => {
     it("throws a validators prop to the error boundary, as Bank.make refuses an option it does not take: the name rules are the package's own", async () => {
       hushConsole()
       const caught: unknown[] = []
-      const validators = { boxlabel: Validators.label }
+      const validators = { boxlabel: label }
       render(
         <CatchingBoundary caught={caught}>
           <BankProvider {...makeWorld().props} user_id="u1" {...{ validators } as object}>

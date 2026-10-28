@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import * as Validators from '../src/validators'
+import * as safebyok from '../src/index'
 import * as PX from '../src/shapes/primitives'
 import * as VX from '../src/shapes/vault'
 import * as DX from '../src/shapes/device'
@@ -16,7 +16,7 @@ import { optionsCheck } from '../src/options'
 import * as TH from './test-helpers'
 import { makeWorld } from './vault/world'
 
-/** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
+/** The validators made in a `Validator` call that the main entry leaves out, each exported from its own module for the package's own use: held to the same rules as those it exports. */
 const InPackage = {
   boxBase: BX.boxBase, madeShape: BX.madeShape, madeUnder: BX.madeUnder, sealBoxProps: BX.sealBoxProps, freshPasskeyAnswer: VX.freshPasskeyAnswer, boxCiphered: BX.boxCiphered, leaseGrant: DX.leaseGrant, vaultStampButFormat: VX.vaultStampButFormat, whisperBag: BX.whisperBag,
   passphraseWayinHeader: VX.passphraseWayinHeader, passkeyWayinHeader: VX.passkeyWayinHeader, wayinkind: VX.wayinkind, device_id: FX.device_id, key_deriver_label: FX.key_deriver_label, credential_id: FX.credential_id,
@@ -24,8 +24,11 @@ const InPackage = {
   declaredBoxes: OX.declaredBoxes, declaredBytes: OX.declaredBytes, leaseHoursAsMillis: OX.leaseHoursAsMillis, maxBoxes: OX.maxBoxes, maxWhisperBytes: OX.maxWhisperBytes, renewMinutesAsMillis: OX.renewMinutesAsMillis, staleMinutesAsMillis: OX.staleMinutesAsMillis, vaultMadeUnder: VX.vaultMadeUnder,
 }
 
-/** Every validator the package makes, the namespace's and its own. */
-const EveryValidator = { ...Validators, ...InPackage }
+/** Each validator the main entry exports, by its name there. */
+const Exported = Object.fromEntries(Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)) as Record<string, Zod.ZodType>
+
+/** Every validator the package makes, those the main entry exports and its own. */
+const EveryValidator = { ...Exported, ...InPackage }
 
 /** What every input below carries, as a key and as a value: a refusal that holds it repeated its input. */
 const Marker = 'zqxMarkerKey7'
@@ -58,29 +61,29 @@ const refusalTextOf = (attempt: () => unknown): string => {
   }
 }
 
-describe("Validators", () => {
-  it("parses a scope through the namespace, as its first example shows", () => {
-    expect(Validators.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+describe("the validators the main entry exports", () => {
+  it("parses a scope, as the README's example shows", () => {
+    expect(safebyok.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
-  it("refuses an empty vault_tok in safeParse, as its second example shows", () => {
-    expect(Validators.vault_tok.safeParse('').success).to.be.false
+  it("refuses an empty vault_tok in safeParse, as the README's example shows", () => {
+    expect(safebyok.vault_tok.safeParse('').success).to.be.false
   })
 
-  it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own, those the namespace leaves out included", () => {
+  it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own, those the main entry leaves out included", () => {
     for (const [valname, validator] of Object.entries(EveryValidator)) {
       const thrown = (() => { try { validator.parse(Symbol('nothing a validator takes')); return null } catch (err) { return err } })()
       expect(thrown, valname).to.be.instanceOf(Object.hasOwn(PX, valname) ? Zod.ZodError : VaultError)
     }
   })
 
-  it("holds every validator as the same object its module exports", () => {
-    expect(Validators.label).to.eq(PX.label)
+  it("exports every validator as the same object its module exports", () => {
+    expect(safebyok.label).to.eq(PX.label)
   })
 
   it("leaves out the validators the package builds others from or checks its own steps with", () => {
     for (const valname of Object.keys(InPackage)) {
-      expect(Object.hasOwn(Validators, valname), valname).to.be.false
+      expect(Object.hasOwn(Exported, valname), valname).to.be.false
     }
   })
 })

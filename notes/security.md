@@ -79,16 +79,16 @@ added or folded into through the subagent, and no other entry changes.
   alone still drops Zod.
   (5) `Wayin.make` refuses with its schema's own `bad_record`, no cause, no re-labelling (`damagedWayinUnless` deleted); a damaged wayin met on
   unlock is still `damaged_wayin`.
-  (6) Every validator a host or a storage adapter needs is public: the main entry exports `Validators` (a namespace of 66 validators, those a host or
+  (6) Every validator a host or a storage adapter needs is public: the main entry exports each by name (66 validators, those a host or
   a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
   field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
-  its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
+  its `Kit`. (amended 2026-10-28 (validator_names): this read "the main entry exports `Validators` (a namespace of 66 validators" when written; the namespace and `src/validators.ts` are gone, and the same validator objects are exported from the main entry by name, a host importing them by name or as `import * as Safebyok from 'safebyok'`; nothing a validator accepts or refuses changed.) (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
   pieces, such as `boxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `leaseGrant`, `storedVaultAnswer` (amended 2026-10-28 (db_hooks): named `ReadAnswer` when this was written), `listingAnswer` (amended 2026-10-28 (validator_names): named `BoxBase`, `LeaseGrant`, `StoredVaultAnswer` and `ListingAnswer` when this was written), the stamps picked from a carrier, `Bank.make`'s per-option field checks and
-  `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
+  `passphraseCleartext`, are no longer exported from the main entry (amended 2026-10-28 (validator_names): "in the namespace" when this was written); they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
   `input` unless a caller asks Zod for it). `label`, `user_id` and `epochMillis` (amended 2026-10-28 (validator_names): `EpochMillis` when this was written) are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
   options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
-  asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not.)
+  asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not; amended 2026-10-28 (validator_names): the namespace is gone, and this holds for every validator, exported from the main entry by name or not.)
   (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
   `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/shapes/device.ts`; amended 2026-10-28 (validator_names): `src/idb-opts.ts` when this was written) is strict too, so
   `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
@@ -2248,7 +2248,7 @@ added or folded into through the subagent, and no other entry changes.
   own clients then refuse as `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box` or
   `damaged_vault`). Amended 2026-10-27 (thread 18, convex_helpers; the Coach's yes for the dependency):
   the component's argument, return and table validators are now made from the core's exported Zod
-  validators (`Validators.vaultRecord`, `boxRecord`, the expectations, `capacity`, `vaultTombstone`,
+  validators (`Safebyok.vaultRecord` (amended 2026-10-28 (validator_names): `Validators.vaultRecord` when this was written; the core's main entry now exports each validator by name and the component's `src/component/validators.ts` star-imports it as `Safebyok`), `boxRecord`, the expectations, `capacity`, `vaultTombstone`,
   `vaultDraft`, `boxscope`; amended 2026-10-28 (validator_names): named `VaultRecord`, `BoxRecord`, `Capacity`, `VaultTombstone` and `VaultDraft` when this was written) by `zodToConvex` from `convex-helpers/server/zod4`. `convex-helpers`
   (^0.1.129) and `zod` are peer dependencies the host installs, so their code now runs inside the
   component's server functions, bundled by the host's Convex CLI; it holds no key material and only

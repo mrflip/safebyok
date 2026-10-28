@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Validators } from 'safebyok'
+import * as Safebyok from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -14,17 +14,17 @@ type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safePars
 
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
-  ['SafebyokVaultScope',         Validators.vaultScope.unwrap(), []],
-  ['SafebyokVaultRecord',        Validators.vaultRecord, []],
-  ['SafebyokVaultRecordInput',   Validators.vaultRecord, []],
-  ['SafebyokGate',               Validators.gateRecord,  []],
-  ['SafebyokGateInput',          Validators.gateRecord,  []],
-  ['SafebyokBox',                Validators.boxRecord,   []],
-  ['SafebyokBoxInput',           Validators.boxRecord,   []],
-  ['SafebyokBoxSparse',          Validators.boxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
-  ['SafebyokBoxDamaged',         Validators.boxDamaged,  []],
-  ['SafebyokCiphered',           Validators.ciphered,    []],
-  ['SafebyokCipheredInput',      Validators.ciphered,    []],
+  ['SafebyokVaultScope',         Safebyok.vaultScope.unwrap(), []],
+  ['SafebyokVaultRecord',        Safebyok.vaultRecord, []],
+  ['SafebyokVaultRecordInput',   Safebyok.vaultRecord, []],
+  ['SafebyokGate',               Safebyok.gateRecord,  []],
+  ['SafebyokGateInput',          Safebyok.gateRecord,  []],
+  ['SafebyokBox',                Safebyok.boxRecord,   []],
+  ['SafebyokBoxInput',           Safebyok.boxRecord,   []],
+  ['SafebyokBoxSparse',          Safebyok.boxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxDamaged',         Safebyok.boxDamaged,  []],
+  ['SafebyokCiphered',           Safebyok.ciphered,    []],
+  ['SafebyokCipheredInput',      Safebyok.ciphered,    []],
 ] as const
 
 /** The fields of the object or input type `typename`, by name. */

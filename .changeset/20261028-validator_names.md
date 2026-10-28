@@ -3,9 +3,11 @@
 "safebyok-convex": minor
 ---
 
-**Breaking, a rename only.** Every validator is now named in lowerCamelCase beside its type, which keeps its ModuleCase name: `import { Validators, type BoxSparse } from 'safebyok'`, then `Validators.boxSparse.parse(row)`. An enumeration's list of values is lowerCamelCase too, beside its checker and its type. Nothing a validator accepts or refuses changes, nor any refusal's kind or message. Find and replace each name below where you use the value (`.parse`, `.safeParse`, `typeof`, a schema built on it); a type annotation (`: BoxRecord`) stays as it is. The `Validators` namespace holds the same validators under the new names, and only validators: `Validators.BoxRecord` as a type is gone, so import the type by name from the main entry.
+**Breaking: validators are renamed, and the `Validators` namespace is gone.** Every validator is now named in lowerCamelCase beside its type, which keeps its ModuleCase name, and the main entry exports each by name: `import { boxSparse, type BoxSparse } from 'safebyok'`, then `boxSparse.parse(row)`; or star-import the main entry, `import * as Safebyok from 'safebyok'`, then `Safebyok.boxSparse.parse(row)`. An enumeration's list of values is lowerCamelCase too, beside its checker and its type. Nothing a validator accepts or refuses changes, nor any refusal's kind or message. Find and replace each name below where you use the value (`.parse`, `.safeParse`, `typeof`, a schema built on it); a type annotation (`: BoxRecord`) stays as it is.
 
-Validators, old -> new, at the main entry and in `Validators` alike:
+**`Validators` is gone.** The main entry no longer exports a namespace of validators: each one `Validators` held is exported by name, under its new name below, so `Validators.vault_tok` is `vault_tok` and `Validators.makeBankOpts` is `makeBankOpts`. Replace `import { Validators } from 'safebyok'` with the names you use, or with `import * as Safebyok from 'safebyok'` and `Safebyok.` where you wrote `Validators.`. `Validators.BoxRecord` as a type is gone too: import the type by name.
+
+Validators, old -> new:
 
 * `EpochMillis` -> `epochMillis`; `Whisper` -> `whisper`; `Sidecar` -> `sidecar`; `Ciphered` -> `ciphered`
 * `BoxRecord` -> `boxRecord`; `BoxSparse` -> `boxSparse`; `BoxDamaged` -> `boxDamaged`; `BoxStamp` -> `boxStamp`
@@ -13,14 +15,13 @@ Validators, old -> new, at the main entry and in `Validators` alike:
 * `VaultRecord` -> `vaultRecord`; `VaultSparse` -> `vaultSparse`; `VaultStamp` -> `vaultStamp`; `VaultTombstone` -> `vaultTombstone`
 * `GateRecord` -> `gateRecord`; `GateSparse` -> `gateSparse`; `WayinRecord` -> `wayinRecord`
 * `PassphraseWayinRecord` -> `passphraseWayinRecord`; `PasskeyWayinRecord` -> `passkeyWayinRecord`; `PassphraseWayinSparse` -> `passphraseWayinSparse`; `PasskeyWayinSparse` -> `passkeyWayinSparse`
-* In `Validators` only: `VaultDraft` -> `vaultDraft`; `Capacity` -> `capacity`; `VaultRecordExpectation` -> `vaultRecordExpectation`; `BoxGetExpectation` -> `boxGetExpectation`; `BoxExpectation` -> `boxExpectation`; `VaultDelExpectation` -> `vaultDelExpectation`; `BoxDelExpectation` -> `boxDelExpectation`; `BoxDeletion` -> `boxDeletion`
+* Formerly in `Validators` only, now exported by name: `VaultDraft` -> `vaultDraft`; `Capacity` -> `capacity`; `VaultRecordExpectation` -> `vaultRecordExpectation`; `BoxGetExpectation` -> `boxGetExpectation`; `BoxExpectation` -> `boxExpectation`; `VaultDelExpectation` -> `vaultDelExpectation`; `BoxDelExpectation` -> `boxDelExpectation`; `BoxDeletion` -> `boxDeletion`
 * Not exported, the package's own: `MadeUnderShape` -> `madeUnder` and `CipheredShape` -> `boxCiphered`, each named for its type (`MadeUnder`, `BoxCiphered`).
-* `VaultScope` -> `vaultScope`. `VaultScope` was the same object as `Validators.vaultScope` under a second name: the main entry now exports it as `vaultScope`, and `Validators.VaultScope` is gone. The type `VaultScope` is unchanged.
+* `VaultScope` -> `vaultScope`. `VaultScope` was the same object as `Validators.vaultScope` under a second name: the main entry now exports it as `vaultScope`. The type `VaultScope` is unchanged.
 
 Lists of values, old -> new:
 
 * `BoxDamageVals` -> `boxDamageVals`; `WayinKindVals` -> `wayinKindVals`; `CorrectableKindVals` -> `correctableKindVals`; `GatingKindVals` -> `gatingKindVals`; `RefusalFamilyVals` -> `refusalFamilyVals`; `RefusalKindVals` -> `refusalKindVals`
-* `Refusals.StaleWriteVals` -> `Refusals.staleWriteVals`
 * `safebyok-convex/server`: `SafebyokErrorKindVals` -> `safebyokErrorKindVals`
 
 `Scopepath.bankScope`, `Scopepath.vaultScope` and `Scopepath.boxscope` keep their names. `safebyok-convex`'s own Convex validators, inside its component, are lowerCamelCase too; a host calls the component through `SafebyokComponent`, whose functions and arguments are unchanged.

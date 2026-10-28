@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as safebyok from '../src/index'
 import * as PX from '../src/shapes/primitives'
-import * as Validators from '../src/validators'
+import * as CX from '../src/shapes/scopes'
+import * as KX from '../src/shapes/key-deriver-spec'
+import * as FX from '../src/shapes/fields'
+import * as BX from '../src/shapes/box'
+import * as VDX from '../src/shapes/vault-db'
+import * as DX from '../src/shapes/device'
+import * as VX from '../src/shapes/vault'
+import * as OX from '../src/shapes/bank-opts'
+import * as MX from '../src/shapes/mask'
 
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
@@ -12,9 +20,13 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'correctableKindVals', 'gatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'ciphered', 'deviceRecord', 'DeviceRecordFormat', 'epochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'boxDamageVals', 'boxDamaged', 'BoxFormat', 'boxRecord', 'boxSparse', 'boxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'passkeyWayinRecord', 'PasskeySaltBytes', 'passphraseWayinRecord', 'sidecar', 'StaleMinutes', 'wayinRecord', 'wayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'leaseRecord', 'leaseStamp', 'gateRecord', 'gateSparse', 'passkeyWayinSparse', 'passphraseWayinSparse', 'VaultFormat', 'vaultSparse', 'vaultStamp', 'vaultTombstone', 'TombstoneFormat', 'vaultRecord', 'vaultScope', 'isGated', 'whisper', 'wallClock',
-      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'consistent', 'demandConsistent', 'verifyConsistent', 'Validators',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'consistent', 'demandConsistent', 'verifyConsistent',
       'VaultError', 'RefusalFamilyForKind', 'refusalFamilyVals', 'refusalKindVals', 'isCondition', 'isVaultError', 'storageTroubleOf', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'HostErrorSanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
+      'bankScope', 'boxscope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath', 'vaultBag', 'bankBag', 'keyDeriverSpec', 'maskOpts', 'idbOpts',
+      'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped',
+      'vaultDraft', 'passkeyAnswerShape', 'strengthChecker', 'passphraseVerdict', 'capacity', 'vaultRecordExpectation', 'boxGetExpectation', 'boxExpectation', 'vaultDelExpectation', 'boxDelExpectation', 'boxDeletion',
+      'makeBankOpts', 'bankVaultOpts', 'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'loggerShape', 'localVaultDBOptsShape',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -30,8 +42,9 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
-  it("exports the validators a host or an adapter calls as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
-    expect(Object.keys(safebyok.Validators)).to.have.members([
+  it("exports each validator a host or an adapter calls by name, no namespace of them, each the object its module makes, and Validator and its kit to make more", () => {
+    const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
+    expect(validatorsByName.map(([exportname]) => exportname)).to.have.members([
       'epochMillis', 'label', 'user_id',
       'bankScope', 'vaultScope', 'boxscope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath',
       'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped', 'ciphered',
@@ -41,13 +54,9 @@ describe("the package's entry point", () => {
       'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
       'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswerShape',
     ])
-    for (const [valname, validator] of Object.entries(Validators)) {
-      expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
-    }
-    const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
-    expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['vaultRecord', 'boxRecord', 'whisper', 'sidecar', 'ciphered', 'leaseStamp', 'label'])
+    const shapesModules: readonly object[] = [PX, CX, KX, FX, BX, VDX, DX, VX, OX, MX]
     for (const [exportname, exported] of validatorsByName) {
-      expect(safebyok.Validators[exportname as keyof typeof Validators], exportname).to.eq(exported)
+      expect(shapesModules.some((shapesModule) => (shapesModule as Record<string, unknown>)[exportname] === exported), exportname).to.be.true
     }
     expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
   })

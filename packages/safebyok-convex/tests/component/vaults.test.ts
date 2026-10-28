@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
-import { Validators, type GatedVaultRecord, memoryStore } from 'safebyok'
+import { boxSparse, type GatedVaultRecord, memoryStore } from 'safebyok'
 import * as TH from '../test-helpers'
 import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 
@@ -289,7 +289,7 @@ describe("a real vault's records", () => {
     const vault = await TH.openOver(memoryStoreHolding(real))
     const listed = await TH.boxesIn(CVX, u1)
     // The listing holds each record's fields as stored but the two ciphered ones: the core's BoxSparse, field for field.
-    expect(listed.map((box) => Validators.boxSparse.parse(box))).to.deep.equal(vault.getSnapshot().boxes)
+    expect(listed.map((box) => boxSparse.parse(box))).to.deep.equal(vault.getSnapshot().boxes)
     TH.closeVault(vault)
   })
 })

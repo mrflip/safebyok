@@ -105,8 +105,8 @@ thing's stage in its life is its `lifecycle`.
 `Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and takes its
 type's name with the first letter lowered: lowerCamelCase beside its ModuleCase type (the Coach,
 2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
-BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { Validators, type BoxSparse } from
-'safebyok'` and calls `Validators.boxSparse.parse(row)`.
+BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { boxSparse, type BoxSparse } from
+'safebyok'` and calls `boxSparse.parse(row)`.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
 spreads a narrower: `export const wayinKindVals = [...] as const`,

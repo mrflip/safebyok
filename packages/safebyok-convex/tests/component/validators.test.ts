@@ -4,15 +4,13 @@ import { defineTestApp } from 'convex-test'
 import { defineSchema } from 'convex/server'
 import { v } from 'convex/values'
 import type { GenericValidator, Infer } from 'convex/values'
-import * as Records from 'safebyok'
+import * as Safebyok from 'safebyok'
 import type {
   VaultRecordExpectation as CoreVaultRecordExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxGetExpectation as CoreBoxGetExpectation, BoxExpectation as CoreBoxExpectation,
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import * as CVX from '../../src/component/validators'
 import * as TH from '../test-helpers'
-
-const { Validators } = Records
 
 /**
  * A record's shape, as both validator libraries can be read: which fields, which optional, and
@@ -108,22 +106,22 @@ const convexShape = (validator: GenericValidator): Shape => {
 }
 
 const ShapeCases = [
-  [Validators.ciphered,               CVX.ciphered,               'ciphered: the shared encrypted-value shape'],
-  [Validators.vaultScope,             CVX.vaultScope,             'vaultScope: what names one vault, which the core hands out frozen'],
-  [Validators.boxscope,               CVX.boxscope,               "boxscope: a vault's scope and a boxlabel"],
-  [Validators.vaultRecord,            CVX.vaultRecord,            "vaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
-  [Validators.gateRecord,             CVX.gate,                   'gate: the passphrase, and the passkey or null'],
-  [Validators.vaultDraft,             CVX.novelVaultRecord,       'novelVaultRecord: every field, gate_epoch 0 and no gate'],
-  [Validators.boxRecord,              CVX.boxRecord,              'boxRecord: every field, the sidecar any value, both ciphered fields nested'],
-  [Validators.boxSparse,              CVX.boxSparse,              'boxSparse: the record without its ciphered fields, format kept'],
-  [Validators.vaultTombstone,         CVX.vaultTombstone,         'vaultTombstone: the scope, its format and the counter carried on'],
-  [Validators.capacity,               CVX.capacity,               'capacity: each max a number or Infinity, as the core takes it in'],
-  [Validators.vaultRecordExpectation, CVX.vaultRecordExpectation, 'vaultRecordExpectation: vault_tok and gate_epoch'],
-  [Validators.boxGetExpectation,      CVX.boxGetExpectation,      'boxGetExpectation: vault_tok'],
-  [Validators.boxExpectation,         CVX.boxExpectation,         'boxExpectation: vault_tok, and revision_tok or null'],
-  [Validators.vaultDelExpectation,    CVX.vaultDelExpectation,    'vaultDelExpectation: vault_tok, and gate_epoch or null'],
-  [Validators.boxDelExpectation,      CVX.boxDelExpectation,      'boxDelExpectation: vault_tok, and revision_tok or null'],
-  [Validators.boxDeletion,            CVX.boxDeletion,            'boxDeletion: one of three outcomes'],
+  [Safebyok.ciphered,               CVX.ciphered,               'ciphered: the shared encrypted-value shape'],
+  [Safebyok.vaultScope,             CVX.vaultScope,             'vaultScope: what names one vault, which the core hands out frozen'],
+  [Safebyok.boxscope,               CVX.boxscope,               "boxscope: a vault's scope and a boxlabel"],
+  [Safebyok.vaultRecord,            CVX.vaultRecord,            "vaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
+  [Safebyok.gateRecord,             CVX.gate,                   'gate: the passphrase, and the passkey or null'],
+  [Safebyok.vaultDraft,             CVX.novelVaultRecord,       'novelVaultRecord: every field, gate_epoch 0 and no gate'],
+  [Safebyok.boxRecord,              CVX.boxRecord,              'boxRecord: every field, the sidecar any value, both ciphered fields nested'],
+  [Safebyok.boxSparse,              CVX.boxSparse,              'boxSparse: the record without its ciphered fields, format kept'],
+  [Safebyok.vaultTombstone,         CVX.vaultTombstone,         'vaultTombstone: the scope, its format and the counter carried on'],
+  [Safebyok.capacity,               CVX.capacity,               'capacity: each max a number or Infinity, as the core takes it in'],
+  [Safebyok.vaultRecordExpectation, CVX.vaultRecordExpectation, 'vaultRecordExpectation: vault_tok and gate_epoch'],
+  [Safebyok.boxGetExpectation,      CVX.boxGetExpectation,      'boxGetExpectation: vault_tok'],
+  [Safebyok.boxExpectation,         CVX.boxExpectation,         'boxExpectation: vault_tok, and revision_tok or null'],
+  [Safebyok.vaultDelExpectation,    CVX.vaultDelExpectation,    'vaultDelExpectation: vault_tok, and gate_epoch or null'],
+  [Safebyok.boxDelExpectation,      CVX.boxDelExpectation,      'boxDelExpectation: vault_tok, and revision_tok or null'],
+  [Safebyok.boxDeletion,            CVX.boxDeletion,            'boxDeletion: one of three outcomes'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod validators they are made from", () => {
@@ -143,13 +141,13 @@ describe("the Convex validators, field for field with the core's Zod validators 
 
   it("type the same records, expectations and summaries as the core", () => {
     // What the core writes is what Convex takes: each record the core checks is one Convex's type takes.
-    expectTypeOf<Records.VaultRecord>().toExtend<Infer<typeof CVX.vaultRecord>>()
-    expectTypeOf<Records.VaultDraft>().toExtend<Infer<typeof CVX.novelVaultRecord>>()
-    expectTypeOf<Records.BoxRecord>().toExtend<Infer<typeof CVX.boxRecord>>()
-    expectTypeOf<Records.BoxSparse>().toExtend<Infer<typeof CVX.boxSparse>>()
-    expectTypeOf<Records.VaultTombstone>().toExtend<Infer<typeof CVX.vaultTombstone>>()
-    expectTypeOf<Records.Capacity>().toExtend<Infer<typeof CVX.capacity>>()
-    expectTypeOf<Readonly<Infer<typeof CVX.vaultScope>>>().toEqualTypeOf<Records.VaultScope>()
+    expectTypeOf<Safebyok.VaultRecord>().toExtend<Infer<typeof CVX.vaultRecord>>()
+    expectTypeOf<Safebyok.VaultDraft>().toExtend<Infer<typeof CVX.novelVaultRecord>>()
+    expectTypeOf<Safebyok.BoxRecord>().toExtend<Infer<typeof CVX.boxRecord>>()
+    expectTypeOf<Safebyok.BoxSparse>().toExtend<Infer<typeof CVX.boxSparse>>()
+    expectTypeOf<Safebyok.VaultTombstone>().toExtend<Infer<typeof CVX.vaultTombstone>>()
+    expectTypeOf<Safebyok.Capacity>().toExtend<Infer<typeof CVX.capacity>>()
+    expectTypeOf<Readonly<Infer<typeof CVX.vaultScope>>>().toEqualTypeOf<Safebyok.VaultScope>()
     expectTypeOf<Infer<typeof CVX.vaultRecordExpectation>>().toEqualTypeOf<CoreVaultRecordExpectation>()
     expectTypeOf<Infer<typeof CVX.boxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
     expectTypeOf<Infer<typeof CVX.boxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
@@ -262,14 +260,14 @@ const BoxCases = [
 describe("the Convex validators, against the core's Zod records, record by record", () => {
   for (const [vaultRecord, zodOk, convexOk, blurb] of VaultRecordCases) {
     it(`vault record: ${blurb}`, async () => {
-      expect(Records.vaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
+      expect(Safebyok.vaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultRecord, { vaultRecord: vaultRecord as never }))).to.eq(convexOk)
     })
   }
 
   for (const [box, zodOk, convexOk, blurb] of BoxCases) {
     it(`box: ${blurb}`, async () => {
-      expect(Records.boxRecord.safeParse(box).success).to.eq(zodOk)
+      expect(Safebyok.boxRecord.safeParse(box).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
@@ -290,7 +288,7 @@ const CapacityCases = [
 describe("the Convex validator of a vault's capacity, against the core's", () => {
   for (const [capacity, zodOk, convexOk, blurb] of CapacityCases) {
     it(blurb, async () => {
-      expect(Records.Validators.capacity.safeParse(capacity).success).to.eq(zodOk)
+      expect(Safebyok.capacity.safeParse(capacity).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeCapacity, { capacity: capacity as never }))).to.eq(convexOk)
     })
   }

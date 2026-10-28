@@ -269,7 +269,7 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, r
   storage holds it, and only `getWhisper()` proves it unaltered. It is stored as the JSON object it
   is, so a backend may keep it as JSON it can query (a Postgres `jsonb` column) and reorder its
   keys: the box binds it with its keys sorted, so the same value opens however storage orders it.
-* **Its shape is yours.** The vault checks only that it is a JSON object (`Validators.sidecar`; anything
+* **Its shape is yours.** The vault checks only that it is a JSON object (`sidecar`; anything
   else, a bare string, array or null among them, is `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
   `putBox()`, the box keeps the sidecar it has: the call reads the box and opens it first; a new box's is `{}`, as
   is one written over a record that will not open. Given with the whisper, nothing is read: the box is
@@ -302,24 +302,26 @@ read, so lowering it strands nothing.
 
 ## Validators
 
-The checks a host or a storage adapter calls or builds on are exported, each under its own name,
-in the `Validators` namespace, lowerCamelCase beside their types: the stored records
-(`Validators.vaultRecord`, `Validators.boxRecord`), the scopes and scopepaths, each stored field (`Validators.vault_tok`),
+The checks a host or a storage adapter calls or builds on are exported from the main entry, each
+under its own name, lowerCamelCase beside its type: the stored records (`vaultRecord`,
+`boxRecord`), the scopes and scopepaths, each stored field (`vault_tok`),
 the options `Bank.make`, its calls and its stores take, the objects a host hands in (a store, a
 clock, a key deriver, a logger) and what their callbacks return, and the expectations a `VaultDB`
 is handed. The pieces the package builds those from are its own. Each is Zod, made in a
 `Validator` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
 `bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and
-`epochMillis` are plain Zod, the names they are all made of.
+`epochMillis` are plain Zod, the names they are all made of. Import each by name, as below, or
+the whole main entry (`import * as Safebyok from 'safebyok'`, then `Safebyok.vaultRecord.parse(row)`):
+there is no namespace of validators.
 
 ```ts
-import { Validator, Validators } from 'safebyok'
+import { Validator, vault_tok } from 'safebyok'
 
 const { sidebarOpts } = Validator('bad_option', ({ obj, bool, vaultlabel }) => ({
   sidebarOpts: obj({ vaultlabel, collapsed: bool.optional() }).strict(),
 }))
 sidebarOpts.parse({ vaultlabel: 'work', collapsed: true })
-Validators.vault_tok.safeParse(storedRow.vault_tok).success
+vault_tok.safeParse(storedRow.vault_tok).success
 ```
 
 A refusal names each failing field and says what it must be, in Zod's English, and never repeats
