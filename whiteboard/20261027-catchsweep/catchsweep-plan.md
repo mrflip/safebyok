@@ -169,6 +169,13 @@ an entry point and its shape must change, that is a contract question: syndicate
 shape. Empty changeset otherwise. Size: small. Depends on: nothing beyond #311; touches
 `proving.ts` beside thread 2's `#unwrap`, different region, restacked at the wrap-up.
 
+*Review:* (medium, 2026-10-28) fixed: the sanitizer's Proxy-trap test armed `get` and `ownKeys` alone,
+now every trap throws and `instanceof` is shown to bite first (`66753376`); the guarantees note's G8
+paragraph rewrapped whole (`36ca8621`). Nothing significant. Minor, left: `listedKindOf(err)` runs before
+the sanitizer at the two logging sites, so a host throw whose prototype or `refusalkind` getter throws
+escapes raw (unchanged from the base; row for the Coach); `sanitizer.ts`'s module doc lists its callers
+and `refusalFor`'s last sentence runs long (documentarian, Cleanup).
+
 ### 6. store_trynames: the stores' verbs named for what they resolve
 
 Coach: "functions returning outcomes <=> named tryVerbFoo ; functions that throw or return a foo
