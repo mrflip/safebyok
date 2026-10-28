@@ -229,4 +229,7 @@ export const { maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHou
     clockReading:         num.gte(FarPast).lte(FarFuture),
   }
 })
+
+/** A clock reading Bank.make accepts, as {@link clockReading} checks it: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
+export type ClockReading = Z.infer<typeof clockReading>
 // --

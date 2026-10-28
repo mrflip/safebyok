@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { Rolldown } from 'tsdown'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as safebyok from '../src/index'
 import * as PX from '../src/shapes/primitives'
@@ -60,6 +60,20 @@ describe("the package's entry point", () => {
       expect(shapesModules.some((shapesModule) => (shapesModule as Record<string, unknown>)[exportname] === exported), exportname).to.be.true
     }
     expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
+  })
+
+  it("exports the type beside each validator it exports", () => {
+    expectTypeOf<safebyok.VaultBag>().toEqualTypeOf<Zod.input<typeof safebyok.vaultBag>>()
+    expectTypeOf<safebyok.BankBag>().toEqualTypeOf<Zod.input<typeof safebyok.bankBag>>()
+    expectTypeOf<safebyok.BankScopepath>().toEqualTypeOf<Zod.input<typeof safebyok.bankScopepath>>()
+    expectTypeOf<safebyok.VaultScopepath>().toEqualTypeOf<Zod.input<typeof safebyok.vaultScopepath>>()
+    expectTypeOf<safebyok.LeaseScopepath>().toEqualTypeOf<Zod.input<typeof safebyok.leaseScopepath>>()
+    expectTypeOf<safebyok.DeviceScopepath>().toEqualTypeOf<Zod.input<typeof safebyok.deviceScopepath>>()
+    expectTypeOf<safebyok.BoxScopepath>().toEqualTypeOf<Zod.input<typeof safebyok.boxScopepath>>()
+    expectTypeOf<safebyok.ClockReading>().toEqualTypeOf<Zod.infer<typeof safebyok.clockReading>>()
+    const maskOpts: safebyok.MaskOpts = safebyok.maskOpts.parse({})
+    const idbOpts: safebyok.IdbOpts = safebyok.idbOpts.parse({})
+    expect([maskOpts.maxLen, idbOpts.dbName]).to.deep.equal([15, 'safebyok'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
