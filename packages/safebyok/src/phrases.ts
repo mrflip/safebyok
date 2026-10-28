@@ -1,4 +1,4 @@
-/** What the checks say when input fails them, every such sentence in one place, and the sentences bank.ts and vault.ts refuse with, a vault's bad news among them (a storage adapter's refusals, which they pass on, keep theirs in refusals.ts): so wording and tone are reviewed together, and so is the rule that none quotes the input. */
+/** What the checks say when input fails them, every such sentence in one place, and the sentences of bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input. */
 
 import { ScopepathDelimiter } from './consts'
 
