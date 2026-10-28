@@ -1,7 +1,7 @@
 # Thread 2: vault_boxes (2026-10-28)
 
 Branch `20261028-vault_boxes`, PR [#340](https://github.com/mrflip/safebyok/pull/340), stacked on
-[#336](https://github.com/mrflip/safebyok/pull/336). Justify: green (core 3476 passed, 37 skipped;
+[#336](https://github.com/mrflip/safebyok/pull/336). Justify: green (core 3485 passed, 37 skipped;
 every package green). Size budgets: none moves (`pnpm size:budget`).
 
 Preplan steps 3 and 4 (`gripeoween-vault-preplan.md`), a commit each, and the Coach's `useWhisper`
@@ -56,21 +56,14 @@ ruling as its own commit inside step 4.
     that gating out and then asked `shouldAsk`. Second: the four written-out demands no longer log
     "A call found the vault moved on" when the Vault object goes gone meanwhile. `#demand` logged
     that line; `#demandNotGone` never logs.
-  * **Three delBox tests wait for the watch** (`TH.readAfresh`): `vault-del`'s "delBox removes the
-    box", and `vault-races`' two "a deletion over a ... box written meanwhile elsewhere" cases.
-    `putBox` resolves a few microtasks sooner now that `#sealAndPutBox` is folded. The watch's
-    refresh rung by the put is still reading when the delete lands. The delete's own ring joins
-    that refresh, so its stale listing lands after the delete. See Discoveries.
   * **useWhisper's order**: on a gone Vault object with a bad callback, it now refuses 'vault_gone'
     before 'bad_option', as every call does. This is the Coach's ruling; "behaviour stays" yields.
   * Two `vault-storage` tests expect `{ call: 'refresh' }` and `{ call: 'getWhisper' }` where they
     expected `untrustedStorage`.
 
 * **Discoveries**:
-  * **A ring during a refresh joins it.** Say this tab writes while the watch's read is in flight.
-    That read's older listing can overwrite the write, and nothing corrects it until the next
-    stale hello. Before, the in-memory store's timing hid this; a network store never did. Not
-    fixed here (behaviour stays).
+  * **A ring during a refresh joined it** (fixed in the rework below). A read in flight when this
+    Vault object's box write landed could then put its older listing over the write.
   * `bank.ts`'s `#revokeLease` still logs `{ call: 'untrustedStorage' }`, and its own bad news is
     `#tellBadNews`. Both are out of scope (bank.ts).
 
@@ -80,10 +73,38 @@ ruling as its own commit inside step 4.
     Error does not become 'unexpected_error'. Uniformity did not need the change: the vault's part
     has the try and the one catch. Pinned by "passes a callback's throw through as the same
     object...". Recommendation: keep.
-  * **Ring joins a stale refresh**: recommendation: a later thread has a ring that arrives during
-    a refresh run one more refresh after it, rather than share the one under way.
   * **Locked box call during another gating answers at once**: recommendation: accept. The doc
     already says "at once, asking nobody".
   * **Gone-log at four sites**: recommendation: accept. Every other `#demandNotGone` is silent.
   * **Bank's `untrustedStorage` tag**: recommendation: `{ call: 'ensureVault' }` the next time
     bank.ts is touched. The README now names the tag as the bank's.
+
+## Rework: a deleted box came back (2026-10-28)
+
+The reviewer's probe: `putBox` then `delBox` listed the box again after `delBox` resolved. Fixed in
+d53be040, one commit.
+
+* **Built**:
+  * `oneAtATime` (`one-at-a-time.ts`) has two doors. `join` shares the run under way, as before.
+    `runAfresh` waits that run out, then shares the one run after it. A failed run still starts
+    its follow-up.
+  * The watch (`#watchRefresh`) uses `runAfresh`. `#refresh` and so `hello`, `refresh` and the
+    gating tool's `freshen` still `join`. `#tellReadsRecovered` is the old tail of `#refresh`.
+  * `#landedSinceRefresh`: box writes of this Vault object's own that landed in the listing since
+    the refresh began, as `boxlabel` mapped to the stored revision, or null for a deletion.
+    `#updateBoxListingOf` and `#dropBoxListingOf` fill it. `#doRefresh` ignores a read whose
+    listing disagrees with it (`showsLanded`), as it ignores an `isOlderPicture`.
+  * Tests: the three delBox tests are unawaited again. Three new tests: put-then-delete lists 0
+    boxes right after `delBox` and after 50 ms; a box written elsewhere during a held read shows;
+    a put over a held read never shows the revision before it (a subscriber checks). The test of
+    three rings now expects two reads. Six new `oneAtATime` tests cover `runAfresh`. The first
+    fails at 88be53db; each of the other two fails with its half of the fix taken out.
+* **Decisions and probes**: in `thread-2-vault_boxes-rework.md` beside this file, for the
+  reviewer and thread 3. In short: the follow-up alone does not fix the probe; the landing check
+  does. Hellos keep sharing a read, as the Contract says. The extra probes found nothing wrong.
+* **For the Coach**:
+  * **Hello during a read**: keep sharing (the Contract row) or wait for a fresh read too?
+    Recommendation: keep sharing; only rings follow up.
+  * **Extra read**: a ring during a read now costs a second `getVault`. STYLE.md bars a re-read
+    in the core; this one is the watch's, not a call's. Recommendation: accept.
+
