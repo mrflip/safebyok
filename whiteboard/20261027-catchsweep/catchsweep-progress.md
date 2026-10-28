@@ -53,6 +53,13 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   wrapper); by the Coach's ruling the worker is moving the mapping into each throwing body, one catch
   around the one `do*` call, before review. `KeptLease.read`'s store call is `deviceDB.tryGetLease(scope)`
   (thread 1 renamed the method `tryRead`: a small restack conflict in `lease.ts`).
+* **Thread 5 (one_sanitizer, #324), ready 2026-10-28:** `Sanitizer.refusalFor(foreign, kind, message)` keeps
+  its signature and is the one place a host function's throw becomes a refusal: `deriverThrewRefusal`
+  (`proving.ts`), `guardStrengthChecker`'s catch (`passphrase-strength.ts`), `requestThrewRefusal`
+  (`vault-opts.ts`, was `requestThrewError`), react's `adviceFailed`/`forBoundary`, convex's `refusing`.
+  `notes/guarantees.md` names it under G8 and beneath the *Where the guarantees are kept* table;
+  `guardRequestCleartext` replaces a stale `parseRequestCleartext` there. The react misuse-dialog test
+  flaked once in threads 4, 5 and 6's justify runs; #320 (open) is its fix.
 * **Thread 4 (where_prefix, #317), filed 2026-10-28 at `9f8fa55b`:** the catch-up over #301 also retired
   `optionsRefusal` (`options.ts`), the helper #301 had lifted the options catch-rewrap into, converting its
   three further callers (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`, `localVaultDB` in
