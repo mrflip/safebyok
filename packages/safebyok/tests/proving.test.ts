@@ -198,6 +198,19 @@ describe("proving.demandOpens", () => {
     land()
     await TH.expectRefusal(proving.demandOpens(), 'gating_landed')
   })
+
+  it("refuses a vault whose stamp fails its check as 'bad_record', never as a wrong proof: the wayin's ctx is built before the unwrap's catch", async () => {
+    const { vault, stored } = await lockedWorld()
+    const proving = await PassphraseProving.seal(vault, headerOf(stored.gate.passphrase), 'pw', { gating: OutsideGating })
+    await proving.demandOpens()
+    // The Vault object is frozen, so the stamp is broken at its getter, on the prototype, and mended after.
+    const broken = vi.spyOn(Object.getPrototypeOf(vault) as Vault, 'stamp', 'get').mockReturnValue({ ...vault.stamp, registered_at: 'yesterday' as unknown as number })
+    try {
+      await TH.expectRefusal(proving.demandOpens(), 'bad_record')
+    } finally {
+      broken.mockRestore()
+    }
+  })
 })
 
 describe("proving.resealWayinFor", () => {
