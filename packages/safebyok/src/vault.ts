@@ -531,13 +531,13 @@ export class Vault implements VaultStamp {
       this.#demandNotGone()
       VX.wayinkind.parse(slotlabel)
       if (slotlabel === 'passphrase') {
-        throw new VaultError('passphrase_required', "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed.")
+        throw new VaultError('passphrase_required', Phrases.PassphraseKept)
       }
       await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
       const kindNow = (): GatingKind => {
         if (! isGated(this.#vaultRecord) || this.#vaultRecord.gate.passkey === null) {
-          throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
+          throw new VaultError('absent_wayin', Phrases.NoPasskeyToRemove)
         }
         return 'del_passkey'
       }
@@ -1207,7 +1207,7 @@ export class Vault implements VaultStamp {
   /** The vault record in hand, once the vault has its passphrase: 'absent_vault' while it is novel. */
   #gatedRecord(): GatedVaultRecord {
     if (! isGated(this.#vaultRecord)) {
-      throw new VaultError('absent_vault', 'This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does.')
+      throw new VaultError('absent_vault', Phrases.ProvingBeforePassphrase)
     }
     return this.#vaultRecord
   }
@@ -1380,7 +1380,7 @@ export class Vault implements VaultStamp {
       return gateMadeElsewhereError()
     }
     // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
-    return new VaultError('stale_write', "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.", err.cause === undefined ? {} : { cause: err.cause })
+    return new VaultError('stale_write', Phrases.VaultChangedInStorage, err.cause === undefined ? {} : { cause: err.cause })
   }
 
   /** Take `next`, a vault record this Vault object's own put just stored, into the picture and publish it, unless a refresh has already taken a later copy or the Vault object is gone.
@@ -1565,7 +1565,7 @@ export class Vault implements VaultStamp {
     const weight = whisperBytes.length + new TextEncoder().encode(stableJsonify(sidecar)).length
     whisperBytes.fill(0)
     if (weight <= this.#maxWhisperBytes) { return }
-    throw new VaultError('whisper_too_large', `That whisper and its box's sidecar are over this vault's limit of ${String(this.#maxWhisperBytes)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`)
+    throw new VaultError('whisper_too_large', Phrases.whisperTooLarge(this.#maxWhisperBytes))
   }
 
   /** Refuse 'vault_full' for a new box while the vault holds `maxBoxes`, or one that would take it past `maxVaultBytes`, each box weighed by `#boxWeight`.
@@ -1577,11 +1577,11 @@ export class Vault implements VaultStamp {
     if (base !== null) { return }
     const others = this.#listed().filter((box) => box.boxlabel !== boxlabel)
     if (others.length >= this.#maxBoxes) {
-      throw new VaultError('vault_full', `This vault already holds its limit of ${String(this.#maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`)
+      throw new VaultError('vault_full', Phrases.vaultFullOfBoxes(this.#maxBoxes))
     }
     const othersWeight = others.reduce((sum, box) => sum + this.#boxWeight(box.boxlabel), 0)
     if (othersWeight + this.#boxWeight(boxlabel) > this.#maxVaultBytes) {
-      throw new VaultError('vault_full', `This vault has no room for that box in the ${String(this.#maxVaultBytes)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`)
+      throw new VaultError('vault_full', Phrases.noRoomForBox(this.#maxVaultBytes))
     }
   }
   // --
@@ -1645,7 +1645,7 @@ export class Vault implements VaultStamp {
    */
   #boxGetRefusal(err: VaultError): VaultError {
     if (! isVaultError(err, 'vault_mismatch')) { return err }
-    const gone = new VaultError('vault_gone', 'The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored.', { cause: err })
+    const gone = new VaultError('vault_gone', Phrases.VaultGoneWhileGettingBox, { cause: err })
     this.#becomeGone(gone)
     return gone
   }
@@ -1743,7 +1743,7 @@ export class Vault implements VaultStamp {
     if (put.ok) { return put }
     await this.#onStorageRefusal(put)
     if (! isVaultError(put.err, 'vault_mismatch')) { return put }
-    return bad(new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: put.err }))
+    return bad(new VaultError('stale_write', Phrases.VaultGoneWhilePuttingBox, { cause: put.err }))
   }
 
   /** Update the box listing with `stored`, a record this vault's own write just landed, and publish it, returning `stored` as a {@link Box} made under the picture in hand. */
@@ -1846,7 +1846,7 @@ export class Vault implements VaultStamp {
     const news = this.#damagedBoxes.filter((box) => ! wasShown(box))
     if (news.length === 0) { return }
     for (const box of news) {
-      this.#tellBadNews(new VaultError('damaged_box', "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it.", { meta: { box_listed: box } }))
+      this.#tellBadNews(new VaultError('damaged_box', Phrases.BoxStoredDamaged, { meta: { box_listed: box } }))
     }
     this.#replaceSnapshot()
   }
@@ -1860,14 +1860,14 @@ export class Vault implements VaultStamp {
     const news = damaged.filter((wayin) => ! wasShown.has(stableJsonify(wayin.record)))
     if (news.length === 0) { return }
     for (const wayin of news) {
-      this.#tellBadNews(new VaultError('damaged_wayin', "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again.", { meta: { wayin_listed: wayin.toJSON() } }))
+      this.#tellBadNews(new VaultError('damaged_wayin', Phrases.WayinStoredDamaged, { meta: { wayin_listed: wayin.toJSON() } }))
     }
     this.#replaceSnapshot()
   }
 
   /** Keep what the host's `onBadNews` threw as the trouble, a 'bad_option' it is the cause of, and tell it to the logger and to the platform (`reportToPlatform`). */
   #handlerThrew(err: unknown) {
-    this.#trouble = new VaultError('bad_option', "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have.", { cause: err })
+    this.#trouble = new VaultError('bad_option', Phrases.BadNewsHandlerThrew, { cause: err })
     this.#logger.error("The onBadNews handler threw as it was told of bad news: the vault's trouble keeps what it threw. The call that met the news went on as it would have.", { call: 'onBadNews' }, asError(err))
     reportToPlatform(err)
   }
@@ -1876,19 +1876,19 @@ export class Vault implements VaultStamp {
 
 // == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError
 
-const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
+const damagedBeyondNaming = () => new VaultError('damaged_box', Phrases.BoxDamagedBeyondNaming)
 
-const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again.')
+const lockedError = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
 const goneError = () => new VaultError('vault_gone', Phrases.VaultObjectGone)
 
-const remadeError = () => new VaultError('vault_remade', 'The vault this call was working on was deleted and made anew on another device, so nothing more was read or written: what the call held belongs to the vault that was deleted. Ask the bank for the vault again (bank.ensureVault), and unlock the one stored now.')
+const remadeError = () => new VaultError('vault_remade', Phrases.VaultRemade)
 
 const behindError = () => new VaultError('vault_behind', Phrases.VaultBehind)
 
-const gateMovedError = () => new VaultError('gate_moved', "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on.")
+const gateMovedError = () => new VaultError('gate_moved', Phrases.GateMoved)
 
-const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
+const gatingLandedError = () => new VaultError('gating_landed', Phrases.GatingLanded)
 
 // --
 
@@ -1965,7 +1965,7 @@ const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional()
 const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryEnsureUnlocked()`.")
 
 /** The refusal of a `renewMinutes` as long as the lease or longer, under which every call would ask the user. */
-const renewPastLease = () => new VaultError('bad_option', "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done.")
+const renewPastLease = () => new VaultError('bad_option', Phrases.RenewPastLease)
 
 /** `demandConsistentWith()`'s options, returned once they hold `leaseBound` alone, a boolean: 'bad_option' otherwise. */
 const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force.")
@@ -1989,13 +1989,13 @@ export type DeletedBox = Readonly<{
 }>
 
 /** The refusal of `putWayin('passkey')` on a novel vault: a passkey is added under the passphrase, which it has none of yet. */
-const passkeyBeforePassphrase = () => new VaultError('absent_vault', "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey.")
+const passkeyBeforePassphrase = () => new VaultError('absent_vault', Phrases.PasskeyBeforePassphrase)
 
 // The refusal never quotes the boxlabel: a label may still be a key pasted by mistake.
-const absentBox = () => new VaultError('absent_box', 'No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds.')
+const absentBox = () => new VaultError('absent_box', Phrases.BoxAbsent)
 
 /** The refusal of a `putBox()` that left out the whisper, to keep the one stored, where none is stored. */
-const noWhisper = () => new VaultError('no_whisper', 'No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store.')
+const noWhisper = () => new VaultError('no_whisper', Phrases.NoWhisperToKeep)
 
 // --
 

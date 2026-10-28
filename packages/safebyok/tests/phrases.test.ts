@@ -17,6 +17,9 @@ describe("Phrases", () => {
   it("names each limit it is given", () => {
     expect(Phrases.labelTooLong(40)).to.include('40')
     expect(Phrases.userIdTooLong(100)).to.include('100')
+    expect(Phrases.whisperTooLarge(4096)).to.include('4096')
+    expect(Phrases.vaultFullOfBoxes(50)).to.include('50')
+    expect(Phrases.noRoomForBox(9000)).to.include('9000')
   })
 
   it("names the scopepath delimiter where a scopepath's shape is said", () => {

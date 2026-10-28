@@ -1,4 +1,4 @@
-/** What the checks say when input fails them, every such sentence in one place, and the sentences of the bank's refusals and of a Vault object's gone and behind ones: so wording and tone are reviewed together, and so is the rule that none quotes the input. */
+/** What the checks say when input fails them, every such sentence in one place, and the sentences bank.ts and vault.ts refuse with, a vault's bad news among them (a storage adapter's refusals, which they pass on, keep theirs in refusals.ts): so wording and tone are reviewed together, and so is the rule that none quotes the input. */
 
 import { ScopepathDelimiter } from './consts'
 
@@ -174,4 +174,79 @@ export const VaultObjectGone = "This Vault object is gone -- the vault was delet
 
 /** Why a vault that storage offers older than this device has seen is not used, and locks. */
 export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
+// --
+
+// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
+
+/** Why a vault's passphrase is not removed: it can be replaced, never removed. */
+export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
+
+/** Why removing a passkey the vault does not hold changes nothing. */
+export const NoPasskeyToRemove = "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed."
+
+/** Why a passkey is not added to a vault with no passphrase yet. */
+export const PasskeyBeforePassphrase = "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey."
+
+/** Why a change that needs proving waits for the vault's first passphrase. */
+export const ProvingBeforePassphrase = "This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does."
+
+/** Why a new gate is not stored over a vault that changed in storage since this device read it. */
+export const VaultChangedInStorage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
+// --
+
+// == [Vault: lifecycle]: VaultLocked, VaultRemade, GateMoved, GatingLanded, RenewPastLease
+
+/** Why a call that needs the vault unlocked does nothing while it is locked. */
+export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again."
+
+/** Why a call stops when its vault was deleted and made anew on another device as it worked. */
+export const VaultRemade = "The vault this call was working on was deleted and made anew on another device, so nothing more was read or written: what the call held belongs to the vault that was deleted. Ask the bank for the vault again (bank.ensureVault), and unlock the one stored now."
+
+/** Why a call stops when a wayin changed, here or on another device, as it worked. */
+export const GateMoved = "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on."
+
+/** Why a proof checked after its gating landed unlocks nothing. */
+export const GatingLanded = "The prompt ended while this proof was being checked -- a lock landed, or it was answered or declined -- and its end wins: nothing was unlocked. Ask again when the user wants the vault."
+
+/** Why ensureUnlocked() refuses a renewMinutes as long as the lease or longer. */
+export const RenewPastLease = "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done."
+// --
+
+// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultGoneWhilePuttingBox
+
+/** Why a call naming a box the vault does not hold refuses. */
+export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
+
+/** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
+export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store."
+
+/** Why nothing is written over a damaged box whose stored record names no revision. */
+export const BoxDamagedBeyondNaming = "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again."
+
+/** A whisper and sidecar over the vault's limit of `maxBytes` bytes of JSON together. */
+export const whisperTooLarge = (maxBytes: number): string => `That whisper and its box's sidecar are over this vault's limit of ${String(maxBytes)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`
+
+/** Why a vault that holds its limit of `maxBoxes` boxes takes no new one. */
+export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
+
+/** Why a box that would take the vault past the `maxBytes` its storage holds of one vault is not stored. */
+export const noRoomForBox = (maxBytes: number): string => `This vault has no room for that box in the ${String(maxBytes)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`
+
+/** Why a box is not read from a vault deleted, or deleted and made anew, on another device, and the Vault object is gone. */
+export const VaultGoneWhileGettingBox = "The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored."
+
+/** Why a box is not stored into a vault deleted, or deleted and made anew, on another device as it was being stored. */
+export const VaultGoneWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
+// --
+
+// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew
+
+/** Bad news of a box stored damaged, which its meta.box_listed names. */
+export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
+
+/** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
+export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
+
+/** Why the vault's trouble holds a throw from the host's onBadNews handler. */
+export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
