@@ -245,8 +245,9 @@ amends this note first.
 **G8. No secret reaches a refusal, a log, or a thrown value.** A `VaultError` carries none in its
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
-class name such as `QuotaExceededError`, kept by the device-store conditions and `crypto_failed`
-until a redact lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests/validators.test.ts`,
+DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
+device store gave its error, kept by the device-store conditions and `crypto_failed` until a redact
+lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests/validators.test.ts`,
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
