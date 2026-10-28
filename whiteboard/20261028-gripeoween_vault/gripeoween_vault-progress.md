@@ -10,16 +10,18 @@ Tabs, by tab id / body id: Open Matters `fdffceb1-e16e` / `2b0e312a-7bf3` (bookm
 Cleanup `e894b5ba-5a8a` / `537a9793-f406`; Progress `c2cac15c-ed58` / `66c5201c-0978`; Resolved
 `a6071e62-dda3` / `63aa62c1-0680`. State enum `64ebedf1-6002`.
 
-## Standing calls (YOLO)
+## Rulings and standing calls
 
-* The preplan's *Open for the Coach* items, until the Coach rules otherwise:
-  - `#goneBy` keeps its factory; a comment says why (each `#demandNotGone` throws a fresh Error
-    with its own stack, never one shared object).
-  - `#replaceSnapshot`'s whole-snapshot `stableJsonify`: a one-line comment, no change.
-  - `useWhisper`'s member doc says it is the one public method without the try and the
-    gone-check, and why.
-  - `DeviceDB.raiseDeviceRecord` keeps "raise"; only the vault's `#raiseRecordAfter` renames
-    (`#noteEpochSeen`).
+* Ruled (2026-10-28): the four-thread split; thread 3 builds the gating tools' shape without a
+  stop, and keeps the lockings apart rather than fold them under a flag; `#goneBy` keeps its
+  factory, with a comment; `#replaceSnapshot` compares with es-toolkit's `isEqual`, not a
+  whole-snapshot `stableJsonify` (thread 4); `useWhisper` is made uniform, the gone-check and
+  the one catch like every public method (thread 2); a refresh let go mid-read still reads and
+  may lock (#336 as built).
+* Under explanation: what `raiseDeviceRecord` means and whether "record" and "raise" stay; why
+  `#onStorageRefusal` is called in the try, not the catch (the Coach: "seems better to have the
+  error handler section handle errors"); what a null device record means. Expect renames on
+  `DeviceDB` and a move of the dispatch into the catch: thread 2 should not entrench either.
 
 ## Threads
 

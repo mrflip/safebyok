@@ -72,7 +72,9 @@ names a stale order (to thread 4, through the note's subagent).
 *Gloss.* `vault.ts` only, but most of it: `getBox`, `getWhisper`, `putBox`, `delBox`, the
 `#listed*` family, `#ensureUnlocked`'s `shouldAsk`, `#demandAfterWait`'s four sites, the
 `#heardRefusal` and bad-news families, `VaultCall`'s `'untrustedStorage'` (not exported: no
-changeset beyond a patch). **Depends on** thread 1: cut from its tip once filed. **Look-ahead:**
+changeset beyond a patch). *Orchestrator:* the Coach ruled `useWhisper` uniform (2026-10-28: "no,
+make it uniform"): the gone-check and the one catch like every other public method; sent to the
+live worker as a directive. **Depends on** thread 1: cut from its tip once filed. **Look-ahead:**
 thread 3 has gating reject raw and the vault's one catch convert, so `#onRefused(err)` must take
 any throw, gating's included. **Size:** large; the preplan's split point falls after it.
 
@@ -89,6 +91,7 @@ they share without one, and say why in the thread file*; step 6's "propose the s
 cutting it" becomes *write the proposed shape in the thread file, then build it*: the tools are
 internal (not exported from `index.ts`), and the Coach's invocation asks for interfaces to
 change. **Depends on** thread 2. **Size:** medium.
+*Orchestrator:* the Coach took both YOLO calls above (2026-10-28, *Resolved*): they are rulings now.
 
 ### 4. `vault_residue`: the residue
 
@@ -106,6 +109,12 @@ its steps; `#loadFromStorage`'s first line stops restating the return; `deviceDB
 rollback-check entry, which says the refresh judges "older than the picture" before the behind
 check, gets an amendment through a `sonnet` subagent (the note's header says how). **Model:** `sonnet`,
 small and mechanical. **Depends on** thread 3. **Size:** small.
+*Orchestrator:* two rulings of 2026-10-28 land here too: `#goneBy` keeps its factory, with a
+comment saying why; and `#replaceSnapshot` stops deciding "changed" by `stableJsonify` of the
+whole snapshot, comparing with es-toolkit's `isEqual` instead (the Coach: "this seems weird and
+hand-rolled. Can you use something from es-toolkit?"; es-toolkit is already a core dependency).
+That is a behaviour-bearing change to the snapshot, so the model is no longer `sonnet`: the
+worker inherits the orchestrator's.
 
 ## For the Coach
 
