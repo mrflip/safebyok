@@ -11,13 +11,13 @@ describe("buildJokePrompt", () => {
 })
 
 describe("tellKnockKnockJoke", () => {
-  it("sends the key as the x-api-key header to the messages endpoint, and nothing else sees it", async () => {
+  it("sends the key as a bearer token to the messages endpoint, and nothing else sees it", async () => {
     const fake = TH.fakeAnthropic(200, "Banana who? Banana split, gotta run!")
     const joke = await tellKnockKnockJoke('sk-ant-fake-key', 'Banana', fake.fetchFn)
     expect(joke).to.eq("Banana who? Banana split, gotta run!")
     expect(fake.seen).to.have.lengthOf(1)
     expect(fake.seen[0]?.url).to.include('api.anthropic.com/v1/messages')
-    expect(fake.seen[0]?.apiKeyHeader).to.eq('sk-ant-fake-key')
+    expect(fake.seen[0]?.apiKey).to.eq('sk-ant-fake-key')
   })
 
   it("asks the cheapest model, with the entry in the prompt", async () => {
