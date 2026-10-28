@@ -87,6 +87,17 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   `gating.ts` wrap in `bad()`. No test changed; empty changeset. Restack note: `refusalOf` exists twice
   (`bank.ts` here, `outcome.ts` in #325); fold by exporting `outcome.ts`'s from the module. Handoff
   corrections: the route handing `#badOutcome` out was `#gatingTools`, not `[provingTools]`.
+* **Thread 3 (db_hooks, #330), ready 2026-10-28:** `#hooks` is a private **static** table handed the instance
+  (`VaultDB.#hooks.doGetVault(this, asked)`), not an instance field: tests build a host's store as
+  `Object.create(world.vaultDB)` and through a Proxy, never running the constructor; the table looks each
+  hook up on the object the verb was called on. `asStorageTrouble` lives in `outcome.ts` (one line,
+  `outcomeOf` with `storageUnavailable` as `otherwise`). `VaultReadResponse` → **`StoredVault`**
+  (`src/shapes/vault-db.ts`, exported); graphql's `vaultReadOf` is typed with it (thread 8's
+  `storedVaultOf` rename is clean). `vault-db.ts` banners: `[Hook adapter]: adaptedHook`,
+  `[Constructor, logger and hooks]`; `adapterAnswer`, `asStorageTrouble`, `readStoredVault` gone from the
+  file. `vaultDBOf` keeps the two-kind pass-through (`not_permitted`, `identity_revoked`), else
+  `unexpectedError`; `MisconfiguredMessage` deleted (row). `.size-limit.json` untouched: the drift in
+  `argon2idWasmDeriver` and `idbVaultDB` is the base's (Cleanup, restack).
 * **Thread 4 (where_prefix, #317), filed 2026-10-28 at `9f8fa55b`:** the catch-up over #301 also retired
   `optionsRefusal` (`options.ts`), the helper #301 had lifted the options catch-rewrap into, converting its
   three further callers (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`, `localVaultDB` in
