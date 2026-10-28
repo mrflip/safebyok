@@ -455,8 +455,8 @@ const checkTexts = (current: unknown, next: unknown): void => {
   checkText(next)
 }
 
-/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswerShape` checks: an answer already used among them. */
-const checkPasskey = (passkey: unknown): void => { VX.passkeyAnswerShape.parse(passkey) }
+/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswer` checks: an answer already used among them. */
+const checkPasskey = (passkey: unknown): void => { VX.passkeyAnswer.parse(passkey) }
 
 /** Refuse 'bad_option' unless the passphrase is text and the passkey's answer one a new passkey gives, over a fresh salt. */
 const checkNewPasskey = (passphrase: unknown, passkey: unknown): void => {

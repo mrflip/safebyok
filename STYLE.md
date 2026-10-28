@@ -515,7 +515,7 @@ the scope.
   Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
   hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
   local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
-  namespaced as the object a `Validator` call returns (`Checks.storyShape`), or through its
+  namespaced as the object a `Validator` call returns (`Checks.story`), or through its
   module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
   `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
   type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending

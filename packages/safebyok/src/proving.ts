@@ -341,7 +341,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
    */
   static async seal(vault: Vault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
-    const checked = VX.passkeyAnswerShape.parse(answer)
+    const checked = VX.passkeyAnswer.parse(answer)
     const { prfBytes } = checked
     try {
       const tools = toolsOf(vault)

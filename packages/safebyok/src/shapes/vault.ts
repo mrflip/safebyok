@@ -309,7 +309,7 @@ export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 // --
 
-// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswerShape, PasskeyAnswer, freshPasskeyAnswer
+// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
  * What a blank one means is the gating's to say.
@@ -331,11 +331,11 @@ export const PrfAnswerBytes = 32
  * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
  * again, it would make a key anyone could rebuild.
  *
- * @example passkeyAnswerShape.parse(await askPasskey(vault.snapshot.gate))
- * @example passkeyAnswerShape.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
+ * @example passkeyAnswer.parse(await askPasskey(vault.snapshot.gate))
+ * @example passkeyAnswer.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
-export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes, credential_id }) => ({
-  passkeyAnswerShape: obj({
+export const { passkeyAnswer } = Validator('bad_option', ({ obj, str, bytes, credential_id }) => ({
+  passkeyAnswer: obj({
     /** Base64url, as `PublicKeyCredential.id` gives it. */
     credential_id,
     prf_salt_b64:  str.min(1),
@@ -352,7 +352,7 @@ export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes
  *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
-export type PasskeyAnswer = Z.infer<typeof passkeyAnswerShape>
+export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
 /** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
  * A passkey wayin sealed over another salt would read as damaged at every later unlock.
@@ -361,7 +361,7 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswerShape>
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
  */
 export const { freshPasskeyAnswer } = Validator('bad_option', () => ({
-  freshPasskeyAnswer: passkeyAnswerShape.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
+  freshPasskeyAnswer: passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
 }))
 // --
 

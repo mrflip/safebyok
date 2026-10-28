@@ -559,7 +559,7 @@ describe("freshPasskeyAnswer", () => {
     })
   }
 
-  it("refuses what is no passkey's answer as passkeyAnswerShape does, bad_option", () => {
+  it("refuses what is no passkey's answer as passkeyAnswer does, bad_option", () => {
     TH.expectSyncRefusal(() => VX.freshPasskeyAnswer.parse({ credential_id: 'abc' }), 'bad_option')
   })
 

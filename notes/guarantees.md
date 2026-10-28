@@ -130,7 +130,7 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
 `bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt`,
-`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswerShape`, `isAllZero`),
+`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isAllZero`),
 `checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
 `PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
 `subtle.deriveKey`), and `prfBytes.fill(0)`.
