@@ -48,7 +48,9 @@ budget within limits).
     `checks/validator.ts` names is exported from the module and `src/index.ts`. Added:
     `ConsistencyRefusal` (named by `Refusing.parseConsistent`, `demandConsistent`,
     `verifyConsistent`) and `Merged` (named by `KitWith`; was module-private). The changeset names
-    each. Not widened to the three `consistent` functions, which are not types (open matter).
+    each. A second ruling (yes to the open matter) then exported `consistent`, `demandConsistent`
+    and `verifyConsistent` as values too; `verifyConsistent`'s doc block stated its relation to
+    `parseConsistent` as a contract where it had named its caller.
   - *"story" replaces "saying" everywhere*: the sweep found one remaining place meaning the Story,
     `.changeset/20261028-where_prefix.md` (#327's note, on this branch), changed in its own commit.
   - *STYLE.md's Shapes bullet*: the reading is now the rule's own wording; namespacing is the
@@ -67,7 +69,5 @@ budget within limits).
     controlled record of what is happening, suitable for logs or refusals".
   - STYLE.md's edits are one `docs:` commit; the exports and changeset one `api:`; the sweep one;
     VOCABULARY.md one `docs:`.
-* **For the Coach**:
-  - Export `consistent`, `demandConsistent` and `verifyConsistent` from `safebyok` too, in the
-    exports ruling's spirit? They are functions, not types, so this round did not. Recommendation:
-    yes, in a Cleanup; a host holding a `Refusing` already reaches `parseConsistent`.
+  - The zxcvbn `PlainSaying`/`SayingForWarning` names stay, a reason sentence and not a Story: the
+    orchestrator records that call.
