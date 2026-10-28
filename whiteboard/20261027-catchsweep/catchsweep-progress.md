@@ -79,6 +79,14 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   expression. **Restack of #321 with #325**: thread 2's `device-db.ts` change is `deviceTrouble` alone
   (doc block and the two `new VaultError` calls); the `DeviceDB` class doc clause "that throw its
   `cause`" (l.22) is dropped by whichever lands second.
+* **Thread 7 (vault_bank_flip, #327), ready 2026-10-28:** 12 Vault pairs (not 18) and 5 Bank pairs hold their
+  bodies whole in the throwing form inside one `try`; the Vault's catch is `throw this.#heardRefusal(err)`
+  (`#badOutcome` renamed; maps, tells the news once, rethrows), the Bank's `throw refusalOf(err)` (a
+  module-private helper in `bank.ts`, since the Bank tells bad news at birth, not in a pair's catch); each
+  `tryX` is `outcomeOf(() => this.X(...))`. `GatingTools.badOutcome` → `heardRefusal`, its three catches in
+  `gating.ts` wrap in `bad()`. No test changed; empty changeset. Restack note: `refusalOf` exists twice
+  (`bank.ts` here, `outcome.ts` in #325); fold by exporting `outcome.ts`'s from the module. Handoff
+  corrections: the route handing `#badOutcome` out was `#gatingTools`, not `[provingTools]`.
 * **Thread 4 (where_prefix, #317), filed 2026-10-28 at `9f8fa55b`:** the catch-up over #301 also retired
   `optionsRefusal` (`options.ts`), the helper #301 had lifted the options catch-rewrap into, converting its
   three further callers (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`, `localVaultDB` in
