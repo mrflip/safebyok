@@ -62,7 +62,7 @@ describe("the package's entry point", () => {
     expect(Safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
   })
 
-  it("exports the type beside each validator it exports", () => {
+  it("exports the type beside each validator it once exported without one", () => {
     expectTypeOf<Safebyok.VaultBag>().toEqualTypeOf<Zod.input<typeof Safebyok.vaultBag>>()
     expectTypeOf<Safebyok.BankBag>().toEqualTypeOf<Zod.input<typeof Safebyok.bankBag>>()
     expectTypeOf<Safebyok.BankScopepath>().toEqualTypeOf<Zod.input<typeof Safebyok.bankScopepath>>()
