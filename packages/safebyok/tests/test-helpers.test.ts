@@ -1579,17 +1579,18 @@ const expectToHold = (check: TH.VaultDBTimingCheck): Promise<void> => check.chec
 /** The checks of the battery over an adapter, by handle. */
 const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boolean, slowSecond?: boolean }) => TH.vaultDBTimingChecks(...roundTripBattery(opts))
 
-/** Timers fired before {@link onFakeClock} calls its work hung: far more than any battery's round trips. */
+/** The most timers {@link onFakeClock} fires before it gives its work up as a loop that never ends: far more than any battery's round trips. */
 const FakeClockTimerLimit = 100_000
 
-/** What `work` resolves to, run on a fake clock: each timer it sets fires, in the order a real clock
- * would fire it, once nothing else can run. A round trip over the wire costs a turn of the event
- * loop rather than the millisecond or more a real `setTimeout` waits, so a battery of thousands
- * runs in a fraction of a second however loaded the machine is; and a race's watchdog falls due
- * only when nothing else is pending, as when an adapter has hung. Rejects as `work` does, with
- * every timer it left run first.
+/**
+ * Run `work` on a fake clock, resolving what it resolves to. Each timer it sets fires in the order
+ * a real clock would fire it, once nothing else can run, so a race's watchdog falls due only when
+ * its moves are stuck. Only for work whose every wait is a timer or a promise: work awaiting I/O,
+ * WebCrypto or `setImmediate` sees its watchdogs fall due early, or hangs. Rejects as `work` does,
+ * once every timer it left has run, or past {@link FakeClockTimerLimit} timers.
  */
 const onFakeClock = async <ValT>(work: () => Promise<ValT>): Promise<ValT> => {
+  // A zero-delay timer fires on the next turn of the event loop, not after the millisecond or more a real one waits.
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], loopLimit: FakeClockTimerLimit })
   try {
     const working = Promise.allSettled([work()])
