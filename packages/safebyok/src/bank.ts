@@ -627,7 +627,7 @@ export class Bank {
 
 // == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
 
-/** What a refusal of the bag naming a vault says to do. */
+/** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
 const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
 /** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */

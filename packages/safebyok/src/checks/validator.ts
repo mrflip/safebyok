@@ -110,14 +110,14 @@ export const Validator = <ValsT extends Record<string, Z.ZodType>, const Sources
 
 /** A validator a {@link Validator} call makes: its schema, its `parse` also taking a {@link Saying}, and for an object, `parseConsistent`. */
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
-  /** `val`, parsed: the call's kind otherwise, its message framed as `saying` asks. */
+  /** `val`, parsed: the call's kind otherwise, its message framed as `saying` asks; 'bad_option' for a saying that is none, whatever `val`. */
   parse: (val: unknown, saying?: Saying) => Z.output<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
   /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal>) => Z.output<SchemaT>
 } : unknown)
 
-/** What a refusal says around the failures it names: `where` the input was judged, before them (`In Bank.make's options`), and `advice`, what to do, after them (`Leave it out for the bank's own.`). Each a sentence of its own, neither quoting the input. */
+/** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
 export type Saying = {
   where?:  string | undefined
   advice?: string | undefined
