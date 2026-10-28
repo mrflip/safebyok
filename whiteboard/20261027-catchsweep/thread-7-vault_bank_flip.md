@@ -1,6 +1,6 @@
 # Thread 7: vault_bank_flip (2026-10-28)
 
-Branch `20261028-vault_bank_flip`, PR #PRNUM, stacked on #321 (cut from its tip 496e3046). Justify: green
+Branch `20261028-vault_bank_flip`, PR [#327](https://github.com/mrflip/safebyok/pull/327), stacked on [#321](https://github.com/mrflip/safebyok/pull/321) (cut from its tip 496e3046). Justify: green
 (core 3475 tests pass, 37 skipped; every package lints, typechecks, builds, tests and fits its size budget).
 
 The Coach's ruling of 2026-10-28: the throwing body does the try/catch that fixes its refusals, and the
