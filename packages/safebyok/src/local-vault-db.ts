@@ -7,7 +7,6 @@ import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
 import * as Phrases from './phrases'
-import { optionsRefusal } from './options'
 import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
 import type { VaultRecordExpectation, StoredBox, VaultReadResponse, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
@@ -40,16 +39,12 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+ *   await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
 export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  try {
-    localVaultDBOptsShape.parse(opts)
-  } catch (err) {
-    throw optionsRefusal(err, (message) => `In localVaultDB's options: ${message}.`)
-  }
+  localVaultDBOptsShape.parse(opts, { where: "In localVaultDB's options" })
   return new StringStoreVaultDB(opts)
 }
 

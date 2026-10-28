@@ -30,7 +30,9 @@ these guarantees until shown otherwise.
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
 (`passphrase-strength.ts`, `guardStrengthChecker`) and `requestCleartext` (`vault-opts.ts`,
-`parseRequestCleartext`). The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque.
+`guardRequestCleartext`). Each guard hands what it caught to `Sanitizer.refusalFor`
+(`sanitizer.ts`), the one function that stands a refusal in for a foreign throw, and it reads
+nothing of it. The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque.
 
 ## The construction
 
@@ -144,19 +146,19 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 `#unwrap` with `RewrapUsage` in `resealWayinFor` and `grantLease`, handed to `wrappedWith`
 (`wrapKeyUnder`) and `sealLeaseRecord` (`wrapKeyUnder` under the leaseKey). Operates, as a
 non-extractable one-usage handle in a local: `checkWayin` (`#unwrap`, `CheckUsage`);
-`Lease.#vaultKeyOrNull` in `tryCipheredWith` (`wrapKey`) and `tryDecipherWith` (`unwrapKey`).
+`Lease.#vaultKeyOrNull` in `cipheredWith` (`wrapKey`) and `decipherWith` (`unwrapKey`).
 Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped` (DeviceDB).
 
-**boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.tryCipheredWith`, wrapped by
+**boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.cipheredWith`, wrapped by
 `wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
-`unwrapKeyUnder` in `Lease.tryDecipherWith`, used by `decipherBytes`. Stored only as
+`unwrapKeyUnder` in `Lease.decipherWith`, used by `decipherBytes`. Stored only as
 `box_key_wrapped`.
 
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `sealLeaseRecord`, called by
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
 `device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
-handed to hold; read back by `KeptLease.read` (`lease.ts`), which checks `DeviceDB.getLease`'s
+handed to hold; read back by `KeptLease.tryRead` (`lease.ts`), which checks `DeviceDB.getLease`'s
 answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#takeStorage`
 (whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
 which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
@@ -166,9 +168,9 @@ record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 **whisper.** Naked: the host → `vault.putBox`, `tryPutBox` → `#checkWhisperFits`
 (`whisperBytesOf`, zeroed) → `#sealAndPutBox` → `Box.seal`, `trySeal` → `checkedWhisper`
 (`Whisper`, a `structuredClone`) → `whisperBytesOf` (`stableJsonify`, `TextEncoder`) →
-`lease.sealProps`, `trySealProps` → `tryCipheredWith` (`cipherBytes`), bytes zeroed in both.
+`lease.sealProps`, `trySealProps` → `cipheredWith` (`cipherBytes`), bytes zeroed in both.
 Out: `vault.getWhisper`, `tryGetWhisper`, `useWhisper` → `box.extractWhisper`,
-`tryExtractWhisper` → `lease.tryDecipherWith` (`decipherBytes`) → `TextDecoder`, parse, zero →
+`tryExtractWhisper` → `lease.decipherWith` (`decipherBytes`) → `TextDecoder`, parse, zero →
 the host, or its `useWhisper` callback. `mask` (`safebyok/utils`) reads one to show a whiff of it.
 
 ## The guarantees
@@ -210,7 +212,7 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `provin
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
-`KeptLease.read`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
+`KeptLease.tryRead`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. A record read back whose key is extractable, of another
@@ -222,12 +224,12 @@ safebyok's protection*). Kept by: `lease.ts`, `idb.ts`, `types.ts`. Checked by:
 `tests/lease.test.ts` (*makes its leaseKey non-extractable*, *refuses a leaseKey that is
 extractable*).
 
-**G5. A boxKey is a local.** Fresh and extractable only to be wrapped, in `Lease.tryCipheredWith`;
-unwrapped non-extractable, `decrypt` only, in `tryDecipherWith`; dropped at the end of each.
+**G5. A boxKey is a local.** Fresh and extractable only to be wrapped, in `Lease.cipheredWith`;
+unwrapped non-extractable, `decrypt` only, in `decipherWith`; dropped at the end of each.
 
 **G6. The whisper's bytes are zeroed; its value is the host's.** `putBox` validates the host's
 value and takes a `structuredClone` (`Whisper`), serializes it (`whisperBytesOf`), and zeroes the
-bytes once ciphered, refused or not (`Box.trySeal`, `Lease.tryCipheredWith`, and the sizing copy
+bytes once ciphered, refused or not (`Box.seal`, `Lease.cipheredWith`, and the sizing copy
 in `#checkWhisperFits`). `extractWhisper` decodes the deciphered bytes, parses them, zeroes them,
 and hands the parsed value to the host. A `Box` holds its record, ciphertext, never a whisper.
 *Caveat:* the JSON value itself cannot be zeroed; `mask` from `safebyok/utils` is how to show one.
@@ -237,25 +239,25 @@ form of one (a cache, a copy in a snapshot, a key kept between calls), is a desi
 amends this note first.
 
 **G8. No secret reaches a refusal, a log, or a thrown value.** A `VaultError` carries none in its
-message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
-kind, a limit or a field name. Every validator's refusal quotes no input: `tests/validators.test.ts`,
-*no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
+message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a kind,
+a limit or a field name. Every validator's refusal quotes no input: `tests/validators.test.ts`, *no
+refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
-replaced, never kept as a `cause`: `deriverThrewRefusal` (kind only, logged), `guardStrengthChecker`
-(nothing), `parseRequestCleartext` (kind only, logged). A WebCrypto failure is caught and replaced
-(`wrongProof`, `damaged_lease`, `damaged_box`). `unexpectedError` keeps a foreign throw as `cause`
-only where the thrower heard no secret: storage adapters and the device store. The logger hears
-messages, a story bag of kinds and calls, and `VaultError`s; `Proving.toJSON`, `Lease.toJSON` and
-`Wayin.toJSON` show no key material, and a lease that will not read is warned of without its
-record. *Host obligations, documented:* a `strengthChecker`'s `reason` becomes the
-`weak_passphrase` message, so it must not quote the passphrase (CUSTOMIZATION.md); a `DeviceDB`'s
-thrown error rides as a `cause`, so it must not echo the record it was handed.
+replaced by `Sanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
+logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). A WebCrypto
+failure is caught and replaced (`wrongProof`, `damaged_lease`, `damaged_box`). `unexpectedError`
+keeps a foreign throw as `cause` only where the thrower heard no secret: storage adapters and the
+device store. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
+`Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will not
+read is warned of without its record. *Host obligations, documented:* a `strengthChecker`'s `reason`
+becomes the `weak_passphrase` message, so it must not quote the passphrase (CUSTOMIZATION.md); a
+`DeviceDB`'s thrown error rides as a `cause`, so it must not echo the record it was handed.
 
 **G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
 key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`,
 `KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
-`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.read` (`lease.ts`) checks what
+`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryRead` (`lease.ts`) checks what
 `DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
 the vault's refresh (`#takeStorage`, whose `leavesInForce` reads the kept stamp) and its take-ups
 (`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`

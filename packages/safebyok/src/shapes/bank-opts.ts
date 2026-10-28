@@ -223,8 +223,8 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
   const minutesToMillis = (minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis))
   return {
     // The public verbs the bank and its vaults call on a VaultDB, beside its being an instance of the `VaultDB` base class.
-    vaultDBShape:         obj({ getVault: verb, ensureVault: verb, putVaultRecord: verb, getBox: verb, putBox: verb, delBox: verb, delVault: verb, delDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
-    deviceDBShape:        obj({ getLease: verb, putLease: verb, delLease: verb, getDeviceRecord: verb, raiseDeviceRecord: verb, delDeviceRecord: verb, delAll: verb }, Phrases.DeviceDBShape),
+    vaultDBShape:         obj({ tryGetVault: verb, tryEnsureVault: verb, tryPutVaultRecord: verb, tryGetBox: verb, tryPutBox: verb, tryDelBox: verb, tryDelVault: verb, tryDelDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
+    deviceDBShape:        obj({ tryGetLease: verb, tryPutLease: verb, tryDelLease: verb, tryGetDeviceRecord: verb, tryRaiseDeviceRecord: verb, tryDelDeviceRecord: verb, tryDelAll: verb }, Phrases.DeviceDBShape),
     maxWhisperBytes:      int.positive().default(MaxWhisperBytes),
     maxBoxes:             int.positive().optional(),
     declaredBytes,

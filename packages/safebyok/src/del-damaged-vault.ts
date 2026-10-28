@@ -54,11 +54,11 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
 export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDB: DeviceDB): Promise<void> => {
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
-  const tombstone = valOf(await vaultDB.delDamagedVault(scope))
-  valOf(await deviceDB.delLease(scope))
+  const tombstone = valOf(await vaultDB.tryDelDamagedVault(scope))
+  valOf(await deviceDB.tryDelLease(scope))
   if (tombstone === null) { return }
   // The device_id is kept where a record is stored: raising keeps the first one stored.
   const raising = deviceRecordOf(scope, randomId(), tombstone.vault_epoch)
-  valOf(await deviceDB.raiseDeviceRecord(raising))
+  valOf(await deviceDB.tryRaiseDeviceRecord(raising))
 }
 

@@ -224,8 +224,8 @@ describe("vault.refresh", () => {
     const world = makeWorld()
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
-    const held = TH.holdNextAnswer(deaf, 'getVault')
-    const reads = vi.spyOn(deaf, 'getVault')
+    const held = TH.holdNextAnswer(deaf, 'tryGetVault')
+    const reads = vi.spyOn(deaf, 'tryGetVault')
     const first = vault.refresh()
     await held.reached
     const others = [vault.refresh(), vault.hello({ staleMinutes: 0 }), vault.hello()]
@@ -251,8 +251,8 @@ describe("the refresh's judgment", () => {
     // A read starts as the change is about to write: storage serves it before the change lands,
     // and its answer is held until after.
     const reading: { served?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
-    TH.beforeNextCall(deaf, 'putVaultRecord', async () => {
-      reading.served = TH.holdNextAnswer(deaf, 'getVault')
+    TH.beforeNextCall(deaf, 'tryPutVaultRecord', async () => {
+      reading.served = TH.holdNextAnswer(deaf, 'tryGetVault')
       reading.done = vault.hello({ staleMinutes: 0 })
       await reading.served.reached
     })
@@ -312,7 +312,7 @@ describe("the refresh's judgment", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const kept = await world.getLease()
     if (kept === null) { throw new Error("The unlock left no lease in this device's store") }
-    vi.spyOn(world.deviceDB, 'getLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
+    vi.spyOn(world.deviceDB, 'tryGetLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
     await vault.refresh()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(await world.getLease()).to.deep.eq(kept)
@@ -324,8 +324,8 @@ describe("the refresh's judgment", () => {
     await vault.lock()
     // A read begins as the unlock is about to write its lease, and finds none; it is answered after.
     const reading: { answered?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
-    TH.beforeNextCall(world.deviceDB, 'putLease', async () => {
-      reading.answered = TH.holdNextAnswer(world.deviceDB, 'getLease')
+    TH.beforeNextCall(world.deviceDB, 'tryPutLease', async () => {
+      reading.answered = TH.holdNextAnswer(world.deviceDB, 'tryGetLease')
       reading.done = vault.refresh()
       await reading.answered.reached
       world.advance(1)
@@ -388,7 +388,7 @@ describe("vault.lock, at once", () => {
     const vault = await world.openUnlocked('pw')
     const heard: string[] = []
     vault.subscribe(() => { heard.push(TH.stateOf(vault.getSnapshot())) })
-    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
+    const erasing = TH.holdNextCall(world.deviceDB, 'tryDelLease')
     const locking = vault.lock()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
     expect(vault.snapshot.ask_passphrase_at).to.be.null
@@ -476,7 +476,7 @@ describe("a lock landing during a box call", () => {
     const world = makeRacingWorld()
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
-    const writing = TH.holdNextAnswer(deaf, 'putBox')
+    const writing = TH.holdNextAnswer(deaf, 'tryPutBox')
     const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     await writing.reached
     await vault.lock()
@@ -490,7 +490,7 @@ describe("a lock landing during a box call", () => {
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const deleting = TH.holdNextAnswer(deaf, 'delBox')
+    const deleting = TH.holdNextAnswer(deaf, 'tryDelBox')
     const removing = vault.delBox('anthropic')
     await deleting.reached
     await vault.lock()

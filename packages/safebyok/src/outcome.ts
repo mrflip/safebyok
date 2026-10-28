@@ -5,7 +5,7 @@ import * as Refusals from './refusals'
  * TypeScript narrows on `ok`.
  *
  * @example
- *   const { ok, val, err } = await vaultDB.getVault(scope)
+ *   const { ok, val, err } = await vaultDB.tryGetVault(scope)
  *   if (! ok) { return err }
  *   val  // VaultRecord | null
  */
@@ -53,10 +53,10 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *
- * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
+ * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself
  * @example
  *   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
- *     return valOf(await this.inner.getBox(scope, boxlabel, expected))
+ *     return valOf(await this.inner.tryGetBox(scope, boxlabel, expected))   // or this.inner.getBox(...), which throws the same
  *   }
  */
 export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {

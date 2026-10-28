@@ -86,7 +86,7 @@ describe("idbVaultDB", () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     expect(await inspectIdbVaultDB({ dbName }).rows()).to.deep.equal([
       { scopepath: 'box^acme^u1^main^anthropic', row: TH.boxOf('anthropic', 'one') },
       { scopepath: 'vault^acme^u1^main',         row: TH.vaultRecordOf('u1') },
@@ -101,7 +101,7 @@ describe("idbVaultDB", () => {
     await set('["box","acme","u1","main","anthropic"]', TH.boxOf('anthropic', 'one'), rawShelf(dbName))
     const vaultDB = idbVaultDB({ dbName })
     expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
-    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
+    await TH.expectBad(vaultDB.tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
     expect(await inspectIdbVaultDB({ dbName }).rows()).to.have.lengthOf(4)
   })
 
@@ -109,13 +109,13 @@ describe("idbVaultDB", () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     for (const tail of ['Open AI', 'x^y', '']) {
       await set(Scopepath.withinVaultScopepathPrefix(TH.scopeOf('u1')) + tail, TH.boxOf('openai', 'two'), rawShelf(dbName))
     }
     const listed = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
     expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
-    const capacity = await TH.expectingGood(vaultDB).getCapacity(TH.scopeOf('u1'))
+    const capacity = await TH.expectingGood(vaultDB).tryGetCapacity(TH.scopeOf('u1'))
     expect(capacity.boxes.used).to.eq(4)
   })
 
@@ -125,7 +125,7 @@ describe("idbVaultDB", () => {
     const lookalike = TH.scopeOf('u1', 'main2')
     for (const user of ['u1', 'u12', 'u2']) {
       await TH.ensureGated(vaultDB, TH.vaultRecordOf(user))
-      await TH.expectingGood(vaultDB).putBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', user))
+      await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', user))
     }
     await set(Scopepath.box({ ...lookalike, boxlabel: 'xx' }), TH.boxOf('xx', 'lookalike'), rawShelf(dbName))
     const rangedGetAll = vi.spyOn(IDBObjectStore.prototype, 'getAll')
@@ -151,7 +151,7 @@ describe("idbVaultDB", () => {
     await set(Scopepath.vault(TH.scopeOf('u1')), TH.vaultRecordOf('u1'), rawShelf(dbName))
     await set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), 'not a box', rawShelf(dbName))
     await set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'openai' }), TH.boxOf('openai', 'two'), rawShelf(dbName))
-    const read = await TH.expectingGood(idbVaultDB({ dbName })).getVault(TH.scopeOf('u1'))
+    const read = await TH.expectingGood(idbVaultDB({ dbName })).tryGetVault(TH.scopeOf('u1'))
     expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
   })
@@ -161,7 +161,7 @@ describe("idbVaultDB", () => {
     await set(Scopepath.vault(TH.scopeOf('u1')), TH.vaultRecordOf('u1'), rawShelf(dbName))
     await set(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), 'not a box', rawShelf(dbName))
     const vaultDB = idbVaultDB({ dbName })
-    expect(await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
+    expect(await TH.expectingGood(vaultDB).tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
     const boxScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' })
     expect(await get(boxScopepath, rawShelf(dbName))).to.be.undefined
   })
@@ -169,7 +169,7 @@ describe("idbVaultDB", () => {
   it("refuses a damaged vault record as damaged_vault, and leaves it as it is", async () => {
     const dbName = TH.freshDbName()
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1', gate_epoch: 'one' }, rawShelf(dbName))
-    await TH.expectBad(idbVaultDB({ dbName }).getVault(TH.scopeOf('u1')), 'damaged_vault')
+    await TH.expectBad(idbVaultDB({ dbName }).tryGetVault(TH.scopeOf('u1')), 'damaged_vault')
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_tok: 'vault-tok-u1', gate_epoch: 'one' })
   })
 
@@ -177,7 +177,7 @@ describe("idbVaultDB", () => {
     const dbName = TH.freshDbName()
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1' }, rawShelf(dbName))
     const next = TH.vaultRecordOf('u1', { gate_epoch: 2 })
-    await TH.expectBad(idbVaultDB({ dbName }).putVaultRecord(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
+    await TH.expectBad(idbVaultDB({ dbName }).tryPutVaultRecord(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
     const storedVaultRecord: unknown = await get(Scopepath.vault(TH.scopeOf('u1')), rawShelf(dbName))
     expect(storedVaultRecord).to.deep.equal({ vault_tok: 'vault-tok-u1' })
   })
@@ -187,14 +187,14 @@ describe("idbVaultDB", () => {
     const vaultDB = idbVaultDB({ dbName })
     const { heard, onChange } = TH.changeCounter()
     const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), onChange)
-    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
+    await TH.expectingGood(vaultDB).tryEnsureVault(TH.gatelessOf('u1'))
     await TH.eventually(() => heard.count > 0)
     const rungOnMaking = heard.count
-    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }))
+    await TH.expectingGood(vaultDB).tryEnsureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }))
     await TH.aWhile()
     expect(heard.count, 'an ensure that found the vault already stored rang anyone').to.eq(rungOnMaking)
     unsubscribe()
-    expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
+    expect(await TH.expectingGood(vaultDB).tryGetVault(TH.scopeOf('u1'))).to.deep.equal({ ...TH.gatelessOf('u1'), boxes: [], damagedBoxes: [] })
   })
 
   it("deletes a vault whose vault record is damaged -- delDamagedVault reads its vault_tok as stored -- and only that vault", async () => {
@@ -202,11 +202,11 @@ describe("idbVaultDB", () => {
     const vaultDB = idbVaultDB({ dbName })
     for (const user of ['u1', 'u2']) {
       await TH.ensureGated(vaultDB, TH.vaultRecordOf(user))
-      await TH.expectingGood(vaultDB).putBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', 'one'))
+      await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', 'one'))
     }
     await set(Scopepath.vault(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1', gate_epoch: 'one' }, rawShelf(dbName))
-    await TH.expectBad(vaultDB.delDamagedVault(TH.scopeOf('u2')), 'bad_option')
-    await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
+    await TH.expectBad(vaultDB.tryDelDamagedVault(TH.scopeOf('u2')), 'bad_option')
+    await TH.expectingGood(vaultDB).tryDelDamagedVault(TH.scopeOf('u1'))
     const shelf = rawShelf(dbName)
     const ourVaultRecord = Scopepath.vault(TH.scopeOf('u1'))
     const ourBox = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' })
@@ -221,12 +221,12 @@ describe("idbVaultDB", () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
-    await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u1'), TH.thisVault)
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryDelVault(TH.scopeOf('u1'), TH.thisVault)
     const leftRows = await inspectIdbVaultDB({ dbName }).rows()
     const left = leftRows.map((row) => [row.scopepath, row.row])
     expect(left).to.deep.equal([[Scopepath.vault(TH.scopeOf('u1')), { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 2 }]])
-    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-reborn' }))
+    await TH.expectingGood(vaultDB).tryEnsureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-reborn' }))
     const rebornRows = await inspectIdbVaultDB({ dbName }).rows()
     const reborn = rebornRows.map((row) => row.row)
     expect(reborn).to.deep.equal([TH.gatelessOf('u1', { vault_tok: 'vault-tok-reborn', vault_epoch: 2 })])
@@ -236,7 +236,7 @@ describe("idbVaultDB", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw new DOMException('IndexedDB is off', 'InvalidStateError') })
     try {
-      await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'storage_unavailable')
+      await TH.expectBad(vaultDB.tryGetVault(TH.scopeOf('u1')), 'storage_unavailable')
     } finally {
       blocked.mockRestore()
     }
@@ -254,7 +254,7 @@ describe("idbVaultDB", () => {
       const withheld = new DOMException('The browser refused.', errName)
       const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw withheld })
       try {
-        const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'storage_blocked')
+        const refusal = await TH.expectBad(vaultDB.tryGetVault(TH.scopeOf('u1')), 'storage_blocked')
         expect(refusal.message).to.include('will not help until that changes')
         expect((refusal as { cause?: unknown }).cause).to.eq(withheld)
       } finally {
@@ -267,7 +267,7 @@ describe("idbVaultDB", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const refusal = await TH.expectBad(vaultDB.ensureVault(TH.gatelessOf('u1')), 'storage_blocked')
+      const refusal = await TH.expectBad(vaultDB.tryEnsureVault(TH.gatelessOf('u1')), 'storage_blocked')
       expect(refusal.message).to.include('no IndexedDB')
     } finally {
       vi.unstubAllGlobals()
@@ -288,7 +288,7 @@ describe("idbVaultDB", () => {
   it("reports a write aborted from outside with the error its request failed with, never a null cause", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     // A transaction aborted from outside has a null error; its pending delete fails with an AbortError.
     const aborting = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementationOnce(function (this: IDBObjectStore, ...args) {
       const request = this.delete(...args)
@@ -296,7 +296,7 @@ describe("idbVaultDB", () => {
       return request
     })
     try {
-      const refusal = await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'storage_unavailable')
+      const refusal = await TH.expectBad(vaultDB.tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'storage_unavailable')
       const { cause } = refusal as { cause?: unknown }
       expect(cause).to.be.instanceOf(Error)
       expect((cause as Error).name).to.eq('AbortError')
@@ -329,12 +329,12 @@ describe("idbVaultDB, every verb one transaction", () => {
     const lookalike = TH.scopeOf('u1', 'main2')
     for (const user of ['u1', 'u12', 'u2']) {
       await TH.ensureGated(vaultDB, TH.vaultRecordOf(user))
-      await TH.expectingGood(vaultDB).putBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', user))
+      await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf(user), { vault_tok: `vault-tok-${user}`, revision_tok: null }, TH.boxOf('anthropic', user))
     }
     await set(Scopepath.box({ ...lookalike, boxlabel: 'xx' }), TH.boxOf('xx', 'lookalike'), rawShelf(dbName))
     const wholeShelf = vi.spyOn(IDBObjectStore.prototype, 'getAllKeys')
     try {
-      await TH.expectingGood(vaultDB).delVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+      await TH.expectingGood(vaultDB).tryDelVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
       expect(wholeShelf).not.toHaveBeenCalled()
     } finally {
       wholeShelf.mockRestore()
@@ -354,18 +354,18 @@ describe("idbVaultDB, every verb one transaction", () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(scope, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(scope, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     const failing = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementationOnce(function (this: IDBObjectStore, ckey) {
       this.delete(ckey)
       throw new DOMException('the disk is full', 'QuotaExceededError')
     })
     try {
-      await TH.expectBad(vaultDB.delVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'storage_blocked')
+      await TH.expectBad(vaultDB.tryDelVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'storage_blocked')
     } finally {
       failing.mockRestore()
     }
     expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(TH.vaultRecordOf('u1'))
-    expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 })
 
@@ -377,9 +377,9 @@ describe("idbVaultDB's subscribe", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     let heardCount = 0
     vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
-    await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
-    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
-    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'too-late' }))
+    await TH.expectBad(vaultDB.tryPutVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
+    await TH.expectingGood(vaultDB).tryEnsureVault(TH.gatelessOf('u1'))
+    await TH.expectingGood(vaultDB).tryEnsureVault(TH.gatelessOf('u1', { vault_tok: 'too-late' }))
     await TH.wakeupAtNextTick()
     expect(heardCount).to.eq(1)
   })
@@ -387,14 +387,14 @@ describe("idbVaultDB's subscribe", () => {
   it("rings for a deletion that removed a box, and for none that found nothing to remove", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     await TH.wakeupAtNextTick()
     let heardCount = 0
     vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
-    expect(await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
+    expect(await TH.expectingGood(vaultDB).tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
     await TH.wakeupAtNextTick()
     expect(heardCount).to.eq(1)
-    expect(await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'absent' })
+    expect(await TH.expectingGood(vaultDB).tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'absent' })
     await TH.wakeupAtNextTick()
     expect(heardCount).to.eq(1)
   })

@@ -12,7 +12,8 @@ The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 
 streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
 (`whiteboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
 (`whiteboard/20261025-restyle/`); the rows on standing, from the fixup sprint of 2026-10-27
-(`whiteboard/20261027-fixup_sprint/unstanding.md`).
+(`whiteboard/20261027-fixup_sprint/unstanding.md`); the rows on the stores' verbs, from the catchsweep sprint of
+2026-10-28 (`whiteboard/20261027-catchsweep/`).
 
 To be deleted at 1.0.0.
 
@@ -152,3 +153,6 @@ To be deleted at 1.0.0.
 | standing (the vault record in hand), the `standing` of `sealLeaseRecord` | the vault record in hand; `held` |
 | the gating standing; a lease standing                  | the pending gating; a lease in force                    |
 | `#checkStanding()`, `StandingGating`, `standsBeside`    | `#demandNotGone()`, `OutsideGating`, `leavesInForce`    |
+| `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords`, `putVaultRecord`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `delDamagedVault`, each resolving an `Outcome` | `tryGetVault`, `tryEnsureVault`, ... resolve the `Outcome`; `getVault`, `ensureVault`, ... resolve the answer or throw the refusal |
+| `DeviceDB.getLease`, `putLease`, `delLease`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`, each resolving an `Outcome` | `tryGetLease`, `tryPutLease`, ... resolve the `Outcome`; `getLease`, `putLease`, ... resolve the answer or throw what the store threw |
+| `HeededVaultDB`'s `Thrown<>` mapping; `ProvingTools.putLease` | `Pick<VaultDB, ...>` of the throwing forms; `ProvingTools.tryPutLease` |

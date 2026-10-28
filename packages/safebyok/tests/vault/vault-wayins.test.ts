@@ -128,8 +128,8 @@ describe("putWayin, with a new passphrase", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: deaf })
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     const leaseBefore = await world.getLease()
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
-    const answering = TH.holdNextAnswer(deaf, 'putVaultRecord')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
+    const answering = TH.holdNextAnswer(deaf, 'tryPutVaultRecord')
     const putting = TH.tryPutWayin(vault, 'pw', 'pw two')
     await answering.reached
     const shown = vault.getSnapshot()
@@ -149,11 +149,11 @@ describe("putWayin, with a new passphrase", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const leaseBefore = await world.getLease()
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
     let raising: ReturnType<typeof TH.holdNextCall> | null = null
     // Past the read putWayin makes first, which raises the record too: the raise after its own write.
-    TH.beforeNextCall(world.vaultDB, 'putVaultRecord', () => {
-      raising = TH.holdNextCall(world.deviceDB, 'raiseDeviceRecord')
+    TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
+      raising = TH.holdNextCall(world.deviceDB, 'tryRaiseDeviceRecord')
       return Promise.resolve()
     })
     const putting = TH.tryPutWayin(vault, 'pw', 'pw two')
@@ -178,7 +178,7 @@ describe("putWayin, with a new passphrase", () => {
     expect(storedVaultRecordOf(world)['gate_epoch']).to.eq(2)
     await vi.waitFor(() => { expect(TH.stateOf(there.getSnapshot())).to.eq('locked') })
     // Dropped from memory, erasing nothing; the lease left is outdated, never taken up, and left where it lies.
-    const theirLease = () => TH.expectGood(thereDeviceDB.getLease(TH.scopeOf('u1')))
+    const theirLease = () => TH.expectGood(thereDeviceDB.tryGetLease(TH.scopeOf('u1')))
     const outdated = await theirLease()
     expect(outdated).to.not.be.null
     await TH.expectRefusal(there.ensureUnlocked(), 'vault_locked')
@@ -251,8 +251,8 @@ describe("putWayin, with a new passphrase", () => {
     const here = await world.openUnlocked('pw')
     const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     // `there` looks at the vault record before `here` writes, and writes after it.
-    const realUpdate = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+    const realUpdate = world.vaultDB.tryPutVaultRecord.bind(world.vaultDB)
+    const spied = vi.spyOn(world.vaultDB, 'tryPutVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
       await TH.putWayin(here, 'pw', 'here pw')
       return await realUpdate(vaultRecord, expected)
     })
@@ -435,7 +435,7 @@ describe("the vault's passkey", () => {
     const world = makeWorld()
     const requestCleartext = vi.fn<RequestCleartext>()
     const novel = await world.open({ requestCleartext })
-    const writes = vi.spyOn(world.vaultDB, 'putVaultRecord')
+    const writes = vi.spyOn(world.vaultDB, 'tryPutVaultRecord')
     await TH.expectRefusal(novel.putWayin('passkey'), 'absent_vault')
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(writes).not.toHaveBeenCalled()
@@ -539,8 +539,8 @@ describe("the vault's passkey", () => {
   it("putWayin with a passkey refuses as gate_moved when another device changed the ways in meanwhile and this one heard of it, writing nothing (Contract: putWayin, Refuses)", async () => {
     const { world, vault } = await vaultWithPasskey()
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    const realUpdate = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-    const spied = vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+    const realUpdate = world.vaultDB.tryPutVaultRecord.bind(world.vaultDB)
+    const spied = vi.spyOn(world.vaultDB, 'tryPutVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
       await TH.putWayin(elsewhere, 'pw', 'pw two')
       return await realUpdate(vaultRecord, expected)
     })
@@ -783,8 +783,8 @@ describe("a new passphrase's strength", () => {
     const world = makeWorld()
     const load = vi.fn(() => Promise.resolve())
     const vault = await world.open({ strengthChecker: Object.assign(() => StrongVerdict, { load }) })
-    const getVault = vi.spyOn(world.vaultDB, 'getVault')
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const getVault = vi.spyOn(world.vaultDB, 'tryGetVault')
+    const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     await vault.checkStrength('pw')
     expect(getVault).not.toHaveBeenCalled()
     expect(ensureVault).not.toHaveBeenCalled()
@@ -809,7 +809,7 @@ describe("a new passphrase's strength", () => {
   it("reads storage for a birth only once the checker's load has succeeded", async () => {
     const world = makeWorld()
     const gate = TH.makeLatch()
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const strengthChecker = Object.assign(() => StrongVerdict, { load: gate.pass })
     const bank = Bank.make(bankOptsOf(world.optsWith({ strengthChecker })))
     const birth = bank.tryEnsureVault(u1Main)
@@ -845,7 +845,7 @@ describe("a new passphrase's strength", () => {
   it("refuses a birth as its load failed, never reading storage", async () => {
     const world = makeWorld()
     const lost = new Error('the word list did not load')
-    const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault')
+    const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
     const err = await TH.expectRefusal(world.open({ strengthChecker: Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) }) }), 'unexpected_error')
     expect(err.cause).to.eq(lost)
     expect(ensureVault).not.toHaveBeenCalled()
@@ -1101,8 +1101,8 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       const here = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
       let landed: string | null = null
       // `there` proves against the vault record before `here` writes, and writes after it.
-      const realPut = world.vaultDB.putVaultRecord.bind(world.vaultDB)
-      vi.spyOn(world.vaultDB, 'putVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
+      const realPut = world.vaultDB.tryPutVaultRecord.bind(world.vaultDB)
+      vi.spyOn(world.vaultDB, 'tryPutVaultRecord').mockImplementationOnce(async (vaultRecord, expected) => {
         await TH.putWayin(here, 'pw', 'here pw')
         landed = storedText(world)
         return await realPut(vaultRecord, expected)
@@ -1115,7 +1115,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
     it(`${callTitle} refuses storage_unavailable when the write cannot reach the backend`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const before = storedText(world)
-      vi.spyOn(world.vaultDB, 'putVaultRecord').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The backend could not be reached: try again shortly.')))
+      vi.spyOn(world.vaultDB, 'tryPutVaultRecord').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The backend could not be reached: try again shortly.')))
       await TH.expectRefusal(change(vault), 'storage_unavailable')
       expect(storedText(world)).to.eq(before)
     })
@@ -1175,7 +1175,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
     it(`${callTitle} refuses identity_revoked when storage says the user signed out, and locks`, async () => {
       const { world, vault } = await vaultWithPasskey()
       const before = storedText(world)
-      vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
+      vi.spyOn(world.vaultDB, 'tryGetVault').mockResolvedValueOnce(bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
       await TH.expectRefusal(change(vault), 'identity_revoked')
       expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
       expect(storedText(world)).to.eq(before)
@@ -1244,8 +1244,8 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
 
   it("refuses a misshapen proof before any read of storage, the only refusal before an await (Contract: putWayin, Does 1)", async () => {
     const { world, vault } = await vaultWithPasskey()
-    const getVaultRecord = vi.spyOn(world.vaultDB, 'getVault')
-    const getLease = vi.spyOn(world.deviceDB, 'getLease')
+    const getVaultRecord = vi.spyOn(world.vaultDB, 'tryGetVault')
+    const getLease = vi.spyOn(world.deviceDB, 'tryGetLease')
     await TH.expectRefusal(TH.putWayin(vault, 42 as unknown as string, 'pw two'), 'bad_option')
     await TH.expectRefusal(TH.putWayin(vault, 'pw', { credential_id: 'x' } as unknown as PasskeyAnswer), 'bad_option')
     await TH.expectRefusal(TH.delWayin(vault, null as unknown as string), 'bad_option')

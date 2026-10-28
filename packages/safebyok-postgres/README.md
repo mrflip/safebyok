@@ -149,14 +149,14 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 // to its check and the table's limits, as a browser's vault does. A vault goes checked and split, which the browser's
 // VaultDB checks again.
 const served = new Map<string, Served>([
-  ['getVault',     (vaultDB, [scope]) => relayed(vaultDB.getVaultRecords(scope as VaultScope))],
-  ['ensureVault',  (vaultDB, [draft]) => relayed(vaultDB.ensureVaultRecords(draft as VaultRecord & { gate: null }))],
-  ['putVaultRecord', (vaultDB, [vaultRecord, expected]) => vaultDB.putVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
-  ['getBox',      (vaultDB, [scope, boxlabel, expected]) => vaultDB.getBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
-  ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
-  ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
-  ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
-  ['delVault',   (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
+  ['getVault',     (vaultDB, [scope]) => relayed(vaultDB.tryGetVaultRecords(scope as VaultScope))],
+  ['ensureVault',  (vaultDB, [draft]) => relayed(vaultDB.tryEnsureVaultRecords(draft as VaultRecord & { gate: null }))],
+  ['putVaultRecord', (vaultDB, [vaultRecord, expected]) => vaultDB.tryPutVaultRecord(vaultRecord as VaultRecord, expected as VaultRecordExpectation)],
+  ['getBox',      (vaultDB, [scope, boxlabel, expected]) => vaultDB.tryGetBox(scope as VaultScope, boxlabel as string, expected as BoxGetExpectation)],
+  ['getCapacity',  (vaultDB, [scope]) => vaultDB.tryGetCapacity(scope as VaultScope)],
+  ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.tryPutBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
+  ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.tryDelBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
+  ['delVault',   (vaultDB, [scope, expected]) => vaultDB.tryDelVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
 
 /** A vault as the VaultDB read it, as the browser's VaultDB answers from its half: its record as `vault`, null for none, beside its boxes, sound and damaged. */

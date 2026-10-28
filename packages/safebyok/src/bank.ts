@@ -228,8 +228,8 @@ export class Bank {
   // == [Bank: vaults]: ensureVault, reopenVault, closeVault, closeVaults, clearCachedVault, delDamagedVault
 
   /** The Vault object for the vault `bag` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
-   * It says hello first. A birth reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.ensureVault`
-   * beside {@link DeviceDB.getLease}, then raises the record with {@link DeviceDB.raiseDeviceRecord}.
+   * It says hello first. A birth reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.ensureVault`
+   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.tryRaiseDeviceRecord}.
    * `VaultDB.ensureVault` resolves the vault as stored, or stores a new, gateless one in one
    * transaction; past a tombstone, a new life, its counter carried on. A lease of the vault's ways
    * in that has not ended, and ends no later than `leaseHours` from now, is taken up: the vault is
@@ -306,7 +306,7 @@ export class Bank {
    * vault served behind what this device has seen, until the next birth, so call it only on the
    * user's or the host's say.
    *
-   * Erases with {@link DeviceDB.delDeviceRecord} and {@link DeviceDB.delLease}, in the `deviceDB` of
+   * Erases with {@link DeviceDB.tryDelDeviceRecord} and {@link DeviceDB.tryDelLease}, in the `deviceDB` of
    * `opts`, or the bank's own. It touches this device's store alone, as clearing the browser's site
    * data would: no VaultDB verb, and no passphrase. A vault the bank does not list, or storage does
    * not hold, is no refusal: what this device keeps of it is erased all the same.
@@ -328,8 +328,8 @@ export class Bank {
     return outcomeOf(async () => {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
-      valOf(await parts.deviceDB.delDeviceRecord(scope))
-      valOf(await parts.deviceDB.delLease(scope))
+      valOf(await parts.deviceDB.tryDelDeviceRecord(scope))
+      valOf(await parts.deviceDB.tryDelLease(scope))
       // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
       // reads neither.
       this.#letGoOf(Scopepath.vault(scope))
@@ -552,16 +552,16 @@ export class Bank {
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
     const readAt = Math.floor(parts.clock.now())
-    const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
+    const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.tryGetDeviceRecord(scope)))
     this.#demandHeld(vaultScopepath, entry)
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), KeptLease.read(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
+    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, readAt)), KeptLease.tryRead(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
     const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
-    const record = deviceRecordFor(scope, valOf(await deviceDB.raiseDeviceRecord(raising))) ?? raising
+    const record = deviceRecordFor(scope, valOf(await deviceDB.tryRaiseDeviceRecord(raising))) ?? raising
     this.#demandHeld(vaultScopepath, entry)
     const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
@@ -574,7 +574,7 @@ export class Bank {
 
   /** Erase this device's lease of `parts`' scope, after a birth refused for storage it cannot trust: a device store that will not erase it is warned of, as the refusal is what the caller must hear. */
   async #revokeLease(parts: VaultParts) {
-    const erased = await parts.deviceDB.delLease(CX.vaultScope.parse(parts))
+    const erased = await parts.deviceDB.tryDelLease(CX.vaultScope.parse(parts))
     if (erased.ok) { return }
     parts.logger.warn("Storage could not be trusted with this vault as it was opened, but this device's lease of it could not be revoked: the next time the vault is opened on this device, as at the next page load, it may take it up.", { call: 'untrustedStorage' }, erased.err)
   }
@@ -625,17 +625,13 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+
+/** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
+const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
 /** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
-const parseVaultBag = (bag: unknown): VaultBag => {
-  try {
-    return vaultBag.parse(bag)
-  } catch (err) {
-    if (! isVaultError(err, 'bad_scope')) { throw err }
-    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do.`, err.meta === undefined ? {} : { meta: err.meta })
-  }
-}
+const parseVaultBag = (bag: unknown): VaultBag => vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: VaultBagAdvice })
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {

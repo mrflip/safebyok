@@ -28,10 +28,10 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await TH.expectGood(browserOpts({ dbName }).deviceDB.putLease(await TH.leaseOf('u1')))
+    await TH.expectGood(browserOpts({ dbName }).deviceDB.tryPutLease(await TH.leaseOf('u1')))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.scopepath)).to.deep.equal(['lease^acme^u1^main'])
-    expect(await TH.expectingGood(browserOpts().deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(browserOpts().deviceDB).tryGetLease(TH.scopeOf('u1'))).to.be.null
   })
 
   it("answers the same frozen bag for the same dbName, so a render may call it, as its fourth example shows", () => {
@@ -82,7 +82,7 @@ describe("browserOpts", () => {
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     const scope = TH.scopeOf('u1')
-    expect(await TH.expectGood(deviceDB.getDeviceRecord(scope))).to.not.be.null
+    expect(await TH.expectGood(deviceDB.tryGetDeviceRecord(scope))).to.not.be.null
     bank.closeVaults()
   })
 })

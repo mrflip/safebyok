@@ -53,14 +53,16 @@ export type VaultDBOpts = {
  *  * **Don't repair.** Return a record exactly as stored, or null when there is none. A damaged
  *    record is safebyok's to refuse, never yours to fix or quietly drop.
  *  * **Refuse with what {@link Refusals} makes.** A `do*` method that hands its call on to another
- *    VaultDB's verb returns that verb's `val` and throws its `err`, as `valOf` does.
+ *    VaultDB calls that VaultDB's throwing verb (`inner.getBox`), which answers with the record
+ *    and throws the refusal, as `valOf` does of an Outcome.
  *
  * Hand `super()` the host's {@link VaultDBOpts}. Never override the public verbs, but
  * `delDamagedVault` in an adapter that hands each call on to another VaultDB.
  *
- * Every public verb resolves an {@link Outcome} and never rejects; {@link VaultDB.subscribe} alone
- * throws. Before your code sees a call, a verb refuses 'bad_scope' for a name, the scope's three
- * or a boxlabel, that fails its check (`label`, or `user_id`) or is over
+ * Every public verb is a try pair: `getVault` resolves its answer or throws its refusal, and
+ * `tryGetVault` resolves the same as an {@link Outcome} and never rejects; {@link VaultDB.subscribe}
+ * alone has one form, and throws. Before your code sees a call, a verb refuses 'bad_scope' for a
+ * name, the scope's three or a boxlabel, that fails its check (`label`, or `user_id`) or is over
  * {@link VaultDB.maxNameBytes}. It refuses 'bad_record' for a record or expectation this package
  * would not build, a name in it failing its check among them ('invalid_box' for a box), naming each
  * failing field, never its value.
@@ -70,7 +72,8 @@ export type VaultDBOpts = {
  * 'damaged_vault' or 'damaged_box', Zod's own error its `cause`. An answer in a shape the protocol
  * does not allow, an Outcome where the bare answer is owed among them, is 'corrupt_record' (from
  * `doGetBox`, 'damaged_box'): a bug in the adapter (`VAULTDB.md`, line 5.1). A throw from the base
- * class's own code that is no VaultError is a bug: 'unexpected_error', never to be retried.
+ * class's own code that is no VaultError is a bug, which a `try` form resolves as
+ * 'unexpected_error', never to be retried, and a throwing form throws as it came.
  */
 export abstract class VaultDB {
   // == [Backend limits]: maxRecordBytes, maxVaultBytes, maxBoxes, maxNameBytes
@@ -135,7 +138,7 @@ export abstract class VaultDB {
 
   // --
 
-  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultRecord, readVault, ensuredVault
+  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultRecord, their try forms, readVault, ensuredVault
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -149,11 +152,16 @@ export abstract class VaultDB {
    * 'newer_format' for a format a later version may write.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.getVault(scope)
-   *   if (ok && val === null) { offerNewVault() }
+   *   const stored = await vaultDB.getVault(scope)
+   *   if (stored === null) { offerNewVault() }
    */
-  getVault(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
-    return outcomeOf(() => this.readVault(scope))
+  getVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
+    return this.readVault(scope)
+  }
+
+  /** The vault of `scope`, or null for none, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getVault}. */
+  tryGetVault(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
+    return outcomeOf(() => this.getVault(scope))
   }
 
   /** Read the vault of `draft`'s scope as {@link VaultDB.getVault} does, creating it from `draft` first when none is stored.
@@ -167,11 +175,16 @@ export abstract class VaultDB {
    * store sets the counter: any other refuses 'bad_record'.
    *
    * @example
-   *   const { ok, val } = await vaultDB.ensureVault(draft)
-   *   if (ok && val.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
+   *   const ensured = await vaultDB.ensureVault(draft)
+   *   if (ensured.vault_tok === draft.vault_tok) { greetNewVault() }   // this call made it
    */
-  ensureVault(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
-    return outcomeOf(() => this.ensuredVault(draft))
+  ensureVault(draft: VaultDraft): Promise<VaultRecord & BoxListing> {
+    return this.ensuredVault(draft)
+  }
+
+  /** The vault of `draft`'s scope, made from `draft` when none was stored, as an {@link Outcome}: the non-throwing form of {@link VaultDB.ensureVault}. */
+  tryEnsureVault(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
+    return outcomeOf(() => this.ensureVault(draft))
   }
 
   /** Read the scope's vault as {@link VaultDB.getVault} does: what a server relays to a browser's VaultDB, as its `doGetVault` answers.
@@ -179,19 +192,28 @@ export abstract class VaultDB {
    * parses its word on a damaged one.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.getVaultRecords(scope)
-   *   if (! ok) { throw err }
-   *   if (val === null) { return null }
-   *   const { boxes, damagedBoxes, ...vault } = val
+   *   const read = await vaultDB.getVaultRecords(scope)   // throws its refusal
+   *   if (read === null) { return null }
+   *   const { boxes, damagedBoxes, ...vault } = read
    *   return { vault, boxes, damagedBoxes }   // what a server sends a browser's VaultDB
    */
-  getVaultRecords(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
-    return outcomeOf(() => this.readVault(scope))
+  getVaultRecords(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
+    return this.readVault(scope)
+  }
+
+  /** The vault of `scope` as a server relays it, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getVaultRecords}. */
+  tryGetVaultRecords(scope: VaultScope): Promise<Outcome<(VaultRecord & BoxListing) | null>> {
+    return outcomeOf(() => this.getVaultRecords(scope))
   }
 
   /** Ensure the vault as {@link VaultDB.ensureVault} does: what a server relays to a browser's VaultDB, as its `doEnsureVault` answers. */
-  ensureVaultRecords(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
-    return outcomeOf(() => this.ensuredVault(draft))
+  ensureVaultRecords(draft: VaultDraft): Promise<VaultRecord & BoxListing> {
+    return this.ensuredVault(draft)
+  }
+
+  /** The vault of `draft`'s scope as a server relays it, as an {@link Outcome}: the non-throwing form of {@link VaultDB.ensureVaultRecords}. */
+  tryEnsureVaultRecords(draft: VaultDraft): Promise<Outcome<VaultRecord & BoxListing>> {
+    return outcomeOf(() => this.ensureVaultRecords(draft))
   }
 
   /** Replace the vault record with `vaultRecord`, only while the stored one has the `vault_tok` and `gate_epoch` in `expected`, resolving the vault record as stored.
@@ -206,20 +228,23 @@ export abstract class VaultDB {
    * refuses 'bad_record', as a vault's never changes.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putVaultRecord(next, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
+   *   const { ok, val, err } = await vaultDB.tryPutVaultRecord(next, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_stored }   // what won
    */
-  putVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<Outcome<VaultRecord>> {
-    return outcomeOf(async () => {
-      const outgoing = checkOutgoing(VaultRecord, vaultRecord, 'vault record')
-      const asked = heldScope(this, outgoing)
-      const expectation = checkOutgoing(VaultRecordExpectation, expected, 'vault record expectation')
-      if (outgoing.vault_tok !== expectation.vault_tok) {
-        throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
-      }
-      const raw = await withStaleVaultRecordChecked(adapterAnswer(() => this.doPutVaultRecord(outgoing, expectation)), asked)
-      return checkWrittenVaultRecord(raw, outgoing)
-    })
+  async putVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<VaultRecord> {
+    const outgoing = checkOutgoing(VaultRecord, vaultRecord, 'vault record')
+    const asked = heldScope(this, outgoing)
+    const expectation = checkOutgoing(VaultRecordExpectation, expected, 'vault record expectation')
+    if (outgoing.vault_tok !== expectation.vault_tok) {
+      throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
+    }
+    const raw = await withStaleVaultRecordChecked(adapterAnswer(() => this.doPutVaultRecord(outgoing, expectation)), asked)
+    return checkWrittenVaultRecord(raw, outgoing)
+  }
+
+  /** The vault record as stored, as an {@link Outcome}: the non-throwing form of {@link VaultDB.putVaultRecord}. */
+  tryPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<Outcome<VaultRecord>> {
+    return outcomeOf(() => this.putVaultRecord(vaultRecord, expected))
   }
 
   /** Read the vault of `scope` through `doGetVault`, its vault record and listing checked and frozen; null for none or a tombstone. */
@@ -242,7 +267,7 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Box verbs]: getBox, putBox
+  // == [Box verbs]: getBox, putBox, their try forms
 
   /** Read the box under `boxlabel`, checked, or null for none, only while the stored vault record has `expected`'s `vault_tok`.
    * The vault record and the box are read in one atomic step. Another vault's record, or none (the
@@ -251,18 +276,21 @@ export abstract class VaultDB {
    * that fails its checks refuses `damaged_box`.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.getBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok })
+   *   const { ok, val, err } = await vaultDB.tryGetBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok })
    *   if (! ok && err.refusalkind === 'vault_mismatch') { await reopen() }   // the vault was remade
    */
-  getBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<Outcome<BoxRecord | null>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const label = heldBoxlabel(this, asked, boxlabel)
-      const expectation = checkOutgoing(BoxGetExpectation, expected, 'box read expectation', 'read')
-      const raw = await adapterAnswer(() => this.doGetBox(asked, label, expectation))
-      if (raw === null || raw === undefined) { return null }
-      return checkStoredBox(raw, label)
-    })
+  async getBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<BoxRecord | null> {
+    const asked = heldScope(this, scope)
+    const label = heldBoxlabel(this, asked, boxlabel)
+    const expectation = checkOutgoing(BoxGetExpectation, expected, 'box read expectation', 'read')
+    const raw = await adapterAnswer(() => this.doGetBox(asked, label, expectation))
+    if (raw === null || raw === undefined) { return null }
+    return checkStoredBox(raw, label)
+  }
+
+  /** The box under `boxlabel`, or null for none, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getBox}. */
+  tryGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<Outcome<BoxRecord | null>> {
+    return outcomeOf(() => this.getBox(scope, boxlabel, expected))
   }
 
   /** Write `box` under its boxlabel in one atomic conditional write, resolving the box as storage now holds it.
@@ -286,26 +314,29 @@ export abstract class VaultDB {
    *   `maxWhisperBytes`.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_tok, revision_tok: null }, box)
+   *   const { ok, val, err } = await vaultDB.tryPutBox(scope, { vault_tok, revision_tok: null }, box)
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.box_stored }  // what won
    */
-  putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<Outcome<BoxRecord>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const outgoing = checked(BoxRecord, box, invalidBox)
-      heldBoxlabel(this, asked, outgoing.boxlabel)
-      const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
-      const recordBytes = jsonBytes({ ...asked, ...outgoing })
-      if (recordBytes > this.maxRecordBytes) {
-        throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
-      }
-      const stored = await withMissChecked(adapterAnswer(() => this.doPutBox(asked, expectation, outgoing)), outgoing.boxlabel)
-      return checkWrittenBox(stored, outgoing)
-    })
+  async putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<BoxRecord> {
+    const asked = heldScope(this, scope)
+    const outgoing = checked(BoxRecord, box, invalidBox)
+    heldBoxlabel(this, asked, outgoing.boxlabel)
+    const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
+    const recordBytes = jsonBytes({ ...asked, ...outgoing })
+    if (recordBytes > this.maxRecordBytes) {
+      throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
+    }
+    const stored = await withMissChecked(adapterAnswer(() => this.doPutBox(asked, expectation, outgoing)), outgoing.boxlabel)
+    return checkWrittenBox(stored, outgoing)
+  }
+
+  /** The box as storage now holds it, as an {@link Outcome}: the non-throwing form of {@link VaultDB.putBox}. */
+  tryPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<Outcome<BoxRecord>> {
+    return outcomeOf(() => this.putBox(scope, expected, box))
   }
   // --
 
-  // == [Capacity]: getCapacity
+  // == [Capacity]: getCapacity, tryGetCapacity
 
   /** Read how full the vault is, as storage reckons it in one step: its boxes and their bytes, each against storage's most.
    * An estimate, for a host to warn its user before a write is refused: storage checks again on
@@ -314,19 +345,22 @@ export abstract class VaultDB {
    * `Number.MAX_SAFE_INTEGER`. A scope holding no vault answers nothing used.
    *
    * @example
-   *   const { ok, val } = await vaultDB.getCapacity(scope)
-   *   if (ok && val.boxes.used >= val.boxes.max) { warnFull() }
+   *   const capacity = await vaultDB.getCapacity(scope)
+   *   if (capacity.boxes.used >= capacity.boxes.max) { warnFull() }
    */
-  getCapacity(scope: VaultScope): Promise<Outcome<Capacity>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const raw = await adapterAnswer(() => this.doGetCapacity(asked))
-      return checkAnswer(Capacity, raw, 'a capacity reading')
-    })
+  async getCapacity(scope: VaultScope): Promise<Capacity> {
+    const asked = heldScope(this, scope)
+    const raw = await adapterAnswer(() => this.doGetCapacity(asked))
+    return checkAnswer(Capacity, raw, 'a capacity reading')
+  }
+
+  /** How full the vault is, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getCapacity}. */
+  tryGetCapacity(scope: VaultScope): Promise<Outcome<Capacity>> {
+    return outcomeOf(() => this.getCapacity(scope))
   }
   // --
 
-  // == [Delete verbs]: delBox, delVault, delDamagedVault, deletedVault
+  // == [Delete verbs]: delBox, delVault, delDamagedVault, their try forms, deletedVault
 
   /** Remove the box under `boxlabel`, whatever revision is stored, only while the stored vault record has `expected`'s `vault_tok`.
    * Another vault's record, or none, refuses `stale_write`, removing nothing. Resolves the
@@ -335,18 +369,21 @@ export abstract class VaultDB {
    * is kept, and a `putBox` expecting the revision removed refuses `stale_write`.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.delBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok })
-   *   if (ok && val.outcome === 'deleted_other') { await refresh() }   // someone wrote over it first
+   *   const deletion = await vaultDB.delBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok })
+   *   if (deletion.outcome === 'deleted_other') { await refresh() }   // someone wrote over it first
    */
-  delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const label = heldBoxlabel(this, asked, boxlabel)
-      const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
-      const deletion = await adapterAnswer(() => this.doDelBox(asked, label, expectation))
-      if (deletion === null) { throw Refusals.staleWrite('del') }
-      return checkAnswer(BoxDeletion, deletion, 'a deletion', 'landed')
-    })
+  async delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion> {
+    const asked = heldScope(this, scope)
+    const label = heldBoxlabel(this, asked, boxlabel)
+    const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
+    const deletion = await adapterAnswer(() => this.doDelBox(asked, label, expectation))
+    if (deletion === null) { throw Refusals.staleWrite('del') }
+    return checkAnswer(BoxDeletion, deletion, 'a deletion', 'landed')
+  }
+
+  /** The {@link BoxDeletion} the removal reports, as an {@link Outcome}: the non-throwing form of {@link VaultDB.delBox}. */
+  tryDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
+    return outcomeOf(() => this.delBox(scope, boxlabel, expected))
   }
 
   /** Remove the vault record and every box, only while the stored vault record has `expected`'s `vault_tok` and `gate_epoch`, leaving a tombstone, which it resolves.
@@ -357,15 +394,18 @@ export abstract class VaultDB {
    * deletion that landed: a tombstone holds no `vault_tok` for an expectation to name.
    *
    * @example
-   *   const { ok, val } = await vaultDB.delVault(scope, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
-   *   if (ok) { rememberEpoch(val.vault_epoch) }
+   *   const tombstone = await vaultDB.delVault(scope, { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch })
+   *   rememberEpoch(tombstone.vault_epoch)
    */
-  delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<Outcome<VaultTombstone>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
-      return await this.deletedVault(asked, expectation)
-    })
+  async delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<VaultTombstone> {
+    const asked = heldScope(this, scope)
+    const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
+    return await this.deletedVault(asked, expectation)
+  }
+
+  /** The tombstone the deletion leaves, as an {@link Outcome}: the non-throwing form of {@link VaultDB.delVault}. */
+  tryDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<Outcome<VaultTombstone>> {
+    return outcomeOf(() => this.delVault(scope, expected))
   }
 
   /** Delete the vault of `scope` through `doDelVault`, resolving the tombstone it leaves, checked: `stale_write` when it removed nothing. */
@@ -397,28 +437,31 @@ export abstract class VaultDB {
    * 'damaged_vault'. So does a backend whose server validates what it reads, as
    * `safebyok-graphql`'s does: there a damaged record is the backend's own to clear.
    */
-  delDamagedVault(scope: VaultScope): Promise<Outcome<VaultTombstone | null>> {
-    return outcomeOf(async () => {
-      const asked = heldScope(this, scope)
-      const read = await readStoredVault(() => adapterAnswer(() => this.doGetVault(asked)))
-      const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
-      if (raw === null || raw === undefined || isTombstone(raw)) { return null }
-      if (mayBeNewer(raw)) { throw newerVaultRecord() }
-      if (isSoundVaultRecord(raw, asked)) {
-        throw new VaultError('bad_option', "That vault's stored record is sound, so it is not deleted here: a vault that opens is deleted through its Vault object's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
-      }
-      const named = StoredVaultTok.safeParse(raw)
-      if (! named.success) { throw unnamedVaultRecord() }
-      return await this.deletedVault(asked, { vault_tok: named.data.vault_tok, gate_epoch: null })
-    })
+  async delDamagedVault(scope: VaultScope): Promise<VaultTombstone | null> {
+    const asked = heldScope(this, scope)
+    const read = await readStoredVault(() => adapterAnswer(() => this.doGetVault(asked)))
+    const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
+    if (raw === null || raw === undefined || isTombstone(raw)) { return null }
+    if (mayBeNewer(raw)) { throw newerVaultRecord() }
+    if (isSoundVaultRecord(raw, asked)) {
+      throw new VaultError('bad_option', "That vault's stored record is sound, so it is not deleted here: a vault that opens is deleted through its Vault object's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
+    }
+    const named = StoredVaultTok.safeParse(raw)
+    if (! named.success) { throw unnamedVaultRecord() }
+    return await this.deletedVault(asked, { vault_tok: named.data.vault_tok, gate_epoch: null })
+  }
+
+  /** The tombstone the deletion leaves, or null for no vault record, as an {@link Outcome}: the non-throwing form of {@link VaultDB.delDamagedVault}. */
+  tryDelDamagedVault(scope: VaultScope): Promise<Outcome<VaultTombstone | null>> {
+    return outcomeOf(() => this.delDamagedVault(scope))
   }
   // --
 
   // == [Watching]: subscribe, listenerFailed, watchTrouble
 
   /** Call `onChange` after any write touching `scope`, from this device or another, returning the unsubscribe.
-   * The one verb that throws rather than resolving an Outcome, as it answers at once: 'bad_option'
-   * for an `onChange` that is no function. A backend without push never calls `onChange`: the vault
+   * The one verb with no `try` form, as it answers at once: it throws 'bad_option' for an
+   * `onChange` that is no function. A backend without push never calls `onChange`: the vault
    * refreshes after its own writes, so it misses only other devices' writes.
    *
    * Nothing `onChange` throws or rejects with reaches the adapter or the write that rang it: it is

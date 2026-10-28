@@ -39,35 +39,35 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       it("answers every verb over a store the browser withholds with a bad Outcome of 'storage_blocked', never a rejection", async () => {
         const deviceDB = await makeBlockedDeviceDB()
         const lease = await leaseOf('u1')
-        await expectBad(deviceDB.getLease(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.putLease(lease), 'storage_blocked')
-        await expectBad(deviceDB.delLease(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.getDeviceRecord(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.raiseDeviceRecord(deviceRecordOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.delDeviceRecord(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.delAll(), 'storage_blocked')
+        await expectBad(deviceDB.tryGetLease(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryPutLease(lease), 'storage_blocked')
+        await expectBad(deviceDB.tryDelLease(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryGetDeviceRecord(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryDelDeviceRecord(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryDelAll(), 'storage_blocked')
       })
     }
 
     it("answers every verb with a good Outcome, never a bare record", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')
-      expect(await deviceDB.putLease(lease)).to.deep.equal({ ok: true, val: lease })
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
-      expect(await deviceDB.delLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
-      expect(await deviceDB.delDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
-      expect(await deviceDB.delAll()).to.deep.equal({ ok: true, val: undefined })
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
+      expect(await deviceDB.tryPutLease(lease)).to.deep.equal({ ok: true, val: lease })
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
+      expect(await deviceDB.tryDelLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
+      expect(await deviceDB.tryDelDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
+      expect(await deviceDB.tryDelAll()).to.deep.equal({ ok: true, val: undefined })
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
     })
 
     it("has no lease until one is written, then keeps it whole, leaseKey handle and all", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
       const lease = await leaseOf('u1')
-      await deviceDB.putLease(lease)
-      const kept = await deviceDB.getLease(scopeOf('u1'))
+      await deviceDB.tryPutLease(lease)
+      const kept = await deviceDB.tryGetLease(scopeOf('u1'))
       expect(kept).to.deep.equal(lease)
       expect(kept?.lease_key).to.be.instanceOf(CryptoKey)
       expect(kept?.lease_key.extractable).to.be.false
@@ -76,24 +76,24 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     it("resolves the lease as stored, whole, leaseKey handle and all", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       const lease = await leaseOf('u1')
-      const stored = await deviceDB.putLease(lease)
+      const stored = await deviceDB.tryPutLease(lease)
       expect(stored).to.deep.equal(lease)
       expect(stored.lease_key).to.be.instanceOf(CryptoKey)
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal(stored)
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal(stored)
     })
 
     it("lands one scope's calls in the order they were made, awaited or not: the last of a put and an erase made together wins", async () => {
       const deviceDB = await makeDeviceDB()
       const first = await leaseOf('u1')
       const second = await leaseOf('u1', { gate_epoch: 2 })
-      await Promise.all([deviceDB.putLease(first), deviceDB.putLease(second)])
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
-      await Promise.all([deviceDB.putLease(first), deviceDB.delLease(scopeOf('u1'))])
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
-      await Promise.all([deviceDB.delLease(scopeOf('u1')), deviceDB.putLease(second)])
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
+      await Promise.all([deviceDB.tryPutLease(first), deviceDB.tryPutLease(second)])
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
+      await Promise.all([deviceDB.tryPutLease(first), deviceDB.tryDelLease(scopeOf('u1'))])
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
+      await Promise.all([deviceDB.tryDelLease(scopeOf('u1')), deviceDB.tryPutLease(second)])
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
       // A read made first sees what was stored then; one made after a write sees the write.
-      const [before, _putOutcome, after] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(first), deviceDB.getLease(scopeOf('u1'))])
+      const [before, _putOutcome, after] = await Promise.all([deviceDB.tryGetLease(scopeOf('u1')), deviceDB.tryPutLease(first), deviceDB.tryGetLease(scopeOf('u1'))])
       expect(before).to.deep.equal({ ok: true, val: second })
       expect(after).to.deep.equal({ ok: true, val: first })
     })
@@ -103,93 +103,93 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     it("never discards a lease written after the unreadable row a getLease found: a putLease made as the getLease began is kept", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')
-      await deviceDB.putLease({ ...lease, lease_key: 'not a key handle' } as unknown as LeaseRecord)
-      const [found, written] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(lease)])
+      await deviceDB.tryPutLease({ ...lease, lease_key: 'not a key handle' } as unknown as LeaseRecord)
+      const [found, written] = await Promise.all([deviceDB.tryGetLease(scopeOf('u1')), deviceDB.tryPutLease(lease)])
       expect(found).to.deep.equal({ ok: true, val: null })
       expect(written).to.deep.equal({ ok: true, val: lease })
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
     })
 
     it("never discards a device record raised after the unreadable row a getDeviceRecord found: a raiseDeviceRecord made as the getDeviceRecord began is kept", async () => {
       const deviceDB = await makeDeviceDB()
       const raising = deviceRecordOf('u1', { highest_vault_epoch: 3 })
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
-      const [found, raised] = await Promise.all([deviceDB.getDeviceRecord(scopeOf('u1')), deviceDB.raiseDeviceRecord(raising)])
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
+      const [found, raised] = await Promise.all([deviceDB.tryGetDeviceRecord(scopeOf('u1')), deviceDB.tryRaiseDeviceRecord(raising)])
       expect(found).to.deep.equal({ ok: true, val: null })
       expect(raised).to.deep.equal({ ok: true, val: raising })
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: raising })
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: raising })
     })
 
     it("discards a row that fails its check, of either kind, and reads it as none", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.putLease({ ...(await leaseOf('u1')), ask_passphrase_at: 'soon' } as unknown as LeaseRecord)
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
+      await deviceDB.tryPutLease({ ...(await leaseOf('u1')), ask_passphrase_at: 'soon' } as unknown as LeaseRecord)
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
       // A sound record raised now starts afresh: nothing of the discarded one is kept.
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two' }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-two' }))
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two' }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-two' }))
     })
 
     it("keeps leases per user: erasing one leaves the other", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.putLease(await leaseOf('u1'))
-      await deviceDB.putLease(await leaseOf('u2'))
-      await deviceDB.delLease(scopeOf('u1'))
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.getLease(scopeOf('u2'))).to.not.be.null
+      await deviceDB.tryPutLease(await leaseOf('u1'))
+      await deviceDB.tryPutLease(await leaseOf('u2'))
+      await deviceDB.tryDelLease(scopeOf('u1'))
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryGetLease(scopeOf('u2'))).to.not.be.null
     })
 
     it("delAll erases every lease, and every device record", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.putLease(await leaseOf('u1'))
-      await deviceDB.putLease(await leaseOf('u2'))
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))
-      await deviceDB.delAll()
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.getLease(scopeOf('u2'))).to.be.null
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
+      await deviceDB.tryPutLease(await leaseOf('u1'))
+      await deviceDB.tryPutLease(await leaseOf('u2'))
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1'))
+      await deviceDB.tryDelAll()
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryGetLease(scopeOf('u2'))).to.be.null
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
     })
 
     it("has no device record until one is raised, then keeps it whole, raised to a higher vault_epoch", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 4 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 4 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
     })
 
     it("never lowers a device record: a lower vault_epoch keeps the higher, and resolves the record as stored", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
     })
 
     it("keeps the first device_id raised: a later raise under another id keeps it, and raises the epoch", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-one' }))
-      expect(await deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 2 }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 }))
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-one' }))
+      expect(await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 2 }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 }))
     })
 
     it("raises two at once to the higher, in whichever order they land", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await Promise.all([deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 7 })), deviceDB.raiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 6 }))])
-      const raised = await deviceDB.getDeviceRecord(scopeOf('u1'))
+      await Promise.all([deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 7 })), deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 6 }))])
+      const raised = await deviceDB.tryGetDeviceRecord(scopeOf('u1'))
       expect(raised?.highest_vault_epoch).to.eq(7)
     })
 
     it("keeps device records per vault, and apart from leases: erasing one leaves the rest", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.putLease(await leaseOf('u1'))
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u1'))
-      await deviceDB.raiseDeviceRecord(deviceRecordOf('u2'))
-      await deviceDB.delDeviceRecord(scopeOf('u1'))
-      expect(await deviceDB.getDeviceRecord(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.getDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
-      expect(await deviceDB.getLease(scopeOf('u1'))).to.not.be.null
-      await deviceDB.delLease(scopeOf('u2'))
-      expect(await deviceDB.getDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
+      await deviceDB.tryPutLease(await leaseOf('u1'))
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u1'))
+      await deviceDB.tryRaiseDeviceRecord(deviceRecordOf('u2'))
+      await deviceDB.tryDelDeviceRecord(scopeOf('u1'))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
+      expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.not.be.null
+      await deviceDB.tryDelLease(scopeOf('u2'))
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))
     })
   })
 }

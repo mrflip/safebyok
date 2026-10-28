@@ -54,10 +54,10 @@ describe("OutageVaultDB, while up", () => {
     const store = memoryStore()
     const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())
     await TH.ensureGated(vaultDB, vaultRecord)
-    await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
+    await TH.expectingGood(vaultDB).tryPutBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // a record that names its boxlabel but will not read back as a box
     store.write(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
-    const read = await TH.expectingGood(vaultDB).getVault(scope)
+    const read = await TH.expectingGood(vaultDB).tryGetVault(scope)
     expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
     expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
   })
@@ -69,7 +69,7 @@ const damagedOver = async () => {
   const outage = makeOutage()
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await TH.ensureGated(vaultDB, vaultRecord)
-  await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
+  await TH.expectingGood(vaultDB).tryPutBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
   store.write(Scopepath.vault(scope), JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
@@ -77,15 +77,22 @@ const damagedOver = async () => {
 describe("OutageVaultDB, deleting a damaged vault", () => {
   it("hands the delete to its inner adapter, which reads the record as stored", async () => {
     const { store, vaultDB } = await damagedOver()
-    await TH.expectBad(vaultDB.getVault(scope), 'damaged_vault')
-    await TH.expectingGood(vaultDB).delDamagedVault(scope)
+    await TH.expectBad(vaultDB.tryGetVault(scope), 'damaged_vault')
+    await TH.expectingGood(vaultDB).tryDelDamagedVault(scope)
     expect(store.scopepaths(), 'a tombstone in the place of the vault record').to.deep.equal([Scopepath.vault(scope)])
   })
 
   it("refuses while the pretend backend is down, deleting nothing", async () => {
     const { store, outage, vaultDB } = await damagedOver()
     outage.setDown(true)
-    await TH.expectBad(vaultDB.delDamagedVault(scope), 'storage_unavailable')
+    await TH.expectBad(vaultDB.tryDelDamagedVault(scope), 'storage_unavailable')
+    expect(store.scopepaths()).to.have.lengthOf(2)
+  })
+
+  it("refuses from its throwing form by rejecting, so a caller's catch hears it", async () => {
+    const { store, outage, vaultDB } = await damagedOver()
+    outage.setDown(true)
+    await TH.expectRefusal(vaultDB.delDamagedVault(scope), 'storage_unavailable')
     expect(store.scopepaths()).to.have.lengthOf(2)
   })
 })
@@ -96,15 +103,15 @@ describe("OutageVaultDB, while down", () => {
   it("refuses a read as storage_unavailable, as a real adapter whose backend is down", async () => {
     const { outage, vaultDB } = downOver()
     outage.setDown(true)
-    expect(await TH.expectBad(vaultDB.getVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
-    expect(await TH.expectBad(vaultDB.getVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectBad(vaultDB.tryGetVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectBad(vaultDB.tryGetVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
   })
 
   it("refuses a write, and writes nothing", async () => {
     const { outage, vaultDB } = downOver()
     outage.setDown(true)
     const draft = TH.gatelessOf('u1')
-    expect(await TH.expectBad(vaultDB.ensureVault(draft), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectBad(vaultDB.tryEnsureVault(draft), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
     expect(await TH.vaultRecordIn(vaultDB, scope)).to.be.null
   })
@@ -113,7 +120,7 @@ describe("OutageVaultDB, while down", () => {
     const { outage, vaultDB } = downOver()
     await TH.ensureGated(vaultDB, vaultRecord)
     outage.setDown(true)
-    expect(await TH.expectBad(vaultDB.getVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectBad(vaultDB.tryGetVault(scope), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
     expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(vaultRecord)
   })

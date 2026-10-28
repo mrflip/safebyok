@@ -290,7 +290,7 @@ describe("proving.grantLease", () => {
     const { world, vault, stored } = await lockedWorld()
     const { gating, land } = landableGating()
     const proving = await PassphraseProving.seal(vault, headerOf(stored.gate.passphrase), 'pw', { gating })
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
     const granting = proving.grantLease()
     land()
     await TH.expectRefusal(granting, 'gating_landed')

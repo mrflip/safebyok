@@ -21,19 +21,17 @@ export const decide = (refusal: unknown): RefusalResponse => (
   isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'vault_behind') ? 'lock' : 'none'
 )
 
-/** The VaultDB verbs a vault calls, each resolving to an Outcome. */
+/** The VaultDB verbs a vault calls, by their throwing forms' names. */
 type HeededVerb = 'getVault' | 'ensureVault' | 'putVaultRecord' | 'getBox' | 'putBox' | 'delBox' | 'delVault'
 
-/** A VaultDB verb as {@link heed} hands it on: resolving its outcome's `val`, rejecting with its `err`. */
-type Thrown<VerbT> = VerbT extends (...args: infer ArgsT) => Promise<Outcome<infer ValT>> ? (...args: ArgsT) => Promise<ValT> : never
+/** The verbs a vault calls on its VaultDB, in their throwing forms: each answers with its value and refuses by rejecting. */
+export type HeededVaultDB = Pick<VaultDB, HeededVerb | 'subscribe'>
 
-/** The verbs a vault calls on its VaultDB, each answering with its `val` and refusing by rejecting. */
-export type HeededVaultDB = { [VerbT in HeededVerb]: Thrown<VaultDB[VerbT]> } & Pick<VaultDB, 'subscribe'>
-
-/** `vaultDB`'s verbs, each resolving its outcome's `val` or rejecting with its refusal once `onRefusal` has heard it.
+/** `vaultDB`'s verbs in their throwing forms, each resolving its value or rejecting with its refusal once `onRefusal` has heard it.
  * So the vault meets every storage refusal, a background refresh's included. A refused verb waits
- * for `onRefusal`: one that never settles holds the call with it. Each verb is looked up on
- * `vaultDB` as it is called, so a test's spy on one is heard. `subscribe` passes through.
+ * for `onRefusal`: one that never settles holds the call with it. Each verb's `try` form is looked
+ * up on `vaultDB` as it is called, so a test's spy on `tryGetVault` is heard. `subscribe` passes
+ * through.
  *
  * @param onRefusal - What the vault does about a refusal. Whatever it throws is dropped, so the
  *   caller hears the refusal itself.
@@ -47,13 +45,13 @@ export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promi
     throw err
   }
   return {
-    getVault:         (...args) => heeding(() => vaultDB.getVault(...args)),
-    ensureVault:      (...args) => heeding(() => vaultDB.ensureVault(...args)),
-    putVaultRecord:   (...args) => heeding(() => vaultDB.putVaultRecord(...args)),
-    getBox:           (...args) => heeding(() => vaultDB.getBox(...args)),
-    putBox:           (...args) => heeding(() => vaultDB.putBox(...args)),
-    delBox:           (...args) => heeding(() => vaultDB.delBox(...args)),
-    delVault:         (...args) => heeding(() => vaultDB.delVault(...args)),
+    getVault:         (...args) => heeding(() => vaultDB.tryGetVault(...args)),
+    ensureVault:      (...args) => heeding(() => vaultDB.tryEnsureVault(...args)),
+    putVaultRecord:   (...args) => heeding(() => vaultDB.tryPutVaultRecord(...args)),
+    getBox:           (...args) => heeding(() => vaultDB.tryGetBox(...args)),
+    putBox:           (...args) => heeding(() => vaultDB.tryPutBox(...args)),
+    delBox:           (...args) => heeding(() => vaultDB.tryDelBox(...args)),
+    delVault:         (...args) => heeding(() => vaultDB.tryDelVault(...args)),
     subscribe:        (...args) => vaultDB.subscribe(...args),
   }
 }

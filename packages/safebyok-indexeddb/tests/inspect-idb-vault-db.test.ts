@@ -15,7 +15,7 @@ describe("inspectIdbVaultDB", () => {
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
+    await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     const rows = await inspector.rows()
     expect(rows.map((row) => row.scopepath)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.eq(3) })

@@ -117,12 +117,12 @@ describe("graphqlVaultDB, a server's box limit", () => {
     // A browser declaring more than its server holds: the server holds the line.
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: Infinity })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
-    const refusal = await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('secret_project_x', 'sk-fake-two')), 'vault_full')
+    await TH.expectingGood(vaultDB).tryPutBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
+    const refusal = await TH.expectBad(vaultDB.tryPutBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('secret_project_x', 'sk-fake-two')), 'vault_full')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.include('1 boxes')
     expect(refusal.message).to.not.include('secret_project_x')
-    expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).getCapacity(u1))
+    expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).tryGetCapacity(u1))
     expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
     const listed = await TH.boxesOf(vaultDB, u1)
     expect(listed.map((box) => box.boxlabel)).to.deep.equal(['openai'])
@@ -133,8 +133,8 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(db, ({ user_id }) => postgresVaultDB({ client: db, user_id }))
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1') })
     await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
-    const capacity = await TH.expectingGood(vaultDB).getCapacity(u1)
+    await TH.expectingGood(vaultDB).tryPutBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
+    const capacity = await TH.expectingGood(vaultDB).tryGetCapacity(u1)
     expect(capacity.boxes).to.deep.equal({ used: 1, max: Number.MAX_SAFE_INTEGER })
     expect(capacity.bytes.max).to.eq(Number.MAX_SAFE_INTEGER)
     expect(capacity.bytes.used).to.be.greaterThan(0)
@@ -156,8 +156,8 @@ describe("graphqlVaultDB, as the README has it", () => {
     const opened = () => vaultIn(schema)
     const first = await opened()
     await TH.unlock(first, 'correct horse battery staple')
-    await first.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
-    await first.putBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
+    await first.tryPutBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-test-not-a-real-key')
+    await first.tryPutBox({ boxlabel: 'openai_api_key' }, { apiKey: 'sk-test-not-a-real-key', orgId: null })
     TH.closeVault(first)
 
     const second = await opened()
@@ -165,7 +165,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
-    await second.delBox('openai_api_key')
+    await second.tryDelBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     TH.closeVault(second)
   })
@@ -193,7 +193,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const laptop = await TH.passkeyOf('laptop')
     const first = await opened()
     await TH.unlock(first, 'correct horse battery staple')
-    await first.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
+    await first.tryPutBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
     expect(await TH.putWayin(first, 'correct horse battery staple', laptop)).to.deep.equal(first.snapshot.gate?.passkey)
     TH.closeVault(first)
 
@@ -222,7 +222,7 @@ describe("graphqlVaultDB, reading a vault the server split", () => {
       boxes:        [{ ...sparse, __typename: 'SafebyokBoxSparse' }],
       damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format', __typename: 'SafebyokBoxDamaged' }],
     } })
-    expect(await TH.expectingGood(relayed).getVault(u1)).to.deep.equal({
+    expect(await TH.expectingGood(relayed).tryGetVault(u1)).to.deep.equal({
       ...TH.vaultRecordOf('u1'),
       boxes:        [sparse],
       damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'newer_format' }],
@@ -231,7 +231,7 @@ describe("graphqlVaultDB, reading a vault the server split", () => {
 
   it("refuses as corrupt_record a server's damaged box that is no BoxDamaged, and judges again a sound box that is no box", async () => {
     const lying = answering({ safebyokGetVault: { vault: TH.vaultRecordOf('u1'), boxes: [], damagedBoxes: [{ boxlabel: 'anthropic', revision_tok: null, damage: 'fine' }] } })
-    await TH.expectBad(lying.getVault(u1), 'corrupt_record')
+    await TH.expectBad(lying.tryGetVault(u1), 'corrupt_record')
     const unsound = answering({ safebyokGetVault: { vault: TH.vaultRecordOf('u1'), boxes: [{ ...TH.boxOf('openai', 'r1'), sidecar: 'none' }], damagedBoxes: [] } })
     expect(await TH.damagedBoxesOf(unsound, u1)).to.deep.equal([{ boxlabel: 'openai', revision_tok: 'rev-r1', damage: 'damaged' }])
   })
@@ -240,14 +240,14 @@ describe("graphqlVaultDB, reading a vault the server split", () => {
 describe("graphqlVaultDB, its refusals", () => {
   it("carries the server's refusal across as the same VaultError, kind and message, the GraphQL error it crossed as its cause", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const notMine = await TH.expectBad(TH.browserFor(schema, 'u1').getVault(TH.scopeOf('u2')), 'identity_revoked')
+    const notMine = await TH.expectBad(TH.browserFor(schema, 'u1').tryGetVault(TH.scopeOf('u2')), 'identity_revoked')
     expect(notMine.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
     expect(notMine.cause).to.include({ message: notMine.message }).and.to.have.nested.property('extensions.kind', 'identity_revoked')
   })
 
   it("carries the host's not_permitted across, kind and message, locking nothing (Contract: VaultDB, What an adapter must do)", async () => {
     const schema = TH.schemaOver(await TH.database(), () => { throw Refusals.notPermitted('Guests may not keep a vault.') })
-    const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').ensureVault(TH.gatelessOf('u1')), 'not_permitted')
+    const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').tryEnsureVault(TH.gatelessOf('u1')), 'not_permitted')
     expect(refusal.message).to.eq('Guests may not keep a vault.')
     expect(refusal.family).to.eq('condition')
     expect(refusal.cause).to.have.nested.property('extensions.kind', 'not_permitted')
@@ -257,7 +257,7 @@ describe("graphqlVaultDB, its refusals", () => {
     const forbidden = new GraphQLError('Guests may not keep a vault.', { extensions: { code: 'FORBIDDEN' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [forbidden] }) }) }
     const guarded = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).getVault(u1), 'not_permitted')
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).tryGetVault(u1), 'not_permitted')
     expect(refusal.message).to.include("by a rule of the app's own")
     expect(refusal.cause).to.include({ message: 'Guests may not keep a vault.' })
   })
@@ -266,13 +266,13 @@ describe("graphqlVaultDB, its refusals", () => {
     const unauthenticated = new GraphQLError('Your session has expired.', { extensions: { code: 'UNAUTHENTICATED' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [unauthenticated] }) }) }
     const guarded = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).getVault(u1), 'storage_unavailable')
+    await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).tryGetVault(u1), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable when the database is down, never saying what the driver said", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const schema = TH.schemaOver(await TH.database(), ({ user_id }) => postgresVaultDB({ client: TH.failingClient(dbDown), user_id }))
-    const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').getVault(u1), 'storage_unavailable')
+    const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').tryGetVault(u1), 'storage_unavailable')
     expect(refusal.message).to.not.include('vault_owner')
     expect(JSON.stringify(refusal)).to.not.include('vault_owner')
   })
@@ -280,7 +280,7 @@ describe("graphqlVaultDB, its refusals", () => {
   it("refuses with storage_unavailable, its cause saying so, when the server does not serve the vault's schema and answers without checking the operation", async () => {
     const schema = buildSchema('type Query { hello: String }')
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }) })
-    const refusal = await TH.expectBad(vaultDB.getVault(u1), 'storage_unavailable')
+    const refusal = await TH.expectBad(vaultDB.tryGetVault(u1), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(Error).with.property('message').that.includes('is it serving safebyok-graphql?')
   })
 
@@ -288,19 +288,19 @@ describe("graphqlVaultDB, its refusals", () => {
     const unknownField = new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [unknownField] }) }) }
     const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).getVault(u1), 'storage_unavailable')
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).tryGetVault(u1), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(CombinedError)
   })
 
   it("refuses with storage_unavailable when the network fails", async () => {
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
-    await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')), 'storage_unavailable')
+    await TH.expectBad(vaultDB.tryPutBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable an answer holding neither data nor an error", async () => {
     const answered = { toPromise: () => Promise.resolve({ data: undefined }) }
     const mute = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectBad(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).getVault(u1), 'storage_unavailable')
+    await TH.expectBad(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).tryGetVault(u1), 'storage_unavailable')
   })
 
   for (const code of ['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED']) {
@@ -308,7 +308,7 @@ describe("graphqlVaultDB, its refusals", () => {
       const quoting = new GraphQLError('Variable "$box" got invalid value "sk-ant-not-a-real-key"', { extensions: { code } })
       const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [quoting] }) }) }
       const strict = { query: () => answered, mutation: () => answered, subscription: () => answered }
-      const refusal = await TH.expectBad(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).getVault(u1), 'bad_option')
+      const refusal = await TH.expectBad(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).tryGetVault(u1), 'bad_option')
       expect(refusal.message).to.include('VaultSchemaSdl')
       expect(refusal.cause).to.be.undefined
       expect(JSON.stringify(Object.assign({}, refusal, { message: refusal.message }))).to.not.include('sk-ant')
@@ -320,9 +320,9 @@ describe("graphqlVaultDB, its refusals", () => {
     const answered = { toPromise: () => { sent += 1; return Promise.resolve({ data: {} }) } }
     const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
-    await TH.expectBad(vaultDB.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('open^ai', 'r1')), 'invalid_box')
+    await TH.expectBad(vaultDB.tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('open^ai', 'r1')), 'invalid_box')
     const sidecarless = TH.omitting(TH.boxOf('openai', 'r1'), 'sidecar')
-    await TH.expectBad(vaultDB.putBox(u1, { ...thisVault, revision_tok: null }, sidecarless), 'invalid_box')
+    await TH.expectBad(vaultDB.tryPutBox(u1, { ...thisVault, revision_tok: null }, sidecarless), 'invalid_box')
     expect(sent).to.eq(0)
   })
 
@@ -333,9 +333,9 @@ describe("graphqlVaultDB, its refusals", () => {
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     const past = 2 ** 31
     const refusals = [
-      await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
-      await TH.expectBad(vaultDB.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
-      await TH.expectBad(vaultDB.delVault(u1, { ...thisVault, gate_epoch: past }), 'bad_record'),
+      await TH.expectBad(vaultDB.tryPutVaultRecord(TH.vaultRecordOf('u1', { vault_epoch: past }), { ...thisVault, gate_epoch: 0 }), 'bad_record'),
+      await TH.expectBad(vaultDB.tryPutVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
+      await TH.expectBad(vaultDB.tryDelVault(u1, { ...thisVault, gate_epoch: past }), 'bad_record'),
     ]
     expect(refusals.map((refusal) => /^Nothing was (written|removed): .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true, true])
     expect(sent).to.eq(0)
@@ -353,32 +353,32 @@ describe("graphqlVaultDB, its refusals", () => {
     const refused = new GraphQLError('Nothing was written: that box is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.', { extensions: { kind: 'bad_record' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [refused] }) }) }
     const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'bad_record')
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'bad_record')
     expect(refusal.message).to.match(/^Nothing was written/)
   })
 
   it("leaves behind a box_stored that came with any refusal but a stale write, which alone carries one, checked", async () => {
     const mismatched = answering({ safebyokPutBox: { landed: false, refusalkind: 'vault_mismatch', message: 'The vault changed.', box_stored: { boxlabel: 'openai', not: 'a box' }, capacity: null } })
-    const refusal = await TH.expectBad(mismatched.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
+    const refusal = await TH.expectBad(mismatched.tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
     expect(refusal).to.not.have.property('meta')
   })
 
   it("refuses as corrupt_record a vault_full that came with no capacity that reads as one", async () => {
     for (const capacity of [null, { boxes: 'many' }]) {
       const full = answering({ safebyokPutBox: { landed: false, refusalkind: 'vault_full', message: 'This vault is full.', box_stored: null, capacity } })
-      await TH.expectBad(full.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
+      await TH.expectBad(full.tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
     }
   })
 
   it("reports a stale box write's stored box that is not one as the damaged box a read of it would name", async () => {
     const stale = answering({ safebyokPutBox: { landed: false, refusalkind: 'stale_write', message: 'The box changed.', box_stored: 'not a box', capacity: null } })
-    const refusal = await TH.expectBad(stale.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'stale_write')
+    const refusal = await TH.expectBad(stale.tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'stale_write')
     expect(refusal.meta?.box_stored).to.include({ boxlabel: 'openai' })
   })
 
   it("refuses a write that came back not landed and naming no kind as corrupt_record, quoting nothing of the answer", async () => {
     const vague = answering({ safebyokPutVaultRecord: { landed: false, refusalkind: 'made_up', message: 'sk-ant-not-a-real-key', vault_stored: null } })
-    const refusal = await TH.expectBad(vague.putVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
+    const refusal = await TH.expectBad(vague.tryPutVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.not.include('sk-ant')
   })
 
@@ -386,7 +386,7 @@ describe("graphqlVaultDB, its refusals", () => {
     const stale = new GraphQLError('The vault changed.', { extensions: { kind: 'stale_write', meta: { box_stored: TH.boxOf('openai', 'r2') } } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [stale] }) }) }
     const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1')), 'corrupt_record')
     expect(refusal.meta).to.be.undefined
   })
 
@@ -395,14 +395,14 @@ describe("graphqlVaultDB, its refusals", () => {
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [misuse, revoked] }) }) }
     const both = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectBad(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).getVault(u1), 'identity_revoked')
+    await TH.expectBad(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).tryGetVault(u1), 'identity_revoked')
   })
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
     const schema = buildSchema('type Query { safebyokGetVault(applabel: String!, user_id: String!, vaultlabel: String!): Boolean }')
     const rootValue = { safebyokGetVault: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }) })
-    await TH.expectBad(vaultDB.getVault(u1), 'storage_unavailable')
+    await TH.expectBad(vaultDB.tryGetVault(u1), 'storage_unavailable')
   })
 })
 
@@ -412,10 +412,10 @@ describe("graphqlVaultDB, hearing other writes", () => {
     const elsewhere = TH.browserFor(schema, 'u1')
     await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
     const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), u1)
-    await TH.expectingGood(elsewhere).putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1'))
+    await TH.expectingGood(elsewhere).tryPutBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1'))
     await TH.eventually(() => heard.count === 1)
     unsubscribe()
-    await TH.expectingGood(elsewhere).delBox(u1, 'openai', TH.deleting('rev-r1'))
+    await TH.expectingGood(elsewhere).tryDelBox(u1, 'openai', TH.deleting('rev-r1'))
     await TH.aWhile()
     expect(heard.count).to.eq(1)
   })

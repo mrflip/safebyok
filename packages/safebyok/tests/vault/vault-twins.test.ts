@@ -135,7 +135,7 @@ const brokenStoreVault = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   const thrown = new TypeError('the storage adapter is down')
-  vi.spyOn(world.vaultDB, 'getBox').mockRejectedValue(thrown)
+  vi.spyOn(world.vaultDB, 'tryGetBox').mockRejectedValue(thrown)
   return { vault, thrown }
 }
 
@@ -195,7 +195,7 @@ describe("vault.hello as an event handler", () => {
   it("refuses an event in place of its options as bad_option, naming the wrap, and reads nothing", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
+    const propsReads = vi.spyOn(world.vaultDB, 'tryGetVault')
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
     expect(err.message).to.match(/^There (is a field|are \d+ fields) it does not take [^:]*: it takes only staleMinutes\. [^.]*\. hello\(\)'s only option is `staleMinutes`/)
     expect(err.message).to.include('Handed to addEventListener or onClick as the handler itself')
@@ -206,7 +206,7 @@ describe("vault.hello as an event handler", () => {
   it("hellos when wrapped as its third example shows, the handler reading storage on the event", async () => {
     const world = makeWorld({ staleMinutes: 0 })
     const vault = await world.open()
-    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
+    const propsReads = vi.spyOn(world.vaultDB, 'tryGetVault')
     const window = new EventTarget()
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
     window.addEventListener('focus', () => vault.tryHello())
