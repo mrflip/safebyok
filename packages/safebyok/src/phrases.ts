@@ -235,14 +235,14 @@ export const NoWhisperToKeep = "No box is stored under that boxlabel, so there i
 /** Why nothing is written over a damaged box whose stored record names no revision. */
 export const BoxDamagedBeyondNaming = "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again."
 
-/** A whisper and sidecar over the vault's limit of `maxBytes` bytes of JSON together. */
-export const whisperTooLarge = (maxBytes: number): string => `That whisper and its box's sidecar are over this vault's limit of ${String(maxBytes)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`
+/** Why a whisper and sidecar over the vault's limit of `maxWhisperBytes` bytes of JSON together are not stored. */
+export const whisperTooLarge = (maxWhisperBytes: number): string => `That whisper and its box's sidecar are over this vault's limit of ${String(maxWhisperBytes)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Bank.make.`
 
 /** Why a vault that holds its limit of `maxBoxes` boxes takes no new one. */
 export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
 
-/** Why a box that would take the vault past the `maxBytes` its storage holds of one vault is not stored. */
-export const noRoomForBox = (maxBytes: number): string => `This vault has no room for that box in the ${String(maxBytes)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`
+/** Why a box that would take the vault past the `maxVaultBytes` its storage holds of one vault is not stored. */
+export const noRoomForBox = (maxVaultBytes: number): string => `This vault has no room for that box in the ${String(maxVaultBytes)} bytes its storage holds of one vault, counting each box's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a box, or store under a shorter boxlabel.`
 
 /** Why a box is not read from a vault deleted, or deleted and made anew, on another device, and the Vault object is gone. */
 export const VaultGoneWhileGettingBox = "The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored."
