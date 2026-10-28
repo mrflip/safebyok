@@ -1,4 +1,6 @@
-/** The check of `mask`'s options, kept apart so that `safebyok/utils` carries no other validator. */
+/** The check of `mask`'s options. */
+
+// Kept apart from the other shapes so that `safebyok/utils` carries no other validator.
 
 import { Validator } from '../checks/validator'
 
