@@ -243,7 +243,9 @@ describe("useWhenShown", () => {
     root.render(<><Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} /><Committing committed={() => { mounted.resolve(undefined) }} /></>)
     await mounted.promise
     await TH.wakeupAtNextTick()
-    container.querySelector('button')?.click()
+    const button = container.querySelector('button')
+    expect(button).to.not.be.null
+    button?.click()
     // The attempt settles in the very commit that takes the Unlocker away.
     root.render(<Committing committed={() => { unlocking.resolve(undefined); unmounted.resolve(undefined) }} />)
     await unmounted.promise
