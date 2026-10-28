@@ -29,6 +29,15 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
 * The Coach wants #316 and #317 as one mergeable line first: #317 is restacked onto #316 once it
   files; thread 2 then stands on #317. A large rename is coming on main; each thread meets it at
   its catch-up rebase.
+* `vaultDBOf` (safebyok-graphql) passes errors through (the Coach, 2026-10-28: "I think I'd figure out
+  pretty quick what was happening if my graphql server gave me a postgres error. Much more slowly if
+  you flush all my lovely diagnostics down the can. Pass errors through"): every VaultError from the
+  host's `vaultDBFor` crosses as itself, a non-VaultError as `unexpected_error` carrying the thrown
+  message; the cause object stays server-side. Thread 3 builds it before filing.
+* Thread 8's four rows ruled (2026-10-28): `written_at` and the kind `'stale_write'` stay (read/write
+  are the category words); Convex `GetBoxAnswer.read` → `got`; `doDelUnreadable(scopepath, isReadable)`
+  → `doDelUnparsed(scopepath, isSound)`.
+* The Coach cleared the memory directory on purpose (2026-10-28).
 
 ## Discoveries by thread
 

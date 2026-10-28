@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), #327 (`c51b7274`, filed 2026-10-28), each PR's base `main`: merging #327 merges all five. 2 (#325, on #316) reviewed and flagged, waits unfiled for the Coach's two TOP rows; 3 (#330) and 8 (#328) on #321 in review; 9 (saying_story, on #327) building. Nine threads.
+**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), #327 (`c51b7274`, filed 2026-10-28), each PR's base `main`: merging #327 merges all five. 2 (#325, on #316) reviewed and flagged, waits unfiled for the Coach's two TOP rows; 3 (#330, on #321) reviewed clean, reopened by the pass-through ruling and reworking; 8 (#328, on #321) reviewed fixed, its worker taking the four rulings; 9 (saying_story, on #327) building. Nine threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -147,6 +147,9 @@ does not clash with `StoredBox`/`StoredVaultTok` usage). The doc example at l.73
 `this.readVaultRows(scope)` becomes `getVaultRows`. The `safebyok` changeset turns `minor` and names
 `VaultReadResponse` → `StoredVault`. Nothing else of thread 8's touches `vault-db.ts` but the two
 `staleWrite(...)` call sites (l.466, l.500), which thread 8 renames; the restack reconciles.
+
+*Review:* medium, clean at `5cdf957e`: 0 fixes, 7 minor left. Every hook goes through the static table once; `asStorageTrouble` is the old line verbatim; `delDamagedVault`'s `damaged_vault` refusal is made at the call in its old position; `crossing` keeps its kinds; no old name survives outside historic changesets. Left: `notes/security.md` l.981/2071/2122 stale (amended by the orchestrator's `sonnet` pass, `60698c5a`); `unexpectedError`'s shared message misdescribes a crossed cause (settled by the pass-through ruling below); STYLE.md `Stored-` wording and `asStorageTrouble` vs `storageTroubleOf` (Open Matters rows); doc blocks of `asStorageTrouble`, `adaptedHook`, `#hooks` (documentarian, Cleanup); `vaultReadOf` → `storedVaultOf` (thread 8 did it); the `Object.create` pattern already broken by `#logger` (pre-existing, in *Discoveries*).
+*Ruling (the Coach, 2026-10-28):* "Pass errors through": `vaultDBOf` passes every VaultError from `vaultDBFor` as itself, a non-VaultError as `unexpected_error` carrying the thrown message. Reopened: a worker reworks the branch before a second review and filing.
 
 
 ### 4. where_prefix: one parse, said where
@@ -308,6 +311,8 @@ Changeset: `safebyok` minor naming `StringStore.get`/`put`/`del`, `Refusals.stal
 `registerLeaseGetter`; patch for each adapter package touched. Size: medium, mechanical. Depends on:
 **thread 6** (`device-db.ts`, `lease.ts`'s `tryGetLease` line) and thread 1 (`KeptLease.tryRead`):
 cut from thread 6's tip once it files, beside thread 3; restacked at the wrap-up. Review `medium`.
+
+*Review:* medium, fixed at `b1ec666f`: 3 fixes (doc blocks of `Birth` and `StaleDelMessage` lead with the thing; three test titles say deletes/getter; the demo's `readSession` → `getSession`), 6 minor left. Pure rename under `-w`; `lease.ts` touched only at `tryGet`'s name and doc. Left: `notes/security.md` `#takeOwnWrite`/`#judgeRead`/`#boxReadRefusal` stale and `one-at-a-time.ts`'s `readStorage` example (the worker, in its rulings pass); `#parsedOrDel` named for what it returns (settled with `doDelUnparsed`); the trythrow changeset introducing and retiring `tryRead` in one release (Cleanup, restack); STYLE.md l.596/699 "Read and open the box" (Open Matters row); umbrella prose around renamed members (documentarian).
 
 ### 9. saying_story: the saying is a Story, exported, inferred from its shape
 
