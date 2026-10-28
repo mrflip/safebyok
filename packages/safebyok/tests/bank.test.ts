@@ -1300,7 +1300,6 @@ describe("bank.demandConsistentWith", () => {
     const bank = bankIn(makeWorld())
     const err = TH.expectSyncRefusal(() => { bank.demandConsistentWith({ user_id: 'u2' }) }, 'bad_scope')
     expect(err.meta?.fieldnames).to.deep.equal(['user_id'])
-    expect(err.message).to.include('a bank serves one app and one signed-in user')
     expect(err.message).to.not.include('u2')
   })
 

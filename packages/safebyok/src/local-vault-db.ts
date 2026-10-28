@@ -117,8 +117,8 @@ class StringStoreVaultDB extends VaultDB {
       .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.get(boxScopepath) }))
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
-      // A row is handed to the split as stored, whatever it holds: the split judges it.
-      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
+      // A row is handed to the split as stored, whatever it holds, cast to the shape a row should hold: the split judges it.
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) as StoredBox['box'] }))
   }
 
   // A row that is not JSON is taken as its text, so a stale write names it, damaged, as the listing does.

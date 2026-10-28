@@ -1,4 +1,4 @@
-import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag, vaultBag } from './shapes/scopes'
+import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
@@ -6,6 +6,7 @@ import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './shapes/scopes'
+import * as Phrases from './phrases'
 import { verifyConsistent } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
 import { type DeviceDB, deviceRecordOf } from './device-db'
@@ -178,7 +179,7 @@ export class Bank {
    * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
    */
   demandConsistentWith(thing: BankBag): void {
-    bankBag.parseConsistent(thing, this.#scope, { message: otherScopeSays })
+    bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScopeSays })
   }
   // --
 
@@ -431,7 +432,7 @@ export class Bank {
 
   /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise, the comparison {@link Bank.demandConsistentWith} makes. */
   #vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(parseVaultBag(bag), this.#scope, { kind: 'bad_scope', message: otherScopeSays })
+    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: Phrases.VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: Phrases.otherScopeSays })
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
 
@@ -634,13 +635,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
-
-/** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
-const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
-
-/** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
-const parseVaultBag = (bag: unknown): VaultBag => vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: VaultBagAdvice })
+// == [Helpers]: loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
@@ -671,12 +666,9 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 
-const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
+const goneError = () => new VaultError('vault_gone', Phrases.GoneWhileOpening)
 
-const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
+const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStores)
 
-/** What a bag naming another app or user than the bank's refuses 'bad_scope' saying, naming the fields that differ, never their values. */
-const otherScopeSays = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`
-
-const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
+const behindError = () => new VaultError('vault_behind', Phrases.BehindOnOpen)
 // --

@@ -1529,7 +1529,7 @@ const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): StoredVa
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => {
   const prefix = Scopepath.withinVaultScopepathPrefix(scope)
   const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box }))
+  return [...rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, box]) => ({ boxlabel: ckey.slice(prefix.length), box: box as StoredBox['box'] }))
 }
 
 /** How full `scope` is in `rows`: its boxes counted, each weighed as its row's JSON, against `maxBoxes` and no limit on bytes. */
