@@ -7,7 +7,7 @@
 
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
-import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
+import { type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, freshPasskeyAnswer } from './proving'
 import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
 import type { Vault } from './vault'
@@ -133,19 +133,19 @@ export type RequestCleartext = (gating: Gating) => void | Promise<void>
  */
 export type GatingTools = VaultPrivateTools & {
   /** Read storage now through the refresh join, demand the Vault object is not gone and `gating` has not landed, and resolve the vault record held. */
-  freshen:     (gating: RaisedGating) => Promise<VaultRecord>
+  freshen:      (gating: RaisedGating) => Promise<VaultRecord>
   /** Store `gate` over its base, `vault.putGate`, within the attempt's hold. */
-  putGate:     (gate: Gate, call: GatingCall) => Promise<Gate>
+  putGate:      (gate: Gate, call: GatingCall) => Promise<Gate>
   /** Delete the vault `proving` proved, once a demand on it holds, expecting the `vault_tok` and `gate_epoch` of the vault record held, resolving the tombstone's `vault_epoch`. */
-  delVault:    (proving: PassphraseProving) => Promise<number>
+  delVault:     (proving: PassphraseProving) => Promise<number>
   /** Once the gating that deleted the vault settled: lock, let the Vault object go, and raise the device record to `vaultEpoch`. */
-  afterDel:    (vaultEpoch: number) => Promise<void>
+  afterDel:     (vaultEpoch: number) => Promise<void>
   /** Consult this device's store for a lease that fits, ending past `renewMillis` from now, and take it up: true when taken. */
-  takeUp:      (gating: RaisedGating, renewMillis: number) => Promise<boolean>
-  /** The refusal `thrown` makes, bad news told, as a public call's outcome. */
-  badOutcome:  (thrown: unknown) => BadOutcome
+  takeUp:       (gating: RaisedGating, renewMillis: number) => Promise<boolean>
+  /** The refusal `thrown` makes, bad news told, as a public call throws it. */
+  heardRefusal: (thrown: unknown) => VaultError
   /** The host's request for cleartext, guarded, or null for none. */
-  request:     ((gating: Gating) => Promise<void>) | null
+  request:      ((gating: Gating) => Promise<void>) | null
 }
 
 /** One gating, raised: what the vault keeps to run, join, settle and land it, and the {@link Gating} it hands the host.
@@ -253,7 +253,7 @@ export class RaisedGating implements ProvingGating {
       this.#decline()
     } catch (err) {
       // A deletion whose write is sent settles as storage decides, a throw as a decline does.
-      this.#decline(this.#tools.badOutcome(err).err)
+      this.#decline(this.#tools.heardRefusal(err))
     }
   }
 
@@ -266,7 +266,7 @@ export class RaisedGating implements ProvingGating {
     try {
       check()
     } catch (err) {
-      return this.#tools.badOutcome(err)
+      return bad(this.#tools.heardRefusal(err))
     }
     if (this.#attempting) { return bad(attemptInFlightError()) }
     this.#attempting = true
@@ -276,7 +276,7 @@ export class RaisedGating implements ProvingGating {
       const settled = await this.settled
       return settled.ok ? good(this.#vault) : bad(settled.err)
     } catch (err) {
-      const refused = this.#tools.badOutcome(err)
+      const refused = bad(this.#tools.heardRefusal(err))
       if (! (CorrectableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
       return refused
     } finally {

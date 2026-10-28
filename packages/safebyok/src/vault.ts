@@ -10,7 +10,7 @@ import * as CX from './shapes/scopes'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
-import { type Outcome, type BadOutcome, bad, good, outcomeOf, valOf } from './outcome'
+import { type Outcome, outcomeOf, valOf } from './outcome'
 import * as Refusals from './refusals'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
@@ -279,10 +279,7 @@ export class Vault implements VaultStamp {
    * @example window.addEventListener('focus', () => vault.tryHello())   // wrapped: vault.hello itself would refuse the event as its options
    * @example await vault.hello({ staleMinutes: 0 })   // read now, or share a read already under way
    */
-  async hello(given?: { staleMinutes?: number | undefined }): Promise<Vault> { return valOf(await this.tryHello(given)) }
-
-  /** Read storage and settle the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.hello}. */
-  async tryHello(given?: { staleMinutes?: number | undefined }): Promise<Outcome<Vault>> {
+  async hello(given?: { staleMinutes?: number | undefined }): Promise<Vault> {
     try {
       this.#demandNotGone()
       const helloOpts = checkHelloOpts(given)
@@ -290,8 +287,13 @@ export class Vault implements VaultStamp {
       await this.#helloWithin(staleMillis)
       // The bank may have let the vault go while storage was read.
       this.#demandNotGone()
-      return good(this)
-    } catch (err) { return this.#badOutcome(err) }
+      return this
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Read storage and settle the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.hello}. */
+  async tryHello(given?: { staleMinutes?: number | undefined }): Promise<Outcome<Vault>> {
+    return outcomeOf(() => this.hello(given))
   }
 
   /** Read storage now and settle the vault, resolving the vault: {@link Vault.hello} with `staleMinutes: 0`.
@@ -300,17 +302,19 @@ export class Vault implements VaultStamp {
    *
    * @example await vault.refresh()   // the listing as storage holds it now
    */
-  async refresh(): Promise<Vault> { return valOf(await this.tryRefresh()) }
-
-  /** Read storage now, as an {@link Outcome}: the non-throwing form of {@link Vault.refresh}. */
-  async tryRefresh(): Promise<Outcome<Vault>> {
+  async refresh(): Promise<Vault> {
     try {
       this.#demandNotGone()
       await this.#helloWithin(0)
       // The bank may have let the vault go while storage was read.
       this.#demandNotGone()
-      return good(this)
-    } catch (err) { return this.#badOutcome(err) }
+      return this
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Read storage now, as an {@link Outcome}: the non-throwing form of {@link Vault.refresh}. */
+  async tryRefresh(): Promise<Outcome<Vault>> {
+    return outcomeOf(() => this.refresh())
   }
 
   /** Have the vault unlocked, asking the user through `requestCleartext` only when it must, resolving the vault.
@@ -338,10 +342,7 @@ export class Vault implements VaultStamp {
    * @example <button onClick={() => vault.tryEnsureUnlocked()}>Unlock</button>
    * @example await vault.ensureUnlocked({ renewMinutes: 60 })   // ask now if the lease ends within the hour
    */
-  async ensureUnlocked(given?: { renewMinutes?: number | undefined }): Promise<Vault> { return valOf(await this.tryEnsureUnlocked(given)) }
-
-  /** Have the vault unlocked, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureUnlocked}. */
-  async tryEnsureUnlocked(given?: { renewMinutes?: number | undefined }): Promise<Outcome<Vault>> {
+  async ensureUnlocked(given?: { renewMinutes?: number | undefined }): Promise<Vault> {
     try {
       this.#demandNotGone()
       const unlockOpts = checkEnsureUnlockedOpts(given)
@@ -349,8 +350,13 @@ export class Vault implements VaultStamp {
       if (renewMillis > 0 && renewMillis >= this.#leaseMillis) { throw renewPastLease() }
       await this.#ensureUnlocked(renewMillis)
       this.#demandLease('ensureUnlocked')
-      return good(this)
-    } catch (err) { return this.#badOutcome(err) }
+      return this
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Have the vault unlocked, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureUnlocked}. */
+  async tryEnsureUnlocked(given?: { renewMinutes?: number | undefined }): Promise<Outcome<Vault>> {
+    return outcomeOf(() => this.ensureUnlocked(given))
   }
   // --
 
@@ -412,15 +418,16 @@ export class Vault implements VaultStamp {
    *
    * @example document.addEventListener('visibilitychange', () => { if (document.hidden) { void vault.lock() } })
    */
-  async lock(): Promise<void> { valOf(await this.tryLock()) }
-
-  /** Forget the unlock, as an {@link Outcome}: the non-throwing form of {@link Vault.lock}. */
-  async tryLock(): Promise<Outcome<void>> {
+  async lock(): Promise<void> {
     try {
       this.#demandNotGone()
       valOf(await this.#lockNow())
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Forget the unlock, as an {@link Outcome}: the non-throwing form of {@link Vault.lock}. */
+  async tryLock(): Promise<Outcome<void>> {
+    return outcomeOf(() => this.lock())
   }
   // --
 
@@ -441,17 +448,18 @@ export class Vault implements VaultStamp {
    *   const { ok, err } = await vault.tryCheckStrength(typed)
    *   setHint(ok || err.refusalkind !== 'weak_passphrase' ? '' : err.message)
    */
-  async checkStrength(passphrase: string): Promise<void> { valOf(await this.tryCheckStrength(passphrase)) }
-
-  /** Refuse a new passphrase too easy to guess, as an {@link Outcome}: the non-throwing form of {@link Vault.checkStrength}. */
-  async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
+  async checkStrength(passphrase: string): Promise<void> {
     try {
       this.#demandNotGone()
       const verdict = await this.#strengthChecker(passphraseCleartext.parse(passphrase))
       this.#demandNotGone()
       if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Refuse a new passphrase too easy to guess, as an {@link Outcome}: the non-throwing form of {@link Vault.checkStrength}. */
+  async tryCheckStrength(passphrase: string): Promise<Outcome<void>> {
+    return outcomeOf(() => this.checkStrength(passphrase))
   }
 
   /** Put a way into the vault at `slotlabel`, through a gating the user answers, resolving the vault.
@@ -482,10 +490,7 @@ export class Vault implements VaultStamp {
    * @example await vault.putWayin('passphrase')   // the dialog asks for the current and the next
    * @example await vault.putWayin('passkey')   // the dialog asks for the passphrase, and creates a passkey
    */
-  async putWayin(slotlabel: WayinKind): Promise<Vault> { return valOf(await this.tryPutWayin(slotlabel)) }
-
-  /** Put a way into the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.putWayin}. */
-  async tryPutWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
+  async putWayin(slotlabel: WayinKind): Promise<Vault> {
     try {
       this.#demandNotGone()
       wayinkind.parse(slotlabel)
@@ -497,8 +502,13 @@ export class Vault implements VaultStamp {
         return 'initialize_gate'
       }
       await this.#gatingFor(kindNow, 'putWayin')
-      return good(this)
-    } catch (err) { return this.#badOutcome(err) }
+      return this
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Put a way into the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.putWayin}. */
+  async tryPutWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
+    return outcomeOf(() => this.putWayin(slotlabel))
   }
 
   /** Delete the way in at `slotlabel`, the passkey, through a `del_passkey` gating the user answers with the passphrase, resolving the vault.
@@ -512,10 +522,7 @@ export class Vault implements VaultStamp {
    *
    * @example await vault.delWayin('passkey')   // the passkey is gone
    */
-  async delWayin(slotlabel: WayinKind): Promise<Vault> { return valOf(await this.tryDelWayin(slotlabel)) }
-
-  /** Delete a way in, as an {@link Outcome}: the non-throwing form of {@link Vault.delWayin}. */
-  async tryDelWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
+  async delWayin(slotlabel: WayinKind): Promise<Vault> {
     try {
       this.#demandNotGone()
       wayinkind.parse(slotlabel)
@@ -531,8 +538,13 @@ export class Vault implements VaultStamp {
         return 'del_passkey'
       }
       await this.#gatingFor(kindNow, 'delWayin')
-      return good(this)
-    } catch (err) { return this.#badOutcome(err) }
+      return this
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Delete a way in, as an {@link Outcome}: the non-throwing form of {@link Vault.delWayin}. */
+  async tryDelWayin(slotlabel: WayinKind): Promise<Outcome<Vault>> {
+    return outcomeOf(() => this.delWayin(slotlabel))
   }
   // --
 
@@ -579,10 +591,7 @@ export class Vault implements VaultStamp {
    * @example await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-...')                 // keeps the sidecar it has
    * @example await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'personal' } })   // keeps the whisper it has
    */
-  async putBox(props: PutBoxProps, whisper?: Whisper): Promise<Box> { return valOf(await this.tryPutBox(props, whisper)) }
-
-  /** Seal and store the box `props.boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.putBox}. */
-  async tryPutBox(props: PutBoxProps, whisper?: Whisper): Promise<Outcome<Box>> {
+  async putBox(props: PutBoxProps, whisper?: Whisper): Promise<Box> {
     try {
       this.#demandNotGone()
       const { boxlabel, sidecar } = putBoxProps.parse(props)
@@ -594,8 +603,13 @@ export class Vault implements VaultStamp {
       this.#checkWhisperFits(given, sidecar ?? {})
       // A whisper left out is kept from the box: one the listing does not show has none to keep.
       if (! await this.#ensureUnlocked(0, () => given !== undefined || this.#isListed(label))) { throw noWhisper() }
-      return good(await this.#sealAndPutBox(label, sidecar, given))
-    } catch (err) { return this.#badOutcome(err) }
+      return await this.#sealAndPutBox(label, sidecar, given)
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Seal and store the box `props.boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.putBox}. */
+  async tryPutBox(props: PutBoxProps, whisper?: Whisper): Promise<Outcome<Box>> {
+    return outcomeOf(() => this.putBox(props, whisper))
   }
 
   /** Read the box stored under `boxlabel`, resolving it as a {@link Box} still sealed, or null for none.
@@ -613,13 +627,15 @@ export class Vault implements VaultStamp {
    *
    * @example const box = await vault.getBox('anthropic_api_key')   // null when there is none
    */
-  async getBox(boxlabel: string): Promise<Box | null> { return valOf(await this.tryGetBox(boxlabel)) }
+  async getBox(boxlabel: string): Promise<Box | null> {
+    try {
+      return await this.#getBoxUnlocked(boxlabel, 'getBox')
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
 
   /** The box under `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.getBox}. */
   async tryGetBox(boxlabel: string): Promise<Outcome<Box | null>> {
-    try {
-      return good(await this.#getBoxUnlocked(boxlabel, 'getBox'))
-    } catch (err) { return this.#badOutcome(err) }
+    return outcomeOf(() => this.getBox(boxlabel))
   }
 
   /** Read and open the whisper in `boxlabel`: 'absent_box' where {@link Vault.getBox} resolves null.
@@ -629,17 +645,19 @@ export class Vault implements VaultStamp {
    *
    * @example const whisper = await vault.getWhisper('anthropic_api_key')   // 'absent_box' when there is none
    */
-  async getWhisper(boxlabel: string): Promise<Whisper> { return valOf(await this.tryGetWhisper(boxlabel)) }
-
-  /** The whisper in `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.getWhisper}. */
-  async tryGetWhisper(boxlabel: string): Promise<Outcome<Whisper>> {
+  async getWhisper(boxlabel: string): Promise<Whisper> {
     try {
       const box = await this.#getBoxUnlocked(boxlabel, 'getWhisper')
       if (box === null) { throw absentBox() }
       const opened = await box.tryExtractWhisper()
       this.#demandAfterWait(opened, box, { leaseBound: true, call: 'getWhisper' })
-      return good(valOf(opened))
-    } catch (err) { return this.#badOutcome(err) }
+      return valOf(opened)
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** The whisper in `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.getWhisper}. */
+  async tryGetWhisper(boxlabel: string): Promise<Outcome<Whisper>> {
+    return outcomeOf(() => this.getWhisper(boxlabel))
   }
 
   /** Read and open the whisper in `boxlabel` and hand it to `callback`, resolving its result: the shape that discourages parking a secret in state.
@@ -651,7 +669,7 @@ export class Vault implements VaultStamp {
    */
   async useWhisper<ResultT>(boxlabel: string, handed: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
     callback.parse(handed)
-    const whisper = valOf(await this.tryGetWhisper(boxlabel))
+    const whisper = await this.getWhisper(boxlabel)
     // The callback's own throw is the host's, and is never told as the vault's bad news.
     return await handed(whisper)
   }
@@ -671,10 +689,7 @@ export class Vault implements VaultStamp {
    *
    * @example const { outcome } = await vault.delBox('anthropic_api_key')   // 'deleted', or 'deleted_other' when another write stood
    */
-  async delBox(boxlabel: string): Promise<DeletedBox> { return valOf(await this.tryDelBox(boxlabel)) }
-
-  /** Delete the box `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.delBox}. */
-  async tryDelBox(boxlabel: string): Promise<Outcome<DeletedBox>> {
+  async delBox(boxlabel: string): Promise<DeletedBox> {
     try {
       this.#demandNotGone()
       const label = this.#checkedBoxlabel(boxlabel)
@@ -699,8 +714,13 @@ export class Vault implements VaultStamp {
           this.#logger.warn("The box deleted was not the revision this device showed: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox' })
         }
       }
-      return good(this.#dropBoxListingOf({ boxlabel: label, vault_tok: this.vault_tok, outcome }))
-    } catch (err) { return this.#badOutcome(err) }
+      return this.#dropBoxListingOf({ boxlabel: label, vault_tok: this.vault_tok, outcome })
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Delete the box `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link Vault.delBox}. */
+  async tryDelBox(boxlabel: string): Promise<Outcome<DeletedBox>> {
+    return outcomeOf(() => this.delBox(boxlabel))
   }
   // --
 
@@ -724,10 +744,7 @@ export class Vault implements VaultStamp {
    *
    * @example await vault.del()   // storage holds a tombstone; bank.ensureVault({ vaultlabel }) births the next life, novel
    */
-  async del(): Promise<void> { valOf(await this.tryDel()) }
-
-  /** Delete the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.del}. */
-  async tryDel(): Promise<Outcome<void>> {
+  async del(): Promise<void> {
     try {
       this.#demandNotGone()
       // Judged on a picture within staleMinutes, as putWayin's and delWayin's are: a stale novel one may be gated by now.
@@ -735,8 +752,12 @@ export class Vault implements VaultStamp {
       this.#demandNotGone()
       this.#gatedRecord()
       await this.#gatingFor(() => 'del_vault', 'del')
-      return good(undefined)
-    } catch (err) { return this.#badOutcome(err) }
+    } catch (err) { throw this.#heardRefusal(err) }
+  }
+
+  /** Delete the vault, as an {@link Outcome}: the non-throwing form of {@link Vault.del}. */
+  async tryDel(): Promise<Outcome<void>> {
+    return outcomeOf(() => this.del())
   }
 
   /** Let this Vault object go, for the bank: it is gone, every call refusing 'vault_gone'. Not a lock: nothing stored is erased, and the lease stays for the next Vault object. */
@@ -825,13 +846,13 @@ export class Vault implements VaultStamp {
     }
     this.#gatingTools = {
       ...tools,
-      freshen:     async (gating) => await this.#freshen(gating),
-      putGate:     async (gate, call) => await this.#putGate(gate, call),
-      delVault:    async (proving) => await this.#delVault(proving),
-      afterDel:    async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
-      takeUp:      async (gating, renewMillis) => await this.#takeUpFromPantry(gating, renewMillis),
-      badOutcome:  (thrown) => this.#badOutcome(thrown),
-      request:     this.#requestCleartext,
+      freshen:      async (gating) => await this.#freshen(gating),
+      putGate:      async (gate, call) => await this.#putGate(gate, call),
+      delVault:     async (proving) => await this.#delVault(proving),
+      afterDel:     async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
+      takeUp:       async (gating, renewMillis) => await this.#takeUpFromPantry(gating, renewMillis),
+      heardRefusal: (thrown) => this.#heardRefusal(thrown),
+      request:      this.#requestCleartext,
     }
     this.#takePicture({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, readAt: born.readAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
@@ -1746,14 +1767,14 @@ export class Vault implements VaultStamp {
   #unsubscribeDB: (() => void) | null = null
   // --
 
-  // == [Two forms]: badOutcome
+  // == [Two forms]: heardRefusal
 
-  /** The refusal `thrown` makes, as the outcome a public `tryX` resolves: a throw that is no VaultError becomes 'unexpected_error'. Bad news is told first, through `#hearBadNews`. */
-  #badOutcome(thrown: unknown): BadOutcome {
+  /** The refusal `thrown` makes, for a public call to throw: a throw that is no VaultError becomes 'unexpected_error'. Bad news is told first, through `#hearBadNews`. */
+  #heardRefusal(thrown: unknown): VaultError {
     // Never logged: a host's function that threw (a key deriver) may have been handed a passphrase.
     const err = isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown)
     this.#hearBadNews(err)
-    return bad(err)
+    return err
   }
   // --
 
