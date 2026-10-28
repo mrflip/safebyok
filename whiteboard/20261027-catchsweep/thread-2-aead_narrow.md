@@ -1,8 +1,37 @@
 # Thread 2: aead_narrow (2026-10-28)
 
 Branch `20261028-aead_narrow`, PR [#325](https://github.com/mrflip/safebyok/pull/325), stacked on
-[#316](https://github.com/mrflip/safebyok/pull/316) (trythrow). Justify: green (safebyok 3464 passed,
-37 skipped, 19 added; every package's lint, typecheck, build and size budget green).
+[#316](https://github.com/mrflip/safebyok/pull/316) (trythrow; merged, the restack is the
+orchestrator's). Justify: green (safebyok 3472 passed, 37 skipped, 27 added over #316; every
+package's lint, typecheck, build and size budget green).
+
+**Rulings applied (the Coach, 2026-10-28), after the first review** (reviewer's fix 5e486337, a
+Proving test, kept):
+1. The cipher step's refusal before the post-wait demand: accepted as built, and a WebCrypto
+   failure got **a refusal kind of its own, `crypto_failed`** (family `condition`): `errors.ts`
+   (`RefusalKindVals`, `RefusalFamilyForKind`, the module doc), the README's conditions table,
+   `tests/errors.test.ts`. `Lease.cipheredWith` holds `makeBoxKey`, `wrapKeyUnder` and
+   `cipherBytes` in one catch (arguments and both ctxs built before it) that throws `cryptoFailed(err)`
+   (module-local in `lease.ts`): no `cause` (WebCrypto was handed key handles and the whisper's
+   bytes), the error's `name` ends the message ("WebCrypto threw OperationError."). The new
+   `thrownNameOf(thrown)` in `errors.ts` (not exported from the package) reads that name;
+   `isStorageBlocked` uses it too. **The decipher side is unchanged**: the ruling's "decipher side's
+   one call" has no WebCrypto throw that read as `unexpected_error`; there, a throw from
+   `unwrapKeyUnder` or `decipherBytes` is indistinguishable from a wrong key or an altered record
+   (OperationError either way), so it stays `damaged_box`, `damaged_lease` or a wrong proof. Named
+   below as an open matter in case the Coach meant otherwise.
+2. `bad_record`, not `damaged_lease`, for a vault stamp failing its check: accepted as built.
+3. The device store's error `name` is kept: `deviceTrouble`'s messages now end "The device store
+   threw QuotaExceededError." (nothing when the throw carries no string `name`); still no `cause`,
+   never its message.
+4. The tail sentence "The device store's own error is not kept, as it may quote the record it was
+   handed." is gone from both messages; the why stays in `deviceTrouble`'s doc block.
+Also from the review: G8 restated as the checkable invariant at `refusalOf` (what can reach it: a
+refusal, the vault's demand, or a bug's own throw from this package's lines; never WebCrypto's
+error, a host function's or the device store's throw), and G8 now allows a refusal to interpolate
+the `name` of an error it replaces, "until a redact lands"; the `Lease` and `Box` class docs say
+"past its argument checks". Changeset now `minor` (a new kind hosts may switch on), naming the
+message changes. `notes/security.md` amended again through a `sonnet` subagent.
 
 The handoff's four parts are built. Each WebCrypto catch now holds exactly one WebCrypto call, with
 its ctx built before the `try`; each Lease and Box throwing form ends in one catch that makes a
@@ -95,8 +124,13 @@ VaultError of any bug; a device-store failure's cause no longer crosses to the h
   it becomes `catch (err) { throw this.#heardRefusal(err) }` or the like, with `refusalOf` inside.
 * **For the orchestrator**: at the restack with thread 6 (#321), drop "that throw its `cause`" from
   the `DeviceDB` class doc (device-db.ts l.22 on this branch), whichever lands second.
-* **For the Coach**:
-  - **Store error name**: keep nothing (as built, recommended), or carry the store error's `name` in
-    the message for a host debugging a custom store.
-  - **Inner cipher catch**: none (as built, recommended), or restore a narrow catch so the post-wait
-    demand runs before an 'unexpected_error' from the cipher step.
+* **For the Coach** (the four rows above are ruled; what remains):
+  - **`crypto_failed` on the decipher side**: left as `damaged_box`/`damaged_lease`/wrong proof
+    (recommended: a WebCrypto throw there cannot be told from a wrong key or an altered record), or
+    did the ruling mean something else by "the decipher side's one call"?
+  - **Siblings for a later thread**, not in this PR: the other WebCrypto sites whose throw still
+    reads as `unexpected_error` or leaves raw (`Proving.wrappedWith`'s `wrapKeyUnder`, `makeVaultKey`
+    in `sealWayins`, `sealLeaseRecord`'s `makeLeaseKey`/`wrapKeyUnder`, `importWrappingKeyBytes`,
+    `deriveWrappingKey`), and `PasskeyProving.seal`'s `outcomeOf(() => deriveWrappingKey(prfBytes,
+    wayinCtxOf(...)))` with the ctx built inside (the reviewer's note). Recommended: one follow-up
+    thread applying `crypto_failed` and the ctx-outside rule to all of them.
