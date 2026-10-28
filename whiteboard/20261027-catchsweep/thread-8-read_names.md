@@ -24,7 +24,14 @@ root scripts 266; every package lints, typechecks, builds and fits its size budg
     `StaleBoxMessage`. Callers: `vault-db.ts` (two), `outcome.ts`'s example, four test files;
     `index.test.ts`'s key list names `staleDel` and `StaleDelMessage`. The kind is still
     `'stale_write'`.
-  - `device-db.ts`: `#readableOf` → `#parsedOrDel`. `doDelUnreadable` is untouched.
+  - `device-db.ts`: `#readableOf` → `#parseOrDel`; the protected hook `doDelUnreadable(scopepath,
+    isReadable)` → `doDelUnparsed(scopepath, isSound)` (the Coach's ruling, round 2) in the abstract,
+    `memoryDeviceDB`, `idb.ts`, the README's adapter recipe and three test files; `notes/security.md`
+    at seven lines by a `sonnet` subagent.
+  - convex `GetBoxAnswer.read` → `got` (the Coach's ruling, round 2): the component's validator and
+    `getBox` query, the client's `isGetBoxAnswer`, the convex tests and the e2e test. A wire field
+    between component and client of one package; the patch changeset says so.
+  - `one-at-a-time.ts`'s example names `refreshOnce` where it named `readStorage` (review leftover).
   - `vault.ts`: `#readBox` → `#getBox`, `#boxReadRefusal` → `#boxGetRefusal`, `#writeOver` →
     `#putOver`, `#takeOwnWrite` → `#takeOwnPut`, `#gateWriteRefusal` → `#gatePutRefusal`; the
     Outcome locals `read`/`written` → `got`/`put`; the refresh family `#readStorage` →
@@ -59,6 +66,10 @@ root scripts 266; every package lints, typechecks, builds and fits its size budg
     already calls it "a partial `putBox()`".
   - `domStore`'s doc keeps "hears only this tab's writes": any mutation is meant there, the generic
     use CLAUDE.md allows. `StringStore`'s class doc says "as a put or a del lands".
+  - `#parseOrDel(verb, recordSchema, scopepath, raw)`, not `#parsedOrDel`: the reviewer noted the
+    first name said what it returns while it deletes through the hook, and STYLE.md's *Naming* has
+    a function that acts named for the act. It parses `raw` and deletes a row that does not parse,
+    so the name says both acts; its first line leads with "Parse".
 * **Deviations**: `STYLE.md` (two example lines) and `notes/old_vocabulary.md` (five rows) were
   not in the handoff; both named retired identifiers. Reported for the orchestrator to strike or
   keep.
@@ -73,10 +84,15 @@ root scripts 266; every package lints, typechecks, builds and fits its size budg
     internals (`readVault`, `readStoredVault`, `checkWritten*`, `ReadAnswer`, `VaultReadResponse`)
     are untouched, as the handoff said.
   - No `eslint-disable` or `@ts-expect-error` added.
-* **For the Coach** (each waits on a ruling; left as is):
-  - **`written_at`**, the stored field. Rec keep.
-  - **The refusal kind `'stale_write'`** that `staleDel`, `staleBox` and `staleVaultRecord` make.
-    Rec `'stale_del'` for the deletion's, named in the changeset; a kind rename is a contract call.
-  - **Convex `GetBoxAnswer.read`**, the protocol field between component and client. Rec `got`.
-  - **`doDelUnreadable(scopepath, isReadable)`**, the protected adapter hook every DeviceDB
-    implements. Rec `doDelUnparsed(scopepath, isSound)`.
+* **Rulings taken** (the Coach, 2026-10-28): `written_at` and the kind `'stale_write'` stay: "read"
+  and "write" are the category words for any viewing or any mutating operation, so a kind or a
+  stored field may say them and a function or method never does. `GetBoxAnswer.read` → `got` and
+  `doDelUnreadable` → `doDelUnparsed(scopepath, isSound)` were taken as the Recs had them (above).
+
+## Review (2026-10-28)
+
+The reviewer's three commits (e0987be5, c5f243bf, b1ec666f: `Birth`'s and `StaleDelMessage`'s doc
+blocks no longer open on "What a", three test titles say deletes/getter, the demo's `readSession` is
+`getSession`) were fast-forwarded onto the branch; round 2 builds on them. Not mine, per the
+orchestrator: the `.changeset/20261028-trythrow.md` `tryRead` note (restack) and STYLE.md l.596/699's
+"Read and open the box" lead verb (a row for the Coach).
