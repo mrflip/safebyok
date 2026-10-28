@@ -264,7 +264,7 @@ added or folded into through the subagent, and no other entry changes.
   role's salt or wrap where another's is wanted (a wayin's wrap where a lease's goes, a passkey's salt where a passphrase's goes) and
   plain text where a parsed passphrase is wanted. Nothing at runtime refuses a mix-up.
   (2) In `src/`, each value gets its brand by a parse of its own output with the field's validator: a fresh salt in
-  `mintedPassphraseHeader`, a passkey's salt from its checked answer, each wrap in `wrappedWith`, `Lease.tryCipheredWith` and
+  `mintedPassphraseHeader`, a passkey's salt from its checked answer, each wrap in `wrappedWith`, `Lease.cipheredWith` and
   `sealLeaseRecord`. A stored record gets its brands from its record's parse, as before. The only casts are in tests, which plant
   damaged values on purpose.
   (3) `passphraseKeyOf`, the one function that hands a passphrase to the key deriver, takes a `PassphraseCleartext`.
@@ -951,7 +951,7 @@ added or folded into through the subagent, and no other entry changes.
   for that call alone, see the 2026-10-14 leaseKey entry). **`DeviceDB`'s verbs
   (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
   `Outcome` and never reject** (amended 2026-10-28 (store_trynames): those are now the `try` forms, `tryGetLease` and the rest; see the entry at the top). `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
-  failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause`, the message
+  failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause` (amended 2026-10-28 (aead_narrow): no longer; `deviceTrouble`, which the throwing verbs and `storeAnswer` map through, keeps neither the thrown error nor its message, only the error's `name` (`QuotaExceededError`, say), read by `thrownNameOf` (`src/errors.ts`, which also tells a blocked store) and put at the end of its message, as a `DeviceDB` is handed every lease record; the Lease and Box throwing forms end in one catch, `refusalOf` (`src/outcome.ts`), that makes an `unexpected_error` of any bug; and a WebCrypto failure while a box is sealed (`Lease.cipheredWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`) refuses a new kind `crypto_failed`, keeping nothing of the error but its name; see the lease_box entry on `Lease.cipheredWith`), the message
   naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
   `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
@@ -1897,6 +1897,35 @@ added or folded into through the subagent, and no other entry changes.
   and every visible field of the box (byte-identical to the ctx before this change). The serialized whisper bytes
   are zeroed after ciphering (in a `finally`) and after parsing on open; the whisper's JSON string cannot be zeroed
   and is not kept. The earlier "held by the opened lease" statements above no longer hold.
+  Amended 2026-10-28 (the aead_narrow thread, PR [#325](https://github.com/mrflip/safebyok/pull/325), Coach-accepted; after the try pairs of PR
+  [#316](https://github.com/mrflip/safebyok/pull/316), thread trythrow, which put the bodies in the throwing forms `Lease.cipheredWith`,
+  `Lease.decipherWith`, `Lease.sealProps`, `Box.seal` and `box.extractWhisper`): **a device-store failure's cause never crosses to the host
+  (only its `name` does), each WebCrypto catch holds one call, a WebCrypto failure while ciphering has its own refusal, and a throwing form never
+  lets a raw error out.**
+  (1) `deviceTrouble` (`packages/safebyok/src/device-db.ts`) makes the `storage_blocked` or `storage_unavailable` condition for a `DeviceDB` verb's
+  failure and keeps only the `name` of what the store threw, ending the condition's message ("The device store threw QuotaExceededError."), via
+  `thrownNameOf` (`errors.ts`, which `isStorageBlocked` also reads it through, to tell a blocked store): never the throw as `cause`, never its message
+  (amended 2026-10-28 (aead_narrow, the Coach: "keep the error name. We will at some soon point add redact")). A `DeviceDB` is host-pluggable and is handed every lease record (`lease_key` and the wrap), so a custom store's error may
+  quote one, and the vault's and bank's loggers hand such a condition to the host whole (`logger.warn(..., err)` in `vault.ts`, `bank.ts`,
+  `gating.ts`). A `VaultDB` adapter's `storage_unavailable` still carries its cause, as that store holds only ciphertext
+  (`Refusals.storageUnavailable`'s doc block says so); `notes/guarantees.md` G8 states both, and now lets a refusal interpolate the `name` of an
+  error it replaces (`thrownNameOf`), as the device-store conditions and `crypto_failed` do, until a redact lands.
+  (2) Each WebCrypto catch holds exactly one WebCrypto call, its ctx built before the `try`: `Proving.#unwrap` (`wayinCtxOf`), `Lease.#vaultKeyOrNull`
+  (`leaseCtxOf`), and the new `Lease.#openedOrNull`, where a box's `unwrapKeyUnder` and `decipherBytes` each sit in a catch of their own, both ctxs
+  handed in. So a vault stamp that fails its check refuses `bad_record` where it used to read as `damaged_lease` (dropping the lease and locking the
+  vault) or as a wrong proof (the Coach: "it's impossible to tell which it is, go with what's natural"). The AEAD `outcomeOf` calls inside `cipheredWith` and `decipherWith` are gone.
+  (3) Each of those throwing forms ends in one `catch (err) { throw refusalOf(err) }`; `refusalOf` (`src/outcome.ts`, not exported from the package)
+  hands a `VaultError` back as it came and makes `unexpectedError` of anything else, so a bug inside never leaves raw (#316 had let it). No secret
+  is added: the cause is the bug's own throw, from code that held key handles but no secret bytes a `TypeError` would quote.
+  (4) Behaviour change, in the changeset (amended 2026-10-28 (aead_narrow, Coach ruling): a new refusal kind `crypto_failed`, family `condition`,
+  `RefusalKindVals` in `errors.ts`): `Lease.cipheredWith` holds its three WebCrypto calls (`makeBoxKey`, `wrapKeyUnder`, `cipherBytes`, arguments and
+  both ctxs built before the `try`) in one catch that throws `cryptoFailed(err)`, a fault of the platform, not of the user or the record, where it
+  was `unexpected_error` with the throw as `cause`. Nothing of WebCrypto's error is kept as `cause`, as WebCrypto was handed key handles and the
+  whisper's bytes; only the error's `name` (a DOMException's, e.g. `OperationError`) ends the message, via `thrownNameOf` (the Coach: "a WebCrypto
+  failure seems like it deserves its own refusal type, unless that's leakage -- but since we set refusals on pretty much anything I don't think we'd
+  fool anybody"). This refusal throws without the post-wait consistency demand running first (accepted). The decipher side is unchanged: a WebCrypto
+  throw there is indistinguishable from a wrong key or an altered record (`OperationError` either way), so it stays `damaged_box`, `damaged_lease`
+  or a wrong proof, and the `damaged_box` verdict in `decipherWith` still waits for that demand.
 * 2026-10-14: a stored record that fails validation or AEAD verification is refused with kind
   `corrupt_record` and left in place -- remote data is never auto-deleted. A device-local
   lease that fails is the one exception: it is dropped, and the user asks again. Amended 2026-10-21
@@ -3583,7 +3612,7 @@ added or folded into through the subagent, and no other entry changes.
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it
   decides only the kind and the retry advice, never whether anything is written or unlocked. The
   messages name the verb that failed and quote no scope, record or key, and the browser's error
-  is the `cause`. `InvalidStateError` stays `storage_unavailable`. `idbDeviceDB` (`idb.ts`) now
+  is the `cause` (amended 2026-10-28 (the aead_narrow thread): it is not; `deviceTrouble` keeps only the error's `name`, in the message, see the lease_box entry). `InvalidStateError` stays `storage_unavailable`. `idbDeviceDB` (`idb.ts`) now
   throws a `NotSupportedError` DOMException at first use where the context has no `indexedDB`.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **`cipherCtx` refuses a top-level `undefined` or `null` part.** `cipherCtx` and its guard

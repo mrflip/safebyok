@@ -39,7 +39,7 @@ describe("memoryDeviceDB", () => {
     await TH.expectBad(memoryDeviceDB().tryGetLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
   })
 
-  it("throws from a throwing verb the VaultError its try form resolves as err: a store's throw as storage_unavailable from both forms, that throw its cause", async () => {
+  it("throws from a throwing verb the VaultError its try form resolves as err: a store's throw as storage_unavailable from both forms, neither keeping that throw", async () => {
     await expect(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' })).rejects.toThrow(VaultError)
     const shelf = new Error('the shelf fell over')
     class DownDeviceDB extends DeviceDB {
@@ -53,13 +53,13 @@ describe("memoryDeviceDB", () => {
       protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
     }
     const thrown = await TH.expectRefusal(new DownDeviceDB().getLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(thrown.cause).to.eq(shelf)
+    expect(thrown.cause).to.be.undefined
     const refused = await TH.expectBad(new DownDeviceDB().tryGetLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(refused.cause).to.eq(shelf)
+    expect(refused.cause).to.be.undefined
     expect(refused.message).to.eq(thrown.message)
     // A store that throws before its promise is caught the same.
     const sync = await TH.expectRefusal(new DownDeviceDB().putLease(await TH.leaseOf('u1')), 'storage_unavailable')
-    expect(sync.cause).to.eq(shelf)
+    expect(sync.cause).to.be.undefined
   })
 
   it("passes a VaultError the store throws through both forms with its kind, and a browser's SecurityError as storage_blocked", async () => {
@@ -77,7 +77,7 @@ describe("memoryDeviceDB", () => {
     await TH.expectRefusal(new RefusingDeviceDB().getLease(TH.scopeOf('u1')), 'not_permitted')
     await TH.expectBad(new RefusingDeviceDB().tryGetLease(TH.scopeOf('u1')), 'not_permitted')
     const thrown = await TH.expectRefusal(new RefusingDeviceDB().delLease(TH.scopeOf('u1')), 'storage_blocked')
-    expect(thrown.cause).to.eq(blocked)
+    expect(thrown.cause).to.be.undefined
     await TH.expectBad(new RefusingDeviceDB().tryDelLease(TH.scopeOf('u1')), 'storage_blocked')
   })
 })
@@ -261,29 +261,45 @@ describe("DeviceDB, the base class", () => {
     expect(raisedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
   })
 
-  it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting", async () => {
+  it("says a SecurityError as 'storage_blocked', keeping only the store's error's name, never rejecting", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
     const deviceDB = new ScriptedDeviceDB(() => Promise.reject(blocked))
     const err = await TH.expectBad(deviceDB.tryDelDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-    expect(err.cause).to.eq(blocked)
+    expect(err.cause).to.be.undefined
     expect(err.message).to.match(/erasing its record of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
+    expect(err.message).to.match(/The device store threw SecurityError\.$/)
+    expect(err.message).to.not.include('insecure')
+  })
+
+  it("keeps nothing of a store's throw that quotes the record it was handed but its name: not as its cause, not in its message or meta", async () => {
+    const record = await TH.leaseOf('u1')
+    const quoting = new Error(`could not store ${JSON.stringify({ ...record, lease_key: 'the leaseKey, as a careless store might print it' })}`)
+    const deviceDB = new ScriptedDeviceDB(() => Promise.reject(quoting))
+    const err = await TH.expectBad(deviceDB.tryPutLease(record), 'storage_unavailable')
+    expect(err.cause).to.be.undefined
+    expect(err.meta).to.be.undefined
+    expect(err.message).to.match(/The device store threw Error\.$/)
+    expect(TH.thrownText(err)).to.not.include(record.vault_tok)
+    expect(TH.thrownText(err)).to.not.include('careless')
   })
 
   const ThrownCases = [
-    // what a host's own store may throw, and what the vault hears:
-    [new DOMException('No room.', 'QuotaExceededError'),     "storage_blocked",      'no room, as a private window or a full disk gives'],
-    [new DOMException('Gone.', 'NotSupportedError'),          "storage_blocked",      'no such storage at all'],
-    [{ name: 'SecurityError', message: 'from another frame' }, "storage_blocked",      'a refusal told by its name alone, from another frame'],
-    [new Error('socket closed'),                              "storage_unavailable",  'any other failure, which a retry may mend'],
-    ["a bare string",                                         "storage_unavailable",  'a thrown value that is no Error'],
+    // what a host's own store may throw, what the vault hears, and how the message ends: the error's name, or no word of it
+    [new DOMException('No room.', 'QuotaExceededError'),     "storage_blocked",      /The device store threw QuotaExceededError\.$/, 'no room, as a private window or a full disk gives'],
+    [new DOMException('Gone.', 'NotSupportedError'),          "storage_blocked",      /The device store threw NotSupportedError\.$/,  'no such storage at all'],
+    [{ name: 'SecurityError', message: 'from another frame' }, "storage_blocked",      /The device store threw SecurityError\.$/,      'a refusal told by its name alone, from another frame'],
+    [new Error('socket closed'),                              "storage_unavailable",  /The device store threw Error\.$/,              'any other failure, which a retry may mend'],
+    ["a bare string",                                         "storage_unavailable",  /or a private window\.$/,                       'a thrown value that is no Error, which has no name to keep'],
   ] as const
 
-  for (const [thrown, refusalkind, blurb] of ThrownCases) {
-    it(`says ${blurb} as '${refusalkind}', what was thrown its cause`, async () => {
+  for (const [thrown, refusalkind, ending, blurb] of ThrownCases) {
+    it(`says ${blurb} as '${refusalkind}', keeping nothing of what was thrown but its name`, async () => {
       const deviceDB = new ScriptedDeviceDB(vi.fn<() => Promise<never>>().mockRejectedValue(thrown))
       const err = await TH.expectBad(deviceDB.tryGetLease(TH.scopeOf('u1')), refusalkind)
-      expect(err.cause).to.eq(thrown)
+      expect(err.cause).to.be.undefined
+      expect(err.message).to.match(ending)
+      for (const quoted of ['No room', 'Gone', 'another frame', 'socket closed', 'bare string']) { expect(err.message).to.not.include(quoted) }
     })
   }
 

@@ -580,6 +580,11 @@ export class Vault implements VaultStamp {
    * `registered_at`, when the whisper is given; a store keeping its whisper refuses 'damaged_box',
    * as does one listed damaged with no revision, writing nothing: {@link Vault.delBox} it first.
    *
+   * Refuses 'crypto_failed' when the browser's WebCrypto fails as the box is sealed (the boxKey made,
+   * wrapped or the whisper ciphered), for no reason this package can act on: a fault of the platform,
+   * not of the user or the record. Nothing was stored, the vault stays unlocked, and trying again
+   * may well succeed.
+   *
    * @param props - The box: its `boxlabel`, and its `sidecar`, your app's own JSON object beside the
    *   whisper, shown in the snapshot while locked, and never interpreted by the vault. It is stored
    *   in the clear, readable by anyone who can read the database: never put secret material in it.
