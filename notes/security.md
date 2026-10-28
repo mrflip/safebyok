@@ -44,7 +44,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
-  `del-damaged-vault.ts`, `RefusalPolicy.heed`) calls the `try` forms. Each `DeviceDB` throwing verb wraps exactly its one
+  `del-damaged-vault.ts`) calls the `try` forms (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed` is gone). Each `DeviceDB` throwing verb wraps exactly its one
   `do*` store call in `storeAnswer(verb, hook)`: a `VaultError` passes as it came, anything else becomes `deviceTrouble`'s
   condition (`storage_blocked` where `isStorageBlocked` names the throw, else `storage_unavailable`, the throw its `cause`), so a
   host calling `deviceDB.getLease` directly never sees the store's raw error. The `try` form is the plain `outcomeOf` of the
@@ -492,7 +492,7 @@ added or folded into through the subagent, and no other entry changes.
   drop the lease from memory and erase nothing, because an unconditional erase on a judgment could take another
   tab's fresh lease. A lease left in the pantry that names an old `gate_epoch` or `vault_tok` is never taken up
   (take-up checks both) and is discarded by the next take-up. `lock()` (and `del()`, which locks as it does) erases,
-  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`).
+  as does a lock for untrusted storage (`identity_revoked`, `rolled_back`: `#heedRefusal`; amended 2026-10-28 (heed_inline): now `#onStorageRefusal`).
   Amended 2026-10-22 (bank): **`close()` and `vault_closed` are gone; `rolled_back` is now `vault_behind`.**
   `bank.closeVault`, `closeVaults` and `reopenVault` let a Vault object go with the same memory-only drop (the lease
   stays in the DeviceDB for the next birth), and every call on it then refuses `vault_gone`. `tryHello` / `tryRefresh`
@@ -2093,9 +2093,14 @@ added or folded into through the subagent, and no other entry changes.
   of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
-  on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
-  hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
-  an interim shim until the vault's own calls are Outcome-shaped.
+  on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
+  and the `HeededVaultDB` wrapper are deleted; the vault holds a plain `VaultDB` and at each of its six call sites
+  (`tryDelBox`, `tryGetVault` in `#takeStorage`, `tryDelVault`, `tryPutVaultRecord`, `tryGetBox`, `tryPutBox`) calls the `try` form, and on a bad
+  Outcome awaits `#onStorageRefusal(refused)` before throwing it. `RefusalPolicy.decide` stays the one pure policy
+  (`identity_revoked` and `vault_behind` answer 'lock'), and the `behind` verdict in `#takeStorage` goes through the same call.
+  The lock has landed and the lease erase has settled before the direct caller hears the throw, a background refresh's refusal
+  included, as before, now at each site by convention: a comment on `#vaultDB` says every site must call the `try` form,
+  and a vault test pins the order for each verb.)
   2026-10-19 (a_sec2, #206): `vault_props_stored` is removed from `RefusalMeta`. Nothing ever
   filled it. Filled, it would have put every passphrase's salt and every wrapped vaultKey into a
   refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
@@ -2820,7 +2825,7 @@ added or folded into through the subagent, and no other entry changes.
   tells newer from damaged). **The rule this rests on, which the Coach
   has ruled (2026-10-16): any change to what a stored record may hold -- a field, a shape, or a
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
-  `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
+  the vault's `#onStorageRefusal` (amended 2026-10-28 (heed_inline): formerly `RefusalPolicy.heed`): there is no handle to lock and no key in memory, so `whenIdentityRevoked`
   has nothing to act on, and the hatch's own last step is erasing the lease.
   Amended 2026-10-22 (bank_provider): **`bank.delDamagedVault(draft)` / `tryDelDamagedVault` run it over the bank's own
   vaultDB and deviceDB** (the shared `delDamagedVaultIn(scope, vaultDB, deviceDB)`), with the same refusals; the bank's

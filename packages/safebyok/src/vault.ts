@@ -10,12 +10,12 @@ import * as CX from './shapes/scopes'
 import { Validator } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
-import { type Outcome, outcomeOf, valOf } from './outcome'
+import { type BadOutcome, type Outcome, bad, outcomeOf, valOf } from './outcome'
 import * as Refusals from './refusals'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin } from './wayin'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
-import { callback, jsonBytes } from './vault-db'
+import { type VaultDB, callback, jsonBytes } from './vault-db'
 import { byCodeUnit } from './text'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
@@ -701,7 +701,8 @@ export class Vault implements VaultStamp {
       // lets storage say whether it removed that one or another.
       const expected = { vault_tok: this.vault_tok, revision_tok: this.#listedRevisionOf(label) }
       const showedDamaged = this.#isListedDamaged(label)
-      const deleted = await outcomeOf(() => this.#vaultDB.delBox(this.#scope, label, expected))
+      const deleted = await this.#vaultDB.tryDelBox(this.#scope, label, expected)
+      if (! deleted.ok) { await this.#onStorageRefusal(deleted) }
       // A lock landing meanwhile lets the deletion land.
       this.#demandAfterWait(deleted, { vault_tok: this.vault_tok }, { call: 'delBox' })
       const { outcome } = valOf(deleted)
@@ -773,8 +774,10 @@ export class Vault implements VaultStamp {
   // == [Options and setup]: bear, the constructor, scope, parsed options, limits, vaultDB, onBadNews, requestCleartext, onGone, clockNow
 
   readonly #scope: VaultScope
-  // Every storage refusal, whichever call met it, passes by the refusal policy on its way out.
-  readonly #vaultDB: RefusalPolicy.HeededVaultDB
+  // Called only in its `try` forms: each site hands a refused Outcome to `#onStorageRefusal`
+  // before it makes anything of it, so storage the vault cannot trust has locked it before its
+  // caller hears the refusal, a background refresh's included.
+  readonly #vaultDB: VaultDB
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   readonly #deviceDB: DeviceDB
   // How long a lease lasts on this device: what a grant runs for, and what a lease taken up may run past.
@@ -812,7 +815,7 @@ export class Vault implements VaultStamp {
     this.registered_at = registered_at
     this.#stamp = Object.freeze({ format, applabel, user_id, vaultlabel, vault_tok: vaultTok, registered_at })
     this.#scope = CX.vaultScope.parse(parts)
-    this.#vaultDB = RefusalPolicy.heed(parts.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
+    this.#vaultDB = parts.vaultDB
     this.#deviceDB = parts.deviceDB
     this.#leaseMillis = parts.leaseMillis
     this.#staleMillis = parts.staleMillis
@@ -1007,14 +1010,19 @@ export class Vault implements VaultStamp {
     const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.tryGetDeviceRecord(this.#scope)))
     // Let go meanwhile: read no more, as the judgment would ignore what came.
     if (this.#goneBy !== null) { return }
-    const [stored, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), KeptLease.tryGet(this.#deviceDB, this.#scope)])
-    const verdict = this.#judgeStored(stored, record)
+    const [stored, leaseKept] = await Promise.all([this.#vaultDB.tryGetVault(this.#scope), KeptLease.tryGet(this.#deviceDB, this.#scope)])
+    if (! stored.ok) {
+      await this.#onStorageRefusal(stored)
+      throw stored.err
+    }
+    const verdict = this.#judgeStored(stored.val, record)
     if (verdict === 'ignore') { return }
     if (verdict === 'behind') {
-      const refusal = behindError()
-      // Storage serving an older copy is not to be trusted with an unlocked vault.
-      await this.#heedRefusal(refusal)
-      throw refusal
+      // Storage serving an older copy is not to be trusted with an unlocked vault: the verdict is
+      // the vault's own, met as a refusal of storage's would be.
+      const behind = bad(behindError())
+      await this.#onStorageRefusal(behind)
+      throw behind.err
     }
     const { boxes, damagedBoxes, ...fresh } = verdict
     this.#takePicture({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
@@ -1124,7 +1132,7 @@ export class Vault implements VaultStamp {
 
   /** Demand `thing` right after a wait whose answer is `settled`, before anything is made of that answer, a refusal included.
    * A refusal from storage about the vault itself (`UntrustedStorageKinds`) comes as it came:
-   * heeding it is what moved the picture. A lease-bound demand asks for the lease only of an answer
+   * `#onStorageRefusal` is what moved the picture. A lease-bound demand asks for the lease only of an answer
    * that came: a lease that refused its own use ('damaged_lease') has dropped itself.
    */
   #demandAfterWait(settled: Outcome<unknown>, thing: VaultMadeUnder, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
@@ -1290,8 +1298,9 @@ export class Vault implements VaultStamp {
   async #delVault(proving: PassphraseProving): Promise<number> {
     this.#demand(proving, { call: 'del' })
     const doomed = this.#vaultRecord
-    const deleted = await outcomeOf(() => this.#vaultDB.delVault(this.#scope, doomed))
+    const deleted = await this.#vaultDB.tryDelVault(this.#scope, doomed)
     if (! deleted.ok) {
+      await this.#onStorageRefusal(deleted)
       this.#demandAfterWait(deleted, proving, { call: 'del' })
       throw deleted.err
     }
@@ -1324,7 +1333,8 @@ export class Vault implements VaultStamp {
     const held = this.#vaultRecord
     // `vault_epoch` is the one the store will set, the stored one plus one; the store ignores what it is handed.
     const drafted = frozenVaultRecord({ ...held, vault_epoch: held.vault_epoch + 1, gate_epoch: gate.gate_epoch, gate: gate.record })
-    const put = await outcomeOf(() => this.#vaultDB.putVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch }))
+    const put = await this.#vaultDB.tryPutVaultRecord(drafted, { vault_tok: gate.vault_tok, gate_epoch: gate.base_epoch })
+    if (! put.ok) { await this.#onStorageRefusal(put) }
     // A read meanwhile may have taken up the other device's first gate, which refused this one:
     // 'gate_made_elsewhere', not a gate moved. A gate stored is this one, held or since moved past.
     this.#demandAfterWait(put, gate, { call, firstGate: firstGate && ! put.ok })
@@ -1379,7 +1389,7 @@ export class Vault implements VaultStamp {
 
   // --
 
-  // == [Locking and expiry]: lockNow, heedRefusal, letGo, dropLease, armExpiry, disarmExpiry
+  // == [Locking and expiry]: lockNow, onStorageRefusal, letGo, dropLease, armExpiry, disarmExpiry
 
   // Every lock goes through here. Nothing is awaited before the erase is issued, so the device
   // store applies it after any lease write already issued: a grant under way when it lands is
@@ -1394,13 +1404,16 @@ export class Vault implements VaultStamp {
     return this.#deviceDB.tryDelLease(this.#scope)
   }
 
-  /** Do what the refusal policy says of `refusal` before it is thrown: lock, as `lock()` does, for storage the vault cannot trust.
+  /** Do what the refusal policy says of `refused`, a storage verb's bad Outcome, before its refusal is thrown: lock, as `lock()` does, for storage the vault cannot trust.
    * That is a user no longer signed in, or an older copy of the vault. The pending gating's waiters
-   * hear `refusal` itself, and the lease is erased with {@link DeviceDB.tryDelLease}: a device store
-   * that will not erase it is only logged, as the refusal is what the caller must hear. Storage it
-   * cannot trust (`UntrustedStorageKinds`) has the next hello read afresh.
+   * hear the refusal itself, and the lease is erased with {@link DeviceDB.tryDelLease}: a device
+   * store that will not erase it is only logged, as the refusal is what the caller must hear.
+   * Storage it cannot trust (`UntrustedStorageKinds`) has the next hello read afresh. Every site
+   * that calls a `VaultDB` verb awaits this on a refusal before it throws, so the lock has landed,
+   * and the lease is erased, by the time the caller hears.
    */
-  async #heedRefusal(refusal: VaultError) {
+  async #onStorageRefusal(refused: BadOutcome) {
+    const refusal = refused.err
     if (UntrustedStorageKinds.some((kind) => isVaultError(refusal, kind))) { this.#refreshedAt = FarPast }
     if (RefusalPolicy.decide(refusal) !== 'lock') { return }
     const why = refusal.refusalkind === 'vault_behind'
@@ -1599,7 +1612,8 @@ export class Vault implements VaultStamp {
    */
   async #getBox(boxlabel: string, call: VaultCall): Promise<Box | null> {
     const madeUnder = vaultSparseOf(this.#vaultRecord)
-    const got = await outcomeOf(() => this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: this.vault_tok }))
+    const got = await this.#vaultDB.tryGetBox(this.#scope, boxlabel, { vault_tok: this.vault_tok })
+    if (! got.ok) { await this.#onStorageRefusal(got) }
     // A vault that moved on meanwhile refuses as the demand finds it, never as what the get found.
     this.#demandAfterWait(got, { vault_tok: this.vault_tok }, { call })
     if (! got.ok) { throw this.#boxGetRefusal(got.err) }
@@ -1651,7 +1665,7 @@ export class Vault implements VaultStamp {
     this.#demand(box, { call: 'putBox' })
     // Lands only in the vault this whisper is sealed for, over the revision it was sealed from: a
     // vault reborn elsewhere, or a box written meanwhile by another device, refuses it.
-    const put = await outcomeOf(() => this.#putOver(box))
+    const put = await this.#putOver(box)
     // A lock landing during the write lets it land; the vault moving on meanwhile refuses as the demand finds it.
     this.#demandAfterWait(put, { vault_tok: box.vault_tok }, { call: 'putBox' })
     return this.#updateBoxListingOf(valOf(put))
@@ -1710,19 +1724,16 @@ export class Vault implements VaultStamp {
     return listed === null ? null : { revision_tok: listed.revision_tok }
   }
 
-  /** Put `box` with `VaultDB.putBox`, in the vault it was sealed for and over the revision it was sealed from, resolving the record as stored: storage refuses it unless that revision is still stored.
+  /** Put `box` with `VaultDB.tryPutBox`, in the vault it was sealed for and over the revision it was sealed from, as an {@link Outcome} of the record as stored: storage refuses it unless that revision is still stored.
    * A stale refusal comes as storage gave it, the box stored as its `meta.box_stored`.
    * Storage's 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
    */
-  async #putOver(box: Box): Promise<BoxRecord> {
-    try {
-      return await this.#vaultDB.putBox(this.#scope, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }, box.record)
-    } catch (err) {
-      if (isVaultError(err, 'vault_mismatch')) {
-        throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: err })
-      }
-      throw err
-    }
+  async #putOver(box: Box): Promise<Outcome<BoxRecord>> {
+    const put = await this.#vaultDB.tryPutBox(this.#scope, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }, box.record)
+    if (put.ok) { return put }
+    await this.#onStorageRefusal(put)
+    if (! isVaultError(put.err, 'vault_mismatch')) { return put }
+    return bad(new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: put.err }))
   }
 
   /** Update the box listing with `stored`, a record this vault's own write just landed, and publish it, returning `stored` as a {@link Box} made under the picture in hand. */
