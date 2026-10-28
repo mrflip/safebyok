@@ -16,7 +16,7 @@ Validators, old -> new:
 * `GateRecord` -> `gateRecord`; `GateSparse` -> `gateSparse`; `WayinRecord` -> `wayinRecord`
 * `PassphraseWayinRecord` -> `passphraseWayinRecord`; `PasskeyWayinRecord` -> `passkeyWayinRecord`; `PassphraseWayinSparse` -> `passphraseWayinSparse`; `PasskeyWayinSparse` -> `passkeyWayinSparse`
 * Formerly in `Validators` only: `VaultDraft` -> `vaultDraft`; `Capacity` -> `capacity`; `VaultRecordExpectation` -> `vaultRecordExpectation`; `BoxGetExpectation` -> `boxGetExpectation`; `BoxExpectation` -> `boxExpectation`; `VaultDelExpectation` -> `vaultDelExpectation`; `BoxDelExpectation` -> `boxDelExpectation`; `BoxDeletion` -> `boxDeletion`
-* Formerly in `Validators` only: `passkeyAnswerShape` -> `passkeyAnswer`, named for its type `PasskeyAnswer`. `vaultDBShape`, `deviceDBShape`, `clockShape`, `keyDeriverShape`, `loggerShape` and `localVaultDBOptsShape` keep their names.
+* Formerly in `Validators` only: `passkeyAnswerShape` -> `passkeyAnswer`, named for its type `PasskeyAnswer`. `vaultDBShape`, `deviceDBShape`, `clockShape`, `keyDeriverShape` and `loggerShape` keep their names.
 * Not exported, the package's own: `MadeUnderShape` -> `madeUnder` and `CipheredShape` -> `boxCiphered`, each named for its type (`MadeUnder`, `BoxCiphered`).
 * `VaultScope` -> `vaultScope`. `VaultScope` was the same object as `Validators.vaultScope` under a second name: the main entry now exports it as `vaultScope`. The type `VaultScope` is unchanged.
 

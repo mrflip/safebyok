@@ -9,7 +9,7 @@ import { TombstoneFormat, VaultFormat, type VaultDraft, type VaultRecord, type V
 import * as VX from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import { verifyConsistent } from './checks/validator'
-import * as OX from './shapes/bank-opts'
+import * as HX from './shapes/host-code'
 import { fieldOf } from './helpers'
 import * as CX from './shapes/scopes'
 import * as Refusals from './refusals'
@@ -511,7 +511,7 @@ export abstract class VaultDB {
    */
   subscribe(scope: VaultScope, onChange: () => void): () => void {
     const asked = heldScope(this, scope)
-    OX.callback.parse(onChange)
+    HX.callback.parse(onChange)
     let live = true
     const unsubscribe = startedWatch(() => this.doSubscribe(asked, () => {
       if (live) { heedListener(onChange, (err) => { this.listenerFailed(err) }) }
