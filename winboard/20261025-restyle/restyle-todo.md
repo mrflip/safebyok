@@ -6,13 +6,16 @@ Groups in order of readiness; within a group, the smaller first. What the Coach 
 
 ## A. Waiting on the clock
 
-- RS-01 **Finish thread 28 (helpers_range) after 2026-10-28 23:13:40 UTC.** Its PR drops
+- RS-01 **Finish thread 28 (helpers_range, #354) after 2026-10-28 23:13:40 UTC:**
+  `/workspace/byok-helpers_range/winboard/20261025-restyle/thread-28-finish.sh`. #354 drops
   convex-helpers 0.1.129's `minimumReleaseAgeExclude` and returns the dev pins to `^0.1.129`, as the
   Coach approved. Until 0.1.129 has been public seven days, pnpm's strict release age refuses it from
   the lockfile (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, frozen or not), so the PR waits as a draft
-  with everything but the re-lock. `winboard/20261025-restyle/thread-28-finish.sh` (on its branch, in
-  `/workspace/byok-helpers_range`) refuses to run before then; after, it re-locks, checks the lockfile
-  still says 0.1.129, commits it, files the thread and takes the PR out of draft.
+  with everything but the re-lock, `notes/security.md`'s record of the exception already ended. The
+  script (on #354's branch) refuses to run before then; after, it re-locks, checks the lockfile still
+  says 0.1.129 and a frozen install passes, commits the lockfile, files the thread and takes #354 out
+  of draft. If filing stops (exit 3 or 4), #354 stays a draft: hand the worktree and the script's last
+  lines to a fresh thread-worker. Until the re-lock, any `pnpm <script>` in that worktree is refused.
 
 ## B. Small, ready: each a few lines, any tidy PR may take them
 
