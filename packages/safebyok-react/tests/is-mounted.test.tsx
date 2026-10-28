@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { StrictMode, Suspense } from 'react'
+import { Activity, StrictMode, Suspense, useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useIsMounted } from '../src/is-mounted'
 import * as TH from './test-helpers'
@@ -35,6 +35,18 @@ describe("useIsMounted", () => {
     expect(isMounted()).to.be.false
   })
 
+  it("answers true in the commit that mounts the component, before React runs its passive effects", () => {
+    const grabbed: (() => boolean)[] = []
+    const seenInCommit: boolean[] = []
+    // Rendered after the Grabber, so its layout effect runs after the Grabber's, in the same commit.
+    const InCommit = () => {
+      useLayoutEffect(() => { seenInCommit.push(grabbed.every((isMounted) => isMounted())) }, [])
+      return null
+    }
+    render(<><Grabber grab={(isMounted) => { grabbed.push(isMounted) }} /><InCommit /></>)
+    expect(seenInCommit).to.deep.equal([true])
+  })
+
   it("answers true once committed under StrictMode, which mounts, unmounts and mounts again", () => {
     const grabbed: (() => boolean)[] = []
     render(<StrictMode><Grabber grab={(isMounted) => { grabbed.push(isMounted) }} /></StrictMode>)
@@ -64,6 +76,18 @@ describe("useIsMounted", () => {
     })
     expect(screen.queryByText('Loading')).to.be.null
     expect(grabbed.every((isMounted) => isMounted())).to.be.true
+  })
+
+  it("answers false while an Activity hides the component, and true once it shows again", () => {
+    const grabbed: (() => boolean)[] = []
+    const grab = (isMounted: () => boolean) => { grabbed.push(isMounted) }
+    const shown = (mode: 'visible' | 'hidden') => <Activity mode={mode}><Grabber grab={grab} /></Activity>
+    const { rerender } = render(shown('visible'))
+    const [isMounted = () => false] = grabbed
+    rerender(shown('hidden'))
+    expect(isMounted()).to.be.false
+    rerender(shown('visible'))
+    expect(isMounted()).to.be.true
   })
 
   it("keeps one identity across renders, so that it never retriggers an effect", () => {
