@@ -1,9 +1,9 @@
 # Thread 2: aead_narrow (2026-10-28)
 
-Branch `20261028-aead_narrow`, PR [#325](https://github.com/mrflip/safebyok/pull/325), stacked on
-[#316](https://github.com/mrflip/safebyok/pull/316) (trythrow; merged, the restack is the
-orchestrator's). Justify: green (safebyok 3472 passed, 37 skipped, 27 added over #316; every
-package's lint, typecheck, build and size budget green).
+Branch `20261028-aead_narrow`, PR [#325](https://github.com/mrflip/safebyok/pull/325), cut on
+[#316](https://github.com/mrflip/safebyok/pull/316) (trythrow; merged) and since caught up onto main
+(see *Catch-up*). Justify: green at the review (safebyok 3472 passed, 37 skipped, 27 added over
+#316); green again at the filing, after the catch-up, by `scripts/file-thread`'s proof.
 
 **Rulings applied (the Coach, 2026-10-28), after the first review** (reviewer's fix 5e486337, a
 Proving test, kept):
@@ -94,9 +94,8 @@ VaultError of any bug; a device-store failure's cause no longer crosses to the h
     and the existing test (*refuse as the demand finds the vault, never 'damaged_box'*) holds.
   - `refusalOf` lives in `outcome.ts` beside `outcomeOf`, whose catch is the same expression. Not
     exported from the package (adding an export would be a `minor` by PROCESS.md).
-  - The device store's error `name` is **not** kept in the message or `meta`: the handoff left it
-    optional, and G8 says a refusal interpolates nothing but a kind, a limit or a field name. A host
-    debugging a custom store logs inside its own `do*` methods. Easy to add later.
+  - The device store's error `name` was first **not** kept (G8 then allowed no interpolation but a
+    kind, a limit or a field name); ruling 3 above reversed that, and the message now ends with it.
 * **Deviations**:
   - **A WebCrypto failure while a box is ciphered** (`makeBoxKey`, `wrapKeyUnder`, `cipherBytes`)
     now throws 'unexpected_error' at once; the post-wait `#demand()` no longer runs first, so a lock
@@ -122,8 +121,11 @@ VaultError of any bug; a device-store failure's cause no longer crosses to the h
   with `tryVerbFoo` one `outcomeOf(() => this.verbFoo(...))`; where a `finally` zeroes bytes the catch
   sits before it (`cipheredWith`, `Box.seal`). For Vault and Bank the catch also tells bad news, so
   it becomes `catch (err) { throw this.#heardRefusal(err) }` or the like, with `refusalOf` inside.
-* **For the orchestrator**: at the restack with thread 6 (#321), drop "that throw its `cause`" from
-  the `DeviceDB` class doc (device-db.ts l.22 on this branch), whichever lands second.
+* **Catch-up (2026-10-28, at the filing)**: rebased onto main f84d61bb (nine conflicts, main's names
+  and structure with this branch's facts; the keeper files' change unchanged), three device-db tests
+  repaired, and the three folds the sprint owed here (`refusalOf` shared with `bank.ts`, the
+  `DeviceDB` class doc, `vault.putBox`'s doc). The detail is
+  [thread-2-aead_narrow-catchup.md](thread-2-aead_narrow-catchup.md).
 * **For the Coach** (the four rows above are ruled; what remains):
   - **`crypto_failed` on the decipher side**: left as `damaged_box`/`damaged_lease`/wrong proof
     (recommended: a WebCrypto throw there cannot be told from a wrong key or an altered record), or
