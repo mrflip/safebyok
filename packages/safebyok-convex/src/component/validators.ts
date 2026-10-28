@@ -105,7 +105,7 @@ export const BoxExpectation = zodToConvex(Validators.BoxExpectation)
  */
 export const Capacity = zodToConvex(Validators.Capacity)
 
-/** What a box get answers, from its one query's snapshot: `got`, with the box, or the refusal that got nothing.
+/** The answer to a `getBox` query, from its one snapshot: `got`, with the box, or the refusal that got nothing.
  * `got: true` carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
  * `vault_mismatch`, when the scope's vault record is not the one expected, or none is stored, carries
  * nothing of it.
