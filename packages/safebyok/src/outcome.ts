@@ -62,6 +62,23 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  */
 export const asStorageTrouble = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.storageUnavailable(thrown))
 
+/** `thrown` as the refusal it stands for: a VaultError as it came, anything else as the 'unexpected_error' {@link Refusals.unexpectedError} makes of it, that throw its cause.
+ * The one catch that ends a throwing form: a bug in its body (a TypeError, a rejection that is no
+ * refusal) reaches the caller as a VaultError, never raw, and every refusal passes untouched.
+ *
+ * @example
+ *   async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> {
+ *     try {
+ *       // ...the body, which throws its refusals
+ *     } catch (err) {
+ *       throw refusalOf(err)
+ *     }
+ *   }
+ * @example refusalOf(new VaultError('vault_locked', 'The vault is locked.'))   // that VaultError, as it came
+ * @example refusalOf(new TypeError('ctx is not a function'))   // a VaultError 'unexpected_error', the TypeError its cause
+ */
+export const refusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown))
+
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *
  * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself

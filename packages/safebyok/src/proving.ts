@@ -239,12 +239,15 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** Unwrap the vaultKey from the gate's current wayin at this slot, with `usage`: `wrongProof()` when it will not.
    * The wrap is read from the vault record held before the wait, and a demand follows the wait.
+   * Only the unwrap itself can read as a wrong proof: its ctx is built before the catch, so a stamp
+   * that fails its check refuses 'bad_record'.
    */
   async #unwrap(usage: typeof RewrapUsage | typeof CheckUsage): Promise<CryptoKey> {
     const wrapped = this.#currentWrap()
+    const ctx = wayinCtxOf(this.vault.stamp, this.header)
     let vaultKey: CryptoKey | null
     try {
-      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, wayinCtxOf(this.vault.stamp, this.header), usage)
+      vaultKey = await unwrapKeyUnder(this.#wayinKey, wrapped, ctx, usage)
     } catch {
       vaultKey = null
     }

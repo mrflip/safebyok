@@ -473,9 +473,9 @@ describe("the logger", () => {
     const passphrase = 'FAKESECRET passphrase'
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'FAKESECRET note' } }, whisper)
-    // every call site: a change whose record could not be raised (its error carrying the device
-    // store's as its cause), a lease that reads but is another scope's, its wrap and all, a
-    // background refresh refused
+    // every call site: a change whose record could not be raised (the device store's own error
+    // kept nowhere, as it may quote the record), a lease that reads but is another scope's, its
+    // wrap and all, a background refresh refused
     TH.spyOnDeviceHook(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await TH.putWayin(vault, passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
@@ -487,10 +487,11 @@ describe("the logger", () => {
     vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open(), 'not_permitted')
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'warn'])
-    expect((world.logged[0]?.err?.cause as Error).message).to.match(/disk full/)
+    expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('storage_unavailable')
+    expect(world.logged[0]?.err?.cause).to.be.undefined
     const text = TH.loggedText(world.logged)
-    // the walk reached the cause, so its search covers what causes hold
-    expect(text).to.include('disk full')
+    // the device store's own words reach the logger neither as a cause nor in a message
+    expect(text).to.not.include('disk full')
     expect(text.toLowerCase()).to.not.include('fakesecret')
     expect(secrets.length).to.be.greaterThan(2)
     for (const secret of secrets) { expect(text).to.not.include(secret) }
@@ -586,7 +587,7 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(world.open(), 'identity_revoked')
     expect(await world.getLease()).to.not.be.null
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'untrustedStorage' }]])
-    expect(world.logged[0]?.err?.cause).to.eq(stuck)
+    expect(world.logged[0]?.err?.cause).to.be.undefined
   })
 
   it("takes no option to stay unlocked: Bank.make refuses one, as it refuses any option it does not know", () => {
@@ -615,7 +616,7 @@ describe("when storage says the user is no longer signed in", () => {
     expect(await world.getLease()).to.not.be.null
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
     expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('storage_unavailable')
-    expect(world.logged[0]?.err?.cause).to.eq(stuck)
+    expect(world.logged[0]?.err?.cause).to.be.undefined
   })
 })
 

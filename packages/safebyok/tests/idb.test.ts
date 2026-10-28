@@ -47,24 +47,35 @@ TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() 
   return idbDeviceDB({ dbName: TH.freshDbName() })
 })
 
+/** What `promise` rejected with, or null for one that resolved: a look at the error a throw carried. */
+const rejectionOf = async (promise: Promise<unknown>): Promise<unknown> => {
+  try {
+    await promise
+    return null
+  } catch (err) {
+    return err
+  }
+}
+
 describe("idbDeviceDB over storage the browser withholds", () => {
-  it("answers a write over quota as storage_blocked, the browser's QuotaExceededError its cause, and keeps nothing of it", async () => {
+  it("answers a write over quota as storage_blocked, keeping nothing of the browser's QuotaExceededError, and stores nothing", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     failWritesOverQuota()
     const refused = await TH.expectBad(deviceDB.tryPutLease(await TH.leaseOf('u1')), 'storage_blocked')
-    expect(refused.cause).to.have.property('name', 'QuotaExceededError')
+    expect(refused.cause).to.be.undefined
     await TH.expectBad(deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
     const scope = TH.scopeOf('u1')
     expect(await TH.expectGood(deviceDB.tryGetLease(scope))).to.be.null
     expect(await TH.expectGood(deviceDB.tryGetDeviceRecord(scope))).to.be.null
   })
 
-  it("answers every verb as storage_blocked when the browser refuses each open through its request's onerror, its SecurityError the cause", async () => {
+  it("answers every verb as storage_blocked when the browser refuses each open through its request's onerror, keeping nothing of its SecurityError", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     failOpens()
     const scope = TH.scopeOf('u1')
     const refused = await TH.expectBad(deviceDB.tryGetLease(scope), 'storage_blocked')
-    expect(refused.cause).to.be.instanceOf(DOMException).and.to.have.property('name', 'SecurityError')
+    expect(refused.cause).to.be.undefined
+    expect(refused.message).to.not.include('insecure')
     await TH.expectBad(deviceDB.tryPutLease(await TH.leaseOf('u1')), 'storage_blocked')
     await TH.expectBad(deviceDB.tryDelLease(scope), 'storage_blocked')
     await TH.expectBad(deviceDB.tryGetDeviceRecord(scope), 'storage_blocked')
@@ -174,12 +185,13 @@ describe("idbDeviceDB", () => {
   ] as const
 
   for (const [factory, blurb] of NoIndexedDBCases) {
-    it(`refuses at its first use as 'storage_blocked', a NotSupportedError its cause, in ${blurb}`, async () => {
+    it(`refuses at its first use as 'storage_blocked', keeping nothing of its NotSupportedError, in ${blurb}`, async () => {
       const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
       vi.stubGlobal('indexedDB', factory)
       try {
         const err = await TH.expectBad(deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-        expect(err.cause).to.have.property('name', 'NotSupportedError')
+        expect(err.cause).to.be.undefined
+        expect(err.message).to.match(/will not help until that changes/)
       } finally {
         vi.unstubAllGlobals()
       }
@@ -197,27 +209,29 @@ describe("idbDeviceDB", () => {
     })
   }
 
-  it("refuses with a DOMException as its cause where the runtime has one", async () => {
+  it("throws a NotSupportedError DOMException from its inspector where the runtime has one, which its DeviceDB tells by name and keeps nothing of", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
+      const thrown = await rejectionOf(inspectIdbDeviceDB({ dbName: TH.freshDbName() }).rows())
+      expect(thrown).to.be.instanceOf(DOMException).and.to.have.property('name', 'NotSupportedError')
       const { cause } = await TH.expectBad(deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-      expect(cause).to.be.instanceOf(DOMException)
-      expect(cause).to.have.property('name', 'NotSupportedError')
+      expect(cause).to.be.undefined
     } finally {
       vi.unstubAllGlobals()
     }
   })
 
-  it("refuses with a plain Error named NotSupportedError as its cause where the runtime has no DOMException, as Hermes has none", async () => {
+  it("throws a plain Error named NotSupportedError from its inspector where the runtime has no DOMException, as Hermes has none, told alike", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     vi.stubGlobal('DOMException', undefined)
     try {
+      const thrown = await rejectionOf(inspectIdbDeviceDB({ dbName: TH.freshDbName() }).rows())
+      expect(thrown).to.be.instanceOf(Error).and.to.have.property('name', 'NotSupportedError')
+      expect(thrown).to.have.property('message').that.includes('no IndexedDB')
       const { cause } = await TH.expectBad(deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-      expect(cause).to.be.instanceOf(Error)
-      expect(cause).to.have.property('name', 'NotSupportedError')
-      expect(cause).to.have.property('message').that.includes('no IndexedDB')
+      expect(cause).to.be.undefined
     } finally {
       vi.unstubAllGlobals()
     }
@@ -348,8 +362,9 @@ describe("idbDeviceDB", () => {
     await TH.expectGood(shelfDB.tryPutLease(await TH.leaseOf('u1')))
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
-      const { cause } = await TH.expectBad(shelfDB.tryDelLease(TH.scopeOf('u1')), 'storage_unavailable')
-      expect(cause).to.have.property('message', 'the shelf will not list')
+      const { cause, message } = await TH.expectBad(shelfDB.tryDelLease(TH.scopeOf('u1')), 'storage_unavailable')
+      expect(cause).to.be.undefined
+      expect(message).to.not.include('the shelf will not list')
     } finally {
       vi.restoreAllMocks()
     }

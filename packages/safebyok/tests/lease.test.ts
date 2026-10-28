@@ -1,9 +1,11 @@
 import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { BoxFormat, type BoxRecord, type BoxSparse } from '../src/shapes/box'
+import { type BoxCiphered, BoxFormat, type BoxRecord, type BoxSparse } from '../src/shapes/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { Lease, sealLeaseRecord } from '../src/lease'
+import { VaultError } from '../src/errors'
+import type { Outcome } from '../src/outcome'
 import { LeaseStamp, LeaseRecord } from '../src/shapes/device'
 import type { VaultSparse, VaultStampButFormat } from '../src/shapes/vault'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
@@ -403,6 +405,50 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
     const err = await TH.expectRefusal(lease.decipherWith({ box_key_wrapped: ciphered.box_key_wrapped } as unknown as BoxRecord, visibleOf()), 'bad_record')
     expect(err.message).to.not.include(ciphered.box_key_wrapped.ciphertext_b64)
   })
+
+  it("refuse a vault whose stamp fails its check as 'bad_record', never as a damaged lease: the lease's ctx is built before the unwrap's catch, so the lease is kept and the vault not locked", async () => {
+    const { lease, vault } = await leasedVault()
+    const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf())
+    Object.assign(vault, { registered_at: 'yesterday' })
+    await TH.expectRefusal(lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf()), 'bad_record')
+    await TH.expectRefusal(lease.decipherWith(ciphered, visibleOf()), 'bad_record')
+    expect(vault.locks).to.eq(0)
+    expect(vault.lease).to.eq(lease)
+  })
+})
+
+/** u1's leased vault, a box's two ciphered fields sealed in it, and then its demand replaced by one that throws `thrown`: a bug in a step every Lease method takes. */
+const buggedVault = async (thrown: Error) => {
+  const { lease, vault } = await leasedVault()
+  const ciphered = await lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf())
+  vault.demandConsistentWith = () => { throw thrown }
+  return { lease, ciphered }
+}
+
+describe("the Lease try pairs, met by a bug", () => {
+  const Pairs: readonly [verb: string, throwing: (lease: Lease, ciphered: BoxCiphered) => Promise<unknown>, trying: (lease: Lease, ciphered: BoxCiphered) => Promise<Outcome<unknown>>][] = [
+    ['cipheredWith', (lease) => lease.cipheredWith(bytesOf('1'), visibleOf()),             (lease) => lease.tryCipheredWith(bytesOf('1'), visibleOf())],
+    ['decipherWith', (lease, ciphered) => lease.decipherWith(ciphered, visibleOf()),       (lease, ciphered) => lease.tryDecipherWith(ciphered, visibleOf())],
+    ['sealProps',    (lease) => lease.sealProps(visibleOf(), { whisper: bytesOf('1') }),  (lease) => lease.trySealProps(visibleOf(), { whisper: bytesOf('1') })],
+  ]
+
+  for (const [verb, throwing, trying] of Pairs) {
+    it(`${verb} throws a bug met inside as 'unexpected_error', the throw its cause, and its try form resolves it as a bad Outcome of that kind`, async () => {
+      const bug = new TypeError('the demand is broken')
+      const { lease, ciphered } = await buggedVault(bug)
+      const thrown = await TH.expectRefusal(throwing(lease, ciphered), 'unexpected_error')
+      expect(thrown.cause).to.eq(bug)
+      const resolved = await TH.expectBad(trying(lease, ciphered), 'unexpected_error')
+      expect(resolved.cause).to.eq(bug)
+    })
+
+    it(`${verb} passes a VaultError thrown inside through with its kind kept, from both forms`, async () => {
+      const refusal = new VaultError('not_permitted', 'This test says no.')
+      const { lease, ciphered } = await buggedVault(refusal)
+      expect(await TH.expectRefusal(throwing(lease, ciphered), 'not_permitted')).to.eq(refusal)
+      expect(await TH.expectBad(trying(lease, ciphered), 'not_permitted')).to.eq(refusal)
+    })
+  }
 })
 
 describe("lease.sealProps", () => {
