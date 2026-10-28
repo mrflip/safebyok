@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Sings out where an agent stands: see scripts/ohai.ts for what it prints and where it logs it.
+exec node "$(dirname "$0")/ohai.ts" "$@"

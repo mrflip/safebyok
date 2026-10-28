@@ -33,6 +33,11 @@ thread. Before anything else:
 A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; the base,
 `git config branch.<branch>.sprintbase`.
 
+Sing out as thread-worker.md's *Singing out* says, in your own worktree: `scripts/ohai --begin
+--role thread-reviewer --sprint <sprint> --thread <N> --branch <the thread's branch> --model
+<your model id> reviewing`, then judging findings, fixing, proving, and the report you are
+about to make. Chain each onto the command it heralds.
+
 ## The job
 
 1. **Review.** `/code-review <level> <base-sha>...<tip-sha>`, with the level spelled out (it

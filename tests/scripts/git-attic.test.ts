@@ -34,7 +34,6 @@ const makeRepo = (scratch: string): RepoT => {
   const where = path.join(scratch, 'repo')
   const env = isolatedEnv(scratch)
   const git = (...args: string[]) => (
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- naming an absolute git would make these tests machine-specific, and the script under test runs the installed git too
     execFileSync('git', ['-C', where, ...args], { encoding: 'utf8', env }).trim()
   )
   mkdirSync(where)

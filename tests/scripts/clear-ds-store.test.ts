@@ -37,7 +37,6 @@ describe('scripts/clear-ds-store.sh', () => {
     main = path.join(scratch, 'repo')
     const env = isolatedEnv(scratch)
     git = (...args: string[]) => (
-      // eslint-disable-next-line sonarjs/no-os-command-from-path -- naming an absolute git would make these tests machine-specific, and the script under test runs the installed git too
       execFileSync('git', ['-C', main, ...args], { encoding: 'utf8', env }).trim()
     )
     clear = (cwd = main) => execFileSync(Script, [], { cwd, encoding: 'utf8', env })

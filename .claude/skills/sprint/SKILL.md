@@ -104,8 +104,9 @@ runs three steps.
 **Build.** `scripts/cut-thread <label> <base>` cuts its worktree from the base §1 gives it, and
 records that base for its reviewer and its filing. (Run the scripts as `<sprint root>/scripts/...`
 once the sprint has its worktree: the main checkout may be on a branch that lacks them.) Spawn
-one `thread-worker` with `run_in_background: true` and the thread's worker model and effort,
-where they differ from the agent's, never with `isolation`. The prompt is the whole handoff,
+one `thread-worker` with `run_in_background: true`, the thread's worker model and effort where
+they differ from the agent's, and a `description` naming the thread (`Thread 3: vault_record`),
+never with `isolation`. The prompt is the whole handoff,
 re-sent on every one of the worker's turns: it carries what this thread needs from the plan and
 the progress document, and points to the rest by file and section.
 
@@ -122,6 +123,12 @@ Look-ahead: <what later threads need from this one, if anything>.
 Read: <the plan's *Read first*, and what else this thread needs, by section>.
 ```
 
+Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
+compaction with its best guess at the agent, by that `description`. To see where each agent
+stands, read the tail of the log every worktree shares,
+`"$(git rev-parse --git-common-dir)/ohai.log"`, rather than resume or wait on one; read it too
+as each report comes in, for the thread's compactions (§4).
+
 What a worker reports it went looking for in the plan or progress document is a gap in the
 handoffs: put it in the next ones. A background worker whose tools were refused (a permission it
 could not ask for) is re-run in the foreground, alone.
@@ -136,6 +143,7 @@ harness from the main checkout.
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
 Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if not the default>.
 The plan's gloss: <the thread's gloss, verbatim>.
+Compactions: <none | when, and before or after the worker's first justify>.
 ```
 
 The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branch>.sprintbase`
@@ -217,6 +225,17 @@ Default rules, absent other guidance:
 * **Resume** a `blocked` worker when you can supply what it lacks: an answer the plan or
   progress document already holds, or -- in YOLO -- a judgment call you can make and record. A
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
+* **A worker that compacts** is doing what its cap asks, until compaction starts to cost more
+  than it saves. The first: nothing to the worker; note it on the thread's *Progress* row and
+  in its review handoff, where the reviewer looks harder at what spans it. A second: the thread
+  outgrew one context, a planning lesson for the progress document; check later threads' glosses
+  for the same shape, and split any that have it. A third, or a second soon after the first:
+  the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
+  file up to date, and report `blocked` with what remains; then a fresh worker continues from
+  the thread file (the rework handoff, with *Continue* for *Act on*), or what remains becomes a
+  thread of its own. A worker whose result reads *Autocompact is thrashing* was stopped by the
+  harness for the same reason: its worktree stands as it left it, uncommitted work included, and
+  a fresh worker continues there.
 * **A trivial fix to closed work** -- a lint error, a typo -- in what another thread built, after
   its agent is done: hand it to the thread underway as a directive, to fix in its own branch,
   or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of

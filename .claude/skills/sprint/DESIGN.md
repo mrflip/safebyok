@@ -30,6 +30,14 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **Filing is a script.** By filing time the builder's context is at its largest, and filing (a
   rebase, a justify, a push) needs none of it. A fresh worker cost a spawn per thread;
   `scripts/file-thread` costs one background command, and a worker is spawned only when it stops.
+* **Agents sing out, and compactions are logged** (`scripts/ohai`, and its PreCompact hook in
+  `.claude/settings.json`). A background worker is otherwise silent until it reports, and its
+  transcript is too large to read. A hook's input names the session but not the subagent, and a
+  subagent's shell knows only its parent's session, so the hook guesses the agent from the
+  transcript written last, and the worker confirms with its own `compacted` line. A probe on
+  2026-10-28 showed both: three compactions logged by the hook, and an agent that saw the
+  summary heading its conversation. The harness itself stops a subagent that refills its context
+  within three turns of a compaction, three times running.
 * **Rework goes to a fresh worker; the builder is resumed only to answer it.** A worker reports
   `ready` at its largest context (300--400k tokens was typical in October 2026), and a
   subagent's prompt cache lasts five minutes, so a builder resumed after a review first rewrites

@@ -31,6 +31,23 @@ number, or for a name, when the handoff leaves you unsure how your work fits. Sa
 what you went looking for, so the orchestrator can put it in the next handoff. Where they
 disagree, the progress document is newer.
 
+## Singing out
+
+`scripts/ohai` prints one greppable line, and logs it where the Coach and the orchestrator watch
+every agent at once. Begin with who you are, as far as you know it: `scripts/ohai --begin
+--role thread-worker --sprint <sprint> --thread <N> --model <your model id> <job>`, the job
+being building, filing or reworking a review; the script adds your branch and what the shell
+knows of you. Then sing each time you turn to a new kind of work: proving (your first
+`pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
+conflict, writing the thread file, and the report you are about to make (`ready`, `filed`,
+`blocked`). Chain it onto the command that starts the work,
+`cd <root> && scripts/ohai repairing lint errors && pnpm lint`, so it costs no turn.
+
+**When your conversation opens with a summary of an earlier one**, you were compacted: sing
+`compacted`, then re-read your thread file and `git log` before going on. What the summary says
+of the code is a sketch, and can be wrong with confidence: trust the files, the test output and
+the diff.
+
 ## The thread
 
 1. **Build**, committing at milestones: related changes together, `pnpm justify` green, messages

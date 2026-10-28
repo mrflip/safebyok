@@ -35,7 +35,6 @@ describe('scripts/file-thread', () => {
     const origin = path.join(scratch, 'origin.git')
     const env = isolatedEnv(scratch)
     git = (...args: string[]) => (
-      // eslint-disable-next-line sonarjs/no-os-command-from-path -- naming an absolute git would make these tests machine-specific, and the script under test runs the installed git too
       execFileSync('git', ['-C', main, ...args], { encoding: 'utf8', env }).trim()
     )
     commit = (where: string, filename: string, body: string) => {
@@ -45,7 +44,6 @@ describe('scripts/file-thread', () => {
       return git('-C', where, 'rev-parse', 'HEAD')
     }
     file = (prove: string) => spawnSync(Script, ['--prove', prove, root], { cwd: main, encoding: 'utf8', env })
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above
     execFileSync('git', ['init', '--quiet', '--bare', '--initial-branch', 'main', origin], { env })
     mkdirSync(main)
     git('init', '--quiet', '--initial-branch', 'main')
@@ -151,9 +149,7 @@ describe('scripts/file-thread', () => {
     beforeEach(() => {
       stubs = path.join(scratch, 'stubs')
       mkdirSync(stubs)
-      // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above: the stubs wrap whichever git and rm the machine has
       const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
-      // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above
       const realRm = execFileSync('sh', ['-c', 'command -v rm'], { encoding: 'utf8' }).trim()
       writeFileSync(path.join(stubs, 'git'), [
         '#!/bin/sh',
