@@ -46,3 +46,28 @@ Cleanup `e894b5ba-5a8a` / `537a9793-f406`; Progress `c2cac15c-ed58` / `66c5201c-
   device waits for that device's watch to read the gate first. Expect the same in later
   timing-sensitive tests.
 * "picture" survives in the doc blocks thread 1 touched (thread 4's pass).
+
+### 2. vault_boxes (#340, stacked on #336)
+
+* `#onRefused(thrown)` is the one conversion: every public catch is `throw this.#onRefused(err)`,
+  and it takes any throw. The `heardRefusal:` gating tool still points at it (thread 3 removes it).
+  `#onRefreshRefused` keeps its name.
+* `#onStorageRefusal(refused, call)` logs under the call that met the refusal; `VaultCall` has no
+  `'untrustedStorage'`.
+* `#ensureUnlocked(renewMillis)` no longer refreshes: each caller runs `#refreshIfStale(staleMillis)`
+  and `#demandNotGone()` first, then checks a locked vault's listing itself.
+* Failure plans: `#onGetBoxRefused`, `#onPutGateRefused`, `#dropEndedLease`; bad news is
+  `#reportBadNews` and `#reportNewDamage`. The three lockings are untouched (thread 3's).
+* `useWhisper`: `#demandNotGone()`, a try with the one catch around the callback check and
+  `getWhisper`; the host's callback runs after the try, its throw passing through as it came.
+* **The race** (review, flagged): a ring arriving mid-refresh joins the refresh in flight
+  (`oneAtATime`), and `isOlderPicture` compares only epochs, which a box write does not raise, so
+  put-then-delete showed the deleted box until the next ring or stale hello. A rework added a
+  follow-up refresh and a ledger of landed writes; it broke STYLE.md (*Control flow*: no retry,
+  refresh or re-read in the core) and CLAUDE.md (never a check to catch a stale cache earlier),
+  and is reverted (2982245e). The Coach's design: the `VaultDB` callback carries the vault as
+  stored, and a ring triggers no refresh (thread 2b). A test that needs `TH.readAfresh` after a
+  change of timing is a smell: suspect a race first; and a fix that adds a read or a ledger is a
+  stop, not a deviation.
+* The PR edit and `gh pr ready` were refused by the permission classifier for a background
+  worker; the Coach is handling #340's. Later workers: report a PR-body draft as a file if refused.

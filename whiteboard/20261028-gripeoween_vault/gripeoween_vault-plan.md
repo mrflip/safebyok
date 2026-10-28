@@ -4,7 +4,7 @@
   four threads stack in one line, so one runs at a time).
 * **Issued by:** the Coach (flip), `/sprint gripeoween-vault YOLO /turbochat`, with: *"your job is
   to modify interfaces there have been no public releases, do not include back-compat"*.
-* **Status:** thread 1 filed (#336); thread 2 next. Sprint doc: https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk
+* **Status:** thread 1 filed (#336); thread 2 (#340) filing; thread 2b next. Sprint doc: https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk
 
 The Coach's request is the preplan beside this file, `gripeoween-vault-preplan.md` (copied from
 the untracked `whiteboard/20261028-gripeoween/` in the main checkout), with its raw material
@@ -78,6 +78,50 @@ live worker as a directive. **Depends on** thread 1: cut from its tip once filed
 thread 3 has gating reject raw and the vault's one catch convert, so `#onRefused(err)` must take
 any throw, gating's included. **Size:** large; the preplan's split point falls after it.
 
+*Review:* flagged (#340). Fixed: `#ensureUnlocked`'s doc block; the release note's "moved on"
+line. **Significant:** put then delete a box and the snapshot lists the deleted box (a ring that
+arrives mid-refresh shares the stale refresh; an old race the faster `putBox` made the usual
+outcome), with three delBox tests re-timed to hide it. Sent back (YOLO, two-way): a ring
+mid-refresh runs one more refresh after it, the tests un-retimed, a put-then-delete snapshot test;
+a fresh worker, the first being near its context's end. Left: `#storedBase` → `#fillFromStored`
+(to thread 4); `#told` kept ("told to onBadNews" is the host's wording); `ProvingTools.heardRefusal`
+(thread 3 removes the tool); one overlong doc line.
+*Orchestrator:* the rework (d53be040, a follow-up refresh after a ring mid-refresh and a ledger of
+landed box writes) broke STYLE.md's "add no retry, refresh, re-read" and CLAUDE.md's "never a
+check added to catch it earlier"; the directive was the orchestrator's mistake. Reverted in
+2982245e (the force-push was refused, so history keeps both), and the Coach's design is thread 2b.
+Thread 2 files with the three delBox tests still waiting on the watch.
+
+### 2b. `vault_watch`: the VaultDB's callback carries the vault
+
+> The Coach, in chat, 2026-10-28, on the deleted box that came back (thread 2's review): "why
+> doesn't vaultDB call back with the correct information, killing any refresh in motion and
+> asserting the correct state?" Then: "I wouldn't yet make it stop any refresh, but it shouldn't
+> need to trigger one".
+
+*Gloss.* Today `VaultDB.subscribe(scope, onChange: () => void)` is a doorbell, and the vault's
+`#watchRefresh` answers each ring with a refresh through `oneAtATime`, so a ring during a refresh
+joins it and is lost (thread 2's put-then-delete: the deleted box stays listed). After: `onChange`
+receives the vault as stored (the checked `StoredVault` `getVault` resolves, or the refusal met
+reading it), and the vault applies it through the same judgements a refresh makes (gone,
+remade, behind, `isOlderPicture`, `#applyVault`), starting no refresh. A refresh in flight is
+not stopped. Where the read happens: an adapter whose push is a doorbell (Postgres `NOTIFY`,
+GraphQL's scope-only `safebyokVaultChanged`, IndexedDB's and local's bell, Convex's
+`watchVault`, which answers a signature, not the vault) needs the base `VaultDB` to read
+`getVault` on the ring and deliver that; each ring is delivered in order, an earlier read's answer
+never applied after a later one's. Propose the shape in the thread file, then build it (the
+Coach asked for interfaces to change; `VaultDB` is exported, so a changeset says what an
+adapter author and a host see). Settle in the thread file: the device-record behind check and
+the kept-lease read that `#loadFromStorage` makes beside `getVault` (the `DeviceDB` stays the
+vault's to read); the watch-trouble path (a failed watch today rings so the vault meets the
+trouble); STYLE.md's "no refresh or re-read in the core" (the read moves to the storage layer,
+which is what the Coach asked). Then the three delBox tests go back to their unawaited form, and a
+put-then-delete snapshot test pins the outcome. **Not** a counter of box writes in the stored
+vault: a stored-format change, raised with the Coach, not ruled. **Depends on** thread 2.
+**Touches** `vault-db.ts`, `vault.ts`'s watch section, every adapter's `doSubscribe` and their
+conformance tests. **Size:** large. Thread 4's renames of `#watchStorage` and `#watchRefresh`
+are struck: this thread names them.
+
 ### 3. `vault_tools`: one locking, and the gating and proving tools
 
 > Preplan steps 5 and 6, verbatim in `gripeoween-vault-preplan.md`: *5. One locking (smells §2;
@@ -90,7 +134,7 @@ needed, stop and ask" becomes *if one locking needs a flag, keep the lockings ap
 they share without one, and say why in the thread file*; step 6's "propose the shape before
 cutting it" becomes *write the proposed shape in the thread file, then build it*: the tools are
 internal (not exported from `index.ts`), and the Coach's invocation asks for interfaces to
-change. **Depends on** thread 2. **Size:** medium.
+change. **Depends on** thread 2b (was 2). **Size:** medium.
 *Orchestrator:* the Coach took both YOLO calls above (2026-10-28, *Resolved*): they are rulings now.
 
 ### 4. `vault_residue`: the residue
@@ -114,7 +158,9 @@ comment saying why; and `#replaceSnapshot` stops deciding "changed" by `stableJs
 whole snapshot, comparing with es-toolkit's `isEqual` instead (the Coach: "this seems weird and
 hand-rolled. Can you use something from es-toolkit?"; es-toolkit is already a core dependency).
 That is a behaviour-bearing change to the snapshot, so the model is no longer `sonnet`: the
-worker inherits the orchestrator's.
+worker inherits the orchestrator's. Struck: `#watchStorage`/`#watchRefresh` → `#subscribeToStorage`/`#refreshOnRing` (thread 2b
+names the watch). Also `#storedBase` → `#fillFromStored` (GW-02's
+`vault.ts` part, STYLE.md's own example), from thread 2's review.
 
 ## For the Coach
 
