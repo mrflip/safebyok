@@ -132,11 +132,11 @@ By hand: confirm those same things, `rm -rf` it, `git worktree prune`.
 ## CLAUDE.md's long-file list
 
 CLAUDE.md's *Reading* names the files long enough that an agent should search them rather than
-read them whole: those past about 700 lines, leaving out `notes/security.md` (an agent never
+read them whole: those past about 700 lines, leaving out `notes/security_flags.md` (an agent never
 reads it), thread folders, lockfiles and changelogs. When a file is split or grows, bring the
 list in line with:
 
 ```sh
 git ls-files ':!:whiteboard' ':!:winboard' ':!:human' ':!:**/pnpm-lock.yaml' ':!:pnpm-lock.yaml' \
-  ':!:**/CHANGELOG.md' ':!:notes/security.md' | xargs wc -l | awk '$1 > 700 && $2 != "total"' | sort -n
+  ':!:**/CHANGELOG.md' ':!:notes/security_flags.md' | xargs wc -l | awk '$1 > 700 && $2 != "total"' | sort -n
 ```

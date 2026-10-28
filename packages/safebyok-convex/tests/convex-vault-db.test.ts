@@ -307,7 +307,7 @@ describe("a record the deployment refused", () => {
       await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), storedVaultRecord)
       // The core refuses a field it does not know, so this one strays in on the wire, past it,
       // where Convex's validator refuses the call. convex-test's validator names the field; a
-      // dev deployment's quotes the arguments too (notes/security.md). The refusal carries none of it.
+      // dev deployment's quotes the arguments too (notes/security_flags.md). The refusal carries none of it.
       const straying: ConvexVaultClient = {
         query:    client.query.bind(client),
         onUpdate: client.onUpdate.bind(client),

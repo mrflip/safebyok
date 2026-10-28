@@ -54,7 +54,7 @@ workspace.
   `ConvexClient`; a vault created, stored into, read from another browser signed in as the same
   user, and refused for another user.
 * [ ] A write refused by the deployment's validators carries no record text in what the browser
-  sees (a dev deployment's own error quotes arguments: `notes/security.md`).
+  sees (a dev deployment's own error quotes arguments: `notes/security_flags.md`).
 * [ ] Anything in the README that no longer matches what the commands print is fixed in the
   release, not noted.
 

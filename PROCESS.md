@@ -177,7 +177,7 @@ offering a **disciplined interface**.
   wait for its seventh day, pin that exact version (no range, no caret), and exempt it in
   `minimumReleaseAgeExclude` by name and exact version (`pkg@1.2.3`; never a bare name, a glob or
   a version list that outlives the need). Never an exclusion for convenience or to get a newer
-  feature sooner. The same day, add an entry to `notes/security.md` naming the package, the exact
+  feature sooner. The same day, add an entry to `notes/security_flags.md` naming the package, the exact
   version, why it could not wait, and the date it passes seven days; say so in the PR. Once it has
   aged, delete the exclusion and the exact pin in one commit, returning to a range. We would
   rather meet a hundred bugs in a conservative release than one vulnerability in a fresh one.
@@ -214,7 +214,7 @@ raising a budget follows the same rule, and says in the PR why the bundle grew. 
 * **`whiteboard/`** -- a thread's plans and progress, while it is open.
 * **`winboard/`** -- a finished thread's folder, moved from `whiteboard/`, with its `human/`
   entries renamed `*-human.md` and a `*-resolution.md` saying how each of its gripes was settled.
-* **`notes/security.md`** -- a decision a security reviewer should look at, in a sentence or two,
+* **`notes/security_flags.md`** -- a decision a security reviewer should look at, in a sentence or two,
   dated. Add one when you make such a decision, in the same PR, through a subagent (the file's
   header says how): the file is long, and building needs none of it.
 * **`notes/wontfix.md`** -- behaviour the package leaves undefined on purpose, dated, with the

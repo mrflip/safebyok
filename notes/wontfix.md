@@ -2,7 +2,7 @@
 
 Behaviour the package leaves undefined on purpose: cases a host can reach, whose outcome we do not
 promise, test or design for, each with the ruling that put it here and what happens today. A
-reviewer reads `notes/security.md` for what we decided; this file is for what we decided not to
+reviewer reads `notes/security_flags.md` for what we decided; this file is for what we decided not to
 decide. Add an entry at the end of the list, dated, with the ruling or the row it came from.
 
 * 2026-10-16 (G129, the Coach: "make a file WONTFIX"): **one device, one setting.** Opening the

@@ -87,7 +87,7 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
   thread's whiteboard, never in doc blocks or comments. Write to it, never read it
   (`human/README.md`).
 * `notes/` -- durable notes. A decision a security reviewer should see goes into
-  `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
+  `notes/security_flags.md` through a `sonnet` subagent (the file's header says how); don't read it
   yourself. `notes/wontfix.md`: behaviour left undefined on purpose. `notes/guarantees.md`: where
   secret material lives, as guarantees. **Before changing the core's `crypto.ts`, `proving.ts`,
   `lease.ts`, `gating.ts`, `box.ts` or `types/types.ts`, read its *The guarantees* section, and

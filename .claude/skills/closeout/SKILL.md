@@ -57,7 +57,7 @@ whether to stop it. Never describe a result that has not arrived.
 
 Collect what is undecided: questions raised in chat and not answered, a reviewer's `flagged`
 findings, open questions in the PR bodies and whiteboards this session wrote, guardrails you
-bent (`eslint-disable-line`, `@ts-expect-error`), `notes/security.md` entries the Coach has not
+bent (`eslint-disable-line`, `@ts-expect-error`), `notes/security_flags.md` entries the Coach has not
 seen yet. Each comes with a one-line recommendation, and with a link to where it lives.
 
 ## 3. Tidy up -- only if 1 and 2 left nothing to do
