@@ -30,6 +30,24 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **Filing is a script.** By filing time the builder's context is at its largest, and filing (a
   rebase, a justify, a push) needs none of it. A fresh worker cost a spawn per thread;
   `scripts/file-thread` costs one background command, and a worker is spawned only when it stops.
+* **Rework goes to a fresh worker; the builder is resumed only to answer it.** A worker reports
+  `ready` at its largest context (300--400k tokens was typical in October 2026), and a
+  subagent's prompt cache lasts five minutes, so a builder resumed after a review first rewrites
+  its whole context to cache, then reads it on every turn. A fresh worker starts from the thread
+  file, finished for it, at a fraction of that. A blocked builder is still resumed: it is
+  mid-build, its thread file unfinished, and blocks tend to come early, while its context is small.
+* **Workers compact near 170k tokens** (`autoCompactWindow: 200000` in `thread-worker.md`:
+  frontmatter only, so it cannot be set per thread). Compaction starts some 25--30k below the
+  cap, not at a share of it: probes on 2026-10-28 compacted at 72--79k under a 100k cap and at
+  166--176k under 200k. A worker's first `pnpm justify` came at a median 176k, so the cap puts
+  the compaction where building turns to proving, whose fixes need the test output and `git
+  diff` more than the build's history. On the 1m window no worker had ever compacted; the
+  median worker turn held 200k tokens, and 45% of what workers read came after their first
+  justify. A compaction costs about one turn's read plus a summary of a few thousand tokens, and
+  leaves 30--55k.
+* **The reviewer re-checks only what `/code-review` did not verify.** Reviewers ran a median of
+  32 turns, up to 97, most of them `grep` and `sed` re-checking findings that `/code-review`'s
+  verify pass had already confirmed.
 * **Rulings live in turbochat's *Resolved* tab and the PR**, swept into the resolutions file at
   the end. They used to be written in five places as they came, with lines owed to filed threads'
   files until the restack.
