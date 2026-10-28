@@ -44,6 +44,9 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   lease by the orchestrator, 854be0c6).
 * Thread 3's pass-through (2026-10-28): `hostThrew(err)` in `vault-resolvers.ts`; `Refusals.unexpectedError`'s
   shared sentence no longer applies to the crossing, since the graphql package no longer calls it.
+  The ruling's one obligation, now in the graphql README and `vaultDBFor`'s doc: what a `vaultDBFor`
+  throws reaches every browser, so a host throws nothing there whose message names a credential or a
+  connection string. A `redactHostThrow` option would be a later thread if a Coach wants a belt too.
 
 ## Discoveries by thread
 
