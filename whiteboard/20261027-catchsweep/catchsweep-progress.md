@@ -1,7 +1,8 @@
 # Sprint catchsweep: progress (2026-10-27)
 
 *Orchestrator:* the plan is `catchsweep-plan.md` beside this file; this file is newer wherever they
-disagree. Nothing has filed yet.
+disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2af68e4`) after #311 and
+#301 merged; every later thread meets the same catch-up rebase at its filing.
 
 ## The ground, from the audit (2026-10-27)
 
@@ -26,7 +27,10 @@ disagree. Nothing has filed yet.
   written-out try/catch. `KeptLease.read` is `tryRead`; no throwing `read` exists (all three callers
   `valOf` after a `Promise.all` or a demand). The inner AEAD `outcomeOf` calls sit one indent level up,
   inside the throwing methods, exactly as they were. `notes/guarantees.md` names the methods holding
-  the bodies (vaultKey/boxKey/whisper access points, G5, G6).
+  the bodies (vaultKey/boxKey/whisper access points, G5, G6). Catch-up over #301: the `checked*`
+  helpers in `lease.ts` and `box.ts` are gone; the bodies call `serializedBytes.parse`,
+  `BoxSparse.parse`, `CipheredShape.parse`, `LeaseSealProps.parse`, `SealBoxProps.parse`,
+  `MadeShape.parse`, `BoxRecord.parse` and `VaultOfBox` from `src/shapes/`.
 * **Thread 4 (where_prefix, #317):** a validator's `parse` takes a saying, `parse(val, { where?,
   advice? })`, framed in `refusalOf`. Zod has no whole-message framing hook. `Refusing<SchemaT>` must
   stay `SchemaT & {...}`: `Omit<SchemaT, 'parse'>` breaks every place a validator is handed to a
