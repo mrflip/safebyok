@@ -14,7 +14,7 @@ import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
 import type { BankVaultOpts, MakeBankOpts } from './shapes/bank-opts'
-import * as OX from './shapes/bank-opts'
+import * as HX from './shapes/host-code'
 import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { KeptLease } from './lease'
@@ -144,7 +144,7 @@ export class Bank {
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    OX.callback.parse(listener)
+    HX.callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }

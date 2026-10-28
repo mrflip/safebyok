@@ -1,6 +1,6 @@
 import type { BoxListing, Capacity } from './shapes/vault-db'
 import type { Clock, BadNewsHandler } from './shapes/bank-opts'
-import * as OX from './shapes/bank-opts'
+import * as HX from './shapes/host-code'
 import type { VaultScope } from './shapes/scopes'
 import type { BoxBase, BoxDamaged, BoxRecord, BoxSparse, Whisper, Sidecar } from './shapes/box'
 import * as BX from './shapes/box'
@@ -250,7 +250,7 @@ export class Vault implements VaultStamp {
   /** Call `listener` after every snapshot change, returning the function that unsubscribes it. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    OX.callback.parse(listener)
+    HX.callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -677,7 +677,7 @@ export class Vault implements VaultStamp {
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
   async useWhisper<ResultT>(boxlabel: string, handed: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
-    OX.callback.parse(handed)
+    HX.callback.parse(handed)
     const whisper = await this.getWhisper(boxlabel)
     // The callback's own throw is the host's, and is never told as the vault's bad news.
     return await handed(whisper)

@@ -9,6 +9,7 @@ import * as FX from '../src/shapes/fields'
 import * as BX from '../src/shapes/box'
 import * as VDX from '../src/shapes/vault-db'
 import * as OX from '../src/shapes/bank-opts'
+import * as HX from '../src/shapes/host-code'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
 import { parseKeyDeriverSpec } from '../src/key-deriver-spec'
@@ -21,7 +22,7 @@ const InPackage = {
   boxBase: BX.boxBase, madeShape: BX.madeShape, madeUnder: BX.madeUnder, sealBoxProps: BX.sealBoxProps, freshPasskeyAnswer: VX.freshPasskeyAnswer, boxCiphered: BX.boxCiphered, leaseGrant: DX.leaseGrant, vaultStampButFormat: VX.vaultStampButFormat, whisperBag: BX.whisperBag,
   passphraseWayinHeader: VX.passphraseWayinHeader, passkeyWayinHeader: VX.passkeyWayinHeader, wayinkind: VX.wayinkind, device_id: FX.device_id, key_deriver_label: FX.key_deriver_label, credential_id: FX.credential_id,
   passphraseCleartext: VX.passphraseCleartext, listedBox: VDX.listedBox, listingAnswer: VDX.listingAnswer, storedVaultAnswer: VDX.storedVaultAnswer, storedRevision: VDX.storedRevision, storedVaultTok: VDX.storedVaultTok,
-  declaredBoxes: OX.declaredBoxes, declaredBytes: OX.declaredBytes, leaseHoursAsMillis: OX.leaseHoursAsMillis, maxBoxes: OX.maxBoxes, maxWhisperBytes: OX.maxWhisperBytes, renewMinutesAsMillis: OX.renewMinutesAsMillis, staleMinutesAsMillis: OX.staleMinutesAsMillis, vaultMadeUnder: VX.vaultMadeUnder,
+  declaredBoxes: OX.declaredBoxes, declaredBytes: OX.declaredBytes, leaseHoursAsMillis: OX.leaseHoursAsMillis, maxBoxes: OX.maxBoxes, maxWhisperBytes: OX.maxWhisperBytes, renewMinutesAsMillis: OX.renewMinutesAsMillis, staleMinutesAsMillis: OX.staleMinutesAsMillis, vaultMadeUnder: VX.vaultMadeUnder, callback: HX.callback,
 }
 
 /** Each validator the main entry exports, by its name there. */

@@ -12,6 +12,7 @@ import * as VDX from '../src/shapes/vault-db'
 import * as DX from '../src/shapes/device'
 import * as VX from '../src/shapes/vault'
 import * as OX from '../src/shapes/bank-opts'
+import * as HX from '../src/shapes/host-code'
 import * as MX from '../src/shapes/mask'
 
 describe("the package's entry point", () => {
@@ -54,7 +55,7 @@ describe("the package's entry point", () => {
       'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
       'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswer',
     ])
-    const shapesModules: readonly object[] = [PX, CX, KX, FX, BX, VDX, DX, VX, OX, MX]
+    const shapesModules: readonly object[] = [PX, CX, KX, FX, BX, VDX, DX, VX, OX, HX, MX]
     for (const [exportname, exported] of validatorsByName) {
       expect(shapesModules.some((shapesModule) => (shapesModule as Record<string, unknown>)[exportname] === exported), exportname).to.be.true
     }
