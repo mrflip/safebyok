@@ -672,8 +672,8 @@ const goneError = () => new VaultError('vault_gone', 'The app let this vault go 
 
 const otherStoresError = () => new VaultError('bad_option', "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault).")
 
-/** What a bag naming another app or user than the bank's refuses 'bad_scope' saying, naming the fields that differ, never their values. */
-const otherScopeSays = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's: a bank serves one app and one signed-in user, and every vault it opens is theirs. Name the vault by its vaultlabel alone, or hand in something of this bank's; for another user, make that user's bank as they sign in, and drop this one as its user signs out.`
+/** What a bag naming another applabel or user_id than the bank's refuses 'bad_scope' saying, naming the fields that differ, never their values. */
+const otherScopeSays = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 
 const behindError = () => new VaultError('vault_behind', "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage.")
 // --
