@@ -1581,6 +1581,29 @@ const expectToHold = (check: TH.VaultDBTimingCheck): Promise<void> => check.chec
 
 /** The checks of the battery over an adapter, by handle. */
 const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boolean, slowSecond?: boolean }) => TH.vaultDBTimingChecks(...roundTripBattery(opts))
+
+/** Timers fired before {@link onFakeClock} calls its work hung: far more than any battery's round trips. */
+const FakeClockTimerLimit = 100_000
+
+/**
+ * What `work` resolves to, run on a fake clock: each timer it sets fires, in the order a real clock
+ * would fire it, once nothing else can run. A round trip over the wire costs a turn of the event
+ * loop rather than the millisecond or more a real `setTimeout` waits, so a battery of thousands
+ * runs in a fraction of a second however loaded the machine is; and a race's watchdog falls due
+ * only when nothing else is pending, as when an adapter has hung. Rejects as `work` does, with
+ * every timer it left run first.
+ */
+const onFakeClock = async <ValT>(work: () => Promise<ValT>): Promise<ValT> => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], loopLimit: FakeClockTimerLimit })
+  try {
+    const [worked, ran] = await Promise.allSettled([work(), vi.runAllTimersAsync()])
+    if (ran.status === 'rejected') { throw ran.reason }
+    if (worked.status === 'rejected') { throw worked.reason }
+    return worked.value
+  } finally {
+    vi.useRealTimers()
+  }
+}
 // --
 
 // == [Conformance checks]: expectRoundTripsThroughTurnstile, vaultDBTimingChecks, VaultDBContract
@@ -1614,7 +1637,9 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
 
   it("misses that late device where nothing holds a round trip: what the turnstile is for", async () => {
     const checks = checksOver({ stepping: checkThenWrite, overTheWire: true, slowSecond: true, unwired: true })
-    for (const handle of SplitLosses) { await expectToHold(checks[handle]) }
+    await onFakeClock(async () => {
+      for (const handle of SplitLosses) { await expectToHold(checks[handle]) }
+    })
   })
 
   it("lets the writes of different boxes through a check-then-write adapter land, as they should", async () => {
