@@ -33,7 +33,7 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *
  * The package README's *Errors* section says what each kind means and what to do about it.
  */
-export const RefusalKindVals = [
+export const refusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'gate_made_elsewhere', // a first unlock found the vault's first passphrase just set on another device
@@ -77,13 +77,13 @@ export const RefusalKindVals = [
   'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
 ] as const
-export type RefusalKind = typeof RefusalKindVals[number]
+export type RefusalKind = typeof refusalKindVals[number]
 
-/** The three families a refusalkind belongs to, told apart by who handles it, as {@link RefusalKindVals} describes them. */
-export const RefusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
-export type RefusalFamily = typeof RefusalFamilyVals[number]
+/** The three families a refusalkind belongs to, told apart by who handles it, as {@link refusalKindVals} describes them. */
+export const refusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
+export type RefusalFamily = typeof refusalFamilyVals[number]
 
-/** The family of each refusalkind in {@link RefusalKindVals}, which a VaultError's `family` is read from.
+/** The family of each refusalkind in {@link refusalKindVals}, which a VaultError's `family` is read from.
  *
  * @example RefusalFamilyForKind.bad_option           // 'misuse'
  * @example RefusalFamilyForKind.bad_record           // 'misuse'
@@ -179,7 +179,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  *   if (! ok && err.family === 'misuse') { throw err }
  */
 export class VaultError extends Error {
-  /** The kind of refusal, from {@link RefusalKindVals}: what went wrong. */
+  /** The kind of refusal, from {@link refusalKindVals}: what went wrong. */
   readonly refusalkind:  RefusalKind
   /** Who handles it, read from {@link RefusalFamilyForKind}. */
   readonly family:       RefusalFamily
@@ -214,14 +214,14 @@ export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is Va
   err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
 )
 
-/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link RefusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
+/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
  * A kind off the list is the thrower's own text, and may quote what it heard.
  *
  * @example listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))  // 'storage_unavailable'
  * @example listedKindOf(new Error('no luck with hunter2'))  // null
  */
 export const listedKindOf = (thrown: unknown): RefusalKind | null => (
-  isVaultError(thrown) && (RefusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
+  isVaultError(thrown) && (refusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
 )
 
 /** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.

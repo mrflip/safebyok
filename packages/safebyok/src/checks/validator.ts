@@ -2,7 +2,7 @@
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
-import { RefusalKindVals, VaultError, type RefusalKind } from '../errors'
+import { refusalKindVals, VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
 import * as PX from '../shapes/primitives'
 
@@ -233,7 +233,7 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 const Checks = Validator('bad_option', ({ custom, obj, oneof, str, union }) => ({
   bag:                     custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusalShape: obj({
-    kind:    oneof(RefusalKindVals),
+    kind:    oneof(refusalKindVals),
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
   storyShape:              obj({ where: str.optional(), advice: str.optional() }).strict(),

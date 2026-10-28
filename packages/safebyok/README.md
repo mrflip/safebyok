@@ -524,7 +524,7 @@ const requestCleartext: RequestCleartext = async (gating) => {
   (`attempt(current, next)`), `put_passkey` (`attempt(passphrase, passkey)`), `del_passkey` and
   `del_vault` (`attempt(passphrase)`).
 * **The attempt runs the whole change** and resolves an `Outcome`. The refusals a user can
-  correct (`CorrectableKindVals`) leave the gating open: show them in place and ask again.
+  correct (`correctableKindVals`) leave the gating open: show them in place and ask again.
   They are `wrong_passphrase`, `wrong_passkey`, `weak_passphrase` and `same_passphrase`, and a
   way in gone or stored damaged (`absent_wayin`, `damaged_wayin`) or a passkey this browser
   cannot ask (`passkey_unavailable`), where the other way in, or Cancel, is the user's next
@@ -989,7 +989,7 @@ A retry predicate never retries `family: 'misuse'` or `vault_locked`, and may re
 `vaultDB.getBox(...)` resolves the record or throws it. `outcomeOf(thunk)` makes an `Outcome` of
 any body that throws, and `valOf(outcome)` hands back its `val` or throws its `err`. A throw that
 is no `VaultError` becomes `unexpected_error`, which a retry predicate never retries: wrap a call
-out to your own storage as `outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `RefusalKindVals`, and the
+out to your own storage as `outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `refusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.
@@ -1289,6 +1289,6 @@ carries `damaged: true` beside `call`, so a host can branch on it. A `delBox()` 
 left to delete -- another device or tab deleted the box first -- is `absent_box`, as storage
 answers it: the vault reads no box beforehand.
 
-In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`RefusalFamilyVals`:
+In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`refusalFamilyVals`:
 `misuse`, `condition`, `bad_news`), and `isCondition(err)` is true for a `VaultError` of the
 condition or bad news family: show or retry those, and let anything else reach an error boundary.

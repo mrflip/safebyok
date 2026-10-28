@@ -1,8 +1,8 @@
-import { CorrectableKindVals, isVaultError } from 'safebyok'
+import { correctableKindVals, isVaultError } from 'safebyok'
 
 /** What a dialog does with a refusal a gating's attempt met.
  * * `in_place`: show its message beside the field and ask again. These are the core's
- *   correctable kinds (`CorrectableKindVals`), each of which leaves the gating open: a wrong
+ *   correctable kinds (`correctableKindVals`), each of which leaves the gating open: a wrong
  *   passphrase or passkey, a weak new passphrase or the same one again, and a way in that cannot
  *   answer (absent or damaged, or a passkey the browser cannot ask), which leaves the other to try.
  * * `gate_made_elsewhere`: the vault's first passphrase was just set on another device. The gating
@@ -18,7 +18,7 @@ import { CorrectableKindVals, isVaultError } from 'safebyok'
 export type AttemptRefusalFlavor = 'in_place' | 'gate_made_elsewhere' | 'close' | 'trouble' | 'in_flight'
 
 /** The refusals a dialog shows in place, asking again: those the core leaves the gating open for. */
-const InPlaceKinds: ReadonlySet<string> = new Set(CorrectableKindVals)
+const InPlaceKinds: ReadonlySet<string> = new Set(correctableKindVals)
 
 /** What a dialog does with `err`, a refusal a gating's attempt met: see {@link AttemptRefusalFlavor}. */
 export const attemptRefusalFlavor = (err: unknown): AttemptRefusalFlavor => {

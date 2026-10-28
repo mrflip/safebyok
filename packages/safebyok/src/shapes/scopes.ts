@@ -27,18 +27,18 @@ export type UserId = Z.infer<typeof PX.user_id>
 // == [Fieldnames]: each scope's fieldnames, in the order its scopepath joins them
 
 /** The fieldnames of a bank's scope, in the order its scopepath joins them. */
-export const BankScopepathFieldnameVals = ['applabel', 'user_id'] as const
+export const bankScopepathFieldnameVals = ['applabel', 'user_id'] as const
 /** The fieldnames of a vault's scope, in the order its scopepath joins them: its bank's, then its vaultlabel. */
-export const VaultScopepathFieldnameVals = [...BankScopepathFieldnameVals, 'vaultlabel'] as const
+export const vaultScopepathFieldnameVals = [...bankScopepathFieldnameVals, 'vaultlabel'] as const
 /** The fieldnames of a box's scope, in the order its scopepath joins them: its vault's, then its boxlabel. */
-export const BoxScopepathFieldnameVals = [...VaultScopepathFieldnameVals, 'boxlabel'] as const
+export const boxScopepathFieldnameVals = [...vaultScopepathFieldnameVals, 'boxlabel'] as const
 
 /** A fieldname of a bank's scope. */
-export type BankScopepathFieldname = typeof BankScopepathFieldnameVals[number]
+export type BankScopepathFieldname = typeof bankScopepathFieldnameVals[number]
 /** A fieldname of a vault's scope. */
-export type VaultScopepathFieldname = typeof VaultScopepathFieldnameVals[number]
+export type VaultScopepathFieldname = typeof vaultScopepathFieldnameVals[number]
 /** A fieldname of a box's scope. */
-export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
+export type BoxScopepathFieldname = typeof boxScopepathFieldnameVals[number]
 // --
 
 // == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath

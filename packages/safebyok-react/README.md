@@ -304,7 +304,7 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 gone or stored damaged, a new passphrase too easy to guess (`weak_passphrase`) or the one the vault
 already has (`same_passphrase`): each shows in the dialog in the vault's own calm words, and the
 gating stays open for the user to try again or cancel. These are the core's
-`CorrectableKindVals`; nothing tries again for the user. A weak passphrase's message is the reason
+`correctableKindVals`; nothing tries again for the user. A weak passphrase's message is the reason
 the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`, which asks
 for 12 characters and turns away common passwords, keyboard patterns and the vault's own names.
 The user hears the same reason before pressing Create, as advice (below). A field of your own can

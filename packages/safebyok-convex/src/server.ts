@@ -8,7 +8,7 @@ import type { SafebyokErrorData } from './refusals'
 import * as CVX from './component/validators'
 
 export type { ComponentApi } from './component-api'
-export { SafebyokErrorKindVals } from './refusals'
+export { safebyokErrorKindVals } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
 /** The host app's answer to "who is calling?": the signed-in user's id as the vault scopes it, or null, undefined or empty for no one.

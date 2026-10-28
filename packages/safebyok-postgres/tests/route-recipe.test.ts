@@ -4,7 +4,7 @@
 // and the README changes with it.
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
-import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
+import { VaultDB, VaultError, refusalKindVals, memoryDeviceDB } from 'safebyok'
 import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDamaged, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary, VaultDraft } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -180,7 +180,7 @@ const checkedAnswer = (sent: unknown): RouteAnswer => {
 
 const misshapen = () => new Error('The vault route answered something that is not a vault answer.')
 
-const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (refusalKindVals as readonly unknown[]).includes(kind)
 
 
 // ------------------------------------------------------------------- the listen fan-out, for pg

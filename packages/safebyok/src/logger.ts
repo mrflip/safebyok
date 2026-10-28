@@ -34,8 +34,8 @@ export type VaultLogger = {
 }
 
 /** The three calls a {@link VaultLogger} answers. */
-export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
-export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
+export const vaultLoggerLevelVals = ['log', 'warn', 'error'] as const
+export type VaultLoggerLevel = typeof vaultLoggerLevelVals[number]
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
 // of reach, so that no logger can claim to be guarded, by a property it carries or inherits.

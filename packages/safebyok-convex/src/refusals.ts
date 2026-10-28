@@ -5,9 +5,9 @@ import type { RefusalKind } from 'safebyok'
  * room, are not refusals: an update or delete resolves `false` or `null`, and a box write resolves
  * why it did not land.
  */
-export const SafebyokErrorKindVals = ['identity_revoked', 'not_permitted'] as const satisfies readonly RefusalKind[]
-/** One of {@link SafebyokErrorKindVals}. */
-export type SafebyokErrorKind = typeof SafebyokErrorKindVals[number]
+export const safebyokErrorKindVals = ['identity_revoked', 'not_permitted'] as const satisfies readonly RefusalKind[]
+/** One of {@link safebyokErrorKindVals}. */
+export type SafebyokErrorKind = typeof safebyokErrorKindVals[number]
 
 /** The `data` of a `ConvexError` safebyok's functions throw: a `kind` to branch on, and a calm message.
  * Neither ever names a user or quotes a record.
@@ -20,6 +20,6 @@ export type SafebyokErrorData = {
 /** True when `data`, a `ConvexError`'s, is one of safebyok's own refusals. */
 export const isSafebyokErrorData = (data: unknown): data is SafebyokErrorData => (
   typeof data === 'object' && data !== null
-  && (SafebyokErrorKindVals as readonly unknown[]).includes((data as { kind?: unknown }).kind)
+  && (safebyokErrorKindVals as readonly unknown[]).includes((data as { kind?: unknown }).kind)
   && typeof (data as { message?: unknown }).message === 'string'
 )
