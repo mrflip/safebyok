@@ -638,6 +638,21 @@ describe("the sidecar", () => {
     }
   })
 
+  it("refuses 'crypto_failed' when the browser's WebCrypto fails as the box is sealed, storing nothing and staying unlocked (Contract: vault.putBox)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    vi.spyOn(crypto.subtle, 'encrypt').mockRejectedValueOnce(new DOMException('The operation failed for an operation-specific reason', 'OperationError'))
+    try {
+      const err = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake'), 'crypto_failed')
+      expect(err.cause).to.be.undefined
+      expect(err.message).to.match(/WebCrypto threw OperationError\.$/)
+      expect(storedRowOf(world, 'anthropic')).to.be.null
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
   it("is shown while locked, the stored sidecar as storage holds it", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
