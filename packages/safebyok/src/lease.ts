@@ -7,18 +7,18 @@
 
 import { type BoxCiphered, type BoxRecord, BoxSparse, BoxStamp, CipheredShape } from './shapes/box'
 import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from './crypto'
-import { VaultError } from './errors'
+import { VaultError, thrownNameOf } from './errors'
 import { heldLeaseOf } from './held-lease'
 import * as CX from './shapes/scopes'
 import { sameScope } from './names'
-import { type Outcome, good, outcomeOf, valOf } from './outcome'
+import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { LeaseFormat, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
-import { box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './shapes/fields'
+import { type Ciphered, box_key_wrapped, vault_key_lease_wrapped, whisper_ciphered } from './shapes/fields'
 import { FarFuture } from './consts'
 import type { Vault } from './vault'
 import type { DeviceDB } from './device-db'
@@ -65,6 +65,8 @@ export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, pu
  *
  * A lease whose vaultKey will not unwrap refuses 'damaged_lease', and the vault drops it as
  * `lock()` does, erasing it from the device store. A hello does not mend it; unlocking again does.
+ * A bug met in any method here past its argument checks (a throw that is no VaultError) arrives as
+ * 'unexpected_error', never raw; each `try` form is one {@link outcomeOf} over its throwing form.
  *
  * Anyone who can use this browser profile while a lease is in force can open the vault: `leaseHours`
  * is that tradeoff, and `lock()` erases the lease at once.
@@ -137,7 +139,10 @@ export class Lease implements LeaseSparse {
 
   /** `serialized` ciphered under a fresh boxKey, that boxKey wrapped under the vaultKey, both bound to `visible`: a box's two ciphered fields.
    * Each ctx is {@link boxCtxOf}'s, for `visible` and this lease's `vault_tok`. Nothing of either
-   * key outlives the call, and `serialized` is zeroed, ciphered or not.
+   * key outlives the call, and `serialized` is zeroed, ciphered or not. When the browser's
+   * WebCrypto fails to make, wrap or cipher under the keys, it refuses 'crypto_failed': a fault of
+   * the platform, not of the box or the lease. That refusal keeps nothing of the error but its
+   * name, and the lease stays held.
    *
    * @example const { box_key_wrapped, whisper_ciphered } = await lease.cipheredWith(whisperBytes, visible)
    */
@@ -149,15 +154,22 @@ export class Lease implements LeaseSparse {
       const vaultKey = await this.#vaultKeyOrNull('wrapKey')
       this.#demand()
       if (vaultKey === null) { throw this.#dropDamaged() }
-      const sealing = await outcomeOf(async () => {
+      const boxKeyCtx  = this.#boxCtxOf(header, 'box_key_wrapped')
+      const whisperCtx = this.#boxCtxOf(header, 'whisper_ciphered')
+      let wrapped: Ciphered
+      let ciphered: Ciphered
+      // The catch holds the three WebCrypto calls alone, each over arguments built above: a failure under fresh keys is the platform's.
+      try {
         const boxKey = await makeBoxKey()
-        return {
-          box_key_wrapped:  box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, this.#boxCtxOf(header, 'box_key_wrapped'))),
-          whisper_ciphered: whisper_ciphered.parse(await cipherBytes(boxKey, bytes, this.#boxCtxOf(header, 'whisper_ciphered'))),
-        }
-      })
+        wrapped  = await wrapKeyUnder(vaultKey, boxKey, boxKeyCtx)
+        ciphered = await cipherBytes(boxKey, bytes, whisperCtx)
+      } catch (err) {
+        throw cryptoFailed(err)
+      }
       this.#demand()
-      return valOf(sealing)
+      return { box_key_wrapped: box_key_wrapped.parse(wrapped), whisper_ciphered: whisper_ciphered.parse(ciphered) }
+    } catch (err) {
+      throw refusalOf(err)
     } finally {
       bytes.fill(0)
     }
@@ -171,29 +183,31 @@ export class Lease implements LeaseSparse {
   /** The bytes `ciphered` holds, its boxKey unwrapped under the vaultKey, both bound to `visible`: the inverse of {@link Lease.cipheredWith}.
    * It refuses 'damaged_box' when the boxKey will not unwrap or the bytes will not decipher under
    * the ctx: altered in storage, moved from another boxlabel or vault, or sealed under another
-   * vaultKey. The bytes are the caller's to zero.
+   * vaultKey. A fault of WebCrypto itself reads the same, as nothing tells it from a wrong key or
+   * an altered record: never 'crypto_failed'. The bytes are the caller's to zero.
    *
    * @example const whisperBytes = await lease.decipherWith(ciphered, visible)
    */
   async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> {
-    const sealed = CipheredShape.parse(ciphered)
-    const header = BoxSparse.parse(visible)
-    this.#demand()
-    const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
-    this.#demand()
-    if (vaultKey === null) { throw this.#dropDamaged() }
-    // WebCrypto's own refusal says nothing a caller can act on: a box that will not open is damaged.
-    const opened = await outcomeOf(async () => {
-      const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, this.#boxCtxOf(header, 'box_key_wrapped'), BoxKeyUsage)
-      return await decipherBytes(boxKey, sealed.whisper_ciphered, this.#boxCtxOf(header, 'whisper_ciphered'))
-    }, damagedBox)
     try {
+      const sealed = CipheredShape.parse(ciphered)
+      const header = BoxSparse.parse(visible)
       this.#demand()
+      const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
+      this.#demand()
+      if (vaultKey === null) { throw this.#dropDamaged() }
+      const opened = await this.#openedOrNull(vaultKey, sealed, this.#boxCtxOf(header, 'box_key_wrapped'), this.#boxCtxOf(header, 'whisper_ciphered'))
+      try {
+        this.#demand()
+      } catch (err) {
+        opened?.fill(0)
+        throw err
+      }
+      if (opened === null) { throw damagedBox() }
+      return opened
     } catch (err) {
-      if (opened.ok) { opened.val.fill(0) }
-      throw err
+      throw refusalOf(err)
     }
-    return valOf(opened)
   }
 
   /** The bytes `ciphered` holds, as an {@link Outcome}: the non-throwing form of {@link Lease.decipherWith}. */
@@ -206,12 +220,16 @@ export class Lease implements LeaseSparse {
    * @example const record = await lease.sealProps(visible, { whisper: whisperBytes })
    */
   async sealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<BoxRecord> {
-    const { whisper } = LeaseSealProps.parse(props)
-    const header = BoxSparse.parse(visible)
-    const ciphered = await this.tryCipheredWith(whisper, header)
-    // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
-    this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
-    return { ...header, ...valOf(ciphered) }
+    try {
+      const { whisper } = LeaseSealProps.parse(props)
+      const header = BoxSparse.parse(visible)
+      const ciphered = await this.tryCipheredWith(whisper, header)
+      // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+      this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
+      return { ...header, ...valOf(ciphered) }
+    } catch (err) {
+      throw refusalOf(err)
+    }
   }
 
   /** The record `visible` makes with its whisper sealed, as an {@link Outcome}: the non-throwing form of {@link Lease.sealProps}. */
@@ -224,10 +242,32 @@ export class Lease implements LeaseSparse {
     this.#vault.demandConsistentWith(this, { leaseBound: true })
   }
 
-  /** The vaultKey, unwrapped under the leaseKey as a non-extractable handle that may only `usage`; null when it will not unwrap. */
+  /** The vaultKey, unwrapped under the leaseKey as a non-extractable handle that may only `usage`; null when it will not unwrap.
+   * Only the unwrap itself can read as null: its ctx is built before the catch, so a vault stamp
+   * that fails its check refuses 'bad_record', never as a damaged lease.
+   */
   async #vaultKeyOrNull(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey | null> {
+    const ctx = leaseCtxOf(this.#vault, this.#record)
     try {
-      return await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, leaseCtxOf(this.#vault, this.#record), { extractable: false, usage: [usage] })
+      return await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
+    } catch {
+      return null
+    }
+  }
+
+  /** The bytes `sealed` holds: its boxKey unwrapped under `vaultKey`, non-extractable and `decrypt` only, and the bytes deciphered under it, each bound to its ctx; null when either will not.
+   * WebCrypto's own refusal says nothing a caller can act on, so each catch holds that one call
+   * alone, and nothing else here can read as null.
+   */
+  async #openedOrNull(vaultKey: CryptoKey, sealed: BoxCiphered, boxKeyCtx: Uint8Array, whisperCtx: Uint8Array): Promise<Uint8Array | null> {
+    let boxKey: CryptoKey
+    try {
+      boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, BoxKeyUsage)
+    } catch {
+      return null
+    }
+    try {
+      return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     } catch {
       return null
     }
@@ -347,6 +387,15 @@ const { serializedBytes, LeaseSealProps } = Validator('bad_option', ({ obj, byte
   serializedBytes: bytes(),
   LeaseSealProps:  obj({ whisper: bytes() }).strict(),
 }))
+
+/** The 'crypto_failed' refusal for a cipher the browser's WebCrypto failed under keys just made, `thrown` what it threw.
+ * Only the error's `name` is kept, ending the message: nothing else of `thrown`, not as a `cause`.
+ */
+const cryptoFailed = (thrown: unknown): VaultError => {
+  const thrownName = thrownNameOf(thrown)
+  const named = thrownName === null ? '' : ` WebCrypto threw ${thrownName}.`
+  return new VaultError('crypto_failed', `This browser's cryptography failed as the box was sealed, so nothing was stored: a fault of the browser or the device, not of the box or the vault. Try again; if it fails every time, this browser cannot keep secrets for the app just now.${named}`)
+}
 
 /** The refusal of a lease whose vaultKey will not unwrap under its leaseKey. */
 const damagedLease = () => new VaultError('damaged_lease', "This device's lease would not open: it may have been damaged where it is kept. It was erased, and the vault is locked: unlock it again to carry on. Reading the vault again does not mend it; a new unlock does.")
