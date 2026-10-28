@@ -212,6 +212,18 @@ export const GatingLanded = "The prompt ended while this proof was being checked
 export const RenewPastLease = "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done."
 // --
 
+// == [Vault: options]: HelloOptionsAdvice, EnsureUnlockedOptionsAdvice, DemandOptionsAdvice
+
+/** The advice a refusal of hello()'s options ends with: the one option it takes, and how a click handler hands it an event. */
+export const HelloOptionsAdvice = "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryHello()`."
+
+/** The advice a refusal of ensureUnlocked()'s options ends with: the one option it takes, and how a click handler hands it an event. */
+export const EnsureUnlockedOptionsAdvice = "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryEnsureUnlocked()`."
+
+/** The advice a refusal of demandConsistentWith()'s options ends with: the one option it takes. */
+export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force."
+// --
+
 // == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultGoneWhilePuttingBox
 
 /** Why a call naming a box the vault does not hold refuses. */

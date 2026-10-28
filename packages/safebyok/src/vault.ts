@@ -1959,16 +1959,16 @@ const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initia
 // == [Argument parsers]: checkHelloOpts, checkEnsureUnlockedOpts, renewPastLease, checkDemandOpts, PutBoxProps, putBoxProps, DeletedBox, passkeyBeforePassphrase, absentBox, noWhisper
 
 /** `hello()`'s options, returned once they hold `staleMinutes` alone, which `parseStaleMinutes` checks: 'bad_option' for any other field. */
-const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryHello()`.")
+const checkHelloOpts = optionsCheck(({ unk }) => ({ staleMinutes: unk.optional() }), Phrases.HelloOptionsAdvice)
 
 /** `ensureUnlocked()`'s options, returned once they hold `renewMinutes` alone, which `parseRenewMinutes` checks: 'bad_option' for any other field. */
-const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryEnsureUnlocked()`.")
+const checkEnsureUnlockedOpts = optionsCheck(({ unk }) => ({ renewMinutes: unk.optional() }), Phrases.EnsureUnlockedOptionsAdvice)
 
 /** The refusal of a `renewMinutes` as long as the lease or longer, under which every call would ask the user. */
 const renewPastLease = () => new VaultError('bad_option', Phrases.RenewPastLease)
 
 /** `demandConsistentWith()`'s options, returned once they hold `leaseBound` alone, a boolean: 'bad_option' otherwise. */
-const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force.")
+const checkDemandOpts = optionsCheck(({ bool }) => ({ leaseBound: bool.optional() }), Phrases.DemandOptionsAdvice)
 
 /** The box `putBox()` seals, as its caller names it: its boxlabel, and its sidecar, left out to keep the one it has. */
 export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
