@@ -1804,7 +1804,15 @@ added or folded into through the subagent, and no other entry changes.
   Adding the rule re-resolved the whole lockfile (the old one held 51 entries under seven days
   old) and lowered the floor of nine direct dependencies' ranges to releases that had aged (the two hand
   pins on `graphql-yoga` and `@graphql-tools/schema` became ranges again: the rule now does what
-  they did). Dependabot's `cooldown` is 7 days to match.
+  they did). Dependabot's `cooldown` is 7 days to match. Amended 2026-10-28 (20261028-helpers_bump;
+  the Coach approved taking it early): the first exception. `convex-helpers@0.1.129` (published
+  2026-10-21T23:13Z) is exempted by exact version in `minimumReleaseAgeExclude` and pinned exactly
+  as a devDependency of `safebyok-convex` and `e2e` (the peer range is ^0.1.129), about 23 hours
+  before it passes seven days (2026-10-28 23:13 UTC). It is a build and test-time dependency (its
+  `zodToConvex` derives the component's Convex validators from the core's Zod) and a peer of
+  `safebyok-convex`; 0.1.128's `.ts` sources broke `erasableSyntaxOnly`; with 0.1.129 TypeScript
+  resolves its imports to `.d.ts`. Once aged, the exclusion and both exact pins are deleted in one commit and the devDependency
+  returns to a range.
 * 2026-10-15: `mask` (`safebyok/utils`) takes a whisper and returns text meant for display: its
   first and last few characters (two and four by default, at the caller's choice) and, up to
   `maxLen` (15 by default), its length. Beyond `maxLen` the result is fixed-width
@@ -2208,7 +2216,7 @@ added or folded into through the subagent, and no other entry changes.
   the component's argument, return and table validators are now made from the core's exported Zod
   validators (`Validators.VaultRecord`, `BoxRecord`, the expectations, `Capacity`, `VaultTombstone`,
   `VaultDraft`, `boxscope`) by `zodToConvex` from `convex-helpers/server/zod4`. `convex-helpers`
-  (^0.1.128) and `zod` are peer dependencies the host installs, so their code now runs inside the
+  (^0.1.129) and `zod` are peer dependencies the host installs, so their code now runs inside the
   component's server functions, bundled by the host's Convex CLI; it holds no key material and only
   shapes validators. Where Convex has no check, the component is looser than the core: names and
   tokens are any text, epochs and counts any number, the vault record's rule tying a null `gate` to
