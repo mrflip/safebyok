@@ -23,13 +23,13 @@ import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-esl
  *
  * @example { cipher_iv_b64: 'q83vEjRWeJA', ciphertext_b64: 'yL3cKX0...' }
  */
-export const Ciphered = zodToConvex(Validators.Ciphered)
+export const Ciphered = zodToConvex(Validators.ciphered)
 
 /** What names one vault: the host application's label, the user, and the vault's own label. The core's `VaultScope`.
  *
  * @example { applabel: 'acme', user_id: 'user_2fJ8...', vaultlabel: 'main' }
  */
-export const VaultScope = zodToConvex(Validators.VaultScope)
+export const VaultScope = zodToConvex(Validators.vaultScope)
 
 /** What names one box: its vault's scope and its boxlabel. The core's `boxscope`.
  *
@@ -41,19 +41,19 @@ export const Boxscope = zodToConvex(Validators.boxscope)
  *
  * @example { passphrase: passphraseWayin, passkey: null }
  */
-export const Gate = zodToConvex(Validators.GateRecord)
+export const Gate = zodToConvex(Validators.gateRecord)
 
 /** A vault's record: its scope and identity, its two epochs, and its gate, nested, null while the vault is novel (`gate_epoch` 0). The core's `VaultRecord`.
  * Nothing in it opens without a passphrase or passkey. That `gate_epoch` is 0 exactly when `gate`
  * is null is the client's to check, as the core's record does on every write and read.
  */
-export const VaultRecord = zodToConvex(Validators.VaultRecord)
+export const VaultRecord = zodToConvex(Validators.vaultRecord)
 
 /** The vault record a vault is first stored as, which `ensureVault` takes: a novel vault's, `gate_epoch` 0 and no gate. The core's `VaultDraft`.
  *
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 0, gate_epoch: 0, gate: null }
  */
-export const NovelVaultRecord = zodToConvex(Validators.VaultDraft)
+export const NovelVaultRecord = zodToConvex(Validators.vaultDraft)
 
 /** One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields. The core's `BoxRecord`.
  * The sidecar is the app's own JSON object, any value to Convex, always written, `{}` for none.
@@ -61,10 +61,10 @@ export const NovelVaultRecord = zodToConvex(Validators.VaultDraft)
  * type is Convex's own reading of its fields: whole, its type would be the core's, whose sidecar is
  * any JSON, a type too deep for Convex's to compare.
  */
-export const BoxRecord = v.object(zodToConvexFields(Validators.BoxRecord.shape))
+export const BoxRecord = v.object(zodToConvexFields(Validators.boxRecord.shape))
 
 /** A box's sparse shape, as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. The core's `BoxSparse`. */
-export const BoxSparse = v.object(zodToConvexFields(Validators.BoxSparse.shape))
+export const BoxSparse = v.object(zodToConvexFields(Validators.boxSparse.shape))
 
 /** A vault as one query or mutation reads it: its vault record, as `vault`, and every box without its two ciphered fields, in boxlabel order.
  * The client splits the boxes into the sound and the damaged, with `splitStoredBoxes`: the
@@ -81,14 +81,14 @@ export const VaultAnswer = v.object({
  *
  * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
-export const VaultRecordExpectation = zodToConvex(Validators.VaultRecordExpectation)
+export const VaultRecordExpectation = zodToConvex(Validators.vaultRecordExpectation)
 
 /** What a box read means to read in: the box is read only while the scope's vault record has this `vault_tok`. The core's `BoxGetExpectation`.
  * So a reader holding the key of one vault is never handed a box of another life of the scope.
  *
  * @example { vault_tok: vaultRecord.vault_tok }
  */
-export const BoxGetExpectation = zodToConvex(Validators.BoxGetExpectation)
+export const BoxGetExpectation = zodToConvex(Validators.boxGetExpectation)
 
 /** What a box write was sealed for and read: the vault record it lands beside, and the box it replaces. The core's `BoxExpectation`.
  * It lands only while the scope's vault record has this `vault_tok`, and the stored box this
@@ -96,14 +96,14 @@ export const BoxGetExpectation = zodToConvex(Validators.BoxGetExpectation)
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: null } // a box that was not there
  */
-export const BoxExpectation = zodToConvex(Validators.BoxExpectation)
+export const BoxExpectation = zodToConvex(Validators.boxExpectation)
 
 /** How full a vault is, from its tally: its boxes, and their bytes as Convex counts a document, against the component's limits. The core's `Capacity`.
  * Each `max` is a number or `Infinity`, as the core takes it; the component's own limits are finite.
  *
  * @example { boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } }
  */
-export const Capacity = zodToConvex(Validators.Capacity)
+export const Capacity = zodToConvex(Validators.capacity)
 
 /** The answer to a `getBox` query, from its one snapshot: `got`, with the box, or the refusal that got nothing.
  * `got: true` carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
@@ -154,13 +154,13 @@ export const PutVaultRecordAnswer = v.union(
  *
  * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
-export const VaultDelExpectation = zodToConvex(Validators.VaultDelExpectation)
+export const VaultDelExpectation = zodToConvex(Validators.vaultDelExpectation)
 
 /** What a deleted vault leaves in its scope: its counter, which the next vault made there carries on. The core's `VaultTombstone`.
  *
  * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
  */
-export const VaultTombstone = zodToConvex(Validators.VaultTombstone)
+export const VaultTombstone = zodToConvex(Validators.vaultTombstone)
 
 /** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none. The core's `BoxDelExpectation`.
  * It lands only while the scope's vault record has this `vault_tok`, whatever revision is stored, so a
@@ -169,14 +169,14 @@ export const VaultTombstone = zodToConvex(Validators.VaultTombstone)
  *
  * @example { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok }
  */
-export const BoxDelExpectation = zodToConvex(Validators.BoxDelExpectation)
+export const BoxDelExpectation = zodToConvex(Validators.boxDelExpectation)
 
 /** What a box delete that landed removed: `deleted`, the revision it named; `deleted_other`, another; `absent`, nothing. The core's `BoxDeletion`.
  * Another is a box written over meanwhile, or one where it named none.
  *
  * @example { outcome: 'deleted' }
  */
-export const BoxDeletion = zodToConvex(Validators.BoxDeletion)
+export const BoxDeletion = zodToConvex(Validators.boxDeletion)
 
 /** One box's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`.
  * Convex has no fixed-length tuple validator, so any list of strings passes: a client only

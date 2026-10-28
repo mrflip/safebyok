@@ -265,9 +265,9 @@ export abstract class VaultDB {
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.vault_stored }   // what won
    */
   async putVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<VaultRecord> {
-    const outgoing = checkOutgoing(VX.VaultRecord, vaultRecord, 'vault record')
+    const outgoing = checkOutgoing(VX.vaultRecord, vaultRecord, 'vault record')
     const asked = heldScope(this, outgoing)
-    const expectation = checkOutgoing(VDX.VaultRecordExpectation, expected, 'vault record expectation')
+    const expectation = checkOutgoing(VDX.vaultRecordExpectation, expected, 'vault record expectation')
     if (outgoing.vault_tok !== expectation.vault_tok) {
       throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
     }
@@ -284,7 +284,7 @@ export abstract class VaultDB {
   private async gottenVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
     const asked = heldScope(this, scope)
     const answer = await VaultDB.#hooks.doGetVault(this, asked)
-    const raw = checkAnswer(VDX.StoredVaultAnswer, answer, 'a vault read').vault
+    const raw = checkAnswer(VDX.storedVaultAnswer, answer, 'a vault read').vault
     if (raw === null || raw === undefined || isTombstone(raw)) { return null }
     return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(answer) })
   }
@@ -292,10 +292,10 @@ export abstract class VaultDB {
   /** Ensure the vault of `draft` through `doEnsureVault`, once the draft is checked, handing it back as {@link VaultDB.getVault} does. */
   private async ensuredVault(draft: VaultDraft): Promise<VaultRecord & BoxListing> {
     // A draft claims no counter, vault_epoch 0: the store sets it, and carries it on past a tombstone.
-    const outgoing = checkOutgoing(VX.VaultDraft, draft, 'novel vault record draft')
+    const outgoing = checkOutgoing(VX.vaultDraft, draft, 'novel vault record draft')
     const asked = heldScope(this, outgoing)
     const answer = await VaultDB.#hooks.doEnsureVault(this, outgoing)
-    const raw = checkAnswer(VDX.StoredVaultAnswer, answer, 'a vault read').vault
+    const raw = checkAnswer(VDX.storedVaultAnswer, answer, 'a vault read').vault
     return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(answer) })
   }
   // --
@@ -315,7 +315,7 @@ export abstract class VaultDB {
   async getBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<BoxRecord | null> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, asked, boxlabel)
-    const expectation = checkOutgoing(VDX.BoxGetExpectation, expected, 'box read expectation', 'read')
+    const expectation = checkOutgoing(VDX.boxGetExpectation, expected, 'box read expectation', 'read')
     const raw = await VaultDB.#hooks.doGetBox(this, asked, label, expectation)
     if (raw === null || raw === undefined) { return null }
     return checkStoredBox(raw, label)
@@ -352,9 +352,9 @@ export abstract class VaultDB {
    */
   async putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<BoxRecord> {
     const asked = heldScope(this, scope)
-    const outgoing = checked(BX.BoxRecord, box, invalidBox)
+    const outgoing = checked(BX.boxRecord, box, invalidBox)
     heldBoxlabel(this, asked, outgoing.boxlabel)
-    const expectation = checkOutgoing(VDX.BoxExpectation, expected, 'box expectation')
+    const expectation = checkOutgoing(VDX.boxExpectation, expected, 'box expectation')
     const recordBytes = jsonBytes({ ...asked, ...outgoing })
     if (recordBytes > this.maxRecordBytes) {
       throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
@@ -384,7 +384,7 @@ export abstract class VaultDB {
   async getCapacity(scope: VaultScope): Promise<Capacity> {
     const asked = heldScope(this, scope)
     const raw = await VaultDB.#hooks.doGetCapacity(this, asked)
-    return checkAnswer(VDX.Capacity, raw, 'a capacity reading')
+    return checkAnswer(VDX.capacity, raw, 'a capacity reading')
   }
 
   /** How full the vault is, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getCapacity}. */
@@ -408,10 +408,10 @@ export abstract class VaultDB {
   async delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, asked, boxlabel)
-    const expectation = checkOutgoing(VDX.BoxDelExpectation, expected, 'delete expectation', 'removed')
+    const expectation = checkOutgoing(VDX.boxDelExpectation, expected, 'delete expectation', 'removed')
     const deletion = await VaultDB.#hooks.doDelBox(this, asked, label, expectation)
     if (deletion === null) { throw Refusals.staleDel() }
-    return checkAnswer(VDX.BoxDeletion, deletion, 'a deletion', 'landed')
+    return checkAnswer(VDX.boxDeletion, deletion, 'a deletion', 'landed')
   }
 
   /** The {@link BoxDeletion} the removal reports, as an {@link Outcome}: the non-throwing form of {@link VaultDB.delBox}. */
@@ -432,7 +432,7 @@ export abstract class VaultDB {
    */
   async delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<VaultTombstone> {
     const asked = heldScope(this, scope)
-    const expectation = checkOutgoing(VDX.VaultDelExpectation, expected, 'delete expectation', 'removed')
+    const expectation = checkOutgoing(VDX.vaultDelExpectation, expected, 'delete expectation', 'removed')
     return await this.deletedVault(asked, expectation)
   }
 
@@ -445,7 +445,7 @@ export abstract class VaultDB {
   private async deletedVault(scope: VaultScope, expectation: VaultDelExpectation): Promise<VaultTombstone> {
     const raw = await VaultDB.#hooks.doDelVault(this, scope, expectation)
     if (raw === null || raw === undefined) { throw Refusals.staleDel() }
-    const tombstone = checkAnswer(VX.VaultTombstone, raw, 'a vault deletion', 'landed')
+    const tombstone = checkAnswer(VX.vaultTombstone, raw, 'a vault deletion', 'landed')
     return verifyConsistent(tombstone, scope, { kind: 'corrupt_record', message: wrongAnswerSays('a vault deletion', 'landed') })
   }
 
@@ -480,13 +480,13 @@ export abstract class VaultDB {
       if (isVaultError(err, 'damaged_vault')) { throw unnamedVaultRecord({ cause: err }) }
       throw err
     }
-    const raw = checkAnswer(VDX.StoredVaultAnswer, answer, 'a vault read').vault
+    const raw = checkAnswer(VDX.storedVaultAnswer, answer, 'a vault read').vault
     if (raw === null || raw === undefined || isTombstone(raw)) { return null }
     if (mayBeNewer(raw)) { throw newerVaultRecord() }
     if (isSoundVaultRecord(raw, asked)) {
       throw new VaultError('bad_option', "That vault's stored record is sound, so it is not deleted here: a vault that opens is deleted through its Vault object's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
     }
-    const named = VDX.StoredVaultTok.safeParse(raw)
+    const named = VDX.storedVaultTok.safeParse(raw)
     if (! named.success) { throw unnamedVaultRecord() }
     return await this.deletedVault(asked, { vault_tok: named.data.vault_tok, gate_epoch: null })
   }
@@ -700,7 +700,7 @@ export const splitStoredBoxes = (rows: readonly StoredBox[]): { boxes: BoxSparse
  * by boxlabel and frozen.
  */
 const checkedListing = (response: unknown): BoxListing => {
-  const { boxes, damagedBoxes } = checkAnswer(VDX.ListingAnswer, response, 'a vault read')
+  const { boxes, damagedBoxes } = checkAnswer(VDX.listingAnswer, response, 'a vault read')
   const sound = boxes.filter((box) => isNameable(box.boxlabel)).map((box) => judgedBox(box.boxlabel as string, box))
   const listing = listingOf([...sound, ...damagedBoxes.map((box) => Object.freeze(box))])
   return { boxes: Object.freeze(listing.boxes), damagedBoxes: Object.freeze(listing.damagedBoxes) }
@@ -711,7 +711,7 @@ const isNameable = (boxlabel: unknown): boolean => CX.label.safeParse(boxlabel).
 
 /** A record filed under `boxlabel` as a listing shows it: its {@link BoxSparse} where `getBox` would take it, else a {@link BoxDamaged}. */
 const judgedBox = (boxlabel: string, box: unknown): BoxSparse | BoxDamaged => {
-  const checked = VDX.ListedBox.safeParse(box)
+  const checked = VDX.listedBox.safeParse(box)
   if (checked.success && checked.data.boxlabel === boxlabel) { return boxSparseOf(checked.data) }
   return damagedOf(boxlabel, box)
 }
@@ -719,7 +719,7 @@ const judgedBox = (boxlabel: string, box: unknown): BoxSparse | BoxDamaged => {
 /** A record filed under `boxlabel` that does not read back as its box, as a listing shows it, frozen: the revision it holds as text, or null, and whether a newer version may have written it. */
 const damagedOf = (boxlabel: string, box: unknown): BoxDamaged => Object.freeze({
   boxlabel,
-  revision_tok: VDX.StoredRevision.safeParse(box).data?.revision_tok ?? null,
+  revision_tok: VDX.storedRevision.safeParse(box).data?.revision_tok ?? null,
   damage:       mayBeNewerBox(box) ? 'newer_format' : 'damaged',
 })
 
@@ -796,7 +796,7 @@ const staleChecked = (err: VaultError, boxlabel: string): VaultError => {
 
 /** A box write's `vault_full`, its `capacity` checked; `corrupt_record` when it carries none that reads as one. */
 const fullChecked = (err: VaultError): VaultError => {
-  const capacity = VDX.Capacity.safeParse(err.meta?.capacity)
+  const capacity = VDX.capacity.safeParse(err.meta?.capacity)
   if (! capacity.success) {
     return new VaultError('corrupt_record', "Storage refused a box write as vault_full, so nothing was written, but did not say how full the vault is. The storage adapter needs a developer's look: its doPutBox throws Refusals.vaultFull(capacity).", { cause: err })
   }
@@ -830,7 +830,7 @@ const remade = (err: VaultError, meta: RefusalMeta): VaultError => (
 /** The record under `boxlabel` as a stale box write reports it: the box where `getBox` would take it, else a {@link BoxDamaged}, or null for none. */
 const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | BoxDamaged | null => {
   if (raw === null || raw === undefined) { return null }
-  const box = BX.BoxRecord.safeParse(raw)
+  const box = BX.boxRecord.safeParse(raw)
   return box.success && box.data.boxlabel === boxlabel ? box.data : damagedOf(boxlabel, raw)
 }
 
@@ -865,14 +865,14 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unk
 const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
   if (mayBeNewer(raw)) { throw newerVaultRecord() }
-  const vaultRecord = checked(VX.VaultRecord, raw, (opts) => damagedVaultRecord('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
+  const vaultRecord = checked(VX.vaultRecord, raw, (opts) => damagedVaultRecord('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
   // A record that names some other scope is a record out of place, wherever it came from.
   return verifyConsistent(vaultRecord, scope, { kind: 'damaged_vault', message: damagedVaultRecordSays('names a different app, user or vault than the one asked for') })
 }
 
 /** The vault record an adapter handed back as `put` landed: a vault record of its scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
 const checkPutVaultRecord = (raw: unknown, put: VaultRecord): VaultRecord => {
-  const stored = checkAnswer(VX.VaultRecord, raw, 'an update of the vault record', 'landed')
+  const stored = checkAnswer(VX.vaultRecord, raw, 'an update of the vault record', 'landed')
   const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = put
   return verifyConsistent(stored, { applabel, user_id, vaultlabel, vault_tok, gate_epoch }, { kind: 'corrupt_record', message: wrongAnswerSays('an update of the vault record', 'landed') })
 }
@@ -915,7 +915,7 @@ const isSoundVaultRecord = (raw: unknown, scope: VaultScope): boolean => {
 
 /** A box read from storage, as `getBox` holds it: a box's shape, under the boxlabel it was asked for; 'damaged_box' otherwise. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
-  const box = checked(BX.BoxRecord, raw, (opts) => damagedBox('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
+  const box = checked(BX.boxRecord, raw, (opts) => damagedBox('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
   // A record naming another boxlabel is out of place: a misfiling adapter, or a moved record.
   if (box.boxlabel !== boxlabel) { throw damagedBox('names a different boxlabel than the one it is stored under') }
   return box
@@ -928,7 +928,7 @@ const damagedBox = (said: string, opts?: ErrorOptions) => new VaultError('damage
 
 /** The box an adapter handed back as `put` landed: a box's shape, under the boxlabel and at the revision put; `corrupt_record` otherwise, quoting neither. */
 const checkPutBox = (raw: unknown, put: BoxRecord): BoxRecord => {
-  const box = checkAnswer(BX.BoxRecord, raw, 'a box write', 'landed')
+  const box = checkAnswer(BX.boxRecord, raw, 'a box write', 'landed')
   const { boxlabel, revision_tok } = put
   return verifyConsistent(box, { boxlabel, revision_tok }, { kind: 'corrupt_record', message: wrongAnswerSays('a box write', 'landed') })
 }

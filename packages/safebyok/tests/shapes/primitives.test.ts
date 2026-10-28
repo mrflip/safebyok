@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { EpochMillis, LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/shapes/primitives'
+import { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern } from '../../src/shapes/primitives'
+import * as PX from '../../src/shapes/primitives'
 import { FarFuture, FarPast } from '../../src/consts'
 
 const LabelCases = [
@@ -28,22 +29,22 @@ const LabelCases = [
 
 describe("label", () => {
   for (const [candidate, expected, blurb] of LabelCases) {
-    it(blurb, () => { expect(label.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(PX.label.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("refuses what is not text: undefined, a number, null", () => {
     for (const misfit of [undefined, 42, null, ['anthropic']]) {
-      expect(label.safeParse(misfit).success).to.be.false
+      expect(PX.label.safeParse(misfit).success).to.be.false
     }
   })
 
   it("passes and refuses as its examples show", () => {
-    expect(label.safeParse('anthropic_api_key').success).to.be.true
-    expect(label.safeParse('ANTHROPIC_API_KEY').success).to.be.false
+    expect(PX.label.safeParse('anthropic_api_key').success).to.be.true
+    expect(PX.label.safeParse('ANTHROPIC_API_KEY').success).to.be.false
   })
 
   it("says what is wrong in its own sentences, and never quotes the label", () => {
-    const said = JSON.stringify([label.safeParse('Secret_Label'), label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
+    const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
     expect(said).to.include('lowercase words of letters and digits')
     expect(said).to.include('at most 40 characters')
     expect(said.toLowerCase()).to.not.include('secret')
@@ -51,7 +52,7 @@ describe("label", () => {
 
   it("answers for text of millions of characters, refusing it by its length", () => {
     const vast = 'n'.repeat(12_000_000)
-    expect(JSON.stringify(label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('at most 40 characters')
+    expect(JSON.stringify(PX.label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('at most 40 characters')
     expect(LabelPattern.test(vast)).to.be.true
     expect(LabelPattern.test(`${vast}__`)).to.be.false
   })
@@ -105,26 +106,26 @@ const UserIdCases = [
 
 describe("user_id", () => {
   for (const [candidate, expected, blurb] of UserIdCases) {
-    it(blurb, () => { expect(user_id.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(PX.user_id.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("refuses what is not text: null, undefined, a number", () => {
     for (const misfit of [null, undefined, 42]) {
-      expect(user_id.safeParse(misfit).success).to.be.false
+      expect(PX.user_id.safeParse(misfit).success).to.be.false
     }
   })
 
   it("passes and refuses as its examples show", () => {
-    expect(user_id.safeParse('user_2abc.def+work').success).to.be.true
-    expect(user_id.safeParse('auth0|5f7c8ec7').success).to.be.true
-    expect(user_id.safeParse('..').success).to.be.false
-    expect(user_id.safeParse('a/b').success).to.be.false
-    expect(user_id.safeParse('a%2Fb').success).to.be.true
+    expect(PX.user_id.safeParse('user_2abc.def+work').success).to.be.true
+    expect(PX.user_id.safeParse('auth0|5f7c8ec7').success).to.be.true
+    expect(PX.user_id.safeParse('..').success).to.be.false
+    expect(PX.user_id.safeParse('a/b').success).to.be.false
+    expect(PX.user_id.safeParse('a%2Fb').success).to.be.true
   })
 
   it("names its bound when it refuses, and never quotes the id", () => {
     const overlong = `alice@example.com${'u'.repeat(MaxUserIdChars)}`
-    const refusals = [user_id.safeParse(overlong), user_id.safeParse(''), user_id.safeParse('alice smith')].map((checked) => JSON.stringify(checked.error?.issues.map((issue) => issue.message)))
+    const refusals = [PX.user_id.safeParse(overlong), PX.user_id.safeParse(''), PX.user_id.safeParse('alice smith')].map((checked) => JSON.stringify(checked.error?.issues.map((issue) => issue.message)))
     expect(refusals[0]).to.include('at most 100 characters')
     expect(refusals[1]).to.include("can't be empty")
     expect(refusals[2]).to.include('percent-encode')
@@ -132,7 +133,7 @@ describe("user_id", () => {
   })
 
   it("says only that an empty user_id can't be empty, not also that its characters are wrong", () => {
-    expect(user_id.safeParse('').error?.issues.map((issue) => issue.message)).to.deep.equal(["A user_id names the signed-in user, so it can't be empty"])
+    expect(PX.user_id.safeParse('').error?.issues.map((issue) => issue.message)).to.deep.equal(["A user_id names the signed-in user, so it can't be empty"])
   })
 })
 
@@ -152,7 +153,7 @@ describe("UserIdPattern", () => {
 
 describe("label and user_id, inside a host's own Zod", () => {
   // A host on classic Zod holds them in its own schemas, as a form checking a box might.
-  const BoxForm = Zod.object({ boxlabel: label, user_id: Zod.optional(user_id) })
+  const BoxForm = Zod.object({ boxlabel: PX.label, user_id: Zod.optional(PX.user_id) })
 
   it("compose into a host's schema and check as they do alone", () => {
     expect(BoxForm.parse({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })).to.deep.equal({ boxlabel: 'anthropic_api_key', user_id: 'auth0|5f7c8ec7' })
@@ -183,27 +184,27 @@ const EpochMillisCases = [
   [null,                      false,  'null'],
 ] as const
 
-describe("EpochMillis", () => {
+describe("epochMillis", () => {
   for (const [candidate, expected, blurb] of EpochMillisCases) {
     it(`${expected ? 'accepts' : 'refuses'} ${blurb}`, () => {
-      expect(EpochMillis.safeParse(candidate).success).to.eq(expected)
+      expect(PX.epochMillis.safeParse(candidate).success).to.eq(expected)
     })
   }
 
   it("says which unit a refused number likely was", () => {
-    const tooSmall = EpochMillis.safeParse(NowMillis / 1000)
-    const tooLarge = EpochMillis.safeParse(NowMillis * 1000)
+    const tooSmall = PX.epochMillis.safeParse(NowMillis / 1000)
+    const tooLarge = PX.epochMillis.safeParse(NowMillis * 1000)
     expect(tooSmall.error?.issues[0]?.message).to.match(/epoch seconds/)
     expect(tooLarge.error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
+    expect(PX.epochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
+    expect(PX.epochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
   })
 
   it("passes a time through unchanged, as its examples show", () => {
-    expect(EpochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
-    expect(EpochMillis.safeParse(1_792_022_400).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
-    expect(EpochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
-    expect(EpochMillis.safeParse(Infinity).success).to.be.false
+    expect(PX.epochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
+    expect(PX.epochMillis.safeParse(1_792_022_400).success).to.be.false
+    expect(PX.epochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
+    expect(PX.epochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
+    expect(PX.epochMillis.safeParse(Infinity).success).to.be.false
   })
 })

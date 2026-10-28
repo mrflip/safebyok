@@ -38,7 +38,7 @@ export const PasskeySaltBytes = 32
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 // --
 
-// == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, headerOf, VaultDraft
+// == [The records]: passphraseWayinRecord, passkeyWayinRecord, wayinRecord, gateRecord, vaultRecord, vaultSparse, vaultStamp, vaultStampButFormat, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse, passphraseWayinHeader, passkeyWayinHeader, WayinHeader, headerOf, vaultDraft
 
 /** The vault's stored records and the shapes sliced from them: each wayin, the gate holding them, the vault record holding the gate, and the tombstone a deletion leaves.
  * Each record is strict: a field this version does not know is damage. A VaultDB reads each back
@@ -47,11 +47,11 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
  * it strips the rest: a Vault object, its record or its snapshot passes as its stamp or its sparse
  * shape.
  *
- * @example VaultRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no vault record
- * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
+ * @example vaultRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no vault record
+ * @example vaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis, key_deriver_label, salt_b64, device_id, vault_key_wayin_wrapped, credential_id, prf_salt_b64, vault_tok }) => {
-  const PassphraseWayinRecord = obj({
+export const { passphraseWayinRecord, passkeyWayinRecord, wayinRecord, gateRecord, vaultRecord, vaultSparse, vaultStamp, vaultStampButFormat, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse, passphraseWayinHeader, passkeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis, key_deriver_label, salt_b64, device_id, vault_key_wayin_wrapped, credential_id, prf_salt_b64, vault_tok }) => {
+  const passphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
     key_deriver_label,
@@ -65,7 +65,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
     vault_key_wayin_wrapped,
   }).strict()
 
-  const PasskeyWayinRecord = obj({
+  const passkeyWayinRecord = obj({
     wayinkind:               lit('passkey'),
     /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
     credential_id,
@@ -79,13 +79,13 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
     vault_key_wayin_wrapped,
   }).strict()
 
-  const WayinRecord = discrim('wayinkind', [PassphraseWayinRecord, PasskeyWayinRecord])
+  const wayinRecord = discrim('wayinkind', [passphraseWayinRecord, passkeyWayinRecord])
 
-  const GateRecord = obj({
+  const gateRecord = obj({
     /** The vault's passphrase wayin, which every gate has. */
-    passphrase:              PassphraseWayinRecord,
+    passphrase:              passphraseWayinRecord,
     /** The vault's passkey wayin, or null when it has none: at most one. */
-    passkey:                 PasskeyWayinRecord.nullable(),
+    passkey:                 passkeyWayinRecord.nullable(),
   }).strict()
 
   // The record's fields, before its one rule across them: what every shape is sliced from, since
@@ -107,41 +107,41 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
     /** A counter that moves up by one at every write of the gate: 0 while the vault is novel, with no gate, and 1 or more once it has one. */
     gate_epoch:              uint,
     /** The vault's ways in, or null while it is novel. */
-    gate:                    GateRecord.nullable(),
+    gate:                    gateRecord.nullable(),
   }).strict()
 
-  const VaultRecord = vaultRecordFields.refine((record) => (record.gate === null) === (record.gate_epoch === 0), { error: Phrases.GateEpochAndGate, path: ['gate_epoch'] })
+  const vaultRecord = vaultRecordFields.refine((record) => (record.gate === null) === (record.gate_epoch === 0), { error: Phrases.GateEpochAndGate, path: ['gate_epoch'] })
 
-  const VaultSparse = vaultRecordFields.omit({ gate: true }).strip()
-  const VaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true }).strip()
+  const vaultSparse = vaultRecordFields.omit({ gate: true }).strip()
+  const vaultStamp = vaultRecordFields.pick({ format: true, applabel: true, user_id: true, vaultlabel: true, vault_tok: true, registered_at: true }).strip()
   // Any format: a box and a lease bind their vault's stamp without it, so a new vault format leaves them open.
-  const VaultStampButFormat = VaultStamp.omit({ format: true })
-  const VaultTombstone = vaultRecordFields.pick({ applabel: true, user_id: true, vaultlabel: true }).extend({ format: lit(TombstoneFormat), vault_epoch: int.positive() }).strict()
+  const vaultStampButFormat = vaultStamp.omit({ format: true })
+  const vaultTombstone = vaultRecordFields.pick({ applabel: true, user_id: true, vaultlabel: true }).extend({ format: lit(TombstoneFormat), vault_epoch: int.positive() }).strict()
 
-  const PassphraseWayinSparse = PassphraseWayinRecord.omit({ key_deriver_label: true, salt_b64: true, vault_key_wayin_wrapped: true })
-  const PasskeyWayinSparse = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
-  const GateSparse = GateRecord.extend({ passphrase: PassphraseWayinSparse, passkey: PasskeyWayinSparse.nullable() })
+  const passphraseWayinSparse = passphraseWayinRecord.omit({ key_deriver_label: true, salt_b64: true, vault_key_wayin_wrapped: true })
+  const passkeyWayinSparse = passkeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
+  const gateSparse = gateRecord.extend({ passphrase: passphraseWayinSparse, passkey: passkeyWayinSparse.nullable() })
 
-  const PassphraseWayinHeader = PassphraseWayinRecord.omit({ vault_key_wayin_wrapped: true })
-  const PasskeyWayinHeader = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
+  const passphraseWayinHeader = passphraseWayinRecord.omit({ vault_key_wayin_wrapped: true })
+  const passkeyWayinHeader = passkeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
 
-  return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader }
+  return { passphraseWayinRecord, passkeyWayinRecord, wayinRecord, gateRecord, vaultRecord, vaultSparse, vaultStamp, vaultStampButFormat, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse, passphraseWayinHeader, passkeyWayinHeader }
 }, [FX])
 
 /** A passphrase wayin as stored: the vaultKey wrapped under the passphraseKey the passphrase and this wayin's passphraseSalt make.
  * Every other field is visible, and bound into that wrap, so a wayin altered or moved to another
  * vault refuses to open. A gate holds exactly one, as its `passphrase`.
  */
-export type PassphraseWayinRecord = Z.infer<typeof PassphraseWayinRecord>
+export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
 
 /** A passkey wayin as stored: the vaultKey wrapped under the passkeyKey made from the authenticator's PRF answer over this wayin's salt.
  * The authenticator holds the secret. Every other field is visible, and bound into that wrap. A
  * gate holds at most one, as its `passkey`.
  */
-export type PasskeyWayinRecord = Z.infer<typeof PasskeyWayinRecord>
+export type PasskeyWayinRecord = Z.infer<typeof passkeyWayinRecord>
 
 /** One wayin as stored, a {@link PassphraseWayinRecord} or a {@link PasskeyWayinRecord}, told apart by `wayinkind`; `Wayin.make` reads one. */
-export type WayinRecord = Z.infer<typeof WayinRecord>
+export type WayinRecord = Z.infer<typeof wayinRecord>
 
 /** A vault's ways in as stored, its gate: the passphrase's wayin, and the passkey's or null.
  * The vault record holds it as its `gate`, null while the vault is novel. Each wayin wraps the one
@@ -149,7 +149,7 @@ export type WayinRecord = Z.infer<typeof WayinRecord>
  *
  * @example { passphrase: passphraseWayinRecord, passkey: null }
  */
-export type GateRecord = Z.infer<typeof GateRecord>
+export type GateRecord = Z.infer<typeof gateRecord>
 
 /** The one record per vault that every device syncs: its {@link VaultStamp}, its two epochs, and its gate. None of it opens without a passphrase or passkey.
  * `vault_epoch` moves at every write of the record; `gate_epoch` at every write of the gate. A
@@ -161,41 +161,41 @@ export type GateRecord = Z.infer<typeof GateRecord>
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 0, gate_epoch: 0, gate: null }
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 3, gate_epoch: 2, gate: { passphrase, passkey: null } }
  */
-export type VaultRecord = Z.infer<typeof VaultRecord>
+export type VaultRecord = Z.infer<typeof vaultRecord>
 
 /** A vault record as storage may hold it: typed as a {@link VaultRecord} is written, though it may fail its check and read back damaged.
  * It names what a VaultDB's `doGetVault` may hand up as `vault`, beside a sound record, a
  * tombstone, and null: present, dead, broken, missing. The base class's check tells them apart.
  */
-export type DamagedVaultRecord = Z.input<typeof VaultRecord>
+export type DamagedVaultRecord = Z.input<typeof vaultRecord>
 
 /** A vault record without its gate: its stamp and both epochs, the shape wherever the gate is not needed.
  *
  * @example { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at, vault_epoch: 3, gate_epoch: 2 }
  */
-export type VaultSparse = Z.infer<typeof VaultSparse>
+export type VaultSparse = Z.infer<typeof vaultSparse>
 
 /** The fields of a vault record fixed for the vault's life: its `format`, scope, `vault_tok` and `registered_at`, never an epoch, which counts.
  *
  * @example { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
  */
-export type VaultStamp = Z.infer<typeof VaultStamp>
+export type VaultStamp = Z.infer<typeof vaultStamp>
 
 /** A vault's stamp as what lies in it binds it: every field of its {@link VaultStamp} but the format, so a new vault format leaves each box and lease open.
  *
- * @example VaultStampButFormat.parse(vault)   // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
+ * @example vaultStampButFormat.parse(vault)   // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'Qm9vdA', registered_at }
  */
-export type VaultStampButFormat = Z.infer<typeof VaultStampButFormat>
+export type VaultStampButFormat = Z.infer<typeof vaultStampButFormat>
 
 /** The check of what a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: a `vault_tok`, and each of the scope's labels and epochs the thing carries checked as the vault record checks it. Its `parse` refuses 'bad_option', naming each failing field.
  * Taken out of whatever carries it, it strips the rest: a box's own `format` or `registered_at`
  * is no part of it.
  *
- * @example VaultMadeUnder.parse(box)                          // { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
- * @example VaultMadeUnder.parse({ gate_epoch: 1 })            // throws 'bad_option', "vault_tok: ..."
+ * @example vaultMadeUnder.parse(box)                          // { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
+ * @example vaultMadeUnder.parse({ gate_epoch: 1 })            // throws 'bad_option', "vault_tok: ..."
  */
-export const { VaultMadeUnder } = Validator('bad_option', () => ({
-  VaultMadeUnder: VaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
+export const { vaultMadeUnder } = Validator('bad_option', () => ({
+  vaultMadeUnder: vaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
     .partial({ applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true }),
 }))
 
@@ -206,21 +206,21 @@ export const { VaultMadeUnder } = Validator('bad_option', () => ({
  * @example vault.demandConsistentWith(box)
  * @example vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 })   // throws 'gate_moved' for a vault with a way in
  */
-export type VaultMadeUnder = Z.infer<typeof VaultMadeUnder>
+export type VaultMadeUnder = Z.infer<typeof vaultMadeUnder>
 
 /** A vault record whose gate is made: what {@link isGated} tells apart, and what every gating but a vault's first works on. */
 export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
 
 /** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
-export const { VaultDraft } = Validator('bad_record', ({ lit }) => ({
-  VaultDraft: VaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict(),
+export const { vaultDraft } = Validator('bad_record', ({ lit }) => ({
+  vaultDraft: vaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict(),
 }))
 
 /** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, `gate_epoch` 0, and `vault_epoch` 0, as the store sets the counter.
  *
  * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
  */
-export type VaultDraft = Z.infer<typeof VaultDraft>
+export type VaultDraft = Z.infer<typeof vaultDraft>
 
 /** What a deleted vault leaves in its scope: its counter, which the next life of the scope carries on.
  * `vault_epoch` is the deleted vault's plus one. Every write refuses over a tombstone as it does
@@ -229,22 +229,22 @@ export type VaultDraft = Z.infer<typeof VaultDraft>
  *
  * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
  */
-export type VaultTombstone = Z.infer<typeof VaultTombstone>
+export type VaultTombstone = Z.infer<typeof vaultTombstone>
 
 /** A passphrase wayin without its wrap, its salt or its key deriver's label: what a guess at the passphrase needs is left out. */
-export type PassphraseWayinSparse = Z.infer<typeof PassphraseWayinSparse>
+export type PassphraseWayinSparse = Z.infer<typeof passphraseWayinSparse>
 
 /** A passkey wayin without its wrap: what to ask the authenticator with, and when and by which device it was added. */
-export type PasskeyWayinSparse = Z.infer<typeof PasskeyWayinSparse>
+export type PasskeyWayinSparse = Z.infer<typeof passkeyWayinSparse>
 
 /** A gate as a host may see it while the vault is locked: each wayin as its sparse shape. */
-export type GateSparse = Z.infer<typeof GateSparse>
+export type GateSparse = Z.infer<typeof gateSparse>
 
 /** A passphrase wayin's visible fields: its record but the wrap, which the wrap is bound to. */
-export type PassphraseWayinHeader = Z.infer<typeof PassphraseWayinHeader>
+export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
 
 /** A passkey wayin's visible fields: its record but the wrap, which the wrap is bound to. */
-export type PasskeyWayinHeader = Z.infer<typeof PasskeyWayinHeader>
+export type PasskeyWayinHeader = Z.infer<typeof passkeyWayinHeader>
 
 /** A wayin's visible header, every field but its wrap: what the wrap is bound to. A {@link PassphraseWayinHeader} or a {@link PasskeyWayinHeader}, told apart by `wayinkind`. */
 export type WayinHeader = PassphraseWayinHeader | PasskeyWayinHeader

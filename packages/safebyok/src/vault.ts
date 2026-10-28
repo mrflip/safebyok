@@ -384,7 +384,7 @@ export class Vault implements VaultStamp {
   demandConsistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): void {
     const demandOpts = checkDemandOpts(opts)
     // Checked only: the thing itself is judged, as a Proving or a Gate is told apart by its class.
-    VX.VaultMadeUnder.parse(thing)
+    VX.vaultMadeUnder.parse(thing)
     this.#demand(thing, { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
 
@@ -396,7 +396,7 @@ export class Vault implements VaultStamp {
    */
   consistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
-    VX.VaultMadeUnder.parse(thing)
+    VX.vaultMadeUnder.parse(thing)
     return this.#inconsistencyWith(thing) === null && (! leaseBound || this.#leaseInForce() !== null)
   }
   // --
@@ -605,7 +605,7 @@ export class Vault implements VaultStamp {
       const { boxlabel, sidecar } = putBoxProps.parse(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const given = whisper === undefined ? undefined : BX.Whisper.parse(whisper)
+      const given = whisper === undefined ? undefined : BX.whisper.parse(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
       this.#checkWhisperFits(given, sidecar ?? {})
@@ -1976,7 +1976,7 @@ export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
  * Its `parse` refuses 'bad_option' for props that are no object, a sidecar that is no JSON object,
  * or a field beside them, quoting none of it. The boxlabel is the caller's to check, as a name.
  */
-const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: BX.Sidecar.optional() }).strict() }))
+const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: BX.sidecar.optional() }).strict() }))
 
 /** The box `delBox()` removed. Storage keeps nothing of it. */
 export type DeletedBox = Readonly<{

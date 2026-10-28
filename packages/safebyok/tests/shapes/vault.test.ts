@@ -2,8 +2,9 @@ import 'fake-indexeddb/auto'
 import { runInNewContext } from 'node:vm'
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { type GatedVaultRecord, type PasskeyAnswer, GateRecord, GateSparse, PasskeyWayinHeader, PasskeyWayinSparse, PassphraseWayinHeader, PassphraseWayinSparse, type VaultDraft, VaultFormat, type VaultMadeUnder, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, gateSparseOf, headerOf, isGated, passkeyAnswerShape, vaultSparseOf, wayinkind } from '../../src/shapes/vault'
-import { LeaseStamp } from '../../src/shapes/device'
+import { type GatedVaultRecord, type PasskeyAnswer, type VaultDraft, VaultFormat, type VaultMadeUnder, gateSparseOf, headerOf, isGated, vaultSparseOf } from '../../src/shapes/vault'
+import * as VX from '../../src/shapes/vault'
+import * as DX from '../../src/shapes/device'
 import * as TH from '../test-helpers'
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
@@ -54,24 +55,24 @@ const VaultRecordCases = [
   [{ ...TH.vaultRecordOf('u1'), note: 'hello' },                   false,  'a field this version does not know'],
 ] as const
 
-describe("VaultRecord", () => {
+describe("vaultRecord", () => {
   for (const [candidate, expected, blurb] of VaultRecordCases) {
-    it(blurb, () => { expect(VaultRecord.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(VX.vaultRecord.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("names the field it refuses, where the union of gated and gateless shapes it replaces named none", () => {
-    const err = TH.expectSyncRefusal(() => VaultRecord.parse({ ...TH.vaultRecordOf('u1'), vault_tok: '' }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => VX.vaultRecord.parse({ ...TH.vaultRecordOf('u1'), vault_tok: '' }), 'bad_record')
     expect(err.message).to.include('vault_tok')
   })
 
   it("refuses a gate_epoch that disagrees with the gate by naming gate_epoch, saying what the rule is", () => {
-    const err = TH.expectSyncRefusal(() => VaultRecord.parse({ ...TH.gatelessOf('u1'), gate_epoch: 3 }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => VX.vaultRecord.parse({ ...TH.gatelessOf('u1'), gate_epoch: 3 }), 'bad_record')
     expect(err.message).to.include('gate_epoch').and.include('exactly when its gate is null')
   })
 
   it("holds both examples its doc block shows: a novel record and a gated one", () => {
-    expect(VaultRecord.parse(TH.gatelessOf('u1')).gate).to.be.null
-    expect(VaultRecord.parse(TH.vaultRecordOf('u1', { vault_epoch: 3, gate_epoch: 2 })).gate?.passkey).to.be.null
+    expect(VX.vaultRecord.parse(TH.gatelessOf('u1')).gate).to.be.null
+    expect(VX.vaultRecord.parse(TH.vaultRecordOf('u1', { vault_epoch: 3, gate_epoch: 2 })).gate?.passkey).to.be.null
   })
 })
 
@@ -95,62 +96,62 @@ const GateCases = [
   [{ gate_epoch: 1 },                                                      false,  'a gate holding its epoch, which rides beside it in the vault record'],
 ] as const
 
-describe("GateRecord, as a vault record's gate", () => {
+describe("gateRecord, as a vault record's gate", () => {
   for (const [changes, expected, blurb] of GateCases) {
     it(blurb, () => {
       const gate = { ...TH.gateOf('u1'), ...changes }
-      expect(GateRecord.safeParse(gate).success).to.eq(expected)
-      expect(VaultRecord.safeParse(TH.vaultRecordOf('u1', { gate: gate as never })).success).to.eq(expected)
+      expect(VX.gateRecord.safeParse(gate).success).to.eq(expected)
+      expect(VX.vaultRecord.safeParse(TH.vaultRecordOf('u1', { gate: gate as never })).success).to.eq(expected)
     })
   }
 
   it("refuses a gate with no passkey field: a gate without one says so with null", () => {
     const { passkey: _passkey, ...gateWithoutPasskey } = TH.gateOf('u1')
-    expect(GateRecord.safeParse(gateWithoutPasskey).success).to.be.false
+    expect(VX.gateRecord.safeParse(gateWithoutPasskey).success).to.be.false
   })
 })
 // --
 
-// == [Shapes]: VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse
+// == [Shapes]: vaultSparse, vaultStamp, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse
 
 describe("the vault record's shapes", () => {
   const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
 
-  it("makes VaultSparse the record without its gate, as its example shows", () => {
-    const sparse = VaultSparse.parse(omit(record, ['gate']))
+  it("makes vaultSparse the record without its gate, as its example shows", () => {
+    const sparse = VX.vaultSparse.parse(omit(record, ['gate']))
     expect(Object.keys(sparse)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at', 'vault_epoch', 'gate_epoch'])
-    expect(VaultSparse.parse(record), 'taken from the whole record, its gate left out').to.deep.equal(sparse)
+    expect(VX.vaultSparse.parse(record), 'taken from the whole record, its gate left out').to.deep.equal(sparse)
   })
 
-  it("makes VaultStamp the six fields fixed for the vault's life, never an epoch, as its example shows", () => {
-    const stamp = VaultStamp.parse(omit(record, ['gate', 'vault_epoch', 'gate_epoch']))
+  it("makes vaultStamp the six fields fixed for the vault's life, never an epoch, as its example shows", () => {
+    const stamp = VX.vaultStamp.parse(omit(record, ['gate', 'vault_epoch', 'gate_epoch']))
     expect(Object.keys(stamp)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'])
   })
 
-  it("makes VaultTombstone the format, the scope and a vault_epoch of 1 or more, as its example shows", () => {
+  it("makes vaultTombstone the format, the scope and a vault_epoch of 1 or more, as its example shows", () => {
     const tombstone = { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 4 }
-    expect(VaultTombstone.parse(tombstone)).to.deep.equal(tombstone)
-    expect(VaultTombstone.safeParse({ ...tombstone, vault_epoch: 0 }).success).to.be.false
-    expect(VaultTombstone.safeParse({ ...tombstone, vault_tok: 'vault-tok-u1' }).success).to.be.false
+    expect(VX.vaultTombstone.parse(tombstone)).to.deep.equal(tombstone)
+    expect(VX.vaultTombstone.safeParse({ ...tombstone, vault_epoch: 0 }).success).to.be.false
+    expect(VX.vaultTombstone.safeParse({ ...tombstone, vault_tok: 'vault-tok-u1' }).success).to.be.false
   })
 
   it("keeps a passphrase's salt, key deriver and wrap out of its sparse shape, and a passkey's wrap out of its", () => {
     const { passphrase, passkey } = record.gate
-    const passphraseSparse = PassphraseWayinSparse.parse(omit(passphrase, ['salt_b64', 'key_deriver_label', 'vault_key_wayin_wrapped']))
+    const passphraseSparse = VX.passphraseWayinSparse.parse(omit(passphrase, ['salt_b64', 'key_deriver_label', 'vault_key_wayin_wrapped']))
     expect(Object.keys(passphraseSparse)).to.have.members(['wayinkind', 'device_id', 'registered_at'])
-    expect(PassphraseWayinSparse.safeParse(omit(passphrase, ['vault_key_wayin_wrapped'])).success).to.be.false
-    const passkeySparse = PasskeyWayinSparse.parse(omit(passkey ?? TH.passkeyWayinOf('laptop'), ['vault_key_wayin_wrapped']))
+    expect(VX.passphraseWayinSparse.safeParse(omit(passphrase, ['vault_key_wayin_wrapped'])).success).to.be.false
+    const passkeySparse = VX.passkeyWayinSparse.parse(omit(passkey ?? TH.passkeyWayinOf('laptop'), ['vault_key_wayin_wrapped']))
     expect(Object.keys(passkeySparse)).to.have.members(['wayinkind', 'credential_id', 'prf_salt_b64', 'device_id', 'registered_at'])
   })
 
-  it("nests each wayin's sparse shape in GateSparse, as the gate nests its wayins", () => {
+  it("nests each wayin's sparse shape in gateSparse, as the gate nests its wayins", () => {
     const sparse = {
       passphrase: omit(record.gate.passphrase, ['salt_b64', 'key_deriver_label', 'vault_key_wayin_wrapped']),
       passkey:    omit(record.gate.passkey ?? TH.passkeyWayinOf('laptop'), ['vault_key_wayin_wrapped']),
     }
-    expect(GateSparse.parse(sparse)).to.deep.equal(sparse)
-    expect(GateSparse.safeParse({ ...sparse, passkey: null }).success).to.be.true
-    expect(GateSparse.safeParse(record.gate).success).to.be.false
+    expect(VX.gateSparse.parse(sparse)).to.deep.equal(sparse)
+    expect(VX.gateSparse.safeParse({ ...sparse, passkey: null }).success).to.be.true
+    expect(VX.gateSparse.safeParse(record.gate).success).to.be.false
   })
 })
 // --
@@ -177,7 +178,7 @@ describe("vaultSparseOf", () => {
     const sparse = vaultSparseOf(record)
     expect(sparse.gate_epoch).to.eq(record.gate_epoch)
     expect(sparse).to.not.have.property('gate')
-    expect(sparse).to.deep.equal(VaultSparse.parse(omit(record, ['gate'])))
+    expect(sparse).to.deep.equal(VX.vaultSparse.parse(omit(record, ['gate'])))
     expect(Object.isFrozen(sparse)).to.be.true
   })
 })
@@ -187,9 +188,9 @@ describe("gateSparseOf", () => {
     const gate = TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
     const sparse = gateSparseOf(gate)
     expect(sparse.passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: gate.passphrase.device_id, registered_at: gate.passphrase.registered_at })
-    expect(sparse).to.deep.equal(GateSparse.parse(sparse))
+    expect(sparse).to.deep.equal(VX.gateSparse.parse(sparse))
     const laptop = TH.passkeyWayinOf('laptop')
-    expect(sparse.passkey).to.deep.equal(PasskeyWayinSparse.parse(omit(laptop, ['vault_key_wayin_wrapped'])))
+    expect(sparse.passkey).to.deep.equal(VX.passkeyWayinSparse.parse(omit(laptop, ['vault_key_wayin_wrapped'])))
     for (const part of [sparse, sparse.passphrase, sparse.passkey]) {
       expect(Object.isFrozen(part)).to.be.true
     }
@@ -204,9 +205,9 @@ describe("gateSparseOf", () => {
 
 describe("wayinkind", () => {
   it("takes each kind of wayin, as its example shows, and refuses any other slot 'bad_option'", () => {
-    expect(wayinkind.safeParse('passkey').success).to.be.true
-    expect(wayinkind.parse('passphrase')).to.eq('passphrase')
-    TH.expectSyncRefusal(() => wayinkind.parse('hunter2'), 'bad_option')
+    expect(VX.wayinkind.safeParse('passkey').success).to.be.true
+    expect(VX.wayinkind.parse('passphrase')).to.eq('passphrase')
+    TH.expectSyncRefusal(() => VX.wayinkind.parse('hunter2'), 'bad_option')
   })
 })
 
@@ -215,14 +216,14 @@ describe("headerOf", () => {
     const gate = TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
     const passphrase = headerOf(gate.passphrase)
     expect(passphrase).to.deep.equal(omit(gate.passphrase, ['vault_key_wayin_wrapped']))
-    expect(PassphraseWayinHeader.parse(passphrase)).to.deep.equal(passphrase)
+    expect(VX.passphraseWayinHeader.parse(passphrase)).to.deep.equal(passphrase)
     const passkey = headerOf(TH.passkeyWayinOf('laptop'))
     expect(passkey).to.not.have.property('vault_key_wayin_wrapped')
-    expect(PasskeyWayinHeader.parse(passkey)).to.deep.equal(passkey)
+    expect(VX.passkeyWayinHeader.parse(passkey)).to.deep.equal(passkey)
   })
 
   it("refuses a header that still holds its wrap, as a header is strict as its record is", () => {
-    expect(PassphraseWayinHeader.safeParse(TH.gateOf('u1').passphrase).success).to.be.false
+    expect(VX.passphraseWayinHeader.safeParse(TH.gateOf('u1').passphrase).success).to.be.false
   })
 })
 
@@ -230,10 +231,10 @@ describe("the named vault record types", () => {
   it("names a gated record GatedVaultRecord, and a novel draft VaultDraft, as its example shows", () => {
     expectTypeOf(TH.vaultRecordOf('u1')).toExtend<GatedVaultRecord>()
     expectTypeOf(TH.gatelessOf('u1')).toExtend<VaultDraft>()
-    expect(VaultRecord.safeParse(TH.gatelessOf('u1')).success).to.be.true
+    expect(VX.vaultRecord.safeParse(TH.gatelessOf('u1')).success).to.be.true
   })
 
-  it("takes a vault_tok and whichever of the scope and epochs a thing carries as VaultMadeUnder, as its example shows, a box's own format and times beside them", () => {
+  it("takes a vault_tok and whichever of the scope and epochs a thing carries as vaultMadeUnder, as its example shows, a box's own format and times beside them", () => {
     expectTypeOf({ vault_tok: 'vault-tok-u1', gate_epoch: 1 }).toExtend<VaultMadeUnder>()
     expectTypeOf({ format: 'safebyok-box-v8', vault_tok: 'vault-tok-u1', registered_at: 1 }).toExtend<VaultMadeUnder>()
     expectTypeOf({ gate_epoch: 1 }).not.toExtend<VaultMadeUnder>()
@@ -245,24 +246,24 @@ describe("the stamps, taken from whatever carries them", () => {
   const record = TH.vaultRecordOf('u1')
   const stamp = { format: VaultFormat, ...TH.scopeOf('u1'), vault_tok: record.vault_tok, registered_at: record.registered_at }
 
-  it("take a vault's stamp from its record, with and without its format, as VaultStampButFormat's example shows", () => {
-    expect(VaultStamp.parse(record)).to.deep.equal(stamp)
-    expect(VaultStampButFormat.parse(record)).to.deep.equal(omit(stamp, ['format']))
+  it("take a vault's stamp from its record, with and without its format, as vaultStampButFormat's example shows", () => {
+    expect(VX.vaultStamp.parse(record)).to.deep.equal(stamp)
+    expect(VX.vaultStampButFormat.parse(record)).to.deep.equal(omit(stamp, ['format']))
   })
 
   it("take a vault's stamp from a Vault object", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
-    expect(VaultStamp.parse(vault)).to.deep.equal(vault.stamp)
+    expect(VX.vaultStamp.parse(vault)).to.deep.equal(vault.stamp)
     TH.closeVault(vault)
   })
 
   it("refuse 'bad_record' a stamp missing a field it binds", () => {
-    TH.expectSyncRefusal(() => VaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
+    TH.expectSyncRefusal(() => VX.vaultStampButFormat.parse(omit(record, ['registered_at'])), 'bad_record')
   })
 
   it("take a lease's stamp from its record, leaving out its key material", async () => {
     const lease = await TH.leaseOf('u1')
-    expect(LeaseStamp.parse(lease)).to.deep.equal(omit(lease, ['lease_key', 'vault_key_lease_wrapped']))
+    expect(DX.leaseStamp.parse(lease)).to.deep.equal(omit(lease, ['lease_key', 'vault_key_lease_wrapped']))
   })
 })
 
@@ -279,7 +280,7 @@ const misshapenAnswers = (answer: PasskeyAnswer) => [
 describe("passkeyAnswerShape", () => {
   it("takes a passkey's answer, its bytes the very ones handed in, as its first example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const checked = passkeyAnswerShape.parse(answer)
+    const checked = VX.passkeyAnswerShape.parse(answer)
     expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(checked.prfBytes).to.eq(answer.prfBytes)
   })
@@ -288,25 +289,25 @@ describe("passkeyAnswerShape", () => {
     const answer = await TH.passkeyOf('laptop')
     const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(foreign instanceof Uint8Array).to.be.false
-    expect(passkeyAnswerShape.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
+    expect(VX.passkeyAnswerShape.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
   })
 
   it("refuses an answer already used, its bytes zeroed, as bad_option, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.passkeyAnswerShape.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
     expect(err.message).to.match(/^prfBytes: .*used already/)
   })
 
   it("refuses what is no answer at all as bad_option", () => {
     for (const given of ["pw", 42, null, { credential_id: 'abc' }]) {
-      TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+      TH.expectSyncRefusal(() => VX.passkeyAnswerShape.parse(given), 'bad_option')
     }
   })
 
   it("refuses a misshapen answer as bad_option, naming the field and quoting none of it", async () => {
     const answer = await TH.passkeyOf('laptop')
     for (const [given, fieldname, blurb] of misshapenAnswers(answer)) {
-      const err = TH.expectSyncRefusal(() => passkeyAnswerShape.parse(given), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.passkeyAnswerShape.parse(given), 'bad_option')
       expect(err.message, blurb).to.match(new RegExp(`^${fieldname}: `))
       expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
     }

@@ -35,7 +35,7 @@ import type { VaultLogger } from './logger'
  * @example await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(vaultRecord, leaseRecord))
  */
 export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
-  cipherCtx([VX.VaultStampButFormat.parse(vaultStamp), DX.LeaseStamp.parse(leaseStamp)], 'vault_key_lease_wrapped')
+  cipherCtx([VX.vaultStampButFormat.parse(vaultStamp), DX.leaseStamp.parse(leaseStamp)], 'vault_key_lease_wrapped')
 )
 
 /** The ctx one of a box's two ciphered fields is bound to: its vault's stamp but for the format, the box's own {@link BoxStamp}, and the purpose, which names the field.
@@ -46,8 +46,8 @@ export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseSta
  * @example await cipherBytes(boxKey, whisperBytes, boxCtxOf(vault, { ...visible, vault_tok: vault.vault_tok }, 'whisper_ciphered'))
  */
 export const boxCtxOf = (vaultStamp: VaultStampButFormat, boxStamp: BoxStamp, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array => {
-  const { sidecar, ...stamp } = BX.BoxStamp.parse(boxStamp)
-  return cipherCtx([VX.VaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
+  const { sidecar, ...stamp } = BX.boxStamp.parse(boxStamp)
+  return cipherCtx([VX.vaultStampButFormat.parse(vaultStamp), { ...stamp, sidecar: stableJsonify(sidecar)! }], purpose)
 }
 
 /** This device's lease on one vault: the vaultKey wrapped under a leaseKey that never leaves this browser profile, and the instant it ends.
@@ -119,7 +119,7 @@ export class Lease implements LeaseSparse {
    * @example Lease.make(vault, { ...record, user_id: 'someone_else' })   // throws 'corrupt_record': another vault's
    */
   static make(vault: ConsistencyWith<VaultStamp & Pick<Vault, 'tryLock'>>, record: unknown): Lease {
-    const checked = DX.LeaseRecord.safeParse(record)
+    const checked = DX.leaseRecord.safeParse(record)
     if (! checked.success) {
       throw new VaultError('corrupt_record', "This device's lease is not in a form this package writes, so it can't be taken up: the vault asks for a proof instead.")
     }
@@ -148,7 +148,7 @@ export class Lease implements LeaseSparse {
   async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> {
     const bytes = serializedBytes.parse(serialized)
     try {
-      const header = BX.BoxSparse.parse(visible)
+      const header = BX.boxSparse.parse(visible)
       this.#demand()
       const vaultKey = await this.#vaultKeyOrNull('wrapKey')
       this.#demand()
@@ -189,8 +189,8 @@ export class Lease implements LeaseSparse {
    */
   async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> {
     try {
-      const sealed = BX.CipheredShape.parse(ciphered)
-      const header = BX.BoxSparse.parse(visible)
+      const sealed = BX.cipheredShape.parse(ciphered)
+      const header = BX.boxSparse.parse(visible)
       this.#demand()
       const vaultKey = await this.#vaultKeyOrNull('unwrapKey')
       this.#demand()
@@ -220,8 +220,8 @@ export class Lease implements LeaseSparse {
    */
   async sealProps(visible: BoxSparse, props: { whisper: Uint8Array }): Promise<BoxRecord> {
     try {
-      const { whisper } = LeaseSealProps.parse(props)
-      const header = BX.BoxSparse.parse(visible)
+      const { whisper } = leaseSealProps.parse(props)
+      const header = BX.boxSparse.parse(visible)
       const ciphered = await this.tryCipheredWith(whisper, header)
       // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
       this.#vault.demandConsistentWith(this, { leaseBound: ciphered.ok })
@@ -338,7 +338,7 @@ export class KeptLease implements LeaseSparse {
     const kept = await deviceDB.tryGetLease(scope)
     if (! kept.ok) { return kept }
     if (kept.val === null) { return good(null) }
-    const checked = DX.LeaseRecord.safeParse(kept.val)
+    const checked = DX.leaseRecord.safeParse(kept.val)
     if (! checked.success || ! sameScope(checked.data, scope)) {
       // Neither the record nor what it failed is told: the record may hold key material.
       told?.logger.warn("This device's lease could not be read as a lease of this vault, so it counts as none and was left where it lies: the vault asks for the passphrase, and the next unlock writes over it.", { call: told.call })
@@ -370,7 +370,7 @@ export class KeptLease implements LeaseSparse {
  */
 export const sealLeaseRecord = async (held: VaultStampButFormat & Pick<VaultSparse, 'gate_epoch'>, vaultKey: CryptoKey, grant: { leaseMillis: number, now: number }): Promise<LeaseRecord> => {
   const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = held
-  const granted = DX.LeaseGrant.parse({ applabel, user_id, vaultlabel, vault_tok, gate_epoch, ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture) })
+  const granted = DX.leaseGrant.parse({ applabel, user_id, vaultlabel, vault_tok, gate_epoch, ask_passphrase_at: Math.min(grant.now + grant.leaseMillis, FarFuture) })
   const stamp = { format: LeaseFormat, ...granted } as const
   const leaseKey = await makeLeaseKey()
   const wrapped = await wrapKeyUnder(leaseKey, vaultKey, leaseCtxOf(held, stamp))
@@ -382,9 +382,9 @@ const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
 
 /** What a lease ciphers, bytes judged by their tag, so bytes from another realm (a test's jsdom, an iframe) pass; and what {@link Lease.sealProps} seals with, the whisper's bytes and nothing else. Each `parse` refuses 'bad_option'. */
-const { serializedBytes, LeaseSealProps } = Validator('bad_option', ({ obj, bytes }) => ({
+const { serializedBytes, leaseSealProps } = Validator('bad_option', ({ obj, bytes }) => ({
   serializedBytes: bytes(),
-  LeaseSealProps:  obj({ whisper: bytes() }).strict(),
+  leaseSealProps:  obj({ whisper: bytes() }).strict(),
 }))
 
 /** The 'crypto_failed' refusal for a cipher the browser's WebCrypto failed under keys just made, `thrown` what it threw.

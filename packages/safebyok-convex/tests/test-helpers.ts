@@ -1,7 +1,7 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { BoxRecord, VaultRecord, localVaultDB, memoryStore } from 'safebyok'
+import { Validators, localVaultDB, memoryStore } from 'safebyok'
 import type { GatedVaultRecord, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
 import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
@@ -134,13 +134,13 @@ export const realRecords = async (user_id = 'u1') => {
   }
   closeVault(vault)
   const rows = store.scopepaths().map((ckey) => ({ ckey, record: JSON.parse(store.get(ckey) ?? 'null') as unknown }))
-  const vaultRecordRow = rows.find((row) => VaultRecord.safeParse(row.record).success)
+  const vaultRecordRow = rows.find((row) => Validators.vaultRecord.safeParse(row.record).success)
   if (! vaultRecordRow) { throw new Error('the core stored no vault record') }
   return {
     vaultRecordCkey: vaultRecordRow.ckey,
-    vaultRecord:     VaultRecord.parse(vaultRecordRow.record),
+    vaultRecord:     Validators.vaultRecord.parse(vaultRecordRow.record),
     boxes:           rows.flatMap((row) => {
-      const checked = BoxRecord.safeParse(row.record)
+      const checked = Validators.boxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []
     }),
   }

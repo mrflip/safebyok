@@ -2,16 +2,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type * as Z from 'zod'
 import type { BoxRecord } from '../../src/shapes/box'
 import type { Applabel, BankScope, Boxlabel, UserId, VaultScope, Vaultlabel } from '../../src/shapes/scopes'
-import * as Primitives from '../../src/shapes/primitives'
+import * as PX from '../../src/shapes/primitives'
 import { cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../../src/crypto'
 import type { VaultError } from '../../src/errors'
-import * as Fields from '../../src/shapes/fields'
-import {
-  type Ciphered, type BoxKeyWrapped, type PassphraseSalt, type PrfSalt, type RevisionTok, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type VaultTok, type WhisperCiphered,
-  box_key_wrapped, prf_salt_b64, revision_tok, salt_b64, vault_key_lease_wrapped, vault_key_wayin_wrapped, vault_tok, whisper_ciphered,
-} from '../../src/shapes/fields'
+import * as FX from '../../src/shapes/fields'
+import type { Ciphered, BoxKeyWrapped, PassphraseSalt, PrfSalt, RevisionTok, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, VaultTok, WhisperCiphered } from '../../src/shapes/fields'
 import type { ConsistencyWith, Lifecycled, Refused } from '../../src/types/type-aliases'
-import { type PassphraseCleartext, type PasskeyWayinRecord, type PassphraseWayinRecord, passphraseCleartext } from '../../src/shapes/vault'
+import type { PassphraseCleartext, PasskeyWayinRecord, PassphraseWayinRecord } from '../../src/shapes/vault'
+import * as VX from '../../src/shapes/vault'
 import type { LeaseRecord } from '../../src/shapes/device'
 import type { Vault } from '../../src/vault'
 import * as TH from '../test-helpers'
@@ -24,19 +22,19 @@ describe("the names a host writes by hand", () => {
     expectTypeOf<UserId>().toEqualTypeOf<string>()
     expectTypeOf<VaultTok>().toEqualTypeOf<string>()
     expectTypeOf<RevisionTok>().toEqualTypeOf<string>()
-    expectTypeOf<Fields.EpochMillis>().toEqualTypeOf<number>()
+    expectTypeOf<FX.EpochMillis>().toEqualTypeOf<number>()
   })
 
   it("check a token as text that is not empty, refusing an empty one as 'bad_record' in a sentence", () => {
-    for (const token of [vault_tok, revision_tok]) {
+    for (const token of [FX.vault_tok, FX.revision_tok]) {
       expect(token.parse('Qm9vdA')).to.eq('Qm9vdA')
       const err = TH.expectSyncRefusal(() => token.parse(''), 'bad_record')
       expect(err.message).to.eq("A token is minted by safebyok, so it can't be empty")
     }
   })
 
-  it("hand out EpochMillis as the same check the package keeps every time with", () => {
-    expect(Fields.EpochMillis).to.eq(Primitives.EpochMillis)
+  it("hand out epochMillis as the same check the package keeps every time with", () => {
+    expect(FX.epochMillis).to.eq(PX.epochMillis)
   })
 })
 
@@ -54,7 +52,7 @@ describe("the branded fields", () => {
   it("brand a key wrapped for its role where the record is made, as the second example shows", async () => {
     const ctx = cipherCtx({ test: 'brand' }, 'a test of the brand')
     const wrapped = await wrapKeyUnder(await makeVaultKey(), await makeBoxKey(), ctx)
-    const branded = box_key_wrapped.parse(wrapped)
+    const branded = FX.box_key_wrapped.parse(wrapped)
     expectTypeOf(branded).toEqualTypeOf<BoxKeyWrapped>()
     expect(branded).to.deep.equal(wrapped)
   })
@@ -70,19 +68,19 @@ describe("the branded fields", () => {
   })
 
   it("take what storage holds unbranded, so a check of a record read back needs no cast", () => {
-    expectTypeOf<Z.input<typeof salt_b64>>().toEqualTypeOf<string>()
-    expectTypeOf<Z.input<typeof box_key_wrapped>>().toEqualTypeOf<Ciphered>()
+    expectTypeOf<Z.input<typeof FX.salt_b64>>().toEqualTypeOf<string>()
+    expectTypeOf<Z.input<typeof FX.box_key_wrapped>>().toEqualTypeOf<Ciphered>()
   })
 
   it("check a salt's shape and leave its length to its wayin, so a short salt passes here", () => {
-    expect(salt_b64.parse('c2FsdA')).to.eq('c2FsdA')
-    expect(prf_salt_b64.parse('c2FsdA')).to.eq('c2FsdA')
+    expect(FX.salt_b64.parse('c2FsdA')).to.eq('c2FsdA')
+    expect(FX.prf_salt_b64.parse('c2FsdA')).to.eq('c2FsdA')
   })
 
   it("refuse an empty salt or a broken wrap as 'bad_record', quoting none of it", () => {
-    TH.expectSyncRefusal(() => salt_b64.parse(''), 'bad_record')
-    TH.expectSyncRefusal(() => prf_salt_b64.parse(42), 'bad_record')
-    for (const role of [whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped]) {
+    TH.expectSyncRefusal(() => FX.salt_b64.parse(''), 'bad_record')
+    TH.expectSyncRefusal(() => FX.prf_salt_b64.parse(42), 'bad_record')
+    for (const role of [FX.whisper_ciphered, FX.box_key_wrapped, FX.vault_key_wayin_wrapped, FX.vault_key_lease_wrapped]) {
       const err = TH.expectSyncRefusal(() => role.parse({ cipher_iv_b64: 'iv-TELLTALE' }), 'bad_record')
       expect(err.message).to.not.include('TELLTALE')
     }
@@ -92,22 +90,22 @@ describe("the branded fields", () => {
 describe("passphraseCleartext", () => {
   it("hands back the text the user typed, branded for the key deriver, as its first example shows", () => {
     const typed = 'correct horse battery staple'
-    const cleartext = passphraseCleartext.parse(typed)
+    const cleartext = VX.passphraseCleartext.parse(typed)
     expectTypeOf(cleartext).toEqualTypeOf<PassphraseCleartext>()
     expect(cleartext).to.eq(typed)
   })
 
   it("refuses anything but text as 'bad_option', quoting none of it, as its second example shows", () => {
-    const err = TH.expectSyncRefusal(() => passphraseCleartext.parse(42), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.passphraseCleartext.parse(42), 'bad_option')
     expect(err.message).to.eq("A passphrase is the text the user typed, as a string")
-    const wrapped = TH.expectSyncRefusal(() => passphraseCleartext.parse({ passphrase: 'TELLTALE' }), 'bad_option')
+    const wrapped = TH.expectSyncRefusal(() => VX.passphraseCleartext.parse({ passphrase: 'TELLTALE' }), 'bad_option')
     expect(wrapped.message).to.not.include('TELLTALE')
     expect(JSON.stringify(wrapped.meta)).to.not.include('TELLTALE')
   })
 
   it("takes a blank passphrase, which is the gating's to judge", () => {
-    expect(passphraseCleartext.parse('')).to.eq('')
-    expect(passphraseCleartext.parse(' '.repeat(3))).to.eq(' '.repeat(3))
+    expect(VX.passphraseCleartext.parse('')).to.eq('')
+    expect(VX.passphraseCleartext.parse(' '.repeat(3))).to.eq(' '.repeat(3))
   })
 
   it("is text a host's own key deriver takes as it is, but no plain text is one", () => {

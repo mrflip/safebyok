@@ -66,7 +66,7 @@ export const vaultMeets = (stored: unknown, expected: Pick<VaultDelExpectation, 
 /** The `vault_epoch` of a stored row, a vault record or a tombstone, as a whole number from zero: zero where the row shows none that reads so.
  * A damaged vault record can show no `vault_epoch`; its deletion still leaves a tombstone.
  */
-const epochOf = (stored: unknown): number => VX.VaultSparse.shape.vault_epoch.safeParse(fieldOf(stored, 'vault_epoch')).data ?? 0
+const epochOf = (stored: unknown): number => VX.vaultSparse.shape.vault_epoch.safeParse(fieldOf(stored, 'vault_epoch')).data ?? 0
 
 /** The vault record an update stores over `stored`, once it has met it: `vaultRecord`, its `vault_epoch` the stored one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2). It hands back the type it

@@ -4,18 +4,18 @@ import type * as Z from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 
-export { EpochMillis } from './primitives'
+export { epochMillis, type EpochMillis } from './primitives'
 
-// == [Ciphered]: Ciphered
+// == [Ciphered]: ciphered
 
 /** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
-export const { Ciphered } = Validator('bad_record', ({ obj, str }) => ({
-  Ciphered: obj({
+export const { ciphered } = Validator('bad_record', ({ obj, str }) => ({
+  ciphered: obj({
     cipher_iv_b64:  str.min(1),
     ciphertext_b64: str.min(1),
   }).strict(),
 }))
-export type Ciphered = Z.infer<typeof Ciphered>
+export type Ciphered = Z.infer<typeof ciphered>
 // --
 
 // == [Record fields]: vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
@@ -38,10 +38,10 @@ export const { vault_tok, revision_tok, device_id, key_deriver_label, credential
   credential_id:           str.min(1),
   salt_b64:                str.min(1).brand<'PassphraseSalt'>(),
   prf_salt_b64:            str.min(1).brand<'PrfSalt'>(),
-  whisper_ciphered:        Ciphered.brand<'WhisperCiphered'>(),
-  box_key_wrapped:         Ciphered.brand<'BoxKeyWrapped'>(),
-  vault_key_wayin_wrapped: Ciphered.brand<'VaultKeyWayinWrapped'>(),
-  vault_key_lease_wrapped: Ciphered.brand<'VaultKeyLeaseWrapped'>(),
+  whisper_ciphered:        ciphered.brand<'WhisperCiphered'>(),
+  box_key_wrapped:         ciphered.brand<'BoxKeyWrapped'>(),
+  vault_key_wayin_wrapped: ciphered.brand<'VaultKeyWayinWrapped'>(),
+  vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
 /** The random token minted for one life of a vault, its `vault_tok`: compared, never parsed further. A thing made under one life carries it, so `demandConsistentWith` tells a thing of another life. */

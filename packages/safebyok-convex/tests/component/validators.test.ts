@@ -110,22 +110,22 @@ const convexShape = (validator: GenericValidator): Shape => {
 }
 
 const ShapeCases = [
-  [Validators.Ciphered,               Ciphered,               'Ciphered: the shared encrypted-value shape'],
-  [Validators.VaultScope,             VaultScope,             'VaultScope: what names one vault, which the core hands out frozen'],
+  [Validators.ciphered,               Ciphered,               'Ciphered: the shared encrypted-value shape'],
+  [Validators.vaultScope,             VaultScope,             'VaultScope: what names one vault, which the core hands out frozen'],
   [Validators.boxscope,               Boxscope,               "Boxscope: a vault's scope and a boxlabel"],
-  [Validators.VaultRecord,            VaultRecord,            "VaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
-  [Validators.GateRecord,             Gate,                   'Gate: the passphrase, and the passkey or null'],
-  [Validators.VaultDraft,             NovelVaultRecord,       'NovelVaultRecord: every field, gate_epoch 0 and no gate'],
-  [Validators.BoxRecord,              BoxRecord,              'BoxRecord: every field, the sidecar any value, both ciphered fields nested'],
-  [Validators.BoxSparse,              BoxSparse,              'BoxSparse: the record without its ciphered fields, format kept'],
-  [Validators.VaultTombstone,         VaultTombstone,         'VaultTombstone: the scope, its format and the counter carried on'],
-  [Validators.Capacity,               Capacity,               'Capacity: each max a number or Infinity, as the core takes it in'],
-  [Validators.VaultRecordExpectation, VaultRecordExpectation, 'VaultRecordExpectation: vault_tok and gate_epoch'],
-  [Validators.BoxGetExpectation,      BoxGetExpectation,      'BoxGetExpectation: vault_tok'],
-  [Validators.BoxExpectation,         BoxExpectation,         'BoxExpectation: vault_tok, and revision_tok or null'],
-  [Validators.VaultDelExpectation,    VaultDelExpectation,    'VaultDelExpectation: vault_tok, and gate_epoch or null'],
-  [Validators.BoxDelExpectation,      BoxDelExpectation,      'BoxDelExpectation: vault_tok, and revision_tok or null'],
-  [Validators.BoxDeletion,            BoxDeletion,            'BoxDeletion: one of three outcomes'],
+  [Validators.vaultRecord,            VaultRecord,            "VaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
+  [Validators.gateRecord,             Gate,                   'Gate: the passphrase, and the passkey or null'],
+  [Validators.vaultDraft,             NovelVaultRecord,       'NovelVaultRecord: every field, gate_epoch 0 and no gate'],
+  [Validators.boxRecord,              BoxRecord,              'BoxRecord: every field, the sidecar any value, both ciphered fields nested'],
+  [Validators.boxSparse,              BoxSparse,              'BoxSparse: the record without its ciphered fields, format kept'],
+  [Validators.vaultTombstone,         VaultTombstone,         'VaultTombstone: the scope, its format and the counter carried on'],
+  [Validators.capacity,               Capacity,               'Capacity: each max a number or Infinity, as the core takes it in'],
+  [Validators.vaultRecordExpectation, VaultRecordExpectation, 'VaultRecordExpectation: vault_tok and gate_epoch'],
+  [Validators.boxGetExpectation,      BoxGetExpectation,      'BoxGetExpectation: vault_tok'],
+  [Validators.boxExpectation,         BoxExpectation,         'BoxExpectation: vault_tok, and revision_tok or null'],
+  [Validators.vaultDelExpectation,    VaultDelExpectation,    'VaultDelExpectation: vault_tok, and gate_epoch or null'],
+  [Validators.boxDelExpectation,      BoxDelExpectation,      'BoxDelExpectation: vault_tok, and revision_tok or null'],
+  [Validators.boxDeletion,            BoxDeletion,            'BoxDeletion: one of three outcomes'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod validators they are made from", () => {
@@ -264,14 +264,14 @@ const BoxCases = [
 describe("the Convex validators, against the core's Zod records, record by record", () => {
   for (const [vaultRecord, zodOk, convexOk, blurb] of VaultRecordCases) {
     it(`vault record: ${blurb}`, async () => {
-      expect(Records.VaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
+      expect(Records.vaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultRecord, { vaultRecord: vaultRecord as never }))).to.eq(convexOk)
     })
   }
 
   for (const [box, zodOk, convexOk, blurb] of BoxCases) {
     it(`box: ${blurb}`, async () => {
-      expect(Records.BoxRecord.safeParse(box).success).to.eq(zodOk)
+      expect(Records.boxRecord.safeParse(box).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
@@ -292,7 +292,7 @@ const CapacityCases = [
 describe("the Convex validator of a vault's capacity, against the core's", () => {
   for (const [capacity, zodOk, convexOk, blurb] of CapacityCases) {
     it(blurb, async () => {
-      expect(Records.Validators.Capacity.safeParse(capacity).success).to.eq(zodOk)
+      expect(Records.Validators.capacity.safeParse(capacity).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeCapacity, { capacity: capacity as never }))).to.eq(convexOk)
     })
   }

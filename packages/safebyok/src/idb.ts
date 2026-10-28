@@ -148,7 +148,7 @@ class IdbDeviceDB extends DeviceDB {
 export type IdbRow = { scopepath: string, row: unknown }
 
 /** What an inspector's `subscribe` is handed: a function to call after each write. Its `parse` refuses 'bad_option'. */
-const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
+const { listenerShape } = Validator('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
 
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. Unlike the store, its `rows()`
@@ -172,7 +172,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
     },
     /** Call `listener` after any write to the shelf, in this tab or another, returning the unsubscribe. Throws 'bad_option' for a `listener` that is no function. */
     subscribe: (listener: () => void): (() => void) => {
-      ListenerShape.parse(listener)
+      listenerShape.parse(listener)
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
     /** Erase every row on the shelf: every lease and device record in this database. */

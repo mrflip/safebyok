@@ -26,7 +26,7 @@ type VaultOfBox = ConsistencyWith<VaultScope & Pick<VaultStamp, 'vault_tok'>>
  * {@link Box.seal}, not yet stored. `box.extractWhisper()` opens it under the lease the vault holds.
  *
  * Misuse refuses before anything is ciphered: 'bad_whisper' for a whisper JSON cannot carry, and
- * 'bad_option' for props amiss, as {@link SealBoxProps} checks them (a boxlabel that is not a
+ * 'bad_option' for props amiss, as `sealBoxProps` checks them (a boxlabel that is not a
  * label, a sidecar JSON cannot carry, a malformed base, or a field but `boxlabel`, `sidecar` and
  * `base`), or a malformed `madeUnder` or `made`. No refusal quotes what the call was handed. A bug
  * met in a seal or an extract past its argument checks (a throw that is no VaultError) arrives as
@@ -120,8 +120,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' }, madeUnder)   // throws 'bad_record': no box record
    */
   static make(vault: VaultOfBox, record: BoxRecord, madeUnder: MadeUnder): Box {
-    const checked = BX.BoxRecord.parse(record)
-    return new this(vault, BX.MadeUnderShape.parse(madeUnder), checked, null)
+    const checked = BX.boxRecord.parse(record)
+    return new this(vault, BX.madeUnderShape.parse(madeUnder), checked, null)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
@@ -146,8 +146,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
   static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> {
-    const { boxlabel, sidecar, base } = BX.SealBoxProps.parse(props)
-    const { madeUnder, now } = BX.MadeShape.parse(made)
+    const { boxlabel, sidecar, base } = BX.sealBoxProps.parse(props)
+    const { madeUnder, now } = BX.madeShape.parse(made)
     const whisperBytes = whisperBytesOf(whisper)
     try {
       vault.demandConsistentWith(madeUnder, { leaseBound: true })
@@ -165,7 +165,7 @@ export class Box implements Boxscope, BoxSparse {
       }, { whisper: whisperBytes })
       // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
       vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
-      return new Box(vault, madeUnder, BX.BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
+      return new Box(vault, madeUnder, BX.boxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
     } catch (err) {
       throw refusalOf(err)
     } finally {
@@ -207,7 +207,7 @@ export class Box implements Boxscope, BoxSparse {
       }
       const whisperBytes = valOf(deciphered)
       try {
-        const checked = BX.Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+        const checked = BX.whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
         if (! checked.success) {
           throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
         }
@@ -246,7 +246,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 // == [Helpers]: whisperBytesOf, parseJsonOrNull, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
-export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(BX.Whisper.parse(whisper)))
+export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(BX.whisper.parse(whisper)))
 
 /** `text` parsed as JSON, or null when it is none. */
 const parseJsonOrNull = (text: string): unknown => {

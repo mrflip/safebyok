@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as ZClassic from 'zod'
 import { Box } from '../../src/box'
-import { BoxRecord, type Whisper, type Sidecar } from '../../src/shapes/box'
+import type { Whisper, Sidecar, BoxRecord } from '../../src/shapes/box'
+import * as BX from '../../src/shapes/box'
 import type { VaultError } from '../../src/errors'
 import type { RequestCleartext } from '../../src/gating'
 import { valOf } from '../../src/outcome'
@@ -9,7 +10,7 @@ import { Vault } from '../../src/vault'
 import { heldLeaseOf, registerLeaseGetter } from '../../src/held-lease'
 import { Lease } from '../../src/lease'
 import { MaxWhisperBytes, MaxBoxes } from '../../src/shapes/bank-opts'
-import { VaultScope } from '../../src/shapes/scopes'
+import * as CX from '../../src/shapes/scopes'
 import { FarFuture } from '../../src/consts'
 import { MaxLabelChars, MaxUserIdChars } from '../../src/shapes/primitives'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
@@ -152,7 +153,7 @@ describe("putBox, the box it seals and stores", () => {
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' } }, 'sk-ant-fake')
     expect(box).to.be.instanceOf(Box)
     expect(box).to.deep.include({ boxlabel: 'anthropic_api_key', sidecar: { note: 'work account' }, vault_tok: vault.vault_tok, gate_epoch: TH.cheatGetVaultEpoch(vault).gate_epoch })
-    expect(box.record).to.deep.equal(BoxRecord.parse(storedRowOf(world, 'anthropic_api_key')))
+    expect(box.record).to.deep.equal(BX.boxRecord.parse(storedRowOf(world, 'anthropic_api_key')))
     expect(box.baseRevisionTok).to.be.null
     expect(await box.extractWhisper()).to.eq('sk-ant-fake')
   })
@@ -847,8 +848,8 @@ describe("the box limit", () => {
       for (const { whisperBytes, sidecar } of heaviestSplitsOf(limitBytes)) {
         const row = await heaviestRowOf(whisperBytes, sidecar)
         const { applabel, user_id, vaultlabel, ...box } = row
-        expect(BoxRecord.safeParse(box).success).to.be.true
-        expect(VaultScope.safeParse({ applabel, user_id, vaultlabel }).success).to.be.true
+        expect(BX.boxRecord.safeParse(box).success).to.be.true
+        expect(CX.vaultScope.safeParse({ applabel, user_id, vaultlabel }).success).to.be.true
         const rowBytes = new TextEncoder().encode(JSON.stringify(row)).length
         expect(rowBytes).to.be.at.most((limitBytes * StoredBytesPerWhisperByte) + BoxFieldsBytes)
       }
@@ -1208,7 +1209,7 @@ describe("useWhisper", () => {
 // == [Opening a box]: storedBoxOf, gotBox, box.extractWhisper through a vault, what a vault hands its boxes
 
 /** The record storage holds for `u1`'s box `anthropic`, checked as a box record. */
-const storedBoxOf = (world: ReturnType<typeof makeWorld>): BoxRecord => BoxRecord.parse(storedRowOf(world, 'anthropic'))
+const storedBoxOf = (world: ReturnType<typeof makeWorld>): BoxRecord => BX.boxRecord.parse(storedRowOf(world, 'anthropic'))
 
 /** The box `vault.getBox('anthropic')` resolves, failing the test where it resolves none. */
 const gotBox = async (vault: Vault): Promise<Box> => {
@@ -1223,7 +1224,7 @@ describe("box.extractWhisper, through a vault", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const record = storedBoxOf(world)
-    const checks = vi.spyOn(BoxRecord, 'parse')
+    const checks = vi.spyOn(BX.boxRecord, 'parse')
     const box = Box.make(vault, record, TH.cheatGetVaultEpoch(vault))
     expect(checks).toHaveBeenCalledTimes(1)
     checks.mockClear()

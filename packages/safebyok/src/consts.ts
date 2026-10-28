@@ -11,7 +11,7 @@ export const ScopepathDelimiter = '^'
  */
 export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER / 1000)
 
-/** The earliest instant the package accepts, 1981-01-01T00:00:00Z, as `EpochMillis` checks.
+/** The earliest instant the package accepts, 1981-01-01T00:00:00Z, as `epochMillis` checks.
  *
  * @example new Date(FarPast).toISOString()   // '1981-01-01T00:00:00.000Z'
  */

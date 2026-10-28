@@ -2,13 +2,13 @@ import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as Validators from '../src/validators'
-import * as Primitives from '../src/shapes/primitives'
-import { PasskeyWayinHeader, PassphraseWayinHeader, VaultMadeUnder, VaultStampButFormat, freshPasskeyAnswer, passphraseCleartext, wayinkind } from '../src/shapes/vault'
-import { LeaseGrant } from '../src/shapes/device'
-import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
-import { BoxBase, CipheredShape, MadeShape, MadeUnderShape, SealBoxProps, whisperBag } from '../src/shapes/box'
-import { ListedBox, ListingAnswer, StoredVaultAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
-import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
+import * as PX from '../src/shapes/primitives'
+import * as VX from '../src/shapes/vault'
+import * as DX from '../src/shapes/device'
+import * as FX from '../src/shapes/fields'
+import * as BX from '../src/shapes/box'
+import * as VDX from '../src/shapes/vault-db'
+import * as OX from '../src/shapes/bank-opts'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
 import { parseKeyDeriverSpec } from '../src/key-deriver-spec'
@@ -18,10 +18,10 @@ import { makeWorld } from './vault/world'
 
 /** The validators made in a `Validator` call that the namespace leaves out, each exported from its own module for the package's own use: held to the same rules as the namespace's. */
 const InPackage = {
-  BoxBase, MadeShape, MadeUnderShape, SealBoxProps, freshPasskeyAnswer, CipheredShape, LeaseGrant, VaultStampButFormat, whisperBag,
-  PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
-  passphraseCleartext, ListedBox, ListingAnswer, StoredVaultAnswer, StoredRevision, StoredVaultTok,
-  declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, VaultMadeUnder,
+  boxBase: BX.boxBase, madeShape: BX.madeShape, madeUnderShape: BX.madeUnderShape, sealBoxProps: BX.sealBoxProps, freshPasskeyAnswer: VX.freshPasskeyAnswer, cipheredShape: BX.cipheredShape, leaseGrant: DX.leaseGrant, vaultStampButFormat: VX.vaultStampButFormat, whisperBag: BX.whisperBag,
+  passphraseWayinHeader: VX.passphraseWayinHeader, passkeyWayinHeader: VX.passkeyWayinHeader, wayinkind: VX.wayinkind, device_id: FX.device_id, key_deriver_label: FX.key_deriver_label, credential_id: FX.credential_id,
+  passphraseCleartext: VX.passphraseCleartext, listedBox: VDX.listedBox, listingAnswer: VDX.listingAnswer, storedVaultAnswer: VDX.storedVaultAnswer, storedRevision: VDX.storedRevision, storedVaultTok: VDX.storedVaultTok,
+  declaredBoxes: OX.declaredBoxes, declaredBytes: OX.declaredBytes, leaseHoursAsMillis: OX.leaseHoursAsMillis, maxBoxes: OX.maxBoxes, maxWhisperBytes: OX.maxWhisperBytes, renewMinutesAsMillis: OX.renewMinutesAsMillis, staleMinutesAsMillis: OX.staleMinutesAsMillis, vaultMadeUnder: VX.vaultMadeUnder,
 }
 
 /** Every validator the package makes, the namespace's and its own. */
@@ -70,12 +70,12 @@ describe("Validators", () => {
   it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own, those the namespace leaves out included", () => {
     for (const [valname, validator] of Object.entries(EveryValidator)) {
       const thrown = (() => { try { validator.parse(Symbol('nothing a validator takes')); return null } catch (err) { return err } })()
-      expect(thrown, valname).to.be.instanceOf(Object.hasOwn(Primitives, valname) ? Zod.ZodError : VaultError)
+      expect(thrown, valname).to.be.instanceOf(Object.hasOwn(PX, valname) ? Zod.ZodError : VaultError)
     }
   })
 
   it("holds every validator as the same object its module exports", () => {
-    expect(Validators.label).to.eq(Primitives.label)
+    expect(Validators.label).to.eq(PX.label)
   })
 
   it("leaves out the validators the package builds others from or checks its own steps with", () => {

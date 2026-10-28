@@ -27,7 +27,7 @@ const PurposeForWayinkind = {
  * @example await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vaultRecord, header))
  */
 export const wayinCtxOf = (vaultStamp: VaultStamp, header: WayinHeader): Uint8Array => (
-  cipherCtx(VX.VaultStamp.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
+  cipherCtx(VX.vaultStamp.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
 )
 
 /** True for a passphrase wayin's salt `keyDeriver` makes: base64url text of its `salt_bytes` bytes. */
@@ -68,7 +68,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   protected constructor(vaultStamp: VaultStamp, record: RecordT, kit: { keyDeriver: KeyDeriver }) {
     this.#record = frozenRecord(record)
     this.#keyDeriver = kit.keyDeriver
-    this.#vaultStamp = Object.freeze(VX.VaultStamp.parse(vaultStamp))
+    this.#vaultStamp = Object.freeze(VX.vaultStamp.parse(vaultStamp))
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at
@@ -93,7 +93,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   static make(vaultStamp: VaultStamp, record: PasskeyWayinRecord, kit: { keyDeriver: KeyDeriver }): PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin
   static make(vaultStamp: VaultStamp, record: unknown, kit: { keyDeriver: KeyDeriver }): PassphraseWayin | PasskeyWayin {
-    const checked = VX.WayinRecord.parse(record)
+    const checked = VX.wayinRecord.parse(record)
     return checked.wayinkind === 'passphrase' ? new PassphraseWayin(vaultStamp, checked, kit) : new PasskeyWayin(vaultStamp, checked, kit)
   }
 

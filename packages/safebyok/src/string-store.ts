@@ -20,7 +20,7 @@ export type StringStore = {
 }
 
 /** What a store's `subscribe` is handed: a function to call after each put or del. Its `parse` refuses 'bad_option'. */
-const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
+const { listenerShape } = Validator('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
 
 /** The listeners of one store, and the `ring` that calls them. */
 const makeBell = () => {
@@ -28,7 +28,7 @@ const makeBell = () => {
   return {
     ring: () => { listeners.forEach((listener) => { callQuietly(listener) }) },
     subscribe: (listener: () => void) => {
-      ListenerShape.parse(listener)
+      listenerShape.parse(listener)
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },

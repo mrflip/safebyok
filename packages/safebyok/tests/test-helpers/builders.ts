@@ -1,4 +1,5 @@
-import { type Ciphered, type BoxKeyWrapped, prf_salt_b64, salt_b64, type VaultKeyLeaseWrapped, type VaultKeyWayinWrapped, type WhisperCiphered } from '../../src/shapes/fields'
+import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered } from '../../src/shapes/fields'
+import * as FX from '../../src/shapes/fields'
 import { toB64 } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
@@ -283,7 +284,7 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
   wayinkind:               'passphrase',
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
-  salt_b64:                salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
+  salt_b64:                FX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
@@ -302,7 +303,7 @@ export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecor
   wayinkind:               'passkey',
   credential_id:           `cred-${tag}`,
   // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
-  prf_salt_b64:            prf_salt_b64.parse('cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM'),
+  prf_salt_b64:            FX.prf_salt_b64.parse('cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM'),
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),

@@ -214,11 +214,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const record = await sealLeaseRecord(held, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     demandOn(tools, this, gating)
-    demandOn(tools, VX.VaultMadeUnder.parse(record), gating)
+    demandOn(tools, VX.vaultMadeUnder.parse(record), gating)
     const put = await tools.tryPutLease(record)
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     demandOn(tools, this, gating)
-    demandOn(tools, VX.VaultMadeUnder.parse(put.ok ? put.val : record), gating)
+    demandOn(tools, VX.vaultMadeUnder.parse(put.ok ? put.val : record), gating)
     return tools.holdLease(Lease.make(this.vault, valOf(put)))
   }
 
