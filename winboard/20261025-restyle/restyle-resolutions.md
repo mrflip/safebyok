@@ -2,6 +2,58 @@
 
 The Coach's rulings on the restyle sprint's open matters, swept from the sprint doc's Resolved tab, newest batch first.
 
+## 2026-10-28, last batch
+
+- **Six public validators keep a Shape suffix.** Coach: "Go with your rec on the shapes" (in chat). Raised: #322 second review, thread 22. Work: Thread 27 (restyle\_tidy): localVaultDBOptsShape becomes localVaultDBOpts, with a changeset line; STYLE names the other five as an exception, kept so their plain names stay free for locals.
+- **Two more Shape-suffixed validators lose the suffix.** Coach: "noted". Raised: #322, thread 22. Work: Done in #322 (merged): passkeyAnswer and Checks.consistencyRefusal.
+- **The newly exported validators' types get exported too.** Coach: "noted". Raised: #322 second review, thread 22. Work: Thread 27 (restyle\_tidy).
+- **What the tidy thread after #322 carries.** Coach: "noted". Raised: orchestrator. Work: Thread 27 (restyle\_tidy), cut from main once #322 merged.
+- **Main is red in safebyok-convex, and every thread waits on #348.** Coach: (moot). Raised: #349, thread 25. Work: #348 merged; main is green.
+- **The convex-helpers 0.1.129 release-age exception ends.** Coach: "you are approved to make the lib changes without waiting a day" (in chat). Raised: #318, thread 23. Work: Thread 28 (helpers\_range). pnpm's strict release age refuses the lockfile's 0.1.129 without the exclusion (ERR\_PNPM\_MINIMUM\_RELEASE\_AGE\_VIOLATION, frozen or not), so the edits wait in a local commit and the thread finishes after 2026-10-28 23:13:40 UTC; nothing was loosened to get around it.
+- **vault.ts's other lifecycle sentences.** Coach: "yes move the sentence" (in chat). Raised: #322 review, thread 22. Work: Thread 29 (vault\_phrases), now rather than after #340: each VaultError sentence moves into phrases.ts word for word, touching only those lines so #340's rebase stays mechanical. Overrides the "proceed" on this matter earlier in the day, which waited for #340.
+
+## 2026-10-28
+
+- **Convex's validators from the core's Zod.** Rec: convex-helpers as a peer of safebyok-convex; proceed is the yes for the dependency. Coach: "yes". Raised: #287, thread 14. Work: Thread 18, cut from main: zodToConvex in safebyok-convex alone.
+- **Scope validators stay camelCase.** 45 of 91 validators were ModuleCase. Coach: "unless it causes problems for the validator to be lowCamelCase and the type to be ModuleCase, it makes it less confusing: import { fooThing, fooThingVals, type FooThing } // the enum checker, its values, its type". Raised: #291, thread 15. Work: Thread 20, after thread 19 files: every validator lowerCamelCase, every type ModuleCase, an enum's values fooThingVals; STYLE.md's rule reversed. Stacked on #301, which moves every validator.
+- **Stamps stay in Validators.** Coach: "yes please". Raised: #293, thread 17. Work: No change.
+- **The bag's refusal always says where stores go.** Coach: "didn't we sort this out -- why is parseVaultBag a thing and guessing at keys?" Raised: #293 review. Work: Thread 19, stacked on #301: parseVaultBag retired; callers parse vaultBag in one line, and its Validator's refusal stands.
+- **otherScopeError's hint fits only one caller.** Coach: "this also smells like we're proactively debugging an error in a critical path". Raised: #293 review. Work: Thread 19: otherScopeError says what went wrong and the one thing to do; the check and its kind stay.
+- **An adapter's box rows are typed unknown.** Coach: "lgtm". Raised: #287, thread 14. Work: Thread 21, on #301: StoredBox.box takes BoxRecord's input type, with one cast where each adapter reads a row.
+- **Vault objects as the vault bag.** Coach: "a lgtm". Raised: #293, thread 17; #301. Work: The rewritten #301 already makes the vault bag the duck. Thread 21 checks it and keeps it.
+- **otherScopeError's one piece of advice.** Coach: "proceed". Raised: #307, thread 19. Work: Thread 21 carries #307's wording onto #301.
+- **bank.ts's refusal sentences outside phrases.ts.** Coach: "proceed". Raised: #307. Work: Thread 21: the four sentences move to phrases.ts together.
+- **The Convex component runs no core check.** Coach: "proceed". Raised: #308, thread 18. Work: Accepted as the trust model assumes. No change.
+- **Four eslint-disable lines for zod's brand.** Coach: "proceed". Raised: #308. Work: Kept.
+- **zod a declared peer of safebyok-convex.** Coach: "proceed". Raised: #308. Work: Kept.
+- **The interim tsconfig loosening until convex-helpers 0.1.129.** Coach: "you are approved to do it one day early". Raised: #308. Work: Thread 23, from main: ^0.1.129, and both overrides deleted.
+- **Capacity's Infinity on a real Convex deployment.** Coach: "will do, carry on though." Raised: #308 review. Work: Yours: one push to a dev deployment before release.
+- **The parity test lets any z.custom pass as v.any().** Coach: "proceed". Raised: #308 review. Work: Thread 23: the custom case is tied to the sidecar field.
+- **Convex's own validators keep ModuleCase.** Coach: "proceed". Raised: #310. Work: Thread 22 renames them lowerCamelCase with the rest, now that #308 is merged.
+- **Names lowercased by the first letter only.** Coach: "proceed". Raised: #310. Work: Thread 22 keeps it: wayinKindVals beside wayinkind, and the fooVals lists.
+- **Scopepath's helpers renamed to free their names.** Coach: "Why isn't it in the shapes directory with other validators? No, we don't rename the code to serve the validators. They are supposed to share the same name. There are two excellent ways to namespace it: star-importing (CX.checker) or using Validator()". Raised: #310. Work: Thread 22: Scopepath keeps bankScope, vaultScope and boxscope. Validators are reached through a namespace, and any validator still outside src/shapes/ moves there.
+- **Stale record names in notes/security.md.** Coach: "We will clean this up, leave it". Raised: #310. Work: Left as it is.
+- **A whisper parameter beside the whisper validator.** Coach: "files are not supposed to naked-import validators. Make that clear in style.md, and repair". Raised: #310 review. Work: Thread 22: STYLE.md says a file reaches validators through a star import (CX.whisper) or Validator(), never a named import, and the code follows. The whisper parameter keeps its name.
+- **A React test that flakes under the full justify run.** Coach: "yes fix". Raised: threads 17, 20. Work: Thread 24, from main: find the race and fix its cause.
+- **convex-helpers: exact pins for dev, a caret for the peer.** Coach: "proceed". Raised: #318, thread 23. Work: Kept as built.
+- **The early-install exception, and when it comes out.** Coach: "proceed". Raised: #318, thread 23. Work: After 2026-10-28 23:13 UTC: one commit drops the exclusion and returns the dev pins to ^0.1.129, on #318 if it is still open, else as a follow-up.
+- **0.1.129 still ships .ts sources, after all.** Coach: "proceed". Raised: #318, thread 23. Work: Noted.
+- **vault.ts's own gone and behind sentences stay inline.** Coach: "yes consistent names and places". Raised: #319, thread 21. Work: Thread 22: they move into phrases.ts beside the bank's, by the same naming convention.
+- **Names of the bank's sentences in phrases.ts.** Coach: "use standard name conventions". Raised: #319 review, thread 21. Work: Thread 22: named for the condition that failed, as the rest of phrases.ts, and the file's header widened to cover lifecycle refusals.
+- **StoredBox over the exported DamagedBoxRecord.** Coach: "y". Raised: #319, thread 21. Work: Later tidy thread, after #322: StoredBox.box is written over DamagedBoxRecord, and the export stays.
+- **The React flake was a real bug, fixed as a patch.** Coach: "proceed". Raised: #320, thread 24. Work: Shipped as built in #320.
+- **A core timing test times out under load.** Coach: "proceed". Raised: #320, thread 24. Work: Thread 25 (timing\_flake) finds why the case is slow under load and fixes that; the timeout stays.
+- **A dialog hidden by <Activity> drops an answer.** Coach: "if this is normal simple react stuff that people do everyday and none of it is in core U-B-U". Raised: #320 review, thread 24. Work: Thread 26 (activity\_mount), in safebyok-react alone: a hidden dialog reads as mounted, and the unmount gap is settled in the same change.
+- **Merge order for this round.** Coach: "proceed". Raised: orchestrator. Work: Merged as ordered; #319 and then #322 rebase over what landed.
+- **Module-private validators stay outside shapes/.** Coach: "proceed". Raised: #322, thread 22. Work: Thread 22: STYLE.md says shapes/ holds the validators a module exports.
+- **The namespace aliases are two or three capitals ending in X.** Coach: "proceed". Raised: #322, thread 22. Work: Thread 22: kept, and STYLE.md lists them.
+- **Hosts still import validators by name.** Coach: "does this just mean "we allow hosts to star-import" ? Yes, do; don't export our own namespaced confections." Raised: #322, thread 22. Work: Thread 22: the entry point exports each validator by name and no longer exports a Validators namespace; a host imports by name or star-imports.
+- **The namespace rule has no lint rule.** Coach: "It's not illegal, it's just unwieldy". Raised: #322, thread 22. Work: No lint rule. Thread 22's STYLE.md says a named import of validators is unwieldy, not forbidden.
+- **A home for the host-callback checks.** Coach: "proceed". Raised: #322 review, thread 22. Work: Later tidy thread, after #322: a small shapes/ module for the host-callback checks.
+- **vault.ts's other lifecycle sentences.** Coach: "proceed". Raised: #322 review, thread 22. Work: A later small change moves them into phrases.ts, after #322 and after the gripeoween\_vault sprint's vault.ts work (#340), which it would collide with. Overridden the same day by the Coach's "yes move the sentence" (see the last batch).
+- **style-reviewer commits with a style: prefix PROCESS.md lacks.** Coach: "proceed". Raised: #322 review, thread 22. Work: Later tidy thread: style joins PROCESS.md's prefix table.
+- **My YOLO calls on #322's review.** Coach: "proceed". Raised: #322 review, thread 22. Work: Done in thread 22's rebuilt history.
+
 ## 2026-10-27, after the close
 
 - **Validators exports internals too.** Rec: accept, or trim to the validators that face a host or adapter. Coach: "trim". Raised: #287. Work: Thread 17 (#293), 95 names to 66.
