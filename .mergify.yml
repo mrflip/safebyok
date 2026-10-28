@@ -1,0 +1,14 @@
+merge_queue:
+  skip_intermediate_results: true
+scopes:
+  source:
+    files:
+      core:
+        include:
+          - packages/safebyok/**
+      safebyok-vaultdb:
+        include:
+          - packages/safebyok-{convex,postgres,graphql,indexeddb}/**
+      safebyok-client:
+        include:
+          - packages/safebyok-{react,fastkey}/**
