@@ -17,7 +17,7 @@
     "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.134.0",
+    "@anthropic-ai/sdk": "^1.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "safebyok": "workspace:*",
