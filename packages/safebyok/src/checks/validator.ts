@@ -6,7 +6,7 @@ import { RefusalKindVals, VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
 import { EpochMillis, label, user_id } from './primitives'
 
-// == [Kit]: isBytes, Kit, KitWith
+// == [Kit]: isBytes, Kit, KitWith, Merged
 
 /** True for a Uint8Array from any realm: judged by its tag, as `instanceof` refuses one made in an iframe or a test's jsdom. */
 const isBytes = (candidate: unknown): candidate is Uint8Array => ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]'
