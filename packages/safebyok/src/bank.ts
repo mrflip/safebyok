@@ -1,4 +1,4 @@
-import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag, vaultBag } from './shapes/scopes'
+import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
@@ -431,7 +431,7 @@ export class Bank {
 
   /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise, the comparison {@link Bank.demandConsistentWith} makes. */
   #vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(parseVaultBag(bag), this.#scope, { kind: 'bad_scope', message: otherScopeSays })
+    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: otherScopeSays })
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
 
@@ -634,13 +634,10 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+// == [Helpers]: VaultBagAdvice, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
 
 /** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
 const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
-
-/** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
-const parseVaultBag = (bag: unknown): VaultBag => vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: VaultBagAdvice })
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
