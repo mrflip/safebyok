@@ -13,24 +13,28 @@ under the Coach's rulings of 2026-10-28.
     `passphraseVerdict`, `PassphraseVerdict` (passphrase-strength.ts) to `shapes/vault.ts`;
     `loggerShape`, `localVaultDBOptsShape` and `callback` to `shapes/bank-opts.ts`; `maskOpts` to
     a new `shapes/mask.ts`, so `safebyok/utils` pulls no other validator. Sizes unchanged.
-  * **Namespaces** (`d07f4267` core, `00d776fd` tests, `9703cbf4` adapters, `c4eee488` demo): no
+  * **Namespaces** (`d07f4267` core; the rest in the rename commits): no
     file names a validator in a value import. PX primitives, FX fields, CX scopes, BX box, DX
     device, VX vault, VDX vault-db, OX bank-opts, KX key-deriver-spec, MX mask; `Validators`
     outside the core; CVX for safebyok-convex's component validators. Types by name. A record's
     field validators come into its `Validator` call from `[FX]` as a source, so records still read
     `obj({ vault_tok, salt_b64 })`. bank.ts uses `CX.bankBag` beside `CX.vaultBag`;
     shapes/vault-db.ts has `import * as BX` plus `import type { BoxSparse, BoxDamaged }`.
-  * **Rename** (`d660310f` core, then the tests and adapters commits): 48 validators lowerFirst,
-    private ones too; `VaultScope` (a second name for `vaultScope`) gone; Validators holds values
-    only. Convex's own validators lowerCamelCase (`gate`, `novelVaultRecord`, `vaultAnswer`, ...).
-  * **Vals** (`c7d0f6a4`): twelve lists lowerFirst, convex's `safebyokErrorKindVals` among them.
-  * **Docs** (`b89438f2`): STYLE.md *Imports* has the namespace rule with an example, *Naming*
+  * **Rename** (`a7a996ae`, one green commit: core, its tests, adapters, demo): 48 validators
+    lowerFirst, private ones too; `VaultScope` (a second name for `vaultScope`) gone; Validators
+    holds values only. Convex's own validators lowerCamelCase and reached as CVX in a commit of
+    their own (`078f9317`): `gate`, `novelVaultRecord`, `vaultAnswer`, ... Later (`a589e466`)
+    `madeUnderShape` and `cipheredShape` became `madeUnder` and `boxCiphered`, named for their
+    types.
+  * **Vals** (`0f875b96`): twelve lists lowerFirst, convex's `safebyokErrorKindVals` among them.
+  * **Docs** (`704ec5d9`): STYLE.md *Imports* has the namespace rule with an example, *Naming*
     the Coach's rule; README and notes/guarantees.md follow. notes/security.md amended by a
-    sonnet subagent (`b1746966`), 17 entries marked `amended 2026-10-28 (validator_names)`.
-  * **phrases.ts** (`848d2565`): `otherScope`, `VaultGoneWhileOpening`, `OtherStoresThanHeld`,
+    sonnet subagent (`fac8ae99`), 17 entries marked `amended 2026-10-28 (validator_names)`.
+  * **phrases.ts** (`f154be58`): `otherScope`, `VaultGoneWhileOpening`, `OtherStoresThanHeld`,
     `VaultBehindWhileOpening`, and vault.ts's two as `VaultObjectGone`, `VaultBehind`, in a
-    `[Bank and vault]` section; header widened. Wording and kinds unchanged.
-  * **Changeset** (`7fda9864`): minor, safebyok and safebyok-convex, every rename old -> new.
+    `[Bank and vault]` section; the header says it holds these and every check's sentence (`f38fb3f3`).
+    Wording and kinds unchanged.
+  * **Changeset** (`3d04edbf`): minor, safebyok and safebyok-convex, every rename old -> new.
 * **Decisions taken**:
   * Namespace names: STYLE *Imports* says a module of functions comes in under its Startcase
     name, but `Box`, `Vault` and `KeyDeriverSpec` are taken; the short `X` names mirror the `T`
@@ -47,9 +51,18 @@ under the Coach's rulings of 2026-10-28.
     rename beyond lowerFirst.
   * `phrases:` was thread 21's commit prefix; PROCESS has none, so these used `api`.
 * **Deviations**:
-  * Commit order: namespaces before the rename, so the rename touches `BX.BoxRecord` as a
-    property and never meets a local of the new name. Between `d660310f` and `9703cbf4` the
-    tests and adapters are red; every other commit is green.
+  * Commit order: namespaces in the core first, so the rename touches `BX.BoxRecord` as a
+    property and never meets a local of the new name. Every commit is green (`pnpm --filter`
+    lint, typecheck, test on each package it touches; full justify at the tip).
+* **Review round** (2026-10-28): the history was rebuilt from `d07f4267` so that no commit is red.
+  The core's rename, its tests, the adapters and the demo are one commit, and convex's own
+  renames are another. The reviewer's InPackage fix was folded into the rename, and its doc-link
+  fix kept (`c910b5c7`). After those: `madeUnder` and `boxCiphered` (`a589e466`); the `Validator`
+  example's module is `GateChecks` again, not `GX` (`37a1e58f`); the phrases.ts header narrowed;
+  shapes/mask.ts's reason is a comment (`7cce9189`); STYLE.md says an out-of-scope `{@link}` is
+  backticks only (`a1ed35fe`). Left for the Coach by the orchestrator: a small shapes module for
+  `loggerShape`, `callback` and `localVaultDBOptsShape`; the private validators; vault.ts's
+  other lifecycle sentences.
   * safebyok-indexeddb's own `idbVaultDBOpts` stays in its package (an adapter's own check).
 * **Discoveries**: `tests/types/type-aliases.test.ts` imported `./shapes/fields` both as
   `Fields` and by name; folded into FX.
@@ -66,3 +79,6 @@ under the Coach's rulings of 2026-10-28.
   * The main entry still exports validators by name beside `Validators`. Rec: keep.
   * The vault's sentences named `VaultObjectGone` and `VaultBehind`. Rec: confirm.
   * No lint rule for the namespace rule. Rec: none for now.
+  * `passkeyAnswerShape` (type `PasskeyAnswer`, public) and the private `consistencyRefusalShape`
+    keep a Shape suffix, as `madeUnderShape` did. Rec: rename to `passkeyAnswer` and
+    `consistencyRefusal` in the same way.
