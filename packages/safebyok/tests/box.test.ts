@@ -356,6 +356,15 @@ describe("Box.seal", () => {
     expect(one).to.not.have.property('boxKey')
   })
 
+  it("refuses 'crypto_failed' when WebCrypto fails the cipher, keeping only the error's name (Contract: vault.putBox, Guarantees)", async () => {
+    const vault = await vaultOf()
+    vi.spyOn(crypto.subtle, 'encrypt').mockRejectedValueOnce(new DOMException('The operation failed for an operation-specific reason', 'OperationError'))
+    const err = await TH.expectRefusal(Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret, vault.making()), 'crypto_failed')
+    expect(err.cause).to.be.undefined
+    expect(err.message).to.match(/WebCrypto threw OperationError\.$/)
+    expect(TH.thrownText(err)).to.not.include(Secret)
+  })
+
   it("stamps written_at, and a new box's registered_at, with the time its vault's clock reads", async () => {
     const { box } = await sealedOf()
     expect(box.written_at).to.eq(T0)
