@@ -1,4 +1,4 @@
-import { VaultError, type RefusalMeta } from './errors'
+import { VaultError, type RefusalMeta, thrownNameOf } from './errors'
 import type { Capacity } from './shapes/vault-db'
 
 /** The refusals a storage adapter throws, with the core's own messages: throw these rather than copying its words.
@@ -17,7 +17,7 @@ export const StorageTroubleMessage = "The vault's storage could not be reached, 
  * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
  *   backend holds: ciphertext and unencrypted fields. True of a `VaultDB` adapter, never of the
  *   device store, which is handed lease records: `DeviceDB` replaces what its store throws with a
- *   condition that keeps nothing of it.
+ *   condition that keeps only its `name`.
  * @param message - What failed, when there is more to say than that storage failed: which read or
  *   write it was, say. Never quotes a record or a name.
  *
@@ -160,9 +160,7 @@ const BlockedStorageNames: ReadonlySet<string> = new Set(['SecurityError', 'Quot
  * @example Refusals.isStorageBlocked(new DOMException('The operation is insecure.', 'SecurityError'))  // true
  * @example Refusals.isStorageBlocked(new DOMException('The connection is closing.', 'InvalidStateError'))  // false
  */
-export const isStorageBlocked = (err: unknown): boolean => (
-  typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string' && BlockedStorageNames.has(err.name)
-)
+export const isStorageBlocked = (err: unknown): boolean => BlockedStorageNames.has(thrownNameOf(err) ?? '')
 
 /** The message of the cause given a backend that failed without an error. */
 const NoErrorGiven = 'The storage backend failed without giving an error.'
