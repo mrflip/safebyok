@@ -1,5 +1,6 @@
 import type * as Z from 'zod'
 import { VaultError } from './errors'
+import * as Sanitizer from './sanitizer'
 import * as Phrases from './phrases'
 import { Validator } from './checks/validator'
 import { type VaultScope, vaultScope } from './shapes/scopes'
@@ -98,8 +99,8 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
     try {
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
       checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
-    } catch {
-      throw new VaultError('unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+    } catch (err) {
+      throw Sanitizer.refusalFor(err, 'unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }
     if (! checked.success) {
       throw new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
