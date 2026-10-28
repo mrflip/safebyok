@@ -1,6 +1,6 @@
 # Thread 23: convex-helpers 0.1.129 and the parity test's custom (2026-10-28)
 
-Branch `20261028-helpers_bump`, PR to be filled in by the PR itself, on main. Justify: green (core 3423 / 37 skipped,
+Branch `20261028-helpers_bump`, PR [#318](https://github.com/mrflip/safebyok/pull/318), on main. Justify: green (core 3423 / 37 skipped,
 convex 368 / 9 skipped, react 310, indexeddb 167, postgres 322, graphql 344, fastkey 49, demo 229,
 e2e 107, root 266; size budgets within limits).
 
