@@ -243,21 +243,28 @@ amends this note first.
 
 **G8. No secret reaches a refusal, a log, or a thrown value.** A `VaultError` carries none in its
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
-kind, a limit or a field name. Every validator's refusal quotes no input: `tests/validators.test.ts`,
+kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
+class name such as `QuotaExceededError`, kept by the device-store conditions and `crypto_failed`
+until a redact lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests/validators.test.ts`,
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced, never kept as a `cause`: `deriverThrewRefusal` (kind only, logged), `guardStrengthChecker`
-(nothing), `parseRequestCleartext` (kind only, logged). A WebCrypto failure is caught and replaced
-(`wrongProof`, `damaged_lease`, `damaged_box`), and each such catch holds that one WebCrypto call
-alone, its ctx built before it (`Proving.#unwrap`, `Lease.#vaultKeyOrNull`, `Lease.#openedOrNull`),
-so a bug in building the ctx never reads as a wrong proof or a damaged box. A device-store
-failure's cause never crosses to the host: `deviceTrouble` (`device-db.ts`) keeps neither what the
-store threw nor its message, reading only its `name`, as a `DeviceDB` is handed every lease
-record and the logger hands a condition to the host whole (`tests/device-db.test.ts`, *keeps
-nothing of a store's throw that quotes the record*). `unexpectedError` keeps a foreign throw as
-`cause` only where the thrower heard no secret: storage adapters, and a bug met inside a Lease or
-Box method, which the throwing form's one catch (`refusalOf`, `outcome.ts`) makes a VaultError of,
-never raw (the Vault and Bank forms map one in their `try` form). The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
+(nothing), `parseRequestCleartext` (kind only, logged). A WebCrypto failure is caught and replaced,
+its error never kept: `wrongProof`, `damaged_lease` and `damaged_box` where a wrong key or an
+altered record explains it, and `crypto_failed` (`Lease.cipheredWith`) for a key made, wrapped or a
+cipher under fresh keys that failed all the same, which keeps the error's `name` alone. Each such
+catch holds only WebCrypto calls, their ctx built before it (`Proving.#unwrap`,
+`Lease.#vaultKeyOrNull`, `Lease.#openedOrNull`, the cipher step of `Lease.cipheredWith`), so a bug
+in building the ctx never reads as a wrong proof or a damaged box. A device-store failure's cause
+never crosses to the host: `deviceTrouble` (`device-db.ts`) keeps neither what the store threw nor
+its message, only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a
+condition to the host whole (`tests/device-db.test.ts`, *keeps nothing of a store's throw that
+quotes the record*). `unexpectedError` keeps a foreign throw as `cause` only where the thrower
+heard no secret. The invariant at the one catch that ends each Lease and Box throwing form
+(`refusalOf`, `outcome.ts`) is checkable by reading what can reach it: a refusal (passed as
+itself), the vault's demand, or a bug's own throw from this package's lines; never WebCrypto's
+error, a host function's throw or the device store's, each replaced before it gets there. The
+Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
 not read is warned of without its record. *Host obligation, documented:* a `strengthChecker`'s
 `reason` becomes the `weak_passphrase` message, so it must not quote the passphrase

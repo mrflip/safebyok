@@ -217,41 +217,45 @@ describe("DeviceDB, the base class", () => {
     expect(raisedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
   })
 
-  it("says a SecurityError as 'storage_blocked', keeping nothing of the store's error, never rejecting", async () => {
+  it("says a SecurityError as 'storage_blocked', keeping only the store's error's name, never rejecting", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
     const deviceDB = new ScriptedDeviceDB(() => Promise.reject(blocked))
     const err = await TH.expectBad(deviceDB.delDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
     expect(err.cause).to.be.undefined
     expect(err.message).to.match(/erasing its record of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
+    expect(err.message).to.match(/The device store threw SecurityError\.$/)
     expect(err.message).to.not.include('insecure')
   })
 
-  it("keeps nothing of a store's throw that quotes the record it was handed: not as its cause, not in its message or meta", async () => {
+  it("keeps nothing of a store's throw that quotes the record it was handed but its name: not as its cause, not in its message or meta", async () => {
     const record = await TH.leaseOf('u1')
     const quoting = new Error(`could not store ${JSON.stringify({ ...record, lease_key: 'the leaseKey, as a careless store might print it' })}`)
     const deviceDB = new ScriptedDeviceDB(() => Promise.reject(quoting))
     const err = await TH.expectBad(deviceDB.putLease(record), 'storage_unavailable')
     expect(err.cause).to.be.undefined
     expect(err.meta).to.be.undefined
+    expect(err.message).to.match(/The device store threw Error\.$/)
     expect(TH.thrownText(err)).to.not.include(record.vault_tok)
     expect(TH.thrownText(err)).to.not.include('careless')
   })
 
   const ThrownCases = [
-    // what a host's own store may throw, and what the vault hears:
-    [new DOMException('No room.', 'QuotaExceededError'),     "storage_blocked",      'no room, as a private window or a full disk gives'],
-    [new DOMException('Gone.', 'NotSupportedError'),          "storage_blocked",      'no such storage at all'],
-    [{ name: 'SecurityError', message: 'from another frame' }, "storage_blocked",      'a refusal told by its name alone, from another frame'],
-    [new Error('socket closed'),                              "storage_unavailable",  'any other failure, which a retry may mend'],
-    ["a bare string",                                         "storage_unavailable",  'a thrown value that is no Error'],
+    // what a host's own store may throw, what the vault hears, and how the message ends: the error's name, or no word of it
+    [new DOMException('No room.', 'QuotaExceededError'),     "storage_blocked",      /The device store threw QuotaExceededError\.$/, 'no room, as a private window or a full disk gives'],
+    [new DOMException('Gone.', 'NotSupportedError'),          "storage_blocked",      /The device store threw NotSupportedError\.$/,  'no such storage at all'],
+    [{ name: 'SecurityError', message: 'from another frame' }, "storage_blocked",      /The device store threw SecurityError\.$/,      'a refusal told by its name alone, from another frame'],
+    [new Error('socket closed'),                              "storage_unavailable",  /The device store threw Error\.$/,              'any other failure, which a retry may mend'],
+    ["a bare string",                                         "storage_unavailable",  /or a private window\.$/,                       'a thrown value that is no Error, which has no name to keep'],
   ] as const
 
-  for (const [thrown, refusalkind, blurb] of ThrownCases) {
-    it(`says ${blurb} as '${refusalkind}', keeping nothing of what was thrown`, async () => {
+  for (const [thrown, refusalkind, ending, blurb] of ThrownCases) {
+    it(`says ${blurb} as '${refusalkind}', keeping nothing of what was thrown but its name`, async () => {
       const deviceDB = new ScriptedDeviceDB(vi.fn<() => Promise<never>>().mockRejectedValue(thrown))
       const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), refusalkind)
       expect(err.cause).to.be.undefined
+      expect(err.message).to.match(ending)
+      for (const quoted of ['No room', 'Gone', 'another frame', 'socket closed', 'bare string']) { expect(err.message).to.not.include(quoted) }
     })
   }
 

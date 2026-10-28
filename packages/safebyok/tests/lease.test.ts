@@ -1,6 +1,6 @@
 import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type BoxCiphered, BoxFormat, type BoxRecord, type BoxSparse } from '../src/shapes/box'
 import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { Lease, sealLeaseRecord } from '../src/lease'
@@ -414,6 +414,43 @@ describe("lease.cipheredWith and lease.decipherWith", () => {
     await TH.expectRefusal(lease.decipherWith(ciphered, visibleOf()), 'bad_record')
     expect(vault.locks).to.eq(0)
     expect(vault.lease).to.eq(lease)
+  })
+})
+
+/** `crypto.subtle` as a bag of methods a test may make reject once. */
+const subtleOf = () => crypto.subtle as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+
+describe("lease.cipheredWith, when the browser's WebCrypto fails under fresh keys", () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  const FailingCases = [
+    // what WebCrypto may fail at, which no key or record explains:
+    ['generateKey', 'the boxKey could not be made'],
+    ['wrapKey',     'the boxKey could not be wrapped under the vaultKey'],
+    ['encrypt',     'the whisper could not be ciphered'],
+  ] as const
+
+  for (const [verb, blurb] of FailingCases) {
+    it(`refuses 'crypto_failed' when ${blurb}, keeping only the error's name, the lease still held (Contract: Lease, Guarantees)`, async () => {
+      const { lease, vault } = await leasedVault()
+      vi.spyOn(subtleOf(), verb).mockRejectedValueOnce(new DOMException('The operation failed for an operation-specific reason', 'OperationError'))
+      const err = await TH.expectRefusal(lease.cipheredWith(bytesOf('"sk-fake"'), visibleOf()), 'crypto_failed')
+      expect(err.family).to.eq('condition')
+      expect(err.cause).to.be.undefined
+      expect(err.message).to.match(/WebCrypto threw OperationError\.$/)
+      expect(err.message).to.not.include('operation-specific')
+      expect(vault.locks).to.eq(0)
+      expect(vault.lease).to.eq(lease)
+    })
+  }
+
+  it("resolves it as a bad Outcome from tryCipheredWith and sealProps, and names no error when WebCrypto threw none", async () => {
+    const { lease } = await leasedVault()
+    vi.spyOn(subtleOf(), 'encrypt').mockRejectedValue('a bare string')
+    const err = await TH.expectBad(lease.tryCipheredWith(bytesOf('1'), visibleOf()), 'crypto_failed')
+    expect(err.message).to.not.include('bare string')
+    expect(err.message).to.not.match(/threw/)
+    await TH.expectBad(lease.trySealProps(visibleOf(), { whisper: bytesOf('1') }), 'crypto_failed')
   })
 })
 

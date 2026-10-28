@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -130,6 +130,7 @@ const FamilyCases = [
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
+  ["crypto_failed",       "condition", "the browser's cryptography failing as a box is sealed is told to the user, who tries again"],
   ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
   ["absent_vault",        "condition", 'a novel vault, asked for what only a gated one has, is set up by its first unlock'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
@@ -252,5 +253,21 @@ describe("listedKindOf", () => {
   it("is null for a VaultError whose kind is off the list: the thrower's own text", () => {
     expect(listedKindOf(new VaultError('no luck with hunter2' as RefusalKind, 'A refusal made up.'))).to.be.null
     expect(listedKindOf('hunter2')).to.be.null
+  })
+})
+
+describe("thrownNameOf", () => {
+  it("is the name an Error, a DOMException or a bare object carries, as its first example shows", () => {
+    expect(thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))).to.eq('QuotaExceededError')
+    expect(thrownNameOf(new TypeError('hunter2 is not a function'))).to.eq('TypeError')
+    expect(thrownNameOf({ name: 'SecurityError', message: 'from another frame' })).to.eq('SecurityError')
+  })
+
+  it("is null for anything without a string name, as its second example shows", () => {
+    expect(thrownNameOf('a bare string')).to.be.null
+    expect(thrownNameOf(null)).to.be.null
+    expect(thrownNameOf(undefined)).to.be.null
+    expect(thrownNameOf({ name: 42 })).to.be.null
+    expect(thrownNameOf({ message: 'nameless' })).to.be.null
   })
 })

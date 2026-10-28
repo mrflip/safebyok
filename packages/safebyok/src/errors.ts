@@ -12,8 +12,8 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *   `insecure_context`, `unexpected_error`, `passphrase_required`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
- *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
- *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
+ *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
+ *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
  *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
  *   `same_passphrase`.
@@ -58,6 +58,7 @@ export const RefusalKindVals = [
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
+  'crypto_failed',       // the browser's WebCrypto failed a key, wrap or cipher that should have worked: a fault of the platform, not of the user or the record
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
   'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
@@ -114,6 +115,7 @@ export const RefusalFamilyForKind = {
   newer_format:        'bad_news',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
+  crypto_failed:       'condition',
   unexpected_error:    'misuse',
   stale_write:         'condition',
   vault_mismatch:      'condition',
@@ -220,6 +222,15 @@ export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is Va
  */
 export const listedKindOf = (thrown: unknown): RefusalKind | null => (
   isVaultError(thrown) && (RefusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
+)
+
+/** The `name` of `thrown` when it is an object carrying a string one (an Error's or a DOMException's class name), else null: all a refusal keeps of an error that may quote what its thrower was handed.
+ *
+ * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
+ * @example thrownNameOf('a bare string')  // null
+ */
+export const thrownNameOf = (thrown: unknown): string | null => (
+  typeof thrown === 'object' && thrown !== null && 'name' in thrown && typeof thrown.name === 'string' ? thrown.name : null
 )
 
 /** True when `err` is a VaultError the app may show the user, or retry: a `condition` or `bad_news`.
