@@ -1582,8 +1582,7 @@ const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boo
 /** Timers fired before {@link onFakeClock} calls its work hung: far more than any battery's round trips. */
 const FakeClockTimerLimit = 100_000
 
-/**
- * What `work` resolves to, run on a fake clock: each timer it sets fires, in the order a real clock
+/** What `work` resolves to, run on a fake clock: each timer it sets fires, in the order a real clock
  * would fire it, once nothing else can run. A round trip over the wire costs a turn of the event
  * loop rather than the millisecond or more a real `setTimeout` waits, so a battery of thousands
  * runs in a fraction of a second however loaded the machine is; and a race's watchdog falls due
