@@ -1,8 +1,8 @@
 # Thread 9: saying_story (2026-10-28)
 
-Branch `20261028-saying_story`, PR #331, stacked on #327 (base `c51b7274`; main has since merged
-#327, #330 and #328). Justify: green (core 3476 passed, 37 skipped; every package green; size
-budget within limits).
+Branch `20261028-saying_story`, PR #331, on main (was stacked on #327, base `c51b7274`; caught up
+onto `f84d61bb` at filing, past #327, #330 and #328). Justify: green at the rebased tip (core 3479
+passed, 37 skipped; every package green; size budget within limits).
 
 * **Built**: in `packages/safebyok/src/checks/validator.ts`, `Saying` → `Story` and `SayingShape` →
   `StoryShape`; `parse(val, story?)` and every doc block follow ("saying" is "story" in prose, in
@@ -52,9 +52,9 @@ budget within limits).
     and `verifyConsistent` as values too; `verifyConsistent`'s doc block stated its relation to
     `parseConsistent` as a contract where it had named its caller.
     `tests/index.test.ts` pins the entry point's surface exactly, which that commit (`c16df6f7`) and
-    the plan commit after it (`f02d2b88`) were pushed without updating, so both are red at
-    `pnpm justify`; `3d4dcc8b` adds the three names and is green. Cause: the push was chained after a
-    log check that read the wrong exit line.
+    the plan commit after it (`f02d2b88`) were pushed without updating, so both were red at
+    `pnpm justify` until `3d4dcc8b` added the three names. Cause: the push was chained after a log
+    check that read the wrong exit line. Folded at filing (*Filing*, below), so no red commit lands.
   - *"story" replaces "saying" everywhere*: the sweep found one remaining place meaning the Story,
     `.changeset/20261028-where_prefix.md` (#327's note, on this branch), changed in its own commit.
   - *STYLE.md's Shapes bullet*: the reading is now the rule's own wording; namespacing is the
@@ -63,15 +63,18 @@ budget within limits).
     folder" gloss (`src/checks/`, `src/shapes/`) kept as settled.
   - *`Stored-` prefix* (from #330's review): the sentence it amends is main's (#330), not on this
     base, so the paragraph here carries main's sentence verbatim plus the clause: the prefix names
-    what storage holds, checked or not (`StoredVaultTok`, `StoredRevision`). **The restack will
-    conflict on this paragraph** (both sides add text at the same spot): take this branch's side,
-    which is main's sentence with the clause.
+    what storage holds, checked or not (`StoredVaultTok`, `StoredRevision`). The restack conflicted
+    on this paragraph as foreseen; how it went is under *Filing*.
   - *Doc-block lead verb* (from #328's review): the rule and its worked example lead "Get and open
     the box", the body "Gets through `#getBox`", the body line written exactly as main (#328) has
-    it, so the restack merges it clean.
+    it. The body merged clean; the example's lead line conflicted (*Filing*).
   - *VOCABULARY.md*: a **story** row in *Names, records and times*, in the Coach's words: "a
     controlled record of what is happening, suitable for logs or refusals".
   - STYLE.md's edits are one `docs:` commit; the exports and changeset one `api:`; the sweep one;
     VOCABULARY.md one `docs:`.
   - The zxcvbn `PlainSaying`/`SayingForWarning` names stay, a reason sentence and not a Story: the
     orchestrator records that call.
+* **Filing** (2026-10-28, a fresh worker, from the reviewed tip `881c1bbe`): the two red commits
+  folded away (sixteen commits became fourteen, the tip's tree unchanged), then the catch-up rebase
+  onto main, which conflicted in STYLE.md's naming paragraph and the entry point's surface list.
+  The commit-by-commit account is `thread-9-saying_story-filing.md`, beside this file.
