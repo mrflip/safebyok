@@ -14,7 +14,7 @@ import { sameScope } from './names'
 import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { Validator } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
-import { LeaseFormat, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
+import { LeaseFormat, LeaseGrant, LeaseRecord, LeaseStamp, type LeaseSparse } from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import { type VaultSparse, type VaultStamp, VaultStampButFormat } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
@@ -23,11 +23,6 @@ import { FarFuture } from './consts'
 import type { Vault } from './vault'
 import type { DeviceDB } from './device-db'
 import type { VaultLogger } from './logger'
-
-/** What {@link sealLeaseRecord} grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold. It refuses 'bad_record'. */
-export const { LeaseGrant } = Validator('bad_record', () => ({
-  LeaseGrant: LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
-}))
 
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
  * Each stamp may come whole, a Vault object or a lease record: only its stamp fields are taken.

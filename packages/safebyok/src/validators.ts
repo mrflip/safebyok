@@ -9,17 +9,13 @@
  * @example Validators.vault_tok.safeParse('').success   // false: a vault_tok is non-empty text
  */
 
-export { EpochMillis, label, user_id } from './checks/primitives'
+export { EpochMillis, label, user_id } from './shapes/primitives'
 export { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath, VaultScope, vaultBag, bankBag } from './shapes/scopes'
-export { keyDeriverSpec } from './checks/key-deriver-spec-checks'
+export { keyDeriverSpec } from './shapes/key-deriver-spec'
 export { vault_tok, revision_tok, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, Ciphered } from './shapes/fields'
 export { Whisper, Sidecar, BoxRecord, BoxSparse, BoxDamaged, BoxStamp } from './shapes/box'
 export { Capacity, VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } from './shapes/vault-db'
-export { LeaseRecord, DeviceRecord, LeaseStamp } from './shapes/device'
-export { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft, passkeyAnswerShape } from './shapes/vault'
-export { makeBankOpts, bankVaultOpts, vaultDBShape, deviceDBShape, clockShape, clockReading, keyDeriverShape } from './shapes/bank-opts'
-export { strengthChecker, passphraseVerdict } from './passphrase-strength'
-export { loggerShape } from './logger'
-export { localVaultDBOptsShape } from './local-vault-db'
-export { maskOpts } from './mask'
-export { idbOpts } from './idb-opts'
+export { LeaseRecord, DeviceRecord, LeaseStamp, idbOpts } from './shapes/device'
+export { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, VaultDraft, passkeyAnswerShape, strengthChecker, passphraseVerdict } from './shapes/vault'
+export { makeBankOpts, bankVaultOpts, vaultDBShape, deviceDBShape, clockShape, clockReading, keyDeriverShape, loggerShape, localVaultDBOptsShape } from './shapes/bank-opts'
+export { maskOpts } from './shapes/mask'

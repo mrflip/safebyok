@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { Validator } from './checks/validator'
+import { maskOpts } from './shapes/mask'
 import { codePointsOf } from './text'
 
 /** How `mask` shows a whisper: how many characters to reveal, and how many stars to hide it behind. */
@@ -16,23 +16,6 @@ export interface MaskOpts {
 
 /** The stars-and-dots a masked whisper collapses to once the result would pass `maxLen`. */
 const Collapsed = '***...***'
-
-/** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
-const MaxShown = 1000
-
-/** The check of `mask`'s options, defaulting each, refusing 'bad_option'. */
-export const { maskOpts } = Validator('bad_option', ({ obj, union, lit, uint }) => {
-  const shownCount = uint.lte(MaxShown)
-  const resultLen  = union([lit(Infinity), uint])
-  return {
-    maskOpts: obj({
-      head:     shownCount.default(2),
-      tail:     shownCount.default(4),
-      minStars: shownCount.default(6),
-      maxLen:   resultLen.default(15),
-    }),
-  }
-})
 
 /** The characters `plainLine` removes: combining marks, controls, invisibles, spaces, bidirectional controls, and symbols drawn blank or boxed.
  * Right-to-left letters and numbers are kept.

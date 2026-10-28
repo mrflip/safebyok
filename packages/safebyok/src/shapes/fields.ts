@@ -4,7 +4,7 @@ import type * as Z from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 
-export { EpochMillis } from '../checks/primitives'
+export { EpochMillis } from './primitives'
 
 // == [Ciphered]: Ciphered
 

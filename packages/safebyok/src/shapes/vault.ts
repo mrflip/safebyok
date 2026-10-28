@@ -1,9 +1,11 @@
-/** The vault record: the one record per vault every device syncs, its gate nested in it, the shapes sliced from it, and the proofs its wayins take. Each record's `parse` refuses 'bad_record', quoting none of it. */
+/** The vault record: the one record per vault every device syncs, its gate nested in it, the shapes sliced from it, the proofs its wayins take, and a new passphrase's strength checker and verdict. Each record's `parse` refuses 'bad_record', quoting none of it. */
 
 import { string as zodString } from 'zod'
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
 import * as Phrases from '../phrases'
+import { fromB64OrNull } from '../crypto'
+import type { StrengthChecker } from '../passphrase-strength'
 import { credential_id, device_id, key_deriver_label, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './fields'
 
 // == [Formats]: VaultFormat, TombstoneFormat
@@ -15,7 +17,7 @@ export const VaultFormat = 'safebyok-vault-v6'
 export const TombstoneFormat = 'safebyok-tombstone-v1'
 // --
 
-// == [Wayin kinds]: WayinKindVals, wayinkind, WayinKind, PasskeySaltBytes
+// == [Wayin kinds]: WayinKindVals, wayinkind, WayinKind, PasskeySaltBytes, isPrfSalt
 
 /** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
 export const WayinKindVals = ['passphrase', 'passkey'] as const
@@ -31,6 +33,9 @@ export type WayinKind = typeof WayinKindVals[number]
  * A new passkey's {@link PasskeyAnswer} carries a fresh salt this long, as `createPasskey` mints.
  */
 export const PasskeySaltBytes = 32
+
+/** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
+export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 // --
 
 // == [The records]: PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, headerOf, VaultDraft
@@ -304,7 +309,7 @@ export type PasskeyWayinSummary = PasskeyWayinSparse & Pick<VaultRecord, 'vault_
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 // --
 
-// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswerShape, PasskeyAnswer
+// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswerShape, PasskeyAnswer, freshPasskeyAnswer
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
  * What a blank one means is the gating's to say.
@@ -348,4 +353,37 @@ export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes
  *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswerShape>
+
+/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
+ * A passkey wayin sealed over another salt would read as damaged at every later unlock.
+ *
+ * @example freshPasskeyAnswer.parse(await createPasskey(opts))   // passes
+ * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
+ */
+export const { freshPasskeyAnswer } = Validator('bad_option', () => ({
+  freshPasskeyAnswer: passkeyAnswerShape.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
+}))
+// --
+
+// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
+
+/** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
+const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
+  typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
+)
+
+/** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
+export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
+  strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
+  passphraseVerdict: union([
+    obj({ strong: lit(true) }),
+    obj({ strong: lit(false), reason: str.min(1) }),
+  ]),
+}))
+
+/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
+ * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
+ * vault's 'weak_passphrase' refusal carries it as its message.
+ */
+export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 // --

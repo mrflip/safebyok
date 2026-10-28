@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { keyDeriverSpec } from './checks/key-deriver-spec-checks'
+import { keyDeriverSpec } from './shapes/key-deriver-spec'
 import type { KeyDeriver } from './key-deriver'
 
 /** A keyDeriverSpec: Argon2id's whole parameter set, under the keyDeriverLabel a vault records.

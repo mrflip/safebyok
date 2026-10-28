@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { EpochMillis, LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/checks/primitives'
+import { EpochMillis, LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern, label, user_id } from '../../src/shapes/primitives'
 import { FarFuture, FarPast } from '../../src/consts'
 
 const LabelCases = [

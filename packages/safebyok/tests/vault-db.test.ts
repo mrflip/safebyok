@@ -13,7 +13,7 @@ import type { VaultScope } from '../src/shapes/scopes'
 import type { VaultRecord, VaultDraft } from '../src/shapes/vault'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
-import { MaxUserIdChars } from '../src/checks/primitives'
+import { MaxUserIdChars } from '../src/shapes/primitives'
 import * as TH from './test-helpers'
 
 // == [Test adapters]: MapVaultDB, TroubledVaultDB, RingingVaultDB, MisreportingVaultDB, MisreportedCases

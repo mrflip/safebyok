@@ -1,5 +1,6 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
-import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
+import type { StrengthChecker } from './passphrase-strength'
+import type { PassphraseVerdict } from './shapes/vault'
 import type { VaultScope } from './shapes/scopes'
 import { codePointsOf } from './text'
 

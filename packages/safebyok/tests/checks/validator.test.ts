@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
-import * as Primitives from '../../src/checks/primitives'
+import * as Primitives from '../../src/shapes/primitives'
 import { type ConsistencyRefusal, Kit, type Story, Validator, consistent, demandConsistent, verifyConsistent } from '../../src/checks/validator'
 import { type RefusalKind, VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'

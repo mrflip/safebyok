@@ -15,13 +15,11 @@ import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import * as HostErrorSanitizer from './host-error-sanitizer'
-import { PasskeySaltBytes, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, VaultMadeUnder, type VaultRecord, type VaultSparse, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import { freshPasskeyAnswer, isPrfSalt, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, VaultMadeUnder, type VaultRecord, type VaultSparse, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
 import type { LeaseRecord } from './shapes/device'
 import { adorn, decorate } from './helpers'
 import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
-import { PasskeyWayin, PassphraseWayin, Wayin, isPrfSalt, isSaltOf, wayinCtxOf } from './wayin'
-import * as Phrases from './phrases'
-import { Validator } from './checks/validator'
+import { PasskeyWayin, PassphraseWayin, Wayin, isSaltOf, wayinCtxOf } from './wayin'
 
 /** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more.
  * `call` is the vault call that raised it, which a demand's refusal names in the log.
@@ -362,7 +360,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 }
 
-// == [Headers]: freshPasskeyAnswer, mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, gateMovedPast, demandOn, demandAfterFailedSeal, sealLandedError
+// == [Headers]: mintedPassphraseHeader, checkedPassphraseHeader, mintedPasskeyHeader, checkedPasskeyHeader, gateMovedPast, demandOn, demandAfterFailedSeal, sealLandedError
 
 /** A fresh passphrase header: the vault's key deriver, a fresh salt of its length, this device's id, and the time now, each as `tools` hands it. */
 const mintedPassphraseHeader = (tools: ProvingTools): PassphraseWayinHeader => ({
@@ -384,16 +382,6 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
   if (! passphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces: type the vault's passphrase.") }
   return header
 }
-
-/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
- * A passkey wayin sealed over another salt would read as damaged at every later unlock.
- *
- * @example freshPasskeyAnswer.parse(await createPasskey(opts))   // passes
- * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
- */
-export const { freshPasskeyAnswer } = Validator('bad_option', () => ({
-  freshPasskeyAnswer: passkeyAnswerShape.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
-}))
 
 /** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now, as `tools` hands them. */
 const mintedPasskeyHeader = (tools: ProvingTools, answer: PasskeyAnswer): PasskeyWayinHeader => {

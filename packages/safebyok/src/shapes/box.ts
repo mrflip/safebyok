@@ -1,10 +1,11 @@
-/** The box record and the shapes sliced from it, and the whisper and sidecar it holds. Each record's `parse` refuses 'bad_record', quoting none of it. */
+/** The box record and the shapes sliced from it, the whisper and sidecar it holds, and what a box is sealed with. Each record's `parse` refuses 'bad_record', quoting none of it. */
 
 import type * as Z from 'zod'
 import { record } from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import { box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './fields'
+import { VaultSparse } from './vault'
 
 // == [Whisper and sidecar]: WhisperJson, Whisper, isPlainBag, whisperBag, Sidecar
 
@@ -162,4 +163,35 @@ export const { CipheredShape } = Validator('bad_record', ({ obj }) => ({
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Z.infer<typeof CipheredShape>
+// --
+
+// == [Seal]: BoxBase, SealBoxProps, MadeUnderShape, MadeShape, MadeUnder
+
+/** What {@link Box.seal} seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
+ * `SealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
+ * any, and nothing else: a boxlabel that is not a label refuses as the rest do. `BoxBase` takes
+ * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
+ * is made under, and what a seal is made with, are taken from a {@link VaultSparse}, frozen.
+ */
+export const { BoxBase, SealBoxProps, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis }) => {
+  const BoxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
+  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
+  return {
+    BoxBase,
+    SealBoxProps: obj({ boxlabel, sidecar: Sidecar.default(() => ({})), base: BoxBase.nullish() }).strict(),
+    MadeUnderShape,
+    MadeShape:    obj({ madeUnder: MadeUnderShape, now: epochMillis }),
+  }
+})
+
+/** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
+ * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
+ */
+export type BoxBase = Z.infer<typeof BoxBase>
+
+/** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
+export type SealBoxProps = Z.input<typeof SealBoxProps>
+
+/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
+export type MadeUnder = Z.infer<typeof MadeUnderShape>
 // --

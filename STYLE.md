@@ -359,7 +359,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 * Modules of validators in `sources` (star imports, `[FooValidators]`) are spread into the kit
   beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
   bringing names into scope.
-* The primitives the kit hands out (`checks/primitives.ts`) are plain Zod, and so is a variation
+* The primitives the kit hands out (`shapes/primitives.ts`) are plain Zod, and so is a variation
   made directly from a validator (`VaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
   use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
 * **One input, one validator.** A function checks what it is handed with one validator, never a

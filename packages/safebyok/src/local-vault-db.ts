@@ -5,8 +5,7 @@ import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
-import { Validator } from './checks/validator'
-import * as Phrases from './phrases'
+import { localVaultDBOptsShape } from './shapes/bank-opts'
 import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
 import type { VaultRecordExpectation, StoredBox, StoredVault, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
@@ -47,12 +46,6 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
   localVaultDBOptsShape.parse(opts, { where: "In localVaultDB's options" })
   return new StringStoreVaultDB(opts)
 }
-
-/** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
-export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
-  const call = fn()
-  return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
-})
 
 class StringStoreVaultDB extends VaultDB {
   // localStorage holds about five megabytes per origin, in all: a mebibyte is this adapter's

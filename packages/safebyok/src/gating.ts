@@ -8,8 +8,8 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type Outcome, bad, good, valOf } from './outcome'
-import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, freshPasskeyAnswer } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
+import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools } from './proving'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, freshPasskeyAnswer, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
 import type { Vault } from './vault'
 
 /** Each kind of gating, by the change its attempt makes: see {@link Gating}. */

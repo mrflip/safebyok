@@ -5,7 +5,8 @@ import { type BoxListing, BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGet
 import type { VaultScope } from './shapes/scopes'
 import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone } from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
-import { Validator, verifyConsistent } from './checks/validator'
+import { verifyConsistent } from './checks/validator'
+import { callback } from './shapes/bank-opts'
 import { fieldOf } from './helpers'
 import * as CX from './shapes/scopes'
 import * as Refusals from './refusals'
@@ -832,12 +833,6 @@ const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | BoxDamaged | n
 
 /** A box handed to `putBox` that this package would not build: kind 'invalid_box', quoting none of it. */
 const invalidBox = () => new VaultError('invalid_box', "Nothing was written: that box is not one this package builds. Hand a VaultDB's putBox only the boxes a vault seals.")
-
-/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
- *
- * @example this.#listeners.add(callback.parse(listener))
- */
-export const { callback } = Validator('bad_option', ({ fn }) => ({ callback: fn() }))
 
 /** `candidate` through `recordSchema`, or the refusal `refused` makes, its cause the schema's own 'bad_record'.
  * That cause names each failing field and what it expected, in its message and `meta.fieldnames`,

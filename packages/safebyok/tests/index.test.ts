@@ -3,7 +3,7 @@ import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import * as safebyok from '../src/index'
-import * as Primitives from '../src/checks/primitives'
+import * as Primitives from '../src/shapes/primitives'
 import * as Validators from '../src/validators'
 
 describe("the package's entry point", () => {

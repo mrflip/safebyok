@@ -1,11 +1,11 @@
-/** What a device keeps of a vault: its lease, and its device record. Each `parse` refuses 'bad_record', and each record is strict. */
+/** What a device keeps of a vault: its lease, what a lease is granted, and its device record, each `parse` refusing 'bad_record', each record strict; and the IndexedDB device store's options. */
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
 
-// == [Lease]: LeaseFormat, isLeaseKey, LeaseRecord, LeaseStamp, LeaseSparse
+// == [Lease]: LeaseFormat, isLeaseKey, LeaseRecord, LeaseStamp, LeaseSparse, LeaseGrant
 
 /** The `format` a {@link LeaseRecord} carries, in its stamp. */
 export const LeaseFormat = 'safebyok-lease-v1'
@@ -59,6 +59,11 @@ export type LeaseStamp = Z.infer<typeof LeaseStamp>
 
 /** A lease's sparse shape, as a log line or a listing shows it: the same fields as its {@link LeaseStamp}. A Lease's own fields are these. */
 export type LeaseSparse = LeaseStamp
+
+/** What `sealLeaseRecord` grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold. It refuses 'bad_record'. */
+export const { LeaseGrant } = Validator('bad_record', () => ({
+  LeaseGrant: LeaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
+}))
 // --
 
 // == [Device record]: DeviceRecordFormat, DeviceRecord
@@ -91,4 +96,13 @@ export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, appla
   }).strict().readonly(),
 }))
 export type DeviceRecord = Z.infer<typeof DeviceRecord>
+// --
+
+// == [IndexedDB options]: DefaultDbName, idbOpts
+
+/** The IndexedDB database a device store keeps its records in when its options name none. */
+const DefaultDbName = 'safebyok'
+
+/** The check of {@link IdbOpts}: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
+export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }).strict() }))
 // --

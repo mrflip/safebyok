@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyDeriverSpec } from '../../src/checks/key-deriver-spec-checks'
+import { keyDeriverSpec } from '../../src/shapes/key-deriver-spec'
 import { Argon2idWebV1 } from '../../src/key-deriver-spec'
 import * as TH from '../test-helpers'
 

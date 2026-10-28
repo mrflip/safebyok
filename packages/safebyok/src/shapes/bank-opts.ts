@@ -1,4 +1,4 @@
-/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults, the stores and libraries a host hands in, and the limits. Each `parse` refuses 'bad_option'. */
+/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults, the stores and libraries a host hands in, and the limits; and the checks of a logger, `localVaultDB`'s options and a callback. Each `parse` refuses 'bad_option'. */
 
 import type * as Z from 'zod'
 import { MinuteMillis, ForeverMillis, FarPast, FarFuture, MaxSaltBytes } from '../consts'
@@ -7,11 +7,12 @@ import type { DeviceDB } from '../device-db'
 import type { RequestCleartext } from '../gating'
 import type { KeyDeriver } from '../key-deriver'
 import type { VaultLogger } from '../logger'
-import { type StrengthChecker, DefaultStrengthChecker, strengthChecker } from '../passphrase-strength'
+import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
 import { key_deriver_label } from './fields'
+import { strengthChecker } from './vault'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock
 
@@ -244,4 +245,25 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
     }, Phrases.KeyDeriverShape),
   }
 })
+// --
+
+// == [Host code and adapters' options]: loggerShape, localVaultDBOptsShape, callback
+
+/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
+export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
+  const loggerCall = fn<VaultLogger['log']>()
+  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape) }
+})
+
+/** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
+  const call = fn()
+  return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
+})
+
+/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
+ *
+ * @example this.#listeners.add(callback.parse(listener))
+ */
+export const { callback } = Validator('bad_option', ({ fn }) => ({ callback: fn() }))
 // --

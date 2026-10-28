@@ -3,11 +3,11 @@
 import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
-import type { label, user_id } from '../checks/primitives'
+import type { label, user_id } from './primitives'
 import { never } from 'zod'
 import { Validator } from '../checks/validator'
 
-export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from '../checks/primitives'
+export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from './primitives'
 
 // == [Names]: Applabel, Vaultlabel, Boxlabel, UserId
 

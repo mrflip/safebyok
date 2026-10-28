@@ -4,7 +4,7 @@ import * as Zod from 'zod'
 import type * as Z from 'zod'
 import { RefusalKindVals, VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
-import { EpochMillis, label, user_id } from './primitives'
+import { EpochMillis, label, user_id } from '../shapes/primitives'
 
 // == [Kit]: isBytes, Kit, KitWith, Merged
 

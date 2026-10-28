@@ -9,7 +9,7 @@
  */
 
 import { cipherCtx, fromB64OrNull } from './crypto'
-import { PasskeySaltBytes, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
+import { isPrfSalt, type PasskeyWayinSummary, type PassphraseWayinSummary, type WayinKind, type WayinSummary, VaultStamp, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type WayinHeader, headerOf } from './shapes/vault'
 import type { KeyDeriver } from './key-deriver'
 import type { PrfSalt } from './shapes/fields'
 
@@ -28,9 +28,6 @@ const PurposeForWayinkind = {
 export const wayinCtxOf = (vaultStamp: VaultStamp, header: WayinHeader): Uint8Array => (
   cipherCtx(VaultStamp.parse(vaultStamp), PurposeForWayinkind[header.wayinkind], header)
 )
-
-/** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
-export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 
 /** True for a passphrase wayin's salt `keyDeriver` makes: base64url text of its `salt_bytes` bytes. */
 export const isSaltOf = (keyDeriver: Pick<KeyDeriver, 'salt_bytes'>, salt_b64: string): boolean => fromB64OrNull(salt_b64)?.length === keyDeriver.salt_bytes

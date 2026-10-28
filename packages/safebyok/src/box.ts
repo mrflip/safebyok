@@ -1,49 +1,18 @@
 import { deepFreeze } from 'es-toolkit'
-import type * as Z from 'zod'
 import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { type Outcome, outcomeOf, refusalOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
-import { revision_tok } from './shapes/fields'
-import { type VaultStamp, VaultSparse } from './shapes/vault'
+import { BoxFormat, BoxRecord, BoxSparse, MadeShape, MadeUnderShape, SealBoxProps, Sidecar, Whisper, type MadeUnder } from './shapes/box'
+import type { VaultStamp } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import type { Boxscope, VaultScope } from './shapes/scopes'
-import { Validator } from './checks/validator'
 
-// == [Box]: VaultOfBox, BoxBase, SealBoxProps, MadeUnderShape, MadeShape, MadeUnder, Box, record, baseRevisionTok, make, seal, extractWhisper
+// == [Box]: VaultOfBox, Box, record, baseRevisionTok, make, seal, extractWhisper
 
 /** The vault a box lies in, as far as a box reads it: its scope and `vault_tok`, and its demand. A Vault object is one. */
 type VaultOfBox = ConsistencyWith<VaultScope & Pick<VaultStamp, 'vault_tok'>>
-
-/** What {@link Box.seal} seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
- * `SealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
- * any, and nothing else: a boxlabel that is not a label refuses as the rest do. `BoxBase` takes
- * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
- * is made under, and what a seal is made with, are taken from a {@link VaultSparse}, frozen.
- */
-export const { BoxBase, SealBoxProps, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis }) => {
-  const BoxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
-  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
-  return {
-    BoxBase,
-    SealBoxProps: obj({ boxlabel, sidecar: Sidecar.default(() => ({})), base: BoxBase.nullish() }).strict(),
-    MadeUnderShape,
-    MadeShape:    obj({ madeUnder: MadeUnderShape, now: epochMillis }),
-  }
-})
-
-/** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
- * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
- */
-export type BoxBase = Z.infer<typeof BoxBase>
-
-/** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
-export type SealBoxProps = Z.input<typeof SealBoxProps>
-
-/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
-type MadeUnder = Z.infer<typeof MadeUnderShape>
 
 /** One revision of one box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and what it was made under.
  * A box revision is never rewritten, so every field a Box shows is fixed for its life, and frozen

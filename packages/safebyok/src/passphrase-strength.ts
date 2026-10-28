@@ -1,8 +1,6 @@
-import type * as Z from 'zod'
 import { VaultError } from './errors'
 import * as HostErrorSanitizer from './host-error-sanitizer'
-import * as Phrases from './phrases'
-import { Validator } from './checks/validator'
+import { passphraseVerdict, type PassphraseVerdict } from './shapes/vault'
 import { type VaultScope, vaultScope } from './shapes/scopes'
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
@@ -57,26 +55,6 @@ const DefaultVerdict: PassphraseVerdict = Object.freeze({
  * @example DefaultStrengthChecker('correct horse battery staple')   // { strong: false, reason: "This app can't take a new passphrase yet: ..." }
  */
 export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
-
-/** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
-const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
-  typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
-)
-
-/** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
-export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
-  strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
-  passphraseVerdict: union([
-    obj({ strong: lit(true) }),
-    obj({ strong: lit(false), reason: str.min(1) }),
-  ]),
-}))
-
-/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
- * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
- * vault's 'weak_passphrase' refusal carries it as its message.
- */
-export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
