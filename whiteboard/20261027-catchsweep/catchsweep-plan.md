@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), each PR's base `main`: merging #321 merges all four. 2 (#325, on #316) reviewed and flagged on its two declared deviations, waits unfiled for the Coach; 7 (#327, on #321) in review; 3 and 8 building on #321. Eight threads.
+**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), each PR's base `main`: merging #321 merges all four. 2 (#325, on #316) reviewed and flagged on its two declared deviations, waits unfiled for the Coach; 7 (#327, on #321) in review; 3 and 8 building on #321; 9 (saying_story) queued. Nine threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -37,6 +37,13 @@ thread 2 is cut from thread 1's tip (same lines of `lease.ts`); threads 1, 3, 4 
   building them never reads as a wrong passphrase, a damaged box or storage trouble.
 * **One wrapper per edge, never nested.** `outcomeOf` is applied once, at a public method; inside,
   plain `try`/`catch`. A prepared closure is one hop, `(x) => this.#method(x)`.
+* **`read` and `write` are category words, never a function's name** (the Coach, 2026-10-28): "read"
+  and "write" are reserved exactly for "any operation that views: get, ensure, find, list, etc"; likewise
+  write for "put, replace, patch, delete, etc". A function or method is named for the one operation it
+  does; a kind or field covering the whole category may say write (`stale_write`, `written_at`).
+* **Shapes and their types** (the Coach, 2026-10-28): "It's an easy rule, unless there's a good reason:
+  use Z.infer (eg recursive types); put in the common checks folder (weird and module-local and good idea
+  to put it near where used); use Validator; namespace it, using Validator or a star-import."
 * **No cause carrying secret material** reaches a host's logger or a thrown error. A device-store
   record holds a key handle; the vault record and box records hold ciphertext and headers.
 * Each export's doc block is written for its caller; a changed refusal is named in it.
@@ -295,6 +302,22 @@ Changeset: `safebyok` minor naming `StringStore.get`/`put`/`del`, `Refusals.stal
 `registerLeaseGetter`; patch for each adapter package touched. Size: medium, mechanical. Depends on:
 **thread 6** (`device-db.ts`, `lease.ts`'s `tryGetLease` line) and thread 1 (`KeptLease.tryRead`):
 cut from thread 6's tip once it files, beside thread 3; restacked at the wrap-up. Review `medium`.
+
+### 9. saying_story: the saying is a Story, exported, inferred from its shape
+
+Coach (2026-10-28), on three rows from #317's review: "yes export"; "May we use 'Story'?"; and the
+shapes rule above.
+
+Gloss: in `packages/safebyok/src/checks/validator.ts` (and wherever #317 left them), `Saying` →
+`Story` and `SayingShape` → `StoryShape`, the parameter and doc blocks of `parse(val, story?)`
+following ("saying" in prose becomes "story"); `Story` and `Refusing` exported from `src/index.ts`
+(minor changeset naming both); `Story` and `ConsistencyRefusal` written as `Z.infer<typeof ...Shape>`
+rather than by hand, their shapes living in the common checks folder and made in a `Validator` call,
+namespaced as the rule says (the worker reads STYLE.md *Shapes and duck typing* and *Validation*, and
+writes the Coach's rule into STYLE.md *Shapes* in the same PR, quoting it). Tests follow the renames;
+`tests/checks/validator.test.ts` gains nothing but names unless a type test is natural. Size: small.
+Depends on: #317 (in the line); cut from the top of the line (#321's tip, or higher once threads file)
+when a slot frees. Review `medium`.
 
 ## Not in this sprint
 
