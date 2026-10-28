@@ -102,6 +102,18 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
   return answerOf(credential_id, prfSaltBytes, answer)
 }
 
+/** Hand `passkey` to `attempt`, then zero its bytes, whatever the attempt did: a dialog hands each answer in once, and keeps no copy that opens the vault.
+ * The vault zeroes an answer it seals; one refused before it was sealed, as for a mistyped
+ * passphrase, it leaves for a retry, which these dialogs never make.
+ */
+export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
+  try {
+    return await attempt(passkey)
+  } finally {
+    passkey.prfBytes.fill(0)
+  }
+}
+
 /** The answer of the vault's one passkey: what an `unlock_vault` gating's `attemptPasskey` takes.
  * `gate` is the snapshot's, as it is now (`vault.getSnapshot().gate`); the browser asks the user to
  * touch its passkey, and asks it for its answer over its own salt.

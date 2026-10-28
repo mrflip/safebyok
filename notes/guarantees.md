@@ -87,6 +87,8 @@ So for the strong key the minimal path is: the deriver's bytes, or the authentic
 zeroed them; the handle exists in `Proving.#wayinKey` until the proving is dropped; nothing of
 either is ever stored. Outside the core, `safebyok-react`'s `bytesOf` copies the browser's PRF
 result into the answer and zeroes the buffer it copied from, so the answer's bytes are the one copy.
+Its dialogs try an answer at once or zero it untried, never keeping one for a hidden dialog to show
+again, and zero it once its one attempt is done (`attemptOnce`).
 
 ## The secret values
 
@@ -96,7 +98,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | Value | Form | Where it may exist | For how long | Who touches it |
 |---|---|---|---|---|
 | passphrase | JS string | function arguments and locals of one gating's chain; the host's dialog | the call | the gating chain, `PassphraseProving.seal`, `passphraseKeyOf`; the host's `keyDeriver`, `strengthChecker` and dialog |
-| passkey PRF answer | `Uint8Array` in the host's `PasskeyAnswer` | the answer object, until `PasskeyProving.seal` zeroes it | one seal | `PasskeyProving.seal`; the host's `askPasskey` |
+| passkey PRF answer | `Uint8Array` in the host's `PasskeyAnswer` | the answer object, until its attempt spends it: `PasskeyProving.seal` zeroes it, or `spendAnswer` an attempt that never sealed it | one attempt | `PasskeyProving.seal`, `spendAnswer`; the host's `askPasskey` |
 | passphraseKey bytes | the deriver's `Uint8Array` | a local in `passphraseKeyOf`, zeroed after import | one import | `passphraseKeyOf`; the host's `keyDeriver` |
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
@@ -133,7 +135,10 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 `attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isAllZero`),
 `checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
 `PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
-`subtle.deriveKey`), and `prfBytes.fill(0)`.
+`subtle.deriveKey`), and `prfBytes.fill(0)`; or, for an attempt that never sealed it,
+`spendAnswer` (`gating.ts`: `passkeyAnswer.safeParse`, then `prfBytes.fill(0)`). In
+`safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s `put_passkey` form hand it on at once
+or zero it untried (`useWhenShown`'s `isShown`), and `attemptOnce` zeroes it after its attempt.
 
 **passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
 (`isSharedMemory`, `isAllZero`, the length check) → `importWrappingKeyBytes`
@@ -194,12 +199,17 @@ output is a view over the deriver's own buffer, imported non-extractable with `w
 `unwrapKey` only, and zeroed in a `finally`, imported or refused (`passphraseKeyOf`,
 `importWrappingKeyBytes`). A passkey's PRF bytes are zeroed in `PasskeyProving.seal`'s `finally`,
 whatever happens, so an answer is single-use, and one handed in again is refused `bad_option` by
-its all-zero bytes (`checkedPasskeyAnswer`). The passkeyKey is HKDF-SHA256 of those bytes, its
+its all-zero bytes (`checkedPasskeyAnswer`). An attempt that never seals the answer it was handed
+zeroes it too (`spendAnswer`): one refused before the seal, after the gating is over, while
+another attempt runs, or when a lock lands first. Only a refusal the user can correct leaves it
+unspent, for the host to hand in again or zero. *Caveat:* that zeroing is then the host's;
+`safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a hidden dialog to
+show again. The passkeyKey is HKDF-SHA256 of those bytes, its
 `info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`proving.ts` header). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/proving.test.ts`,
-`tests/wayin.test.ts`.
+`tests/wayin.test.ts`, `tests/gating.test.ts` (*a passkey's answer handed to an attempt*).
 
 **G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an
 *extractable* local where WebCrypto requires it to be wrapped: fresh in `sealWayins`

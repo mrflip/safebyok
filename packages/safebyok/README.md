@@ -537,6 +537,10 @@ const requestCleartext: RequestCleartext = async (gating) => {
   refuses `ensureUnlocked()` `storage_blocked` or `storage_unavailable`, saying the passphrase was
   set; through `putWayin`, the change resolves and the logger says so. A second submit while an
   attempt runs refuses `attempt_in_flight`; disable the button meanwhile.
+* **An attempt spends the passkey's answer it is handed**: its bytes are zeroed, whether it was
+  sealed or never tried. Only a refusal the user can correct leaves it unspent, to hand in again;
+  zero it yourself (`answer.prfBytes.fill(0)`) if you will not. Each later attempt needs a fresh
+  answer: ask the passkey again.
 * **Cancel** resolves your `requestCleartext`, or calls `gating.decline()`: a gating still open
   then is declined, and its calls refuse `vault_locked`. Declining never locks a vault that is
   unlocked, and is no lock: a decline that lands while an attempt's lease is being written to this
