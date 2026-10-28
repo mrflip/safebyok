@@ -143,7 +143,7 @@ const PutPasskeyModal = (props: KindModalProps<PutPasskeyGating>) => (
 const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutPasskeyGating>) => {
   const { vault } = gating
   const { snapshot, username } = useFiling(vault, passphraseUsername)
-  const { gripe, setGripe, meet, attempt, isMounted } = useAttempts('GatingModal', done)
+  const { gripe, setGripe, meet, attempt, whenShown } = useAttempts('GatingModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
   // One submit at a time: the browser asks for one passkey at a time, and a second submit while
   // one runs would make a second passkey.
@@ -156,10 +156,10 @@ const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutP
     try {
       // Asked first, within the submit's own gesture, as WebAuthn wants.
       const made = await createPasskey({ rp: { name: snapshot.applabel }, user: { name: username, displayName: username } })
-      if (made === null || ! isMounted()) { return }
-      await attempt(() => gating.attempt(typed, made), 'unlocked')
+      if (made === null) { return }
+      await whenShown(() => attempt(() => gating.attempt(typed, made), 'unlocked'))
     } catch (err) {
-      if (isMounted()) { meet(err) }
+      await whenShown(() => { meet(err) })
     }
   }
 

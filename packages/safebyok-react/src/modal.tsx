@@ -2,9 +2,9 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { ForeverMillis, MinuteMillis, HostErrorSanitizer, type Gating, type Outcome, type Vault } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, type BoundarySource } from './boundary'
-import { useIsMounted } from './is-mounted'
 import { Doing, Locale, Messages } from './messages'
 import { useRevealToggle } from './reveal-toggle'
+import { useWhenShown } from './when-shown'
 
 /**
  * The parts every gating's dialog is built of: its one answer, kept above the boundary that shows
@@ -21,7 +21,7 @@ export type DialogAnswer = 'unlocked' | 'deleted' | 'declined'
 
 /**
  * The dialog's one answer to `gating`: `done`, which calls the host's `onDone` (as of the last
- * commit) the first time only. A lock landing answers `declined`.
+ * commit) the first time only. A lock landing answers `declined`, once the dialog shows.
  */
 const useAnswerOnce = (gating: Gating, onDone: (answer: DialogAnswer) => void) => {
   const onDoneRef = useRef(onDone)
@@ -32,11 +32,12 @@ const useAnswerOnce = (gating: Gating, onDone: (answer: DialogAnswer) => void) =
     answered.current = true
     onDoneRef.current(answer)
   }, [])
+  const whenShown = useWhenShown()
   useEffect(() => {
     let current = true
-    void gating.lockLanded.then(() => { if (current) { done('declined') } })
+    void gating.lockLanded.then(() => whenShown(() => { if (current) { done('declined') } }))
     return () => { current = false }
-  }, [gating, done])
+  }, [gating, done, whenShown])
   return done
 }
 
@@ -109,17 +110,19 @@ export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
  * A form's state around its attempts, for the dialog that `done` answers and `source` names:
  * the `gripe` it shows, `meet`, what it does with a refusal (as `attemptRefusalFlavor` groups
  * them), `fail`, which has the next render throw to the dialog's boundary what an event handler
- * met, `attempt`, one submit's attempt and what follows it, and `isMounted`, asked after each
- * await. A refusal to show in place becomes the gripe; one that ends the gating closes the
- * dialog, answering `declined`; a second attempt while one runs changes nothing.
+ * met, `attempt`, one submit's attempt and what follows it, and `whenShown`, which a handler goes
+ * on through after each await (`useWhenShown`). A refusal to show in place becomes the gripe; one
+ * that ends the gating closes the dialog, answering `declined`; a second attempt while one runs
+ * changes nothing.
  */
 export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
   const [gripe, setGripe] = useState<Gripe | null>(null)
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   // A dialog gone meanwhile -- its host took it away, another gating remounted it, or the page
-  // closed -- touches neither its state nor its host's onDone again.
-  const isMounted = useIsMounted()
+  // closed -- touches neither its state nor its host's onDone again. One hidden meanwhile meets
+  // the outcome once it shows again.
+  const whenShown = useWhenShown()
   const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
   if (failure !== null) { throw forBoundary(failure.err, source) }
 
@@ -137,12 +140,13 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
   const attempt = async (tried: () => Promise<Outcome<Vault>>, answer: DialogAnswer) => {
     setGripe(null)
     const { ok, err } = await tried()
-    if (! isMounted()) { return }
-    if (ok) { done(answer); return }
-    meet(err)
+    await whenShown(() => {
+      if (ok) { done(answer); return }
+      meet(err)
+    })
   }
 
-  return { gripe, setGripe, meet, fail, attempt, isMounted }
+  return { gripe, setGripe, meet, fail, attempt, whenShown }
 }
 
 /** What a {@link ModalForm} is handed. */
@@ -374,35 +378,39 @@ const vaultAdvice = async (vault: Vault, typed: string): Promise<string | null> 
  * What the advice last said of the text typed so far -- the host's `passphraseAdvice`, or the
  * vault's own -- and `hear`, which asks it of a new text. Only the answer to the latest text is
  * kept, and only the latest call's failure goes to `fail`; an empty text has nothing said of it,
- * nor has an undefined answer; what was said goes when `creating` changes; and nothing comes back
- * once the dialog has gone.
+ * nor has an undefined answer; what was said goes when `creating` changes; an answer that comes
+ * back while the dialog is hidden lands once it shows again; and nothing comes back once the
+ * dialog has gone.
  */
 export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, vault: Vault, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
+  // The mode as of the last commit, which an answer on its way is checked against.
+  const creatingNow = useRef(creating)
   // A change of mode forgets what was said (React's "adjusting state while rendering"), and makes
-  // any answer or failure still on its way stale, in the same commit. The dialog unmounting makes
-  // them stale too, so that none reaches a dialog that has gone.
+  // any answer or failure still on its way stale from the same commit: it was asked of the other
+  // mode.
   const [saidWhile, setSaidWhile] = useState(creating)
   if (saidWhile !== creating) {
     setSaidWhile(creating)
     setSaid(null)
   }
-  useLayoutEffect(() => {
-    return () => { asked.current += 1 }
-  }, [creating])
+  useLayoutEffect(() => { creatingNow.current = creating }, [creating])
+  const whenShown = useWhenShown()
   const hear = async (typed: string) => {
     asked.current += 1
     if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
+    // Only the latest call, in the mode it was asked in, is heard: a superseded call's answer or
+    // failure is stale.
+    const latest = () => askedNow === asked.current && creating === creatingNow.current
     try {
       // A JavaScript host's undefined is nothing to say, as null is.
       const answer = passphraseAdvice === undefined ? await vaultAdvice(vault, typed) : (await passphraseAdvice(typed)) ?? null
-      if (askedNow === asked.current) { setSaid(answer) }
+      await whenShown(() => { if (latest()) { setSaid(answer) } })
     } catch (err) {
-      // Only the latest call can fail: a superseded one's failure is as stale as its answer. The
-      // vault's own check throws only a refusal that quotes nothing; the host's may quote anything.
-      if (askedNow === asked.current) { fail(passphraseAdvice === undefined ? err : adviceFailed(err)) }
+      // The vault's own check throws only a refusal that quotes nothing; the host's may quote anything.
+      await whenShown(() => { if (latest()) { fail(passphraseAdvice === undefined ? err : adviceFailed(err)) } })
     }
   }
   return { said, hear }

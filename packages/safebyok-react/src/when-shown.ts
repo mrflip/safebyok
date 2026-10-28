@@ -1,30 +1,39 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 
-/** A function that answers true from the commit that mounts the component until it unmounts, for
- * an async handler to ask once its await settles: a component gone meanwhile -- its host took it
- * away, another vault remounted it, or the page that showed it closed -- is touched no more,
- * neither its state nor the callbacks its host handed it. True from the commit itself, so that a
- * handler the user sets off the moment the component shows -- before React has run its passive
- * effects, as on a busy page it may not have -- hears its answer. A component a Suspense boundary
- * hides for a moment is still mounted, and meets what its handlers settle while hidden. One an
- * `<Activity>` hides reads as gone until it shows again.
- * A function, not the ref itself, so that TypeScript never carries an answer across an await.
+/** A function that calls `goOn` while the component is on the page, for an async handler to go on through after each await of its own.
+ * It calls `goOn` at once while the component shows, and hands back a promise of what `goOn`
+ * returns. While a Suspense boundary or an `<Activity>` hides the component, it calls `goOn` once
+ * the component shows again, so the handler meets then what settled meanwhile. Once the component
+ * has unmounted, it never calls `goOn`, and the promise never settles: the handler goes no
+ * further, touching neither the component's state nor the callbacks its host handed it.
+ * The component shows from the commit that mounts or reveals it, before React runs its passive
+ * effects, so a handler the user sets off the moment it shows goes on. It stops showing in the
+ * commit that hides or unmounts it.
  *
  * @example
- *   const isMounted = useIsMounted()
+ *   const whenShown = useWhenShown()
  *   const submit = async () => {
  *     await gating.attemptPassphrase(passphrase)
- *     if (! isMounted()) { return }
- *     onDone(true)
+ *     await whenShown(() => { onDone(true) })
  *   }
  */
-export const useIsMounted = (): (() => boolean) => {
-  const mounted = useRef(false)
-  // Set in the commit that shows the component: React runs passive effects after it, in a task of
-  // their own once it has yielded, and a click can land between the two.
-  useLayoutEffect(() => { mounted.current = true }, [])
-  // Cleared by a passive effect, as the library hooks of the name are: a Suspense boundary that
-  // hides the component runs its layout cleanups, never its passive ones.
-  useEffect(() => () => { mounted.current = false }, [])
-  return useCallback(() => mounted.current, [])
+export const useWhenShown = (): (<ValT>(goOn: () => ValT) => Promise<Awaited<ValT>>) => {
+  const shown = useRef(false)
+  // Each handler waiting for the component to show again. A component gone keeps them, never
+  // called, until it is collected with them.
+  const waiting = useRef<(() => void)[]>([])
+  // A layout effect, set and cleared in the commit itself: a click can land before React runs
+  // passive effects, and an answer can settle between a commit that unmounts the component and
+  // its passive cleanup. Activity and Suspense both run it again on showing what they hid.
+  useLayoutEffect(() => {
+    shown.current = true
+    for (const showing of waiting.current.splice(0)) { showing() }
+    return () => { shown.current = false }
+  }, [])
+  // `goOn` is called in the same turn while shown, never after an await: a host awaiting the call
+  // the handler awaited would run first, and could raise another gating before hearing an answer.
+  return useCallback(async <ValT>(goOn: () => ValT): Promise<Awaited<ValT>> => {
+    if (! shown.current) { await new Promise<void>((showing) => { waiting.current.push(showing) }) }
+    return await goOn()
+  }, [])
 }
