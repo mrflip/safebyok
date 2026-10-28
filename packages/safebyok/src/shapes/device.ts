@@ -103,6 +103,6 @@ export type DeviceRecord = Z.infer<typeof deviceRecord>
 /** The IndexedDB database a device store keeps its records in when its options name none. */
 const DefaultDbName = 'safebyok'
 
-/** The check of {@link IdbOpts}: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
+/** The check of `IdbOpts`: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
 export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }).strict() }))
 // --

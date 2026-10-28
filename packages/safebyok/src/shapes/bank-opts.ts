@@ -255,7 +255,7 @@ export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
   return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape) }
 })
 
-/** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
 export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
   const call = fn()
   return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }

@@ -167,11 +167,11 @@ export type BoxCiphered = Z.infer<typeof cipheredShape>
 
 // == [Seal]: boxBase, sealBoxProps, madeUnderShape, madeShape, MadeUnder
 
-/** What {@link Box.seal} seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
+/** What `Box.seal` seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
  * `sealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
  * any, and nothing else: a boxlabel that is not a label refuses as the rest do. `boxBase` takes
  * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
- * is made under, and what a seal is made with, are taken from a {@link VaultSparse}, frozen.
+ * is made under, and what a seal is made with, are taken from a `VaultSparse`, frozen.
  */
 export const { boxBase, sealBoxProps, madeUnderShape, madeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
   const boxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
@@ -185,13 +185,13 @@ export const { boxBase, sealBoxProps, madeUnderShape, madeShape } = Validator('b
 }, [FX])
 
 /** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
- * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
+ * A `Box` read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
  */
 export type BoxBase = Z.infer<typeof boxBase>
 
-/** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
+/** What `Box.seal` seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
 export type SealBoxProps = Z.input<typeof sealBoxProps>
 
-/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
+/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A `VaultSparse` carries them. */
 export type MadeUnder = Z.infer<typeof madeUnderShape>
 // --
