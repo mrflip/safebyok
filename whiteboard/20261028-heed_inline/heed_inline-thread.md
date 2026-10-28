@@ -1,6 +1,6 @@
 # Thread 1: heed_inline (2026-10-28)
 
-Branch `20261028-heed_inline`, PR pending, cut from `origin/main` at f84d61bb. Justify: green (core 3473 passed, 37 skipped; every package green; size budgets unchanged).
+Branch `20261028-heed_inline`, PR [#334](https://github.com/mrflip/safebyok/pull/334), cut from `origin/main` at f84d61bb. Justify: green (core 3473 passed, 37 skipped; every package green; size budgets unchanged).
 
 Closes the open half of the Coach's GW-11: `RefusalPolicy.heed` is gone, and the vault meets each
 storage refusal at the site that met it.
