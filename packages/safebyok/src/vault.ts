@@ -22,7 +22,7 @@ import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
+import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
 import { registerLeaseGetter } from './held-lease'
@@ -260,7 +260,7 @@ export class Vault implements VaultStamp {
   /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
    * Never prompts. Within `staleMinutes` of the last read it re-settles without reading, unless that
    * read failed or found storage it could not trust. One that reads while a read is under way
-   * shares it. Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside
+   * shares it. Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside
    * {@link DeviceDB.tryGetLease}.
    *
    * It takes no lease up: another tab's unlock shows here at the next {@link Vault.ensureUnlocked}.
@@ -999,7 +999,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Get the vault record, listing and this device's lease, judge them against the picture in hand by `#judgeStored`, take what it finds new, and raise this device's record to it.
-   * Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.tryGet}, the lease kept.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.tryGet}, the lease kept.
    * A vault judged `behind` locks the vault as storage it cannot trust, and refuses 'vault_behind'.
    */
   async #takeStorage() {
@@ -1007,7 +1007,7 @@ export class Vault implements VaultStamp {
     const leasesSeen = this.#leasesHeld
     // The device record is read first, so a raise this device's own write made is never held
     // against a read served before that write landed.
-    const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.tryGetDeviceRecord(this.#scope)))
+    const record = await this.#deviceDB.getDeviceRecord(this.#scope)
     // Let go meanwhile: read no more, as the judgment would ignore what came.
     if (this.#goneBy !== null) { return }
     const [stored, leaseKept] = await Promise.all([this.#vaultDB.tryGetVault(this.#scope), KeptLease.tryGet(this.#deviceDB, this.#scope)])

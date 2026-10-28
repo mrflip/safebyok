@@ -230,7 +230,7 @@ export const BoxCount = () => {
 export const countStoreCalls = (world: { vaultDB: VaultDB, deviceDB: DeviceDB }) => {
   const subscribe = vi.spyOn(world.vaultDB, 'subscribe')
   const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
-  const getDeviceRecord = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord')
+  const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
   return () => ({ subscribe: subscribe.mock.calls.length, ensureVault: ensureVault.mock.calls.length, getDeviceRecord: getDeviceRecord.mock.calls.length })
 }
 

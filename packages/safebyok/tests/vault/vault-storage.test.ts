@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { VaultError, isVaultError } from '../../src/errors'
-import type { DeviceRecord } from '../../src/shapes/device'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import type { Vault } from '../../src/vault'
@@ -750,7 +749,7 @@ describe("this device's record of the vault", () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
     // Every read of the record at this birth hands back u2's, and one that has seen far more.
-    const misfiled = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord').mockResolvedValue(TH.good(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 })))
+    const misfiled = TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockResolvedValue(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 }))
     const vault = await world.open()
     misfiled.mockRestore()
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
@@ -761,7 +760,7 @@ describe("this device's record of the vault", () => {
     const world = makeWorld()
     // A device store of the host's own that hands back what it holds unchecked: here, a row that has lost its device_id.
     const malformed = { ...TH.deviceRecordOf('u1', { highest_vault_epoch: 9 }), device_id: undefined }
-    const spoiled = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord').mockResolvedValue(TH.good(malformed as unknown as DeviceRecord))
+    const spoiled = TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockResolvedValue(malformed)
     const vault = await world.open()
     spoiled.mockRestore()
     expect(TH.stateOf(vault.snapshot)).to.eq('novel')
@@ -771,9 +770,9 @@ describe("this device's record of the vault", () => {
     expect(storedWayinOf(world, 'passphrase')?.['device_id']).to.eq(record?.device_id)
   })
 
-  it("gives way to the record it handed over when the store's answer to the birth's raise is malformed: the first way in carries that record's device_id", async () => {
+  it("gives way to the record it handed over when the birth's raise resolves none: the first way in carries that record's device_id", async () => {
     const world = makeWorld()
-    vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord').mockResolvedValueOnce(TH.good({ format: 'safebyok-device-v1' } as unknown as DeviceRecord))
+    vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockResolvedValueOnce(null)
     const vault = await world.open()
     await TH.unlock(vault, 'pw')
     expect(storedWayinOf(world, 'passphrase')?.['device_id']).to.be.a('string').and.not.be.empty
@@ -782,7 +781,7 @@ describe("this device's record of the vault", () => {
   it("reads a record naming another scope as none at a refresh too: the read is taken, never refused vault_behind", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const misfiled = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord').mockResolvedValue(TH.good(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 })))
+    const misfiled = TH.spyOnDeviceHook(world.deviceDB, 'getDeviceRecord').mockResolvedValue(TH.deviceRecordOf('u2', { highest_vault_epoch: 9 }))
     await vault.hello({ staleMinutes: 0 })
     misfiled.mockRestore()
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')

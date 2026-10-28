@@ -915,9 +915,9 @@ describe("bank.closeVault", () => {
   it("writes nothing more for a birth let go during its first read: no vault record ensured, no device record raised", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
-    const reading = TH.holdNextCall(world.deviceDB, 'tryGetDeviceRecord')
+    const reading = TH.holdNextCall(world.deviceDB, 'getDeviceRecord')
     const ensuring = vi.spyOn(world.vaultDB, 'tryEnsureVault')
-    const raising = vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord')
+    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
@@ -931,7 +931,7 @@ describe("bank.closeVault", () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
-    const raising = vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord')
+    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
     const subscribing = vi.spyOn(world.vaultDB, 'subscribe')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
@@ -1085,7 +1085,7 @@ describe("bank.snapshot, bank.lifecycle, bank.vaults, bank.vaultOf, bank.bankVau
   it("reads nothing for a birth let go in the task that asked for it, its caller refused 'vault_gone'", async () => {
     const world = makeWorld()
     const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault')
-    const getDeviceRecord = vi.spyOn(world.deviceDB, 'tryGetDeviceRecord')
+    const getDeviceRecord = vi.spyOn(world.deviceDB, 'getDeviceRecord')
     const bank = bankIn(world)
     const asked = bank.ensureVault(Main)
     bank.closeVault(Main)

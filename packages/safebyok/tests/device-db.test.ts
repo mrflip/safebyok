@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DeviceDB, deviceRecordFor, deviceRecordOf, memoryDeviceDB, raisedDeviceRecord } from '../src/device-db'
+import { DeviceDB, deviceRecordOf, memoryDeviceDB, raisedDeviceRecord } from '../src/device-db'
 import { VaultError } from '../src/errors'
 import type { Outcome } from '../src/outcome'
 import * as Scopepath from '../src/scopepath'
@@ -134,17 +134,21 @@ describe("deviceRecordOf", () => {
   })
 })
 
-describe("deviceRecordFor", () => {
+describe("a device record DeviceDB resolves", () => {
   const scope = TH.scopeOf('u1')
   const record: DeviceRecord = TH.deviceRecordOf('u1')
+  /** A DeviceDB whose store hands back `row` for every device record read. */
+  const storeHolding = (row: unknown) => new ScriptedDeviceDB((hookname) => (hookname === 'doGetDeviceRecord' ? row : undefined))
 
-  it("hands back a record of the scope as it came, and none as none, as its first example shows", () => {
-    expect(deviceRecordFor(scope, record)).to.deep.equal(record)
-    expect(deviceRecordFor(scope, null)).to.be.null
+  it("is the record of the scope as stored, and none as none", async () => {
+    expect(await storeHolding(record).getDeviceRecord(scope)).to.deep.equal(record)
+    expect(await storeHolding(undefined).getDeviceRecord(scope)).to.be.null
   })
 
-  it("reads a record naming another user as none, as its second example shows", () => {
-    expect(deviceRecordFor(scope, { ...record, user_id: 'someone-else' })).to.be.null
+  it("reads a record naming another user as none, misfiled under this scope, and leaves it stored", async () => {
+    const deviceDB = storeHolding({ ...record, user_id: 'someone-else' })
+    expect(await deviceDB.getDeviceRecord(scope)).to.be.null
+    expect(deviceDB.calls).to.deep.equal(['doGetDeviceRecord'])
   })
 
   const NoneCases = [
@@ -157,11 +161,17 @@ describe("deviceRecordFor", () => {
     ['a string, not a record',                     'what is no record at all'],
   ] as const
 
-  for (const [answer, blurb] of NoneCases) {
-    it(`reads ${blurb} as none`, () => {
-      expect(deviceRecordFor(scope, answer)).to.be.null
+  for (const [row, blurb] of NoneCases) {
+    it(`reads ${blurb} as none`, async () => {
+      expect(await storeHolding(row).getDeviceRecord(scope)).to.be.null
     })
   }
+
+  it("resolves a raise of a record that fails its check as none, and a sound raise over it as the sound record", async () => {
+    const deviceDB = memoryDeviceDB()
+    expect(await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))).to.be.null
+    expect(await deviceDB.raiseDeviceRecord(record)).to.deep.equal(record)
+  })
 })
 
 /** A DeviceDB whose every `do*` method answers as `answer` says, synchronously, its name logged in `calls` as it is made: for the base class's own tests.

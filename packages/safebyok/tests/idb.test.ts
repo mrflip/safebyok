@@ -125,7 +125,7 @@ describe("idbDeviceDB, two tabs raising at once", () => {
       const otherRecord = TH.deviceRecordOf('u1', { highest_vault_epoch: second })
       const [thisRaised, otherRaised] = await Promise.all([TH.expectGood(thisTab.tryRaiseDeviceRecord(thisRecord)), TH.expectGood(otherTab.tryRaiseDeviceRecord(otherRecord))])
       // Each resolves what it stored: the one that landed second saw the first's raise.
-      expect(Math.max(thisRaised.highest_vault_epoch, otherRaised.highest_vault_epoch)).to.eq(7)
+      expect(Math.max(thisRaised?.highest_vault_epoch ?? 0, otherRaised?.highest_vault_epoch ?? 0)).to.eq(7)
       const highest = TH.deviceRecordOf('u1', { highest_vault_epoch: 7 })
       const scope = TH.scopeOf('u1')
       expect(await TH.expectGood(thisTab.tryGetDeviceRecord(scope))).to.deep.equal(highest)
