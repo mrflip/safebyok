@@ -173,11 +173,15 @@ call reads), so `#refreshIfStale(staleMillis)` reads `#refreshIfStale(maxMillisS
 `leaseMillis` is a length, not a bound, and keeps its name unless the Coach's answer below says
 otherwise. The rename runs through `vault-opts.ts`'s parsed bank opts (`parseRenewMinutes`,
 `parseStaleMinutes`, the `leaseMillis`/`staleMillis` fields), `gating.ts`'s `takeUp(gating,
-renewMillis)` and `run(renewMillis | null)`, and `#fitsTakeUp`. The host-facing options
-(`renewMinutes`, `staleMinutes`, `leaseHours`) stay as they are unless the Coach rules below: the
-parse at the door is where the host's word becomes the vault's (STYLE.md, *clear intent at the
-door, clean data inside*). Two questions for the Coach, under *For the Coach*; build on the
-assumptions stated there if they are not answered by the time this thread is cut.
+renewMillis)` and `run(renewMillis | null)`, and `#fitsTakeUp`. **The host-facing options follow
+the scheme too** (the Coach, 2026-10-28: "we'd update everyone to use that scheme, minutes or
+millis. stale and renew are confusing"): `staleMinutes` → `maxMinutesSinceRefresh` on `Bank.make`
+and `hello()`, `renewMinutes` → `minMinutesToAutolock` on `ensureUnlocked()`; `leaseHours`, a
+length, keeps its name. Surfaces: `shapes/bank-opts.ts`, `vault-opts.ts`, `vault.ts`,
+`phrases.ts`, `lease.ts`'s doc blocks, `safebyok-react`'s `bank-provider.tsx`, both READMEs and
+the snapshot's `freshness` doc. Exported, so a minor changeset says what a host renames; no
+alias. One question for the Coach, under *For the Coach*; build on the assumption stated there
+if it is not answered by the time this thread is cut.
 
 ## For the Coach
 
@@ -185,10 +189,9 @@ assumptions stated there if they are not answered by the time this thread is cut
   with a call the threads will follow unless you rule otherwise.
 * `whiteboard/20261028-gripeoween/` is untracked in the main checkout; this sprint carries only
   its two vault files.
-* Thread 4's horizon scheme, two questions. (1) *autolock* is a new cast word: VOCABULARY.md says
+* Thread 4's horizon scheme, one question left. *autolock* is a new cast word: VOCABULARY.md says
   the lease is "dropped, by a timer, and the vault locks" at `ask_passphrase_at`, and names no
   event. Add *autolock* to VOCABULARY.md as that event, or name the bound in the cast's words
-  (`minMillisToAskPassphrase`)? The plan assumes *autolock* is added. (2) Do the host-facing
-  options follow the scheme (`maxMinutesSinceRefresh`, `minMinutesToAutolock` in place of
-  `staleMinutes`, `renewMinutes`), or stay short at the door and take the scheme's name at the
-  parse? The plan assumes they stay; pre-1.0, either is a changeset line, not a shim.
+  (`minMinutesToAskPassphrase`)? The plan assumes *autolock* is added. Ruled (2026-10-28): the
+  host-facing options follow the scheme, `maxMinutesSinceRefresh` and `minMinutesToAutolock`, no
+  short name kept at the door.
