@@ -30,7 +30,7 @@ describe("delDamagedVault", () => {
     TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/writing its record of this vault/)
-    expect(err.cause).to.eq(trouble)
+    expect(err.cause).to.be.undefined
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
   })
 
@@ -85,7 +85,7 @@ describe("delDamagedVault", () => {
     // The device store fails its first erase, as a busy one may, and erases at the next.
     TH.spyOnDeviceHook(world.deviceDB, 'delLease').mockRejectedValueOnce(new Error('device store is busy'))
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: world.deviceDB })), 'storage_unavailable')
-    expect((err.cause as Error).message).to.include('busy')
+    expect(err.cause).to.be.undefined
     expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault record, and no box').to.deep.equal([u1VaultScopepath])
     expect(await world.getLease()).to.not.be.null
     await delDamagedVault(world.optsWith({ deviceDB: world.deviceDB }))

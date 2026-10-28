@@ -309,14 +309,18 @@ const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }
   delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
 
-/** The condition a failure of the device store's `verb` becomes, `thrown` its cause: 'storage_blocked' for what {@link isStorageBlocked} names, else 'storage_unavailable', naming no scope and quoting no record. */
+/** The condition a failure of the device store's `verb` becomes: 'storage_blocked' for what {@link isStorageBlocked} names of `thrown`, else 'storage_unavailable', naming no scope and keeping nothing of `thrown`.
+ * Not its message and not as a `cause`: a device store is handed every lease record, and what it
+ * throws may quote one, while a logger hands the condition to the host whole. Only its `name` is
+ * read, to tell a refusal that lasts from one that may pass.
+ */
 const deviceTrouble = (verb: DeviceVerb, thrown: unknown): VaultError => {
   const { failed, instead } = DeviceTroubleSaid[verb]
   if (isStorageBlocked(thrown)) {
     const meanwhile = instead === undefined ? '' : `: ${instead} instead`
-    return new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}. The device store's error is this error's cause.`, { cause: thrown })
+    return new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}. The device store's own error is not kept, as it may quote the record it was handed.`)
   }
   const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
-  return new VaultError('storage_unavailable', `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: thrown })
+  return new VaultError('storage_unavailable', `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's own error is not kept, as it may quote the record it was handed.`)
 }
 // --
