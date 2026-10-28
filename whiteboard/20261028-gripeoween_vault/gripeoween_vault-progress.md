@@ -23,4 +23,24 @@ Cleanup `e894b5ba-5a8a` / `537a9793-f406`; Progress `c2cac15c-ed58` / `66c5201c-
 
 ## Threads
 
-(none filed yet)
+### 1. vault_refresh (#336, stacked on #334)
+
+* Names now in `vault.ts`: `refresh()` / `hello()` → `#refreshIfStale(staleMillis)` → `#refresh()`
+  (a method over the one-at-a-time run; logs the recovery after a warned streak) → `#doRefresh()`
+  → `#loadFromStorage()`, `#applyVault`, `#noteEpochSeen`, `#becomeGone(refusal)` (`[letGo]`
+  calls it with null), `#forceNextRefresh()`. Gone: `#helloWithin`, `#refreshOnce`,
+  `#takeStorage`, `#judgeStored`, `#takePicture`, `#raiseRecordAfter`, `#letGo`, `#freshen`.
+* `#doRefresh`'s catch is `catch (err) { throw this.#onRefreshRefused(err) }`. Thread 2: fold or
+  rename it with the `#onRefused` family.
+* `#onStorageRefusal` is called where a refusal is met, inside the try (`getVault`'s refused
+  Outcome, the behind check), not from the catch: the catch cannot tell a `getVault` refusal from
+  a host device store's throw of the same kind. The house pattern, as #334 has it.
+* `#freshen` is now the body of the `freshen:` gating-tool closure in the constructor (five lines,
+  the tool's shape unchanged). Thread 3 reshapes it.
+* `DeviceDB.getDeviceRecord` and `raiseDeviceRecord` (and their try forms) resolve a checked
+  `DeviceRecord | null`; `deviceRecordFor` is module-private. Tests spy on the throwing forms or
+  the store's `doGetDeviceRecord` hook.
+* The refresh reads in sequence now, one round trip longer: a race test that unlocks on another
+  device waits for that device's watch to read the gate first. Expect the same in later
+  timing-sensitive tests.
+* "picture" survives in the doc blocks thread 1 touched (thread 4's pass).

@@ -4,7 +4,7 @@
   four threads stack in one line, so one runs at a time).
 * **Issued by:** the Coach (flip), `/sprint gripeoween-vault YOLO /turbochat`, with: *"your job is
   to modify interfaces there have been no public releases, do not include back-compat"*.
-* **Status:** planned; thread 1 underway. Sprint doc: https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk
+* **Status:** thread 1 filed (#336); thread 2 next. Sprint doc: https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk
 
 The Coach's request is the preplan beside this file, `gripeoween-vault-preplan.md` (copied from
 the untracked `whiteboard/20261028-gripeoween/` in the main checkout), with its raw material
@@ -58,6 +58,12 @@ cut from its tip, PR "Stacked on #334". **Look-ahead:** thread 2's `#onRefused` 
 public catch; `#doRefresh`'s fat catch should already read as a dispatch thread 2 can rename
 without restructuring. **Size:** medium.
 
+*Review:* fixed (#336). It dropped a caller-naming sentence from `deviceRecordFor`'s doc block.
+Left: `#doRefresh`'s and `#loadFromStorage`'s doc blocks recite steps (to thread 4);
+`raiseDeviceRecord` resolves null for a failing record where it could refuse at entry (later,
+when `DeviceDB`'s entry checks are next touched); `notes/security.md`'s rollback-check entry
+names a stale order (to thread 4, through the note's subagent).
+
 ### 2. `vault_boxes`: the box ladders and the failure plans
 
 > Preplan steps 3 and 4, verbatim in `gripeoween-vault-preplan.md`: *3. The box ladders (smells
@@ -92,7 +98,13 @@ change. **Depends on** thread 2. **Size:** medium.
 *Gloss.* Renames, `#takeUp`'s merge, `#checkedBoxlabel`, and "picture" out of the doc blocks.
 GW-02 (in the gripeoween todo shelf): `#picture` → `#snapshotAt`, ruled, not yet done: do its
 `vault.ts` part here and say so in the PR, leaving GW-02's other renames (`RefusalPolicy.decide`,
-`Proving.wrongProof`, Convex's `written`, `OutsideGating`) to their own PR. **Model:** `sonnet`,
+`Proving.wrongProof`, Convex's `written`, `OutsideGating`) to their own PR.
+*Orchestrator:* from thread 1's review, also: `#doRefresh`'s doc block states its contract (which
+refusals it raises; a refused refresh leaves the snapshot as it stood but for its freshness), not
+its steps; `#loadFromStorage`'s first line stops restating the return; `deviceDBShape`'s doc
+(`shapes/bank-opts.ts`) names the throwing forms the bank now calls; and `notes/security.md`'s
+rollback-check entry, which says the refresh judges "older than the picture" before the behind
+check, gets an amendment through a `sonnet` subagent (the note's header says how). **Model:** `sonnet`,
 small and mechanical. **Depends on** thread 3. **Size:** small.
 
 ## For the Coach
