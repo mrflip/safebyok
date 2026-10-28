@@ -1,0 +1,5 @@
+---
+"safebyok": minor
+---
+
+**`Story` and `Refusing` are exported from `safebyok`.** `Refusing<SchemaT>` is the type of each validator a `Validator` call returns: its schema, its `parse(val, story?)` throwing a `VaultError` of the call's kind, and `parseConsistent` for an object. `Story` is that `parse`'s second argument, `{ where?, advice? }`, the words framing a refusal; inside the package it was `Saying`, never exported. `Story` and `ConsistencyRefusal` are now read off their shapes (`Z.infer`) rather than written by hand; what each accepts is unchanged, and every message a host sees reads as before. **Stored format:** unchanged.

@@ -384,7 +384,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
   made in a `Validator` call does (`src/checks/validator.ts`), and a check of options names the
-  call and says what to do in the parse's own saying, `parse(opts, { where, advice })`, never in a
+  call and says what to do in the parse's own story, `parse(opts, { where, advice })`, never in a
   catch that rethrows (`optionsCheck`, `readBankOpts`). Never `Z.config`, which is the host's
   Zod too. Zod's English names a refused value's type, never the value.
 * **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
@@ -454,6 +454,16 @@ the scope.
   `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
 * **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
   validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
+* **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
+  there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
+  and module-local and good idea to put it near where used); use Validator; namespace it, using
+  Validator or a star-import." So the type is `Z.infer` of the shape, never a parallel written by
+  hand; the shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
+  local to one module, which keeps it beside its use; it is made in a `Validator` call; and it is
+  reached under a namespace, the object a `Validator` call returns (`Checks.StoryShape`) or a star
+  import (`Validators.vaultScope`). A good reason for an exception is said beside it. A type its
+  own validator's type names (`Story`, which `Refusing` names and a `Refusing` makes) is an
+  `interface` extending the `Z.infer`, whose members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
