@@ -1873,7 +1873,7 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // == [Vocabulary]: Birth, frozenVaultRecord, isOlderPicture, fitsLease, leavesInForce, VaultCall, UntrustedStorageKinds, UnlockingKinds
 
-/** What a Vault object is born of, as `bank.ensureVault` made it: one `VaultDB.ensureVault` and the lease this device's store kept. */
+/** The pieces a Vault object is born of, as `bank.ensureVault` made them: one `VaultDB.ensureVault` and the lease this device's store kept. */
 export type Birth = Readonly<{
   /** The vault record `VaultDB.ensureVault` resolved. */
   vaultRecord: VaultRecord

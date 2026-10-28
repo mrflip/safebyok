@@ -35,7 +35,7 @@ export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
 )
 
-/** What a stale deletion says: what changed under the deleter, and to read the vault again. A box put's stale refusal is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
+/** The message of a stale deletion: what changed under the deleter, and to read the vault again. A box put's stale refusal is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
 export const StaleDelMessage = 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.'
 
 /** A `stale_write` refusal of a deletion: what it expected is no longer stored, so nothing was removed.
