@@ -1181,7 +1181,7 @@ added or folded into through the subagent, and no other entry changes.
   `data` is `{ kind, message }` with kind `identity_revoked`, `not_permitted` or `vault_full`
   (amended 2026-10-21 (store_rulings, #217): no longer `vault_full`, see the Convex component entry
   below) becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
-  it, through `Sanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
+  it, through `HostErrorSanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
   and its data was written by safebyok's server or the host's `getUserId`: function name, request id
   and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
   still carries nothing of Convex's error, since a dev deployment's validator error quotes the
@@ -2856,8 +2856,8 @@ added or folded into through the subagent, and no other entry changes.
   gets text-only checks, which is what the shipped server recipes already passed. The same holds
   for `delDamagedVault` and its verb. A `damaged_box` refusal no longer quotes the boxlabel,
   as `absent_box` already did not.
-* 2026-10-16: **a foreign error that may quote stays behind.** `Sanitizer.refusalFor`
-  (`src/sanitizer.ts`, exported as `Sanitizer`) is the one place that decides what of a foreign
+* 2026-10-16: **a foreign error that may quote stays behind.** `HostErrorSanitizer.refusalFor`
+  (`src/host-error-sanitizer.ts`, exported as `HostErrorSanitizer`) is the one place that decides what of a foreign
   error rides along on the refusal thrown in its place: today, nothing -- no `cause`, no text, no
   property. Two callers: a host's schema that throws (`bad_option`, as since #95), and
   `convexVaultDB`, which now throws every Convex failure that is not one of safebyok's own
@@ -3427,7 +3427,7 @@ added or folded into through the subagent, and no other entry changes.
   `vault_full` and `storage_unavailable` alike (amended 2026-10-21 (store_rulings, #217): `vault_full`
   is now an answer in `putBox`'s result, not a thrown error) -- because a Convex error on a dev deployment may
   quote the call's arguments (names, sidecars, ciphertext). Its refusals are made through
-  `Sanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
+  `HostErrorSanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
   browser console instead.
 * 2026-10-17 (thread 5b, store_base, G304): **GraphQL errors cross with no server text where they
   might quote.** In the browser, `graphqlVaultDB` (`safebyok-graphql/src/graphql-vault-db.ts`)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { ForeverMillis, MinuteMillis, Sanitizer, type Gating, type Outcome, type Vault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, HostErrorSanitizer, type Gating, type Outcome, type Vault } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, type BoundarySource } from './boundary'
 import { useIsMounted } from './is-mounted'
@@ -360,7 +360,7 @@ export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
 export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
 
 /** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of what it threw goes on. */
-const adviceFailed = (thrown: unknown) => Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
+const adviceFailed = (thrown: unknown) => HostErrorSanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
 
 /** The vault's own advice: the message of `vault.tryCheckStrength`'s 'weak_passphrase', the checker's reason, and nothing for a passphrase it admits. Any other refusal is thrown. */
 const vaultAdvice = async (vault: Vault, typed: string): Promise<string | null> => {
