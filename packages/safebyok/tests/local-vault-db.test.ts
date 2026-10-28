@@ -1,0 +1,220 @@
+import { describe, it, expect } from 'vitest'
+import { memoryStore } from '../src/string-store'
+import { localVaultDB } from '../src/local-vault-db'
+import { VaultError } from '../src/errors'
+import * as Scopepath from '../src/scopepath'
+import * as TH from './test-helpers'
+
+
+// The ckeys u1's main vault is filed under, spelled out rather than computed: they are stored.
+const u1VaultScopepath = 'vault^acme^u1^main'
+const u1BoxScopepath = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
+
+describe("localVaultDB", () => {
+  it("resolves a vault never made as a good outcome holding null, as its first example shows", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    expect(await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ ok: true, val: null })
+  })
+
+  it("stores a gateless vault as its JSON, and reads it back beside its boxes in one step", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
+    expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.gatelessOf('u1')))
+    await TH.expectingGood(vaultDB).putVaultRecord(TH.vaultRecordOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    const read = await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))
+    expect(TH.recordOfRead(read!)).to.deep.equal(TH.vaultRecordOf('u1'))
+    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+  })
+
+  it("holds a mebibyte in one record, and sets no limit on a vault, in bytes or in boxes, or on a name", () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    expect(vaultDB.maxRecordBytes).to.eq(1_048_576)
+    expect(vaultDB.maxVaultBytes).to.eq(Infinity)
+    expect(vaultDB.maxBoxes).to.eq(Infinity)
+    expect(vaultDB.maxNameBytes).to.eq(Infinity)
+  })
+
+  it("reads rows filed under the ckeys of earlier versions as absent, and leaves them be", async () => {
+    const store = memoryStore()
+    const earlier = ['vault:acme:u1:main', 'box:acme:u1:main:anthropic', '["vault","acme","u1","main"]', '["box","acme","u1","main","anthropic"]']
+    for (const ckey of earlier) {
+      store.write(ckey, JSON.stringify(ckey.includes('box') ? TH.boxOf('anthropic', 'one') : TH.vaultRecordOf('u1')))
+    }
+    const vaultDB = localVaultDB({ store })
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
+    expect(await TH.boxesOf(vaultDB, TH.scopeOf('u1'))).to.have.lengthOf(0)
+    expect(store.scopepaths()).to.have.members(earlier)
+  })
+
+  it("reads boxes as written today, with a sidecar and with an empty one, and writes them back the same", async () => {
+    // A stored vault is a contract: these rows are byte for byte what putBox() writes today.
+    const store = memoryStore()
+    const emptied = TH.boxOf('openai', 'two', { sidecar: {} })
+    const sidecarRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
+    const emptiedRow = JSON.stringify(emptied)
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), sidecarRow)
+    store.write(u1BoxScopepath('openai'), emptiedRow)
+    const vaultDB = localVaultDB({ store })
+    const summaries = await TH.boxesOf(vaultDB, TH.scopeOf('u1'))
+    expect(summaries.map((box) => box.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
+    const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai', TH.inThisVault)
+    expect(prev).to.deep.equal(emptied)
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: 'rev-two' }, emptied)
+    expect(store.read(u1BoxScopepath('openai'))).to.eq(emptiedRow)
+  })
+
+  it("lists a box written before the sidecar, with a note, as damaged: no earlier record is read", async () => {
+    const store = memoryStore()
+    const { sidecar: _sidecar, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-box-v2', note: 'a test box' }))
+    const vaultDB = localVaultDB({ store })
+    expect(await TH.damagedBoxesOf(vaultDB, TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
+  })
+
+  it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'openai' }), JSON.stringify(TH.boxOf('openai', 'two')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), '{"not": json')
+    const read = await TH.expectingGood(localVaultDB({ store })).getVault(scope)
+    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
+    expect(read?.boxes.map((box) => [box.boxlabel, box.revision_tok])).to.deep.equal([['openai', 'rev-two']])
+    // Listed, never repaired: the row is still there for forensics.
+    expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.eq('{"not": json')
+  })
+
+  it("passes over a row under the vault's prefix that no box is filed under, listing the rest rather than failing the read, and erases it with the vault", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    const vaultDB = localVaultDB({ store })
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    const strays = ['Open AI', 'x^y', ''].map((tail) => Scopepath.withinVaultScopepathPrefix(scope) + tail)
+    for (const stray of strays) { store.write(stray, JSON.stringify(TH.boxOf('openai', 'two'))) }
+    const listed = await TH.boxesOf(vaultDB, scope)
+    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+    const capacity = await TH.expectingGood(vaultDB).getCapacity(scope)
+    expect(capacity.boxes.used).to.eq(4)
+    await TH.expectingGood(vaultDB).delVault(scope, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+    expect(strays.map((stray) => store.read(stray))).to.deep.equal([null, null, null])
+  })
+
+  it("deletes a damaged row, JSON or not, holding no revision, as the one a deletion naming none means", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), '{"not": json')
+    store.write(Scopepath.box({ ...scope, boxlabel: 'openai' }), JSON.stringify({ boxlabel: 'openai', revision_tok: '' }))
+    const vaultDB = localVaultDB({ store })
+    expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
+    expect(await TH.expectingGood(vaultDB).delBox(scope, 'openai', TH.deleting(null))).to.deep.equal({ outcome: 'deleted' })
+    expect(await TH.boxesOf(vaultDB, scope)).to.have.lengthOf(0)
+    expect(await TH.damagedBoxesOf(vaultDB, scope)).to.have.lengthOf(0)
+  })
+
+  it("deletes a damaged row that holds a revision as another, for a deletion naming none", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    store.write(Scopepath.vault(scope), JSON.stringify(TH.vaultRecordOf('u1')))
+    const sidecarless = TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar')
+    store.write(Scopepath.box({ ...scope, boxlabel: 'anthropic' }), JSON.stringify(sidecarless))
+    const vaultDB = localVaultDB({ store })
+    expect(await TH.damagedBoxesOf(vaultDB, scope)).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
+    expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted_other' })
+    expect(store.read(Scopepath.box({ ...scope, boxlabel: 'anthropic' }))).to.be.null
+  })
+
+  it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
+    expect(store.read(u1VaultScopepath)).to.eq(JSON.stringify(TH.vaultRecordOf('u1')))
+    expect(store.read(u1BoxScopepath('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
+    expect(store.scopepaths()).to.have.members([u1VaultScopepath, u1BoxScopepath('anthropic')])
+  })
+
+  it("refuses a mangled vault record row as damaged_vault, quoting none of it", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    store.write(u1VaultScopepath, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
+    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
+    expect(refusal).to.be.instanceOf(VaultError)
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
+  })
+
+  it("hands a row that is not JSON up as its text, which reads back as damaged_box, quoting none of it", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(u1BoxScopepath('anthropic'), 'SUPERSECRET{')
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
+    expect(refusal.message).to.match(/did not read back in a shape this package knows/)
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
+  })
+
+  it("hands vault record that is not JSON up as its text, which reads back as damaged_vault", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    store.write(u1VaultScopepath, 'SUPERSECRET{')
+    const refusal = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
+  })
+
+  it("refuses as damaged a record that names a scope or label other than the one asked for", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    // u2's vault record smuggled into u1's slot, and a box row moved under another label.
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u2')))
+    const elsewhere = await TH.expectBad(vaultDB.getVault(TH.scopeOf('u1')), 'damaged_vault')
+    expect(elsewhere.message).to.match(/different app, user or vault/)
+    store.write(u1VaultScopepath, JSON.stringify(TH.vaultRecordOf('u1')))
+    store.write(u1BoxScopepath('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
+    const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box', TH.inThisVault), 'damaged_box')
+    expect(moved.message).to.match(/different boxlabel/)
+  })
+})
+
+describe("localVaultDB, as it is made", () => {
+  const BadOpts = [
+    [undefined,                                          'nothing at all'],
+    [{},                                                 'a bag with no store'],
+    [{ store: { read: () => null } },                    'a store missing four of its five calls'],
+    [{ store: memoryStore(), logger: 'console' },        'a logger that is not a VaultLogger'],
+  ] as const
+
+  for (const [opts, blurb] of BadOpts) {
+    it(`refuses ${blurb} with kind 'bad_option'`, () => {
+      expect(() => localVaultDB(opts as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    })
+  }
+
+  it("takes a store bare of a bag, by mistake, as no store: kind 'bad_option'", () => {
+    expect(() => localVaultDB(memoryStore() as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError, /one bag of options/)
+  })
+
+  it("logs a listener that throws through its logger, the write it heard of landed", async () => {
+    const spy = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: memoryStore(), logger: spy.logger })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.deep.equal(TH.gatelessOf('u1'))
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
+  })
+
+  it("refuses a write past the store's quota as storage_unavailable, the store's own error its cause, writing nothing", async () => {
+    const quota = new Error('The quota has been exceeded.')
+    const store = memoryStore()
+    const full = { ...store, write: () => { throw quota } }
+    const vaultDB = localVaultDB({ store: full })
+    const refusal = await TH.expectBad(vaultDB.ensureVault(TH.gatelessOf('u1')), 'storage_unavailable')
+    expect(refusal.cause).to.eq(quota)
+    expect(store.scopepaths()).to.have.lengthOf(0)
+  })
+})

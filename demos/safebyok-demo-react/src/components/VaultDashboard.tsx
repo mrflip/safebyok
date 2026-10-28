@@ -1,82 +1,109 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useVault, useVaultSnapshot } from 'safebyok-react'
+import { useBank, useListedVault, useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { Sidecar, Whisper } from 'safebyok'
+import type { BoxDamaged, BoxSparse, Sidecar, Whisper, VaultSnapshot } from 'safebyok'
 
 /**
- * Direct manipulation of the vault's lockboxes: add, view, edit, remove, use. The lines that
- * matter are the one-liners inside each handler -- `vault.storeBox(...)`, `vault.readBox(...)`,
- * `vault.useBox(...)`, `vault.retireBox(...)`, each wrapped in `withUnlockedVault()` so a locked
- * vault summons the passphrase dialog and retries. Everything else is table furniture.
+ * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
+ * matter are the one-liners inside each handler -- `vault.putBox(...)`, `vault.getWhisper(...)`,
+ * `vault.useWhisper(...)`, `vault.delBox(...)`: a locked vault asks for the passphrase through the
+ * provider's dialog and goes on, and a dialog dismissed is refused 'vault_locked', which the
+ * handlers pass over. Everything else is table furniture.
  */
 
 type FormState = { editing: string | null, boxlabelText: string, whisperText: string, noteText: string }
 const blankForm: FormState = { editing: null, boxlabelText: '', whisperText: '', noteText: '' }
 
 /**
- * The note this demo keeps in a lockbox's sidecar, as `{ note }`: the vault never looks inside
+ * The note this demo keeps in a box's sidecar, as `{ note }`: the vault never looks inside
  * the sidecar, so the app reads its own shape back out of it, and finds no note in any other.
  */
 const noteOf = (sidecar: Sidecar): string => {
-  if (typeof sidecar !== 'object' || sidecar === null || Array.isArray(sidecar)) { return '' }
   const { note } = sidecar
   return typeof note === 'string' ? note : ''
 }
 
 export const VaultDashboard = () => {
-  const { vault, openError, retryOpen, retireDamagedVault, withUnlockedVault } = useVault()
-  const snapshot = useVaultSnapshot()
+  const bank = useBank()
+  const bankVault = useListedVault('main')
+  const vault = useVault('main')
+  const snapshot = useVaultSnapshot('main')
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
   const [psst, setPsst] = useState<{ boxlabel: string, whisper: Whisper } | null>(null)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // A condition that stopped the vault opening -- storage unreachable, signed out of the
-  // backend -- is shown here, in place, with a way to try again. (Misuse would have gone to an
-  // error boundary instead.)
-  // A damaged record will not mend on retry, so it gets no Retry button: only a way to retire it
-  // and start over, which asks first, as it takes every lockbox in the vault with it.
-  if (openError?.kind === 'damaged_vault') {
-    const startOver = async () => {
-      if (! globalThis.confirm("Remove this vault and start over? Every lockbox in it is lost for good.")) { return }
-      setGripe(null)
-      try {
-        await retireDamagedVault()
-      } catch (err) {
-        setGripe(err instanceof Error ? err.message : 'Could not remove the vault.')
+  // Why the bank has no vault to hand down -- storage unreachable, signed out of the backend -- is
+  // shown here, in place, with a way to ask again. (Misuse would have gone to an error boundary.)
+  // A vault refused stays so until the app asks the bank for it again: the buttons below ask.
+  // Each call names the vault by its label alone: the bank is this user's.
+  if (bank !== null && bankVault?.lifecycle === 'refused') {
+    const refusal = bankVault.err
+    const choice = { vaultlabel: bankVault.vaultlabel }
+    const askAgain = () => { void bank.tryEnsureVault(choice) }
+    // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
+    // and start over, which asks first, as it takes every box in the vault with it.
+    if (refusal.refusalkind === 'damaged_vault') {
+      const startOver = async () => {
+        if (! globalThis.confirm("Remove this vault and start over? Every box in it is lost for good.")) { return }
+        setGripe(null)
+        const deleted = await bank.tryDelDamagedVault(choice)
+        if (! deleted.ok) { setGripe(deleted.err.message); return }
+        askAgain()
       }
+      return (
+        <>
+          <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{refusal.message} <button onClick={() => { void startOver() }}>Remove and start over</button></p>
+          {gripe !== null && <p className="gripe">{gripe}</p>}
+        </>
+      )
+    }
+    // A browser that will not let the app keep anything here holds to that until the user changes
+    // it, so it gets no Retry button either: only what to change.
+    if (refusal.refusalkind === 'storage_blocked') {
+      return <p className="gripe">{"This browser won't let the app keep your vault on this device. "}{refusal.message}</p>
+    }
+    // Storage serving an older copy than this device has seen holds until it serves the newer one
+    // again, or the user, sure the restore was meant, has this device accept the older copy.
+    if (refusal.refusalkind === 'vault_behind') {
+      const accept = async () => {
+        if (! globalThis.confirm("Accept the older copy of this vault that storage holds now? Only do this if it was restored from a backup on purpose.")) { return }
+        setGripe(null)
+        const cleared = await bank.tryClearCachedVault(choice)
+        if (! cleared.ok) { setGripe(cleared.err.message); return }
+        askAgain()
+      }
+      return (
+        <>
+          <p className="gripe">{refusal.message} <button onClick={askAgain}>Retry</button> <button onClick={() => { void accept() }}>Accept this copy</button></p>
+          {gripe !== null && <p className="gripe">{gripe}</p>}
+        </>
+      )
+    }
+    // A vault deleted -- here, or on another device -- stays gone until the user asks for a new one.
+    if (refusal.refusalkind === 'vault_gone' || refusal.refusalkind === 'vault_remade') {
+      return <p className="quiet">{"This vault was deleted. "}<button onClick={askAgain}>Start a new vault</button></p>
     }
     return (
-      <>
-        <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{openError.message} <button onClick={() => { void startOver() }}>Remove and start over</button></p>
-        {gripe !== null && <p className="gripe">{gripe}</p>}
-      </>
-    )
-  }
-  // A browser that will not let the app keep anything here holds to that until the user changes
-  // it, so it gets no Retry button either: only what to change.
-  if (openError?.kind === 'storage_blocked') {
-    return <p className="gripe">{"This browser won't let the app keep your vault on this device. "}{openError.message}</p>
-  }
-  if (openError !== null) {
-    return (
       <p className="gripe">
-        {"Can't reach your vault. "}{openError.message} <button onClick={retryOpen}>Retry</button>
+        {"Can't reach your vault. "}{refusal.message} <button onClick={askAgain}>Retry</button>
       </p>
     )
   }
-  // The handle comes at once, and says it is opening until its hello has read storage.
-  if (vault === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
+  // No Vault object until its birth has read storage: until then, the vault is opening.
+  if (vault === null || snapshot === null) { return <p className="quiet">Opening vault…</p> }
 
-  // A whisper is never null (the vault refuses a bare one), so null from withUnlockedVault can
-  // only mean the user dismissed the passphrase dialog: the read needs no wrapping.
+  // A read the user dismissed the passphrase dialog for is refused vault_locked, and a box gone
+  // meanwhile absent_box: nothing to show.
   const view = async (boxlabel: string) => {
-    const whisper = await withUnlockedVault(() => vault.readBox(boxlabel))
-    if (whisper !== null) { setShown((prev) => ({ ...prev, [boxlabel]: whisper })) }
+    const read = await vault.tryGetWhisper(boxlabel)
+    if (! read.ok) { return }
+    const whisper = read.val
+    setShown((prev) => ({ ...prev, [boxlabel]: whisper }))
   }
 
   const hide = (boxlabel: string) => {
@@ -84,47 +111,86 @@ export const VaultDashboard = () => {
   }
 
   const edit = async (boxlabel: string, noteText: string) => {
-    const whisper = await withUnlockedVault(() => vault.readBox(boxlabel))
-    if (whisper !== null) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(whisper), noteText }) }
+    const read = await vault.tryGetWhisper(boxlabel)
+    if (read.ok) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(read.val), noteText }) }
   }
 
-  const retireBox = async (boxlabel: string) => {
-    if (! globalThis.confirm(`Remove the lockbox '${boxlabel}'?`)) { return }
+  const delBox = async (boxlabel: string) => {
+    if (! globalThis.confirm(`Remove the box '${boxlabel}'?`)) { return }
     try {
-      await withUnlockedVault(() => vault.retireBox(boxlabel))
+      await vault.delBox(boxlabel)
     } catch (err) {
-      // Gone already -- from another device, or with the vault the user retired to start over from
-      // the passphrase dialog -- is what was asked for.
+      // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
+      // the user deleted, its Vault object gone with it -- is what was asked for.
+      if (isVaultError(err, 'vault_locked') || isVaultError(err, 'vault_gone')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
     hide(boxlabel)
   }
 
-  const applyWhisper = (boxlabel: string) => withUnlockedVault(() => vault.useBox(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) }))
+  const applyWhisper = async (boxlabel: string) => {
+    try {
+      await vault.useWhisper(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) })
+    } catch (err) {
+      if (! isVaultError(err, 'vault_locked')) { throw err }
+    }
+  }
 
   const save = async () => {
     if (form === null) { return }
     setGripe(null)
     try {
-      const saved = await withUnlockedVault(async () => {
-        // The cast hands validation to the vault: typing "null" in the box parses to a bare
-        // null, and the store's refusal lands in the gripe below. A blank note leaves the
-        // sidecar out, so the lockbox keeps the one it has.
-        const note = form.noteText.trim()
-        await vault.storeBox(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
-        return true
-      })
-      if (saved !== null) { setForm(null) }
+      // The cast hands validation to the vault: typing "null" in the box parses to a bare
+      // null, and the store's refusal lands in the gripe below. A blank note leaves the
+      // sidecar out, so the box keeps the one it has.
+      const note = form.noteText.trim()
+      await vault.putBox({ boxlabel: form.boxlabelText.trim(), sidecar: note === '' ? undefined : { note } }, parseWhisperText(form.whisperText)!)
+      setForm(null)
     } catch (err) {
-      setGripe(err instanceof Error ? err.message : 'Could not store that.')
+      if (! isVaultError(err, 'vault_locked')) { setGripe(err instanceof Error ? err.message : 'Could not store that.') }
     }
+  }
+
+  // A damaged box can't be read, used or edited -- only removed, or stored over afresh while it
+  // names its revision: one damaged beyond naming putBox() refuses. One a newer safebyok wrote is
+  // the app's to update, not the user's to remove.
+  const damagedRow = (box: BoxDamaged) => (
+    <tr key={box.boxlabel} className="damaged">
+      <td><code>{box.boxlabel}</code></td>
+      <td colSpan={3} className="gripe">{box.damage === 'newer_format' ? "written by a newer version of this app: update the app to read it" : "damaged: its stored record can't be read"}</td>
+      <td className="row">
+        {box.damage === 'damaged' && box.revision_tok !== null && <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>}
+        {box.damage === 'damaged' && <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>}
+      </td>
+    </tr>
+  )
+
+  const soundRow = (box: BoxSparse) => {
+    const viewed = shown[box.boxlabel]
+    return (
+      <tr key={box.boxlabel}>
+        <td><code>{box.boxlabel}</code></td>
+        <td className="whisper-cell">
+          {viewed === undefined
+            ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
+            : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
+        </td>
+        <td className="quiet">{noteOf(box.sidecar)}</td>
+        <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
+        <td className="row">
+          <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
+          <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
+          <button className="mini danger" onClick={() => { void delBox(box.boxlabel) }}>remove</button>
+        </td>
+      </tr>
+    )
   }
 
   return (
     <section className="vault-dashboard">
       <div className="row spread">
-        <h2>Vault dashboard <span className="quiet">vault “{snapshot.scope.vaultlabel}”</span></h2>
-        <LockChip state={snapshot.state} askPassphraseAt={snapshot.askPassphraseAt} onLock={() => { void vault.lock() }} />
+        <h2>Vault dashboard <span className="quiet">vault “{snapshot.vaultlabel}”</span></h2>
+        <LockChip snapshot={snapshot} onLock={() => { void vault.lock() }} />
       </div>
 
       <p className="quiet">
@@ -132,56 +198,24 @@ export const VaultDashboard = () => {
         sees none of it, and clearing this site&apos;s data removes it.
       </p>
 
-      {snapshot.boxes.length === 0 && <p className="quiet">No lockboxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
+      {snapshot.boxes.length === 0 && snapshot.damagedBoxes.length === 0 && <p className="quiet">No boxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
 
-      {snapshot.boxes.length > 0 && (
+      {(snapshot.boxes.length > 0 || snapshot.damagedBoxes.length > 0) && (
         <table>
           <thead>
             <tr><th>label</th><th>whisper</th><th>note</th><th>written</th><th></th></tr>
           </thead>
           <tbody>
-            {snapshot.boxes.map((box) => {
-              // A damaged lockbox can't be read, used or edited -- only removed, or stored over afresh.
-              if (box.damaged) {
-                return (
-                  <tr key={box.boxlabel} className="damaged">
-                    <td><code>{box.boxlabel}</code></td>
-                    <td colSpan={3} className="gripe">{"damaged: its stored record can't be read"}</td>
-                    <td className="row">
-                      <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>
-                      <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>remove</button>
-                    </td>
-                  </tr>
-                )
-              }
-              const viewed = shown[box.boxlabel]
-              return (
-                <tr key={box.boxlabel}>
-                  <td><code>{box.boxlabel}</code></td>
-                  <td className="whisper-cell">
-                    {viewed === undefined
-                      ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
-                      : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
-                  </td>
-                  <td className="quiet">{noteOf(box.sidecar)}</td>
-                  <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
-                  <td className="row">
-                    <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
-                    <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
-                    <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>remove</button>
-                  </td>
-                </tr>
-              )
-            })}
+            {[...snapshot.boxes, ...snapshot.damagedBoxes].toSorted(byBoxlabel).map((box) => ('damage' in box ? damagedRow(box) : soundRow(box)))}
           </tbody>
         </table>
       )}
 
       {form === null
-        ? <button onClick={() => { setForm(blankForm) }}>Add a lockbox</button>
+        ? <button onClick={() => { setForm(blankForm) }}>Add a box</button>
         : (
-          <div className="lockbox-form">
-            <h3>{form.editing === null ? 'New lockbox' : `Edit ${form.editing}`}</h3>
+          <div className="box-form">
+            <h3>{form.editing === null ? 'New box' : `Edit ${form.editing}`}</h3>
             <label>
               label
               <input
@@ -202,7 +236,7 @@ export const VaultDashboard = () => {
               />
             </label>
             <label>
-              note <span className="quiet">(not encrypted: visible without the passphrase; left blank, the note stands)</span>
+              note <span className="quiet">(not encrypted: visible without the passphrase; left blank, the note is kept)</span>
               <input
                 placeholder="personal account"
                 value={form.noteText}
@@ -222,16 +256,20 @@ export const VaultDashboard = () => {
   )
 }
 
-const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassphraseAt: number | null, onLock: () => void }) => {
-  if (state === 'unlocked') {
-    return (
-      <span className="row">
-        <span className="chip unlocked">🔓 unlocked{asksAgain(askPassphraseAt)}</span>
-        <button className="mini" onClick={onLock}>lock now</button>
-      </span>
-    )
-  }
-  if (state === 'locked') { return <span className="chip locked">🔒 locked</span> }
-  if (state === 'absent') { return <span className="chip">no vault yet</span> }
-  return <span className="chip">…</span>
+/** The vault's lock, as its snapshot shows it: no gate yet, a gate and no lease on this device, or unlocked until `ask_passphrase_at`. */
+const LockChip = ({ snapshot, onLock }: { snapshot: VaultSnapshot, onLock: () => void }) => {
+  if (snapshot.gate === null) { return <span className="chip">no vault yet</span> }
+  if (snapshot.ask_passphrase_at === null) { return <span className="chip locked">🔒 locked</span> }
+  return (
+    <span className="row">
+      <span className="chip unlocked">🔓 unlocked{asksAgain(snapshot.ask_passphrase_at)}</span>
+      <button className="mini" onClick={onLock}>lock now</button>
+    </span>
+  )
+}
+
+/** Boxes, sound and damaged alike, in boxlabel order, as the vault lists each kind: by code unit. */
+const byBoxlabel = (one: { boxlabel: string }, two: { boxlabel: string }): number => {
+  if (one.boxlabel === two.boxlabel) { return 0 }
+  return one.boxlabel < two.boxlabel ? -1 : 1
 }

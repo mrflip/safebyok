@@ -181,10 +181,10 @@ export default defineConfig([
       'no-global-assign': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        varsIgnorePattern:         '^_',
-        argsIgnorePattern:         '^_',
-        caughtErrorsIgnorePattern: '^_',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        varsIgnorePattern:         '^_[a-zA-Z0-9]',
+        argsIgnorePattern:         '^_[a-zA-Z0-9]',
+        caughtErrorsIgnorePattern: '^_[a-zA-Z0-9]',
       }],
     },
   },
@@ -263,6 +263,9 @@ export default defineConfig([
       // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
       // field dropped by destructuring): typescript-eslint's, configured above, is the one.
       'sonarjs/no-unused-vars': 'off',
+      // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
+      // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
+      'sonarjs/redundant-type-aliases': 'off',
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
@@ -305,7 +308,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, lockboxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },

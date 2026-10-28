@@ -12,7 +12,7 @@ import { keepStorage } from '../lib/persist-storage'
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const { vault } = useVault()
+  const vault = useVault('main')
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -50,16 +50,30 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
   }
 
   const deleteAccount = async () => {
-    if (! globalThis.confirm('Delete this account and remove its vault? The stored lockboxes are gone for good.')) { return }
-    await vault?.retire()
+    if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
+    setGripe(null)
+    // The vault's dialog asks for the passphrase, which proves the deletion. The vault deleted
+    // stays gone: nothing asks for it again, so no new one is stored under the account as it goes.
+    // A vault with no passphrase yet holds no boxes, and has nothing to prove the deletion with
+    // (absent_vault): the account goes without it. Cancelled, the account stays, quietly; any
+    // other refusal keeps the account, and says why.
+    if (vault !== null) {
+      const deleted = await vault.tryDel()
+      if (! deleted.ok) {
+        const { refusalkind, message } = deleted.err
+        if (refusalkind === 'vault_locked') { return }
+        if (refusalkind !== 'absent_vault') { setGripe(message); return }
+      }
+    }
     await auth.deleteAccount()
   }
 
   return (
     <div className="session-bar">
-      <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.userId})</code></span>
+      <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.user_id})</code></span>
       <button onClick={() => { void signOut() }}>Sign out</button>
       <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
+      {gripe !== null && <span className="gripe">{gripe}</span>}
     </div>
   )
 }

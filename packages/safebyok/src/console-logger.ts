@@ -1,11 +1,7 @@
 /* eslint-disable no-console -- the one module in src/ that writes to the console: the fallback a vault logs to when its host passes no logger, as the Coach approved */
 import type { VaultLogger } from './logger'
 
-/**
- * The logger a vault uses when its host passes none: the console, each message tagged
- * `safebyok:`, followed by its story and its error when there are any. A host that wants quiet
- * passes a logger whose calls do nothing.
- */
+/** The console, each message tagged `safebyok:` and followed by its story and its error when there are any. */
 export const consoleLogger: VaultLogger = {
   log:   (message, story, err) => { console.log(...consoleArgs(message, story, err)) },
   warn:  (message, story, err) => { console.warn(...consoleArgs(message, story, err)) },

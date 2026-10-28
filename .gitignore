@@ -22,6 +22,9 @@ lib-cov
 coverage
 *.lcov
 
+# vitest's JSON reports, in each package
+.vitest/
+
 # nyc test coverage
 .nyc_output
 

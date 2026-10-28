@@ -3,7 +3,7 @@ import {
   Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore,
   type KeyDeriver, type KeyDeriverSpec,
 } from 'safebyok'
-import { anyPassphraseTest } from 'safebyok/testing'
+import { anyStrengthChecker } from 'safebyok/testing'
 import * as TH from 'safebyok/testing'
 import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
@@ -216,41 +216,41 @@ describe("argon2idWasmDeriver's bounds", () => {
 /** Two devices sharing one vault store: each opens the vault through its own key deriver. */
 const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const deviceOf = (keyDeriver: KeyDeriver) => TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, passphraseStrengthTest: anyPassphraseTest })
+  const deviceOf = (keyDeriver: KeyDeriver) => TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, strengthChecker: anyStrengthChecker })
   return { first: () => deviceOf(firstDeriver), second: () => deviceOf(secondDeriver) }
 }
 
 // Each runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
-  it("is accepted by Vault.make under the supplied label", async () => {
-    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, passphraseStrengthTest: anyPassphraseTest })
-    expect(vault.getSnapshot().state).to.eq('absent')
-    vault.close()
+  it("is accepted by Bank.make under the supplied label", async () => {
+    const vault = await TH.settledVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, strengthChecker: anyStrengthChecker })
+    expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
+    TH.closeVault(vault)
   })
 
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWasmWebV1Deriver, argon2idWebV1Deriver)
     const first = await devices.first()
-    await first.unlock('correct horse battery staple')
-    await first.storeBox('openai', FakeApiKey)
+    await TH.unlock(first, 'correct horse battery staple')
+    await first.putBox({ boxlabel: 'openai' }, FakeApiKey)
     const second = await devices.second()
-    await second.unlock('correct horse battery staple')
-    expect(await second.readBox('openai')).to.eq(FakeApiKey)
-    first.close()
-    second.close()
+    await TH.unlock(second, 'correct horse battery staple')
+    expect(await second.getWhisper('openai')).to.eq(FakeApiKey)
+    TH.closeVault(first)
+    TH.closeVault(second)
   })
 
   it("made through the core's deriver opens through WebAssembly, and refuses a wrong passphrase there", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWebV1Deriver, argon2idWasmWebV1Deriver)
     const first = await devices.first()
-    await first.unlock('correct horse battery staple')
-    await first.storeBox('openai', FakeApiKey)
+    await TH.unlock(first, 'correct horse battery staple')
+    await first.putBox({ boxlabel: 'openai' }, FakeApiKey)
     const second = await devices.second()
-    await expect(second.unlock('correct horse battery stapler')).rejects.toThrow(/didn't unlock/u)
-    await second.unlock('correct horse battery staple')
-    expect(await second.readBox('openai')).to.eq(FakeApiKey)
-    first.close()
-    second.close()
+    await expect(TH.unlock(second, 'correct horse battery stapler')).rejects.toThrow(/didn't unlock/u)
+    await TH.unlock(second, 'correct horse battery staple')
+    expect(await second.getWhisper('openai')).to.eq(FakeApiKey)
+    TH.closeVault(first)
+    TH.closeVault(second)
   })
 })
 

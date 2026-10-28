@@ -1,6 +1,6 @@
 /**
  * The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the
- * means to render a component as the demo's App does -- inside a VaultProvider -- over stores in
+ * means to render a component as the demo's App does -- inside a BankProvider -- over stores in
  * memory, to fill its vault beforehand as another device would, to answer the passphrase
  * dialog the provider raises, to watch the vault beside a component, and to stand in for Anthropic.
  */
@@ -8,8 +8,8 @@ import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
-import { VaultProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { memoryVaultOpts, settledVault } from 'safebyok/testing'
+import { BankProvider, useVault, useVaultSnapshot } from 'safebyok-react'
+import { closeVault, memoryVaultOpts, settledVault, stateOf, unlock } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
@@ -20,16 +20,16 @@ export const Passphrase = 'correct horse battery staple'
 
 /**
  * A fresh world in memory for the demo's components: the vault's two stores; a render that wraps
- * a component in a VaultProvider over them, signed in as `userId` and deriving through the cheap
+ * a component in a BankProvider over them, signed in as `user_id` and deriving through the cheap
  * test deriver; an opener for a look at the vault from outside the page; and a seeder that fills
  * the vault beforehand from another device, so the page finds it locked. Its vaults are in the
  * `acme` app, as `scopeOf` has them.
  *
  * @param stores - `vaultDB`, to put the vault behind an adapter of the test's own. Default: a
  *   fresh `localVaultDB` in memory.
- * @returns `vaultDB` and `deviceDB`, `renderInVault(ui, userId?)`, `open(userId?)`,
- *   `openUnlocked(userId?)`, unlocked with {@link Passphrase}, and `seed(whispers, userId?)`. The
- *   user is `u1` unless named. Each vault `open` and `openUnlocked` hand out is closed when the
+ * @returns `vaultDB` and `deviceDB`, `renderInVault(ui, user_id?)`, `open(user_id?)`,
+ *   `openUnlocked(user_id?)`, unlocked with {@link Passphrase}, and `seed(whispers, user_id?)`. The
+ *   user is `u1` unless named. Each vault `open` and `openUnlocked` hand out is let go when the
  *   test ends, by tests/setup.ts.
  *
  * @example
@@ -40,28 +40,30 @@ export const Passphrase = 'correct horse battery staple'
 export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: { vaultDB?: VaultDB } = {}) => {
   const opts = memoryVaultOpts({ vaultDB })
   const { deviceDB } = opts
+  // The provider shows its own dialog: the scripted requestCleartext is for the vaults open() hands out.
+  const { user_id: _user_id, vaultlabel: _vaultlabel, requestCleartext: _scripted, ...bankOpts } = opts
 
-  const renderInVault = (ui: ReactNode, userId: string | null = 'u1') => (
-    render(<VaultProvider {...opts} userId={userId}>{ui}</VaultProvider>)
+  const renderInVault = (ui: ReactNode, user_id: string | null = 'u1') => (
+    render(<BankProvider {...bankOpts} user_id={user_id}>{ui}</BankProvider>)
   )
 
-  const open = async (userId = 'u1') => keepToClose(await settledVault({ ...opts, userId }))
+  const open = async (user_id = 'u1') => keepToClose(await settledVault({ ...opts, user_id }))
 
-  const openUnlocked = async (userId = 'u1') => {
-    const vault = await open(userId)
-    await vault.unlock(Passphrase)
+  const openUnlocked = async (user_id = 'u1') => {
+    const vault = await open(user_id)
+    await unlock(vault, Passphrase)
     return vault
   }
 
-  const seed = async (whispers: Record<string, Whisper>, userId = 'u1') => {
-    const vault = await settledVault({ ...opts, userId, deviceDB: memoryDeviceDB() })
+  const seed = async (whispers: Record<string, Whisper>, user_id = 'u1') => {
+    const vault = await settledVault({ ...opts, user_id, deviceDB: memoryDeviceDB() })
     try {
-      await vault.unlock(Passphrase)
+      await unlock(vault, Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
-        await vault.storeBox(boxlabel, whisper)
+        await vault.putBox({ boxlabel }, whisper)
       }
     } finally {
-      vault.close()
+      closeVault(vault)
     }
   }
 
@@ -70,7 +72,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
 
 /**
  * Answers the passphrase dialog once it shows: types `passphrase` and submits, whether the dialog
- * is choosing a new vault's passphrase or unlocking one.
+ * is choosing a new vault's passphrase (typed again in its confirmation) or unlocking one.
  *
  * @param passphrase - What to type. Default: {@link Passphrase}.
  *
@@ -81,6 +83,8 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
 export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   const field = await screen.findByPlaceholderText('vault passphrase')
   fireEvent.change(field, { target: { value: passphrase } })
+  const confirmation = screen.queryByPlaceholderText('confirm vault passphrase')
+  if (confirmation !== null) { fireEvent.change(confirmation, { target: { value: passphrase } }) }
   const form = field.closest('form')
   if (form === null) { throw new Error('the passphrase dialog has no form to submit') }
   fireEvent.submit(form)
@@ -131,22 +135,22 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
 
 /**
  * The vault as a page sees it, to render beside a component under test: whether there is one
- * (`vault`: `none` or `open`), its `state`, its `boxes` (boxlabels, comma-joined), a `read` button
- * that reads `anthropic_api_key` through withUnlockedVault, and an `unlock` button that unlocks it
- * with {@link Passphrase} directly.
+ * (`vault`: `none` or `open`), its `state` (`none` while there is none), its `boxes` (boxlabels,
+ * comma-joined), a `read` button that reads `anthropic_api_key`, asking through the provider's dialog, and an
+ * `unlock` button that has it unlocked (`ensureUnlocked`), asking through the provider's dialog too.
  *
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
-  const { vault, withUnlockedVault } = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')
+  const snapshot = useVaultSnapshot('main')
   return (
     <p>
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
-      <span data-testid="state">{snapshot.state}</span>
-      <span data-testid="boxes">{snapshot.boxes.map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void withUnlockedVault(() => vault?.readBox('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
-      <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
+      <span data-testid="state">{snapshot === null ? 'none' : stateOf(snapshot)}</span>
+      <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
+      <button onClick={() => { void vault?.tryGetWhisper('anthropic_api_key') }}>read</button>
+      <button onClick={() => { void vault?.tryEnsureUnlocked() }}>unlock</button>
     </p>
   )
 }
@@ -154,7 +158,7 @@ export const VaultProbe = () => {
 /**
  * Waits until the {@link VaultProbe} shows the vault in `state`, failing if it never does.
  *
- * @param state - The snapshot state to wait for: `absent`, `locked` or `unlocked`.
+ * @param state - The state to wait for, as `TH.stateOf` reads it from the snapshot: `novel`, `locked` or `unlocked`.
  *
  * @example await TH.expectProbeState('locked')
  */

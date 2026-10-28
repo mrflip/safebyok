@@ -1,40 +1,64 @@
 import { fileURLToPath } from 'node:url'
 import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
+import * as Zod from 'zod'
 import * as safebyok from '../src/index'
+import * as Primitives from '../src/checks/primitives'
 import * as Validators from '../src/validators'
 
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
-      'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
-      'Vault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
-      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
-      'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
-      'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
+      'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
+      'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
+      'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'BoxDamaged', 'BoxFormat', 'BoxRecord', 'BoxSparse', 'BoxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'LeaseStamp', 'GateRecord', 'GateSparse', 'PasskeyWayinSparse', 'PassphraseWayinSparse', 'VaultFormat', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'TombstoneFormat', 'VaultRecord', 'VaultScope', 'isGated', 'Whisper', 'wallClock',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'Validators',
+      'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
+      'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
   })
 
-  it("exports every check and bound safebyok/validators does, as the same objects", () => {
-    for (const [exportname, exported] of Object.entries(Validators)) {
+  it("exports each name check and its bounds, as the same objects the vault checks with", () => {
+    for (const [exportname, exported] of Object.entries(Primitives)) {
       expect(safebyok[exportname as keyof typeof safebyok], exportname).to.eq(exported)
     }
   })
 
-  it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isMark'])
+  it("exports the scopepaths an adapter over a key-value store files rows under, as one namespace", () => {
+    expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
+  })
+
+  it("exports the validators a host or an adapter calls as one namespace, each the object its module makes, and Validator and its kit to make more", () => {
+    expect(Object.keys(safebyok.Validators)).to.have.members([
+      'EpochMillis', 'label', 'user_id',
+      'bankScope', 'vaultScope', 'boxscope', 'VaultScope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath',
+      'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped', 'Ciphered',
+      'PassphraseWayinRecord', 'PasskeyWayinRecord', 'WayinRecord', 'GateRecord', 'VaultRecord', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'VaultDraft', 'GateSparse', 'PassphraseWayinSparse', 'PasskeyWayinSparse',
+      'BoxRecord', 'BoxSparse', 'BoxDamaged', 'BoxStamp', 'LeaseRecord', 'LeaseStamp', 'DeviceRecord', 'Whisper', 'Sidecar', 'Capacity',
+      'VaultRecordExpectation', 'BoxGetExpectation', 'BoxExpectation', 'VaultDelExpectation', 'BoxDelExpectation', 'BoxDeletion',
+      'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
+      'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswerShape',
+    ])
+    for (const [valname, validator] of Object.entries(Validators)) {
+      expect(safebyok.Validators[valname as keyof typeof Validators], valname).to.eq(validator)
+    }
+    const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
+    expect(validatorsByName.map(([exportname]) => exportname)).to.include.members(['VaultRecord', 'BoxRecord', 'Whisper', 'Sidecar', 'Ciphered', 'LeaseStamp', 'label'])
+    for (const [exportname, exported] of validatorsByName) {
+      expect(safebyok.Validators[exportname as keyof typeof Validators], exportname).to.eq(exported)
+    }
+    expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
     expect(Object.keys(safebyok.Sanitizer)).to.have.members(['refusalFor'])
   })
 
-  it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
-    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
-    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
+  it("exports the refusals an adapter throws and unexpectedError, and the comparisons a key-value adapter makes, each as one namespace", () => {
+    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'unexpectedError', 'staleWrite', 'staleVaultRecord', 'StaleVaultRecordMessage', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['isTombstone', 'vaultRecordMeets', 'vaultRecordRefusalOf', 'vaultMeets', 'vaultRecordPutOf', 'newLifeOf', 'tombstoneOf', 'boxRefusalOf', 'deletionOf'])
   })
 })
 
@@ -58,14 +82,14 @@ const bundleOf = async (imports: string): Promise<string> => {
   return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
 }
 
-// The supplied spec's label ships with Vault.make, which refuses a deriver wearing it without its
+// The supplied spec's label ships with Bank.make, which refuses a deriver wearing it without its
 // parameters; Argon2id's implementation shows by the variants it names, Argon2d among them.
 const Argon2Implementation = /argon2d/iu
 
 describe("the main entry's tree-shaking", () => {
-  it("leaves Argon2id out of an app that imports Vault.make alone", async () => {
-    const shipped = await bundleOf('Vault')
-    expect(shipped).to.include('Vault.make')
+  it("leaves Argon2id out of an app that imports Bank alone", async () => {
+    const shipped = await bundleOf('Bank')
+    expect(shipped).to.include('Bank.make')
     expect(shipped).to.include('argon2id_web_v1')
     expect(shipped).to.not.match(Argon2Implementation)
   }, 30_000)

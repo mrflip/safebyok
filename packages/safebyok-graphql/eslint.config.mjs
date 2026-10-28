@@ -177,10 +177,10 @@ export default defineConfig([
       'no-global-assign': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        varsIgnorePattern:         '^_',
-        argsIgnorePattern:         '^_',
-        caughtErrorsIgnorePattern: '^_',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        varsIgnorePattern:         '^_[a-zA-Z0-9]',
+        argsIgnorePattern:         '^_[a-zA-Z0-9]',
+        caughtErrorsIgnorePattern: '^_[a-zA-Z0-9]',
       }],
     },
   },
@@ -219,18 +219,18 @@ export default defineConfig([
     },
   },
 
-  // And it costs the host only what it uses. src/ validates with zod/mini, whose builders a host's
-  // bundler drops when nothing reaches them; classic zod's it cannot, so one import of classic
-  // would put all of it in every host's bundle.
+  // And it costs the host little: Zod comes in as `zod`, classic, the flavour the core is built
+  // on, so a host bundles one Zod. `zod/mini` would bundle a second beside it, some 7 kB gzipped
+  // more; named and star imports shake alike.
   {
-    name: 'safebyok-graphql/tree-shaking',
+    name: 'safebyok-graphql/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
-        paths: ['zod', 'zod/v4', 'zod/v3'].map((classicPath) => ({
-          name:    classicPath,
-          message: "Import zod/mini (`import * as Z from 'zod/mini'`): classic zod does not tree-shake, and would ride along in every host's bundle.",
+        paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
+          name:    otherPath,
+          message: "Import zod as `zod` (`import { object as obj } from 'zod'`): the core is built on classic Zod, and a second flavour would bundle beside it.",
         })),
       }],
     },
@@ -276,6 +276,9 @@ export default defineConfig([
       // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
       // field dropped by destructuring): typescript-eslint's, configured above, is the one.
       'sonarjs/no-unused-vars': 'off',
+      // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
+      // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
+      'sonarjs/redundant-type-aliases': 'off',
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
@@ -303,7 +306,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, lockboxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },

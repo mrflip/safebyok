@@ -1,4 +1,5 @@
 import { Component, useState, type ReactNode } from 'react'
+import { Sanitizer, VaultError, isVaultError } from 'safebyok'
 
 /** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
 export type BoundaryProps = {
@@ -18,11 +19,12 @@ export type BoundaryProps = {
  * and an error tracker hooked there receives it.
  *
  * An error from an event handler or a promise reaches it only when it is rethrown while
- * rendering, held in state and thrown on the next render, as `PassphraseModal` does.
+ * rendering, held in state and thrown on the next render, as `PassphraseModal` does -- through
+ * {@link forBoundary}, so that what React reports carries nothing the user typed.
  *
  * @example
  *   <Boundary fallback={<p>Something went wrong.</p>}>
- *     <UnlockForm vault={vault} onDone={onDone} />
+ *     <UnlockForm gating={gating} onDone={onDone} />
  *   </Boundary>
  * @example <Boundary fallback={null} onCaught={() => { onGripe(trouble) }}><PasskeyPress {...props} /></Boundary>
  */
@@ -37,17 +39,50 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
 }
 
 /**
- * A number that changes whenever `handle` does: the key for a component that serves one vault
- * handle, so that handed another it starts afresh -- its boundary caught nothing, its form holds
- * nothing typed for the last vault.
+ * A number that changes whenever `thing` does: the key for a component that serves one gating,
+ * so that handed another it starts afresh -- its boundary caught nothing, its form holds nothing
+ * typed for the last.
  *
- * @example <Boundary key={useRoundFor(vault)} fallback={null}><PasskeyPress vault={vault} /></Boundary>
+ * @example <Boundary key={useRoundFor(gating)} fallback={null}><PasskeyPress gating={gating} /></Boundary>
  */
-export const useRoundFor = (handle: object): number => {
-  const [served, setServed] = useState({ handle, round: 0 })
-  if (served.handle === handle) { return served.round }
+export const useRoundFor = (thing: object): number => {
+  const [served, setServed] = useState({ thing, round: 0 })
+  if (served.thing === thing) { return served.round }
   // React's "adjusting state while rendering": it renders again at once, before committing this.
   const round = served.round + 1
-  setServed({ handle, round })
+  setServed({ thing, round })
   return round
+}
+
+/** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
+export type BoundarySource = 'PassphraseModal' | 'GatingModal' | 'PasskeyUnlockButton'
+
+/** Where to look, by the component, for an error that was not the vault's own. */
+const LookFor: Record<BoundarySource, string> = {
+  PassphraseModal:     "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
+  GatingModal:         "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice, and, for a passkey, the browser's passkey prompt (call createPasskey yourself to see it).",
+  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey yourself to see it.",
+}
+
+/**
+ * What a component throws in render for its {@link Boundary}, in place of `err`, so that what
+ * React reports through `onCaughtError` -- the console, an error tracker -- carries nothing the
+ * user typed. A VaultError keeps its kind, message and meta, but never its `cause`: that may be a
+ * host key deriver's throw, which was handed the passphrase. Its message says
+ * that the cause was left out, should it point at one. One with no cause is thrown as itself.
+ * Anything else becomes a fixed `unexpected_error` quoting nothing of it, naming `source`, the
+ * component it came from, and where to look.
+ *
+ * @param err - What the component's call failed with.
+ * @param source - The component reporting it.
+ *
+ * @example if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
+ */
+export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
+  if (! isVaultError(err)) {
+    return Sanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LookFor[source]}`)
+  }
+  if (err.cause === undefined) { return err }
+  const message = `${err.message} (safebyok-react's ${source} left this error's cause out of its report to React: it may quote what the user typed.)`
+  return new VaultError(err.refusalkind, message, err.meta === undefined ? undefined : { meta: err.meta })
 }

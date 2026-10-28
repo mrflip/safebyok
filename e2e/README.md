@@ -35,9 +35,9 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   * [races.test.ts](tests/postgres/races.test.ts) -- writers for a vault's last places, with no
     turnstile: some land, none past the writers racing, every one readable (bounds and read-back,
     not the limit: it is a best effort); and a write that
-    counted before another's lockbox committed, which lands past the limit as the README says.
-  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault retired
-    while a lockbox's insert waited on the foreign key, refused as `stale_write`.
+    counted before another's box committed, which lands past the limit as the README says.
+  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault deleted
+    while a box's insert waited on the foreign key, refused as `stale_write`.
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the one list of which suites run against the server**; the rest of the
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
@@ -62,10 +62,15 @@ services, one to a backend, for a contributor's machine; CI starts the same imag
 container (the `postgres` job in `.github/workflows/ci.yml`).
 
 ```sh
-pnpm --filter safebyok-e2e db:up           # postgres:17 on 127.0.0.1:54320
+pnpm --filter safebyok-e2e db:up           # postgres:18 on 127.0.0.1:54320
 pnpm --filter safebyok-e2e test:postgres   # SAFEBYOK_PG_URL defaults to that container
 pnpm --filter safebyok-e2e db:down
 ```
+
+Inside the dev container there is nothing to start: its Postgres runs beside it
+([.devcontainer/services.yaml](../.devcontainer/services.yaml), extended from this compose file),
+and `SAFEBYOK_PG_URL` is set to it, so `pnpm test` here runs the Postgres tests too. Every worktree
+in the container shares that one server, each test file in a database of its own.
 
 To run against a Postgres of your own, set `SAFEBYOK_PG_URL` and run `pnpm test` in this directory
 (or `test:postgres`, which runs only these). The compose file has slots, as comments, for the

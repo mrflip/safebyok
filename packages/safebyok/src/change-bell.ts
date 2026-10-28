@@ -1,20 +1,11 @@
+/** The change bell: how a write to a store in this browser tells every listener, in this tab and every other tab of the origin.
+ * Import it whole: `import { ChangeBell } from 'safebyok/idb'`. A bell carries nothing, so a
+ * listener reads again. Each listener hears a ring once. A store of your own over IndexedDB rings
+ * a bell of its own name. A bell never holds a Node or Bun process open.
+ */
+
 import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
-
-/**
- * The change bell: how a write to a store in this browser tells everyone listening to it, in this
- * tab and in every other. Listeners in this tab hear the bell directly; a BroadcastChannel of the
- * bell's name carries it to the other tabs of this origin (a channel never echoes to its own
- * sender, so nothing hears twice). The bell carries nothing: a listener's only news is that
- * something changed, and it reads again. `idbDeviceDB` rings one, and `safebyok-indexeddb`'s
- * vault store another; a store of your own over IndexedDB rings one of its own name. Import it
- * whole, from `safebyok/idb`: `import { ChangeBell } from 'safebyok/idb'`.
- *
- * The channel lives only while it has work: it is closed when its last listener in this tab leaves,
- * and a ring that finds no listener in this tab opens one to tell the other tabs and closes it
- * again, so a tab that only writes still rings the others. Where a platform's channel holds a Node
- * or Bun process open, it is also unref'd, so a process exits when its own work is done.
- */
 
 const listenersByBell = new Map<string, Set<() => void>>()
 const channels = new Map<string, BroadcastChannel>()
@@ -37,12 +28,11 @@ const callEach = (listeners: Set<() => void> | undefined) => {
   })
 }
 
-/**
- * Rings the bell named `bellname`: every listener to it in this tab, and over the BroadcastChannel
- * of that name, every other tab's. Ring it once a write has committed.
+/** Ring the bell named `bellname`, for its listeners in this tab and every other: ring it once a write has committed.
+ * A tab with no listener of its own still rings the others.
  *
- * @param bellname - The bell, and its channel's name, shared with every other tab: the same in
- *   each version of the package that rings it.
+ * @param bellname - The bell's name, shared with every other tab and every version of the package
+ *   that rings it.
  *
  * @example ChangeBell.ring('safebyok-idb:acme:vault_db')  // after a write to the acme vault shelf has committed
  */
@@ -52,15 +42,10 @@ export const ring = (bellname: string): void => {
   closeIfIdle(bellname)
 }
 
-/**
- * Calls `listener` whenever the bell named `bellname` rings, from this tab or another; returns the
- * unsubscribe. Where there is no BroadcastChannel, only this tab's rings are heard. What the
- * listener throws goes to the default logger, as an error, and to the platform's `reportError`
- * where there is one.
- *
- * @param bellname - The bell to listen to.
- * @param listener - What to call, with nothing, on each ring.
- * @returns The unsubscribe: once the last listener of this tab leaves, its channel closes.
+/** Call `listener`, in a microtask of its own, whenever the bell named `bellname` rings in this tab or another; returns the unsubscribe.
+ * Where there is no BroadcastChannel, only this tab's rings are heard. A listener that throws
+ * silences no other: what it threw goes to the default logger, and to the platform's
+ * `reportError` where there is one.
  *
  * @example
  *   const stop = ChangeBell.listen('safebyok-idb:acme:vault_db', () => { void refresh() })

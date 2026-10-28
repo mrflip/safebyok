@@ -1,76 +1,67 @@
 import { argon2idAsync } from '@noble/hashes/argon2.js'
-import { Argon2idWebV1, ensureSaltFits, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
+import { Argon2idWebV1, checkSaltFits, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 
-/**
- * What every key deriver carries, whatever its algorithm: the label a vault stores, the salt
- * length it takes, and the function that derives.
- */
+/** What every key deriver carries, whatever its algorithm: the label a vault stores, the salt length it takes, and the function that derives. */
 type KeyDeriverBase = {
-  /** Stored beside each vault, so the stored format says how it was made. */
+  /** Stored with each passphrase wayin, to say how its passphraseKey was made. */
   key_deriver_label: string
   /** How long a passphraseSalt this deriver expects, in bytes: from 1 to 65536. */
   salt_bytes:        number
-  /**
-   * 32 key bytes from the passphrase and its salt: deterministic, and slow by design. Refuses a
-   * salt of another length than `salt_bytes` (kind 'bad_option'), as the supplied derivers do.
+  /** 32 key bytes from the passphrase and its salt: deterministic, and slow by design.
+   * Refuse a salt of another length than `salt_bytes` as 'bad_option', as the supplied derivers do.
+   * Nothing you throw reaches the caller, as you hear the passphrase. A condition-family VaultError
+   * keeps its kind under safebyok's own words. Anything else becomes 'unexpected_error', and the
+   * logger hears only the kind of a VaultError you threw.
    */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
+  /** Fetch or build what the deriver needs before it can derive, such as a WebAssembly module.
+   * Each bank's `hello()` runs it, so call it early only to warm up. Make it cost nothing once it
+   * has succeeded, and forget a failure, so the next call tries again. One that fails refuses the
+   * hello 'unexpected_error', what it threw the cause, as it heard no passphrase.
+   */
+  load?:             (() => void | Promise<void>) | undefined
 }
 
-/**
- * A key deriver running Argon2id: the whole {@link KeyDeriverSpec} beside its function, every
- * parameter present. `Vault.make` checks the spec as `argon2idDeriver` does, so one Argon2id
- * cannot run is refused (kind 'bad_option') when the vault is opened, not at its first unlock.
- * What {@link argon2idDeriver}, {@link argon2idWebV1Deriver} and safebyok-fastkey's derivers are.
+/** A key deriver running Argon2id, carrying its whole {@link KeyDeriverSpec}, as {@link argon2idDeriver}'s do.
+ * So are {@link argon2idWebV1Deriver} and safebyok-fastkey's derivers.
+ * `Bank.make` checks the spec as {@link parseKeyDeriverSpec} does, so a bad one is refused when the
+ * Vault object is made, not at its first unlock.
  */
 export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriverBase
 
-/**
- * A key deriver of any other algorithm, or of none declared: a label, a salt length and a
- * function, and optionally the `algorithm` it runs, named in the host's own words. It carries no
- * Argon2id parameters; `Vault.make` refuses one that declares `algorithm: 'argon2id'` without
- * them being a whole spec, and one whose label safebyok reserves (those beginning `argon2id_web_`).
+/** A key deriver of another algorithm, or none declared: a label, a salt length and a function, with no Argon2id parameters.
+ * `Bank.make` refuses one that declares `algorithm: 'argon2id'` without a whole spec, and one
+ * wearing a label safebyok reserves (beginning `argon2id_web_`).
  */
 export type CustomKeyDeriver = KeyDeriverBase & {
-  /** What the deriver runs, if it says: `argon2id` here means a whole {@link KeyDeriverSpec} must be carried. */
+  /** What the deriver runs, in the host's own words. `argon2id` here means a whole {@link KeyDeriverSpec} must be carried. */
   readonly algorithm?: string
 }
 
-/**
- * What turns a passphrase into passphraseKey bytes: an {@link Argon2idKeyDeriver}, the one to use
- * being {@link argon2idWebV1Deriver} and {@link argon2idDeriver} making one for a spec of your
- * own, or a {@link CustomKeyDeriver} of some other algorithm. The seam exists so tests can
- * substitute a cheap deriver, and so a host on a platform with a faster implementation of the
- * same Argon2id spec (WebAssembly, native) can plug it in.
+/** What turns a passphrase into passphraseKey bytes: an {@link Argon2idKeyDeriver} or a {@link CustomKeyDeriver}.
+ * Use {@link argon2idWebV1Deriver}, or {@link argon2idDeriver} for a spec of your own. The seam lets
+ * tests use a cheap deriver, and a host plug in a faster build of the same spec (WebAssembly, native).
+ * Make it once, before any bank, and hand the same one to each: a deriver costly to set up carries
+ * that setup as `load`, which each bank's `hello()` runs.
  *
- * A vault stores its deriver's `key_deriver_label`, and unlocks only through a deriver carrying
- * that same label: plugging in your own commits every one of your users' vaults to it. An
- * Argon2id deriver carries its whole keyDeriverSpec beside its function, and one that wears the
- * label of a spec safebyok supplies must carry exactly that spec's parameters, or Vault.make
- * refuses it (kind 'bad_option'); so does a label beginning `argon2id_web_` that is not one
- * safebyok supplies, those being reserved. Do not write your own derivation; if you must
- * substitute, use a vetted Argon2id implementation, spread the spec into it, keep the label, and
- * test that it derives the same bytes as the deriver it stands in for. Vault.make logs a warning
- * for a label beginning `test_`, the mark of a deriver made cheap for tests.
+ * A vault unlocks only through a deriver carrying the `key_deriver_label` its wayin stores, so
+ * plugging in your own commits every user's vault to it. A deriver wearing a supplied spec's label
+ * must carry exactly its parameters, or Bank.make refuses it as 'bad_option'.
+ *
+ * Do not write your own derivation. To substitute, use a vetted Argon2id implementation, spread the
+ * spec into it, keep the label, and test that it derives the same bytes. Bank.make warns of a
+ * label beginning `test_`, the mark of a deriver made cheap for tests.
  *
  * @example const wasmDeriver: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: deriveWithWasm }
  */
 export type KeyDeriver = Argon2idKeyDeriver | CustomKeyDeriver
 
-/**
- * A KeyDeriver running Argon2id at `spec`, through `@noble/hashes` (audited, pure JS, runs
- * wherever the host app does), carrying the spec beside its function. The async form yields to
- * the event loop as it works, so a browser unlock does not freeze the page. Choose a label of
- * your own (naming your app, say), and never change its parameters once a vault is made under it.
+/** A frozen KeyDeriver running Argon2id at `spec` through `@noble/hashes`, audited pure JS that runs wherever the host app does.
+ * It yields to the event loop as it works, so an unlock does not freeze the page. Choose a label of
+ * your own, naming your app, say. Never change its parameters once a vault is made under it.
  *
- * Refuses (kind 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over 65536,
- * memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32 bytes -- and
- * one wearing a label safebyok reserves, or a supplied spec's without its parameters. A weak spec
- * that runs is allowed. The deriver it returns refuses (kind 'bad_option') a salt of another
- * length than the spec's `salt_bytes`, before any derivation.
- *
- * @param spec - The whole Argon2id parameter set, and the label vaults made under it record.
- * @returns A frozen KeyDeriver: the spec's fields and `deriveKeyBytes`.
+ * It refuses `spec` as {@link parseKeyDeriverSpec} does. The deriver refuses 'bad_option' for a
+ * salt of another length than `salt_bytes`, before deriving anything.
  *
  * @example
  *   const keyDeriver = argon2idDeriver({
@@ -91,16 +82,14 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => {
   return Object.freeze({
     ...spec,
     deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
-      ensureSaltFits(spec, saltBytes)
+      checkSaltFits(spec, saltBytes)
       return await argon2idAsync(passphrase, saltBytes, argonOpts)
     },
   })
 }
 
-/**
- * The KeyDeriver to use: Argon2id at the supplied {@link Argon2idWebV1} spec. `browserOpts()`,
- * from `safebyok/browser`, hands it to Vault.make; outside a browser, pass it as `keyDeriver`
- * yourself.
+/** The KeyDeriver to use: Argon2id at the supplied {@link Argon2idWebV1} spec.
+ * `browserOpts()` hands it to Bank.make. Outside a browser, pass it as `keyDeriver` yourself.
  *
  * @example
  *   const keyBytes = await argon2idWebV1Deriver.deriveKeyBytes('correct horse battery staple', passphraseSalt)

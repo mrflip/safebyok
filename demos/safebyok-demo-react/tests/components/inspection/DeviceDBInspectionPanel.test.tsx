@@ -10,7 +10,7 @@ import * as TH from '../../test-helpers'
 
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
-  for (const ckey of deviceStore.ckeys()) { deviceStore.erase(ckey) }
+  for (const scopepath of deviceStore.scopepaths()) { deviceStore.erase(scopepath) }
   await deviceDbInspector.wipe()
 })
 
@@ -18,13 +18,13 @@ describe("DeviceDBInspectionPanel", () => {
   it("shows this device's lease as it lands, its leaseKey a handle", async () => {
     render(<DeviceDBInspectionPanel />)
     const lease = { ...(await TH.leaseOf('u1')), applabel: Applabel }
-    await act(() => idbDeviceDB({ dbName: Applabel }).writeLease(lease, TH.NoLocks))
+    await act(() => idbDeviceDB({ dbName: Applabel }).putLease(lease))
     await waitFor(() => { expect(screen.getAllByText('🔑 non-extractable key')).to.have.lengthOf(1) })
     expect(screen.getByText(/«CryptoKey non-extractable handle»/)).to.not.be.null
   })
 
   it("shows the fake auth's session beside it", () => {
-    deviceStore.write('session:safebyok_demo', '{"userId":"user_0123456789abcdef","userlabel":"margo"}')
+    deviceStore.write('session:safebyok_demo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
     render(<DeviceDBInspectionPanel />)
     expect(screen.getByText(/"userlabel":"margo"/)).to.not.be.null
   })

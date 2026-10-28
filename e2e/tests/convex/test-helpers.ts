@@ -3,7 +3,7 @@ import { defineTestApp } from 'convex-test'
 import { SafebyokComponent } from 'safebyok-convex/server'
 import type { GetUserId } from 'safebyok-convex/server'
 import { register } from 'safebyok-convex/test'
-import { boxOf } from 'safebyok/testing'
+import { boxOf, type FakeCiphered } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
 export * from 'safebyok/testing'
@@ -25,11 +25,11 @@ export const bySubject: GetUserId = async (ctx) => {
 }
 
 /**
- * A lockbox whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
+ * A box whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
  * a replacement weighs exactly `bytes` more or less only under a tag as long as the one it replaces.
  */
 export const heavyBox = (boxlabel: string, bytes: number, tag = boxlabel) => (
-  boxOf(boxlabel, tag, { whisper_ciphered: { cipher_iv_b64: 'iv', ciphertext_b64: 'c'.repeat(bytes) } })
+  boxOf(boxlabel, tag, { whisper_ciphered: { cipher_iv_b64: 'iv', ciphertext_b64: 'c'.repeat(bytes) } as FakeCiphered })
 )
 
 export const RealPassphrase = 'correct horse battery staple'

@@ -1,21 +1,17 @@
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
 import { Refusals } from 'safebyok'
 
-/**
- * The shelf: the one IndexedDB object store this package keeps its rows in, `records` in the
- * database `<dbName>:vault_db`, opened through `idb-keyval` -- which opens it lazily, on the
- * first read or write, and makes it on first use. The name is a stored contract, like the
- * ckeys: it is where a vault already written is found.
+/** The shelf is the one object store, `records` in the database `<dbName>:vault_db`, holding every row.
+ * Its name is a stored contract, like the scopepaths: a vault already written is found there.
  */
 
 // One UseStore per dbName, shared by every adapter and inspector over it: making one is free
 // until something reads or writes.
 const shelves = new Map<string, UseStore>()
 
-/**
- * The shelf of the database `dbName`, as `idb-keyval` hands one to its own calls.
+/** The shelf of the database `dbName`, as `idb-keyval`'s own calls take one.
  *
- * @example await get(vaultPropsCkey(scope), shelfOf('acme'))
+ * @example await get(Scopepath.vault(scope), shelfOf('acme'))
  */
 export const shelfOf = (dbName: string): UseStore => {
   const kept = shelves.get(dbName)
@@ -25,14 +21,12 @@ export const shelfOf = (dbName: string): UseStore => {
   return fresh
 }
 
-/**
- * The shelf of the database `dbName` as a VaultDB reaches it: a call's failure that the browser
- * gives for storage it withholds (`Refusals.isStorageBlocked`: site data blocked, no room left)
- * refuses as `storage_blocked`, the browser's own error its cause, and so does a call in a context
- * with no IndexedDB at all. Any other failure comes as it came, which the VaultDB base class says
- * as `storage_unavailable`.
+/** The shelf of the database `dbName` as a VaultDB reaches it, refusing `storage_blocked` where the browser withholds storage.
+ * That is a failure `Refusals.isStorageBlocked` recognizes (site data blocked, no room left), the
+ * browser's error its cause, or a context with no IndexedDB at all. Any other failure comes as it
+ * came, for the VaultDB base class to say as `storage_unavailable`.
  *
- * @example await withheldShelfOf('acme')('readonly', (store) => settle(store.get(ckey)))
+ * @example await withheldShelfOf('acme')('readonly', (store) => settle(store.get(scopepath)))
  */
 export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => ValT | PromiseLike<ValT>): Promise<ValT> => {
   if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) {
@@ -45,14 +39,13 @@ export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode
   }
 }
 
-/**
- * The result of an IndexedDB request, or the outcome of a transaction, as a promise: `idb-keyval`'s
- * `promisifyRequest`, except that a transaction one of whose requests failed rejects with that
- * request's error, where the transaction's own is still null when the failure reaches it. A
- * failure the browser gives no error for at all (a transaction aborted from outside) rejects with
- * that null, which the VaultDB base class says as `storage_unavailable` with an Error for a cause.
+/** The result of an IndexedDB request, or a transaction's completion, as a promise.
+ * It is `idb-keyval`'s `promisifyRequest`, but a failed transaction rejects with the error of the
+ * request that failed it, where the transaction's own error is still null. A failure the browser
+ * gives no error for (a transaction aborted from outside) rejects with null, which the VaultDB
+ * base class says as `storage_unavailable`.
  *
- * @example const standing = await settle<unknown>(store.get(ckey))
+ * @example const stored = await settle<unknown>(store.get(scopepath))
  */
 export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTransaction): Promise<ValT> => {
   const target: EventTarget = request
@@ -67,25 +60,19 @@ export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTr
   }
 }
 
-/**
- * `work`, run in one readwrite IndexedDB transaction over the shelf: what it reads and what it
- * writes go together, and no other tab's write lands in between, since IndexedDB runs readwrite
- * transactions over one store one after another. Resolves with what `work` resolves with, once
- * the transaction has committed; rejects, writing nothing, when `work` or any request in it
- * fails.
+/** What `work` resolves, run in one readwrite transaction over `shelf`, once that has committed.
+ * No other tab's write lands between its reads and its writes. It rejects, writing nothing, when
+ * `work` or any request in it fails.
  *
- * `work` must wait only on the store's own requests (through {@link settle}): IndexedDB
- * commits a transaction as soon as it has no request pending, so awaiting anything else -- a
- * timer, a fetch, WebCrypto -- would end it midway, and its next request would throw.
- *
- * @param shelf - The shelf, from {@link shelfOf}.
- * @param work - The reads, the decision and the writes, against the transaction's store.
+ * `work` must await only the store's own requests, through {@link settle}. IndexedDB commits a
+ * transaction once no request is pending, so awaiting a timer, a fetch or WebCrypto ends it
+ * midway, and the next request throws.
  *
  * @example
  *   const landed = await inOneTransaction(shelfOf('acme'), async (store) => {
- *     const standing = await settle(store.get(ckey))
- *     if (! meetsExpectation(standing)) { return false }
- *     store.put(record, ckey)
+ *     const stored = await settle(store.get(scopepath))
+ *     if (! meetsExpectation(stored)) { return false }
+ *     store.put(record, scopepath)
  *     return true
  *   })
  */

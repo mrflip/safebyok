@@ -7,7 +7,8 @@
 #   docker compose -f e2e/compose.yaml down              # or `pnpm --filter safebyok-e2e db:down`
 #
 # Each service listens on 127.0.0.1 only and has no password to keep: it holds nothing but
-# ciphertext made by the tests, and is thrown away with its container.
+# ciphertext made by the tests, and is thrown away with its container. The dev container runs
+# the same services beside it, extended from these without their ports (.devcontainer/services.yaml).
 name: safebyok-e2e
 
 services:
@@ -15,7 +16,7 @@ services:
   # tests/postgres/ is postgres://postgres@127.0.0.1:54320/postgres. The role is a superuser, as
   # the tests make a database of their own for each file.
   postgres:
-    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:

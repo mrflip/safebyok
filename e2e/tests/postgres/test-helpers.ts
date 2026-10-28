@@ -3,8 +3,8 @@ import { Client, Pool } from 'pg'
 import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
-import type { VaultDBOpts } from 'safebyok'
-import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile } from 'safebyok/testing'
+import type { Outcome, VaultDBOpts } from 'safebyok'
+import { boxOf, vaultRecordOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -20,7 +20,7 @@ export type PostgresSuite = 'battery' | 'races' | 'foreign key'
 
 /**
  * The suites that run against a real Postgres, when {@link PgUrlVar} names one: the whole
- * selection, in one place. The VaultDB battery and its races, the lockbox limit's real races and
+ * selection, in one place. The VaultDB battery and its races, the box limit's real races and
  * the `23503` case. Every other Postgres test stays
  * in `packages/safebyok-postgres`, over a PGlite, so `pnpm justify` needs no Docker. A suite added
  * to this directory is added to {@link PostgresSuite} and to this list; to run one more, list it.
@@ -144,7 +144,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         devices.push({ end: () => client.end() })
         return client
       },
-      empty:      async () => { await host.query('TRUNCATE safebyok_lockboxes, safebyok_vaults') },
+      empty:      async () => { await host.query('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones') },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)
@@ -210,10 +210,10 @@ const poolConfigFor = ({ isolation }: DeviceKind): PoolConfig => {
  *
  * @param db - The file's database.
  * @param turnstile - Where the race holds this device's round trips; omit for a device that races none.
- * @param deviceOpts - The lockbox limit to hold the device to; `kind`, its pool's isolation level; and `vaultDBOpts`, the base class's own options, such as the battery's logger.
+ * @param deviceOpts - The box limit to hold the device to; `kind`, its pool's isolation level; and `vaultDBOpts`, the base class's own options, such as the battery's logger.
  */
-export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, deviceOpts: { maxLockboxes?: number | undefined, kind?: DeviceKind, vaultDBOpts?: VaultDBOpts } = {}) => {
-  const { maxLockboxes, kind = {}, vaultDBOpts = {} } = deviceOpts
+export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, deviceOpts: { maxBoxes?: number | undefined, kind?: DeviceKind, vaultDBOpts?: VaultDBOpts } = {}) => {
+  const { maxBoxes, kind = {}, vaultDBOpts = {} } = deviceOpts
   const pool = db.devicePool(poolConfigFor(kind))
   const listenHere = listenOver(db)
   const client = turnstile === undefined ? pool : throughTurnstile(turnstile, pool, ['query'])
@@ -223,7 +223,7 @@ export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, d
       await turnstile.pass()
       return await listenHere(channel, onNotify)
     }
-  return (userId: string | null) => postgresVaultDB({ ...vaultDBOpts, client, userId, listen, maxLockboxes })
+  return (user_id: string | null) => postgresVaultDB({ ...vaultDBOpts, client, user_id, listen, maxBoxes })
 }
 
 /**
@@ -235,67 +235,61 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
   const db = getDb()
   await db.endDevices()
   await db.empty()
-  return ({ maxLockboxes }) => {
-    const vaultDBFor = deviceOver(db, turnstile, { maxLockboxes })
-    return perUser((userId) => vaultDBFor(userId))
+  return ({ maxBoxes }) => {
+    const vaultDBFor = deviceOver(db, turnstile, { maxBoxes })
+    return perUser((user_id) => vaultDBFor(user_id))
   }
 }
 
 // --------------------------------------------------------------------------- what a host's own code does
 
 /**
- * Resolves once a statement matching `statementLike` (an SQL `LIKE` pattern over the statement's
- * text) is waiting on another's lock on the file's database: the write under test, held where a
- * race wants it -- not any lock wait, nor this check's own query. Rejects after two seconds, well
- * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
- * timed-out test.
+ * Resolves once a statement of another connection is waiting on a lock `blocker` holds: the write
+ * under test, held where a race wants it -- not a wait on any other lock, nor this check's own
+ * query. The waiter is found by what blocks it and never by its text, which `pg_stat_activity`
+ * cuts at `track_activity_query_size` (1 kB unless the server sets more). Rejects after two
+ * seconds, well inside the test's own timeout, so a write that never waits fails here, by name,
+ * rather than as a timed-out test.
  *
- * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_lockboxes%')
+ * @example await TH.untilBlockedBy(db, eraser)
  */
-export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
+export const untilBlockedBy = async (db: FileDatabase, blocker: Client): Promise<void> => {
+  const { rows: held } = await blocker.query('SELECT pg_backend_pid() AS pid')
   await vi.waitUntil(async () => {
     const { rows } = await db.host.query(
-      "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE $1",
-      [statementLike],
+      'SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND $1::int = ANY (pg_blocking_pids(pid))',
+      [(held[0] as { pid: number }).pid],
     )
     return (rows[0] as { waiting: number }).waiting > 0
   }, { timeout: 2000, interval: 10 })
 }
 
-/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a lockbox. */
-export const FirstWriteStatement = '%INSERT INTO safebyok_lockboxes%'
-
-/** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a lockbox under each of `boxlabels`. */
+/** Makes the u1 vault the helpers' vault record stands for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
-  await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))
-  for (const boxlabel of boxlabels) { await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
+  await ensureGated(vaultDB, vaultRecordOf('u1'))
+  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
 }
 
 /**
- * A lockbox written straight to the table, as a host's own code might, through `client`: a copy of
- * the u1 vault's lockbox `like`, under `boxlabel`. With `client` in a transaction not yet
+ * A box written straight to the table, as a host's own code might, through `client`: a copy of
+ * the u1 vault's box `like`, under `boxlabel`. With `client` in a transaction not yet
  * committed, it is a write the adapter's next statement cannot see. The copy goes through a
  * temporary table so that it names no column, and follows the tables' shape wherever it goes.
  */
 export const insertRawBox = async (client: Client, boxlabel: string, like: string): Promise<void> => {
-  await client.query('CREATE TEMP TABLE raw_box ON COMMIT DROP AS SELECT * FROM safebyok_lockboxes WHERE boxlabel = $1', [like])
+  await client.query('CREATE TEMP TABLE raw_box ON COMMIT DROP AS SELECT * FROM safebyok_boxes WHERE boxlabel = $1', [like])
   await client.query("UPDATE raw_box SET boxlabel = $1, revision_tok = 'rev-raw'", [boxlabel])
-  await client.query('INSERT INTO safebyok_lockboxes SELECT * FROM raw_box')
+  await client.query('INSERT INTO safebyok_boxes SELECT * FROM raw_box')
 }
 
-/** How many lockboxes the u1 vault holds, counted straight from the table. */
-export const lockboxesStanding = async (db: FileDatabase): Promise<number> => {
-  const { rows } = await db.host.query('SELECT count(*)::int AS standing FROM safebyok_lockboxes')
-  return (rows[0] as { standing: number }).standing
+/** How many boxes the u1 vault holds, counted straight from the table. */
+export const boxesStored = async (db: FileDatabase): Promise<number> => {
+  const { rows } = await db.host.query('SELECT count(*)::int AS stored FROM safebyok_boxes')
+  return (rows[0] as { stored: number }).stored
 }
 
-/** How a write settled, never rejecting: `landed`, or the kind it was refused with (`unknown` for none). */
-export const outcomeOf = async (write: Promise<unknown>): Promise<{ kind: string }> => {
-  try {
-    await write
-    return { kind: 'landed' }
-  } catch (err) {
-    const { kind } = (err ?? {}) as { kind?: unknown }
-    return { kind: typeof kind === 'string' ? kind : 'unknown' }
-  }
+/** How a write settled: `landed`, or the refusalkind it was refused with. */
+export const settledKind = async (write: Promise<Outcome<unknown>>): Promise<{ kind: string }> => {
+  const { ok, err } = await write
+  return { kind: ok ? 'landed' : err.refusalkind }
 }

@@ -1,6 +1,9 @@
 # Wrapping up a sprint
 
 Read by the orchestrator when the last thread files, or the sprint pauses for good (SKILL.md, §5).
+The sprint doc's *Cleanup* tab, *Finally*, is this wrap-up's checklist for the sprint at hand:
+work through it beside the steps below, tick each item as it lands, and carry any still open
+into the done note.
 
 1. **Restack** the filed threads into one line on `origin/main`. A stack the threads already form
    keeps its order; peers go biggest and messiest first, so the large changes merge first and the
@@ -13,9 +16,9 @@ Read by the orchestrator when the last thread files, or the sprint pauses for go
    bottom stands on today's `origin/main`, not on an unmerged PR whose commits `main` already
    holds under other SHAs.
 2. **Sweep the rulings.** Hand a `sonnet` subagent the doc's link and the sprint directory: it
-   reads *Resolved* once, writes `<sprint_name>-resolutions.md` there -- each matter as the row
+   reads *Resolved* and *Cleanup*'s *Your calls* once, writes `<sprint_name>-resolutions.md` there -- each matter as the row
    put it and the Coach's answer word for word, with where it was raised and where the work went,
-   newest batch first -- and clears the tab. It is turbochat's *Carrying a ruling back*, done
+   newest batch first, the calls left to you as such -- and clears both. It is turbochat's *Carrying a ruling back*, done
    once at the end.
 3. **Close the sprint PR.** Set the plan's status line; add `human/YYYYMMDD-sprint_<name>_done.md`
    -- the sprint in a paragraph, the PRs in merge order with their "Stacked on" notes, YOLO

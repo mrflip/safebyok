@@ -1,8 +1,8 @@
 {
   "name": "safebyok-convex",
   "private": false,
-  "version": "0.3.0",
-  "description": "Convex storage for safebyok: a Convex component holding vault props and lockboxes as ciphertext, and the VaultDB adapter that speaks to it.",
+  "version": "0.4.0",
+  "description": "Convex storage for safebyok: a Convex component holding vault records and boxes as ciphertext, and the VaultDB adapter that speaks to it.",
   "keywords": [
     "safebyok",
     "convex",
@@ -50,29 +50,32 @@
     "@edge-runtime/vm": "^5.0.0",
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.4",
     "@vitest/eslint-plugin": "^1.6.27",
     "convex": "^1.46.0",
-    "convex-test": "^0.0.61",
+    "convex-helpers": "^0.1.128",
+    "convex-test": "^0.0.62",
     "eslint": "^10.12.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-chai-expect": "^4.1.1",
     "eslint-plugin-chai-friendly": "^1.2.1",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-sonarjs": "^4.2.2",
-    "eslint-plugin-unicorn": "^77.0.0",
+    "eslint-plugin-unicorn": "^78.0.0",
     "publint": "^0.3.25",
     "safebyok": "workspace:*",
     "tsdown": "^0.23.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.71.1",
+    "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
-    "vitest": "^5.0.3",
-    "zod": "^4.6.5"
+    "vitest": "^5.0.4",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "convex": "^1.46.0",
-    "safebyok": "workspace:^"
+    "convex-helpers": "^0.1.128",
+    "safebyok": "workspace:^",
+    "zod": "^4.6.7"
   },
   "exports": {
     ".": {

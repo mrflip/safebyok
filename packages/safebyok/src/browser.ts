@@ -1,44 +1,34 @@
+/** `safebyok/browser`: the answers nearly every browser app gives to `Bank.make`'s options, so an app that answers otherwise never ships them. */
+
 import { argon2idWebV1Deriver } from './key-deriver'
 import { idbDeviceDB, type IdbOpts } from './idb'
 import { parseDbName } from './idb-opts'
-import type { MakeVaultOpts } from './vault'
-import { zxcvbnPassphraseTest } from './zxcvbn-passphrase-test'
+import type { MakeBankOpts } from './vault-opts'
+import { zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
-export { MinPassphraseChars, MinZxcvbnScore, zxcvbnPassphraseTest } from './zxcvbn-passphrase-test'
+export { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
-/**
- * The defaults for an app in a browser, as an entry point of their own, `safebyok/browser`: the
- * options `Vault.make` asks for that nearly every browser app answers the same way. The main entry
- * asks for each of them outright, so an app that answers differently -- another key deriver, a
- * device store of its own -- never ships the code for these. Among them is `zxcvbnPassphraseTest`,
- * the passphrase strength test, whose dictionary loads only when a passphrase is first tested.
- */
-
-/** The Vault.make options {@link browserOpts} supplies: spread them in beside your own. */
-export type BrowserOpts = Readonly<Pick<MakeVaultOpts, 'keyDeriver' | 'deviceDB' | 'passphraseStrengthTest'>>
+/** The Bank.make options {@link browserOpts} supplies: spread them in beside your own. */
+export type BrowserOpts = Readonly<Pick<MakeBankOpts, 'keyDeriver' | 'deviceDB' | 'strengthChecker'>>
 
 // One bag per dbName, so a React host may call browserOpts() during render: the provider reopens
 // its vault whenever an option changes identity, and a fresh deviceDB each render would loop.
 const bagsByDbName = new Map<string, BrowserOpts>()
 
-/**
- * The browser's answers to Vault.make's options: the pinned Argon2id key deriver
- * (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`), and the passphrase
- * strength test (`zxcvbnPassphraseTest`), whose zxcvbn dictionary loads, as a chunk of its own,
- * only when a passphrase is first tested. Spread the bag into `Vault.make` beside the storage
- * adapter for your backend, which is never a default; any field you pass after the spread wins,
- * a strength test of your own among them. The same `dbName` always answers the same bag.
+/** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, to spread into `Bank.make` beside your storage adapter.
+ * They are {@link argon2idWebV1Deriver}, {@link idbDeviceDB} and {@link zxcvbnStrengthChecker}. A
+ * field you pass after the spread wins. The same `dbName` always answers the same bag, so it is
+ * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text,
+ * or an option it does not take.
  *
  * @param opts - Where the device store keeps its records: `dbName`, default 'safebyok'.
- * @returns A frozen bag of `keyDeriver`, `deviceDB` and `passphraseStrengthTest`. Kind 'bad_option' for a `dbName` that is
- *   not non-empty text.
  *
  * @example
- *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
+ *   const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })
  * @example
- *   const vault = Vault.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', user_id: session.user_id, vaultDB })
  * @example
- *   const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB, passphraseStrengthTest: myStrengthTest })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB, strengthChecker: myStrengthChecker })
  * @example
  *   browserOpts({ dbName: 'acme' }) === browserOpts({ dbName: 'acme' })  // true
  */
@@ -47,9 +37,9 @@ export const browserOpts = (opts?: IdbOpts): BrowserOpts => {
   const kept = bagsByDbName.get(dbName)
   if (kept !== undefined) { return kept }
   const bag: BrowserOpts = Object.freeze({
-    keyDeriver:             argon2idWebV1Deriver,
-    deviceDB:               idbDeviceDB({ dbName }),
-    passphraseStrengthTest: zxcvbnPassphraseTest,
+    keyDeriver:      argon2idWebV1Deriver,
+    deviceDB:        idbDeviceDB({ dbName }),
+    strengthChecker: zxcvbnStrengthChecker,
   })
   bagsByDbName.set(dbName, bag)
   return bag

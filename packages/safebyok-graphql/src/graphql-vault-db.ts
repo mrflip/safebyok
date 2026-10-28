@@ -1,11 +1,10 @@
-import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
+import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import { VaultPropsFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
+import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 
-/**
- * What graphqlVaultDB needs of an urql Client: its three ways to send an operation. The Client
- * your app already has is one, whatever its exchanges.
+/** What graphqlVaultDB needs of an urql Client: its three ways to send an operation.
+ * The Client your app already has is one, whatever its exchanges.
  */
 export type GraphqlVaultClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
 
@@ -13,61 +12,57 @@ export type GraphqlVaultClient = Pick<Client, 'query' | 'mutation' | 'subscripti
 export type GraphqlVaultDBOpts = VaultDBOpts & {
   /** Your app's urql Client, its `url` your GraphQL server's. */
   client: GraphqlVaultClient
-  /**
-   * The most lockboxes one vault holds, as the VaultDB behind your server enforces it: a whole
-   * number above zero, or `Infinity` for a server that sets none. Default: `Infinity`, as the
-   * Postgres VaultDB sets none unless told. Declare your server's own, so that `Vault.make`
-   * refuses a vault asking for more up front, rather than the server at the first lockbox past it.
+  /** The most boxes one vault holds, as the VaultDB behind your server enforces it: a whole number above zero, or `Infinity`, the default, for none.
+   * Declare your server's own, so that `Bank.make` refuses a vault asking for more up front,
+   * rather than the server at the first box past it.
    */
-  maxLockboxes?: number | undefined
+  maxBoxes?: number | undefined
 }
 
 /** The most bytes of UTF-8 the Postgres VaultDB behind the server holds in one name. */
 const ServerMaxNameBytes = 640
 
-/**
- * safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation,
- * sent through your app's urql Client to a server serving `VaultSchemaSdl` with `vaultResolvers`
- * (from `safebyok-graphql/server`), which runs each on a VaultDB made there for the signed-in
- * user. Hand it to `Vault.make` as its `vaultDB`.
+/** safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation through your app's urql Client.
+ * The server serves `VaultSchemaSdl` with `vaultResolvers`, from `safebyok-graphql/server`, and
+ * runs each operation on a VaultDB made there for the signed-in user.
  *
- * * **Every query goes to the network** (`requestPolicy: 'network-only'`): your Client's cache
- *   never answers for a vault.
+ * * **Every query goes to the network**: your Client's cache never answers for a vault.
+ * * **Limits** are those of the Postgres VaultDB behind the server: 1 MiB in one record, 640 bytes
+ *   in one name, `maxBoxes` boxes, and no limit on a vault's bytes.
  * * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
- *   message. Anything else that goes wrong -- the network, a server that is not serving the
- *   schema -- refuses with kind `storage_unavailable`, urql's own error as its `cause`.
+ *   message, the GraphQL error its `cause`. A stale write, and a box write into a full vault,
+ *   come back in the mutation's body (`landed: false`) with what is stored or how full the vault is,
+ *   never in an error's `extensions`, and are thrown here as the same VaultError, `meta` and all.
+ *   A GraphQL error your server's own auth raises with `extensions.code` `FORBIDDEN` refuses with
+ *   kind `not_permitted`. One with `UNAUTHENTICATED` is `storage_unavailable`, as a token expired
+ *   mid-refresh is not a user gone.
  * * **Other writes** reach `subscribe` through the `safebyokVaultChanged` subscription, when your
- *   Client has a way to send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
- *   `fetchSubscriptions`); without one, nothing is pushed, and the vault refreshes after its own
- *   writes as before. A subscription that fails is not retried: it is logged, once for a failing
- *   streak, and calls `onChange`, so the vault reads again and meets the trouble itself.
- * * **Misuse crosses as misuse**: a GraphQL validation error (`BAD_USER_INPUT`,
- *   `GRAPHQL_VALIDATION_FAILED`) refuses with kind `bad_option`, quoting nothing of what the
- *   server said, which may quote the variables.
- *
- * @param opts - Your app's urql `client`; optionally, the `maxLockboxes` your server holds a vault
- *   to, and a `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, holding at most 1 MiB in one record, as the Postgres VaultDB behind it
- *   does, and `maxLockboxes` lockboxes in one vault, setting no limit on a vault's bytes.
+ *   Client can send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
+ *   `fetchSubscriptions`). Without one, nothing is pushed. A subscription that fails is not
+ *   retried: the vault reads again, and meets the trouble itself.
+ * * **Misuse crosses as misuse**: a record or expectation at fault refuses as `bad_record`, here
+ *   before it is sent (an epoch past GraphQL's 32-bit `Int` included) or on the server. So a
+ *   GraphQL validation error means the server's schema is at odds with what this version sends:
+ *   it refuses with kind `bad_option`, quoting nothing of what the server said.
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
- *   const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const bank = Bank.make({ ...browserOpts(), applabel: 'acme', user_id: session.user_id, vaultDB })   // as the user signs in
  * @example
- *   const vaultDB = graphqlVaultDB({ client, maxLockboxes: 250 })  // the server's postgresVaultDB holds 250
+ *   const vaultDB = graphqlVaultDB({ client, maxBoxes: 250 })  // the server's postgresVaultDB holds 250
  */
 export const graphqlVaultDB = (opts: GraphqlVaultDBOpts): VaultDB => {
-  const { client, maxLockboxes = Infinity } = (opts as Partial<GraphqlVaultDBOpts> | null | undefined) ?? {}
+  const { client, maxBoxes = Infinity } = (opts as Partial<GraphqlVaultDBOpts> | null | undefined) ?? {}
   if (! isUrqlClient(client)) {
     throw new VaultError('bad_option', "graphqlVaultDB needs a `client`, an urql Client: your app's own, made with `new Client({ url, exchanges })` from @urql/core or urql.")
   }
-  if (! isLockboxCount(maxLockboxes)) {
-    throw new VaultError('bad_option', "graphqlVaultDB's `maxLockboxes`, when given, is a whole number above zero, or Infinity for a server that sets no limit.")
+  if (! isBoxCount(maxBoxes)) {
+    throw new VaultError('bad_option', "graphqlVaultDB's `maxBoxes`, when given, is a whole number above zero, or Infinity for a server that sets no limit.")
   }
-  return new UrqlVaultDB({ ...opts, client, maxLockboxes })
+  return new UrqlVaultDB({ ...opts, client, maxBoxes })
 }
 
-const isLockboxCount = (count: unknown): count is number => (
+const isBoxCount = (count: unknown): count is number => (
   count === Infinity || (Number.isSafeInteger(count) && (count as number) > 0)
 )
 
@@ -79,130 +74,154 @@ const isUrqlClient = (client: unknown): client is GraphqlVaultClient => {
 
 // ---------------------------------------------------------------------------------- the operations
 
-const Scope = '$scope: SafebyokVaultScopeInput!'
-const VaultPropsSelection = selectionOf(VaultPropsFields)
+// A vault's three names, each an argument of its own: the server's VaultDB holds `user_id` to the
+// user its own auth signed in.
+const ScopeVariables = '$applabel: String!, $user_id: String!, $vaultlabel: String!'
+const ScopeArgs = 'applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel'
+const VaultRecordSelection = selectionOf(VaultRecordFields)
 
-const ReadVaultPropsDoc = `query SafebyokReadVaultProps(${Scope}) {
-  safebyokReadVaultProps(scope: $scope) { ${VaultPropsSelection} }
+const VaultSelection = `vault { ${VaultRecordSelection} } boxes { ${selectionOf(BoxSparseFields)} } damagedBoxes { ${selectionOf(BoxDamagedFields)} }`
+
+const GetVaultDoc = `query SafebyokGetVault(${ScopeVariables}) {
+  safebyokGetVault(${ScopeArgs}) { ${VaultSelection} }
 }`
-const ReadBoxDoc = `query SafebyokReadBox(${Scope}, $boxlabel: String!) {
-  safebyokReadBox(scope: $scope, boxlabel: $boxlabel) { ${selectionOf(LockboxFields)} }
+const EnsureVaultDoc = `mutation SafebyokEnsureVault($draft: SafebyokVaultRecordInput!) {
+  safebyokEnsureVault(draft: $draft) { ${VaultSelection} }
 }`
-const ListBoxesDoc = `query SafebyokListBoxes(${Scope}) {
-  safebyokListBoxes(scope: $scope) { ${selectionOf(ListedLockboxFields)} }
+const GetBoxDoc = `query SafebyokGetBox(${ScopeVariables}, $boxlabel: String!, $expected: SafebyokBoxGetExpectationInput!) {
+  safebyokGetBox(${ScopeArgs}, boxlabel: $boxlabel, expected: $expected) { ${selectionOf(BoxFields)} }
 }`
-const FetchOrCreateVaultPropsDoc = `mutation SafebyokFetchOrCreateVaultProps($vaultProps: SafebyokVaultPropsInput!) {
-  safebyokFetchOrCreateVaultProps(vaultProps: $vaultProps) { ${VaultPropsSelection} }
+const GetCapacityDoc = `query SafebyokGetCapacity(${ScopeVariables}) {
+  safebyokGetCapacity(${ScopeArgs}) { boxes { used max } bytes { used max } }
 }`
-const UpdateVaultPropsDoc = `mutation SafebyokUpdateVaultProps($vaultProps: SafebyokVaultPropsInput!, $expected: SafebyokVaultPropsExpectationInput!) {
-  safebyokUpdateVaultProps(vaultProps: $vaultProps, expected: $expected)
+const PutVaultRecordDoc = `mutation SafebyokPutVaultRecord($vaultRecord: SafebyokVaultRecordInput!, $expected: SafebyokVaultRecordExpectationInput!) {
+  safebyokPutVaultRecord(vaultRecord: $vaultRecord, expected: $expected) { landed refusalkind message vault_stored }
 }`
-const UpdateBoxDoc = `mutation SafebyokUpdateBox(${Scope}, $lockbox: SafebyokLockboxInput!, $expected: SafebyokLockboxExpectationInput!) {
-  safebyokUpdateBox(scope: $scope, lockbox: $lockbox, expected: $expected)
+const PutBoxDoc = `mutation SafebyokPutBox(${ScopeVariables}, $box: SafebyokBoxInput!, $expected: SafebyokBoxExpectationInput!) {
+  safebyokPutBox(${ScopeArgs}, box: $box, expected: $expected) { landed refusalkind message box_stored capacity { boxes { used max } bytes { used max } } }
 }`
-const RetireBoxDoc = `mutation SafebyokRetireBox(${Scope}, $boxlabel: String!, $expected: SafebyokRetireExpectationInput!) {
-  safebyokRetireBox(scope: $scope, boxlabel: $boxlabel, expected: $expected)
+const DelBoxDoc = `mutation SafebyokDelBox(${ScopeVariables}, $boxlabel: String!, $expected: SafebyokBoxDelExpectationInput!) {
+  safebyokDelBox(${ScopeArgs}, boxlabel: $boxlabel, expected: $expected) { outcome }
 }`
-const RetireVaultDoc = `mutation SafebyokRetireVault(${Scope}, $expected: SafebyokRetireExpectationInput!) {
-  safebyokRetireVault(scope: $scope, expected: $expected)
+const DelVaultDoc = `mutation SafebyokDelVault(${ScopeVariables}, $expected: SafebyokVaultDelExpectationInput!) {
+  safebyokDelVault(${ScopeArgs}, expected: $expected) { ${selectionOf(VaultTombstoneFields)} }
 }`
-const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
-  safebyokVaultChanged(scope: $scope) { ${selectionOf(ScopeFields)} }
+const VaultChangedDoc = `subscription SafebyokVaultChanged(${ScopeVariables}) {
+  safebyokVaultChanged(${ScopeArgs}) { ${selectionOf(ScopeFields)} }
 }`
 
-/**
- * Every operation graphqlVaultDB sends, by the root field it asks for: the documents a host whose
- * GraphQL server accepts only allowlisted (persisted) operations registers, and a test holds to
- * the schema. They change only as the SDL ({@link VaultSchemaSdl}) does, and are versioned with
- * the package, which moves its client and its server together.
+/** Every operation graphqlVaultDB sends, by the root field it asks for: the documents to register with a server that allows only listed operations.
+ * They change only as `VaultSchemaSdl` does, versioned with the package, which moves its client
+ * and its server together.
  *
  * @example
  *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
  */
 export const VaultOperations = {
-  safebyokReadVaultProps:          ReadVaultPropsDoc,
-  safebyokReadBox:                 ReadBoxDoc,
-  safebyokListBoxes:               ListBoxesDoc,
-  safebyokFetchOrCreateVaultProps: FetchOrCreateVaultPropsDoc,
-  safebyokUpdateVaultProps:        UpdateVaultPropsDoc,
-  safebyokUpdateBox:               UpdateBoxDoc,
-  safebyokRetireBox:               RetireBoxDoc,
-  safebyokRetireVault:             RetireVaultDoc,
-  safebyokVaultChanged:            VaultChangedDoc,
+  safebyokGetVault:         GetVaultDoc,
+  safebyokEnsureVault:      EnsureVaultDoc,
+  safebyokGetBox:           GetBoxDoc,
+  safebyokGetCapacity:      GetCapacityDoc,
+  safebyokPutVaultRecord:   PutVaultRecordDoc,
+  safebyokPutBox:           PutBoxDoc,
+  safebyokDelBox:           DelBoxDoc,
+  safebyokDelVault:         DelVaultDoc,
+  safebyokVaultChanged:     VaultChangedDoc,
 } as const
 
 // ------------------------------------------------------------------------------------ the adapter
 
-/** Each verb one operation; the base class validates both ways, and the server checks the user. */
+/** The VaultDB {@link graphqlVaultDB} makes: each verb one operation, the server checking the user. */
 class UrqlVaultDB extends VaultDB {
   // What the Postgres VaultDB behind the server holds in one record, and about what a GraphQL
   // server accepts in one request by default.
   readonly maxRecordBytes = 1024 * 1024
   // Nothing here reads a vault under a budget: the server's storage sets what it sets.
   readonly maxVaultBytes = Infinity
-  readonly maxLockboxes: number
+  readonly maxBoxes: number
   // What the Postgres VaultDB behind the server holds in one name, so a longer one is refused here,
   // before the wire.
   readonly maxNameBytes = ServerMaxNameBytes
 
   private readonly client: GraphqlVaultClient
 
-  constructor(opts: GraphqlVaultDBOpts & { maxLockboxes: number }) {
+  constructor(opts: GraphqlVaultDBOpts & { maxBoxes: number }) {
     super(opts)
     this.client = opts.client
-    this.maxLockboxes = opts.maxLockboxes
+    this.maxBoxes = opts.maxBoxes
   }
 
-  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
-    const { safebyokReadVaultProps } = await this.asked(ReadVaultPropsDoc, { scope: scopeOut(scope) })
-    return recordOf(safebyokReadVaultProps, VaultPropsFields)
+  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in
+  // one step, and splits its boxes, which this VaultDB's base class checks again.
+  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+    const { safebyokGetVault } = await this.asked(GetVaultDoc, scopeOut(scope))
+    return vaultReadOf(safebyokGetVault)
   }
 
-  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
-    const { safebyokFetchOrCreateVaultProps } = await this.told(FetchOrCreateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields) })
-    return recordOf(safebyokFetchOrCreateVaultProps, VaultPropsFields)
+  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+    const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultRecordFields) })
+    return vaultReadOf(safebyokEnsureVault)
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers landed.
-  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
-    const { vault_id, unlock_epoch } = expected
-    await this.told(UpdateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_id, unlock_epoch } })
-    return true
+  // A write that lands answers with the vault record as the server's storage holds it; a stale
+  // one answers in the body, not landed, with what is stored, which the base class checks: it is
+  // refused here as the VaultError the server's VaultDB made of it.
+  protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
+    checkInts('vault record', vaultRecord)
+    checkInts('vault record expectation', expected)
+    const { vault_tok, gate_epoch } = expected
+    const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultRecord: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
+    const answer = safebyokPutVaultRecord as WriteAnswer
+    if (answer.landed) { return recordOf(answer.vault_stored, VaultRecordFields) }
+    throw refusalOfAnswer(answer, 'vault_stored')
   }
 
-  protected async doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    const { safebyokReadBox } = await this.asked(ReadBoxDoc, { scope: scopeOut(scope), boxlabel })
-    return recordOf(safebyokReadBox, LockboxFields)
+  // A read whose vault record is not the one expected refuses on the server, in the step that
+  // reads the box, and crosses as its kind.
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+    const { vault_tok } = expected
+    const { safebyokGetBox } = await this.asked(GetBoxDoc, { ...scopeOut(scope), boxlabel, expected: { vault_tok } })
+    return recordOf(safebyokGetBox, BoxFields)
   }
 
-  // Each row is stored under its own boxlabel, which the server's listing carries as a field.
-  protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
-    const { safebyokListBoxes } = await this.asked(ListBoxesDoc, { scope: scopeOut(scope) })
-    return (safebyokListBoxes as unknown[]).map((listed) => {
-      const lockbox = recordOf(listed, ListedLockboxFields)
-      return { boxlabel: (lockbox as { boxlabel: string }).boxlabel, lockbox }
-    })
+  // A write that misses answers in the body, not landed -- a stale one with what is stored, a full
+  // vault with how full it is, which the base class checks -- and is refused here as the VaultError
+  // the server's VaultDB made of it; one that landed answers with the box as the server's storage holds it.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
+    checkInts('box', box)
+    const { vault_tok, revision_tok } = expected
+    const { safebyokPutBox } = await this.told(PutBoxDoc, { ...scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_tok, revision_tok } })
+    const answer = safebyokPutBox as WriteAnswer
+    if (answer.landed) { return recordOf(answer.box_stored, BoxFields) }
+    throw refusalOfAnswer(answer, 'box_stored')
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
-    const { vault_id, revision_tok, vault_key_epoch } = expected
-    await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
-    return true
+  // How full the vault is, as the server's storage reckons it: the base class checks it.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    const { safebyokGetCapacity } = await this.asked(GetCapacityDoc, scopeOut(scope))
+    return safebyokGetCapacity
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
-    await this.told(RetireBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id: expected.vault_id } })
-    return true
+  // A stale delete refuses on the server and crosses as its kind, so a delete that answers landed,
+  // with what the server's storage removed.
+  protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
+    const { vault_tok, revision_tok } = expected
+    const { safebyokDelBox } = await this.told(DelBoxDoc, { ...scopeOut(scope), boxlabel, expected: { vault_tok, revision_tok } })
+    return safebyokDelBox
   }
 
-  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
-    await this.told(RetireVaultDoc, { scope: scopeOut(scope), expected: { vault_id: expected.vault_id } })
-    return true
+  // A stale delete refuses on the server and crosses as its kind, so a delete that answers landed,
+  // with the tombstone the server's storage left.
+  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
+    checkInts('delete expectation', expected)
+    const { vault_tok, gate_epoch } = expected
+    const { safebyokDelVault } = await this.told(DelVaultDoc, { ...scopeOut(scope), expected: { vault_tok, gate_epoch } })
+    return recordOf(safebyokDelVault, VaultTombstoneFields)
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
     const trouble = this.watchTrouble("This vault's GraphQL subscription failed, so other devices' changes may not show until the vault next reads. The vault reads again now, and meets the trouble itself.")
-    const subscription = this.client.subscription(VaultChangedDoc, { scope: scopeOut(scope) }).subscribe((result) => {
+    const subscription = this.client.subscription(VaultChangedDoc, scopeOut(scope)).subscribe((result) => {
       if (result.error) {
         trouble.failed(result.error)
         onChange()
@@ -225,7 +244,44 @@ class UrqlVaultDB extends VaultDB {
   }
 }
 
-const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
+// The three names as the operations take them, each a variable of its own.
+const scopeOut = ({ applabel, user_id, vaultlabel }: VaultScope) => ({ applabel, user_id, vaultlabel })
+
+/** A vault as the server sent it, or null for none, passed through as the VaultDB's half answers: its vault record, its sound boxes and its damaged ones.
+ * Each record is rebuilt from its own fields alone, so GraphQL's `__typename` stays behind before
+ * the base class's strict checks; a list that is no list goes up as it came, for them to refuse.
+ * A field the answer leaves out altogether is no answer, as from a server that does not serve
+ * safebyok-graphql's schema and checks no operation against its own.
+ */
+const vaultReadOf = (sent: unknown): VaultReadResponse => {
+  if (sent === undefined) { throw new Error('The GraphQL server answered without the vault it was asked for: is it serving safebyok-graphql?') }
+  if (sent === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
+  const { vault, boxes, damagedBoxes } = sent as Record<string, unknown>
+  return {
+    vault:        recordOf(vault, VaultRecordFields),
+    boxes:        recordsOf(boxes, BoxSparseFields),
+    damagedBoxes: recordsOf(damagedBoxes, BoxDamagedFields),
+  } as VaultReadResponse
+}
+
+/** Each record of `sent`, rebuilt from `fields` alone; `sent` as it came when it is no list. */
+const recordsOf = (sent: unknown, fields: Parameters<typeof recordOf>[1]): unknown => (Array.isArray(sent) ? sent.map((record) => recordOf(record, fields)) : sent)
+
+/** The most a GraphQL `Int` carries, a signed 32-bit integer, where the core takes any safe integer. */
+const GraphqlIntMax = 2_147_483_647
+
+/** The fields a record or expectation sends as an `Int!`, each a whole number above zero once the base class has checked it. */
+const IntFields = ['gate_epoch', 'vault_epoch', 'whisper_schema_version'] as const
+
+/** Refuse `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields fits a GraphQL `Int`.
+ * No vault builds an epoch that large.
+ */
+const checkInts = (said: string, outgoing: Partial<Record<typeof IntFields[number], number | null>>) => {
+  const over = IntFields.find((field) => (outgoing[field] ?? 0) > GraphqlIntMax)
+  if (over !== undefined) {
+    throw new VaultError('bad_record', `Nothing was written: that ${said}'s ${over} is past ${String(GraphqlIntMax)}, the most GraphQL carries in an Int, and so not one a vault builds. Hand a VaultDB only the records and expectations a vault builds.`)
+  }
+}
 
 /** An operation's data, or what it was refused with: the server's VaultError, or urql's error. */
 const answerOf = (result: OperationResult): Record<string, unknown> => {
@@ -236,23 +292,58 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
   return result.data as Record<string, unknown>
 }
 
-/**
- * The server's refusal as the VaultError it was, when one carries a kind; a GraphQL validation
- * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error, as
- * it is, which the base class says as storage trouble.
+/** What a failed operation refuses with: the server's VaultError, when one carries a kind, or urql's error as it is.
+ * A crossed VaultError keeps its message and the GraphQL error as its cause; what a refusal learned
+ * crosses in a write's answer, not here ({@link refusalOfAnswer}).
+ * A GraphQL server's own `FORBIDDEN` becomes `not_permitted`. A GraphQL validation error becomes
+ * `bad_option`, quoting nothing of it, as it may quote the variables. urql's error, as it is, the
+ * base class says as `storage_unavailable`.
  */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
     const { kind } = refused.extensions
-    if (isKind(kind)) { return new VaultError(kind, refused.message) }
+    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused }) }
   }
+  const forbidden = err.graphQLErrors.find(({ extensions: { code } }) => code === 'FORBIDDEN')
+  if (forbidden) { return Refusals.notPermitted(ForbiddenMessage, { cause: forbidden }) }
+  // Never the record's fault, nor 'bad_record': every variable has passed the base class's checks,
+  // the ones the server's VaultDB makes, and checkInts', so a validation error says the server
+  // serves another schema.
   if (err.graphQLErrors.some(({ extensions: { code } }) => typeof code === 'string' && MisuseCodes.has(code))) {
     return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
   }
   return err
 }
 
+/** What a GraphQL server's own `FORBIDDEN` says: its message is the host's, and may say more, so it rides along as the cause. */
+const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user this call by a rule of the app's own. Signing in again will not help: the app's own rules decide who may."
+
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as readonly unknown[]).includes(kind)
+/** What a box write or an update of the vault record answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_stored` or `capacity`). */
+type WriteAnswer = {
+  landed:              boolean
+  refusalkind?:        unknown
+  message?:            unknown
+  box_stored?:         unknown
+  vault_stored?:       unknown
+  capacity?:           unknown
+}
+
+/** The VaultError a write's answer refused with, its kind and message as the server's VaultDB made them: a stale write's `storedField` and a full vault's `capacity` as its meta.
+ * The stored record is handed on unchecked, null for none: the base class checks a `stale_write`'s as it
+ * checks a record, and a `vault_full`'s as `getCapacity` checks its answer. An answer that says
+ * neither a kind nor a message is the server's bug, `corrupt_record`.
+ */
+const refusalOfAnswer = (answer: WriteAnswer, storedField: 'box_stored' | 'vault_stored'): VaultError => {
+  const { refusalkind, message, capacity } = answer
+  if (typeof message !== 'string' || ! isKind(refusalkind)) {
+    return new VaultError('corrupt_record', "The GraphQL server refused a write without saying why: is it serving safebyok-graphql of the same version as this app's client? Serve VaultSchemaSdl and vaultResolvers from it.")
+  }
+  if (refusalkind === 'stale_write') { return new VaultError(refusalkind, message, { meta: { [storedField]: answer[storedField] ?? null } }) }
+  if (refusalkind !== 'vault_full' || capacity === null || capacity === undefined) { return new VaultError(refusalkind, message) }
+  return new VaultError(refusalkind, message, { meta: { capacity: capacity as Exclude<RefusalMeta['capacity'], undefined> } })
+}
+
+const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)

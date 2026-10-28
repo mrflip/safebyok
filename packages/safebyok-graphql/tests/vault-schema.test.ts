@@ -1,25 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { buildSchema, getNamedType, isInputObjectType, isListType, isNonNullType, isObjectType, parse, validate } from 'graphql'
+import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, Lockbox, VaultProps, VaultScope } from 'safebyok'
+import { Ciphered, BoxDamaged, BoxRecord, GateRecord, VaultRecord, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
 const schema = buildSchema(VaultSchemaSdl)
 
 /** A record's validator, as the core exports it: its fields, each one a validator. */
-// A field is optional when Zod says it may be left out (`optin`), whether or not it takes an undefined.
-type RecordSchema = { shape: Record<string, { _zod: { optin?: string } }> }
+// A field is optional when Zod says it may be left out (`optin`), whether or not it takes an undefined;
+// nullable when its validator is Zod's nullable.
+type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
 
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
-  ['SafebyokVaultScope',         VaultScope,  []],
-  ['SafebyokVaultScopeInput',    VaultScope,  []],
-  ['SafebyokVaultProps',         VaultProps, []],
-  ['SafebyokVaultPropsInput',    VaultProps, []],
-  ['SafebyokLockbox',            Lockbox,     []],
-  ['SafebyokLockboxInput',       Lockbox,     []],
-  ['SafebyokListedLockbox',      Lockbox,     ['lockbox_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokVaultScope',         VaultScope.unwrap(), []],
+  ['SafebyokVaultRecord',        VaultRecord, []],
+  ['SafebyokVaultRecordInput',   VaultRecord, []],
+  ['SafebyokGate',               GateRecord,  []],
+  ['SafebyokGateInput',          GateRecord,  []],
+  ['SafebyokBox',                BoxRecord,   []],
+  ['SafebyokBoxInput',           BoxRecord,   []],
+  ['SafebyokBoxSparse',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxDamaged',         BoxDamaged,  []],
   ['SafebyokCiphered',           Ciphered,    []],
   ['SafebyokCipheredInput',      Ciphered,    []],
 ] as const
@@ -44,29 +47,55 @@ describe("VaultSchemaSdl", () => {
       expect(Object.keys(fieldsOf(typename))).to.have.members(recordFields)
     })
 
-    it(`makes a field of ${typename} nullable exactly where the record's is optional`, () => {
+    it(`makes a field of ${typename} nullable exactly where the record's is optional or takes null`, () => {
       const { shape } = recordSchema as unknown as RecordSchema
       const described = Object.entries(fieldsOf(typename))
       for (const [field, { type }] of described) {
-        expect(isNonNullType(type), `${typename}.${field}`).to.eq(shape[field]!._zod.optin !== 'optional')
+        const fieldSchema = shape[field]!
+        expect(isNonNullType(type), `${typename}.${field}`).to.eq(fieldSchema._zod.optin !== 'optional' && ! fieldSchema.safeParse(null).success)
       }
+    })
+
+    it(`carries ${typename}'s sidecar, if it has one, as a SafebyokSidecar, never null: a sidecar is always an object`, () => {
+      const { sidecar } = fieldsOf(typename)
+      if (sidecar === undefined) { return }
+      expect(isNonNullType(sidecar.type)).to.be.true
+      expect(getNamedType(sidecar.type).name).to.eq('SafebyokSidecar')
     })
   }
 
-  it("carries the vault props' wayins as a list, each one opaque JSON", () => {
-    for (const typename of ['SafebyokVaultProps', 'SafebyokVaultPropsInput']) {
-      const wayins = fieldsOf(typename)['wayins']!.type
-      expect(isNonNullType(wayins) && isListType(wayins.ofType)).to.be.true
-      expect(getNamedType(wayins).name).to.eq('SafebyokWayin')
+  it("carries the vault record's gate nested and nullable, as a novel vault holds none, its passphrase required and its passkey nullable, each as opaque JSON", () => {
+    for (const [recordType, gateType] of [['SafebyokVaultRecord', 'SafebyokGate'], ['SafebyokVaultRecordInput', 'SafebyokGateInput']] as const) {
+      const { gate } = fieldsOf(recordType)
+      expect(isNonNullType(gate!.type)).to.be.false
+      expect(getNamedType(gate!.type).name).to.eq(gateType)
+      const { passphrase, passkey } = fieldsOf(gateType)
+      expect(isNonNullType(passphrase!.type)).to.be.true
+      expect(isNonNullType(passkey!.type)).to.be.false
+      expect(getNamedType(passphrase!.type).name).to.eq('SafebyokWayin')
+      expect(getNamedType(passkey!.type).name).to.eq('SafebyokWayin')
     }
   })
 
   it("names one root field for each VaultDB verb a browser's vault calls, and one subscription", () => {
-    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokReadVaultProps', 'safebyokReadBox', 'safebyokListBoxes'])
+    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVault', 'safebyokGetBox', 'safebyokGetCapacity'])
     expect(Object.keys(schema.getMutationType()!.getFields())).to.have.members([
-      'safebyokFetchOrCreateVaultProps', 'safebyokUpdateVaultProps', 'safebyokUpdateBox', 'safebyokRetireBox', 'safebyokRetireVault',
+      'safebyokEnsureVault', 'safebyokPutVaultRecord', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
     ])
     expect(Object.keys(schema.getSubscriptionType()!.getFields())).to.have.members(['safebyokVaultChanged'])
+  })
+
+  it("takes a vault's three names as arguments of their own, each a String!, on every root field aimed at a vault, and nests no scope", () => {
+    const rootFields = [schema.getQueryType()!, schema.getMutationType()!, schema.getSubscriptionType()!].flatMap((rootType) => Object.values(rootType.getFields()))
+    const scoped = rootFields.filter((rootField) => rootField.args.some((arg) => arg.name === 'user_id'))
+    expect(scoped.map((rootField) => rootField.name)).to.have.members([
+      'safebyokGetVault', 'safebyokGetBox', 'safebyokGetCapacity', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault', 'safebyokVaultChanged',
+    ])
+    for (const rootField of scoped) {
+      const scopeArgs = rootField.args.filter((arg) => ['applabel', 'user_id', 'vaultlabel'].includes(arg.name))
+      expect(scopeArgs.map((arg) => String(arg.type)), rootField.name).to.deep.equal(['String!', 'String!', 'String!'])
+    }
+    expect(rootFields.flatMap((rootField) => rootField.args).filter((arg) => arg.name === 'scope')).to.deep.equal([])
   })
 
   it("adds nothing to a host's schema that is not named for safebyok, but its three root types", () => {

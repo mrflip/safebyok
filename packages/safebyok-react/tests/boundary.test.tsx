@@ -1,7 +1,8 @@
 import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { Boundary, useRoundFor } from '../src/boundary'
+import { VaultError } from 'safebyok'
+import { Boundary, forBoundary, useRoundFor } from '../src/boundary'
 import * as TH from './test-helpers'
 
 /** A child that throws `failure.err` while rendering, or shows "fine" when it has no failure. */
@@ -58,22 +59,68 @@ describe("Boundary", () => {
   })
 })
 
-/** The example's shape: a boundary keyed by the handle it serves, over a child that fails for one handle. */
-const Served = ({ handle, failing }: { handle: object, failing: object }) => (
-  <Boundary key={useRoundFor(handle)} fallback={<p>fallback</p>}>
-    <Thrower {...(handle === failing ? { failure: { err: new Error('broke') } } : {})} />
+/** The example's shape: a boundary keyed by the gating it serves, over a child that fails for one gating. */
+const Served = ({ gating, failing }: { gating: object, failing: object }) => (
+  <Boundary key={useRoundFor(gating)} fallback={<p>fallback</p>}>
+    <Thrower {...(gating === failing ? { failure: { err: new Error('broke') } } : {})} />
   </Boundary>
 )
 
 describe("useRoundFor", () => {
-  it("starts a boundary afresh for another handle, and keeps it as it is for the same one", () => {
+  it("starts a boundary afresh for another gating, and keeps it as it is for the same one, as its example shows", () => {
     const first = {}
     const second = {}
-    const { rerender } = TH.renderReporting(<Served handle={first} failing={first} />)
+    const { rerender } = TH.renderReporting(<Served gating={first} failing={first} />)
     expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served handle={first} failing={second} />)
+    rerender(<Served gating={first} failing={second} />)
     expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served handle={second} failing={first} />)
+    rerender(<Served gating={second} failing={first} />)
     expect(screen.queryByText('fine')).to.not.be.null
+  })
+})
+
+/** A child that fails as the dialog does: `err` thrown in render through forBoundary. */
+const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err, 'PassphraseModal') }
+
+describe("forBoundary", () => {
+  const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
+
+  it("hands React a VaultError's kind, message and meta but not its cause, thrown in render, as its example shows", () => {
+    const misuse = new VaultError('bad_option', 'A bad option.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
+    const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><ForBoundaryThrower err={misuse} /></Boundary>)
+    expect(screen.queryByText('Something went wrong.')).to.not.be.null
+    expect(reported).to.have.lengthOf(1)
+    const told = reported[0] as VaultError
+    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_option' })
+    expect(told.message).to.match(/^A bad option\. \(safebyok-react's PassphraseModal left this error's cause out of its report to React/)
+    expect(told.meta).to.deep.equal(meta)
+    expect(told.cause).to.be.undefined
+  })
+
+  it("hands back a VaultError with no cause as itself", () => {
+    const misuse = new VaultError('bad_option', 'A bad option.', { meta })
+    expect(forBoundary(misuse, 'PasskeyUnlockButton')).to.equal(misuse)
+  })
+
+  const ForeignCases = [
+    [new TypeError('could not judge pw-the-passphrase'),  'turns an Error that quotes what it was handed into a fixed unexpected_error quoting none of it'],
+    ["pw-the-passphrase",                                 'turns a bare string into a fixed unexpected_error quoting none of it'],
+    [null,                                                'turns null into a fixed unexpected_error'],
+  ] as const
+
+  for (const [thrown, blurb] of ForeignCases) {
+    it(blurb, () => {
+      const told = forBoundary(thrown, 'PassphraseModal')
+      expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'unexpected_error' })
+      expect(told.message).to.not.include('pw-the-passphrase')
+      expect(told.cause).to.be.undefined
+    })
+  }
+
+  it("names the component a foreign throw came from, and where to look: the dialog's functions, or the passkey prompt", () => {
+    const fromDialog = forBoundary(new TypeError('fell over'), 'PassphraseModal').message
+    const fromButton = forBoundary(new TypeError('fell over'), 'PasskeyUnlockButton').message
+    expect(fromDialog).to.include("safebyok-react's PassphraseModal").and.to.include('the functions the app handed the dialog')
+    expect(fromButton).to.include("safebyok-react's PasskeyUnlockButton").and.to.include('askPasskey').and.to.not.include('handed the dialog')
   })
 })

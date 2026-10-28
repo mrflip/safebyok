@@ -58,9 +58,9 @@ describe("inOneTransaction", () => {
   it("resolves with what its work resolves with, once its writes have committed", async () => {
     const shelf = shelfOf(TH.freshDbName())
     const outcome = await inOneTransaction(shelf, async (store) => {
-      const standing: unknown = await promisifyRequest<unknown>(store.get('ckey'))
+      const stored: unknown = await promisifyRequest<unknown>(store.get('ckey'))
       store.put('written', 'ckey')
-      return standing ?? 'nothing'
+      return stored ?? 'nothing'
     })
     expect(outcome).to.eq('nothing')
     expect(await get('ckey', shelf)).to.eq('written')

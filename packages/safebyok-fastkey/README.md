@@ -22,11 +22,12 @@ pnpm add safebyok safebyok-fastkey
 Pass the deriver as `keyDeriver`, after any `browserOpts()` spread, so it wins:
 
 ```ts
-import { Vault } from 'safebyok'
+import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const vault = Vault.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', user_id: session.user_id, vaultDB })
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
 A vault records only its deriver's label, and this deriver derives exactly what the core's does
@@ -70,16 +71,20 @@ supplied one, consider running the vault's unlock where a pause does not show.
   fetched.
 
 Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_option` (the
-host's to fix), saying which; the vault's `unlock()` passes the refusal on. It never falls back to
-the core's deriver on its own: choose one per platform yourself, as `keyDeriver`.
+host's to fix), saying which. The vault, having handed the deriver a passphrase, keeps nothing of
+what it threw, as a throw may quote the passphrase: its `unlock()` refuses `unexpected_error`, and
+its logger hears that the deriver threw and the kind it threw (`bad_option`), not the words. Read
+the log for which. It never falls back to the core's deriver on its own: choose one per platform yourself, as `keyDeriver`.
 
 ## Errors
 
 * `bad_option` -- from `argon2idWasmDeriver(spec)`, a spec it cannot run (the message names the
-  field); from `deriveKeyBytes`, no WebAssembly here, or a Content-Security-Policy without
-  `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
+  field); from `deriveKeyBytes` called directly, no WebAssembly here, or a Content-Security-Policy
+  without `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`). Through the vault,
+  this arrives as `unexpected_error` with no `cause`; the logger hears the kind `bad_option`.
 * `wrong_passphrase` -- an empty passphrase handed straight to `deriveKeyBytes`. The vault refuses
-  one before it reaches a deriver.
+  one before it reaches a deriver; should one reach it on unlock, the vault answers with its own
+  `wrong_passphrase`, never the deriver's message.
 
-Any other failure (a device without the memory a spec asks for, say) is passed on as the platform
-raised it.
+Any other failure (a device without the memory a spec asks for, say) is thrown as the platform
+raised it; through the vault, it too arrives as `unexpected_error`, what was thrown kept nowhere.

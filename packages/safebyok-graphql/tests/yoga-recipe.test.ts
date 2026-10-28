@@ -18,19 +18,19 @@ TH.bootDatabaseFirst()
 // ------------------------------------------------------------------------- the server half
 
 /** What each request's resolvers know of it: the user your own auth signed in, or null. */
-type VaultContext = { userId: string | null }
+type VaultContext = { user_id: string | null }
 
 /** The README's route, over `pool` and `listen`, its signed-in user found by `signedInUserId`. */
 const vaultRoute = (pool: PostgresClient, listen: PostgresListen | undefined, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
   const schema = createSchema<VaultContext>({
     typeDefs:  [VaultSchemaSdl],
-    resolvers: [vaultResolvers({ vaultDBFor: ({ userId }: VaultContext) => postgresVaultDB({ client: pool, userId, listen }) })],
+    resolvers: [vaultResolvers({ vaultDBFor: ({ user_id }: VaultContext) => postgresVaultDB({ client: pool, user_id, listen }) })],
   })
   const { handleRequest } = createYoga<object, VaultContext>({
     schema,
     graphqlEndpoint: '/api/graphql',
     // Made per request, for the user your own auth signed in -- never one the request names.
-    context:         async ({ request }) => ({ userId: await signedInUserId(request) }),
+    context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
     maskedErrors:    { isDev },
     logging:         false,
   })
@@ -61,22 +61,22 @@ const routeOver = async () => {
   return vaultRoute(db, TH.listenOn(db), byHeader)
 }
 
-/** A browser for `userId`: its fetch reaches `route` in-process, signed in as that user. */
-const browserFor = (route: (request: Request) => Promise<Response>, userId: string | null) => (
+/** A browser for `user_id`: its fetch reaches `route` in-process, signed in as that user. */
+const browserFor = (route: (request: Request) => Promise<Response>, user_id: string | null) => (
   browserVaultDB((url, init) => {
     const request = new Request(url, init)
-    if (userId !== null) { request.headers.set('x-test-user', encodeURIComponent(userId)) }
+    if (user_id !== null) { request.headers.set('x-test-user', encodeURIComponent(user_id)) }
     return route(request)
   })
 )
 
 TH.describeVaultDB('the README Yoga recipe, over postgresVaultDB', async () => {
   const route = await routeOver()
-  return TH.perUser((userId) => browserFor(route, userId))
+  return TH.perUser((user_id) => browserFor(route, user_id))
 }, {
   makeVaultDBFor: async () => {
     const route = await routeOver()
-    return (userId) => browserFor(route, userId)
+    return (user_id) => browserFor(route, user_id)
   },
 })
 
@@ -84,19 +84,19 @@ describe("the README Yoga recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
     const vault = await TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
-    await vault.unlock('correct horse battery staple')
-    await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    vault.close()
+    await TH.unlock(vault, 'correct horse battery staple')
+    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    TH.closeVault(vault)
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), undefined, () => Promise.resolve('u1'), true)
-    const document = 'query ($scope: SafebyokVaultScopeInput!) { safebyokReadVaultProps(scope: $scope) { vault_id } }'
-    const variables = { scope: TH.scopeOf('u1') }
+    const document = 'query ($applabel: String!, $user_id: String!, $vaultlabel: String!) { safebyokGetVault(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) { vault { vault_tok } } }'
+    const variables = TH.scopeOf('u1')
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
@@ -111,7 +111,7 @@ describe("the README Yoga recipe", () => {
     const route = await routeOver()
     const elsewhere = browserFor(route, 'u1')
     const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await elsewhere.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
     await TH.eventually(() => heard.count > 0)
     unsubscribe()
     expect(heard.count).to.eq(1)

@@ -1,72 +1,122 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
-import type { VaultScope } from './types'
+import { Validator } from './checks/validator'
+import type { VaultScope } from './types/types'
 
-/**
- * What a passphrase strength test finds of one passphrase: strong enough, or weak, with a
- * `reason` written for the user -- calm, saying what to do, never quoting the passphrase -- which a
- * field shows beside the passphrase, and the vault throws as the message of its refusal.
+/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
+ * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
+ * vault's 'weak_passphrase' refusal carries it as its message.
  */
 export type PassphraseVerdict = { strong: true } | { strong: false, reason: string }
 
-/**
- * A check that a new passphrase is strong enough, `Vault.make`'s `passphraseStrengthTest`: handed
- * the passphrase as typed, and the scope of the vault it is for -- the applabel, the user's id
- * and the vaultlabel, words a guesser who knows the user tries first -- it answers a
- * {@link PassphraseVerdict}, at once or as a promise. The vault runs it on every passphrase about
- * to become a way in -- the one the first `unlock()` creates a vault with, and each
- * `addPassphrase()` or `changePassphrase()` sets -- before any key derivation, and refuses a weak
- * one with kind 'weak_passphrase', the verdict's reason its message. It never runs on `unlock()`
- * of a vault that stands.
+/** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
+ * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
+ * tries first. The vault runs it on each new passphrase before any key derivation: the one an
+ * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
+ * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws refuses
+ * its call 'unexpected_error', and one that answers no verdict 'bad_option'.
  *
- * Call the same function from the passphrase field as the user types, so they hear "too weak"
- * before they submit (`safebyok-react`'s dialog does). It hears the passphrase in plain text: it
- * should keep nothing, send nothing anywhere, and never put the passphrase in its reason. In a
- * browser, `browserOpts()` from `safebyok/browser` supplies `zxcvbnPassphraseTest`, which turns
- * away short passphrases, common passwords and patterns; pass your own after the spread to
- * replace it, or wrap it to ask for more.
+ * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
+ * quote it.
+ *
+ * A checker that needs something fetched or built first, such as a dictionary, carries it as
+ * `load`, which each bank's `hello()` runs. Make the checker once, before any bank, and hand the
+ * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
+ * `load` yourself only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
+ * vault that cannot check a new passphrase never opens.
+ *
+ * `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to replace it,
+ * or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
+ * `vault.tryCheckStrength(typed)`.
  *
  * @example
- *   const verdict = await passphraseStrengthTest(typed, vault.getSnapshot().scope)
- *   setHint(verdict.strong ? '' : verdict.reason)
+ *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
+ * @example
+ *   const strengthChecker = Object.assign((typed: string) => judge(typed), { load: () => loadWordList() })
  */
-export type PassphraseStrengthTest = (passphrase: string, scope: VaultScope) => PassphraseVerdict | Promise<PassphraseVerdict>
-
-/** A verdict that admits. Frozen, so a test handing it out shares it safely. */
-export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
-
-const reasonText = Z.string().check(Z.minLength(1))
-const passphraseVerdict = Z.union([
-  Z.object({ strong: Z.literal(true) }),
-  Z.object({ strong: Z.literal(false), reason: reasonText }),
-])
-
-/**
- * `passphrase` put to `strengthTest` for the vault named by `scope`, refused with kind
- * 'weak_passphrase' and the test's reason when it finds it weak; kind 'bad_option' for a test that
- * answers anything but a verdict. Whatever the test throws, this throws.
- */
-export const ensureStrongEnough = async (strengthTest: PassphraseStrengthTest, passphrase: string, scope: VaultScope): Promise<void> => {
-  const checked = passphraseVerdict.safeParse(await strengthTest(passphrase, scope))
-  if (! checked.success) {
-    throw new VaultError('bad_option', 'passphraseStrengthTest answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.')
-  }
-  if (! checked.data.strong) { throw new VaultError('weak_passphrase', checked.data.reason) }
+export type StrengthChecker = {
+  (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
+  /** Fetch or build what the checker needs before it can judge; each bank's `hello()` runs it. */
+  load?: (() => void | Promise<void>) | undefined
 }
 
-/**
- * A host's `passphraseStrengthTest`, exactly as handed in, once it is a function; kind
- * 'bad_option' for anything else, a missing one among them: the vault has no test of its own, so
- * every host chooses one (`browserOpts()` from `safebyok/browser` supplies a good one). Vault.make
- * runs it on its option; a binding or wrapper that takes the options apart runs it first, once, as
- * soon as it is handed the test.
+/** A strength checker as a vault keeps it: the host's, told the vault's scope and held to its contract by {@link guardStrengthChecker}. */
+export type GuardedStrengthChecker = {
+  (passphrase: string): Promise<PassphraseVerdict>
+  load: () => Promise<void>
+}
+
+/** A verdict that admits, frozen so that a checker may share it. */
+export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
+
+/** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
+const DefaultVerdict: PassphraseVerdict = Object.freeze({
+  strong: false,
+  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
+})
+
+/** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.
+ * Its reason tells the app's makers where to look. It logs nothing.
  *
- * @example checkStrengthTest(zxcvbnPassphraseTest)  // the same function
- * @example checkStrengthTest(undefined)             // throws: bad_option
+ * @example DefaultStrengthChecker('correct horse battery staple')   // { strong: false, reason: "This app can't take a new passphrase yet: ..." }
  */
-export const checkStrengthTest = (strengthTest: PassphraseStrengthTest): PassphraseStrengthTest => {
-  if (typeof strengthTest !== 'function') {
-    throw new VaultError('bad_option', "passphraseStrengthTest is required: a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnPassphraseTest; elsewhere, pass your own.")
+export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
+
+/** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
+const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
+  typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
+)
+
+/** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
+export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
+  strengthChecker: custom<StrengthChecker>(isStrengthChecker, {
+    error: "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.",
+  }),
+  passphraseVerdict: union([
+    obj({ strong: lit(true) }),
+    obj({ strong: lit(false), reason: str.min(1) }),
+  ]),
+}))
+
+/** The verdict on a blank new passphrase, which no checker hears. */
+const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
+
+/** `hostChecker` held to its contract and told `scope`. Ask the host's checker only through it, so the vault and a dialog checking as the user types decide alike.
+ * A blank passphrase is weak before the host's checker hears it. It refuses 'bad_option' for an
+ * answer that is no verdict, and 'unexpected_error' for a throw, carrying nothing of it, as the
+ * checker heard the passphrase. `load` refuses a failure 'unexpected_error', its cause the throw,
+ * as it heard nothing.
+ *
+ * @example guardStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
+ * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
+ */
+export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
+  // Frozen, so the host's checker can change nothing of what it is told.
+  const told = Object.freeze({ applabel: scope.applabel, user_id: scope.user_id, vaultlabel: scope.vaultlabel })
+  const check = async (passphrase: string): Promise<PassphraseVerdict> => {
+    if (! passphrase.trim()) { return BlankVerdict }
+    let checked: ReturnType<typeof passphraseVerdict.safeParse>
+    try {
+      // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
+      checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
+    } catch {
+      throw new VaultError('unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+    }
+    if (! checked.success) {
+      throw new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+    }
+    return checked.data.strong ? StrongVerdict : checked.data
   }
-  return strengthTest
+  return Object.assign(check, { load: () => loadStrengthChecker(hostChecker) })
+}
+
+/** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause.
+ *
+ * @example await loadStrengthChecker(zxcvbnStrengthChecker)   // the zxcvbn chunk fetched, or 'unexpected_error'
+ */
+export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise<void> => {
+  try {
+    await hostChecker.load?.()
+  } catch (err) {
+    throw new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause: err })
+  }
 }

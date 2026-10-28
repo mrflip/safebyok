@@ -1,13 +1,13 @@
-import { EpochMillis, Label, wallClock, type Clock, type StringStore } from 'safebyok'
+import { EpochMillis, label, wallClock, type Clock, type StringStore } from 'safebyok'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
  * auth...). What the vault layer needs from auth is only what Session carries: a stable opaque
- * userId and a display userlabel. The demo fakes the rest: typing a userlabel signs you in,
+ * user_id and a display userlabel. The demo fakes the rest: typing a userlabel signs you in,
  * creating the account on first sight.
  */
 export type Session = {
-  userId:    string
+  user_id:   string
   userlabel: string
 }
 
@@ -43,7 +43,7 @@ export type Auth = {
  *
  * @example
  *   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore })
- *   const session = await auth.signIn('margo')  // { userId: 'user_3f...', userlabel: 'margo' }
+ *   const session = await auth.signIn('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
  */
 export const createAuth = (opts: { applabel: string, dbStore: StringStore, deviceStore: StringStore, clock?: Clock | undefined }): Auth => {
   const { applabel, dbStore, deviceStore, clock = wallClock } = opts
@@ -65,7 +65,7 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     if (text === null) { return null }
     try {
       const parsed: unknown = JSON.parse(text)
-      if (parsed && typeof parsed === 'object' && 'userId' in parsed && 'userlabel' in parsed) {
+      if (parsed && typeof parsed === 'object' && 'user_id' in parsed && 'userlabel' in parsed) {
         return parsed as Session
       }
     } catch { /* fall through: a mangled session reads as signed out */ }
@@ -82,9 +82,9 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     },
 
     signIn: (userlabel) => {
-      const checked = Label.safeParse(userlabel)
+      const checked = label.safeParse(userlabel)
       if (! checked.success) {
-        return Promise.reject(new Error('A username is 2-64 letters, digits and underscores, starting with a letter.'))
+        return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }
       const ckey = accountCkey(checked.data)
       const existing = dbStore.read(ckey)
@@ -93,7 +93,7 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
         return Promise.reject(new Error("The demo's clock read no time between 1981 and 2255, in epoch milliseconds: check what it was handed."))
       }
       if (existing === null) { dbStore.write(ckey, JSON.stringify(account)) }
-      session = { userId: account.user_id, userlabel: account.userlabel }
+      session = { user_id: account.user_id, userlabel: account.userlabel }
       deviceStore.write(sessionCkey, JSON.stringify(session))
       bump()
       return Promise.resolve(session)

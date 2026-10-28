@@ -3,7 +3,7 @@ import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import * as TH from './test-helpers'
-import { VaultPropsColumns, LockboxColumns } from '../src/columns'
+import { VaultRowColumns, BoxColumns, TombstoneColumns } from '../src/columns'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 /** A column as information_schema describes it: its name and its type. */
@@ -43,7 +43,7 @@ const tablesOnlyDatabase = async (): Promise<PGlite> => {
     return db
   })()
   const db = await tablesOnly.db
-  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_vaults')
+  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones')
   return db
 }
 beforeAll(async () => { await tablesOnlyDatabase() }, TH.BootMillis)
@@ -56,53 +56,65 @@ describe("VaultTablesSql", () => {
 
   it("can be run again over the tables it made, keeping their rows", async () => {
     const db = await TH.emptyDatabase()
-    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await db.exec(VaultTablesSql)
-    expect(await TH.requestFor(db, 'u1').readVaultProps(TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(await TH.vaultRecordIn(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
   })
 
-  it("makes the vault props' columns exactly as the adapter writes them, in order, and no more", async () => {
+  it("makes the vault record's columns exactly as the adapter writes it, in order, and no more", async () => {
     const db = await TH.database()
-    expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultPropsColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
+    expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultRowColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
   })
 
-  it("makes a lockbox's columns exactly as the adapter writes them, after its vault's scope and vault_id", async () => {
+  it("makes the tombstone's columns exactly as the adapter writes them, in order, and no more", async () => {
     const db = await TH.database()
-    const adapterColumns = [['applabel', 'text'], ['user_id', 'text'], ['vaultlabel', 'text'], ['vault_id', 'text']]
-    expect(await describedColumns(db, 'safebyok_lockboxes')).to.deep.equal([
+    expect(await describedColumns(db, 'safebyok_vault_tombstones')).to.deep.equal(TombstoneColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
+  })
+
+  it("makes a box's columns exactly as the adapter writes them, after its vault's scope and vault_tok", async () => {
+    const db = await TH.database()
+    const adapterColumns = [['applabel', 'text'], ['user_id', 'text'], ['vaultlabel', 'text'], ['vault_tok', 'text']]
+    expect(await describedColumns(db, 'safebyok_boxes')).to.deep.equal([
       ...adapterColumns,
-      ...LockboxColumns.map(([field, kind]) => [field, TypeForKind[kind]]),
+      ...BoxColumns.map(([field, kind]) => [field, TypeForKind[kind]]),
     ])
   })
 
   it("names each key for its table, as Postgres does a key made with the table", async () => {
     const db = await tablesOnlyDatabase()
     expect(await describedKeys(db, 'safebyok_vaults')).to.deep.equal([
-      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_id_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_id)'],
+      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_tok_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_tok)'],
       ['safebyok_vaults_pkey',                                     'PRIMARY KEY (applabel, user_id, vaultlabel)'],
     ])
-    expect(await describedKeys(db, 'safebyok_lockboxes')).to.deep.equal([
-      ['safebyok_lockboxes_applabel_user_id_vaultlabel_vault_id_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_id) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE'],
-      ['safebyok_lockboxes_pkey',                                      'PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel)'],
+    expect(await describedKeys(db, 'safebyok_vault_tombstones')).to.deep.equal([
+      ['safebyok_vault_tombstones_pkey', 'PRIMARY KEY (applabel, user_id, vaultlabel)'],
+    ])
+    expect(await describedKeys(db, 'safebyok_boxes')).to.deep.equal([
+      ['safebyok_boxes_applabel_user_id_vaultlabel_vault_tok_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_tok) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_tok) ON DELETE CASCADE'],
+      ['safebyok_boxes_pkey',                                      'PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel)'],
     ])
   })
 
-  it("holds every column NOT NULL but the vault props' prior_vault_key, the one field a record may leave out, and defaults none", async () => {
+  it("holds every column NOT NULL but the vault record's passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
     const db = await tablesOnlyDatabase()
     const { rows } = await db.query(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_lockboxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
+      "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
     )
-    expect(rows).to.deep.equal([{ table_name: 'safebyok_vaults', column_name: 'prior_vault_key' }])
+    expect(rows).to.have.deep.members([
+      { table_name: 'safebyok_vaults', column_name: 'passphrase', is_nullable: 'YES', column_default: null },
+      { table_name: 'safebyok_vaults', column_name: 'passkey', is_nullable: 'YES', column_default: null },
+      { table_name: 'safebyok_boxes',  column_name: 'sidecar', is_nullable: 'NO',  column_default: "'{}'::jsonb" },
+    ])
   })
 
   it("never changes the columns of a table already there, so a table of another release's shape stays as it was until the host drops it", async () => {
     const db = await tablesOnlyDatabase()
     const elderColumns = await db.transaction(async (tx) => {
       await tx.exec('CREATE SCHEMA elder; SET LOCAL search_path TO elder')
-      await tx.exec('CREATE TABLE safebyok_lockboxes (applabel text, revision_id text)')
+      await tx.exec('CREATE TABLE safebyok_boxes (applabel text, revision_id text)')
       await tx.exec(VaultTablesSql)
       const { rows } = await tx.query<{ column_name: string }>(
-        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'elder' AND table_name = 'safebyok_lockboxes' ORDER BY ordinal_position",
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'elder' AND table_name = 'safebyok_boxes' ORDER BY ordinal_position",
       )
       await tx.rollback()
       return rows.map((row) => row.column_name)
@@ -110,25 +122,25 @@ describe("VaultTablesSql", () => {
     expect(elderColumns).to.deep.equal(['applabel', 'revision_id'])
   })
 
-  it("makes tables and their keys, and no function, trigger or table beyond the two", async () => {
+  it("makes tables and their keys, and no function, trigger or table beyond the three", async () => {
     const db = await tablesOnlyDatabase()
     const { rows: triggers } = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
     const { rows: functions } = await db.query("SELECT proname FROM pg_proc JOIN pg_namespace ON pg_namespace.oid = pronamespace WHERE nspname = 'public'")
     const { rows: tables } = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")
     expect(triggers).to.deep.equal([])
     expect(functions).to.deep.equal([])
-    expect(tables).to.deep.equal([{ tablename: 'safebyok_lockboxes' }, { tablename: 'safebyok_vaults' }])
+    expect(tables).to.deep.equal([{ tablename: 'safebyok_boxes' }, { tablename: 'safebyok_vault_tombstones' }, { tablename: 'safebyok_vaults' }])
   })
 
   it("keeps every row from a role that is not the tables' owner", async () => {
     const db = await TH.emptyDatabase()
-    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
     await db.exec('CREATE ROLE stranger; GRANT SELECT, INSERT ON safebyok_vaults TO stranger')
     try {
       await db.exec('SET ROLE stranger')
       const { rows } = await db.query('SELECT * FROM safebyok_vaults')
       expect(rows).to.have.lengthOf(0)
-      await TH.expectRefusal(TH.requestFor(db, 'u2').fetchOrCreateVaultProps(TH.vaultPropsOf('u2')), 'storage_unavailable')
+      await TH.expectBad(TH.requestFor(db, 'u2').ensureVault(TH.gatelessOf('u2')), 'not_permitted')
     } finally {
       await db.exec('RESET ROLE; DROP OWNED BY stranger; DROP ROLE stranger')
     }
@@ -150,17 +162,17 @@ describe("VaultNotifySql", () => {
     await db.exec(VaultNotifySql)
     await db.exec(VaultNotifySql)
     const { rows } = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal ORDER BY tgname")
-    expect(rows).to.deep.equal([{ tgname: 'safebyok_lockboxes_changed' }, { tgname: 'safebyok_vaults_changed' }])
+    expect(rows).to.deep.equal([{ tgname: 'safebyok_boxes_changed' }, { tgname: 'safebyok_vaults_changed' }])
   })
 
   it("is what push needs: a vault over tables without it never hears another request's write, and works whole", async () => {
     const db = await tablesOnlyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
-    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
-    await TH.requestFor(db, 'u1').updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'sk-fake'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })
+    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)
-    expect(await TH.requestFor(db, 'u1').listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(1)
+    expect(await TH.boxesOf(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.have.lengthOf(1)
     unsubscribe()
   })
 })

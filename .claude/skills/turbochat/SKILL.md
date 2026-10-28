@@ -20,9 +20,10 @@ they conflict with this file.
 ## The tab
 
 It lives in the doc the session already keeps (usually a sprint's), ordered first, so it is the
-tab that opens. With no doc in the session, birth one named for the work. Load the Docs guide
-(`topic.index`, `topic.editing`, `topic.tabs`) before the first write of a session: the surface
-moves.
+tab that opens. With no doc in the session, birth one named for the work. Editing or interacting
+with a doc: load the docs skill and the Docs guides `topic.index`, `topic.tabs`, and (if needed)
+`topic.editing`, before the first write of a session: the surface moves. Reading only: spawn
+`doc-tab-reader`.
 
 * **A lead**, a few lines long, saying what each state does.
 * **The matters table**: `Coach answer | State | Matter`. *Coach Answer* is the Coach's and starts
@@ -53,7 +54,8 @@ device, delete a file on their machine) starts **For coach:**. Inside a cell a P
 link it in full.
 
 Agents may rewrite any *Matter* cell whenever they like. *Coach answer* is the Coach's only place
-to speak, and agents never edit it.
+to speak, and agents edit it only to strike out a question they have answered (**explain**,
+below).
 
 When setting up, gather widely: TODO's open sections, the done and rulings notes in `human/`, the
 reviews' leftovers, PRs left open, flakes CI met, housekeeping. Leave out another session's open
@@ -69,9 +71,13 @@ questions, and say so in the lead.
 * **explain**: bring in more of the explanation that already exists. Hand the matter to a cheap,
   fast subagent (`haiku`, or `sonnet` for a knotty one) with the whiteboard and `human/` files
   behind it, and more if they would help, and have it write the fuller *Matter* cell: still plain,
-  a few sentences more. Put that in, reset the chip to `drafting`, and leave *Coach answer* as it
-  was. When the Coach wants it grounded further, they say so in *Coach answer* ("resummarize from
-  the code and more of the whiteboard") and flip it to `proceed`; then that is the work.
+  a few sentences more, answering any question the Coach asked in *Coach answer*. Put that in,
+  strike out the Coach's question (re-spell their text word for word inside `~~ ~~`; when the cell
+  is blank, because they only flipped the chip, write `~~Explain more, please~~`), and reset the
+  chip to `drafting`. The struck text shows the Coach their question was taken up, and leaves the
+  cell free for their next word. When the Coach wants it grounded further, they say so in *Coach
+  answer* ("resummarize from the code and more of the whiteboard") and flip it to `proceed`; then
+  that is the work.
 * **elevate**: sweep the row into a tab of its own, nested under Open Matters, and add a row to
   *Elevated matters* pointing to it. The tab is for the Coach to hand to an agent in another
   session, to discuss (below).
@@ -83,6 +89,14 @@ The chip is the only signal. An answer whose chip still says `drafting` is still
 
 The Coach says "go" when they want something fast-tracked, or when a good batch is waiting. The
 session that keeps the doc may act on flipped rows whenever it is there.
+
+**Sweep on a timer, never a subscription.** Don't subscribe to the doc or ask for comment alerts:
+each wake is a full turn at the session's whole context. Instead, when a pass changes the doc,
+start a background timer (`sleep 1200` with `run_in_background`, about 20 minutes, unless the
+Coach names another) and sweep when it fires. A sweep that finds nothing new since the bookmark
+starts no new timer: polling stops until the Coach speaks in chat or a report brings the session
+back to the doc. And before any write to the doc, read `sinceRev` from the bookmark first, and
+act on what was flipped in that same pass.
 
 **That session keeps the tab.** In a sprint it is the orchestrator: a row that proceeds into a
 thread goes into that thread's handoff as text -- the matter and the Coach's answer, or a
@@ -135,7 +149,7 @@ When a matter is ruled (`proceed`, or an answer in chat), beside acting on it:
 ## An elevated matter's tab
 
 Written for an agent in another session that has the repo and this tab and nothing else; it
-reads the tab with the Claude Docs tools, given the doc's link. Text and bullet points, no
+reads the tab with `doc-tab-reader`, given the doc's link. Text and bullet points, no
 tables, so the Coach can write between the lines:
 
 * **Where it stands**: what the tab assumes (usually main, after a named merge), with paths, line

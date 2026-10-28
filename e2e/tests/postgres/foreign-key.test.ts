@@ -1,5 +1,5 @@
 // @vitest-environment node
-// The `23503` the postgres README maps to `stale_write`: a lockbox whose vault is retired after the
+// The `23503` the postgres README maps to `vault_mismatch`: a box whose vault is deleted after the
 // insert's statement began. PGlite cannot raise it between two statements; here one device's
 // insert is held at its foreign key check by another's uncommitted delete of the vault row, and
 // meets the foreign key's own verdict when that delete commits.
@@ -10,8 +10,8 @@ const getDb = TH.useFileDatabase()
 const u1 = TH.scopeOf('u1')
 
 TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real Postgres", () => {
-  // The insert's own count sees the vault standing, so only the foreign key's `23503` can refuse it here.
-  it("refuses as stale_write a lockbox whose vault another connection retired while its insert waited on the foreign key, and stores nothing", async () => {
+  // The insert's own count sees the vault still stored, so only the foreign key's `23503` can refuse it here.
+  it("refuses as vault_mismatch a box whose vault another connection deleted while its insert waited on the foreign key, and stores nothing", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, {})('u1')
@@ -20,16 +20,16 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = TH.expectRefusal(device.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet), 'stale_write')
-    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
+    const write = TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
+    await TH.untilBlockedBy(db, eraser)
     await eraser.query('COMMIT')
     await write
 
-    expect(await device.readVaultProps(u1)).to.be.null
-    expect(await TH.lockboxesStanding(db)).to.eq(0)
+    expect(await TH.vaultRecordIn(device, u1)).to.be.null
+    expect(await TH.boxesStored(db)).to.eq(0)
   })
 
-  it("lands the lockbox when the delete is rolled back instead: the foreign key is read against the vault row that stands", async () => {
+  it("lands the box when the delete is rolled back instead: the foreign key is read against the vault row as last committed", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, {})('u1')
@@ -38,11 +38,11 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = device.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet)
-    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
+    const write = device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
+    await TH.untilBlockedBy(db, eraser)
     await eraser.query('ROLLBACK')
-    await write
+    await TH.expectGood(write)
 
-    expect(await device.readBox(u1, 'anthropic')).to.not.be.null
+    expect(await TH.expectingGood(device).getBox(u1, 'anthropic', TH.inThisVault)).to.not.be.null
   })
 })

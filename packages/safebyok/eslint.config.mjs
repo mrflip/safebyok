@@ -176,10 +176,10 @@ export default defineConfig([
       'no-global-assign': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        varsIgnorePattern:         '^_',
-        argsIgnorePattern:         '^_',
-        caughtErrorsIgnorePattern: '^_',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        varsIgnorePattern:         '^_[a-zA-Z0-9]',
+        argsIgnorePattern:         '^_[a-zA-Z0-9]',
+        caughtErrorsIgnorePattern: '^_[a-zA-Z0-9]',
       }],
     },
   },
@@ -189,12 +189,12 @@ export default defineConfig([
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // The one exception is src/console-logger.ts, the fallback when a host passes no logger, which
   // disables no-console for itself alone. The helpers published as `safebyok/testing`
-  // (tests/test-helpers.ts) ship to hosts too, so they keep the rules of src/ in this section and
-  // in 3c, besides the rules of the tests.
+  // (tests/test-helpers.ts and the parts it re-exports, in tests/test-helpers/) ship to hosts too,
+  // so they keep the rules of src/ in this section and in 3c, besides the rules of the tests.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
     name: 'safebyok/secret-keeping',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'no-console':              'error',
       'no-eval':                 'error',
@@ -212,7 +212,7 @@ export default defineConfig([
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
     name: 'safebyok/platform-neutral',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
       'no-restricted-globals': ['error', ...['Buffer', 'process', 'global', 'require', '__dirname', '__filename', 'setImmediate'].map((nodeGlobal) => ({
@@ -222,18 +222,19 @@ export default defineConfig([
     },
   },
 
-  // And it costs the host only what it uses. src/ validates with zod/mini, whose builders a host's
-  // bundler drops when nothing reaches them; classic zod's it cannot, so one import of classic
-  // would put all of it in every host's bundle.
+  // Zod comes in as `zod`, classic, the one flavour: every schema in src/ is made in a Validator
+  // call, which hands its builder Zod's makers. Classic is the larger library (the same five
+  // validators bundle to some 25 kB gzipped, against 7 kB in mini), a cost the Coach accepted for
+  // its ergonomics; named and star imports shake alike. `zod/mini` would bundle a second Zod beside
+  // it. `zod/v4` is the same classic under its version path, and `zod/v3` the classic before it.
   {
-    name: 'safebyok/tree-shaking',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    name: 'safebyok/zod-paths',
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
-        // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
-        paths: ['zod', 'zod/v4', 'zod/v3'].map((classicPath) => ({
-          name:    classicPath,
-          message: "Import zod/mini (`import * as Z from 'zod/mini'`): classic zod does not tree-shake, and would ride along in every host's bundle.",
+        paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
+          name:    otherPath,
+          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Validator call, which hands its builder Zod's makers: one Zod, classic, bundles.",
         })),
       }],
     },
@@ -279,6 +280,9 @@ export default defineConfig([
       // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
       // field dropped by destructuring): typescript-eslint's, configured above, is the one.
       'sonarjs/no-unused-vars': 'off',
+      // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
+      // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
+      'sonarjs/redundant-type-aliases': 'off',
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
@@ -306,7 +310,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, lockboxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
+import { isVaultError, type BoxDamaged } from 'safebyok'
 import { WhisperField, useVault, useVaultSnapshot } from 'safebyok-react'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 
 /**
  * The "app": a knock-knock machine powered by the user's own Anthropic key. This is what using
- * the library day-to-day looks like -- one lockbox holding the key, `withUnlockedVault()` around
- * anything that needs it, and `vault.useBox()` scoping the decrypted key to the API call.
+ * the library day-to-day looks like -- one box holding the key, the vault asking for the
+ * passphrase through the provider's dialog whenever a call needs it, and `vault.useWhisper()` scoping
+ * the decrypted key to the API call. A dialog the user dismissed is refused 'vault_locked': nothing
+ * to say.
  */
 
-/** The lockbox the knock-knock machine keeps its key in. */
+/** The box the knock-knock machine keeps its key in. */
 const ApiKeyBoxlabel = 'anthropic_api_key'
 
 /** The key, as the slot below stores it: text. Anything else was put there some other way. */
@@ -18,28 +21,28 @@ const apiKeyOf = (whisper: unknown): string => {
 }
 
 export const KnockKnock = () => {
-  const { vault, withUnlockedVault } = useVault()
-  const snapshot = useVaultSnapshot()
+  const vault = useVault('main')
+  const snapshot = useVaultSnapshot('main')
   const [whosThere, setWhosThere] = useState('')
   const [joke, setJoke] = useState<string | null>(null)
   const [telling, setTelling] = useState(false)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // The handle comes at once, its lockboxes listed only once its hello has read storage.
-  if (vault === null || snapshot.state === 'opening') { return null }
+  // No Vault object until its birth has read storage, and with it the boxes it lists.
+  if (vault === null || snapshot === null) { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
+  const damagedKeyBox = snapshot.damagedBoxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
-  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
+  const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined
 
   const knock = async () => {
     setTelling(true)
     setJoke(null)
     setGripe(null)
     try {
-      const told = await withUnlockedVault(() => vault.useBox(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
-      if (told !== null) { setJoke(told) }
+      setJoke(await vault.useWhisper(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
     } catch (err) {
-      setGripe(gripeForJokeErr(err))
+      if (! isVaultError(err, 'vault_locked')) { setGripe(gripeForJokeErr(err)) }
     } finally {
       setTelling(false)
     }
@@ -68,7 +71,7 @@ export const KnockKnock = () => {
       {telling && <p className="quiet">Claude is clearing its throat…</p>}
       {joke !== null && <blockquote className="joke">{joke}</blockquote>}
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
+      <ApiKeySlot haveKeyBox={keyBox !== undefined || damagedKeyBox !== undefined} damage={damagedKeyBox?.damage ?? null} replaceable={damagedKeyBox?.revision_tok !== null} savedAt={keyBox?.written_at} />
     </section>
   )
 }
@@ -77,13 +80,16 @@ export const KnockKnock = () => {
 export const SavedFlashMillis = 2000
 
 /**
- * The facility for entering (or replacing) the Anthropic API key, stored as a lockbox. A damaged
- * key lockbox -- its stored record unreadable -- is offered for replacing: storing over it writes it afresh.
+ * The facility for entering (or replacing) the Anthropic API key, stored as a box. A damaged
+ * key box -- its stored record unreadable -- is offered for replacing while it names its
+ * revision: storing over it writes it afresh. One damaged beyond naming, which putBox() refuses,
+ * is offered for removing instead, and then for adding anew. One a newer version of the app
+ * wrote is offered for neither: the app is the one to update, as the dashboard says.
  * A save flashes "saved" a moment, then relaxes to when the key was last saved -- any save, the
  * same key saved again included.
  */
-const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, damaged: boolean, savedAt?: number | undefined }) => {
-  const { vault, withUnlockedVault } = useVault()
+const ApiKeySlot = ({ haveKeyBox, damage, replaceable, savedAt }: { haveKeyBox: boolean, damage: BoxDamaged['damage'] | null, replaceable: boolean, savedAt?: number | undefined }) => {
+  const vault = useVault('main')
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
@@ -105,11 +111,26 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
       </p>
     )
   }
-  if (damaged && ! editing) {
+  if (damage === 'newer_format') {
+    return <p className="api-key-slot gripe">{"The stored Anthropic key was written by a newer version of this app: update the app to read it."}</p>
+  }
+  const remove = async () => {
+    setGripe(null)
+    try {
+      await vault.delBox(ApiKeyBoxlabel)
+    } catch (err) {
+      if (! isVaultError(err, 'vault_locked')) { setGripe(err instanceof Error ? err.message : 'Could not remove that key.') }
+    }
+  }
+
+  if (damage === 'damaged' && ! editing) {
     return (
       <p className="api-key-slot gripe">
         {"The stored Anthropic key is damaged and can't be read."}{' '}
-        <button className="mini" onClick={() => { setEditing(true) }}>replace it</button>
+        {replaceable
+          ? <button className="mini" onClick={() => { setEditing(true) }}>replace it</button>
+          : <button className="mini danger" onClick={() => { void remove() }}>remove it</button>}
+        {gripe !== null && <span> {gripe}</span>}
       </p>
     )
   }
@@ -125,17 +146,12 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
   const save = async () => {
     setGripe(null)
     try {
-      const saved = await withUnlockedVault(async () => {
-        await vault.storeBox(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
-        return true
-      })
-      if (saved !== null) {
-        setEditing(false)
-        setKeyText('')
-        setJustSaved(true)
-      }
+      await vault.putBox({ boxlabel: ApiKeyBoxlabel, sidecar: { note: 'feeds the knock-knock machine' } }, keyText.trim())
+      setEditing(false)
+      setKeyText('')
+      setJustSaved(true)
     } catch (err) {
-      setGripe(err instanceof Error ? err.message : 'Could not save that key.')
+      if (! isVaultError(err, 'vault_locked')) { setGripe(err instanceof Error ? err.message : 'Could not save that key.') }
     }
   }
 

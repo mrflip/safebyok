@@ -1,27 +1,29 @@
-import * as Z from 'zod/mini'
-import { VaultError } from './errors'
+import type * as Z from 'zod'
+import { VaultError, isVaultError } from './errors'
+import { type KitWith, Validator } from './checks/validator'
 
-/**
- * A check of a host's bag of options, made once, for a call to run on each bag handed in: the bag,
- * exactly as handed in, once it is left out or is an object holding only fields `shape` knows,
- * each passing its schema. Kind 'bad_option', saying `said`, otherwise, so a misspelt option, or
- * one this version no longer takes, is refused at once rather than quietly ignored. `said` names
- * the fields there are and what to do; it never quotes the bag, which may hold anything.
+/** Make a check of a host's options bag, which hands the bag back as given when it is left out or every field passes `fieldsOf`.
+ * It refuses 'bad_option' otherwise, so a misspelt option is never quietly ignored. The message
+ * names each field it judged, counts a field it does not take without naming it, quotes no value,
+ * and ends with `said`.
  *
- * @param shape - Each field the bag may hold, and its schema; wrap a field's schema in
- *   `Z.optional` to let it be left out.
- * @param said - The refusal's message: what the bag may hold, and what to check.
- * @returns The check, which hands back the bag it was given.
+ * @param fieldsOf - Each field the bag may hold, and its schema, from the `Validator` kit; make
+ *   one `.optional()` to let it be left out.
  *
  * @example
- *   const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`.")
+ *   const checkStoreOpts = optionsCheck(({ unk }) => ({ sidecar: unk.optional() }), "putBox()'s only option is `sidecar`.")
  *   checkStoreOpts({ sidecar: { note: 'work' } }) // the same bag
- *   checkStoreOpts({ note: 'work' })              // throws: bad_option
+ *   checkStoreOpts({ note: 'work' })              // throws: bad_option, "There is a field it does not take ...: it takes only sidecar. ..."
  */
-export const optionsCheck = (shape: Z.core.$ZodLooseShape, said: string) => {
-  const schema = Z.optional(Z.strictObject(shape))
+export const optionsCheck = (fieldsOf: (kit: KitWith<readonly []>) => Z.ZodRawShape, said: string) => {
+  const { optionsBag } = Validator('bad_option', (kit) => ({ optionsBag: kit.obj(fieldsOf(kit)).strict().optional() }))
   return <Bag>(candidate: Bag): Bag => {
-    if (! schema.safeParse(candidate).success) { throw new VaultError('bad_option', said) }
-    return candidate
+    try {
+      optionsBag.parse(candidate)
+      return candidate
+    } catch (err) {
+      if (! isVaultError(err, 'bad_option')) { throw err }
+      throw new VaultError('bad_option', `${err.message}. ${said}`, err.meta === undefined ? {} : { meta: err.meta })
+    }
   }
 }

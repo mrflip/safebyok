@@ -9,8 +9,8 @@ describe("register", () => {
   it("installs the component under the name a host gave it, and hands back its functions", async () => {
     const CVX = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
     const vaultstore = register(CVX, 'vaultstore')
-    await CVX.mutation(vaultstore.vaults.fetchOrCreateVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
-    expect(await CVX.query(vaultstore.vaults.getVaultProps, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.vaultPropsOf('u1'))
+    await CVX.mutation(vaultstore.vaults.ensureVault, { draft: TH.gatelessOf('u1') })
+    expect(await CVX.query(vaultstore.vaults.getVault, { ...TH.scopeOf('u1') })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -19,7 +19,7 @@ describe("register", () => {
       safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId: () => 'u1' }),
     })
     const CVX = createTest()
-    await CVX.mutation(api.safebyok.fetchOrCreateVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
-    expect(await CVX.query(api.safebyok.getVaultProps, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.vaultPropsOf('u1'))
+    await CVX.mutation(api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
+    expect(await CVX.query(api.safebyok.getVault, { ...TH.scopeOf('u1') })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
   })
 })

@@ -35,6 +35,10 @@ An ordered series of threads issued at once is a **sprint**, run by `/sprint`
 (`.claude/skills/sprint/SKILL.md`) through `thread-worker` and `thread-reviewer` agents.
 Open questions too many for chat go to a doc's **Open Matters** tab, run by `/turbochat`
 (`.claude/skills/turbochat/SKILL.md`): the Coach flips a row's state, and agents act on that.
+A set of open PRs is made one merge line by `/restacker` (`.claude/skills/restacker/SKILL.md`),
+which rebases in a clone of its own, tests once at the tip, and force-pushes only under named leases.
+Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
+(`.claude/agents/documentarian.md`), on a target a Coach names.
 
 ## The history we keep
 
@@ -46,8 +50,10 @@ Open questions too many for chat go to a doc's **Open Matters** tab, run by `/tu
 * **Every commit lands in main individually**, so each should pass `pnpm justify`. An
   intermediate red commit is allowed only when it isolates something, say a large mechanical
   change from the thoughtful repairs after it, and the PR says so.
-* **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you expect>`.
-  Never plain `--force`, and never a branch that isn't your thread's.
+* **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
+  the branch's tip when you took it, never one fetched since: a lease read off a fresh fetch
+  always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
+  thread's.
 * **Never merge a PR or enable auto-merge. The Coach merges.**
 * Before a command that throws work away (`reset --hard`, `restore`, `clean`, `branch -D`), make
   what it would discard reachable first: commit it or put a branch on it. If you can't tell what
@@ -96,6 +102,8 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
   sprint to the orchestrator -- take it out of draft (`gh pr ready`), whatever the report says.
   It stays out of draft from then on: later fixes are pushed to it as it stands.
 * **Title**: plain language, saying what changed.
+* **Link each PR, branch or commit on first mention**, in chat, a PR body or a note:
+  `[#12](https://github.com/mrflip/safebyok/pull/12)`.
 * **Body**: what changed, in short paragraphs or bullets with **bold lead-ins**; a **Tests:**
   line naming what ran and the counts; "Stacked on #N" for an unmerged PR the branch stands on;
   and an *Open questions* list for what remains. Put those questions in chat and `human/` too: a
@@ -187,8 +195,7 @@ budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and
    least +1 kB, so a small bundle is not given more room than its own size.
 3. **Round up to a round number**: two significant figures, never down (2.3 kB of measure is
    3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 27 kB). Round numbers keep a stack of PRs
-   from fighting over digits: a budget of 2_431 bytes is a conflict waiting for the next
-   thread, and 2_500 is not.
+   from fighting over digits.
 
 `pnpm size:budget` applies the rule: it prints each budget beside the rule's, and `--raise` or
 `--write` sets them (its header says how).
@@ -196,9 +203,9 @@ budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and
 The rule sets a budget; it may lower one as well as raise it. A bundle that shrank gets the
 smaller budget the rule gives, so a budget never sits looser than its measure earns.
 
-A sprint's first thread raises the budgets for the whole sprint, so the stacked PRs agree, and a
-late thread lowers them to the rule (`.claude/skills/sprint/SKILL.md`). Anyone else raising a
-budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
+In a sprint, each thread moves the budgets its own change moves, up or down, with
+`pnpm size:budget --write` (`.claude/skills/sprint/SKILL.md`, *Size budgets*). Anyone else
+raising a budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
 `notes/ci.md`, *Size checks*.
 
 ## Where things are written

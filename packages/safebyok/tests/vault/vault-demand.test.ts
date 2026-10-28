@@ -1,0 +1,486 @@
+import { describe, it, expect, vi } from 'vitest'
+import { memoryDeviceDB } from '../../src/device-db'
+import { MinuteMillis } from '../../src/consts'
+import type { Vault } from '../../src/vault'
+import { heldLeaseOf } from '../../src/held-lease'
+import type { Gating } from '../../src/gating'
+import * as TH from '../test-helpers'
+import { makeWorld, makeRacingWorld, boxlabelsOf, storedRowOf, u1BoxScopepath } from './world'
+
+/** Delete the vault from another device and make it anew there under 'pw two': a new life, of another vault_tok. */
+const remakeElsewhere = async (world: ReturnType<typeof makeWorld>) => {
+  const there = await world.open({ deviceDB: memoryDeviceDB() })
+  await TH.del(there, 'pw')
+  const anew = await TH.bankOf(there).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+  await TH.unlock(anew, 'pw two')
+  return anew
+}
+
+// == [Made under]: what a thing the vault makes is made under
+
+describe("what the vault makes things under", () => {
+  it("is its scope and vault_tok while novel, at gate_epoch 0", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    expect(TH.stateOf(vault.snapshot)).to.eq('novel')
+    expect(TH.cheatGetVaultEpoch(vault)).to.deep.include({ ...TH.scopeOf('u1'), vault_tok: vault.vault_tok, gate_epoch: 0 })
+  })
+
+  it("is the vault record held but for its gate: its stamp, the Vault object's own fields, and its vault_epoch and gate_epoch", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(TH.cheatGetVaultEpoch(vault)).to.deep.equal({ ...TH.shownOf(vault), vault_epoch: 1, gate_epoch: 1 })
+  })
+
+  it("moves up by one on every change to the ways in", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const before = TH.cheatGetVaultEpoch(vault).gate_epoch
+    await TH.putWayin(vault, 'pw', 'pw two')
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(before + 1)
+    expect(TH.cheatGetVaultEpoch(vault).vault_epoch).to.eq(2)
+  })
+})
+// --
+
+// == [The demand]: vault.demandConsistentWith, vault.consistentWith
+
+describe("vault.demandConsistentWith", () => {
+  it("passes a box the vault handed out while the vault has not moved on, as its first example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(() => { vault.demandConsistentWith(box) }).to.not.throw()
+    expect(() => { vault.demandConsistentWith(box, { leaseBound: true }) }).to.not.throw()
+  })
+
+  it("refuses a box from before the vault was deleted as 'vault_gone', as its first example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await TH.del(vault, 'pw')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(box) }, 'vault_gone')
+  })
+
+  it("refuses a box from before the vault was deleted and made anew elsewhere as 'vault_remade', as its first example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await remakeElsewhere(world)
+    await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'vault_remade')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(box) }, 'vault_remade')
+  })
+
+  it("refuses a box once a lock lands, when lease-bound, as 'vault_locked', as its second example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await vault.lock()
+    expect(() => { vault.demandConsistentWith(box) }).to.not.throw()
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(box, { leaseBound: true }) }, 'vault_locked')
+  })
+
+  it("drops a lease it finds ended, as the expiry would, when lease-bound", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { leaseHours: 1 })
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    world.advance(60 * 60 * 1000)
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leaseBound: true }) }, 'vault_locked')
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+  })
+
+  it("refuses a thing of another gate_epoch as 'gate_moved', as its third example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: vault.vault_tok, gate_epoch: 0 }) }, 'gate_moved')
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: madeUnder.gate_epoch + 1 }) }, 'gate_moved')
+  })
+
+  it("takes a vault_epoch at or below the vault's, and refuses one past it as 'gate_moved'", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await TH.putWayin(vault, 'pw', 'pw two')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch - 1 }) }).to.not.throw()
+    expect(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch }) }).to.not.throw()
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ vault_tok: madeUnder.vault_tok, vault_epoch: madeUnder.vault_epoch + 1 }) }, 'gate_moved')
+  })
+
+  it("refuses a thing of another scope as 'vault_remade', whatever its vault_tok", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, user_id: 'u2' }) }, 'vault_remade')
+  })
+
+  it("refuses 'vault_gone' once the bank lets the vault go", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    TH.closeVault(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder) }, 'vault_gone')
+  })
+
+  it("refuses a thing carrying no vault_tok, or an option it does not take, as 'bad_option', quoting none of it", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    const sloppy: unknown[] = [null, 'a vault_tok', 42, { gate_epoch: 1 }, { vault_tok: 7 }, { vault_tok: madeUnder.vault_tok, gate_epoch: 'one' }]
+    for (const thing of sloppy) {
+      const err = TH.expectSyncRefusal(() => { vault.demandConsistentWith(thing as never) }, 'bad_option')
+      expect(err.message).to.not.include('a vault_tok')
+    }
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith(madeUnder, { leasebound: true } as never) }, 'bad_option')
+  })
+
+  it("tells the logger the kind and the call it refused, never the thing's fields", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    TH.expectSyncRefusal(() => { vault.demandConsistentWith({ ...madeUnder, gate_epoch: 0 }) }, 'gate_moved')
+    expect(world.logged).to.have.lengthOf(1)
+    expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'demandConsistentWith', refusalkind: 'gate_moved' } })
+    expect(TH.loggedText(world.logged)).to.not.include(madeUnder.vault_tok)
+  })
+
+})
+
+describe("vault.consistentWith", () => {
+  it("answers the demand's question without refusing: true while the thing is current, false once the vault moved on", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    expect(vault.consistentWith(madeUnder)).to.be.true
+    expect(vault.consistentWith({ ...madeUnder, gate_epoch: 0 })).to.be.false
+    expect(vault.consistentWith({ ...madeUnder, vault_tok: 'vault-tok-other' })).to.be.false
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("reads a box again once the vault moved on, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    let box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await TH.putWayin(vault, 'pw', 'pw two')
+    expect(vault.consistentWith(box)).to.be.false
+    const read = await vault.getBox(box.boxlabel)
+    if (read === null) { throw new Error('expected the box') }
+    box = read
+    expect(vault.consistentWith(box)).to.be.true
+  })
+
+  it("asks for a lease in hand that has not ended when lease-bound, dropping none it finds ended", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { leaseHours: 1 })
+    const madeUnder = TH.cheatGetVaultEpoch(vault)
+    expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.true
+    world.advance(60 * 60 * 1000)
+    expect(vault.consistentWith(madeUnder, { leaseBound: true })).to.be.false
+    expect(vault.consistentWith(madeUnder)).to.be.true
+    expect(heldLeaseOf(vault)).to.not.be.null
+  })
+
+  it("throws 'bad_option' for a thing with no vault_tok, or an option it does not take", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    TH.expectSyncRefusal(() => vault.consistentWith({} as never), 'bad_option')
+    TH.expectSyncRefusal(() => vault.consistentWith(vault, { leasebound: true } as never), 'bad_option')
+  })
+})
+// --
+
+// == [Refresh]: vault.refresh, the joined read, the refresh's judgment
+
+describe("vault.refresh", () => {
+  it("reads storage now, whatever was read a moment ago, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+    await there.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    expect(boxlabelsOf(vault)).to.deep.equal([])
+    await vault.refresh()
+    expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
+  })
+
+  it("shares a read under way: a hello or refresh asked for meanwhile, at any staleness, starts none of its own", async () => {
+    const world = makeWorld()
+    const deaf = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+    const held = TH.holdNextAnswer(deaf, 'getVault')
+    const reads = vi.spyOn(deaf, 'getVault')
+    const first = vault.refresh()
+    await held.reached
+    const others = [vault.refresh(), vault.hello({ staleMinutes: 0 }), vault.hello()]
+    held.release()
+    await Promise.all([first, ...others])
+    expect(reads).toHaveBeenCalledTimes(1)
+  })
+
+  it("refuses as hello() does: 'vault_gone' once the bank lets the vault go, in its try form too", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    TH.closeVault(vault)
+    await TH.expectRefusal(vault.refresh(), 'vault_gone')
+    await TH.expectBad(vault.tryRefresh(), 'vault_gone')
+  })
+})
+
+describe("the refresh's judgment", () => {
+  it("ignores a late read of this tab's own write, setting nothing and throwing nothing", async () => {
+    const world = makeWorld()
+    const deaf = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+    // A read starts as the change is about to write: storage serves it before the change lands,
+    // and its answer is held until after.
+    const reading: { served?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
+    TH.beforeNextCall(deaf, 'putVaultRecord', async () => {
+      reading.served = TH.holdNextAnswer(deaf, 'getVault')
+      reading.done = vault.hello({ staleMinutes: 0 })
+      await reading.served.reached
+    })
+    await TH.putWayin(vault, 'pw', 'pw two')
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
+    reading.served?.release()
+    await reading.done
+    expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(2)
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("drops the lease from memory when this device's store no longer holds it: a lock in another tab lands here", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const otherTab = await world.open()
+    expect(TH.stateOf(otherTab.snapshot)).to.eq('unlocked')
+    await otherTab.lock()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('locked')
+  })
+
+  it("keeps its own lease when another tab's renewal writes one ending later: it never shows 'locked' for it, and takes the renewed one up, unasked, once its own ends", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), leaseHours: 1 })
+    const own = thisTab.snapshot.ask_passphrase_at
+    if (own === null) { throw new Error("The unlock left this tab no lease") }
+    world.advance(30 * MinuteMillis)
+    const otherTab = await world.open({ leaseHours: 1 })
+    expect(TH.stateOf(otherTab.snapshot)).to.eq('unlocked')
+    TH.answering(otherTab, async (gating) => { if (gating.gatingkind === 'unlock_vault') { await gating.attemptPassphrase('pw') } })
+    await otherTab.ensureUnlocked({ renewMinutes: 45 })
+    const renewed = await world.getLease()
+    expect(renewed?.ask_passphrase_at).to.be.above(own)
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+    expect(thisTab.snapshot.ask_passphrase_at).to.eq(own)
+    world.advance(own - world.clock.now())
+    await thisTab.ensureUnlocked()
+    expect(thisTab.snapshot.ask_passphrase_at).to.eq(renewed?.ask_passphrase_at)
+  })
+
+  it("keeps its own lease when another tab's lock and unlock both land before it reads: the store holds a lease under the same gate", async () => {
+    const world = makeWorld()
+    const thisTab = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const otherTab = await world.open()
+    await otherTab.lock()
+    world.advance(MinuteMillis)
+    await TH.unlock(otherTab, 'pw')
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+  })
+
+  it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault record read still shows the old", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const kept = await world.getLease()
+    if (kept === null) { throw new Error("The unlock left no lease in this device's store") }
+    vi.spyOn(world.deviceDB, 'getLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
+    await vault.refresh()
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+    expect(await world.getLease()).to.deep.eq(kept)
+  })
+
+  it("keeps a lease granted after a read began, though that read found none in this device's store", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    await vault.lock()
+    // A read begins as the unlock is about to write its lease, and finds none; it is answered after.
+    const reading: { answered?: ReturnType<typeof TH.makeLatch>, done?: Promise<Vault> } = {}
+    TH.beforeNextCall(world.deviceDB, 'putLease', async () => {
+      reading.answered = TH.holdNextAnswer(world.deviceDB, 'getLease')
+      reading.done = vault.refresh()
+      await reading.answered.reached
+      world.advance(1)
+    })
+    await TH.unlock(vault, 'pw')
+    reading.answered?.release()
+    await reading.done
+    expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
+  })
+
+  it("drops the lease from memory, erasing nothing, when the ways in changed elsewhere", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const there = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+    await TH.putWayin(there, 'pw', 'pw two')
+    await vault.refresh()
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+    const kept = await world.getLease()
+    expect(kept?.gate_epoch).to.eq(1)
+  })
+
+  it("makes the Vault object gone, 'vault_remade', erasing nothing, when the vault was deleted and made anew elsewhere: the old life's lease is never taken up", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const formerTok = vault.vault_tok
+    const anew = await remakeElsewhere(world)
+    await TH.expectRefusal(vault.refresh(), 'vault_remade')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_remade')
+    const kept = await world.getLease()
+    expect(kept?.vault_tok).to.eq(formerTok)
+    const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
+    expect(reborn.vault_tok).to.eq(anew.vault_tok)
+    expect(TH.stateOf(reborn.snapshot)).to.eq('locked')
+    const stillKept = await world.getLease()
+    expect(stillKept?.vault_tok).to.eq(formerTok)
+  })
+
+  it("takes no lease up: another tab's unlock shows here at the next ensureUnlocked, without a prompt", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    const requestCleartext = vi.fn()
+    const thisTab = await world.open({ requestCleartext })
+    const otherTab = await world.open()
+    await TH.unlock(otherTab, 'pw')
+    await thisTab.refresh()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('locked')
+    await thisTab.ensureUnlocked()
+    expect(TH.stateOf(thisTab.snapshot)).to.eq('unlocked')
+    expect(requestCleartext).not.toHaveBeenCalled()
+  })
+})
+// --
+
+// == [Lock]: lock's order, and a lock landing during a box call
+
+describe("vault.lock, at once", () => {
+  it("has the vault locked, its listeners told, before it returns: only the erase is awaited", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const heard: string[] = []
+    vault.subscribe(() => { heard.push(TH.stateOf(vault.getSnapshot())) })
+    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
+    const locking = vault.lock()
+    expect(TH.stateOf(vault.snapshot)).to.eq('locked')
+    expect(vault.snapshot.ask_passphrase_at).to.be.null
+    expect(heard).to.deep.equal(['locked'])
+    await erasing.reached
+    expect(await world.getLease()).to.not.be.null
+    erasing.release()
+    await locking
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("lands on the pending gating before it returns: lockLanded settles, and every caller waiting refuses 'vault_locked'", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    const seen: { gating: Gating | null, landed: boolean } = { gating: null, landed: false }
+    const vault = await world.open({ requestCleartext: (gating) => {
+      seen.gating = gating
+      void gating.lockLanded.then(() => { seen.landed = true })
+      return new Promise(() => { /* the user never answers */ })
+    } })
+    const waiting = vault.tryEnsureUnlocked()
+    await TH.eventually(() => seen.gating !== null)
+    const locking = vault.lock()
+    await TH.expectBad(waiting, 'vault_locked')
+    expect(seen.landed).to.be.true
+    await locking
+  })
+})
+
+describe("a lock landing during a box call", () => {
+  const BoxWrites = [
+    ['putBox()', (vault: Vault) => vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')],
+    ['delBox()', (vault: Vault) => vault.delBox('anthropic')],
+  ] as const
+
+  for (const [blurb, call] of BoxWrites) {
+    it(`refuses a ${blurb} 'vault_locked' when it lands on the call's gating, writing nothing`, async () => {
+      const world = makeWorld()
+      const maker = await world.openUnlocked('pw')
+      await maker.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+      await maker.lock()
+      const row = storedRowOf(world, 'anthropic')
+      const seen: { gating: Gating | null } = { gating: null }
+      const vault = await world.open({ requestCleartext: (gating) => {
+        seen.gating = gating
+        return new Promise(() => { /* the user never answers */ })
+      } })
+      const calling = call(vault)
+      await TH.eventually(() => seen.gating !== null)
+      await vault.lock()
+      await TH.expectRefusal(calling, 'vault_locked')
+      expect(storedRowOf(world, 'anthropic')).to.deep.equal(row)
+    })
+  }
+
+  it("refuses a putBox() 'vault_locked' when it lands while the box is read, writing nothing", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const row = storedRowOf(world, 'anthropic')
+    const reading = world.holdNextBoxRead()
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-two')
+    await reading.reached
+    await vault.lock()
+    reading.release()
+    await TH.expectRefusal(putting, 'vault_locked')
+    expect(storedRowOf(world, 'anthropic')).to.deep.equal(row)
+  })
+
+  it("refuses a putBox() 'vault_locked' when a lock comes while the whisper is sealed, writing nothing: the lease demands itself after its seal", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    const sealing = TH.holdNextCall(crypto.subtle, 'encrypt')
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await sealing.reached
+    await vault.lock()
+    sealing.release()
+    await TH.expectRefusal(putting, 'vault_locked')
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(boxlabelsOf(vault)).to.deep.equal([])
+  })
+
+  it("lands a putBox() when it comes while the box is written, and lists what was stored", async () => {
+    const world = makeRacingWorld()
+    const deaf = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+    const writing = TH.holdNextAnswer(deaf, 'putBox')
+    const putting = vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await writing.reached
+    await vault.lock()
+    writing.release()
+    await putting
+    expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
+  })
+
+  it("lands a delBox() when it comes while the box is deleted, and drops it from the listing", async () => {
+    const world = makeRacingWorld()
+    const deaf = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    const deleting = TH.holdNextAnswer(deaf, 'delBox')
+    const removing = vault.delBox('anthropic')
+    await deleting.reached
+    await vault.lock()
+    deleting.release()
+    await removing
+    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(boxlabelsOf(vault)).to.deep.equal([])
+  })
+})
+// --

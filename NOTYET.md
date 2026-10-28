@@ -40,13 +40,17 @@ implementation.
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
   that when the idea keeps coming up there's some place to point to." There is none today: a write
   that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
-  damage on its own, so `storeBox()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
+  damage on its own, so `putBox()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a box
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests
   (`packages/safebyok-postgres/tests/`) stay on PGlite, in-process, because they are written against
   PGlite's interface; only `e2e/tests/postgres/` runs on the container. A PGlite-shaped wrapper over
   a `pg` pool would run them there too, so that "every Postgres test, one line" held.
+
+* **One sentence per refusal.** A value that fails several checks gets a sentence for each, which
+  can mislead: an empty `user_id` would also be told to percent-encode. The restyle (#274) stops
+  at the first failure there alone. The Coach (2026-10-26): do the simple thing and let it go.
 
 ## RAGEBAIT
 
@@ -56,7 +60,7 @@ be bitten finds the ruling.
 * **Storing without a sidecar keeps the old one.** The Coach (2026-10-16, thread 2,
   [#133](https://github.com/mrflip/safebyok/pull/133)): "I hate optional fields but we can wait for
   it to bug me again, go ahead as you propose." Storing a new whisper under an existing label with
-  no sidecar keeps the lockbox's sidecar; passing `{}` empties it. The alternative, an omitted
+  no sidecar keeps the box's sidecar; passing `{}` empties it. The alternative, an omitted
   sidecar meaning empty, is one line.
 * **The demo's App tests depend on order.** The Coach (2026-10-16, thread 14,
   [#134](https://github.com/mrflip/safebyok/pull/134)): "leave, file under RAGEBAIT." Under

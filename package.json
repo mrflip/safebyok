@@ -17,6 +17,7 @@
   "scripts": {
     "lint": "both() { pnpm lint:root; root=$?; pnpm -r --no-bail --stream --workspace-concurrency=4 lint \"$@\"; exit $(( root || $? )); }; both",
     "lint:root": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
+    "lint:workflows": "scripts/actionlint.sh",
     "typecheck": "both() { pnpm typecheck:root; root=$?; pnpm -r --no-bail --stream --workspace-concurrency=4 typecheck \"$@\"; exit $(( root || $? )); }; both",
     "typecheck:root": "tsc --noEmit",
     "test": "both() { pnpm test:root; root=$?; pnpm build && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm -r --no-bail --stream --workspace-concurrency=4 test \"$@\"; exit $(( root || $? )); }; both",
@@ -25,7 +26,7 @@
     "test:coverage:root": "vitest run --coverage",
     "build": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm -r --stream build",
     "justify:root": "all() { pnpm lint:root; lint=$?; pnpm typecheck:root; typecheck=$?; pnpm test:root; exit $(( lint || typecheck || $? )); }; all",
-    "justify": "all() { pnpm install || exit; pnpm lint; lint=$?; pnpm typecheck; typecheck=$?; pnpm test; tested=$?; pnpm size:check; exit $(( lint || typecheck || tested || $? )); }; all",
+    "justify": "all() { pnpm install || exit; pnpm lint; lint=$?; pnpm lint:workflows; workflows=$?; pnpm typecheck; typecheck=$?; pnpm test; tested=$?; pnpm size:check; exit $(( lint || workflows || typecheck || tested || $? )); }; all",
     "size": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter safebyok --filter safebyok-fastkey --filter safebyok-indexeddb --filter safebyok-react build && size-limit",
     "size:check": "size-limit",
     "size:budget": "node scripts/size-budget.ts",
@@ -43,7 +44,7 @@
     "@size-limit/preset-small-lib": "^14.2.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.2",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.4",
     "@vitest/eslint-plugin": "^1.6.27",
     "es-toolkit": "^1.52.0",
     "eslint": "^10.12.0",
@@ -52,11 +53,11 @@
     "eslint-plugin-chai-friendly": "^1.2.1",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-sonarjs": "^4.2.2",
-    "eslint-plugin-unicorn": "^77.0.0",
+    "eslint-plugin-unicorn": "^78.0.0",
     "safe-stable-stringify": "^2.5.0",
     "size-limit": "^14.2.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.71.1",
-    "vitest": "^5.0.3"
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.4"
   }
 }

@@ -10,14 +10,14 @@ import * as TH from '../../test-helpers'
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
   outage.setDown(false)
-  for (const ckey of dbStore.ckeys()) { dbStore.erase(ckey) }
+  for (const scopepath of dbStore.scopepaths()) { dbStore.erase(scopepath) }
   await vaultDbInspector.wipe()
 })
 
 describe("VaultDBInspectionPanel", () => {
   it("shows the backend's vault rows as they land, ciphertext marked as such", async () => {
     render(<VaultDBInspectionPanel />)
-    await act(() => vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1')))
+    await act(() => TH.ensureGated(vaultDB, TH.vaultRecordOf('u1')))
     await waitFor(() => { expect(screen.getAllByText('🔐 ciphertext')).to.have.lengthOf(1) })
     expect(screen.getByText(/ct-vault-u1/)).to.not.be.null
   })

@@ -1,199 +1,197 @@
+import { zodToConvex, zodToConvexFields } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
+import { Validators } from 'safebyok'
+import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 
-/**
- * Convex validators for safebyok's stored records, field for field with the core's Zod records
- * (`Lockbox`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
- * which fields, their types, which are optional, and each record's `format`. Every name, and a
- * lockbox's sidecar, is any text here: the floor beneath every name (well-formed, NFC, no
- * control characters, 1 KiB) and that the sidecar is JSON are the core's records' to hold, and what text each may be beyond it
- * the vault's validators', which the server never sees. The finer rules -- the floor, non-empty
- * strings, a positive whole `unlock_epoch`, each time's bounds as epoch milliseconds -- are the
- * client's, checked by the core's Zod records on every write and every read.
+/** Convex validators for safebyok's stored records, each made from the core's Zod validator its doc block names by convex-helpers' `zodToConvex`.
+ * Convex takes only its own validators for a function's arguments and returns and for a table's
+ * schema, so each is converted here from the core's, and a test holds each to the core's field for
+ * field. They check what Convex can: which fields, their types, which are optional, and each
+ * literal, a record's `format` among them. What Convex has no check for converts to the looser
+ * check it has: each name and token is any text, each epoch and count any number, a box's sidecar
+ * any value, and a vault record's rule tying `gate` to `gate_epoch` is left out. The finer rules
+ * are the client's, checked by the core's records on every write and every read.
  *
- * A new record format widens its `format` union: an additive deploy, shipped with this package.
+ * Their types are the core's, a salt the core brands keeping its {@link $brand}; a box's alone is
+ * Convex's reading of its fields, as {@link BoxRecord} says.
+ *
+ * A new record format in the core widens the `format` its record converts to: an additive deploy,
+ * shipped with this package.
  */
 
-/**
- * An encrypted value as a record holds it: its cipherIv and its ciphertext, each base64url
- * text. Every encrypted field of every record is this one shape, nested as the record holds it.
+/** An encrypted value as a record holds it: its cipherIv and its ciphertext, each base64url text. The core's `Ciphered`.
  *
  * @example { cipher_iv_b64: 'q83vEjRWeJA', ciphertext_b64: 'yL3cKX0...' }
  */
-export const Ciphered = v.object({
-  cipher_iv_b64:  v.string(),
-  ciphertext_b64: v.string(),
-})
+export const Ciphered = zodToConvex(Validators.Ciphered)
 
-/**
- * What names one vault: the host application's label, the user, and the vault's own label.
+/** What names one vault: the host application's label, the user, and the vault's own label. The core's `VaultScope`.
  *
  * @example { applabel: 'acme', user_id: 'user_2fJ8...', vaultlabel: 'main' }
  */
-export const VaultScope = v.object({
-  applabel:   v.string(),
-  user_id:    v.string(),
-  vaultlabel: v.string(),
-})
+export const VaultScope = zodToConvex(Validators.VaultScope)
 
-/** The VaultProps formats this package stores. */
-export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v3'))
-
-/** The formats of a Lockbox this package stores. */
-export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v5'))
-
-/**
- * A passphrase's way into a vault: its `wayin_id` and `wayinlabel`, how its passphraseKey is
- * derived (`key_deriver_label`, `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the
- * device and time that added it (`device_id`, `registered_at`), and the vaultKey wrapped under
- * that passphraseKey.
+/** What names one box: its vault's scope and its boxlabel. The core's `boxscope`.
  *
- * @example { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { applabel: 'acme', user_id: 'user_2fJ8...', vaultlabel: 'main', boxlabel: 'anthropic_api_key' }
  */
-export const PassphraseWayin = v.object({
-  wayinkind:               v.literal('passphrase'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
-  key_deriver_label:       v.string(),
-  salt_b64:                v.string(),
-  vault_key_epoch:         v.number(),
-  device_id:               v.string(),
-  registered_at:           v.number(),
-  vault_key_wayin_wrapped: Ciphered,
-})
+export const Boxscope = zodToConvex(Validators.boxscope)
 
-/**
- * A passkey's way into a vault: its `wayin_id` and `wayinlabel`, which WebAuthn credential to ask
- * (`credential_id`) and the salt to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps,
- * the device and time that added it, and the vaultKey wrapped under the key that answer makes.
+/** A vault's gate: its ways in, each the vaultKey wrapped under a wayinKey: a `passphrase`, and a `passkey` or null. The core's `GateRecord`.
  *
- * @example { wayinkind: 'passkey', wayin_id: '7c2e...', wayinlabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { passphrase: passphraseWayin, passkey: null }
  */
-export const PasskeyWayin = v.object({
-  wayinkind:               v.literal('passkey'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
-  credential_id:           v.string(),
-  prf_salt_b64:            v.string(),
-  vault_key_epoch:         v.number(),
-  device_id:               v.string(),
-  registered_at:           v.number(),
-  vault_key_wayin_wrapped: Ciphered,
-})
+export const Gate = zodToConvex(Validators.GateRecord)
 
-/**
- * One way into a vault, told apart by its `wayinkind`: a {@link PassphraseWayin} or a
- * {@link PasskeyWayin}. A new wayinkind widens this union, an additive deploy shipped with this
- * package.
+/** A vault's record: its scope and identity, its two epochs, and its gate, nested, null while the vault is novel (`gate_epoch` 0). The core's `VaultRecord`.
+ * Nothing in it opens without a passphrase or passkey. That `gate_epoch` is 0 exactly when `gate`
+ * is null is the client's to check, as the core's record does on every write and read.
  */
-export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
+export const VaultRecord = zodToConvex(Validators.VaultRecord)
 
-/**
- * The vaultKey before the vault's own, wrapped under its own, at its `vault_key_epoch`: absent
- * until a vault's vaultKey is first replaced.
- */
-export const PriorVaultKey = v.object({
-  vault_key_epoch:   v.number(),
-  vault_key_wrapped: Ciphered,
-})
-
-/**
- * A vault's props: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
- * (`vault_key_epoch`, and the one before as `prior_vault_key`), its ways in (`wayins`, each the
- * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
- * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
- * share an id or label, are the client's rules.
- */
-export const VaultProps = v.object({
-  format:           VaultPropsFormat,
-  applabel:         v.string(),
-  user_id:          v.string(),
-  vaultlabel:       v.string(),
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
-  vault_key_epoch:  v.number(),
-  prior_vault_key:  v.optional(PriorVaultKey),
-  wayins:           v.array(Wayin),
-  registered_at:    v.number(),
-})
-
-/**
- * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
- * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
- * whisper's codec and schema version, the sidecar as JSON text (`sidecar_json`, always
- * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
- * revision written (`written_at`).
- */
-export const Lockbox = v.object({
-  format:                 LockboxFormat,
-  boxlabel:               v.string(),
-  revision_tok:           v.string(),
-  vault_key_epoch:        v.number(),
-  lockbox_key_wrapped:    Ciphered,
-  whisper_ciphered:       Ciphered,
-  whisper_codec:          v.literal('json_v1'),
-  whisper_schema_version: v.literal(1),
-  sidecar_json:           v.string(),
-  registered_at:          v.number(),
-  written_at:             v.number(),
-})
-
-/**
- * A lockbox as a listing returns it: every field but the two ciphered ones, `format` kept, so the
- * client validates it as it would a whole record.
- */
-export const ListedLockbox = Lockbox.omit('lockbox_key_wrapped', 'whisper_ciphered')
-
-/**
- * What an update of the vault props was proven against: it lands only while the vault props
- * standing still have this `vault_id` and `unlock_epoch`.
+/** The vault record a vault is first stored as, which `ensureVault` takes: a novel vault's, `gate_epoch` 0 and no gate. The core's `VaultDraft`.
  *
- * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
+ * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, vault_epoch: 0, gate_epoch: 0, gate: null }
  */
-export const VaultPropsExpectation = v.object({
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
-})
+export const NovelVaultRecord = zodToConvex(Validators.VaultDraft)
 
-/**
- * What a lockbox update was written for and read: it lands only while the scope's vault props
- * have this `vault_id`, and the standing lockbox this `revision_tok` -- or, for null, there is no
- * lockbox. Its `vault_key_epoch` names the vaultKey the lockbox was sealed under.
+/** One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields. The core's `BoxRecord`.
+ * The sidecar is the app's own JSON object, any value to Convex, always written, `{}` for none.
+ * Times are epoch milliseconds. It converts field by field, as does {@link BoxSparse}, so that its
+ * type is Convex's own reading of its fields: whole, its type would be the core's, whose sidecar is
+ * any JSON, a type too deep for Convex's to compare.
+ */
+export const BoxRecord = v.object(zodToConvexFields(Validators.BoxRecord.shape))
+
+/** A box's sparse shape, as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. The core's `BoxSparse`. */
+export const BoxSparse = v.object(zodToConvexFields(Validators.BoxSparse.shape))
+
+/** A vault as one query or mutation reads it: its vault record, as `vault`, and every box without its two ciphered fields, in boxlabel order.
+ * The client splits the boxes into the sound and the damaged, with `splitStoredBoxes`: the
+ * component holds no judgment of a box's damage, which is safebyok's.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: null, vault_key_epoch: vaultProps.vault_key_epoch } // a box that was not there
+ * @example { vault: vaultRecord, boxes: [boxSparse] }
  */
-export const LockboxExpectation = v.object({
-  vault_id:        v.string(),
-  revision_tok:    v.nullable(v.string()),
-  vault_key_epoch: v.number(),
+export const VaultAnswer = v.object({
+  vault: VaultRecord,
+  boxes: v.array(BoxSparse),
 })
 
-/**
- * What a retire was meant for: the vault it lands in. A retire lands only while the scope's
- * vault props have this `vault_id`, whatever revision any lockbox stands at -- so a stale session
- * never retires anything from a vault made anew elsewhere.
+/** What an update of the vault record was proven against: it lands only while the stored vault record has this `vault_tok` and `gate_epoch`. The core's `VaultRecordExpectation`.
  *
- * @example { vault_id: vaultProps.vault_id }
+ * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
  */
-export const RetireExpectation = v.object({
-  vault_id: v.string(),
-})
+export const VaultRecordExpectation = zodToConvex(Validators.VaultRecordExpectation)
 
-/**
- * One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`. Convex has no
- * fixed-length tuple validator, so any list of strings passes: the component makes these, and a
- * client only compares one signature with the next.
+/** What a box read means to read in: the box is read only while the scope's vault record has this `vault_tok`. The core's `BoxGetExpectation`.
+ * So a reader holding the key of one vault is never handed a box of another life of the scope.
+ *
+ * @example { vault_tok: vaultRecord.vault_tok }
+ */
+export const BoxGetExpectation = zodToConvex(Validators.BoxGetExpectation)
+
+/** What a box write was sealed for and read: the vault record it lands beside, and the box it replaces. The core's `BoxExpectation`.
+ * It lands only while the scope's vault record has this `vault_tok`, and the stored box this
+ * `revision_tok`, or, for null, there is no box.
+ *
+ * @example { vault_tok: vaultRecord.vault_tok, revision_tok: null } // a box that was not there
+ */
+export const BoxExpectation = zodToConvex(Validators.BoxExpectation)
+
+/** How full a vault is, from its tally: its boxes, and their bytes as Convex counts a document, against the component's limits. The core's `Capacity`.
+ * Each `max` is a number or `Infinity`, as the core takes it; the component's own limits are finite.
+ *
+ * @example { boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } }
+ */
+export const Capacity = zodToConvex(Validators.Capacity)
+
+/** What a box read answers, from its one query's snapshot: `read`, with the box, or the refusal that read nothing.
+ * A read carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
+ * `vault_mismatch`, when the scope's vault record is not the one expected, or none is stored, carries
+ * nothing of it.
+ *
+ * @example { read: true, box_stored: stored }
+ * @example { read: false, refusalkind: 'vault_mismatch' }
+ */
+export const GetBoxAnswer = v.union(
+  v.object({ read: v.literal(true), box_stored: v.nullable(BoxRecord) }),
+  v.object({ read: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+)
+
+/** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.
+ * A write that landed carries the box as stored. `stale_write` carries the box stored under the
+ * boxlabel as a read returns it (`box_stored`, whole; null for none). `vault_mismatch`, when the
+ * scope's vault record is not the one the box was sealed for, carries nothing of it.
+ * `vault_full`, for a write the vault has no room for, carries its {@link Capacity} as it found it.
+ *
+ * @example { landed: true, box_stored: stored }
+ * @example { landed: false, refusalkind: 'stale_write', box_stored: winner }
+ * @example { landed: false, refusalkind: 'vault_mismatch' }
+ * @example { landed: false, refusalkind: 'vault_full', capacity }
+ */
+export const PutBoxAnswer = v.union(
+  v.object({ landed: v.literal(true), box_stored: BoxRecord }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('stale_write'), box_stored: v.nullable(BoxRecord) }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
+)
+
+/** What an update of the vault record answers, from its one transaction: `landed` with the vault record as stored, or the stored vault record that it did not land over.
+ * A landed update carries it as stored, its `vault_epoch` moved up by one (`vault_stored`).
+ * A miss carries what is stored as a read returns it (`vault_stored`; null for none).
+ *
+ * @example { landed: true, vault_stored: stored }
+ * @example { landed: false, vault_stored: winner }
+ */
+export const PutVaultRecordAnswer = v.union(
+  v.object({ landed: v.literal(true), vault_stored: VaultRecord }),
+  v.object({ landed: v.literal(false), vault_stored: v.nullable(VaultRecord) }),
+)
+
+/** What a vault delete was meant for: it lands only while the scope's vault record has this `vault_tok` and `gate_epoch`. The core's `VaultDelExpectation`.
+ * So a stale session never deletes a vault made anew elsewhere, nor one whose gate has changed.
+ * A null `gate_epoch` is for deleting a vault whose record is damaged, and expects the `vault_tok` alone.
+ *
+ * @example { vault_tok: vaultRecord.vault_tok, gate_epoch: vaultRecord.gate_epoch }
+ */
+export const VaultDelExpectation = zodToConvex(Validators.VaultDelExpectation)
+
+/** What a deleted vault leaves in its scope: its counter, which the next vault made there carries on. The core's `VaultTombstone`.
+ *
+ * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
+ */
+export const VaultTombstone = zodToConvex(Validators.VaultTombstone)
+
+/** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none. The core's `BoxDelExpectation`.
+ * It lands only while the scope's vault record has this `vault_tok`, whatever revision is stored, so a
+ * stale session never deletes from a vault made anew elsewhere. The revision only says whether
+ * what it removed was the one meant, as a {@link BoxDeletion}.
+ *
+ * @example { vault_tok: vaultRecord.vault_tok, revision_tok: listed.revision_tok }
+ */
+export const BoxDelExpectation = zodToConvex(Validators.BoxDelExpectation)
+
+/** What a box delete that landed removed: `deleted`, the revision it named; `deleted_other`, another; `absent`, nothing. The core's `BoxDeletion`.
+ * Another is a box written over meanwhile, or one where it named none.
+ *
+ * @example { outcome: 'deleted' }
+ */
+export const BoxDeletion = zodToConvex(Validators.BoxDeletion)
+
+/** One box's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`.
+ * Convex has no fixed-length tuple validator, so any list of strings passes: a client only
+ * compares one signature with the next.
  */
 const BoxRevision = v.array(v.string())
 
-/**
- * The vault's change signature: its vault props' `vault_id` and `unlock_epoch` (null while it has
- * no vault props) and each lockbox's `[boxlabel, revision_tok]`, in boxlabel order. It changes
- * exactly when a write lands in the vault, and holds nothing a listing does not already show.
+/** The vault's change signature: it changes exactly when a write lands in the vault, and holds nothing a listing does not show.
+ * It is the vault record's `vault_tok` and `gate_epoch`, null while there is none, and each box's
+ * `[boxlabel, revision_tok]`, in boxlabel order.
  *
- * @example { vault_id: 'b3f1...', unlock_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
+ * @example { vault_tok: 'b3f1...', gate_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
  */
 export const VaultSignature = v.object({
-  vault_id:         v.nullable(v.string()),
-  unlock_epoch:     v.nullable(v.number()),
+  vault_tok:        v.nullable(v.string()),
+  gate_epoch:       v.nullable(v.number()),
   boxes:            v.array(BoxRevision),
 })

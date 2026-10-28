@@ -1,8 +1,6 @@
-/**
- * safebyok-indexeddb: safebyok's storage in this browser's IndexedDB. {@link idbVaultDB} is the
- * VaultDB for an app with no backend, every verb one IndexedDB transaction; {@link
- * inspectIdbVaultDB} shows the rows it keeps, raw. It is also the template for a key-value
- * backend of your own: the README says what to copy and where to type.
+/** safebyok-indexeddb: safebyok's storage in this browser's IndexedDB, for an app with no backend.
+ * {@link idbVaultDB} makes the VaultDB, and {@link inspectIdbVaultDB} shows the rows it keeps, raw.
+ * It is also the template for a key-value backend of your own: the README says what to copy.
  */
 export { idbVaultDB } from './idb-vault-db'
 export type { IdbVaultDBOpts } from './idb-opts'

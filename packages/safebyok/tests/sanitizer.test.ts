@@ -13,14 +13,14 @@ describe("Sanitizer.refusalFor", () => {
   it("is a VaultError of the kind and message asked for", () => {
     const refusal = Sanitizer.refusalFor(quotingError(), 'storage_unavailable', 'Storage failed: try again shortly.')
     expect(refusal).to.be.instanceOf(VaultError)
-    expect(refusal.kind).to.eq('storage_unavailable')
+    expect(refusal.refusalkind).to.eq('storage_unavailable')
     expect(refusal.message).to.eq('Storage failed: try again shortly.')
   })
 
   it("carries nothing of the foreign error: no cause, no property, no text of it", () => {
     const refusal = Sanitizer.refusalFor(quotingError(), 'bad_option', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
-    expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'kind'])
+    expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'refusalkind', 'family'])
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
@@ -32,14 +32,14 @@ describe("Sanitizer.refusalFor", () => {
 
   it("stands in for a storage client's failure, as its example throws it", async () => {
     const client = { mutation: () => Promise.reject(quotingError()) }
-    const updateBox = async () => {
+    const putBox = async () => {
       try {
         return await client.mutation()
       } catch (err) {
         throw Sanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
       }
     }
-    const refusal = await TH.expectRefusal(updateBox(), 'storage_unavailable')
+    const refusal = await TH.expectRefusal(putBox(), 'storage_unavailable')
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 })

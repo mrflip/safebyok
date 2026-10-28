@@ -4,11 +4,22 @@
   "remoteUser": "node",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspace,type=bind",
+  // The databases beside the container (services.yaml): started on the host before it, at every
+  // start, and waited on until healthy; the container joins their network.
+  "initializeCommand": "docker compose -f ${localWorkspaceFolder}/.devcontainer/services.yaml -p ${localWorkspaceFolderBasename}-services up -d --wait",
+  "runArgs": ["--network=${localWorkspaceFolderBasename}-services_default"],
   "mounts": [
     "source=byok-${devcontainerId}-claude,target=/home/node/.claude,type=volume",
     "source=byok-${devcontainerId}-node_modules,target=/workspace/${localWorkspaceFolderBasename}/node_modules,type=volume"
+    // , "source=${localWorkspaceFolderBasename}-services_convex-key,target=/run/convex,type=volume,readonly"
   ],
-  "containerEnv": { "CLAUDE_CONFIG_DIR": "/home/node/.claude" },
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "SAFEBYOK_PG_URL": "postgres://postgres@postgres:5432/postgres"
+    // , "SAFEBYOK_MYSQL_URL": "mysql://root@mysql:3306/mysql"
+    // , "CONVEX_SELF_HOSTED_URL": "http://convex:3210"
+    // , "SAFEBYOK_CONVEX_ADMIN_KEY_FILE": "/run/convex/admin_key"
+  },
   "customizations": { "vscode": { "extensions": ["anthropic.claude-code"] } },
   "postCreateCommand": "pnpm install"
 }

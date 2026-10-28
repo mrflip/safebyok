@@ -14,7 +14,7 @@ export default defineConfig({
   // are a list so that `root` is honoured: given an object, tsdown takes the package's own directory
   // as the root and writes the modules under dist/src/. The testing entry builds from tests/, outside
   // `src`, so it is named in an object beside the list.
-  entry:      ['src/index.ts', 'src/idb.ts', 'src/browser.ts', 'src/utils.ts', 'src/validators.ts', { testing: 'tests/test-helpers.ts' }],
+  entry:      ['src/index.ts', 'src/idb.ts', 'src/browser.ts', 'src/utils.ts', { testing: 'tests/test-helpers.ts' }],
   format:     ['esm', 'cjs'],
   // Browser first, but nothing here is browser-only: WebCrypto is the same global under Node.
   platform:   'neutral',

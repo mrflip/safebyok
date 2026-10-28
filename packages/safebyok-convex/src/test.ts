@@ -10,19 +10,16 @@ export const modules = import.meta.glob('./component/**/*.ts')
 
 export { default as schema } from './component/schema'
 
-/**
- * Install the safebyok component into a `convex-test` instance, so the host's own functions --
- * the ones `SafebyokComponent.api` made -- can be tested against it, in memory.
+/** Install the safebyok component into a `convex-test` instance, to test the host's own functions against it in memory.
  *
  * @param testRoot - The test instance, from `convexTest(...)` or `defineTestApp(...).createTest()`.
- * @param componentPath - The name the host installs the component under: `safebyok` unless it
- *   passed another to `app.use`.
+ * @param componentPath - The name the host passed `app.use`, if not `safebyok`.
  * @returns The component's functions as the host references them, `components.safebyok`.
  *
  * @example
  *   const CVX = convexTest(schema, modules)
  *   register(CVX)
- *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getVaultProps, { scope })
+ *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getVault, { ...scope })
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })

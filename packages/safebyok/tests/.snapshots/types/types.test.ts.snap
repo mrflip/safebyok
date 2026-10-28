@@ -1,0 +1,884 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Stored record formats > safebyok-box-v8 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "box_key_wrapped": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "boxlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-box-v8",
+        "type": "string",
+      },
+      "registered_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "revision_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "sidecar": {},
+      "whisper_ciphered": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "whisper_codec": {
+        "const": "json_v1",
+        "type": "string",
+      },
+      "whisper_schema_version": {
+        "const": 1,
+        "type": "number",
+      },
+      "written_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+    },
+    "required": [
+      "format",
+      "boxlabel",
+      "revision_tok",
+      "box_key_wrapped",
+      "whisper_ciphered",
+      "whisper_codec",
+      "whisper_schema_version",
+      "sidecar",
+      "registered_at",
+      "written_at",
+    ],
+    "type": "object",
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "box_key_wrapped": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "boxlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-box-v8",
+        "type": "string",
+      },
+      "registered_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "revision_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "sidecar": {},
+      "whisper_ciphered": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "whisper_codec": {
+        "const": "json_v1",
+        "type": "string",
+      },
+      "whisper_schema_version": {
+        "const": 1,
+        "type": "number",
+      },
+      "written_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+    },
+    "required": [
+      "format",
+      "boxlabel",
+      "revision_tok",
+      "box_key_wrapped",
+      "whisper_ciphered",
+      "whisper_codec",
+      "whisper_schema_version",
+      "sidecar",
+      "registered_at",
+      "written_at",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`Stored record formats > safebyok-device-v1 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "device_id": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-device-v1",
+        "type": "string",
+      },
+      "highest_vault_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "readOnly": true,
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "device_id",
+      "highest_vault_epoch",
+    ],
+    "type": "object",
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "device_id": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-device-v1",
+        "type": "string",
+      },
+      "highest_vault_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "readOnly": true,
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "device_id",
+      "highest_vault_epoch",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`Stored record formats > safebyok-lease-v1 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "ask_passphrase_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "format": {
+        "const": "safebyok-lease-v1",
+        "type": "string",
+      },
+      "gate_epoch": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer",
+      },
+      "lease_key": {},
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_key_lease_wrapped": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "vault_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "vault_tok",
+      "gate_epoch",
+      "lease_key",
+      "vault_key_lease_wrapped",
+      "ask_passphrase_at",
+    ],
+    "type": "object",
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "ask_passphrase_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "format": {
+        "const": "safebyok-lease-v1",
+        "type": "string",
+      },
+      "gate_epoch": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer",
+      },
+      "lease_key": {},
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_key_lease_wrapped": {
+        "additionalProperties": false,
+        "properties": {
+          "cipher_iv_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "ciphertext_b64": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "cipher_iv_b64",
+          "ciphertext_b64",
+        ],
+        "type": "object",
+      },
+      "vault_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "vault_tok",
+      "gate_epoch",
+      "lease_key",
+      "vault_key_lease_wrapped",
+      "ask_passphrase_at",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`Stored record formats > safebyok-tombstone-v1 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-tombstone-v1",
+        "type": "string",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_epoch": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "format",
+      "vault_epoch",
+    ],
+    "type": "object",
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-tombstone-v1",
+        "type": "string",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_epoch": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "format",
+      "vault_epoch",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`Stored record formats > safebyok-vault-v6 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-vault-v6",
+        "type": "string",
+      },
+      "gate": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "passkey": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "credential_id": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "device_id": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "prf_salt_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "registered_at": {
+                        "maximum": 9007199254740,
+                        "minimum": 347155200000,
+                        "type": "integer",
+                      },
+                      "vault_key_wayin_wrapped": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cipher_iv_b64": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "ciphertext_b64": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "cipher_iv_b64",
+                          "ciphertext_b64",
+                        ],
+                        "type": "object",
+                      },
+                      "wayinkind": {
+                        "const": "passkey",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "wayinkind",
+                      "credential_id",
+                      "prf_salt_b64",
+                      "device_id",
+                      "registered_at",
+                      "vault_key_wayin_wrapped",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "passphrase": {
+                "additionalProperties": false,
+                "properties": {
+                  "device_id": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "key_deriver_label": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "registered_at": {
+                    "maximum": 9007199254740,
+                    "minimum": 347155200000,
+                    "type": "integer",
+                  },
+                  "salt_b64": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "vault_key_wayin_wrapped": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cipher_iv_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "ciphertext_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "cipher_iv_b64",
+                      "ciphertext_b64",
+                    ],
+                    "type": "object",
+                  },
+                  "wayinkind": {
+                    "const": "passphrase",
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "wayinkind",
+                  "key_deriver_label",
+                  "salt_b64",
+                  "device_id",
+                  "registered_at",
+                  "vault_key_wayin_wrapped",
+                ],
+                "type": "object",
+              },
+            },
+            "required": [
+              "passphrase",
+              "passkey",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "gate_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "registered_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "vault_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "vault_tok",
+      "registered_at",
+      "vault_epoch",
+      "gate_epoch",
+      "gate",
+    ],
+    "type": "object",
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "applabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+      "format": {
+        "const": "safebyok-vault-v6",
+        "type": "string",
+      },
+      "gate": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "passkey": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "credential_id": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "device_id": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "prf_salt_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "registered_at": {
+                        "maximum": 9007199254740,
+                        "minimum": 347155200000,
+                        "type": "integer",
+                      },
+                      "vault_key_wayin_wrapped": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cipher_iv_b64": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "ciphertext_b64": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "cipher_iv_b64",
+                          "ciphertext_b64",
+                        ],
+                        "type": "object",
+                      },
+                      "wayinkind": {
+                        "const": "passkey",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "wayinkind",
+                      "credential_id",
+                      "prf_salt_b64",
+                      "device_id",
+                      "registered_at",
+                      "vault_key_wayin_wrapped",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "passphrase": {
+                "additionalProperties": false,
+                "properties": {
+                  "device_id": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "key_deriver_label": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "registered_at": {
+                    "maximum": 9007199254740,
+                    "minimum": 347155200000,
+                    "type": "integer",
+                  },
+                  "salt_b64": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "vault_key_wayin_wrapped": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cipher_iv_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "ciphertext_b64": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "cipher_iv_b64",
+                      "ciphertext_b64",
+                    ],
+                    "type": "object",
+                  },
+                  "wayinkind": {
+                    "const": "passphrase",
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "wayinkind",
+                  "key_deriver_label",
+                  "salt_b64",
+                  "device_id",
+                  "registered_at",
+                  "vault_key_wayin_wrapped",
+                ],
+                "type": "object",
+              },
+            },
+            "required": [
+              "passphrase",
+              "passkey",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "gate_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "registered_at": {
+        "maximum": 9007199254740,
+        "minimum": 347155200000,
+        "type": "integer",
+      },
+      "user_id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+|%-]+$",
+        "type": "string",
+      },
+      "vault_epoch": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "vault_tok": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "vaultlabel": {
+        "maxLength": 40,
+        "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "format",
+      "applabel",
+      "user_id",
+      "vaultlabel",
+      "vault_tok",
+      "registered_at",
+      "vault_epoch",
+      "gate_epoch",
+      "gate",
+    ],
+    "type": "object",
+  },
+}
+`;

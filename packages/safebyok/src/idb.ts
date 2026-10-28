@@ -1,7 +1,7 @@
-import { createStore, del, delMany, entries, get, keys, promisifyRequest, clear, update, type UseStore } from 'idb-keyval'
-import { DeviceMark, Lease } from './types'
-import * as Ckeys from './ckeys'
-import { keepingLocks, lockGenerationOf, lockedMeanwhile, type DeviceDB } from './device-db'
+import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
+import type { DeviceRecord, LeaseRecord } from './types/types'
+import * as Scopepath from './scopepath'
+import { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
@@ -9,18 +9,13 @@ import * as ChangeBell from './change-bell'
 export type { IdbOpts } from './idb-opts'
 export * as ChangeBell from './change-bell'
 
-/**
- * The device store over this browser's IndexedDB (through `idb-keyval`), as an entry point of its
- * own, `safebyok/idb`: device storage is exactly what IndexedDB is, and the only browser storage
- * that can hold a non-extractable leaseKey. Where a vault itself lives is a backend choice,
- * not a fact about the device, so the IndexedDB vault store is a package of its own,
- * `safebyok-indexeddb`.
+/** `safebyok/idb`: the device store over this browser's IndexedDB, the only browser storage that can keep a non-extractable leaseKey.
+ * Importing it is safe anywhere: it touches IndexedDB only when the store is used. It loads
+ * `idb-keyval`, about 600 bytes. It also exports {@link ChangeBell}, which its writes ring. The
+ * IndexedDB vault store is a package of its own, `safebyok-indexeddb`.
  *
- * This entry point touches IndexedDB only when the store is used, so importing it is safe
- * anywhere; the store itself needs a browser (or anything else with `indexedDB`). It reaches
- * IndexedDB through `idb-keyval`, a regular dependency of about 600 bytes that only this entry
- * point loads. Beside the device store, it exports the change bell its writes ring,
- * {@link ChangeBell}, which `safebyok-indexeddb` rings too.
+ * Each maker refuses 'bad_option' for a `dbName` that is not non-empty text, or an option it does
+ * not take.
  */
 
 // One UseStore per dbName, shared by stores and inspectors alike: idb-keyval opens the
@@ -37,11 +32,7 @@ const shelfStore = (dbName: string): UseStore => {
   return fresh
 }
 
-/**
- * The refusal of a context with no IndexedDB, named as a browser names a storage it does not
- * offer: a `NotSupportedError` DOMException, or, in a runtime with no DOMException either (React
- * Native's Hermes, say), a plain Error of that name.
- */
+/** The error for a context with no IndexedDB: a `NotSupportedError` DOMException, or a plain Error of that name where there is no DOMException. */
 const noIndexedDB = (): Error => {
   const message = 'This context offers no IndexedDB, so the device store has nowhere to keep its records.'
   if (typeof DOMException === 'function') { return new DOMException(message, 'NotSupportedError') }
@@ -57,124 +48,108 @@ class NotSupportedError extends Error {
 // shared with every other tab, and with any other version of this package running in one.
 const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
-/**
- * DeviceDB over this browser's IndexedDB: the real device storage. IndexedDB keeps the
- * {@link Lease} record by structured clone, which is the only way a browser persists the
- * non-extractable leaseKey -- as a handle, never as bytes. Device marks share its shelf.
- *
- * A record that will not read back (damaged, or written by another version) reads as "no
- * lease", or no device mark, and is discarded: losing the convenience is the safe failure. A row
- * filed under an earlier version's ckey is deleted unread at the next read or erase of a lease.
- * Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name holding one is
- * refused with kind 'bad_label'. Kind 'bad_option' for a `dbName` that is not non-empty text.
- *
- * Its failures are IndexedDB's own errors, which a vault says as conditions: one the browser gives
- * for storage withheld or full (a `SecurityError`, a `QuotaExceededError`) as 'storage_blocked',
- * and so a context with no IndexedDB at all, which this store refuses with a `NotSupportedError`
- * at its first use; any other as 'storage_unavailable'.
+/** A {@link DeviceDB} over this browser's IndexedDB, keeping the leaseKey as a handle by structured clone, never as bytes.
+ * Each write rings its change bell, in this tab and every other. A row under any scopepath but a
+ * lease's or a device record's, an earlier version's among them, is deleted unread at the next
+ * read or erase of a lease. A context with no IndexedDB meets 'storage_blocked' at first use.
  *
  * @example
  *   const deviceDB = idbDeviceDB()
- *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
+ *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
  */
-export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
-  const dbName = parseDbName(opts, 'idbDeviceDB')
-  const shelf = () => shelfStore(dbName)
-  const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
+export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => new IdbDeviceDB(parseDbName(opts, 'idbDeviceDB'))
 
-  // A row under any ckey but a lease's or a mark's is one an earlier version filed (`unlock^…`
-  // before the lease, `["unlock","acme","u1","main"]` before the joined ckeys), which nothing else
-  // would ever reach, expire or erase. It is deleted unread, so an old record never outlives the
-  // lock that should revoke it.
-  const sweepStrays = async () => {
-    const ckeys = await keys(shelf())
-    const strays = ckeys.filter((ckey) => ! Ckeys.isLease(ckey) && ! Ckeys.isMark(ckey))
-    if (strays.length === 0) { return }
-    await delMany(strays, shelf())
-    ring()
+/** The DeviceDB {@link idbDeviceDB} makes, over the shelf of `dbName`: each `do*` method one IndexedDB transaction, or two side by side. */
+class IdbDeviceDB extends DeviceDB {
+  /** The database whose shelf holds the rows. */
+  readonly #dbName: string
+
+  constructor(dbName: string) {
+    super()
+    this.#dbName = dbName
   }
 
-  return {
-    readLease: async (scope) => {
-      await sweepStrays()
-      const raw: unknown = await get(Ckeys.lease(scope), shelf())
-      if (raw === undefined || raw === null) { return null }
-      const checked = Lease.safeParse(raw)
-      if (! checked.success) {
-        await del(Ckeys.lease(scope), shelf())
-        ring()
-        return null
-      }
-      return checked.data
-    },
+  protected async doGetLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<unknown> {
+    // The read is asked for first, so it lands where this call was made among the scope's other
+    // calls; the sweep of stray rows goes beside it, after.
+    const [raw] = await Promise.all([get<unknown>(leaseScopepath, this.#shelf()), this.#sweepStrays()])
+    return raw
+  }
 
-    // The mark is read and the lease written in one transaction: a lock's raise of the mark lands
-    // wholly before it or wholly after.
-    writeLease: async (lease, expected) => {
-      const written = await shelf()('readwrite', async (records) => {
-        const kept: unknown = await promisifyRequest(records.get(Ckeys.mark(lease)))
-        if (lockGenerationOf(kept) !== expected.lock_generation) { return false }
-        records.put(lease, Ckeys.lease(lease))
-        await promisifyRequest(records.transaction)
-        return true
+  protected async doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: LeaseRecord): Promise<void> {
+    await set(leaseScopepath, record, this.#shelf())
+    this.#ring()
+  }
+
+  // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
+  protected async doDelLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<void> {
+    await del(leaseScopepath, this.#shelf())
+    this.#ring()
+    await this.#sweepStrays()
+  }
+
+  protected async doGetDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath): Promise<unknown> {
+    return await get<unknown>(deviceScopepath, this.#shelf())
+  }
+
+  // Read and written in one transaction, so two tabs raising at once never lower each other's.
+  protected async doRaiseDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, raisedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
+    await update<unknown>(deviceScopepath, raisedFrom, this.#shelf())
+    this.#ring()
+  }
+
+  protected async doDelDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath): Promise<void> {
+    await del(deviceScopepath, this.#shelf())
+    this.#ring()
+  }
+
+  // The shelf holds leases and device records and nothing else, so erasing them all
+  // is clearing it: any row an earlier version filed under another ckey goes too.
+  protected async doDelAll(): Promise<void> {
+    await clear(this.#shelf())
+    this.#ring()
+  }
+
+  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean): Promise<void> {
+    await this.#shelf()('readwrite', (objects) => (
+      new Promise<void>((resolve, reject) => {
+        const reading = objects.get(scopepath)
+        reading.addEventListener('error', () => { reject(reading.error ?? new Error('IndexedDB could not read a row it found unreadable.')) })
+        reading.addEventListener('success', () => {
+          if (! isReadable(reading.result)) { objects.delete(scopepath) }
+          resolve()
+        })
       })
-      if (! written) { throw lockedMeanwhile() }
-      ring()
-    },
+    ))
+    this.#ring()
+  }
 
-    // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
-    eraseLease: async (scope) => {
-      await del(Ckeys.lease(scope), shelf())
-      ring()
-      await sweepStrays()
-    },
+  #shelf(): UseStore { return shelfStore(this.#dbName) }
 
-    readMark: async (scope) => {
-      const raw: unknown = await get(Ckeys.mark(scope), shelf())
-      if (raw === undefined || raw === null) { return null }
-      const checked = DeviceMark.safeParse(raw)
-      if (! checked.success) {
-        await del(Ckeys.mark(scope), shelf())
-        ring()
-        return null
-      }
-      return checked.data
-    },
+  #ring() { ChangeBell.ring(bellnameOf(this.#dbName)) }
 
-    writeMark: async (mark) => {
-      await update(Ckeys.mark(mark), (kept: unknown) => keepingLocks(mark, kept), shelf())
-      ring()
-    },
-
-    eraseMark: async (scope) => {
-      await del(Ckeys.mark(scope), shelf())
-      ring()
-    },
-
-    // The shelf holds leases and device marks and nothing else, so erasing them all
-    // is clearing it: any row an earlier version filed under another ckey goes too.
-    eraseAll: async () => {
-      await clear(shelf())
-      ring()
-    },
+  // A row under any scopepath but a lease's or a device record's is one this version did not file:
+  // an earlier version's (`unlock^…` before the lease, `mark^…` before the device record,
+  // `["unlock","acme","u1","main"]` before the joined scopepaths), or one under a name no scope
+  // check passes. Nothing else would ever reach, expire or erase it. It is deleted unread, so an
+  // old record never outlives the lock that should revoke it.
+  async #sweepStrays() {
+    const ckeys = await keys(this.#shelf())
+    const strays = ckeys.filter((ckey) => ! Scopepath.isLease(ckey) && ! Scopepath.isDevice(ckey))
+    if (strays.length === 0) { return }
+    await delMany(strays, this.#shelf())
+    this.#ring()
   }
 }
 
-/** One stored row, as {@link inspectIdbDeviceDB} reports it: its ckey and the raw stored value. */
-export type IdbRow = { ckey: string, row: unknown }
+/** One stored row, as {@link inspectIdbDeviceDB} reports it: its scopepath and the raw stored value. */
+export type IdbRow = { scopepath: string, row: unknown }
 
-/**
- * A window onto the rows {@link idbDeviceDB} keeps, for inspectors and debug panels: the raw
- * rows, a change bell, and a wipe. This is how the demo shows what this device remembers without
- * asking the vault's opinion -- what it reports is what is actually stored. The vault store's
- * own rows have their window beside it, `inspectIdbVaultDB` from `safebyok-indexeddb`.
- *
- * @param opts - The database to look at: `dbName`, default 'safebyok'.
- * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, and from
- *   its `subscribe`, for a listener that is not a function. Its `rows()` and `wipe()` reject in a
- *   context with no IndexedDB, as the device store does, with a `NotSupportedError`.
+/** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
+ * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. Unlike the store, its `rows()`
+ * and `wipe()` reject, with a `NotSupportedError` where there is no IndexedDB.
  *
  * @example
  *   const inspector = inspectIdbDeviceDB({ dbName: 'acme' })
@@ -184,20 +159,20 @@ export type IdbRow = { ckey: string, row: unknown }
 export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
   const dbName = parseDbName(opts, 'inspectIdbDeviceDB')
   return {
-    /** Every stored row on the shelf, sorted by ckey. */
+    /** Every stored row on the shelf, sorted by scopepath. */
     rows: async (): Promise<IdbRow[]> => {
       const stored = await entries(shelfStore(dbName))
       return stored
         .filter((pair): pair is [string, unknown] => typeof pair[0] === 'string')
-        .map(([ckey, row]) => ({ ckey, row }))
-        .toSorted((one, two) => one.ckey.localeCompare(two.ckey))
+        .map(([scopepath, row]) => ({ scopepath, row }))
+        .toSorted((one, two) => one.scopepath.localeCompare(two.scopepath))
     },
-    /** Calls `listener` after any write to the shelf, this tab or another; returns the unsubscribe. */
+    /** Call `listener` after any write to the shelf, in this tab or another, returning the unsubscribe. Throws 'bad_option' for a `listener` that is no function. */
     subscribe: (listener: () => void): (() => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
-    /** Remove every row on the shelf: every lease and device mark in this database. */
+    /** Erase every row on the shelf: every lease and device record in this database. */
     wipe: async (): Promise<void> => {
       await clear(shelfStore(dbName))
       ChangeBell.ring(bellnameOf(dbName))

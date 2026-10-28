@@ -7,29 +7,29 @@ import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'
 import * as TH from './test-helpers'
 
 describe("inspectIdbVaultDB", () => {
-  it("shows the raw rows sorted by ckey, hears writes, and wipes the shelf clean", async () => {
+  it("shows the raw rows sorted by scopepath, hears writes, and wipes the shelf clean", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     const inspector = inspectIdbVaultDB({ dbName })
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
-    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })
+    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     const rows = await inspector.rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
-    await vi.waitFor(() => { expect(heardCount).to.eq(2) })
+    expect(rows.map((row) => row.scopepath)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
+    await vi.waitFor(() => { expect(heardCount).to.eq(3) })
 
     await inspector.wipe()
     expect(await inspector.rows()).to.have.lengthOf(0)
-    expect(await vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
-    await vi.waitFor(() => { expect(heardCount).to.eq(3) })
+    expect(await TH.vaultRecordIn(vaultDB, TH.scopeOf('u1'))).to.be.null
+    await vi.waitFor(() => { expect(heardCount).to.eq(4) })
     unsubscribe()
   })
 
   it("meets trouble from IndexedDB as an Error, never a null, as the vault's own reads do", async () => {
     const dbName = TH.freshDbName()
-    await idbVaultDB({ dbName }).fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(idbVaultDB({ dbName }), TH.vaultRecordOf('u1'))
     const failing = vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementationOnce(function (this: IDBObjectStore) {
       const request = this.getAll()
       this.transaction.abort()
@@ -43,22 +43,22 @@ describe("inspectIdbVaultDB", () => {
   })
 
   it("looks at 'safebyok' given no options", async () => {
-    await idbVaultDB().fetchOrCreateVaultProps(TH.vaultPropsOf('inspected_u1'))
+    await TH.ensureGated(idbVaultDB(), TH.vaultRecordOf('inspected_u1'))
     const rows = await inspectIdbVaultDB().rows()
-    expect(rows.map((row) => row.ckey)).to.include('vault^acme^inspected_u1^main')
+    expect(rows.map((row) => row.scopepath)).to.include('vault^acme^inspected_u1^main')
   })
 
   it("refuses a dbName that is not non-empty text with kind 'bad_option'", () => {
     for (const dbName of ['', 42, null]) {
-      expect(() => inspectIdbVaultDB({ dbName } as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^inspectIdbVaultDB takes an optional dbName/).with.property('kind', 'bad_option')
+      expect(() => inspectIdbVaultDB({ dbName } as unknown as IdbVaultDBOpts)).to.throw(VaultError, /^inspectIdbVaultDB takes an optional dbName/).with.property('refusalkind', 'bad_option')
     }
   })
 
   it("refuses a listener that is not a function as it subscribes, so no later write meets it", async () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbVaultDB({ dbName })
-    expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/).with.property('kind', 'bad_option')
-    await idbVaultDB({ dbName }).fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/).with.property('refusalkind', 'bad_option')
+    await TH.ensureGated(idbVaultDB({ dbName }), TH.vaultRecordOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })

@@ -32,20 +32,22 @@ This repository is a pnpm workspace. Its packages:
 ### Backend (VaultDB)
 
 Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
-Holds vault​s and lockbox​es scoped by applabel, userId, vaultlabel and boxlabel.
-* A lockbox holds a sidecar under the app's control and an encrypted whisper​
-* verbs: vault: readVaultProps, fetchOrCreateVaultProps, updateVaultProps, retireVault, subscribe, listBoxes; lockbox: readBox, updateBox, retireBox.
+Holds vault​s and box​es scoped by applabel, user_id, vaultlabel and boxlabel.
+* A box holds a sidecar under the app's control and an encrypted whisper​
+* verbs: vault: getVault (record and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultRecord, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
 
 ### Browser
 
 * a vault​ object
-  - Vault.make({ applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver, ... })​: Vault, non-async
-  - vault.hello() (initial bookkeeping that doesn't bother the user)
-  - lock​, unlock​, changePassphrase​, readBox(boxlabel)​, storeBox(boxlabel, whisper, { sidecar? })​, retireBox(boxlabel)
+  - Bank.make({ applabel, user_id, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async, one per signed-in user
+  - bank.ensureVault({ vaultlabel }, { vaultDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
+  - vault.hello() (reads storage once its picture has aged; never asks the user)
+  - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
+  - a gating, handed to the app's requestCleartext, is the one place the user is asked for the passphrase or passkey
 * a pantry​ holding keys
-* a DeviceDB​ safely holding and managing access to the lockboxes (indexedDB)
+* a DeviceDB​ safely holding and managing access to the boxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)
 
-assume initially that the app provides and guarantees the userId, and that the vaultDB can access all and only the records needed to support this.
+assume initially that the app provides and guarantees the user_id, and that the vaultDB can access all and only the records needed to support this.
 the app interface is to call  non-async At the app level, whisper is anything JSONable.
 for concreteness of discussion, assume a postgres backing store,

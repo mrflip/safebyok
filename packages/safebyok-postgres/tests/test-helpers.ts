@@ -56,10 +56,51 @@ export const tablelessClient = (db: PGlite): PostgresClient => ({
   }),
 })
 
+/**
+ * The roles {@link roleClient} sends as, made once in this file's database. Each may keep its
+ * vault record and its tombstone (a vault's birth writes both) and read every box;
+ * `safebyok_reader` lacks the privilege to write a box, and `safebyok_viewer` holds it, but no
+ * row-level security policy lets it insert or change one.
+ */
+export type GuestRole = 'safebyok_reader' | 'safebyok_viewer'
+
+const GuestRolesSql = `DO $$ BEGIN
+    CREATE ROLE safebyok_reader NOLOGIN;
+    CREATE ROLE safebyok_viewer NOLOGIN;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END $$;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_vaults TO safebyok_reader, safebyok_viewer;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_vault_tombstones TO safebyok_reader, safebyok_viewer;
+  GRANT SELECT ON safebyok_boxes TO safebyok_reader;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON safebyok_boxes TO safebyok_viewer;
+  DROP POLICY IF EXISTS guests ON safebyok_vaults;
+  DROP POLICY IF EXISTS guests ON safebyok_vault_tombstones;
+  DROP POLICY IF EXISTS guests ON safebyok_boxes;
+  CREATE POLICY guests ON safebyok_vaults TO safebyok_reader, safebyok_viewer USING (true) WITH CHECK (true);
+  CREATE POLICY guests ON safebyok_vault_tombstones TO safebyok_reader, safebyok_viewer USING (true) WITH CHECK (true);
+  CREATE POLICY guests ON safebyok_boxes FOR SELECT TO safebyok_reader, safebyok_viewer USING (true);`
+
+/**
+ * A client over this file's database whose every statement runs as `role` (a {@link GuestRole}),
+ * in a transaction of its own, where the tables' owner runs every other: for the database
+ * refusing a call by its own rules, without booting a second PGlite.
+ *
+ * @example TH.roleClient(db, 'safebyok_reader')  // reads; a box write fails with 42501
+ */
+export const roleClient = async (db: PGlite, role: GuestRole): Promise<PostgresClient> => {
+  await db.exec(GuestRolesSql)
+  return {
+    query: (text, params) => db.transaction(async (tx) => {
+      await tx.exec(`SET LOCAL ROLE ${role}`)
+      return await tx.query(text, params)
+    }),
+  }
+}
+
 /** This file's database, its tables emptied. */
 export const emptyDatabase = async (): Promise<PGlite> => {
   const db = await database()
-  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_vaults')
+  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones')
   return db
 }
 
@@ -93,5 +134,5 @@ export const failingClient = (err: Error): PostgresClient => ({
   query: () => Promise.reject(err),
 })
 
-/** The postgresVaultDB a request for `userId` makes over `db`, listening there. */
-export const requestFor = (db: PGlite, userId: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, userId, listen: listenOn(db) })
+/** The postgresVaultDB a request for `user_id` makes over `db`, listening there. */
+export const requestFor = (db: PGlite, user_id: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, user_id, listen: listenOn(db) })

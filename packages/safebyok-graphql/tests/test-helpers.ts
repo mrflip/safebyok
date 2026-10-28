@@ -52,7 +52,7 @@ export const bootDatabaseFirst = (): void => {
 /** This file's database, its tables emptied. */
 export const emptyDatabase = async (): Promise<PGlite> => {
   const db = await database()
-  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_vaults')
+  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones')
   return db
 }
 
@@ -60,32 +60,32 @@ export const emptyDatabase = async (): Promise<PGlite> => {
 export const listenOn = (db: PGlite): PostgresListen => (channel, onNotify) => db.listen(channel, onNotify)
 
 /** What the test server's context holds for one request: the user its auth signed in, or null. */
-export type TestContext = { userId: string | null }
+export type TestContext = { user_id: string | null }
 
-/** The VaultDB a request for `userId` gets: safebyok-postgres's, over `db`, listening there. */
-export const requestFor = (db: PGlite, userId: string | null) => postgresVaultDB({ client: db, userId, listen: listenOn(db) })
+/** The VaultDB a request for `user_id` gets: safebyok-postgres's, over `db`, listening there. */
+export const requestFor = (db: PGlite, user_id: string | null) => postgresVaultDB({ client: db, user_id, listen: listenOn(db) })
 
 /**
  * The schema a GraphQL server makes of {@link VaultSchemaSdl} and {@link vaultResolvers}, as
  * Yoga and Apollo do (graphql-tools' makeExecutableSchema), each request's VaultDB made by
  * `vaultDBFor` -- by default, safebyok-postgres's over `db`, for the context's user.
  */
-export const schemaOver = (db: PGlite, vaultDBFor: (context: TestContext) => ServedVaultDB = ({ userId }) => requestFor(db, userId)): GraphQLSchema => (
+export const schemaOver = (db: PGlite, vaultDBFor: (context: TestContext) => ServedVaultDB = ({ user_id }) => requestFor(db, user_id)): GraphQLSchema => (
   makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDBFor }) })
 )
 
 /**
- * An urql Client signed in as `userId`, as a browser's would be, that runs each operation
+ * An urql Client signed in as `user_id`, as a browser's would be, that runs each operation
  * in-process against `schema`, its context that user's. It has urql's document cache in front,
  * as an app's Client usually does.
  */
-export const urqlClientFor = (schema: GraphQLSchema, userId: string | null): Client => new Client({
+export const urqlClientFor = (schema: GraphQLSchema, user_id: string | null): Client => new Client({
   url:       'https://app.example.test/api/graphql',
-  exchanges: [cacheExchange, executeExchange({ schema, context: { userId } satisfies TestContext })],
+  exchanges: [cacheExchange, executeExchange({ schema, context: { user_id } satisfies TestContext })],
 })
 
-/** The browser's VaultDB for `userId`: graphqlVaultDB over its own urql Client. */
-export const browserFor = (schema: GraphQLSchema, userId: string | null, vaultDBOpts: VaultDBOpts = {}): VaultDB => graphqlVaultDB({ ...vaultDBOpts, client: urqlClientFor(schema, userId) })
+/** The browser's VaultDB for `user_id`: graphqlVaultDB over its own urql Client. */
+export const browserFor = (schema: GraphQLSchema, user_id: string | null, vaultDBOpts: VaultDBOpts = {}): VaultDB => graphqlVaultDB({ ...vaultDBOpts, client: urqlClientFor(schema, user_id) })
 
 /** A PostgresClient whose every statement rejects with `err`, as a driver does when the database is down. */
 export const failingClient = (err: Error): PostgresClient => ({

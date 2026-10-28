@@ -1,7 +1,7 @@
 {
   "name": "safebyok-fastkey",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A WebAssembly key deriver for safebyok: Argon2id through hash-wasm, under the same keyDeriverSpecs and labels as the core's pure-JavaScript deriver, deriving the same bytes.",
   "keywords": [
     "safebyok",
@@ -54,7 +54,7 @@
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.2",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.4",
     "@vitest/eslint-plugin": "^1.6.27",
     "eslint": "^10.12.0",
     "eslint-import-resolver-typescript": "^4.4.5",
@@ -62,14 +62,14 @@
     "eslint-plugin-chai-friendly": "^1.2.1",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-sonarjs": "^4.2.2",
-    "eslint-plugin-unicorn": "^77.0.0",
+    "eslint-plugin-unicorn": "^78.0.0",
     "publint": "^0.3.25",
     "safebyok": "workspace:*",
     "tsdown": "^0.23.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.71.1",
-    "vitest": "^5.0.3",
-    "zod": "^4.6.5"
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.4",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "safebyok": "workspace:^"

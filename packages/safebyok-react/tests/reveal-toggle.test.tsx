@@ -9,7 +9,7 @@ const Revealed = () => {
 }
 
 describe("useRevealToggle", () => {
-  it("starts hidden, and the button flips the field's type, saying which way it stands", () => {
+  it("starts hidden, and the button flips the field's type, saying which way it is set", () => {
     render(<Revealed />)
     const field = screen.getByLabelText<HTMLInputElement>('secret')
     expect(field.type).to.eq('password')

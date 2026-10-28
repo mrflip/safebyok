@@ -53,11 +53,14 @@ A thread is cut:
 The Coach merges a sprint as **one linear line**: each PR rebased onto the one below it, every
 PR's base still `main`, so merging the top merges them all. Making that line is your job (§5).
 
-**Size budgets.** Stacked PRs that each raise the same `.size-limit.json` line conflict at every
-restack, so one thread raises them all. Run `pnpm size:budget` while planning and estimate what
-each thread adds. The *first* thread runs `pnpm size:budget --raise --add <entry>=<kB> ...` for
-the sprint's sum, guessed generously; a *late* thread runs `pnpm size:budget --write` once the
-sizes are known. The plan names those two threads; no other touches the file.
+**Size budgets.** Each thread keeps `.size-limit.json` in step with its own change. When what it
+built moves a line's measure far enough that the rule (PROCESS.md, *Size budgets*) gives that
+line another budget, up or down, the thread runs `pnpm size:budget --write` and commits the
+result with the change that moved it, its PR saying which lines moved and why. A thread that
+moves no line's budget leaves the file alone. The rule's round numbers keep most stacked threads
+off each other's lines; where two meet at a restack, rerun `pnpm size:budget --write` on the
+rebased branch rather than merge the digits by hand. Run `pnpm size:budget` while planning, and
+name in a thread's gloss any line it will likely move.
 
 **`<sprint_name>-progress.md`** -- yours alone: a curated summary of what the threads have taught,
 newer than the plan wherever they disagree, under about 3,000 words. You write each handoff from
@@ -70,11 +73,14 @@ the progress document, the resolutions, the sprint's `human/` entry -- so it nev
 a thread, and its commits never force a restack. It joins the line last, on top.
 
 **The sprint doc** is where the Coach watches, from any device. With the Claude Docs tools in the
-session, birth one doc named for the sprint, with three tabs: *Open Matters* and *Resolved*, which
-`/turbochat` sets up, and *Progress*: a lead linking the plan and the progress document on GitHub
+session, birth one doc named for the sprint, with four tabs: *Open Matters* and *Resolved*, which
+`/turbochat` sets up; *Progress*: a lead linking the plan and the progress document on GitHub
 (`https://github.com/mrflip/safebyok/blob/<branch>/<path>`), then one table row per thread,
-`Thread | Status | PR | Thread file | Review`, the thread file linked on the thread's branch.
-Give the Coach its link once in chat. Edit it cell by cell, as turbochat says, and never copy a
+`Thread | Status | PR | Thread file | Review`, the thread file linked on the thread's branch; and
+*Cleanup*, second in the tray: a one-line lead, then *Your calls*, a table `Matter | My call |
+Lands in`, and *Finally*, a checklist of what the sprint owes before it closes (§3).
+Give the Coach its link once in chat. Load the docs skill and guides and edit it cell by cell,
+as turbochat says; never copy a
 file into it: link the file, and push it. No Docs tools: say so in one line, keep the status in
 chat, and carry on.
 
@@ -153,8 +159,18 @@ finishes it.
    *Progress*. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never
    rolled up -- tagged with where it was raised (`#N`, thread N); say in chat why you left any
-   out. The full account is the thread file and the PR: don't paste a report into chat or the
-   doc.
+   out. Start the row with **TOP** when the matter blocks other work, changes a contract or a
+   lot of code, or is one the Coach would want first: with little time, they read those. The
+   full account is the thread file and the PR: don't paste a report into chat or the doc.
+
+   **What needs no decision goes to *Cleanup*, not *Open Matters*.** Unless it changes an
+   outcome, a matter of scheduling -- which thread does it, now or at the restack -- needs no
+   report: put it on *Finally*. So do a loosening a later thread tightens, a mostly harmless
+   leftover that later work clears away, and anything else that needs no decision but would need
+   attention if the sprint ended today. When the Coach answers a row "your call", or a row is one
+   they plainly would, the decision is yours: make it, move the row to *Your calls* with the call
+   and where it lands, and do it. Revisit what is already on *Cleanup* as rows come in, and tick
+   off what has landed.
 3. **Tend the documents.** Revise later threads' glosses where a thread's discoveries changed
    them. When a thread files, add a `*Review:*` line under its plan entry from the reviewer's
    report: what it fixed, and each finding it left, with its disposition. A worker may pull a
@@ -185,6 +201,10 @@ Default rules, absent other guidance:
 * **Resume** a `blocked` worker when you can supply what it lacks: an answer the plan or
   progress document already holds, or -- in YOLO -- a judgment call you can make and record. A
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
+* **A trivial fix to closed work** -- a lint error, a typo -- in what another thread built, after
+  its agent is done: hand it to the thread underway as a directive, to fix in its own branch,
+  or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of
+  its own, and no row.
 * **Pause the sprint** -- start no new threads, let those underway reach their next report and
   hold them there, update the status lines and *Progress*, write
   `human/YYYYMMDD-sprint_<name>_paused.md` in the sprint worktree saying exactly where things
