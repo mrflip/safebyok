@@ -71,3 +71,13 @@ flag cleared a task late at unmount. The Coach: ordinary React, nothing in the c
 * **For the Coach**:
   * **Suspense now waits as Activity does** (open on the PR): a dialog a Suspense boundary hides
     meets what settled once it shows again, not while hidden. Same outcome, later. Rec: keep.
+
+## Wrap-up pass
+
+Three small leftovers from the review, one commit each in `packages/safebyok-react` and the changeset:
+
+* The changeset now says a passkey touched while the dialog is hidden is *tried* once it shows again (the attempt itself waits), apart from the attempts, advice and lock landings whose outcome waits.
+* `inActivity`, defined identically in `passkey-unlock-button.test.tsx` and `passphrase-modal.test.tsx`, is now `TH.inActivity`, defined in the new `tests/test-helpers-react.tsx` (a `.ts` file cannot hold the JSX, and the linter refuses children passed as a prop to `createElement`), which `tests/test-helpers.ts` re-exports with `export *`, so callers keep one `TH`. At the Coach's word the package's `test-helpers.ts` kept its name and history; STYLE.md *Tests* says where a JSX helper goes.
+* The bare-root unmount test in `when-shown.test.tsx` asserts the button is there before it clicks, so it cannot pass vacuously.
+
+Left alone, bound for the todo file: `useAdvice`'s `creatingNow`, and the doc blocks.
