@@ -3,6 +3,15 @@
 What the threads have taught, newer than the plan where they disagree. Kept by the orchestrator;
 workers look things up here and never write it.
 
+## Cancelled, 2026-10-28
+
+The Coach cancelled this sprint after thread 2 (#340): "too many of the things in the todo point
+at" the consistency work. State at cancellation: thread 1 filed (#336, stacked on #334); thread 2
+filed (#340, stacked on #336), its three delBox tests still waiting on the watch; threads 2b, 3
+and 4 not started. What they were to do is carried by `gripeoween_vault-consistency.md` beside
+this file, and by the next sprint, `storeable_base` (its section 9). Thread 4's rulings (the
+horizon names, the salt and `credential_id` bounds, `#doEnsureUnlocked`) stand and move with it.
+
 ## Sprint doc
 
 https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk (doc `70a5671a-f1d2-452b-ab6b-96967076ed0d`).

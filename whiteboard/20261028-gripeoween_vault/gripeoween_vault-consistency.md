@@ -191,9 +191,14 @@ policy (ours as a package, or boilerplate for an agent to write), never the core
 ## 6. The box write, split (the orchestrator's position, 2026-10-28, for the Coach)
 
 * **One `putBox` becomes several verbs, each one scenario, no branches on what was left out.**
-  Today one method does a whole write over the listing's base with no read, or reads the box,
-  opens it and reseals when the sidecar or whisper is left out, and writes over a damaged box as
-  new in one of those paths and refuses in the other. Split, with names for the Coach to settle:
+  Today one method handles, by branching: whether the listing shows the box or not; whether a
+  read finds it or not; and for each of sidecar and whisper, given, left out, or known from the
+  read, three or so combinations each, multiplied; and writes over a damaged box as new in one of
+  those paths and refuses in the other (the Coach: "it's even worse than you describe"). The shape
+  wanted instead: a `doPutBox` that handles the write and nothing else; called by a
+  `sealAndPutBox` that captures its metadata from a timely best guess of the most recent sparse
+  box; and a timely-refresh primitive on the box itself, so "the freshest sparse box I may hold"
+  is one mechanism, not a branch per caller. Split, with names for the Coach to settle:
   `putBox(props, whisper)`, whole, both given, create or replace over the listed base, no read,
   allowed over a box listed damaged (a whole write vouches for everything it writes);
   `putSidecar(boxlabel, sidecar)`, reads the box, opens it (which proves the whisper and the old
@@ -245,3 +250,34 @@ breaks VAULTDB.md 2.1 lets the vault keep any of the four for the boxlist.
   2(f); whether to send it, or read on the ring, is thread 2b's.
 * A `served_at` from the server on each answer: cheap, good for display and debugging, kept out
   of the ordering path.
+
+## 9. The Storeable base class (the Coach, 2026-10-28: the next sprint, `storeable_base`)
+
+A client-side base class for a thing cached from storage, broken out of `vault.ts`, implementing:
+
+* a revision token and seq (section 4), and the single-thing and per-entry rules;
+* a lazy `oneAtATime` refresh, and a purposeful one that promises a read issued after the call
+  (lane 4);
+* a timed refresh trigger;
+* a subscription (lane 5);
+* a sparse listing (lane 3);
+* a snapshot, exposed as `useSyncExternalStore` wants it;
+* `#doGet`, `#doPut`, `#doDel` facades over the `VaultDB`, establishing the guarantees of
+  section 7 and nothing else;
+* a defined flow of steps within `.put`, `.get`, `.del` and `.ensure` that subclasses hook into
+  (a default no-op `doSealForWrite()` step, say): timeliness, lock check, base, seal, send, apply,
+  lock check, hand back (lane 6).
+
+Built **independently of box and vault**, against its own contract and tests, and matched to them
+only once that contract is tight. Breaking it out of the vault is its own win; stating its
+guarantees in isolation is what lets an agent tell an unforeseen inconsistency from a foreseen
+non-guarantee. The sprint `gripeoween_vault` is cancelled in its favour (its progress file says
+what was filed); too many of the gripeoween todo rows point here.
+
+## 10. Illustrations of what the library does not guarantee, and what to do about it
+
+**TODO.** Not filled in yet; agents, do not fill it in on the way to something else. For now, what
+section 7 says is not promised: that this device shows another device's write at any particular
+moment (the boxlist may lag; the vault+core lags at most one push or refresh); that two devices
+writing without seeing each other agree on who was first before the server says; that a backend
+which breaks VAULTDB.md 2.1 lets the vault keep any of the four guarantees for the boxlist.
