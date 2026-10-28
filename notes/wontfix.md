@@ -30,3 +30,10 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   The Coach: "we check for a crazy edge case used by people who know exactly what they're doing or
   have nfid what they're doing, so we can make them drop the weird field we would have dropped
   anyway." No refusal; a host that cares keeps such keys out of what it stores.
+* 2026-10-22 (the Coach, primitives sprint, ruling against a turn queue): **no ordering among a
+  vault's box calls.** `getBox`, `putBox` and `delBox` calls in flight together on one vault, for
+  different boxes or the same `boxlabel`, settle in no promised order. The vault joins only its
+  storage refresh (a `hello()` during one is in it, not behind it) and its gating (one prompt at a
+  time); nothing queues the box calls. A store's expectation (`vault_tok`, `gate_epoch`, a box's
+  `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
+  call before making the next.
