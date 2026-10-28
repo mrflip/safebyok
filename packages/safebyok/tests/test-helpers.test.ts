@@ -1581,6 +1581,31 @@ const expectToHold = (check: TH.VaultDBTimingCheck): Promise<void> => check.chec
 
 /** The checks of the battery over an adapter, by handle. */
 const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boolean, slowSecond?: boolean }) => TH.vaultDBTimingChecks(...roundTripBattery(opts))
+
+/** The most timers {@link onFakeClock} fires before it gives its work up as a loop that never ends: far more than any battery's round trips. */
+const FakeClockTimerLimit = 100_000
+
+/**
+ * Run `work` on a fake clock, resolving what it resolves to. Each timer it sets fires in the order
+ * a real clock would fire it, once nothing else can run, so a race's watchdog falls due only when
+ * its moves are stuck. Only for work whose every wait is a timer or a promise: work awaiting I/O,
+ * WebCrypto or `setImmediate` sees its watchdogs fall due early, or hangs. Rejects as `work` does,
+ * once every timer it left has run, or past {@link FakeClockTimerLimit} timers.
+ */
+const onFakeClock = async <ValT>(work: () => Promise<ValT>): Promise<ValT> => {
+  // A zero-delay timer fires on the next turn of the event loop, not after the millisecond or more a real one waits.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], loopLimit: FakeClockTimerLimit })
+  try {
+    const working = Promise.allSettled([work()])
+    // Rejects at the loop limit, and then no timer fires again, so `work` would never settle: not waited on.
+    await vi.runAllTimersAsync()
+    const [worked] = await working
+    if (worked.status === 'rejected') { throw worked.reason }
+    return worked.value
+  } finally {
+    vi.useRealTimers()
+  }
+}
 // --
 
 // == [Conformance checks]: expectRoundTripsThroughTurnstile, vaultDBTimingChecks, VaultDBContract
@@ -1614,7 +1639,9 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
 
   it("misses that late device where nothing holds a round trip: what the turnstile is for", async () => {
     const checks = checksOver({ stepping: checkThenWrite, overTheWire: true, slowSecond: true, unwired: true })
-    for (const handle of SplitLosses) { await expectToHold(checks[handle]) }
+    await onFakeClock(async () => {
+      for (const handle of SplitLosses) { await expectToHold(checks[handle]) }
+    })
   })
 
   it("lets the writes of different boxes through a check-then-write adapter land, as they should", async () => {
