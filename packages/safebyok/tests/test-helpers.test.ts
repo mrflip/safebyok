@@ -1592,8 +1592,10 @@ const FakeClockTimerLimit = 100_000
 const onFakeClock = async <ValT>(work: () => Promise<ValT>): Promise<ValT> => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], loopLimit: FakeClockTimerLimit })
   try {
-    const [worked, ran] = await Promise.allSettled([work(), vi.runAllTimersAsync()])
-    if (ran.status === 'rejected') { throw ran.reason }
+    const working = Promise.allSettled([work()])
+    // Rejects at the loop limit, and then no timer fires again, so `work` would never settle: not waited on.
+    await vi.runAllTimersAsync()
+    const [worked] = await working
     if (worked.status === 'rejected') { throw worked.reason }
     return worked.value
   } finally {
