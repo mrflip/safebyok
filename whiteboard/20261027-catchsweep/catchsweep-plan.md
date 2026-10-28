@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). Open, each PR's base `main`: 7 (#327, `c51b7274`, filed, stands on #321's tip, so on main's history); 3 (#330, `8a9f83ed`, filed on main); 8 (#328, `f3c9a732`, filed, rebased onto main); 9 (#331, `a984cea5`, on #327) reviewed fixed, waits unfiled on its three rows; 2 (#325, `5e486337`, on #316's tip) reviewed and flagged, waits unfiled for the Coach's two TOP rows. Nine threads; restack of the open five at the wrap-up.
+**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). The open line, restacked 2026-10-28, each PR's base `main`: #327 (`32d91c7d`, on main) → #330 (`e7285b66`) → #328 (`0e48262e`, justify green; size budgets rerun; trythrow and read_names release notes trimmed of internal names): merging #328 merges all three. Waiting on the Coach, unfiled: 9 (#331, `a984cea5`, still on #327's old tip `c51b7274`; rebased over #328 when its rows rule) and 2 (#325, `5e486337`, on #316's tip; its two TOP rows). Nine threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
