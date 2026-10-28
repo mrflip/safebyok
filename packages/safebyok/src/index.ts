@@ -45,7 +45,7 @@ export type { Capacity, BoxGetExpectation, BoxExpectation, BoxDelExpectation, Bo
 export { Ciphered } from './shapes/fields'
 export { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from './errors'
 export type { RefusalFamily, RefusalKind, RefusalMeta, VaultErrorOpts } from './errors'
-export { asStorageTrouble, outcomeOf, valOf } from './outcome'
+export { storageTroubleOf, outcomeOf, valOf } from './outcome'
 export { unexpectedError } from './refusals'
 export type { BadOutcome, GoodOutcome, Outcome } from './outcome'
 export { VaultDB, splitStoredBoxes } from './vault-db'

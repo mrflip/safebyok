@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql'
-import { VaultError, asStorageTrouble, isVaultError } from 'safebyok'
+import { VaultError, storageTroubleOf, isVaultError } from 'safebyok'
 import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
@@ -247,7 +247,7 @@ const noUnsubscribing = (): void => undefined
  * servers, gateways and APM tools log: {@link refusedBoxInBody} and {@link staleVaultRecordInBody} carry it in the body.
  */
 const crossing = (err: unknown): GraphQLError => {
-  const refusal = asStorageTrouble(err)
+  const refusal = storageTroubleOf(err)
   const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.

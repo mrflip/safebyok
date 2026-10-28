@@ -978,7 +978,7 @@ added or folded into through the subagent, and no other entry changes.
   refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
   (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
   declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
-  (`src/outcome.ts`), `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
+  (`src/outcome.ts`), `storageTroubleOf` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
   bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
   lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` and `crossing`). a_fixes
   made it also recognize a `VaultError` of another copy of safebyok loaded beside this one (an ESM
@@ -2068,7 +2068,7 @@ added or folded into through the subagent, and no other entry changes.
   throw, and the one catch is `outcomeOf` (`src/outcome.ts`). Amended 2026-10-27 (outcome_default):
   `outcomeOf`'s default for a throw that is no `VaultError` is now `unexpected_error` (family `misuse`,
   never retried), the throw still its `cause`; it was `storage_unavailable`. An adapter's throw is still
-  made `storage_unavailable` by `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): applied once per hook call by the `VaultDB` hook table, `VaultDB.#hooks` / `adaptedHook` in `src/vault-db.ts`, which replaced `adapterAnswer`), and a caller
+  made `storage_unavailable` by `storageTroubleOf` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): applied once per hook call by the `VaultDB` hook table, `VaultDB.#hooks` / `adaptedHook` in `src/vault-db.ts`, which replaced `adapterAnswer`), and a caller
   wrapping a call out to storage passes `Refusals.storageUnavailable` for the retryable kind. `outcomeOf` is
   exported for an app wrapping its own calls: whatever such a body throws that is not a `VaultError` is kept,
   as it came, as the `cause`, so an app must not throw secret material from a body it wraps. `unexpectedError`
@@ -2120,7 +2120,7 @@ added or folded into through the subagent, and no other entry changes.
   `VaultDB` that forgot to unwrap another's answer, `valOf`) was refused as `bad_option`; before, a
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
   Amended 2026-10-27 (outcome_default): `adapterAnswer` (`src/vault-db.ts`; amended 2026-10-28 (db_hooks): gone, each verb now calls its hook through the table `VaultDB.#hooks` / `adaptedHook`) no longer refuses an
-  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble (`asStorageTrouble`, `src/outcome.ts`)
+  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble (`storageTroubleOf`, `src/outcome.ts`)
   (the check, `isOutcomeShaped`, has since been removed). A hook that resolves a still-wrapped `Outcome` now meets
   the ordinary answer checks: `corrupt_record` on every verb (for a write or deletion, whether it landed is
   not known) and `damaged_box` from `getBox`; `tests/vault-db.test.ts` pins that no wrapped answer is taken

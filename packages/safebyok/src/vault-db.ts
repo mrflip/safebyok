@@ -12,7 +12,7 @@ import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
-import { type Outcome, asStorageTrouble, outcomeOf } from './outcome'
+import { type Outcome, storageTroubleOf, outcomeOf } from './outcome'
 import { byCodeUnit } from './text'
 
 // == [Options]: VaultDBOpts
@@ -36,12 +36,12 @@ export type VaultDBOpts = {
 
 // == [Hook adapter]: adaptedHook
 
-/** `hook`, one `do*` method of an adapter called on the VaultDB handed first, as a verb calls it: its answer resolved, and a throw made storage trouble by {@link asStorageTrouble}. */
+/** `hook`, one `do*` method of an adapter called on the VaultDB handed first, as a verb calls it: its answer resolved, and a throw made storage trouble by {@link storageTroubleOf}. */
 const adaptedHook = <ArgsT extends unknown[], AnswerT>(hook: (...args: ArgsT) => Promise<AnswerT>) => async (...args: ArgsT): Promise<AnswerT> => {
   try {
     return await hook(...args)
   } catch (err) {
-    throw asStorageTrouble(err)
+    throw storageTroubleOf(err)
   }
 }
 // --
@@ -643,12 +643,12 @@ export type WatchTrouble = {
   delivered: () => void
 }
 
-/** Start the adapter's watch, returning its unsubscribe; a throw is made storage trouble by `asStorageTrouble`. */
+/** Start the adapter's watch, returning its unsubscribe; a throw is made storage trouble by `storageTroubleOf`. */
 const startedWatch = (start: () => () => void): (() => void) => {
   try {
     return start()
   } catch (err) {
-    throw asStorageTrouble(err)
+    throw storageTroubleOf(err)
   }
 }
 
