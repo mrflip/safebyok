@@ -120,7 +120,7 @@ export class OutageVaultDB extends VaultDB {
   // The one public verb this adapter hands on itself: deleting a vault whose record is damaged
   // needs the record as stored, which this adapter's own doGetVault never sees, as the inner
   // verbs refuse it. The inner adapter does the checking and the deleting.
-  override delDamagedVault(scope: VaultScope): Promise<VaultTombstone | null> {
+  override async delDamagedVault(scope: VaultScope): Promise<VaultTombstone | null> {
     this.refuseWhileDown()
     return this.inner.delDamagedVault(scope)
   }
