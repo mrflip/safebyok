@@ -94,7 +94,7 @@ describe("BankProvider", () => {
     first.unmount()
 
     // A fresh mount after the lease is gone: lock it by clearing the device side.
-    await world.deviceDB.delAll()
+    await world.deviceDB.tryDelAll()
     world.mount('u1')
     await expectShown('locked')
     fireEvent.click(screen.getByText('grab'))

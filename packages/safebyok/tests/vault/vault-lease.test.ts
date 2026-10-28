@@ -214,7 +214,7 @@ describe("the lease", () => {
       await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
       const written = await world.getLease()
       if (written === null) { throw new Error('expected a lease on the device') }
-      await world.deviceDB.putLease({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis })
+      await world.deviceDB.tryPutLease({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis })
       // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the ctx can.
       const reopened = await world.open({ leaseHours: Infinity })
       expect(TH.stateOf(reopened.getSnapshot())).to.eq('unlocked')
@@ -231,7 +231,7 @@ describe("the lease", () => {
       await world.openUnlocked('pw one')
       const written = await world.getLease()
       if (written === null) { throw new Error('expected a lease on the device') }
-      await world.deviceDB.putLease({ ...written, ask_passphrase_at })
+      await world.deviceDB.tryPutLease({ ...written, ask_passphrase_at })
       // Under Infinity no window check refuses it: only the bounds can.
       const reopened = await world.open({ leaseHours: Infinity })
       expect(TH.stateOf(reopened.getSnapshot())).to.eq('locked')
@@ -296,7 +296,7 @@ describe("the lease, when the host changes leaseHours", () => {
   it("writes no lease on any birth, shortened or not", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: Infinity })
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
     await world.open({ leaseHours: Infinity })
     await world.open({ leaseHours: 1 })
     await world.open({ leaseHours: 1 })
@@ -306,8 +306,8 @@ describe("the lease, when the host changes leaseHours", () => {
   it("never brings back a lease that another tab's lock() erased during the open", async () => {
     const world = makeWorld()
     const otherTab = await world.openUnlocked('pw one', { leaseHours: Infinity })
-    const getLease = world.deviceDB.getLease.bind(world.deviceDB)
-    vi.spyOn(world.deviceDB, 'getLease').mockImplementationOnce(async (scope) => {
+    const getLease = world.deviceDB.tryGetLease.bind(world.deviceDB)
+    vi.spyOn(world.deviceDB, 'tryGetLease').mockImplementationOnce(async (scope) => {
       const kept = await getLease(scope)
       await otherTab.lock()
       return kept
@@ -531,7 +531,7 @@ describe("natural expiry", () => {
   it("drops the lease from memory alone at ask_passphrase_at, erasing nothing: another tab may hold one renewed under the scope", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    const erases = vi.spyOn(world.deviceDB, 'delLease')
+    const erases = vi.spyOn(world.deviceDB, 'tryDelLease')
     world.pass(HourMillis)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(erases).not.toHaveBeenCalled()
@@ -627,7 +627,7 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
-    TH.beforeNextCall(world.vaultDB, 'putVaultRecord', () => {
+    TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
       TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
       return Promise.resolve()
     })
@@ -891,7 +891,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const requestCleartext = typingPw()
     const { world, vault } = await lockedVaultWith({ requestCleartext })
     world.advance(StaleMinutes * MinuteMillis)
-    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(world.vaultDB, 'tryGetVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
@@ -902,7 +902,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const requestCleartext = typingPw()
     const vault = await world.openUnlocked('pw', { requestCleartext })
     requestCleartext.mockClear()
-    const putLease = vi.spyOn(world.deviceDB, 'putLease')
+    const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
     expect(await vault.ensureUnlocked()).to.eq(vault)
     expect(await vault.ensureUnlocked({ renewMinutes: 60 })).to.eq(vault)
     expect(requestCleartext).not.toHaveBeenCalled()
@@ -1010,7 +1010,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
   it("reads storage again in its attempt, and resolves the fresh vault (Contract: ensureUnlocked, Does 3.4, and Returns)", async () => {
     const requestCleartext = typingPw()
     const { world, vault } = await lockedVaultWith({ requestCleartext })
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     world.advance((StaleMinutes + 1) * MinuteMillis)
     expect(await vault.ensureUnlocked()).to.eq(vault)
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
@@ -1072,7 +1072,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const gating = await unlockAsked(dialog)
     await vault.lock()
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectBad(gating.attemptPassphrase('pw'), 'gating_landed')
     expect(derive).not.toHaveBeenCalled()
     expect(reads).not.toHaveBeenCalled()
@@ -1194,7 +1194,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     dialog.close()
     await TH.expectBad(ensuring, 'vault_locked')
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     const err = await TH.expectBad(gating.attemptPassphrase('pw'), 'gating_landed')
     expect(err.message).to.include('This dialog is over')
     expect(derive).not.toHaveBeenCalled()
@@ -1325,7 +1325,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const requestCleartext = typingPw()
     const { world, vault } = await lockedVaultWith({ requestCleartext })
     world.advance(StaleMinutes * MinuteMillis)
-    const looking = TH.holdNextCall(world.vaultDB, 'getVault')
+    const looking = TH.holdNextCall(world.vaultDB, 'tryGetVault')
     const ensuring = vault.ensureUnlocked()
     await looking.reached
     TH.closeVault(vault)
@@ -1339,7 +1339,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const { world, vault } = await lockedVaultWith({ requestCleartext })
     const otherTab = await world.open()
     await TH.unlock(otherTab, 'pw')
-    const reading = TH.holdNextCall(world.deviceDB, 'getLease')
+    const reading = TH.holdNextCall(world.deviceDB, 'tryGetLease')
     const ensuring = vault.ensureUnlocked()
     await reading.reached
     TH.closeVault(vault)
@@ -1355,7 +1355,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     const { world, vault } = await lockedVaultWith({ requestCleartext })
     const otherTab = await world.open()
     await TH.unlock(otherTab, 'pw')
-    const reading = TH.holdNextCall(world.deviceDB, 'getLease')
+    const reading = TH.holdNextCall(world.deviceDB, 'tryGetLease')
     const ensuring = vault.ensureUnlocked()
     await reading.reached
     await vault.lock()
@@ -1377,10 +1377,10 @@ describe("a lock or a let-go landing while a box call waits to be unlocked (risk
     ['its hello', (world: ReturnType<typeof makeWorld>) => {
       // Past staleMinutes, so the hello reads.
       world.advance(StaleMinutes * MinuteMillis)
-      return TH.holdNextCall(world.vaultDB, 'getVault')
+      return TH.holdNextCall(world.vaultDB, 'tryGetVault')
     }],
     // The answer held, not the call: the lease is read before the lock lands, as a device store applies calls in order.
-    ["its gating's consult of another tab's lease", (world: ReturnType<typeof makeWorld>) => TH.holdNextAnswer(world.deviceDB, 'getLease')],
+    ["its gating's consult of another tab's lease", (world: ReturnType<typeof makeWorld>) => TH.holdNextAnswer(world.deviceDB, 'tryGetLease')],
   ] as const
 
   for (const [call, callname] of BoxCalls) {
@@ -1540,7 +1540,7 @@ describe("every data call, through ensureUnlocked", () => {
     await TH.unlock(elsewhere, 'pw')
     await elsewhere.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     world.advance(MinuteMillis)
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(reads).not.toHaveBeenCalled()
@@ -1579,7 +1579,7 @@ describe("every data call, through ensureUnlocked", () => {
   it("reads storage for the box once unlocked, whatever the listing shows: the listing in hand only spares a prompt", async () => {
     const { world, vault } = await lockedVaultWith({ requestCleartext: typingPw() })
     await vault.ensureUnlocked()
-    const reads = vi.spyOn(world.vaultDB, 'getBox')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetBox')
     await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
     expect(reads).toHaveBeenCalledOnce()
   })
@@ -1651,7 +1651,7 @@ describe("the gating's attempt, by the Contract", () => {
     const ensuring = vault.tryEnsureUnlocked()
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'putVaultRecord', async () => { await TH.unlock(elsewhere, 'pw one') })
+    TH.beforeNextCall(deafDB, 'tryPutVaultRecord', async () => { await TH.unlock(elsewhere, 'pw one') })
     await TH.expectBad(gating.attempt('pw one'), 'gate_made_elsewhere')
     expect(TH.stateOf(vault.snapshot)).to.eq('novel')
     await TH.expectBad(ensuring, 'gate_made_elsewhere')
@@ -1696,7 +1696,7 @@ describe("the gating's attempt, by the Contract", () => {
     const { world, vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
     const gating = await unlockAsked(dialog)
-    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(world.vaultDB, 'tryGetVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectBad(gating.attemptPassphrase('pw'), 'storage_unavailable')
     await TH.expectBad(ensuring, 'storage_unavailable')
     dialog.close()

@@ -44,7 +44,7 @@ export const expectRefusal = async (operation: Promise<unknown>, refusalkind: Re
  * @param operation - The call that should succeed, or its outcome.
  * @returns Its `val`.
  *
- * @example expect(await TH.expectGood(vaultDB.getVault(scope))).to.be.null
+ * @example expect(await TH.expectGood(vaultDB.tryGetVault(scope))).to.be.null
  */
 export const expectGood = async <ValT>(operation: Outcome<ValT> | Promise<Outcome<ValT>>): Promise<ValT> => {
   const outcome = await operation
@@ -65,7 +65,7 @@ export type ExpectingGood<DbT> = {
  * @param db - The store whose answers the test reads.
  * @returns `db`, its verbs answering with their `val`s.
  *
- * @example expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', TH.inThisVault)).to.be.null
+ * @example expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.be.null
  */
 export const expectingGood = <DbT extends object>(db: DbT): ExpectingGood<DbT> => new Proxy(db, {
   get: (target, prop) => {
@@ -98,7 +98,7 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
  * @param refusalkind - The refusal's expected `refusalkind`.
  * @returns The refusal, for a closer look at its message, cause or meta.
  *
- * @example await TH.expectBad(vaultDB.putBox(scope, TH.noBoxYet, box), 'vault_mismatch')
+ * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_mismatch')
  */
 export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind: RefusalKind): Promise<VaultError> => {
   const outcome = await operation

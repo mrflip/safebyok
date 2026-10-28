@@ -39,8 +39,8 @@ const deletingUnderThrowingDialog = async (refusing: boolean) => {
   const deleting = vault.tryDel()
   await TH.eventually(() => asked.gating !== null)
   const gating = TH.asKind(asked.gating as unknown as Gating, 'del_vault')
-  if (refusing) { vi.spyOn(world.vaultDB, 'delVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached.")) }
-  const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+  if (refusing) { vi.spyOn(world.vaultDB, 'tryDelVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached.")) }
+  const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
   const attempting = gating.attempt('pw')
   await writing.reached
   asked.fail(new Error('the dialog broke'))
@@ -208,7 +208,7 @@ describe("an attempt the user can correct", () => {
     const removing = vault.tryDelWayin('passkey')
     const gating = TH.asKind(await dialog.asked(), 'del_passkey')
     await TH.delWayin(maker, 'pw')
-    const writes = vi.spyOn(world.vaultDB, 'putVaultRecord')
+    const writes = vi.spyOn(world.vaultDB, 'tryPutVaultRecord')
     await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
     await TH.expectBad(gating.attempt('pw'), 'absent_wayin')
     dialog.close()
@@ -254,7 +254,7 @@ describe("a gating's attempts", () => {
     const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
     await TH.expectGood(gating.attemptPassphrase('pw'))
     await TH.expectGood(ensuring)
-    const reads = vi.spyOn(world.vaultDB, 'getVault')
+    const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectBad(gating.attemptPassphrase('pw'), 'gating_landed')
     expect(reads).not.toHaveBeenCalled()
   })
@@ -267,7 +267,7 @@ describe("a gating's attempts", () => {
     const gating = TH.asKind(await dialog.asked(), 'initialize_gate')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.unlock(elsewhere, 'pw there')
-    const writes = vi.spyOn(world.vaultDB, 'putVaultRecord')
+    const writes = vi.spyOn(world.vaultDB, 'tryPutVaultRecord')
     await TH.expectBad(gating.attempt('pw here'), 'gate_made_elsewhere')
     await TH.expectBad(ensuring, 'gate_made_elsewhere')
     expect(writes).not.toHaveBeenCalled()
@@ -289,7 +289,7 @@ describe("a step of an attempt's chain failing", () => {
       return {}
     }, 'unlock', 'the key deriver throwing'],
     ['stale_write', (world) => {
-      vi.spyOn(world.vaultDB, 'putVaultRecord').mockResolvedValueOnce(bad(new VaultError('stale_write', 'The vault record changed in storage.')))
+      vi.spyOn(world.vaultDB, 'tryPutVaultRecord').mockResolvedValueOnce(bad(new VaultError('stale_write', 'The vault record changed in storage.')))
       return {}
     }, 'change', 'putVaultRecord refusing stale_write'],
     ['storage_unavailable', (world) => {
@@ -413,7 +413,7 @@ describe("a lock or a decline landing during an attempt", () => {
     const before = TH.cheatGetVaultEpoch(vault).gate_epoch
     const putting = vault.tryPutWayin('passphrase')
     const gating = TH.asKind(await dialog.asked(), 'change_passphrase')
-    const writing = TH.holdNextAnswer(world.vaultDB, 'putVaultRecord')
+    const writing = TH.holdNextAnswer(world.vaultDB, 'tryPutVaultRecord')
     const attempting = gating.attempt('pw', 'pw two')
     await writing.reached
     await vault.lock()
@@ -435,7 +435,7 @@ describe("a lock or a decline landing during an attempt", () => {
       const calling = flavor === 'unlock' ? vault.tryEnsureUnlocked() : vault.tryPutWayin('passphrase')
       const gating = await dialog.asked()
       TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
-      const writing = TH.holdNextCall(world.deviceDB, 'putLease')
+      const writing = TH.holdNextCall(world.deviceDB, 'tryPutLease')
       const attempting = flavor === 'unlock' ? TH.asKind(gating, 'unlock_vault').attemptPassphrase('pw') : TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw two')
       await writing.reached
       await vault.lock()
@@ -485,7 +485,7 @@ describe("a lock or a decline landing during an attempt", () => {
     const deleting = vault.tryDel()
     const gating = TH.asKind(await dialog.asked(), 'del_vault')
     void gating.lockLanded.then(() => { dialog.close() })
-    const writing = TH.holdNextAnswer(world.vaultDB, 'delVault')
+    const writing = TH.holdNextAnswer(world.vaultDB, 'tryDelVault')
     const attempting = gating.attempt('pw')
     await writing.reached
     await TH.expectBad(vault.tryRefresh(), 'vault_gone')
@@ -506,7 +506,7 @@ describe("a lock or a decline landing during an attempt", () => {
       const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
       const deleting = vault.tryDel()
       const gating = TH.asKind(await dialog.asked(), 'del_vault')
-      const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+      const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
       const attempting = gating.attempt('pw')
       await writing.reached
       await landing(vault, gating)
@@ -530,8 +530,8 @@ describe("a lock or a decline landing during an attempt", () => {
       const gating = TH.asKind(await dialog.asked(), 'del_vault')
       let lockLanded = false
       void gating.lockLanded.then(() => { lockLanded = true })
-      vi.spyOn(world.vaultDB, 'delVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached."))
-      const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+      vi.spyOn(world.vaultDB, 'tryDelVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached."))
+      const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
       const attempting = gating.attempt('pw')
       await writing.reached
       await landing(vault, gating)
@@ -550,7 +550,7 @@ describe("a lock or a decline landing during an attempt", () => {
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
     const deleting = vault.tryDel()
     const gating = TH.asKind(await dialog.asked(), 'del_vault')
-    const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+    const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
     const attempting = gating.attempt('pw')
     await writing.reached
     await vault.lock()
@@ -570,7 +570,7 @@ describe("a lock or a decline landing during an attempt", () => {
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
     const deleting = vault.tryDel()
     const gating = TH.asKind(await dialog.asked(), 'del_vault')
-    const writing = TH.holdNextCall(world.vaultDB, 'delVault')
+    const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
     const attempting = gating.attempt('pw')
     await writing.reached
     dialog.close()
@@ -737,7 +737,7 @@ describe("joining a gating, by kind", () => {
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
     await TH.unlock(await world.open(), 'pw')
     world.advance(SevenDaysMillis - (30 * MinuteMillis))
-    const consulting = TH.holdNextAnswer(world.deviceDB, 'getLease')
+    const consulting = TH.holdNextAnswer(world.deviceDB, 'tryGetLease')
     const first = vault.tryEnsureUnlocked()
     await consulting.reached
     const renewing = vault.tryEnsureUnlocked({ renewMinutes: 60 })
@@ -804,7 +804,7 @@ describe("an unlock's consult of this device's store", () => {
     const vault = await lockedVaultIn(world, { requestCleartext })
     const otherTab = await world.open()
     await TH.unlock(otherTab, 'pw')
-    const reading = TH.holdNextAnswer(world.deviceDB, 'getLease')
+    const reading = TH.holdNextAnswer(world.deviceDB, 'tryGetLease')
     const ensuring = vault.tryEnsureUnlocked()
     await reading.reached
     await vault.lock()

@@ -83,8 +83,8 @@ describe("the ctx builders' output, byte for byte", () => {
     await TH.unlock(vault, 'pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const vaultRecord = (await TH.vaultRecordIn(vaultDB, scope))!
-    const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok }))!
-    const lease = (await TH.expectGood(deviceDB.getLease(scope)))!
+    const box = (await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', { vault_tok: vaultRecord.vault_tok }))!
+    const lease = (await TH.expectGood(deviceDB.tryGetLease(scope)))!
     const vaultText = `{"applabel":"acme","registered_at":${String(vaultRecord.registered_at)},"user_id":"u1","vault_tok":"${vaultRecord.vault_tok}","vaultlabel":"main"}`
     const boxText = `{"boxlabel":"anthropic","format":"safebyok-box-v8","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar":"{}","vault_tok":"${vaultRecord.vault_tok}","whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
     const leaseText = `{"applabel":"acme","ask_passphrase_at":${String(lease.ask_passphrase_at)},"format":"safebyok-lease-v1","gate_epoch":${String(lease.gate_epoch)},"user_id":"u1","vault_tok":"${vaultRecord.vault_tok}","vaultlabel":"main"}`

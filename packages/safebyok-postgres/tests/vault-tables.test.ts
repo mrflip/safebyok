@@ -140,7 +140,7 @@ describe("VaultTablesSql", () => {
       await db.exec('SET ROLE stranger')
       const { rows } = await db.query('SELECT * FROM safebyok_vaults')
       expect(rows).to.have.lengthOf(0)
-      await TH.expectBad(TH.requestFor(db, 'u2').ensureVault(TH.gatelessOf('u2')), 'not_permitted')
+      await TH.expectBad(TH.requestFor(db, 'u2').tryEnsureVault(TH.gatelessOf('u2')), 'not_permitted')
     } finally {
       await db.exec('RESET ROLE; DROP OWNED BY stranger; DROP ROLE stranger')
     }
@@ -169,7 +169,7 @@ describe("VaultNotifySql", () => {
     const db = await tablesOnlyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
     await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
+    await TH.expectGood(TH.requestFor(db, 'u1').tryPutBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)
     expect(await TH.boxesOf(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.have.lengthOf(1)

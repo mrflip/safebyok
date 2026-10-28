@@ -15,18 +15,22 @@ import { consistent } from './checks/validator'
  * *Your own storage adapter* shows a third, and `describeDeviceDB` (from `safebyok/testing`) checks
  * one.
  *
- * The public verbs are the base class's; never override them. Each resolves an {@link Outcome} and
+ * The public verbs are the base class's; never override them. Each is a try pair: `getLease`
+ * resolves its answer or throws, and `tryGetLease` resolves the same as an {@link Outcome} and
  * never rejects. Each but `delAll` refuses 'bad_scope' for a scope whose names fail their checks
- * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A VaultError
- * your code throws passes as it came; anything else becomes 'storage_blocked' where
- * {@link isStorageBlocked} names it, else 'storage_unavailable', that throw its `cause`, naming no
- * scope and quoting no record. A record read back that fails its check reads as null, and is
- * discarded through `doDelUnreadable`.
+ * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A record read
+ * back that fails its check reads as null, and is discarded through `doDelUnreadable`.
+ *
+ * What your code throws, a throwing verb throws as it came. A `try` form passes a VaultError as
+ * it came, and makes anything else 'storage_blocked' where {@link isStorageBlocked} names it, else
+ * 'storage_unavailable', that throw its `cause`, naming no scope and quoting no record: the vault
+ * reads its device store through the `try` forms, so a host's logger hears those kinds.
  *
  * **Calls land in the order they were made.** Each verb calls its `do*` method before it awaits
  * anything, so a store that starts each call's work in the order it is called keeps one scope's
- * calls in the order the vault made them, awaited or not: a lock's `delLease`, made after a grant's
- * `putLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnreadable` each say what else they owe.
+ * calls in the order the vault made them, awaited or not: a lock's `tryDelLease`, made after a
+ * grant's `tryPutLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnreadable` each say what
+ * else they owe.
  *
  * @example
  *   class SecureStoreDeviceDB extends DeviceDB {
@@ -35,71 +39,104 @@ import { consistent } from './checks/validator'
  *   }
  */
 export abstract class DeviceDB {
-  // == [Lease verbs]: getLease, putLease, delLease
+  // == [Lease verbs]: getLease, putLease, delLease, their try forms
 
   /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryRead`, which checks it and holds it closed; the vault judges whether it still fits.
    *
-   * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+   * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
-  getLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
-    return deviceOutcomeOf('getLease', async () => {
-      const leaseScopepath = Scopepath.lease(scope)
-      const raw = await this.doGetLease(leaseScopepath)
-      return await this.#readableOf(LeaseRecord, leaseScopepath, raw)
-    })
+  async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
+    const leaseScopepath = Scopepath.lease(scope)
+    const raw = await this.doGetLease(leaseScopepath)
+    return await this.#readableOf(LeaseRecord, leaseScopepath, raw)
+  }
+
+  /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
+   *
+   * @example await deviceDB.tryGetLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+   */
+  tryGetLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
+    return deviceOutcomeOf('getLease', () => this.getLease(scope))
   }
 
   /** Store `record` as the lease of its vault, in place of any before, resolving the record as stored. */
-  putLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>> {
-    return deviceOutcomeOf('putLease', async () => {
-      await this.doPutLease(Scopepath.lease(record), record)
-      return record
-    })
+  async putLease(record: LeaseRecord): Promise<LeaseRecord> {
+    await this.doPutLease(Scopepath.lease(record), record)
+    return record
+  }
+
+  /** The lease as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.putLease}. */
+  tryPutLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>> {
+    return deviceOutcomeOf('putLease', () => this.putLease(record))
   }
 
   /** Erase the lease of one vault. */
-  delLease(scope: VaultScope): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delLease', async () => { await this.doDelLease(Scopepath.lease(scope)) })
+  async delLease(scope: VaultScope): Promise<void> {
+    await this.doDelLease(Scopepath.lease(scope))
+  }
+
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delLease}. */
+  tryDelLease(scope: VaultScope): Promise<Outcome<void>> {
+    return deviceOutcomeOf('delLease', () => this.delLease(scope))
   }
   // --
 
-  // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll
+  // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll, their try forms
 
   /** Read this device's record of one scope, or null for none. The bank judges what it says.
    *
-   * @example await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+   * @example await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
    */
-  getDeviceRecord(scope: VaultScope): Promise<Outcome<DeviceRecord | null>> {
-    return deviceOutcomeOf('getDeviceRecord', async () => {
-      const deviceScopepath = Scopepath.device(scope)
-      const raw = await this.doGetDeviceRecord(deviceScopepath)
-      return await this.#readableOf(DeviceRecord, deviceScopepath, raw)
-    })
+  async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
+    const deviceScopepath = Scopepath.device(scope)
+    const raw = await this.doGetDeviceRecord(deviceScopepath)
+    return await this.#readableOf(DeviceRecord, deviceScopepath, raw)
+  }
+
+  /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
+   *
+   * @example await deviceDB.tryGetDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+   */
+  tryGetDeviceRecord(scope: VaultScope): Promise<Outcome<DeviceRecord | null>> {
+    return deviceOutcomeOf('getDeviceRecord', () => this.getDeviceRecord(scope))
   }
 
   /** Store `record` as this device's record of its scope, never lowering what is stored, resolving the record as stored.
    * The store keeps what {@link raisedDeviceRecord} makes of the stored record and `record`, in one
    * transaction, so a tab that saw less never lowers what another saw.
    */
-  raiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
-    return deviceOutcomeOf('raiseDeviceRecord', async () => {
-      let raised = record
-      await this.doRaiseDeviceRecord(Scopepath.device(record), (stored) => {
-        raised = raisedDeviceRecord(stored, record)
-        return raised
-      })
+  async raiseDeviceRecord(record: DeviceRecord): Promise<DeviceRecord> {
+    let raised = record
+    await this.doRaiseDeviceRecord(Scopepath.device(record), (stored) => {
+      raised = raisedDeviceRecord(stored, record)
       return raised
     })
+    return raised
+  }
+
+  /** The device record as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.raiseDeviceRecord}. */
+  tryRaiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
+    return deviceOutcomeOf('raiseDeviceRecord', () => this.raiseDeviceRecord(record))
   }
 
   /** Erase this device's record of one scope. */
-  delDeviceRecord(scope: VaultScope): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delDeviceRecord', async () => { await this.doDelDeviceRecord(Scopepath.device(scope)) })
+  async delDeviceRecord(scope: VaultScope): Promise<void> {
+    await this.doDelDeviceRecord(Scopepath.device(scope))
+  }
+
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delDeviceRecord}. */
+  tryDelDeviceRecord(scope: VaultScope): Promise<Outcome<void>> {
+    return deviceOutcomeOf('delDeviceRecord', () => this.delDeviceRecord(scope))
   }
 
   /** Erase every lease and device record this store keeps. */
-  delAll(): Promise<Outcome<void>> {
-    return deviceOutcomeOf('delAll', async () => { await this.doDelAll() })
+  async delAll(): Promise<void> {
+    await this.doDelAll()
+  }
+
+  /** The erase, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.delAll}. */
+  tryDelAll(): Promise<Outcome<void>> {
+    return deviceOutcomeOf('delAll', () => this.delAll())
   }
 
   /** `raw`, a row read under `scopepath`, through `recordSchema`: the record, or null for none, or for one that fails, which it discards through `doDelUnreadable`. */
@@ -144,16 +181,16 @@ export abstract class DeviceDB {
   // --
 }
 
-/** A verb of {@link DeviceDB}. */
-export type DeviceVerb = keyof DeviceDB
+/** A verb of {@link DeviceDB}, by its throwing form's name: `getLease`, whose `try` form is `tryGetLease`. */
+export type DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>
 
 /** A DeviceDB over a Map, which remembers nothing past the page: for tests, and wherever IndexedDB is missing or blocked.
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
- *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
+ *   await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const memoryDeviceDB = (): DeviceDB => new MemoryDeviceDB()
 

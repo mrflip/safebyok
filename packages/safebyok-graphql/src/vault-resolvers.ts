@@ -3,12 +3,12 @@ import { Refusals, VaultError, isVaultError } from 'safebyok'
 import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
-/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, the ones handing on records in place of those handing back summaries.
- * That is `getVaultRecords` and `ensureVaultRecords` in place of `getVault` and `ensureVault`:
- * the browser's VaultDB checks stored records. Every VaultDB is one: `safebyok-postgres`'s, or one
- * of your own.
+/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, in their `try` forms, the ones handing on records in place of those handing back summaries.
+ * That is `tryGetVaultRecords` and `tryEnsureVaultRecords` in place of `tryGetVault` and
+ * `tryEnsureVault`: the browser's VaultDB checks stored records. Every VaultDB is one:
+ * `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'getVaultRecords' | 'ensureVaultRecords' | 'putVaultRecord' | 'getBox' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'tryGetVaultRecords' | 'tryEnsureVaultRecords' | 'tryPutVaultRecord' | 'tryGetBox' | 'tryPutBox' | 'tryGetCapacity' | 'tryDelBox' | 'tryDelVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -125,16 +125,16 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   return {
     Query: {
       // Checked and split, as the browser's VaultDB answers from its half, which checks it again.
-      safebyokGetVault:      served((vaultDB, args) => vaultDB.getVaultRecords(scopeIn(args)), relayedVault),
-      safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string, boxGetExpectationIn(args))),
-      safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
+      safebyokGetVault:      served((vaultDB, args) => vaultDB.tryGetVaultRecords(scopeIn(args)), relayedVault),
+      safebyokGetBox:        served((vaultDB, args) => vaultDB.tryGetBox(scopeIn(args), args.boxlabel as string, boxGetExpectationIn(args))),
+      safebyokGetCapacity: served((vaultDB, args) => vaultDB.tryGetCapacity(scopeIn(args))),
     },
     Mutation: {
-      safebyokEnsureVault: served((vaultDB, args) => vaultDB.ensureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultDraft), relayedVault),
-      safebyokPutVaultRecord: served((vaultDB, args) => vaultDB.putVaultRecord(vaultRecordIn(args), vaultRecordExpectationIn(args)), (stored) => ({ landed: true, vault_stored: stored }), staleVaultRecordInBody),
-      safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
-      safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
-      safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args))),
+      safebyokEnsureVault: served((vaultDB, args) => vaultDB.tryEnsureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultDraft), relayedVault),
+      safebyokPutVaultRecord: served((vaultDB, args) => vaultDB.tryPutVaultRecord(vaultRecordIn(args), vaultRecordExpectationIn(args)), (stored) => ({ landed: true, vault_stored: stored }), staleVaultRecordInBody),
+      safebyokPutBox: served((vaultDB, args) => vaultDB.tryPutBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
+      safebyokDelBox: served((vaultDB, args) => vaultDB.tryDelBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
+      safebyokDelVault: served((vaultDB, args) => vaultDB.tryDelVault(scopeIn(args), vaultDelExpectationIn(args))),
     },
     Subscription: {
       safebyokVaultChanged: {

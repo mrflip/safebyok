@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
+import { VaultDB, VaultError, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -75,12 +75,12 @@ export class OutageVaultDB extends VaultDB {
   // read as its listing does.
   protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
     this.refuseWhileDown()
-    return storedVaultOf(valOf(await this.inner.getVaultRecords(scope)))
+    return storedVaultOf(await this.inner.getVaultRecords(scope))
   }
 
   protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
     this.refuseWhileDown()
-    return storedVaultOf(valOf(await this.inner.ensureVaultRecords(draft)))
+    return storedVaultOf(await this.inner.ensureVaultRecords(draft))
   }
 
   // The inner adapter's public verbs refuse a failed expectation as stale_write themselves, and a
@@ -88,40 +88,41 @@ export class OutageVaultDB extends VaultDB {
   // it landed, and the vault record as the inner adapter stored it is the answer.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.putVaultRecord(vaultRecord, expected))
+    return await this.inner.putVaultRecord(vaultRecord, expected)
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.getBox(scope, boxlabel, expected))
+    return await this.inner.getBox(scope, boxlabel, expected)
   }
 
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.putBox(scope, expected, box))
+    return await this.inner.putBox(scope, expected, box)
   }
 
   protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.getCapacity(scope))
+    return await this.inner.getCapacity(scope)
   }
 
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.delBox(scope, boxlabel, expected))
+    return await this.inner.delBox(scope, boxlabel, expected)
   }
 
   // What the inner adapter's deletion left, its tombstone, is the answer.
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.delVault(scope, expected))
+    return await this.inner.delVault(scope, expected)
   }
 
   // The one public verb this adapter hands on itself: deleting a vault whose record is damaged
   // needs the record as stored, which this adapter's own doGetVault never sees, as the inner
   // verbs refuse it. The inner adapter does the checking and the deleting.
-  override delDamagedVault(scope: VaultScope): Promise<Outcome<VaultTombstone | null>> {
-    return this.outage.isDown() ? outcomeOf(() => { this.refuseWhileDown(); return null }) : this.inner.delDamagedVault(scope)
+  override delDamagedVault(scope: VaultScope): Promise<VaultTombstone | null> {
+    this.refuseWhileDown()
+    return this.inner.delDamagedVault(scope)
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {

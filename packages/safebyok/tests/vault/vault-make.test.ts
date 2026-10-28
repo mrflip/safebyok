@@ -88,9 +88,9 @@ describe("Bank.make and bank.ensureVault", () => {
     expect(err.message).to.include('an instance of the VaultDB class')
   })
 
-  it("refuses a VaultDB without delDamagedVault at Bank.make, not at the bank's first delDamagedVault", () => {
+  it("refuses a VaultDB without tryDelDamagedVault at Bank.make, not at the bank's first delDamagedVault", () => {
     const world = makeWorld()
-    Object.defineProperty(world.vaultDB, 'delDamagedVault', { value: undefined })
+    Object.defineProperty(world.vaultDB, 'tryDelDamagedVault', { value: undefined })
     const err = TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world)), 'bad_option')
     expect(err.message).to.match(/^In Bank.make's options: vaultDB: Expected a storage adapter/)
   })
@@ -106,7 +106,7 @@ describe("Bank.make and bank.ensureVault", () => {
   it("hands on storage's damaged_vault as it came, even from a VaultDB that throws before its promise", async () => {
     const world = makeWorld()
     const damaged = new VaultError('damaged_vault', "This vault's stored props did not read back.")
-    vi.spyOn(world.vaultDB, 'ensureVault').mockImplementationOnce(() => { throw damaged })
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockImplementationOnce(() => { throw damaged })
     const err = await TH.expectRefusal(world.open(), 'damaged_vault')
     expect(err).to.eq(damaged)
     vi.restoreAllMocks()
@@ -115,7 +115,7 @@ describe("Bank.make and bank.ensureVault", () => {
   it("hands on an adapter's corrupt_record as it came, never as damage: that kind is an adapter's wrong answer", async () => {
     const world = makeWorld()
     const wrongAnswer = new VaultError('corrupt_record', 'Storage answered a vault read in a shape this package does not know.')
-    vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(wrongAnswer))
+    vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(wrongAnswer))
     const err = await TH.expectRefusal(world.open(), 'corrupt_record')
     expect(err).to.eq(wrongAnswer)
     vi.restoreAllMocks()
@@ -163,7 +163,7 @@ describe("Bank.make's options", () => {
 
   it("refuses an option it does not take as 'bad_option', counting it and naming the options it takes, before storage is touched", () => {
     const world = makeWorld()
-    const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
+    const reads = [vi.spyOn(world.vaultDB, 'tryGetVault'), vi.spyOn(world.vaultDB, 'tryEnsureVault')]
     const err = TH.expectSyncRefusal(() => Bank.make({ ...bankOptsOf(world), leaseHour: 1 } as MakeBankOpts), 'bad_option')
     expect(err.message).to.match(/^In Bank\.make's options: There is a field it does not take \(its name is not repeated\): it takes only applabel, /)
     expect(err.message).to.include('leaseHours')
@@ -195,7 +195,7 @@ describe("a page that is not a secure context", () => {
   it("refuses Bank.make over plain http with kind 'insecure_context', before it touches storage", () => {
     vi.stubGlobal('isSecureContext', false)
     const world = makeWorld()
-    const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
+    const reads = [vi.spyOn(world.vaultDB, 'tryGetVault'), vi.spyOn(world.vaultDB, 'tryEnsureVault')]
     const err = TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world)), 'insecure_context')
     expect(err.message).to.match(/https/)
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
@@ -230,7 +230,7 @@ describe("the host's clock", () => {
   for (const [reading, blurb] of OutOfBoundsReadings) {
     it(`refuses a clock reading ${blurb} at Bank.make, before reading storage`, async () => {
       const world = makeWorld()
-      const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
+      const reads = [vi.spyOn(world.vaultDB, 'tryGetVault'), vi.spyOn(world.vaultDB, 'tryEnsureVault')]
       const err = await TH.expectRefusal(world.open({ clock: { now: () => reading as number } }), 'bad_option')
       expect(err.message).to.match(/epoch milliseconds/)
       for (const read of reads) { expect(read).not.toHaveBeenCalled() }
@@ -567,7 +567,7 @@ describe("Bank.make, by the Contract", () => {
   for (const [given, blurb] of BadNewOptionCases) {
     it(`validates every option, refusing ${blurb} by throwing 'bad_option', touching nothing (Contract: Bank.make, Does 1)`, () => {
       const world = makeWorld()
-      const reads = [vi.spyOn(world.vaultDB, 'getVault'), vi.spyOn(world.vaultDB, 'ensureVault')]
+      const reads = [vi.spyOn(world.vaultDB, 'tryGetVault'), vi.spyOn(world.vaultDB, 'tryEnsureVault')]
       TH.expectSyncRefusal(() => Bank.make(bankOptsOf(world, given as Partial<MakeBankOpts>)), 'bad_option')
       for (const read of reads) { expect(read).not.toHaveBeenCalled() }
     })
@@ -618,8 +618,8 @@ describe("Bank.make, by the Contract", () => {
     } }
     const vaultDB = localVaultDB({ store: ringingAtOnce })
     const tally = TH.tallyWatches(vaultDB)
-    const births = vi.spyOn(vaultDB, 'ensureVault')
-    const propsReads = vi.spyOn(vaultDB, 'getVault')
+    const births = vi.spyOn(vaultDB, 'tryEnsureVault')
+    const propsReads = vi.spyOn(vaultDB, 'tryGetVault')
     const vault = await world.open({ vaultDB })
     await TH.aWhile()
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
@@ -665,7 +665,7 @@ describe("Bank.make, by the Contract", () => {
     const world = makeWorld()
     const bank = Bank.make({ ...bankOptsOf(world), staleMinutes: 1 })   // hello() reads at most once a minute
     const vault = await bank.ensureVault({ user_id: 'u1', vaultlabel: 'main' })
-    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
+    const propsReads = vi.spyOn(world.vaultDB, 'tryGetVault')
     world.advance(MinuteMillis - 1)
     await vault.hello()
     expect(propsReads).not.toHaveBeenCalled()

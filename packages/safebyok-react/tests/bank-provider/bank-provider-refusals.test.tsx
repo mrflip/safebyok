@@ -97,7 +97,7 @@ describe("BankProvider", () => {
       const world = makeWorld()
       // Mocked past VaultDB's public verb, which would wrap a raw throw as storage_unavailable.
       const stray = new TypeError('something is not a function')
-      vi.spyOn(world.vaultDB, 'ensureVault').mockRejectedValueOnce(stray)
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockRejectedValueOnce(stray)
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -115,7 +115,7 @@ describe("BankProvider", () => {
       it(`hands down ${blurb} as the entry's refusal, in place, leaving the boundary alone`, async () => {
         const world = makeWorld()
         const condition = new VaultError(kind, 'Something the app can tell the user about.')
-        vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(condition))
+        vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(condition))
         const caught: unknown[] = []
         world.mount('u1', caught)
         await expectShown(`refused: ${kind}`)
@@ -126,7 +126,7 @@ describe("BankProvider", () => {
     it("hands down the very VaultError its birth was refused with, and no vault", async () => {
       const world = makeWorld()
       const refusal = unreachable()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(refusal))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(refusal))
       const { Grab, latest } = grabber()
       render(
         <BankProvider {...world.props} user_id="u1">
@@ -139,7 +139,7 @@ describe("BankProvider", () => {
 
     it("hands down no vault while its birth reads storage, the entry starting; then the vault, novel", async () => {
       const world = makeWorld()
-      const gate = TH.holdNextCall(world.vaultDB, 'ensureVault')
+      const gate = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
       const { Grab, latest, opened } = grabber()
       render(<BankProvider {...world.props} user_id="u1"><Grab /></BankProvider>)
       await gate.reached
@@ -154,7 +154,7 @@ describe("BankProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_option', 'Something the developer must fix.')
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(misuse))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(misuse))
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -165,7 +165,7 @@ describe("BankProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_record', 'A record the developer built wrongly.')
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(misuse))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(misuse))
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -190,7 +190,7 @@ describe("BankProvider", () => {
 
     it("opens once the app asks again and storage relents, the refusal gone with the entry that held it", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       world.mount('u1')
       await expectShown('refused: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -263,7 +263,7 @@ describe("BankProvider", () => {
 
     it("leaves a vault a later read finds deleted refused, vault_gone, asking nothing until the app asks again: then the next life, novel", async () => {
       const world = await madeWorld()
-      const reads = vi.spyOn(world.vaultDB, 'ensureVault')
+      const reads = vi.spyOn(world.vaultDB, 'tryEnsureVault')
       const { Grab, latest } = grabber()
       render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
@@ -305,7 +305,7 @@ describe("BankProvider", () => {
       const world = makeWorld()
       const first = unreachable()
       const second = new VaultError('not_permitted', 'Sign in to reach this vault.')
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(first)).mockResolvedValueOnce(TH.bad(second))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(first)).mockResolvedValueOnce(TH.bad(second))
       world.mount('u1')
       await expectShown('refused: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -315,7 +315,7 @@ describe("BankProvider", () => {
     it("retries with a new birth each time, only the vault born at last holding a storage watch", async () => {
       const world = makeWorld()
       const tally = TH.tallyWatches(world.vaultDB)
-      const reads = vi.spyOn(world.vaultDB, 'ensureVault')
+      const reads = vi.spyOn(world.vaultDB, 'tryEnsureVault')
       reads.mockResolvedValueOnce(TH.bad(unreachable())).mockResolvedValueOnce(TH.bad(unreachable()))
       world.mount('u1')
       await expectShown('refused: storage_unavailable')
@@ -329,7 +329,7 @@ describe("BankProvider", () => {
 
     it("asks again only once the bank holds no entry: a vault let go is born anew, one still held is left alone", async () => {
       const world = makeWorld()
-      const reads = vi.spyOn(world.vaultDB, 'ensureVault')
+      const reads = vi.spyOn(world.vaultDB, 'tryEnsureVault')
       const { Grab, latest } = grabber()
       const { rerender } = render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('novel')
@@ -353,13 +353,13 @@ describe("BankProvider", () => {
       })
       await expectShown('novel')
       expect(store.scopepaths(), 'a tombstone in the place of the vault record').to.deep.equal(['vault^acme^u1^main'])
-      expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
+      expect(await TH.expectingGood(deviceDB).tryGetLease(TH.scopeOf('u1'))).to.be.null
       expect(latest().err).to.be.null
     })
 
     it("hands down no refusal once the user signs out", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       const { rerender } = world.mount('u1')
       await expectShown('refused: storage_unavailable')
       rerender(world.tree(null))
@@ -368,7 +368,7 @@ describe("BankProvider", () => {
 
     it("matches useListedVault's @example for a refusal: the refusal's message, in place", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockResolvedValueOnce(TH.bad(unreachable()))
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockResolvedValueOnce(TH.bad(unreachable()))
       render(
         <BankProvider {...world.props} user_id="u1">
           <BankVaultExample />
@@ -382,7 +382,7 @@ describe("BankProvider", () => {
     it("throws a rejection of null too, as unexpected_error: the failure is held, not the value", async () => {
       hushConsole()
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'ensureVault').mockRejectedValueOnce(null)
+      vi.spyOn(world.vaultDB, 'tryEnsureVault').mockRejectedValueOnce(null)
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
@@ -400,7 +400,7 @@ describe("BankProvider", () => {
       hushConsole()
       const world = makeWorld()
       let rejectRead: (err: unknown) => void = noop
-      const ensureVault = vi.spyOn(world.vaultDB, 'ensureVault').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
+      const ensureVault = vi.spyOn(world.vaultDB, 'tryEnsureVault').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
       const caught: unknown[] = []
       const tree = (user_id: string | null) => (
         <CatchingBoundary caught={caught}>

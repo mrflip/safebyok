@@ -391,12 +391,14 @@ keep records by structured clone, never as JSON.
   two tabs raising at once never lower each other's record.
 * **Calls land in the order they were made.** Each verb calls its `do*` method before awaiting
   anything, so a store that starts each call's work in the order it is called keeps that order,
-  awaited or not: a lock's `delLease`, made after a grant's `putLease`, must erase it.
-* **What your store throws is a condition.** A browser's refusal that holds until something
-  outside the app changes (`SecurityError`, `QuotaExceededError`, `NotSupportedError`) becomes
-  `storage_blocked`, which a host shows without offering a retry, and anything else
-  `storage_unavailable`, what was thrown its `cause`. Every verb resolves an `Outcome` and never
-  rejects.
+  awaited or not: a lock's `tryDelLease`, made after a grant's `tryPutLease`, must erase it.
+* **What your store throws is a condition.** Every verb is a try pair: `getLease` resolves the
+  record or throws, and `tryGetLease` resolves an `Outcome` and never rejects. The vault calls the
+  `try` forms, which make of what your store throws a condition: a browser's refusal that holds
+  until something outside the app changes (`SecurityError`, `QuotaExceededError`,
+  `NotSupportedError`) becomes `storage_blocked`, which a host shows without offering a retry, and
+  anything else `storage_unavailable`, what was thrown its `cause`. The throwing form throws what
+  your store threw, as it came.
 
 ```ts
 import { openDB } from 'idb'
@@ -978,11 +980,12 @@ const queryFn = () => vault.getWhisper('anthropic_api_key')   // throws its refu
 ```
 
 A retry predicate never retries `family: 'misuse'` or `vault_locked`, and may retry
-`storage_unavailable`. A `VaultDB` verb throws nothing either: it resolves an `Outcome`, its `err`
-that same `VaultError`; `outcomeOf(thunk)` makes one of any body that throws, and `valOf(outcome)`
-hands back its `val` or throws its `err`. A throw that is no `VaultError` becomes
-`unexpected_error`, which a retry predicate never retries: wrap a call out to your own storage as
-`outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `RefusalKindVals`, and the
+`storage_unavailable`. A `VaultDB`'s and a `DeviceDB`'s verbs come in the same two forms:
+`vaultDB.tryGetBox(...)` resolves an `Outcome`, its `err` that same `VaultError`, and
+`vaultDB.getBox(...)` resolves the record or throws it. `outcomeOf(thunk)` makes an `Outcome` of
+any body that throws, and `valOf(outcome)` hands back its `val` or throws its `err`. A throw that
+is no `VaultError` becomes `unexpected_error`, which a retry predicate never retries: wrap a call
+out to your own storage as `outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `RefusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.

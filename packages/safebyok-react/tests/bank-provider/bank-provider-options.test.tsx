@@ -29,7 +29,7 @@ describe("BankProvider", () => {
     const vault = await opened()
     // No minute trusted: each hello reads, and bad news it meets is told to the handler given.
     const revoked = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
-    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(revoked))
+    vi.spyOn(vaultDB, 'tryGetVault').mockResolvedValueOnce(TH.bad(revoked))
     await TH.expectRefusal(vault.hello(), 'identity_revoked')
     expect(told).to.deep.equal([revoked])
 
@@ -119,7 +119,7 @@ describe("BankProvider", () => {
     const vault = await opened()
     await TH.unlock(vault, 'correct horse battery staple')
     await expectShown('unlocked')
-    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
+    vi.spyOn(vaultDB, 'tryGetBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
     await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     await expectShown('locked')
   })
@@ -137,7 +137,7 @@ describe("BankProvider", () => {
     const vault = await opened()
     await TH.unlock(vault, 'correct horse battery staple')
     // A change pushed from storage that the vault cannot read: its background refresh warns.
-    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(vaultDB, 'tryGetVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn']) })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'refresh' })
@@ -160,7 +160,7 @@ describe("BankProvider", () => {
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('BankProvider') })
     const vault = await opened()
     await TH.unlock(vault, 'correct horse battery staple')
-    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(vaultDB, 'tryGetVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'BankProvider'], ['warn', 'refresh']])
