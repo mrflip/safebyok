@@ -1,4 +1,4 @@
-/** What the checks say when input fails them, and what the bank and a vault say when a vault's lifecycle refuses a call: every sentence in one place, so wording and tone are reviewed together, and so is the rule that none quotes the input. */
+/** What the checks say when input fails them, every such sentence in one place, and the sentences of the bank's refusals and of a Vault object's gone and behind ones: so wording and tone are reviewed together, and so is the rule that none quotes the input. */
 
 import { ScopepathDelimiter } from './consts'
 
