@@ -194,7 +194,7 @@ export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, u
 })
 // --
 
-// == [Limits]: maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading
+// == [Limits]: maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading, ClockReading
 
 /** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Bank.make reads it. */
 const UnlimitedBytes = Number.MAX_SAFE_INTEGER
