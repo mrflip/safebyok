@@ -1,6 +1,6 @@
 # Thread 1: trythrow (2026-10-28)
 
-Branch `20261028-trythrow`, PR #TBD, stacked on [#311](https://github.com/mrflip/safebyok/pull/311).
+Branch `20261028-trythrow`, PR [#316](https://github.com/mrflip/safebyok/pull/316), stacked on [#311](https://github.com/mrflip/safebyok/pull/311).
 Justify: green (safebyok 3423 tests passed, 37 skipped; every package's lint, typecheck, build and size budget green).
 
 The Coach's naming rule of 2026-10-27: a function resolving an Outcome is `tryVerbFoo`, one that
