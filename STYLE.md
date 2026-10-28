@@ -698,8 +698,9 @@ rows with it.
   or leaving an optional parameter out means, a return the first line doesn't cover. A `@param`
   is the parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner
   named it.`
-* Each `{@link}` names something in scope in its file: add a type-only import, or write the name
-  as plain code. A private member is always plain code, in backticks: never a `{@link}`.
+* Each `{@link}` names something in scope in its file; anything else is plain code, in
+  backticks, never a type-only import made for the link, which `no-unused-vars` refuses. A
+  private member is always plain code, in backticks: never a `{@link}`.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would grep for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
