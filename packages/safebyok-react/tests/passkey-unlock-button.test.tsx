@@ -1,5 +1,4 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { Activity, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type UnlockVaultGating } from 'safebyok'
 import { createPasskey } from '../src/passkey'
@@ -32,9 +31,6 @@ const stubUnlockGating = (credential_id: string, stubOpts: TH.GatingOfOpts & TH.
 const gatingRefusing = (err: Error, credential_id: string) => stubUnlockGating(credential_id, { attempt: () => Promise.reject(err) })
 
 const noop = () => undefined
-
-/** `shown` inside an Activity in `mode`, for `rerender` to hide and show again. */
-const inActivity = (mode: 'visible' | 'hidden', shown: ReactNode) => <Activity mode={mode}>{shown}</Activity>
 
 /** What the button tells the user when it takes itself away. */
 const PasskeyTrouble = "Your passkey can't be used here just now. Unlock with your passphrase instead."
@@ -259,17 +255,17 @@ describe("PasskeyUnlockButton", () => {
       const attempt = vi.fn<TH.StubAttempt>(() => unlocking.promise)
       const gripes: (string | null)[] = []
       const button = <PasskeyUnlockButton gating={stubUnlockGating(credential_id, { attempt })} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />
-      const { rerender } = render(inActivity('visible', button))
+      const { rerender } = render(TH.inActivity('visible', button))
       fireEvent.click(screen.getByText('Use a passkey'))
       await waitFor(() => { expect(attempt).toHaveBeenCalledOnce() })
-      rerender(inActivity('hidden', button))
+      rerender(TH.inActivity('hidden', button))
       await act(async () => {
         unlocking.reject(new VaultError('wrong_passkey', "That passkey's answer didn't unlock it."))
         await TH.wakeupAtNextTick()
       })
       expect(gripes).to.deep.equal([null])
       await act(async () => {
-        rerender(inActivity('visible', button))
+        rerender(TH.inActivity('visible', button))
         await TH.wakeupAtNextTick()
       })
       expect(gripes).to.deep.equal([null, "That passkey's answer didn't unlock it."])
@@ -291,16 +287,16 @@ describe("PasskeyUnlockButton", () => {
       const gating: UnlockVaultGating = { ...raised, attemptPasskey }
       const heard: DialogAnswer[] = []
       const button = <PasskeyUnlockButton gating={gating} onDone={(answer) => { heard.push(answer) }} onGripe={noop} />
-      const { rerender } = render(inActivity('visible', button))
+      const { rerender } = render(TH.inActivity('visible', button))
       fireEvent.click(screen.getByText('Use a passkey'))
-      rerender(inActivity('hidden', button))
+      rerender(TH.inActivity('hidden', button))
       await act(async () => {
         touching.resolve(undefined)
         await answered.promise
         await TH.wakeupAtNextTick()
       })
       expect(attemptPasskey).not.toHaveBeenCalled()
-      rerender(inActivity('visible', button))
+      rerender(TH.inActivity('visible', button))
       await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
       expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })

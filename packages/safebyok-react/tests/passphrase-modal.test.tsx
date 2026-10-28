@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { Activity, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext, type Vault } from 'safebyok'
 import type { DialogAnswer, PassphraseAdvice } from '../src/modal'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
-// == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, confirmField, inActivity, renderUnlocking, others
+// == [Test helpers]: vaultInState, noop, Trouble, wordingOf, usernameField, confirmField, renderUnlocking, others
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
 const vaultInState = (state: 'novel' | 'locked') => TH.stubVault({ state })
@@ -49,9 +49,6 @@ const confirmField = () => screen.getByPlaceholderText<HTMLInputElement>('confir
 
 /** The polite region beside the field, which says the advice. */
 const adviceRegion = () => screen.getByRole('status')
-
-/** `shown` inside an Activity in `mode`, for `rerender` to hide and show again. */
-const inActivity = (mode: 'visible' | 'hidden', shown: ReactNode) => <Activity mode={mode}>{shown}</Activity>
 
 /** The dialog, unlocking through `unlocking`, rendered, and what reached its host: each onDone, and each error React reported. */
 const renderUnlocking = (unlocking: Promise<undefined>) => {
@@ -984,16 +981,16 @@ describe("PassphraseModal", () => {
       const unlocking = TH.held()
       const heard: DialogAnswer[] = []
       const dialog = <PassphraseModal gating={TH.gatingUnlockingWith(() => unlocking.promise)} onDone={(answer) => { heard.push(answer) }} />
-      const { rerender } = render(inActivity('visible', dialog))
+      const { rerender } = render(TH.inActivity('visible', dialog))
       TH.submitPassphrase('pw')
-      rerender(inActivity('hidden', dialog))
+      rerender(TH.inActivity('hidden', dialog))
       await act(async () => {
         unlocking.resolve(undefined)
         await TH.wakeupAtNextTick()
       })
       expect(heard).to.deep.equal([])
       await act(async () => {
-        rerender(inActivity('visible', dialog))
+        rerender(TH.inActivity('visible', dialog))
         await TH.wakeupAtNextTick()
       })
       expect(heard).to.deep.equal(['unlocked'])
@@ -1003,15 +1000,15 @@ describe("PassphraseModal", () => {
       const unlocking = TH.held()
       const heard: DialogAnswer[] = []
       const dialog = <PassphraseModal gating={TH.gatingUnlockingWith(() => unlocking.promise)} onDone={(answer) => { heard.push(answer) }} />
-      const { rerender } = render(inActivity('visible', dialog))
+      const { rerender } = render(TH.inActivity('visible', dialog))
       TH.submitPassphrase('pw')
-      rerender(inActivity('hidden', dialog))
+      rerender(TH.inActivity('hidden', dialog))
       await act(async () => {
         unlocking.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.'))
         await TH.wakeupAtNextTick()
       })
       await act(async () => {
-        rerender(inActivity('visible', dialog))
+        rerender(TH.inActivity('visible', dialog))
         await TH.wakeupAtNextTick()
       })
       expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.')
@@ -1022,15 +1019,15 @@ describe("PassphraseModal", () => {
       const landing = TH.held()
       const heard: DialogAnswer[] = []
       const dialog = <PassphraseModal gating={TH.gatingOf(vaultInState('locked'), { lockLanded: landing.promise })} onDone={(answer) => { heard.push(answer) }} />
-      const { rerender } = render(inActivity('visible', dialog))
-      rerender(inActivity('hidden', dialog))
+      const { rerender } = render(TH.inActivity('visible', dialog))
+      rerender(TH.inActivity('hidden', dialog))
       await act(async () => {
         landing.resolve(undefined)
         await TH.wakeupAtNextTick()
       })
       expect(heard).to.deep.equal([])
       await act(async () => {
-        rerender(inActivity('visible', dialog))
+        rerender(TH.inActivity('visible', dialog))
         await TH.wakeupAtNextTick()
       })
       expect(heard).to.deep.equal(['declined'])
@@ -1039,15 +1036,15 @@ describe("PassphraseModal", () => {
     it("says the advice that came back while it was hidden, once it shows again", async () => {
       const answering = TH.held<string | null>()
       const dialog = <PassphraseModal gating={TH.gatingOf(vaultInState('novel'))} passphraseAdvice={() => answering.promise} onDone={noop} />
-      const { rerender } = render(inActivity('visible', dialog))
+      const { rerender } = render(TH.inActivity('visible', dialog))
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
-      rerender(inActivity('hidden', dialog))
+      rerender(TH.inActivity('hidden', dialog))
       await act(async () => {
         answering.resolve('Longer is stronger.')
         await TH.wakeupAtNextTick()
       })
       await act(async () => {
-        rerender(inActivity('visible', dialog))
+        rerender(TH.inActivity('visible', dialog))
         await TH.wakeupAtNextTick()
       })
       expect(adviceRegion().textContent).to.eq('Longer is stronger.')

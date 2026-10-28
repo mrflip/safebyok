@@ -789,7 +789,9 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
   part that holds a helper, then read that part). A new helper goes in its part and in the door. The
   core's is also published as `safebyok/testing`, so another package's tests reach the same
   helpers; a package with helpers of its own keeps them in its own `tests/test-helpers.ts`, which
-  re-exports `safebyok/testing` beside them, so each test still has one `TH`.
+  re-exports `safebyok/testing` beside them, so each test still has one `TH`. A helper that builds
+  JSX cannot live in a `.ts` file: it goes in `tests/test-helpers-react.tsx`, which the `.ts` door
+  re-exports, so a test still reaches it as `TH`.
 
 * **Assertions are chai-style**: `expect(foo).to.eq(bar)`, `to.deep.equal` (`to.equal` is `===`;
   an object or array wants `deep`), `to.have.lengthOf`, `to.throw`, `to.have.members`. `true`,
