@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). Open, each PR's base `main`: 7 (#327, `c51b7274`, filed, stands on #321's tip, so on main's history); 3 (#330, `854be0c6`, rebased onto main, pass-through built, second review); 8 (#328, `f3c9a732`, filed, rebased onto main); 9 (#331, `e1601ff3`, on #327, in review); 2 (#325, `5e486337`, on #316's tip) reviewed and flagged, waits unfiled for the Coach's two TOP rows. Nine threads; restack of the open five at the wrap-up.
+**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). Open, each PR's base `main`: 7 (#327, `c51b7274`, filed, stands on #321's tip, so on main's history); 3 (#330, `854be0c6`, rebased onto main, pass-through built, second review); 8 (#328, `f3c9a732`, filed, rebased onto main); 9 (#331, `a984cea5`, on #327) reviewed fixed, waits unfiled on its three rows; 2 (#325, `5e486337`, on #316's tip) reviewed and flagged, waits unfiled for the Coach's two TOP rows. Nine threads; restack of the open five at the wrap-up.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -330,6 +330,8 @@ writes the Coach's rule into STYLE.md *Shapes* in the same PR, quoting it). Test
 `tests/checks/validator.test.ts` gains nothing but names unless a type test is natural. Size: small.
 Depends on: #317 (in the line); cut from the top of the line (#321's tip, or higher once threads file)
 when a slot frees. Review `medium`.
+
+*Review:* medium, fixed at `a984cea5`: 1 fix (STYLE.md's glosses of the rule marked "Read as:", a reading pending the Coach), 1 significant left: `ConsistencyRefusal` unexported though public `Refusing.parseConsistent` names it (Open Matters row; the thread waits unfiled on it). Verified: the alias form `type Story = Z.infer<...>` fails (293 errors, TS7022 on `Validator`), so the interfaces stand; the type test pins both to their hand-written shapes. Minor left: `message`'s bare `custom` (Cleanup); `#327`'s changeset says "saying" (the worker edits it in #331 on resume); `Story` absent from VOCABULARY.md (row); STYLE.md bullet overlap and the namespacing clause beside a destructuring codebase (row); field tours in the two doc blocks (documentarian).
 
 ## Not in this sprint
 
