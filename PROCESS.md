@@ -115,7 +115,9 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
 * A change to the public surface or to the stored format says so in its first line, and says
   what a consumer or an existing vault has to do about it.
 
-What CI checks on a PR, and how Dependabot's PRs get their changesets, is `notes/ci.md`.
+What CI checks on a PR, and how Dependabot's PRs get their changesets, is `notes/ci.md`. What to
+do with a Dependabot PR that fails, and what pushing to its branch costs, is
+`notes/dependabot-prs.md`.
 
 ## Packages
 
