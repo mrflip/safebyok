@@ -3,8 +3,8 @@ import type { UnlockVaultGating, VaultSnapshot } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Messages } from './messages'
-import { useIsMounted } from './is-mounted'
-import { askPasskey, passkeysAvailable } from './passkey'
+import { askPasskey, attemptOnce, passkeysAvailable } from './passkey'
+import { useWhenShown } from './when-shown'
 
 /**
  * A button that answers an `unlock_vault` gating with the vault's passkey: rendered only when the
@@ -13,8 +13,10 @@ import { askPasskey, passkeysAvailable } from './passkey'
  * to touch the passkey -- the press is the user gesture WebAuthn needs -- then hands its answer to
  * `gating.attemptPasskey`. It follows the vault's snapshot as it changes: a passkey added on
  * another device brings the button, one removed takes it away. Handed another gating, it starts
- * afresh. Taken away,
- * it lets go: a press still under way finishes unheard, calling `onDone` and `onGripe` no more.
+ * afresh. Taken away, it lets go: a press still under way finishes unheard, calling `onDone` and
+ * `onGripe` no more. Hidden by an `<Activity>` or a Suspense boundary, it waits: an attempt that
+ * settles meanwhile is met once it shows again. A passkey touched while it is hidden is never
+ * tried: its answer is zeroed at once, and the button is pressable again once it shows.
  *
  * `onDone('unlocked')` once the attempt is ok; `onDone('declined')` for a refusal that closes the
  * dialog -- a lock that won meanwhile, storage out of reach -- as the passphrase dialog does. Each
@@ -62,9 +64,10 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, autoFocus }: PasskeyUnloc
   const [asking, setAsking] = useState(false)
   // Wrapped, so that a rejection carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // Asked after each await: a button gone meanwhile -- its dialog went, or another vault remounted
-  // it -- unlocks nothing, and touches neither its state nor its dialog's callbacks again.
-  const isMounted = useIsMounted()
+  // Gone on through after each await: a button gone meanwhile -- its dialog went, or another vault
+  // remounted it -- unlocks nothing, and touches neither its state nor its dialog's callbacks
+  // again. One hidden meanwhile goes on once it shows again.
+  const { whenShown, isShown } = useWhenShown()
   if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(snapshot)) { return null }
 
@@ -73,15 +76,26 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, autoFocus }: PasskeyUnloc
     onGripe(null)
     try {
       const passkey = await askPasskey(snapshot.gate, { rpId })
-      if (passkey === null || ! isMounted()) { return }
-      const { ok, err } = await gating.attemptPasskey(passkey)
-      if (! isMounted()) { return }
-      if (ok) { onDone('unlocked'); return }
-      heard(err)
+      if (passkey === null) { await whenShown(() => { setAsking(false) }); return }
+      // An answer is as good as the passphrase, so it is tried now or never: one that comes back
+      // while the button is hidden is zeroed untried, not kept for it to show again, and the user
+      // presses again.
+      if (! isShown()) {
+        passkey.prfBytes.fill(0)
+        await whenShown(() => { setAsking(false) })
+        return
+      }
+      const { ok, err } = await attemptOnce(passkey, gating.attemptPasskey)
+      await whenShown(() => {
+        setAsking(false)
+        if (ok) { onDone('unlocked'); return }
+        heard(err)
+      })
     } catch (err) {
-      if (isMounted()) { heard(err) }
-    } finally {
-      if (isMounted()) { setAsking(false) }
+      await whenShown(() => {
+        setAsking(false)
+        heard(err)
+      })
     }
   }
 

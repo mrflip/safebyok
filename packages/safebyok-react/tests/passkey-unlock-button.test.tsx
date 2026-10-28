@@ -1,11 +1,25 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type UnlockVaultGating } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type UnlockVaultGating } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
 import type { DialogAnswer } from '../src/modal'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
+
+const asked = vi.hoisted(() => [] as (PasskeyAnswer | null)[])
+
+// Each answer askPasskey hands the button is noted in `asked`, so a test can see what became of
+// its bytes.
+vi.mock('../src/passkey', async (importOriginal) => {
+  const passkey = await importOriginal<typeof import('../src/passkey')>()
+  const askPasskeyNoting: typeof passkey.askPasskey = async (gate, opts) => {
+    const answer = await passkey.askPasskey(gate, opts)
+    asked.push(answer)
+    return answer
+  }
+  return { ...passkey, askPasskey: askPasskeyNoting }
+})
 
 /** A locked vault in memory with one passkey, made through the fake authenticator, that authenticator, and the `unlock_vault` gating the vault raised, held open. */
 const lockedVaultWithPasskey = async () => {
@@ -241,6 +255,73 @@ describe("PasskeyUnlockButton", () => {
       expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
       expect(updates.count()).to.eq(0)
       expect(gripes).to.deep.equal([null])
+    })
+  })
+
+  describe("while an Activity hides it", () => {
+    // Each call is held under way while the host hides the button's dialog, and settles before
+    // it shows it again. The button meets an attempt's outcome once it shows again; a passkey's
+    // answer it never keeps waiting.
+
+    it("says a refusal that lands while it is hidden once it shows again, and takes a press again", async () => {
+      const { authenticator } = await lockedVaultWithPasskey()
+      const [credential_id = ''] = authenticator.credentialIds()
+      const unlocking = TH.held()
+      const attempt = vi.fn<TH.StubAttempt>(() => unlocking.promise)
+      const gripes: (string | null)[] = []
+      const button = <PasskeyUnlockButton gating={stubUnlockGating(credential_id, { attempt })} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />
+      const { rerender } = render(TH.inActivity('visible', button))
+      fireEvent.click(screen.getByText('Use a passkey'))
+      await waitFor(() => { expect(attempt).toHaveBeenCalledOnce() })
+      rerender(TH.inActivity('hidden', button))
+      await act(async () => {
+        unlocking.reject(new VaultError('wrong_passkey', "That passkey's answer didn't unlock it."))
+        await TH.wakeupAtNextTick()
+      })
+      expect(gripes).to.deep.equal([null])
+      await act(async () => {
+        rerender(TH.inActivity('visible', button))
+        await TH.wakeupAtNextTick()
+      })
+      expect(gripes).to.deep.equal([null, "That passkey's answer didn't unlock it."])
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Use a passkey' }).disabled).to.be.false
+    })
+
+    it("never tries a passkey the user touched while it was hidden, zeroing its answer at once: once it shows again, a press unlocks", async () => {
+      const { vault, gating: raised } = await lockedVaultWithPasskey()
+      asked.length = 0
+      const touching = TH.held()
+      const answered = TH.held()
+      const fakeGet = navigator.credentials.get.bind(navigator.credentials)
+      vi.spyOn(navigator.credentials, 'get').mockImplementation(async (options) => {
+        await touching.promise
+        const credential = await fakeGet(options)
+        answered.resolve(undefined)
+        return credential
+      })
+      const attemptPasskey = vi.fn(raised.attemptPasskey)
+      const gating: UnlockVaultGating = { ...raised, attemptPasskey }
+      const heard: DialogAnswer[] = []
+      const button = <PasskeyUnlockButton gating={gating} onDone={(answer) => { heard.push(answer) }} onGripe={noop} />
+      const { rerender } = render(TH.inActivity('visible', button))
+      fireEvent.click(screen.getByText('Use a passkey'))
+      rerender(TH.inActivity('hidden', button))
+      await act(async () => {
+        touching.resolve(undefined)
+        await answered.promise
+        await TH.wakeupAtNextTick()
+      })
+      expect(attemptPasskey).not.toHaveBeenCalled()
+      const [touched] = asked
+      expect(touched?.prfBytes.every((byte) => byte === 0)).to.be.true
+      rerender(TH.inActivity('visible', button))
+      const pressable = screen.getByRole<HTMLButtonElement>('button', { name: 'Use a passkey' })
+      await waitFor(() => { expect(pressable.disabled).to.be.false })
+      expect(heard).to.deep.equal([])
+      fireEvent.click(pressable)
+      await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+      expect(attemptPasskey).toHaveBeenCalledOnce()
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     })
   })
 })

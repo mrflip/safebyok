@@ -463,12 +463,13 @@ describe("the vault's passkey", () => {
     expect(TH.stateOf(fresh.getSnapshot())).to.eq('unlocked')
   })
 
-  it("putWayin takes only the current passphrase as proof of a new passkey: a passkey's answer is bad_option, a wrong passphrase wrong_passphrase, adding nothing (Contract: putWayin, Guarantees)", async () => {
+  it("putWayin takes only the current passphrase as proof of a new passkey: a passkey's answer is bad_option, spending the new one beside it, a wrong passphrase wrong_passphrase, adding nothing (Contract: putWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const before = storedVaultRecordOf(world)
     const phone = await TH.passkeyOf('phone')
     await TH.expectRefusal(TH.putWayin(vault, laptop as unknown as string, phone), 'bad_option')
-    await TH.expectRefusal(TH.putWayin(vault, 'not the passphrase', phone), 'wrong_passphrase')
+    expect(phone.prfBytes.every((byte) => byte === 0)).to.be.true
+    await TH.expectRefusal(TH.putWayin(vault, 'not the passphrase', await TH.passkeyOf('phone')), 'wrong_passphrase')
     await TH.expectRefusal(TH.putWayin(vault, ' '.repeat(3), await TH.passkeyOf('phone')), 'wrong_passphrase')
     expect(storedVaultRecordOf(world)).to.deep.equal(before)
   })

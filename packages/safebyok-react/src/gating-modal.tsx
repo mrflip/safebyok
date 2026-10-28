@@ -3,7 +3,7 @@ import type { ChangePassphraseGating, DelPasskeyGating, DelVaultGating, Gating, 
 import { useRoundFor } from './boundary'
 import { Messages } from './messages'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
-import { createPasskey } from './passkey'
+import { attemptOnce, createPasskey } from './passkey'
 import { PassphraseModal } from './passphrase-modal'
 
 /**
@@ -27,7 +27,8 @@ import { PassphraseModal } from './passphrase-modal'
  *
  * Adding a passkey makes it at each submit, before the attempt checks the passphrase: a passkey
  * made for an attempt refused (a typo in the passphrase, say) stays on the authenticator, of no
- * use to the vault, and the next submit makes another. The passkey is filed under
+ * use to the vault, and the next submit makes another; so does one made while the dialog is
+ * hidden, which is never tried, its answer zeroed at once. The passkey is filed under
  * `passphraseUsername`, the relying party named for the vault's `applabel`, at this page's own
  * domain. A browser without WebAuthn says so in place.
  *
@@ -143,7 +144,7 @@ const PutPasskeyModal = (props: KindModalProps<PutPasskeyGating>) => (
 const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutPasskeyGating>) => {
   const { vault } = gating
   const { snapshot, username } = useFiling(vault, passphraseUsername)
-  const { gripe, setGripe, meet, attempt, isMounted } = useAttempts('GatingModal', done)
+  const { gripe, setGripe, meet, attempt, whenShown, isShown } = useAttempts('GatingModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
   // One submit at a time: the browser asks for one passkey at a time, and a second submit while
   // one runs would make a second passkey.
@@ -156,10 +157,13 @@ const PutPasskeyForm = ({ gating, done, passphraseUsername }: KindFormProps<PutP
     try {
       // Asked first, within the submit's own gesture, as WebAuthn wants.
       const made = await createPasskey({ rp: { name: snapshot.applabel }, user: { name: username, displayName: username } })
-      if (made === null || ! isMounted()) { return }
-      await attempt(() => gating.attempt(typed, made), 'unlocked')
+      if (made === null) { return }
+      // Tried now or never, as the passkey button's answer is: one made while the dialog is hidden
+      // is zeroed untried, and the passkey stays on its authenticator, a way into nothing.
+      if (! isShown()) { made.prfBytes.fill(0); return }
+      await attempt(() => attemptOnce(made, (passkey) => gating.attempt(typed, passkey)), 'unlocked')
     } catch (err) {
-      if (isMounted()) { meet(err) }
+      await whenShown(() => { meet(err) })
     }
   }
 

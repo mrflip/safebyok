@@ -28,6 +28,9 @@ const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable
  */
 export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
 
+/** Whether `err` is a refusal the user can correct, which leaves its gating open. */
+const isCorrectable = (err: VaultError): boolean => (correctableKindVals as readonly string[]).includes(err.refusalkind)
+
 /** The vault call a gating was raised by, as the logger names it. */
 export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
 
@@ -102,6 +105,10 @@ export type DelVaultGating = GatingCommon & {
  * every call waiting on it hears it: close the dialog. A second attempt while one runs refuses
  * 'attempt_in_flight'; one after the gating settled, 'gating_landed'. A malformed argument refuses
  * 'bad_option', leaving it open.
+ *
+ * An attempt spends the passkey's answer it is handed: its bytes are zeroed, whether it was sealed
+ * or never tried. Only a refusal the user can correct leaves it unspent, to hand in again; zero it
+ * yourself if you will not. A later attempt needs a fresh answer.
  *
  * @example
  *   if (gating.gatingkind === 'unlock_vault') {
@@ -278,7 +285,7 @@ export class RaisedGating implements ProvingGating {
       return settled.ok ? good(this.#vault) : bad(settled.err)
     } catch (err) {
       const refused = bad(this.#tools.heardRefusal(err))
-      if (! (correctableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
+      if (! isCorrectable(refused.err)) { this.settle(refused) }
       return refused
     } finally {
       this.#attempting = false
@@ -288,20 +295,26 @@ export class RaisedGating implements ProvingGating {
   /** The {@link Gating} the host is handed, frozen: its kind's attempt, `decline` and `lockLanded`. */
   #gatingOf(lockLanded: Promise<void>): Gating {
     const common = { vault: this.#vault, leaseMillis: this.#tools.leaseMillis, lockLanded, decline: () => { this.#decline() } }
-    // One attempt of the kind: its arguments checked, then its chain, each handed what the host handed in.
-    const attemptOf = <ArgsT extends unknown[]>(check: (...args: ArgsT) => void, chain: (...args: ArgsT) => Promise<void>) => (
-      async (...args: ArgsT): Promise<Outcome<Vault>> => await this.#attempt(() => { check(...args) }, async () => { await chain(...args) })
+    // One attempt of the kind: its arguments checked, then its chain, each handed what the host
+    // handed in. The passkey's answer among them, which `answerOf` picks out, is spent by every
+    // outcome but a refusal the user can correct: zeroed, sealed or not, tried or not.
+    const attemptOf = <ArgsT extends unknown[]>(check: (...args: ArgsT) => void, chain: (...args: ArgsT) => Promise<void>, answerOf: (...args: ArgsT) => unknown = () => undefined) => (
+      async (...args: ArgsT): Promise<Outcome<Vault>> => {
+        const tried = await this.#attempt(() => { check(...args) }, async () => { await chain(...args) })
+        if (tried.ok || ! isCorrectable(tried.err)) { spendAnswer(answerOf(...args)) }
+        return tried
+      }
     )
     const byKind: { [KindT in GatingKind]: () => Extract<Gating, { gatingkind: KindT }> } = {
-      initialize_gate: () => ({ ...common, gatingkind: 'initialize_gate', attempt: attemptOf(checkFirstGate, async (passphrase: string, passkey?: PasskeyAnswer) => { await this.#initializeGate(passphrase, passkey) }) }),
+      initialize_gate: () => ({ ...common, gatingkind: 'initialize_gate', attempt: attemptOf(checkFirstGate, async (passphrase: string, passkey?: PasskeyAnswer) => { await this.#initializeGate(passphrase, passkey) }, (_passphrase, passkey) => passkey) }),
       unlock_vault:    () => ({
         ...common,
         gatingkind:        'unlock_vault',
         attemptPassphrase: attemptOf(checkText, async (passphrase: string) => { await this.#unlockByPassphrase(passphrase) }),
-        attemptPasskey:    attemptOf(checkPasskey, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }),
+        attemptPasskey:    attemptOf(checkPasskey, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }, (passkey) => passkey),
       }),
       change_passphrase: () => ({ ...common, gatingkind: 'change_passphrase', attempt: attemptOf(checkTexts, async (current: string, next: string) => { await this.#changePassphrase(current, next) }) }),
-      put_passkey:       () => ({ ...common, gatingkind: 'put_passkey', attempt: attemptOf(checkNewPasskey, async (passphrase: string, passkey: PasskeyAnswer) => { await this.#putPasskey(passphrase, passkey) }) }),
+      put_passkey:       () => ({ ...common, gatingkind: 'put_passkey', attempt: attemptOf(checkNewPasskey, async (passphrase: string, passkey: PasskeyAnswer) => { await this.#putPasskey(passphrase, passkey) }, (_passphrase, passkey) => passkey) }),
       del_passkey:       () => ({ ...common, gatingkind: 'del_passkey', attempt: attemptOf(checkText, async (passphrase: string) => { await this.#delPasskey(passphrase) }) }),
       del_vault:         () => ({ ...common, gatingkind: 'del_vault', attempt: attemptOf(checkText, async (passphrase: string) => { await this.#delVault(passphrase) }) }),
     }
@@ -442,6 +455,12 @@ export class RaisedGating implements ProvingGating {
     return held
   }
   // --
+}
+
+/** Zero the bytes of `answer`, a passkey's answer as the host handed it in, when it reads as one not yet spent: it opens nothing again. */
+const spendAnswer = (answer: unknown): void => {
+  const unspent = VX.passkeyAnswer.safeParse(answer)
+  if (unspent.success) { unspent.data.prfBytes.fill(0) }
 }
 
 // == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
