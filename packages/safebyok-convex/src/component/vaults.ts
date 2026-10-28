@@ -6,9 +6,7 @@ import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
-import {
-  Boxscope, Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
-} from './validators'
+import * as CVX from './validators'
 
 /** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
  * That wrapper authenticates first: inside the component every call is trusted to be its
@@ -30,8 +28,8 @@ import {
 
 /** The vault record and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
 export const getVault = query({
-  args:    { ...VaultScope.fields },
-  returns: v.nullable(VaultAnswer),
+  args:    { ...CVX.vaultScope.fields },
+  returns: v.nullable(CVX.vaultAnswer),
   handler: async (ctx, scope) => {
     const row = await findVaultRecordRow(ctx.db, scope)
     return row && { vault: vaultRecordOfRow(row), boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) }
@@ -43,8 +41,8 @@ export const getVault = query({
  * life, the counter carried on, as the core's `Expectations.newLifeOf` makes it.
  */
 export const ensureVault = mutation({
-  args:    { draft: NovelVaultRecord },
-  returns: VaultAnswer,
+  args:    { draft: CVX.novelVaultRecord },
+  returns: CVX.vaultAnswer,
   handler: async (ctx, { draft }) => {
     const scope = scopeOf(draft)
     const storedRow = await findVaultRecordRow(ctx.db, scope)
@@ -59,15 +57,15 @@ export const ensureVault = mutation({
 
 // ------------------------------------------------------------------------------- the vault record
 
-/** Replace the vault record, only while the one stored has `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link PutVaultRecordAnswer}.
+/** Replace the vault record, only while the one stored has `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link CVX.putVaultRecordAnswer}.
  * What lands is `vaultRecord` with its `vault_epoch` the stored one plus one, whatever it carries.
  * It also misses, writing nothing, for a vault record that names another vault or does not move
  * `gate_epoch` forward. A miss names the stored vault record, or null for none.
  */
 export const putVaultRecord = mutation({
-  args:    { vaultRecord: VaultRecord, expected: VaultRecordExpectation },
-  returns: PutVaultRecordAnswer,
-  handler: async (ctx, { vaultRecord, expected }): Promise<Infer<typeof PutVaultRecordAnswer>> => {
+  args:    { vaultRecord: CVX.vaultRecord, expected: CVX.vaultRecordExpectation },
+  returns: CVX.putVaultRecordAnswer,
+  handler: async (ctx, { vaultRecord, expected }): Promise<Infer<typeof CVX.putVaultRecordAnswer>> => {
     const storedRow = await findVaultRecordRow(ctx.db, scopeOf(vaultRecord))
     // The core's comparison, then the server's own: the record written stays the vault's, its gate moving forward.
     const movesForward = storedRow !== null
@@ -83,13 +81,13 @@ export const putVaultRecord = mutation({
 
 // ----------------------------------------------------------------------------- the boxes
 
-/** Read the box under `boxlabel` as `VaultDB`'s `doGetBox` does, resolving a {@link GetBoxAnswer} where that throws.
+/** Read the box under `boxlabel` as `VaultDB`'s `doGetBox` does, resolving a {@link CVX.getBoxAnswer} where that throws.
  * The vault record and the box are read from one query's snapshot.
  */
 export const getBox = query({
-  args:    { ...Boxscope.fields, expected: BoxGetExpectation },
-  returns: GetBoxAnswer,
-  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
+  args:    { ...CVX.boxscope.fields, expected: CVX.boxGetExpectation },
+  returns: CVX.getBoxAnswer,
+  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof CVX.getBoxAnswer>> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     if (! Expectations.vaultMeets(vaultRow, expected)) {
       return { got: false, refusalkind: 'vault_mismatch' }
@@ -99,16 +97,16 @@ export const getBox = query({
   },
 })
 
-/** Write `box` as `VaultDB`'s `doPutBox` does, resolving a {@link PutBoxAnswer} where that throws.
+/** Write `box` as `VaultDB`'s `doPutBox` does, resolving a {@link CVX.putBoxAnswer} where that throws.
  * Beside its refusals, it resolves `vault_full` for a write that would take the vault past {@link
  * Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes} bytes and leave it larger: a new
  * box in a full vault, or a heavier replacement. A vault with no tally yet is counted first,
  * reading it once.
  */
 export const putBox = mutation({
-  args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
-  returns: PutBoxAnswer,
-  handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof PutBoxAnswer>> => {
+  args:    { ...CVX.vaultScope.fields, expected: CVX.boxExpectation, box: CVX.boxRecord },
+  returns: CVX.putBoxAnswer,
+  handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof CVX.putBoxAnswer>> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     if (vaultRow === null || ! Expectations.vaultMeets(vaultRow, expected)) {
       return { landed: false, refusalkind: 'vault_mismatch' }
@@ -144,8 +142,8 @@ export const putBox = mutation({
  * A vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
  */
 export const getCapacity = query({
-  args:    { ...VaultScope.fields },
-  returns: Capacity,
+  args:    { ...CVX.vaultScope.fields },
+  returns: CVX.capacity,
   handler: async (ctx, scope) => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     if (vaultRow === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
@@ -156,9 +154,9 @@ export const getCapacity = query({
 
 /** Remove the box under `boxlabel` as `VaultDB`'s `doDelBox` does, and take it off the vault's tally. */
 export const delBox = mutation({
-  args:    { ...Boxscope.fields, expected: BoxDelExpectation },
-  returns: v.nullable(BoxDeletion),
-  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof BoxDeletion> | null> => {
+  args:    { ...CVX.boxscope.fields, expected: CVX.boxDelExpectation },
+  returns: v.nullable(CVX.boxDeletion),
+  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof CVX.boxDeletion> | null> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     if (vaultRow === null || ! Expectations.vaultMeets(vaultRow, expected)) { return null }
     const storedRow = await findBoxRow(ctx.db, scope, boxlabel)
@@ -178,9 +176,9 @@ export const delBox = mutation({
  * Null when the vault record does not meet the expectation, or none is stored.
  */
 export const delVault = mutation({
-  args:    { ...VaultScope.fields, expected: VaultDelExpectation },
-  returns: v.nullable(VaultTombstone),
-  handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof VaultTombstone> | null> => {
+  args:    { ...CVX.vaultScope.fields, expected: CVX.vaultDelExpectation },
+  returns: v.nullable(CVX.vaultTombstone),
+  handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof CVX.vaultTombstone> | null> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     const tombstone = vaultRow && Expectations.tombstoneOf(vaultRow, scope, expected)
     if (! vaultRow || ! tombstone) { return null }
@@ -198,8 +196,8 @@ export const delVault = mutation({
  * of a document's fields. The tallies' limits keep that within one query's reads.
  */
 export const watchVault = query({
-  args:    { ...VaultScope.fields },
-  returns: VaultSignature,
+  args:    { ...CVX.vaultScope.fields },
+  returns: CVX.vaultSignature,
   handler: async (ctx, scope) => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     const boxes = await vaultBoxRows(ctx.db, scope)
@@ -213,9 +211,9 @@ export const watchVault = query({
 
 // ------------------------------------------------------------------------------------ helpers
 
-type VaultScope = Infer<typeof VaultScope>
-type VaultRecord = Infer<typeof VaultRecord>
-type BoxRecord = Infer<typeof BoxRecord>
+type VaultScope = Infer<typeof CVX.vaultScope>
+type VaultRecord = Infer<typeof CVX.vaultRecord>
+type BoxRecord = Infer<typeof CVX.boxRecord>
 
 /** The scope vault record names: its three names picked out, and nothing else. */
 const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
@@ -266,7 +264,7 @@ const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
 }
 
 /** Box rows as a listing returns them: each box's sparse shape, its record without its two ciphered fields. */
-const boxSparsesOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof BoxSparse>[] => rows.map((row) => {
+const boxSparsesOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof CVX.boxSparse>[] => rows.map((row) => {
   const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...sparse } = boxOfRow(row)
   return sparse
 })

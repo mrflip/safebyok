@@ -9,9 +9,7 @@ import type {
   VaultRecordExpectation as CoreVaultRecordExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxGetExpectation as CoreBoxGetExpectation, BoxExpectation as CoreBoxExpectation,
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
-import {
-  Boxscope, Capacity, VaultRecordExpectation, Ciphered, VaultDelExpectation, BoxSparse, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, Gate, NovelVaultRecord, VaultRecord, VaultScope, VaultTombstone,
-} from '../../src/component/validators'
+import * as CVX from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
 const { Validators } = Records
@@ -110,22 +108,22 @@ const convexShape = (validator: GenericValidator): Shape => {
 }
 
 const ShapeCases = [
-  [Validators.ciphered,               Ciphered,               'Ciphered: the shared encrypted-value shape'],
-  [Validators.vaultScope,             VaultScope,             'VaultScope: what names one vault, which the core hands out frozen'],
-  [Validators.boxscope,               Boxscope,               "Boxscope: a vault's scope and a boxlabel"],
-  [Validators.vaultRecord,            VaultRecord,            "VaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
-  [Validators.gateRecord,             Gate,                   'Gate: the passphrase, and the passkey or null'],
-  [Validators.vaultDraft,             NovelVaultRecord,       'NovelVaultRecord: every field, gate_epoch 0 and no gate'],
-  [Validators.boxRecord,              BoxRecord,              'BoxRecord: every field, the sidecar any value, both ciphered fields nested'],
-  [Validators.boxSparse,              BoxSparse,              'BoxSparse: the record without its ciphered fields, format kept'],
-  [Validators.vaultTombstone,         VaultTombstone,         'VaultTombstone: the scope, its format and the counter carried on'],
-  [Validators.capacity,               Capacity,               'Capacity: each max a number or Infinity, as the core takes it in'],
-  [Validators.vaultRecordExpectation, VaultRecordExpectation, 'VaultRecordExpectation: vault_tok and gate_epoch'],
-  [Validators.boxGetExpectation,      BoxGetExpectation,      'BoxGetExpectation: vault_tok'],
-  [Validators.boxExpectation,         BoxExpectation,         'BoxExpectation: vault_tok, and revision_tok or null'],
-  [Validators.vaultDelExpectation,    VaultDelExpectation,    'VaultDelExpectation: vault_tok, and gate_epoch or null'],
-  [Validators.boxDelExpectation,      BoxDelExpectation,      'BoxDelExpectation: vault_tok, and revision_tok or null'],
-  [Validators.boxDeletion,            BoxDeletion,            'BoxDeletion: one of three outcomes'],
+  [Validators.ciphered,               CVX.ciphered,               'ciphered: the shared encrypted-value shape'],
+  [Validators.vaultScope,             CVX.vaultScope,             'vaultScope: what names one vault, which the core hands out frozen'],
+  [Validators.boxscope,               CVX.boxscope,               "boxscope: a vault's scope and a boxlabel"],
+  [Validators.vaultRecord,            CVX.vaultRecord,            "vaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
+  [Validators.gateRecord,             CVX.gate,                   'gate: the passphrase, and the passkey or null'],
+  [Validators.vaultDraft,             CVX.novelVaultRecord,       'novelVaultRecord: every field, gate_epoch 0 and no gate'],
+  [Validators.boxRecord,              CVX.boxRecord,              'boxRecord: every field, the sidecar any value, both ciphered fields nested'],
+  [Validators.boxSparse,              CVX.boxSparse,              'boxSparse: the record without its ciphered fields, format kept'],
+  [Validators.vaultTombstone,         CVX.vaultTombstone,         'vaultTombstone: the scope, its format and the counter carried on'],
+  [Validators.capacity,               CVX.capacity,               'capacity: each max a number or Infinity, as the core takes it in'],
+  [Validators.vaultRecordExpectation, CVX.vaultRecordExpectation, 'vaultRecordExpectation: vault_tok and gate_epoch'],
+  [Validators.boxGetExpectation,      CVX.boxGetExpectation,      'boxGetExpectation: vault_tok'],
+  [Validators.boxExpectation,         CVX.boxExpectation,         'boxExpectation: vault_tok, and revision_tok or null'],
+  [Validators.vaultDelExpectation,    CVX.vaultDelExpectation,    'vaultDelExpectation: vault_tok, and gate_epoch or null'],
+  [Validators.boxDelExpectation,      CVX.boxDelExpectation,      'boxDelExpectation: vault_tok, and revision_tok or null'],
+  [Validators.boxDeletion,            CVX.boxDeletion,            'boxDeletion: one of three outcomes'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod validators they are made from", () => {
@@ -145,19 +143,19 @@ describe("the Convex validators, field for field with the core's Zod validators 
 
   it("type the same records, expectations and summaries as the core", () => {
     // What the core writes is what Convex takes: each record the core checks is one Convex's type takes.
-    expectTypeOf<Records.VaultRecord>().toExtend<Infer<typeof VaultRecord>>()
-    expectTypeOf<Records.VaultDraft>().toExtend<Infer<typeof NovelVaultRecord>>()
-    expectTypeOf<Records.BoxRecord>().toExtend<Infer<typeof BoxRecord>>()
-    expectTypeOf<Records.BoxSparse>().toExtend<Infer<typeof BoxSparse>>()
-    expectTypeOf<Records.VaultTombstone>().toExtend<Infer<typeof VaultTombstone>>()
-    expectTypeOf<Records.Capacity>().toExtend<Infer<typeof Capacity>>()
-    expectTypeOf<Readonly<Infer<typeof VaultScope>>>().toEqualTypeOf<Records.VaultScope>()
-    expectTypeOf<Infer<typeof VaultRecordExpectation>>().toEqualTypeOf<CoreVaultRecordExpectation>()
-    expectTypeOf<Infer<typeof BoxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
-    expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
-    expectTypeOf<Infer<typeof VaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
-    expectTypeOf<Infer<typeof BoxDelExpectation>>().toEqualTypeOf<CoreBoxDelExpectation>()
-    expectTypeOf<Infer<typeof BoxDeletion>>().toEqualTypeOf<CoreBoxDeletion>()
+    expectTypeOf<Records.VaultRecord>().toExtend<Infer<typeof CVX.vaultRecord>>()
+    expectTypeOf<Records.VaultDraft>().toExtend<Infer<typeof CVX.novelVaultRecord>>()
+    expectTypeOf<Records.BoxRecord>().toExtend<Infer<typeof CVX.boxRecord>>()
+    expectTypeOf<Records.BoxSparse>().toExtend<Infer<typeof CVX.boxSparse>>()
+    expectTypeOf<Records.VaultTombstone>().toExtend<Infer<typeof CVX.vaultTombstone>>()
+    expectTypeOf<Records.Capacity>().toExtend<Infer<typeof CVX.capacity>>()
+    expectTypeOf<Readonly<Infer<typeof CVX.vaultScope>>>().toEqualTypeOf<Records.VaultScope>()
+    expectTypeOf<Infer<typeof CVX.vaultRecordExpectation>>().toEqualTypeOf<CoreVaultRecordExpectation>()
+    expectTypeOf<Infer<typeof CVX.boxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
+    expectTypeOf<Infer<typeof CVX.boxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
+    expectTypeOf<Infer<typeof CVX.vaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
+    expectTypeOf<Infer<typeof CVX.boxDelExpectation>>().toEqualTypeOf<CoreBoxDelExpectation>()
+    expectTypeOf<Infer<typeof CVX.boxDeletion>>().toEqualTypeOf<CoreBoxDeletion>()
   })
 })
 
@@ -166,9 +164,9 @@ describe("the Convex validators, field for field with the core's Zod validators 
 const probeApp = defineTestApp({ schema: defineSchema({}) })
 const { api: probeApi, createTest } = probeApp.defineModules({
   probe: {
-    takeVaultRecord: probeApp.mutation({ args: { vaultRecord: VaultRecord }, returns: v.null(), handler: () => null }),
-    takeBox: probeApp.mutation({ args: { box: BoxRecord }, returns: v.null(), handler: () => null }),
-    takeCapacity: probeApp.mutation({ args: { capacity: Capacity }, returns: v.null(), handler: () => null }),
+    takeVaultRecord: probeApp.mutation({ args: { vaultRecord: CVX.vaultRecord }, returns: v.null(), handler: () => null }),
+    takeBox: probeApp.mutation({ args: { box: CVX.boxRecord }, returns: v.null(), handler: () => null }),
+    takeCapacity: probeApp.mutation({ args: { capacity: CVX.capacity }, returns: v.null(), handler: () => null }),
   },
 })
 
