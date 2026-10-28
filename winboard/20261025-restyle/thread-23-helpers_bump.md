@@ -31,3 +31,5 @@ A follow-up to thread 18 ([#308](https://github.com/mrflip/safebyok/pull/308)), 
   * **Follow-up after 2026-10-28 23:13 UTC:** delete the `minimumReleaseAgeExclude` entry and
     return the two devDependency pins to `^0.1.129` in one commit (PROCESS.md); the security note's
     amendment then says it is closed. The exclusion can go the moment the PR merges after that time.
+* **After review**: safebyok-convex's README and #308's unreleased changeset
+  (`.changeset/20261027-convex_helpers.md`) said "0.1.128 or later"; both now say 0.1.129.

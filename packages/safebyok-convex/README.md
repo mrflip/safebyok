@@ -14,7 +14,7 @@ pnpm add safebyok safebyok-convex convex convex-helpers
 `safebyok`, `convex` and `convex-helpers` are peer dependencies: your app installs them itself, so
 the adapter and your app share one copy of each, and a `VaultError` from one is a `VaultError` to
 the other. The component's Convex validators are made from the core's Zod ones by `convex-helpers`
-(0.1.128 or later), when your Convex CLI bundles it. `zod`, a peer of `safebyok` and of this
+(0.1.129 or later), when your Convex CLI bundles it. `zod`, a peer of `safebyok` and of this
 package too, comes with them: your package manager installs it if your app has not.
 
 Platform: Node 22 and up, and evergreen browsers for the client; the floor is stated in the core's
