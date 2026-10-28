@@ -7,10 +7,7 @@
       "ES2023",
       "DOM",
       "DOM.Iterable"
-    ],
-    // Off until convex-helpers 0.1.129 passes its seven days (2026-10-28), as in
-    // packages/safebyok-convex/tsconfig.json, which says why.
-    "erasableSyntaxOnly": false
+    ]
   },
   "include": [
     "tests",

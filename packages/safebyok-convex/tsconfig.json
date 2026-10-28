@@ -7,12 +7,7 @@
       "ES2023",
       "DOM",
       "DOM.Iterable"
-    ],
-    // Off until convex-helpers 0.1.129 passes its seven days (2026-10-28): 0.1.128 ships its .ts
-    // sources beside its .d.ts, TypeScript resolves an import to the .ts first and checks it, and
-    // one class there takes its fields as constructor parameters, which this flag refuses. 0.1.129
-    // ships no .ts: raise the floor to it and delete this.
-    "erasableSyntaxOnly": false
+    ]
   },
   "include": [
     "src",
