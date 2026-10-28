@@ -51,7 +51,7 @@ type Merged<SourcesT extends readonly object[]> =
   SourcesT extends readonly [infer HeadT extends object, ...infer RestT extends readonly object[]] ? Omit<HeadT, keyof Merged<RestT>> & Merged<RestT> : unknown
 // --
 
-// == [Validator]: Validator, Refusing, Saying
+// == [Validator]: Validator, Refusing
 
 /** Make validators: `build` gets the kit and returns its schemas by name, and each comes back with a `parse` that throws a VaultError of `kind`.
  * The message names each failing field by its path, up to eight, and counts the rest, each with
@@ -59,9 +59,9 @@ type Merged<SourcesT extends readonly object[]> =
  * an object does not take, it says how many, never which, and lists the fields it takes. It quotes
  * no input and carries no `cause`.
  *
- * `parse(val, saying?)` frames the message as the {@link Saying} asks: `where` the input was
+ * `parse(val, story?)` frames the message as the {@link Story} asks: `where` the input was
  * judged, before the failures, and `advice`, what to do, after them. With either, the failures
- * end in a period; with neither, the message is the failures alone. A saying that is none
+ * end in a period; with neither, the message is the failures alone. A story that is none
  * refuses 'bad_option', whatever the input.
  *
  * Only `parse` changes: `safeParse` and `parseAsync` are Zod's own. A schema sliced from a
@@ -108,28 +108,22 @@ export const Validator = <ValsT extends Record<string, Z.ZodType>, const Sources
   return Object.fromEntries(Object.entries(build(kit)).map(([valname, schema]) => [valname, refusing(kind, schema)])) as { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> }
 }
 
-/** A validator a {@link Validator} call makes: its schema, its `parse` also taking a {@link Saying}, and for an object, `parseConsistent`. */
+/** A validator a {@link Validator} call makes, what the call returns under each name: its schema, its `parse` also taking a {@link Story}, and for an object, `parseConsistent`. */
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
-  /** `val`, parsed: the call's kind otherwise, its message framed as `saying` asks; 'bad_option' for a saying that is none, whatever `val`. */
-  parse: (val: unknown, saying?: Saying) => Z.output<SchemaT>
+  /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_option' for a story that is none, whatever `val`. */
+  parse: (val: unknown, story?: Story) => Z.output<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
   /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal>) => Z.output<SchemaT>
 } : unknown)
-
-/** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
-export type Saying = {
-  where?:  string | undefined
-  advice?: string | undefined
-}
 // --
 
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf, framed
 
 /** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then holds the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
 const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT): Refusing<SchemaT> => {
-  const parse = (val: unknown, saying?: Saying): Z.output<SchemaT> => {
-    const framing = saying === undefined ? {} : SayingShape.parse(saying)
+  const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
+    const framing = story === undefined ? {} : Checks.StoryShape.parse(story)
     const result = schema.safeParse(val, InEnglish)
     if (result.success) { return result.data }
     throw refusalOf(kind, result.error, framing)
@@ -168,30 +162,24 @@ const sentenceOf = (issue: Z.core.$ZodIssue): string => {
   return fieldname ? `${fieldname}: ${issue.message}` : issue.message
 }
 
-/** The VaultError of `kind` for a failed parse, its message and `meta.fieldnames` as {@link Validator} says, framed as `saying` asks. */
-const refusalOf = (kind: RefusalKind, err: Z.ZodError, saying: Saying): VaultError => {
+/** The VaultError of `kind` for a failed parse, its message and `meta.fieldnames` as {@link Validator} says, framed as `story` asks. */
+const refusalOf = (kind: RefusalKind, err: Z.ZodError, story: Story): VaultError => {
   const issues     = err.issues.slice(0, MaxFailuresSaid)
   const unsaid     = err.issues.length - issues.length
   const sentences  = [...issues.map((issue) => sentenceOf(issue)), ...(unsaid > 0 ? [Phrases.moreFailures(unsaid)] : [])]
   const fieldnames = Object.freeze([...new Set(issues.map((issue) => fieldnameOf(issue)).filter((fieldname) => fieldname !== ''))])
-  return new VaultError(kind, framed(sentences.join('; '), saying), { meta: { fieldnames } })
+  return new VaultError(kind, framed(sentences.join('; '), story), { meta: { fieldnames } })
 }
 
-/** The failures `said`, with `saying`'s `where` before them and its `advice` after: with either, the failures end in a period; with neither, they stand alone. */
-const framed = (said: string, { where, advice }: Saying): string => {
+/** The failures `said`, with `story`'s `where` before them and its `advice` after: with either, the failures end in a period; with neither, they stand alone. */
+const framed = (said: string, { where, advice }: Story): string => {
   if (where === undefined && advice === undefined) { return said }
   const led    = where  === undefined ? said : `${where}: ${said}`
   return advice === undefined ? `${led}.` : `${led}. ${advice}`
 }
 // --
 
-// == [Consistency]: ConsistencyRefusal, consistent, demandConsistent, verifyConsistent, disagreeing, Bag, ConsistencyRefusalShape, SayingShape
-
-/** What a disagreement refuses with: its `kind`, and its `message`, a sentence or one made from the names of the fields that disagree, never their values. */
-export type ConsistencyRefusal = {
-  kind:     RefusalKind
-  message?: string | ((fieldnames: readonly string[]) => string) | undefined
-}
+// == [Consistency]: consistent, demandConsistent, verifyConsistent, disagreeing
 
 /** True when `bag` agrees with `other` wherever both make an assertion: each field defined in both (present, and not undefined) is `===`.
  * A field only one of them holds, or holds as undefined, is passed by. The fields compared are
@@ -213,7 +201,7 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
 export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {
-  const { kind, message } = ConsistencyRefusalShape.parse(refusal)
+  const { kind, message } = Checks.ConsistencyRefusalShape.parse(refusal)
   const fieldnames = disagreeing(bag, other)
   if (fieldnames.length === 0) { return true }
   const said = typeof message === 'function' ? message(fieldnames) : message
@@ -231,20 +219,31 @@ export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, 
 
 /** The names of the fields `bag` and `other` both define and hold apart, frozen: each bag checked to be an object first. */
 const disagreeing = (bag: object, other: object): readonly string[] => {
-  const ours = Bag.parse(bag)
-  const theirs: Partial<Record<string, unknown>> = Bag.parse(other)
+  const ours = Checks.Bag.parse(bag)
+  const theirs: Partial<Record<string, unknown>> = Checks.Bag.parse(other)
   return Object.freeze(Object.entries(ours)
     .filter(([ckey, val]) => val !== undefined && theirs[ckey] !== undefined && theirs[ckey] !== val)
     .map(([ckey]) => ckey))
 }
+// --
 
-/** A bag of fields to compare, any object, taken as it is, so a getter still reads; a refusal for a disagreement; and a parse's saying. Made below {@link Validator} and its refusals, which the call needs. */
-const { Bag, ConsistencyRefusalShape, SayingShape } = Validator('bad_option', ({ custom, obj, oneof, str, union }) => ({
+// == [Checks]: Checks, ConsistencyRefusal, Story
+
+/** The checks this module makes for itself, under one name: `Bag`, any object, taken as it is, so a getter still reads; `ConsistencyRefusalShape`, what a disagreement refuses with; and `StoryShape`, the words around a parse's refusal. Made below {@link Validator} and its refusals, which the call needs. */
+const Checks = Validator('bad_option', ({ custom, obj, oneof, str, union }) => ({
   Bag:                     custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   ConsistencyRefusalShape: obj({
     kind:    oneof(RefusalKindVals),
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
-  SayingShape:             obj({ where: str.optional(), advice: str.optional() }).strict(),
+  StoryShape:              obj({ where: str.optional(), advice: str.optional() }).strict(),
 }))
+
+// Each is an interface extending its Z.infer, not a type alias of it: Refusing names both, and
+// each is read off a Refusing, a loop TypeScript follows only through an interface's deferred members.
+/** What a disagreement refuses with: its `kind`, and its `message`, a sentence or one made from the names of the fields that disagree, never their values. */
+export interface ConsistencyRefusal extends Z.infer<typeof Checks.ConsistencyRefusalShape> {}
+
+/** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
+export interface Story extends Z.infer<typeof Checks.StoryShape> {}
 // --
