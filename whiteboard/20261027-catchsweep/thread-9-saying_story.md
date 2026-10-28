@@ -51,6 +51,10 @@ budget within limits).
     each. A second ruling (yes to the open matter) then exported `consistent`, `demandConsistent`
     and `verifyConsistent` as values too; `verifyConsistent`'s doc block stated its relation to
     `parseConsistent` as a contract where it had named its caller.
+    `tests/index.test.ts` pins the entry point's surface exactly, which that commit (`c16df6f7`) and
+    the plan commit after it (`f02d2b88`) were pushed without updating, so both are red at
+    `pnpm justify`; `3d4dcc8b` adds the three names and is green. Cause: the push was chained after a
+    log check that read the wrong exit line.
   - *"story" replaces "saying" everywhere*: the sweep found one remaining place meaning the Story,
     `.changeset/20261028-where_prefix.md` (#327's note, on this branch), changed in its own commit.
   - *STYLE.md's Shapes bullet*: the reading is now the rule's own wording; namespacing is the
