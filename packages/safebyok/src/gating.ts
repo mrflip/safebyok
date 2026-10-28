@@ -361,7 +361,7 @@ export class RaisedGating implements ProvingGating {
     const base = Gate.of(held, { keyDeriver: this.#tools.keyDeriver })
     await this.#strengthUnder(next, base)
     const currentProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), current, { gating: this })
-    await currentProving.checkWayin()
+    await currentProving.demandOpens()
     const newProving = await PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, next, { gating: this })
     const wayin = await currentProving.resealWayinFor(newProving)
     await this.#tools.putGate(Gate.make(this.#vault, { base, passphrase: wayin, passkey: null }), this.call)
@@ -376,7 +376,7 @@ export class RaisedGating implements ProvingGating {
     const held = await this.#freshenGated()
     const base = Gate.of(held, { keyDeriver: this.#tools.keyDeriver })
     const passphraseProving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
-    await passphraseProving.checkWayin()
+    await passphraseProving.demandOpens()
     const passkeyProving = await PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this })
     const wayin = await passphraseProving.resealWayinFor(passkeyProving)
     await this.#tools.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: wayin }), this.call)
@@ -389,7 +389,7 @@ export class RaisedGating implements ProvingGating {
     if (held.gate.passkey === null) { throw absentPasskey("Nothing was changed.") }
     const base = Gate.of(held, { keyDeriver: this.#tools.keyDeriver })
     const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
-    await proving.checkWayin()
+    await proving.demandOpens()
     await this.#tools.putGate(Gate.make(this.#vault, { base, passphrase: base.passphrase, passkey: null }), this.call)
     await this.#grantAfterChange(proving)
   }
@@ -398,7 +398,7 @@ export class RaisedGating implements ProvingGating {
   async #delVault(passphrase: string): Promise<void> {
     const held = await this.#freshenGated()
     const proving = await PassphraseProving.seal(this.#vault, headerOf(held.gate.passphrase), passphrase, { gating: this })
-    await proving.checkWayin()
+    await proving.demandOpens()
     // Sent in this same step: from here a lock or a decline leaves the settling to this chain.
     this.#deletionSent = true
     const vaultEpoch = await this.#tools.delVault(proving)

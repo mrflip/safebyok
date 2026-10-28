@@ -107,7 +107,17 @@ added or folded into through the subagent, and no other entry changes.
   only at open, the ciphertext's ctx binding the lease's `vault_tok`; this changes the Box object's own visible fields and what
   `demandConsistentWith` judges). A proving reaches the key deriver, logger, lease
   length, clock and the vault record in hand through `ProvingTools`, a WeakMap keyed by the Vault object in `src/proving.ts`, which no entry point
-  exports (amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
+  exports (amended 2026-10-27 (proving_tidy): the WeakMap is gone; `ProvingTools` is reached through a Symbol-keyed getter on the Vault class,
+  `get [provingTools]()`, with `export const provingTools = Symbol('Vault.provingTools')` a local Symbol in `src/proving.ts` (not `Symbol.for`) that
+  no entry point exports; `PassphraseProving.seal` and `PasskeyProving.seal` read `vault[provingTools]` once and refuse 'bad_option' for an object
+  without it, and a Proving keeps the tools in a non-enumerable protected field. A host holding a Vault object can find the getter with
+  `Object.getOwnPropertySymbols(Vault.prototype)` and so reach `ProvingTools`: `vaultRecord()` (the vault record in hand, gate wraps included),
+  `demand`, `keyDeriver`, `logger`, `leaseMillis`, `now()`, `deviceId()`, `putLease(record)` (writes a lease record to the host's own DeviceDB) and
+  `holdLease(lease)` (takes a `Lease` object that `Proving.grantLease` made with `Lease.make(this.vault, valOf(put))` from the record `putLease`
+  stored, and has the vault hold it, expiry armed and snapshot replaced; rebased onto #305, the lease record does not cross into `src/vault.ts`).
+  The lease registry in `src/held-lease.ts` stays a WeakMap, as
+  `tests/vault/vault-boxes.test.ts` "the Vault object's public surface" walks symbol-keyed getters and asserts no Lease is reachable from a Vault
+  object without a method call; amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
   `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `putLease` and `holdLease`, the power to grant
   a lease, and `GatingTools`, handed to each gating by its constructor, alone holds `putGate`, `delVault` and `takeUp`; a merged bundle would give
   each the other's powers).
@@ -116,7 +126,7 @@ added or folded into through the subagent, and no other entry changes.
   vault's `vault_tok` and two epochs, all stored unencrypted, with the scope being the vault's address; the ciphertext stays in the private
   `#record`. A Lease's `format` is likewise an own field; its leaseKey and wrapped vaultKey stay private. Older entries here that name
   `vault.leaseMillis`, `vault.now()` or `vault.keyDeriver` as public describe what stood before.
-  (4) `vaultRecordHeldBy(vault)` (reading through the private `toolsOf`) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
+  (4) `vaultRecordHeldBy(vault)` (reading through the Symbol-keyed `vault[provingTools]`; amended 2026-10-27 (proving_tidy), it read through a private `toolsOf` WeakMap lookup) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
   record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
@@ -295,7 +305,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **the put_passkey dialog makes the passkey before the passphrase is checked.**
   `GatingModal`'s `PutPasskeyForm` (`packages/safebyok-react/src/gating-modal.tsx`) calls `createPasskey()` at each submit, straight
   from the submit's user gesture as WebAuthn requires, then hands the passphrase and the new passkey's PRF answer to the
-  `put_passkey` gating's attempt; the core checks the passphrase (`checkWayin`) before it seals the passkey proving. After a wrong
+  `put_passkey` gating's attempt; the core checks the passphrase (`demandOpens`) before it seals the passkey proving. After a wrong
   passphrase the core leaves the PRF answer unspent, but the dialog keeps none across attempts (a secret answer is not held in React
   state between submits), so a typo leaves an unused credential on the authenticator (useless to the vault) and the next submit makes
   another. One submit runs at a time (a ref guard), so one press never makes two passkeys. The relying party is named for the vault's
@@ -357,7 +367,7 @@ added or folded into through the subagent, and no other entry changes.
   passphrase another device has replaced opens nothing here; a vault whose gate another device set while the user typed
   refuses a first gate `gate_made_elsewhere` without trying the typed text against the winner's gate.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the order of checks and seals within a chain.** `change_passphrase` seals and checks
-  the current passphrase (`checkWayin`) before it derives the next; `put_passkey` seals and checks the passphrase before it
+  the current passphrase (`demandOpens`) before it derives the next; `put_passkey` seals and checks the passphrase before it
   seals (and zeroes) the new passkey's answer, so a typo returns to the dialog with the answer unspent; the strength check
   runs before any derivation. `same_passphrase` compares the two strings the user typed in this tab with `===`: no
   attacker observes it, and no constant time is used (the spec has it so). The seals of a chain share no junction.
@@ -1144,7 +1154,7 @@ added or folded into through the subagent, and no other entry changes.
   `src/proving.ts` replaces `src/proof.ts`, and no object holds the secret or hands out the wayinKey.** A
   `PassphraseProving` or `PasskeyProving`, made by its `seal`, holds the wayinKey as a non-extractable CryptoKey in a
   private `#wayinKey` field, never handed out, and the vaultKey it unwraps never crosses out of its methods
-  (`checkWayin`, `resealWayinFor`, `sealWayins`, `grantLease`). `tryOpen`'s returned vaultKey pair (session and
+  (`demandOpens`, `resealWayinFor`, `sealWayins`, `grantLease`). `tryOpen`'s returned vaultKey pair (session and
   transient) no longer exists.
 * 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**

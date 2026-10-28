@@ -137,7 +137,7 @@ To be deleted at 1.0.0.
 | kind `too_many_wayins`                                 | none: a new passkey replaces the passkey                |
 | `vault.decryptWhisper(record)`, `tryDecryptWhisper`, `vault.openBox`, `box.tryOpen(vaultKey)`, `box.open` | `box.extractWhisper()`, `tryExtractWhisper`, under the vault's lease |
 | `Lease.grant`, `lease.tryOpen`, `lease.wrapBoxKey`, `lease.unwrapBoxKey`, `lease.record` | `proving.grantLease()`; a lease taken up as read; `lease.cipheredWith` / `decipherWith` / `sealProps`; no public record |
-| `Wayin.seal`, `Wayin.sealPassphrase`, `Wayin.sealPasskey`, `Wayin.tryOpenAmong`, `wayin.tryOpen` | `PassphraseProving.seal` / `PasskeyProving.seal`, then `proving.sealWayins`, `resealWayinFor`, `checkWayin` |
+| `Wayin.seal`, `Wayin.sealPassphrase`, `Wayin.sealPasskey`, `Wayin.tryOpenAmong`, `wayin.tryOpen` | `PassphraseProving.seal` / `PasskeyProving.seal`, then `proving.sealWayins`, `resealWayinFor`, `demandOpens` |
 | `tryDemandConsistentWith`                              | `consistentWith` (the query) beside `demandConsistentWith` (throws) |
 | `VaultDB.getVaultProps`, `ensureVaultProps`, `listBoxes`, `listBoxRecords` | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords` |
 | `TH.makeGate`                                          | `TH.makeLatch`: a gate is the vault's ways in       |
