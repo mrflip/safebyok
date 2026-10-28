@@ -23,7 +23,7 @@ import { consistent } from './checks/validator'
  *
  * A VaultError your code throws passes as it came, from either form; anything else it throws
  * becomes 'storage_blocked' where {@link isStorageBlocked} names it, else 'storage_unavailable',
- * that throw its `cause`, naming no scope and quoting no record. A throw from the base class's own
+ * naming no scope and quoting no record. A throw from the base class's own
  * code that is no VaultError is a bug, which a `try` form resolves as 'unexpected_error' and a
  * throwing form throws as it came.
  *
