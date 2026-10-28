@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #311 rebased onto main (41f44f69, 2026-10-28). Threads 1, 6 and 4 building in `/workspace/byok-trythrow`, `/workspace/byok-store_trynames`, `/workspace/byok-where_prefix`; 5 queued; 2 waits on 1; 3 waits on 6.
+**Status:** threads 1 (#316) and 4 (#317) ready and in review; 6 building; 5 queued; 2 waits on 1; 3 and 7 wait on 6. Seven threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -75,7 +75,12 @@ Gloss: (a) `proving.ts` `#unwrap`: compute `wayinCtxOf(...)` before the `try`; t
 `unwrapKeyUnder`. (b) `lease.ts`: `#vaultKeyOrNull`, and the inner `outcomeOf` calls in the cipher
 and decipher bodies, become plain `try`/`catch` around exactly the one `subtle`-backed call each
 (`wrapKeyUnder`, `cipherBytes`, `unwrapKeyUnder`, `decipherBytes`), ctx computed outside; the
-`damaged_box` and `unexpected_error` mappings stay as they are, per call. (c) `device-db.ts`
+`damaged_box` and `unexpected_error` mappings stay as they are, per call. (b2) By the Coach's
+ruling of 2026-10-28 ("I'm happier with the throwing body doing a try catch to fix its refusals --
+that's most of its job, it belongs there; then having the try version wrap as usual"): each
+throwing form thread 1 made (`cipheredWith`, `decipherWith`, `sealProps`, `Box.seal`,
+`extractWhisper`) ends with one catch that maps a non-VaultError to `unexpectedError` and rethrows,
+so no bug leaves it raw; the `try` form stays one `outcomeOf` hop. (c) `device-db.ts`
 `deviceTrouble`: the condition no longer carries the store's throw as `cause` (keep its
 `name` in the message or `meta` if that helps a host, never its message), since a custom
 `DeviceDB`'s throw may quote stored lease text and the logger hands the error to the host whole
@@ -155,6 +160,24 @@ listing each rename, `patch` per adapter whose docs or tests changed. Size: larg
 nothing beyond #311. Look-ahead: thread 3 rewrites these verbs' insides right after; keep each verb's
 body whole so its diff stays small.
 
+### 7. vault_bank_flip: the Vault's and Bank's try pairs in the one-catch form
+
+Coach, 2026-10-28, on thread 1's open matter: "I'm happier with the throwing body doing a try catch
+to fix its refusals -- that's most of its job, it belongs there; then having the try version wrap
+as usual".
+
+Gloss: the 18 `vault.ts` pairs and 5 `bank.ts` pairs keep the body in `tryX` inside a hand
+`try`/`catch` whose `#badOutcome` maps a non-VaultError to `unexpectedError`, tells bad news to the
+listeners, and returns `bad(err)`; `X` is `valOf(await this.tryX())`. Flip each: `X` holds the body
+and ends `catch (err) { throw this.#heardRefusal(err) }` (or the name the worker finds right: it maps,
+tells the news once, and rethrows), and `tryX` is one `outcomeOf(() => this.X(...))` hop. Bad news is
+told exactly once on both paths; a `useWhisper`-style caller that composes keeps its behaviour.
+Every demand, every `#demandNotGone`, and every refusal kind stays where it is; doc blocks move to
+the throwing form. The `Vault[provingTools]` route that hands `#badOutcome` to a proving (thread 1's
+note) follows the same one-catch form. Empty changeset unless a refusal changes. Size: medium,
+mechanical but wide. Depends on: thread 6 (it renames the store calls inside these same bodies): cut
+from thread 6's tip once it files.
+
 ## Not in this sprint
 
 * `safebyok-react` `askAuthenticator`'s `SecurityError` branch: the audit called it a guess; the
@@ -164,5 +187,5 @@ body whole so its diff stays small.
 
 ## For the Coach
 
-* Thread 1 will report, not flip, the `vault.ts` and `bank.ts` pairs (bad news told on both paths).
+* ~~Thread 1 will report, not flip, the `vault.ts` and `bank.ts` pairs~~: ruled 2026-10-28, thread 7 flips them.
 * Thread 5's sanitizer shape, if `Sanitizer` is an exported type.
