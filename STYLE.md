@@ -90,7 +90,10 @@ spreads a narrower: `export const WayinKindVals = [...] as const`,
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
 `VaultTombstone`, `VaultSnapshot`; never a bare `Stamp`. A sparse thing is `-Sparse`
 (`BoxSparse`), never `-Listing`, which reads as the list or what holds it, nor `-Listed`: a sparse
-shape turns up well beyond listings. A response is named for the operation's family, not a
+shape turns up well beyond listings. What an adapter hands up unchecked is `Stored-` and what it
+holds (`StoredVault`, `StoredBox`): named for what storage holds, not for the call that read it.
+The prefix names what storage holds, checked or not, so a validator of it keeps it
+(`StoredVaultTok`, `StoredRevision`). A response is named for the operation's family, not a
 moment: `VaultReadResponse`.
 
 **The stamp is the bound fields.** Say *stamp* for the fields a thing's cryptography is bound to,
@@ -457,13 +460,14 @@ the scope.
 * **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
   and module-local and good idea to put it near where used); use Validator; namespace it, using
-  Validator or a star-import." Read as: the type is `Z.infer` of the shape, never a parallel
-  written by hand; the shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it
-  is odd and local to one module, which keeps it beside its use; it is made in a `Validator` call;
-  and it is reached under a namespace, the object a `Validator` call returns (`Checks.StoryShape`)
-  or a star import (`Validators.vaultScope`). A good reason for an exception is said beside it. A
-  type its own validator's type names (`Story`, which `Refusing` names and a `Refusing` makes) is
-  an `interface` extending the `Z.infer`, whose members TypeScript resolves on demand.
+  Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
+  hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
+  local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
+  namespaced as the object a `Validator` call returns (`Checks.StoryShape`), or through its
+  module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
+  `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
+  type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
+  the `Z.infer`, whose members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
@@ -603,8 +607,8 @@ rows with it.
   function leads with what it is or returns: `/** The fields written to storage: the visible
   ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
   that will be written to the database */`. A function that reads storage, decrypts, asks the
-  user or writes leads with that verb: `/** Read and open the box stored under boxlabel, ...`.
-  "Read" means a storage read: a lookup in memory leads with what it returns. Never open on "What
+  user or writes leads with that verb: `/** Get and open the box stored under boxlabel, ...`.
+  "Get" here is a storage read: a lookup in memory leads with what it returns. Never open on "What
   a ..." or "What ... does": name the thing, or say the act.
 * **Read the member's name against that first line** (*Naming*).
 * **Name the shape and say *stamp*.** A block says which shape it takes or hands back
@@ -706,8 +710,8 @@ A private helper whose block toured its return value and hid its reach. Before:
 After, and renamed from `#storedBase`, as the line showed the name was wrong:
 
 ```ts
-/** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
- * Reads through `#readBox`, and decrypts the whisper under the lease in hand. The write then
+/** Get and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
+ * Gets through `#getBox`, and decrypts the whisper under the lease in hand. The put then
  * lands only over the revision read.
  */
 async #fillFromStored(boxlabel: string, ...)
