@@ -1,84 +1,88 @@
 # Thread 22: validator names (2026-10-28)
 
-Branch `20261028-validator_names`, PR #322, stacked on #319 (its base stays main). Justify: green
-at the tip (core 3448 passed, every package and e2e green). Re-runs thread 20 (#310, superseded)
-under the Coach's rulings of 2026-10-28.
+Branch `20261028-validator_names`, PR #322, on main (its base #319 has merged; the branch stands
+on #319's tip `90b28414`). Justify: green at the tip (the PR's **Tests:** line has the counts).
+Re-runs thread 20 (#310, superseded) under the Coach's rulings of 2026-10-28, and folds in the
+rulings of round 4.
 
-* **Built**:
-  * **Moves into `src/shapes/`** (`f0147022`): `checks/primitives.ts` and
-    `checks/key-deriver-spec-checks.ts` become `shapes/primitives.ts` and
-    `shapes/key-deriver-spec.ts` (tests moved beside); the seal's checks (box.ts) to
-    `shapes/box.ts`; `LeaseGrant` (lease.ts) and `idbOpts` (idb-opts.ts) to `shapes/device.ts`;
-    `freshPasskeyAnswer` (proving.ts) with `isPrfSalt` (wayin.ts), and `strengthChecker`,
-    `passphraseVerdict`, `PassphraseVerdict` (passphrase-strength.ts) to `shapes/vault.ts`;
-    `loggerShape`, `localVaultDBOptsShape` and `callback` to `shapes/bank-opts.ts`; `maskOpts` to
-    a new `shapes/mask.ts`, so `safebyok/utils` pulls no other validator. Sizes unchanged.
-  * **Namespaces** (`d07f4267` core; the rest in the rename commits): no
-    file names a validator in a value import. PX primitives, FX fields, CX scopes, BX box, DX
-    device, VX vault, VDX vault-db, OX bank-opts, KX key-deriver-spec, MX mask; `Validators`
-    outside the core; CVX for safebyok-convex's component validators. Types by name. A record's
-    field validators come into its `Validator` call from `[FX]` as a source, so records still read
-    `obj({ vault_tok, salt_b64 })`. bank.ts uses `CX.bankBag` beside `CX.vaultBag`;
-    shapes/vault-db.ts has `import * as BX` plus `import type { BoxSparse, BoxDamaged }`.
-  * **Rename** (`a7a996ae`, one green commit: core, its tests, adapters, demo): 48 validators
-    lowerFirst, private ones too; `VaultScope` (a second name for `vaultScope`) gone; Validators
-    holds values only. Convex's own validators lowerCamelCase and reached as CVX in a commit of
-    their own (`078f9317`): `gate`, `novelVaultRecord`, `vaultAnswer`, ... Later (`a589e466`)
-    `madeUnderShape` and `cipheredShape` became `madeUnder` and `boxCiphered`, named for their
-    types.
-  * **Vals** (`0f875b96`): twelve lists lowerFirst, convex's `safebyokErrorKindVals` among them.
-  * **Docs** (`704ec5d9`): STYLE.md *Imports* has the namespace rule with an example, *Naming*
-    the Coach's rule; README and notes/guarantees.md follow. notes/security.md amended by a
-    sonnet subagent (`fac8ae99`), 17 entries marked `amended 2026-10-28 (validator_names)`.
-  * **phrases.ts** (`f154be58`): `otherScope`, `VaultGoneWhileOpening`, `OtherStoresThanHeld`,
-    `VaultBehindWhileOpening`, and vault.ts's two as `VaultObjectGone`, `VaultBehind`, in a
-    `[Bank and vault]` section; the header says it holds these and every check's sentence (`f38fb3f3`).
-    Wording and kinds unchanged.
-  * **Changeset** (`3d04edbf`): minor, safebyok and safebyok-convex, every rename old -> new.
+* **Built** (SHAs as of the round-4 restack):
+  * **Moves into `src/shapes/`** (`5254c7c6`): every exported validator lives there. That covers
+    the primitives and keyDeriverSpec (out of `checks/`), the seal's checks (box.ts), `leaseGrant`
+    and `idbOpts` (`shapes/device.ts`), `freshPasskeyAnswer` with `isPrfSalt`, the strength
+    checker's and the verdict's checks (`shapes/vault.ts`), `loggerShape`,
+    `localVaultDBOptsShape`, `callback` (`shapes/bank-opts.ts`) and `maskOpts` (`shapes/mask.ts`).
+  * **Namespaces** (`d87b8037` for the core; the rest came with the rename): PX, FX, CX, BX, DX,
+    VX, VDX, OX, KX, MX, and CVX for convex's component validators. Types are imported by name. A
+    record's field validators come in from `[FX]` as a source.
+  * **Rename** (`9aab24f6` for the core, tests, adapters and demo; `74d8a2f1` for convex's own):
+    lowerFirst. `VaultScope`, a second name for `vaultScope`, is gone. After that come `madeUnder`
+    and `boxCiphered` (`7d50e60c`). The **Vals** lists are lowerFirst too (`01498e11`).
+  * **phrases.ts** (`6d846513`): `otherScope`, `VaultGoneWhileOpening`, `OtherStoresThanHeld`,
+    `VaultBehindWhileOpening`, `VaultObjectGone` and `VaultBehind`, beside main's
+    `VaultBagAdvice`.
+  * **Docs**: STYLE.md *Imports* and *Naming*, the README, notes/guarantees.md and
+    notes/security.md (through sonnet subagents). The changeset lists every rename.
+  * **Round 4, the Coach's rulings**, one commit each:
+    * (a) `e73bc1df`: no `Validators` namespace. `src/validators.ts` is gone, and the main entry
+      exports all 63 validators by name. Adapters, tests and the demo import the few they use by
+      name. Convex's component and the two test files that reach many validators star-import the
+      main entry as `Safebyok`. The README, changeset and notes/security.md follow.
+    * (b) `fc7ea59f`: STYLE.md has a table of the namespace aliases against their files, checked
+      against the code. It says the core's `src/shapes/` holds the validators a module exports,
+      and one a module keeps to itself stays beside its one user.
+    * (c) `fdf65251`: STYLE.md says the namespace is there because a named import is unwieldy,
+      not because it is banned. There is no lint rule.
+    * (d) `1912601a`: `passkeyAnswerShape` -> `passkeyAnswer` (public, so the changeset names
+      it), and `Checks.ConsistencyRefusalShape` -> `Checks.consistencyRefusal`.
+  * **Size** (`0acda6c6`): idbDeviceDB's budget goes from 31 to 32 kB, by
+    `pnpm size:budget --write`.
 * **Decisions taken**:
-  * Namespace names: STYLE *Imports* says a module of functions comes in under its Startcase
-    name, but `Box`, `Vault` and `KeyDeriverSpec` are taken; the short `X` names mirror the `T`
-    rule for type modules and keep the Coach's `CX`. STYLE.md says so.
-  * Values through the namespace, types by name, even where that is two import lines of one module
-    (as #301's `CX` + `import type { VaultScope }` already were).
-  * Module-private validators stay where they are, STYLE's "module-local variation"
-    (lease.ts `serializedBytes`, `leaseSealProps`; string-store.ts and idb.ts `listenerShape`;
-    vault.ts `putBoxProps`; del-damaged-vault.ts; vault-opts.ts's three; checks/validator.ts
-    `bagShape`, `consistencyRefusalShape`). `options.ts`'s `optionsBag`, built per call by
-    `optionsCheck`, is judged machinery, not a validator. `Kit` is the builder kit.
-  * checks/validator.ts's private `Bag` would become `bag`, which its own `bag` parameters take: it
-    is `bagShape`, as the house's other host-object checks are named (`loggerShape`). The only
-    rename beyond lowerFirst.
-  * `phrases:` was thread 21's commit prefix; PROCESS has none, so these used `api`.
+  * Namespace names end in X, not STYLE's Startcase, because `Box`, `Vault` and `KeyDeriverSpec`
+    are taken.
+  * Outside the core, a file that reaches one or two validators imports them by name. One that
+    reaches many star-imports `safebyok` as `Safebyok`, by STYLE's Startcase rule for a module
+    imported whole.
+  * Main's #331 made checks/validator.ts's private checks one object, `Checks` (`Bag`,
+    `ConsistencyRefusalShape`, `StoryShape`). I kept that shape. The rename made its members
+    lowerFirst (`Checks.bag`). In (d), `Checks.consistencyRefusal` and, by the same rule,
+    `Checks.story`.
+  * `Scopepath`, `Expectations`, `Refusals` and `HostErrorSanitizer` stay namespace exports.
+    Each is one real module's namespace (STYLE *Imports*), not a confection gathered from several.
+  * `maskOpts`, `idbOpts`, the bank-opts checks and everything else `Validators` held are exported
+    by name from the main entry, so a host loses nothing it could reach before.
 * **Deviations**:
-  * Commit order: namespaces in the core first, so the rename touches `BX.BoxRecord` as a
-    property and never meets a local of the new name. Every commit is green (`pnpm --filter`
-    lint, typecheck, test on each package it touches; full justify at the tip).
-* **Review round** (2026-10-28): the history was rebuilt from `d07f4267` so that no commit is red.
-  The core's rename, its tests, the adapters and the demo are one commit, and convex's own
-  renames are another. The reviewer's InPackage fix was folded into the rename, and its doc-link
-  fix kept (`c910b5c7`). After those: `madeUnder` and `boxCiphered` (`a589e466`); the `Validator`
-  example's module is `GateChecks` again, not `GX` (`37a1e58f`); the phrases.ts header narrowed;
-  shapes/mask.ts's reason is a comment (`7cce9189`); STYLE.md says an out-of-scope `{@link}` is
-  backticks only (`a1ed35fe`). Left for the Coach by the orchestrator: a small shapes module for
-  `loggerShape`, `callback` and `localVaultDBOptsShape`; the private validators; vault.ts's
-  other lifecycle sentences.
-  * safebyok-indexeddb's own `idbVaultDBOpts` stays in its package (an adapter's own check).
-* **Discoveries**: `tests/types/type-aliases.test.ts` imported `./shapes/fields` both as
-  `Fields` and by name; folded into FX.
-* **For a later branch** cut before #322: rebase it onto `f43dc37e` (the moves; conflicts there
-  are text). Then re-run, rather than merge, the rename: `thread-22-recase.cjs` (beside this file;
-  its header says how) `ns`, then `rename`, then `verify`, over the whole tree, whose core `src` is
-  still pre-rename as the script needs; lowercase the `*Vals` with `perl -pi -e
-  's/\b(<lists>)\b/lcfirst($1)/ge'`; commit; then rebase onto #322's tip, where a conflict is a
-  name and #322's side wins. Docs, phrases and changeset merge as text.
+  * The changeset no longer lists `Refusals.staleWriteVals`, because main removed it.
+* **Discoveries**:
+  * **The round-4 restack**: I merged the moves commit by hand, because main had reworked
+    `localVaultDBOptsShape` and `idbOpts`'s callers. I re-ran the namespace and rename commits
+    rather than merging them. The script ran over the new base. The old commit's hand edits came
+    across by a three-way `git merge-file`: the base was the script's output on the old base,
+    theirs the old commit, ours the script's output on the new base. I settled its conflicts by
+    hand, with main's names winning (`StoredVaultAnswer`, `getRow`, `get`/`put`/`del`,
+    `HostErrorSanitizer`).
+  * **The committed `thread-22-recase.cjs` did not reproduce the rename.** The original run used a
+    core-only variant, which left convex's own validators for their own commit and skipped a type
+    alias's declared name. The script now does both under `CORE_ONLY=1`, and its header gives the
+    order.
+  * **Star imports do not always shake the same as named ones.** The namespace commit alone grew
+    the `idbDeviceDB` bundle by 0.21 kB (27.90 -> 28.11 kB). STYLE *Imports* says they shake
+    identically, so that claim may want a qualifier.
+  * **`GIT_DIR` leaking into `tests/scripts/` under `rebase --exec`**: avoided. Every per-commit
+    check ran from a plain shell, never under `--exec`.
+* **For a later branch** cut before #322:
+  1. Rebase onto `5254c7c6` (the moves).
+  2. Re-run the rename with `thread-22-recase.cjs` under `CORE_ONLY=1`: `ns`, then `rename`, then
+     `verify`. Run each adapter, the demo and e2e before the core, whose `src` must still be
+     pre-rename.
+  3. Lowercase the `*Vals` with `perl -pi -e 's/\b(<lists>)\b/lcfirst($1)/ge'`.
+  4. Rebase onto #322's tip. A conflict there is a name, and #322's side wins.
 * **For the Coach** (also the PR's open questions):
-  * Private validators stay out of shapes/ (STYLE's module-local variation). Rec: keep.
-  * The X namespace names, not STYLE's Startcase. Rec: keep.
-  * Field validators through `[FX]` sources in records. Rec: keep.
-  * The main entry still exports validators by name beside `Validators`. Rec: keep.
-  * The vault's sentences named `VaultObjectGone` and `VaultBehind`. Rec: confirm.
-  * No lint rule for the namespace rule. Rec: none for now.
-  * `passkeyAnswerShape` (type `PasskeyAnswer`, public) and the private `consistencyRefusalShape`
-    keep a Shape suffix, as `madeUnderShape` did. Rec: rename to `passkeyAnswer` and
-    `consistencyRefusal` in the same way.
+  * Field validators come into records through `[FX]` sources. Rec: keep.
+  * The vault's sentences are named `VaultObjectGone` and `VaultBehind`. Rec: confirm.
+  * `Checks.story` was renamed with `consistencyRefusal`, beyond the two names the ruling gave.
+    Rec: keep.
+  * Outside the core: named imports for one or two validators, `Safebyok` for many. Rec: keep.
+  * `Scopepath`, `Expectations`, `Refusals` and `HostErrorSanitizer` are kept as namespace
+    exports. Rec: keep. They are modules, not confections.
+  * STYLE says named and star imports shake identically, against the 0.21 kB above. Rec: qualify
+    the line ("nearly") and leave the rule as it is.

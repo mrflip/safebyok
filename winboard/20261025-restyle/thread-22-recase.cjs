@@ -3,8 +3,10 @@
 //   REPO_ROOT=<worktree> node recase.cjs <mode> <tsconfig> <absolute dir to edit> [--dry]
 //
 // Thread 22's tool, kept so a branch cut before #322 can re-run the rename over its own code
-// rather than merge it: `ns`, then `rename`, each run with the core's src checked out as it was
-// before the rename (d07f4267), then `verify`. thread-22-validator_names.md says the order.
+// rather than merge it: `ns`, then `rename`, then `verify`, each run over every adapter, the demo
+// and e2e (each with its own tsconfig) before the core, whose src must still be pre-rename.
+// CORE_ONLY=1 leaves safebyok-convex's own component validators alone, as #322's core rename
+// commit did (they are renamed in a commit of their own). thread-22-validator_names.md says more.
 //
 // mode `rename`: every Zod validator declared under packages/safebyok/src (and convex's
 //   component/validators.ts) whose name starts with a capital is renamed lowerFirst, in value
@@ -24,6 +26,7 @@ const tsconfigPath = path.resolve(tsconfigArg)
 const dry = flags.includes('--dry')
 const CoreSrc = path.join(Root, 'packages/safebyok/src')
 const ConvexValidators = path.join(Root, 'packages/safebyok-convex/src/component/validators.ts')
+const CoreOnly = process.env.CORE_ONLY === '1'
 
 const NsFor = {
   'shapes/primitives.ts':       'PX',
@@ -38,7 +41,7 @@ const NsFor = {
   'shapes/mask.ts':             'MX',
 }
 const nsOfFile = (fileName) => {
-  if (fileName === ConvexValidators) { return 'CVX' }
+  if (fileName === ConvexValidators) { return CoreOnly ? null : 'CVX' }
   const rel = path.relative(CoreSrc, fileName)
   if (rel === 'index.ts' || rel === 'validators.ts') { return 'Validators' }
   return NsFor[rel] ?? null
@@ -70,7 +73,7 @@ const isConvexValidatorType = (type) => Boolean(type.getProperty('isConvexValida
 
 const declaredUnderTargets = (sym) => (sym?.declarations ?? []).some((decl) => {
   const fileName = decl.getSourceFile().fileName
-  return fileName.startsWith(CoreSrc + '/') || fileName === ConvexValidators
+  return fileName.startsWith(CoreSrc + '/') || (! CoreOnly && fileName === ConvexValidators)
 })
 
 /** A validator renamed: declared in a target file, a Zod (or Convex) schema, capitalized. */
@@ -309,6 +312,7 @@ const runNs = () => {
           if (sym !== entry.sym) { continue }
           const pos = positionOf(id)
           if (pos === 'type') { typeUses++; continue }
+          if (pos === 'typedecl') { continue }
           if (pos === 'value') { entry.hasValue = true }
           if (pos === 'query') { entry.hasQuery = true }
           pending.push([id, `${ns}.${entry.imported}`])
