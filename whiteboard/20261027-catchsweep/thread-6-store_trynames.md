@@ -1,8 +1,8 @@
 # Thread 6: store_trynames (2026-10-28)
 
-Branch `20261028-store_trynames`, PR #321, stacked on #311 (merged into main at 41f44f69). Justify: green
-(core 3444 tests pass, 37 skipped; graphql 344 pass; every package lints, typechecks, builds and
-fits its size budget).
+Branch `20261028-store_trynames`, PR #321, cut from #311's tip (41f44f69), rebased onto main at f2af68e4
+after #311, #301 and #313 merged. Justify: green (core 3470 tests pass, 37 skipped; graphql 344 pass;
+every package lints, typechecks, builds and fits its size budget).
 
 * **Built**: every public verb of `VaultDB` (`getVault`, `ensureVault`, `getVaultRecords`,
   `ensureVaultRecords`, `putVaultRecord`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`,
@@ -79,3 +79,22 @@ fits its size budget).
     `#delVault`, `#putGate`, `#readBox`, `#writeOver`'s caller): kept, each feeding a demand. If
     the Coach wants `heed` to hand Outcomes instead, so the rewraps go, that is a contract-shaped
     change for a thread of its own.
+
+## Catch-up rebase (2026-10-28)
+
+`scripts/file-thread` stopped on a conflict with main (exit 3): #301 (validator_ducks) had moved
+the shapes to `src/shapes/`, replaced the `typeof vaultDB.delDamagedVault` check in
+`del-damaged-vault.ts` with `vaultDBShape` in `shapes/bank-opts.ts` (which now names
+`delDamagedVault`), and reworded several test expectations; #313 (quiet_tests) had quieted every
+suite. Rebased with `--no-update-refs` (tip tagged `prerebase-store_trynames`, local). Thirteen
+files conflicted, every one a side-by-side edit: main's structure and text with this thread's
+verb names inside it. `vault-opts.ts` and `del-damaged-vault.ts` took main's side whole, and the
+rename moved to where main put the duck-type shapes: `shapes/bank-opts.ts`'s `vaultDBShape` and
+`deviceDBShape` name the `try` forms, `tryDelDamagedVault` included, so `VaultDBVerbsUsed` in
+`tests/vault/world.ts` gained `'tryDelDamagedVault'` and main's new vault-make test, *refuses a
+VaultDB without tryDelDamagedVault at Bank.make*, undefines that name. `vault-db.ts` keeps the try
+pairs with main's `BoxListing` type and two-argument `checkWrittenVaultRecord`. In
+`vault-races.test.ts` main's expectation (a store's `invalid_box` refusal passed through as
+itself) won over the base's (`bad_record` with the refusal as cause), with `tryPutBox` spied.
+`vault-hello.test.ts` imports `LeaseRecord` from `shapes/device`. Nothing of either side was
+dropped; the rest of the thread's commits replayed clean.
