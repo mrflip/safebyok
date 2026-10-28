@@ -1102,6 +1102,8 @@ describe("versioned updates: two devices writing at once", () => {
     TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
+      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
@@ -1129,6 +1131,8 @@ describe("versioned updates: two devices writing at once", () => {
       await there.delBox('anthropic')
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
+      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null

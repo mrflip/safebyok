@@ -166,7 +166,7 @@ which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceD
 record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `tryPutBox` → `#checkWhisperFits`
-(`whisperBytesOf`, zeroed) → `#sealAndPutBox` → `Box.seal`, `trySeal` → `checkedWhisper`
+(`whisperBytesOf`, zeroed) → `Box.seal`, `trySeal` → `checkedWhisper`
 (`Whisper`, a `structuredClone`) → `whisperBytesOf` (`stableJsonify`, `TextEncoder`) →
 `lease.sealProps`, `trySealProps` → `cipheredWith` (`cipherBytes`), bytes zeroed in both.
 Out: `vault.getWhisper`, `tryGetWhisper`, `useWhisper` → `box.extractWhisper`,

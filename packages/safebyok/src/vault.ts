@@ -348,6 +348,8 @@ export class Vault implements VaultStamp {
       const unlockOpts = checkEnsureUnlockedOpts(given)
       const renewMillis = parseRenewMinutes(unlockOpts?.renewMinutes)
       if (renewMillis > 0 && renewMillis >= this.#leaseMillis) { throw renewPastLease() }
+      await this.#refreshIfStale(this.#staleMillis)
+      this.#demandNotGone()
       await this.#ensureUnlocked(renewMillis)
       this.#demandLease('ensureUnlocked')
       return this
@@ -594,16 +596,34 @@ export class Vault implements VaultStamp {
   async putBox(props: PutBoxProps, whisper?: Whisper): Promise<Box> {
     try {
       this.#demandNotGone()
-      const { boxlabel, sidecar } = putBoxProps.parse(props)
+      const { boxlabel, sidecar: givenSidecar } = putBoxProps.parse(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const given = whisper === undefined ? undefined : Whisper.parse(whisper)
+      const givenWhisper = whisper === undefined ? undefined : Whisper.parse(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
-      this.#checkWhisperFits(given, sidecar ?? {})
-      // A whisper left out is kept from the box: one the listing does not show has none to keep.
-      if (! await this.#ensureUnlocked(0, () => given !== undefined || this.#isListed(label))) { throw noWhisper() }
-      return await this.#sealAndPutBox(label, sidecar, given)
+      this.#checkWhisperFits(givenWhisper, givenSidecar ?? {})
+      await this.#refreshIfStale(this.#staleMillis)
+      this.#demandNotGone()
+      // A whisper left out is kept from the box: one a locked vault's listing does not show has none to keep.
+      if (givenWhisper === undefined && ! this.#leaseLastsPast(0) && ! this.#isListed(label)) { throw noWhisper() }
+      await this.#ensureUnlocked(0)
+      const lease = this.#demandLease('putBox')
+      const isPartial = givenSidecar === undefined || givenWhisper === undefined
+      const { base, sidecar, whisper: sealing } = isPartial
+        ? await this.#storedBase(label, givenSidecar, givenWhisper)
+        : { base: this.#listedBase(label), sidecar: givenSidecar, whisper: givenWhisper }
+      // A lock landing while the box was read and opened refuses, sealing nothing.
+      if (isPartial) { this.#demand(lease, { leaseBound: true, call: 'putBox' }) }
+      // A sidecar kept counts toward the limit as one given does, weighed before any key is made.
+      this.#checkWhisperFits(sealing, sidecar)
+      this.#checkRoomFor(label, base)
+      const sealed = await Box.trySeal(this, { boxlabel: label, sidecar, base }, sealing, { madeUnder: vaultSparseOf(this.#vaultRecord), now: this.#clockNow() })
+      // A lock landing during the seal refuses, writing nothing.
+      this.#demandAfterWait(sealed, lease, { leaseBound: true, call: 'putBox' })
+      const box = valOf(sealed)
+      this.#demand(box, { call: 'putBox' })
+      return this.#updateBoxListingOf(await this.#putBoxOverBase(box))
     } catch (err) { throw this.#heardRefusal(err) }
   }
 
@@ -629,7 +649,15 @@ export class Vault implements VaultStamp {
    */
   async getBox(boxlabel: string): Promise<Box | null> {
     try {
-      return await this.#getBoxUnlocked(boxlabel, 'getBox')
+      this.#demandNotGone()
+      const label = this.#checkedBoxlabel(boxlabel)
+      await this.#refreshIfStale(this.#staleMillis)
+      this.#demandNotGone()
+      // Checked before the user is asked for anything: a box a locked vault's listing does not show is none.
+      if (! this.#leaseLastsPast(0) && ! this.#isListed(label)) { return null }
+      await this.#ensureUnlocked(0)
+      this.#demandLease('getBox')
+      return await this.#getBoxFromStorage(label, 'getBox')
     } catch (err) { throw this.#heardRefusal(err) }
   }
 
@@ -647,7 +675,15 @@ export class Vault implements VaultStamp {
    */
   async getWhisper(boxlabel: string): Promise<Whisper> {
     try {
-      const box = await this.#getBoxUnlocked(boxlabel, 'getWhisper')
+      this.#demandNotGone()
+      const label = this.#checkedBoxlabel(boxlabel)
+      await this.#refreshIfStale(this.#staleMillis)
+      this.#demandNotGone()
+      // Checked before the user is asked for anything: a box a locked vault's listing does not show is none.
+      if (! this.#leaseLastsPast(0) && ! this.#isListed(label)) { throw absentBox() }
+      await this.#ensureUnlocked(0)
+      this.#demandLease('getWhisper')
+      const box = await this.#getBoxFromStorage(label, 'getWhisper')
       if (box === null) { throw absentBox() }
       const opened = await box.tryExtractWhisper()
       this.#demandAfterWait(opened, box, { leaseBound: true, call: 'getWhisper' })
@@ -693,18 +729,24 @@ export class Vault implements VaultStamp {
     try {
       this.#demandNotGone()
       const label = this.#checkedBoxlabel(boxlabel)
+      await this.#refreshIfStale(this.#staleMillis)
+      this.#demandNotGone()
       // Checked before the user is asked for anything: a call that cannot land never prompts.
-      if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { throw absentBox() }
+      if (! this.#leaseLastsPast(0) && ! this.#isListed(label)) { throw absentBox() }
+      await this.#ensureUnlocked(0)
       this.#demandLease('delBox')
       // Lands only in the vault this device holds a lease for, whatever revision of the box is stored:
-      // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
-      // lets storage say whether it removed that one or another.
-      const expected = { vault_tok: this.vault_tok, revision_tok: this.#listedRevisionOf(label) }
-      const showedDamaged = this.#isListedDamaged(label)
+      // a vault deleted and made anew elsewhere refuses it. The revision the listing shows, sound or
+      // damaged, only lets storage say whether it removed that one or another.
+      const expected = { vault_tok: this.vault_tok, revision_tok: this.#listedOf(label)?.revision_tok ?? null }
+      const showedDamaged = this.#damagedBoxes.some((box) => box.boxlabel === label)
       const deleted = await this.#vaultDB.tryDelBox(this.#scope, label, expected)
-      if (! deleted.ok) { await this.#onStorageRefusal(deleted) }
-      // A lock landing meanwhile lets the deletion land.
-      this.#demandAfterWait(deleted, { vault_tok: this.vault_tok }, { call: 'delBox' })
+      if (! deleted.ok) {
+        await this.#onStorageRefusal(deleted)
+        if (isUntrustedStorageRefusal(deleted.err)) { throw deleted.err }
+      }
+      // A lock landing meanwhile lets the deletion land; the Vault object gone meanwhile refuses.
+      this.#demandNotGone()
       const { outcome } = valOf(deleted)
       // Storage arbitrates: nothing stood there to delete.
       if (outcome === 'absent') { throw absentBox() }
@@ -1146,7 +1188,7 @@ export class Vault implements VaultStamp {
    * that came: a lease that refused its own use ('damaged_lease') has dropped itself.
    */
   #demandAfterWait(settled: Outcome<unknown>, thing: VaultMadeUnder, opts: { leaseBound?: boolean, firstGate?: boolean, call: VaultCall }) {
-    if (! settled.ok && UntrustedStorageKinds.some((kind) => isVaultError(settled.err, kind))) { throw settled.err }
+    if (! settled.ok && isUntrustedStorageRefusal(settled.err)) { throw settled.err }
     this.#demand(thing, { leaseBound: opts.leaseBound === true && settled.ok, firstGate: opts.firstGate === true, call: opts.call })
   }
 
@@ -1214,17 +1256,12 @@ export class Vault implements VaultStamp {
   // What a proving reaches of this Vault object, through its [provingTools] getter: see ProvingTools.
   readonly #provingTools: ProvingTools
 
-  /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, resolving true; or resolve false, asking nobody, when `shouldAsk` says not to ask.
-   * `shouldAsk` runs only when the vault must ask, after the hello and before any gating is joined
-   * or raised: a call checks there what it can know without the key, so a call that cannot land
-   * never prompts. It demands nothing once unlocked: demand the lease before using it.
+  /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, judged by the picture in hand: refresh it first, and demand the Vault object not gone after, so no gating is raised over a gone one.
+   * It demands nothing once unlocked: demand the lease before using it.
    */
-  async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
-    await this.#refreshIfStale(this.#staleMillis)
-    // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
-    this.#demandNotGone()
+  async #ensureUnlocked(renewMillis: number): Promise<void> {
     for (;;) {
-      if (this.#leaseLastsPast(renewMillis)) { return true }
+      if (this.#leaseLastsPast(renewMillis)) { return }
       // The threshold is the truth: a lease past its deadline goes now, should its timer run late.
       if (this.#lease !== null && this.#leaseInForce() === null) {
         this.#dropLease()
@@ -1237,12 +1274,11 @@ export class Vault implements VaultStamp {
         this.#demandNotGone()
         continue
       }
-      if (shouldAsk?.() === false) { return false }
       const settled = await (pending ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
       this.#demandNotGone()
       valOf(settled)
-      if (pending === null) { return true }
+      if (pending === null) { return }
     }
   }
 
@@ -1415,7 +1451,7 @@ export class Vault implements VaultStamp {
    */
   async #onStorageRefusal(refused: BadOutcome) {
     const refusal = refused.err
-    if (UntrustedStorageKinds.some((kind) => isVaultError(refusal, kind))) { this.#forceNextRefresh() }
+    if (isUntrustedStorageRefusal(refusal)) { this.#forceNextRefresh() }
     if (RefusalPolicy.decide(refusal) !== 'lock') { return }
     const why = refusal.refusalkind === 'vault_behind'
       ? 'Storage handed back an older copy of the vault than this device has seen'
@@ -1577,13 +1613,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Getting boxes]: listedRevisionOf, isListed, isListedDamaged, getBoxUnlocked, getBox, boxGetRefusal
-
-  /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
-   * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
-   * store, never a record.
-   */
-  #listedRevisionOf(boxlabel: string): string | null { return this.#listedOf(boxlabel)?.revision_tok ?? null }
+  // == [Getting boxes]: listedOf, checkedBoxlabel, isListed, getBoxFromStorage, boxGetRefusal
 
   /** The listing's entry for the box under `boxlabel`, sound or damaged, or undefined for none. */
   #listedOf(boxlabel: string): BoxSparse | BoxDamaged | undefined { return this.#listed().find((box) => box.boxlabel === boxlabel) }
@@ -1594,32 +1624,22 @@ export class Vault implements VaultStamp {
   /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it raises a gating. */
   #isListed(boxlabel: string): boolean { return this.#listedOf(boxlabel) !== undefined }
 
-  /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
-  #isListedDamaged(boxlabel: string): boolean { return this.#damagedBoxes.some((box) => box.boxlabel === boxlabel) }
-
-  /** Get the box under `boxlabel` through `#getBox`, once `#ensureUnlocked` has the vault unlocked; null when there is none, and at once, asking nobody, when a locked vault's listing shows none. */
-  async #getBoxUnlocked(boxlabel: string, call: VaultCall): Promise<Box | null> {
-    this.#demandNotGone()
-    const label = this.#checkedBoxlabel(boxlabel)
-    // Checked before the user is asked for anything: a box the listing does not show is none.
-    if (! await this.#ensureUnlocked(0, () => this.#isListed(label))) { return null }
-    this.#demandLease(call)
-    return await this.#getBox(label, call)
-  }
-
-  /** Get the box under `boxlabel` with `VaultDB.getBox`, expecting the `vault_tok` in hand, resolving it, made under the picture the get began with, or null when none is stored.
+  /** Read the box under `boxlabel` with `VaultDB.getBox`, expecting the `vault_tok` in hand, resolving it, made under the picture the get began with, or null when none is stored.
    * A lock landing while storage answers refuses 'vault_locked', a box or none; ways in moved
    * meanwhile, 'gate_moved'. A refusal from storage refuses as `#boxGetRefusal` says.
    */
-  async #getBox(boxlabel: string, call: VaultCall): Promise<Box | null> {
+  async #getBoxFromStorage(boxlabel: string, call: VaultCall): Promise<Box | null> {
     const madeUnder = vaultSparseOf(this.#vaultRecord)
     const got = await this.#vaultDB.tryGetBox(this.#scope, boxlabel, { vault_tok: this.vault_tok })
-    if (! got.ok) { await this.#onStorageRefusal(got) }
-    // A vault that moved on meanwhile refuses as the demand finds it, never as what the get found.
-    this.#demandAfterWait(got, { vault_tok: this.vault_tok }, { call })
+    if (! got.ok) {
+      await this.#onStorageRefusal(got)
+      if (isUntrustedStorageRefusal(got.err)) { throw got.err }
+    }
+    // A vault that moved on meanwhile refuses as it is found, never as what the get found.
+    this.#demandNotGone()
     if (! got.ok) { throw this.#boxGetRefusal(got.err) }
-    // The demand above cannot see a lock, which moves no `vault_tok`, so the lease is demanded
-    // again before anything is handed back.
+    // The Vault object not gone says nothing of a lock, so the lease is demanded again before
+    // anything is handed back.
     if (got.val === null) {
       this.#demandLease(call)
       return null
@@ -1642,35 +1662,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Putting boxes]: sealAndPutBox, listedBase, storedBase, damagedBase, putOver, updateBoxListingOf, dropBoxListingOf
-
-  /** Seal and store the box `boxlabel`, as {@link Vault.putBox} says, once the vault is unlocked, resolving the box as stored.
-   * It reads through `#storedBase` when the sidecar or whisper is left out, seals with
-   * `Box.trySeal`, and puts through `#putOver`.
-   */
-  async #sealAndPutBox(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<Box> {
-    const lease = this.#demandLease('putBox')
-    const isPartial = givenSidecar === undefined || givenWhisper === undefined
-    const { base, sidecar, whisper } = isPartial
-      ? await this.#storedBase(boxlabel, givenSidecar, givenWhisper)
-      : { base: this.#listedBase(boxlabel), sidecar: givenSidecar, whisper: givenWhisper }
-    // A lock landing while the box was read and opened refuses, sealing nothing.
-    if (isPartial) { this.#demand(lease, { leaseBound: true, call: 'putBox' }) }
-    // A sidecar kept counts toward the limit as one given does, weighed before any key is made.
-    this.#checkWhisperFits(whisper, sidecar)
-    this.#checkRoomFor(boxlabel, base)
-    const sealed = await Box.trySeal(this, { boxlabel, sidecar, base }, whisper, { madeUnder: vaultSparseOf(this.#vaultRecord), now: this.#clockNow() })
-    // A lock landing during the seal refuses, writing nothing.
-    this.#demandAfterWait(sealed, lease, { leaseBound: true, call: 'putBox' })
-    const box = valOf(sealed)
-    this.#demand(box, { call: 'putBox' })
-    // Lands only in the vault this whisper is sealed for, over the revision it was sealed from: a
-    // vault reborn elsewhere, or a box written meanwhile by another device, refuses it.
-    const put = await this.#putOver(box)
-    // A lock landing during the write lets it land; the vault moving on meanwhile refuses as the demand finds it.
-    this.#demandAfterWait(put, { vault_tok: box.vault_tok }, { call: 'putBox' })
-    return this.#updateBoxListingOf(valOf(put))
-  }
+  // == [Putting boxes]: listedBase, storedBase, putBoxOverBase, updateBoxListingOf, dropBoxListingOf
 
   /** The base a whole `putBox()` seals over, from the listing in hand: the revision and `registered_at` listed for `boxlabel`, or null for a box it does not show, which is a new box.
    * A box listed damaged gives its revision alone; one naming none refuses 'damaged_box'.
@@ -1687,18 +1679,23 @@ export class Vault implements VaultStamp {
   }
 
   /** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out, resolving them with the base to seal over.
-   * Gets through `#getBox`, and decrypts the whisper under the lease in hand, which proves what is
-   * kept unaltered. The write then lands only over the revision read. A box that will not read or
-   * open is written over as new, keeping nothing, when the whisper is given, and refuses
+   * Gets through `#getBoxFromStorage`, and decrypts the whisper under the lease in hand, which
+   * proves what is kept unaltered. The write then lands only over the revision read. A box that will
+   * not read or open is written over as new, keeping nothing, when the whisper is given, and refuses
    * 'damaged_box' when it is not; where no box is stored, it refuses 'no_whisper' when the whisper
    * is not given.
    */
   async #storedBase(boxlabel: string, givenSidecar: Sidecar | undefined, givenWhisper: Whisper | undefined): Promise<{ base: BoxBase | null, sidecar: Sidecar, whisper: Whisper }> {
-    const got = await outcomeOf(() => this.#getBox(boxlabel, 'putBox'))
-    this.#demandAfterWait(got, { vault_tok: this.vault_tok }, { call: 'putBox' })
+    const got = await outcomeOf(() => this.#getBoxFromStorage(boxlabel, 'putBox'))
+    if (! got.ok && isUntrustedStorageRefusal(got.err)) { throw got.err }
+    this.#demandNotGone()
     if (! got.ok) {
       if (givenWhisper === undefined || ! isVaultError(got.err, 'damaged_box')) { throw got.err }
-      return { base: this.#damagedBase(boxlabel), sidecar: givenSidecar ?? {}, whisper: givenWhisper }
+      // A box that will not read vouches for none of its fields: the base keeps the revision the
+      // listing names alone. One not listed yet is sealed as new, which storage refuses while one is
+      // stored: the next hello lists it, with its revision for the next store.
+      const listed = this.#listedBase(boxlabel)
+      return { base: listed === null ? null : { revision_tok: listed.revision_tok }, sidecar: givenSidecar ?? {}, whisper: givenWhisper }
     }
     const stored = got.val
     if (stored === null) {
@@ -1715,26 +1712,23 @@ export class Vault implements VaultStamp {
     return { base: stored, sidecar: givenSidecar ?? stored.sidecar, whisper: givenWhisper ?? opened.val }
   }
 
-  /** The base a store seals over a box storage refused as damaged: the revision the listing names, or null for a box it does not show yet; 'damaged_box' for one listed with none.
-   * It keeps the revision alone, as a box that will not read vouches for none of its fields. A box
-   * not shown yet is sealed as new, which storage refuses while one is stored: the next hello lists
-   * it, with its revision for the next store.
+  /** Put `box` with `VaultDB.putBox`, in the vault it was sealed for and over the revision it was sealed from, resolving the record as stored: storage refuses it unless that revision is still stored.
+   * A lock landing during the write lets it land. A stale refusal comes as storage gave it, the box
+   * stored as its `meta.box_stored`. Storage's 'vault_mismatch' becomes 'stale_write', as the vault
+   * this device read is gone.
    */
-  #damagedBase(boxlabel: string): BoxBase | null {
-    const listed = this.#listedBase(boxlabel)
-    return listed === null ? null : { revision_tok: listed.revision_tok }
-  }
-
-  /** Put `box` with `VaultDB.tryPutBox`, in the vault it was sealed for and over the revision it was sealed from, as an {@link Outcome} of the record as stored: storage refuses it unless that revision is still stored.
-   * A stale refusal comes as storage gave it, the box stored as its `meta.box_stored`.
-   * Storage's 'vault_mismatch' becomes 'stale_write', as the vault this device read is gone.
-   */
-  async #putOver(box: Box): Promise<Outcome<BoxRecord>> {
+  async #putBoxOverBase(box: Box): Promise<BoxRecord> {
     const put = await this.#vaultDB.tryPutBox(this.#scope, { vault_tok: box.vault_tok, revision_tok: box.baseRevisionTok }, box.record)
-    if (put.ok) { return put }
-    await this.#onStorageRefusal(put)
-    if (! isVaultError(put.err, 'vault_mismatch')) { return put }
-    return bad(new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: put.err }))
+    if (! put.ok) {
+      await this.#onStorageRefusal(put)
+      if (isUntrustedStorageRefusal(put.err)) { throw put.err }
+    }
+    // The Vault object gone meanwhile refuses as it is found, whatever the write did.
+    this.#demandNotGone()
+    if (! put.ok && isVaultError(put.err, 'vault_mismatch')) {
+      throw new VaultError('stale_write', 'The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now.', { cause: put.err })
+    }
+    return valOf(put)
   }
 
   /** Update the box listing with `stored`, a record this vault's own write just landed, and publish it, returning `stored` as a {@link Box} made under the picture in hand. */
@@ -1883,7 +1877,7 @@ const gatingLandedError = () => new VaultError('gating_landed', 'The prompt ende
 
 // --
 
-// == [Vocabulary]: Birth, frozenVaultRecord, isOlderPicture, fitsLease, leavesInForce, VaultCall, UntrustedStorageKinds, UnlockingKinds
+// == [Vocabulary]: Birth, frozenVaultRecord, isOlderPicture, fitsLease, leavesInForce, VaultCall, UntrustedStorageKinds, isUntrustedStorageRefusal, UnlockingKinds
 
 /** The pieces a Vault object is born of, as `bank.ensureVault` made them: one `VaultDB.ensureVault` and the lease this device's store kept. */
 export type Birth = Readonly<{
@@ -1942,6 +1936,9 @@ type VaultCall = 'birth' | 'hello' | 'refresh' | 'del' | 'untrustedStorage' | 'e
  * storage to be looked at, or the app to be updated. Each has the next hello read afresh.
  */
 const UntrustedStorageKinds = ['identity_revoked', 'vault_behind', 'newer_format'] as const satisfies readonly RefusalKind[]
+
+/** True when `err` is a refusal of storage the vault cannot trust (`UntrustedStorageKinds`): one a call hears as it came, as `#onStorageRefusal` has already done what it asks, whatever the vault became meanwhile. */
+const isUntrustedStorageRefusal = (err: unknown): boolean => UntrustedStorageKinds.some((kind) => isVaultError(err, kind))
 
 /** The gatings whose settling answers `ensureUnlocked`'s question, which it joins: an unlock, and a first gate. Any other it waits out. */
 const UnlockingKinds: ReadonlySet<GatingKind> = new Set(['unlock_vault', 'initialize_gate'])
