@@ -27,7 +27,7 @@ describe("the package's entry point", () => {
       'bankScope', 'boxscope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath', 'vaultBag', 'bankBag', 'keyDeriverSpec', 'maskOpts', 'idbOpts',
       'vault_tok', 'revision_tok', 'salt_b64', 'prf_salt_b64', 'whisper_ciphered', 'box_key_wrapped', 'vault_key_wayin_wrapped', 'vault_key_lease_wrapped',
       'vaultDraft', 'passkeyAnswer', 'strengthChecker', 'passphraseVerdict', 'capacity', 'vaultRecordExpectation', 'boxGetExpectation', 'boxExpectation', 'vaultDelExpectation', 'boxDelExpectation', 'boxDeletion',
-      'makeBankOpts', 'bankVaultOpts', 'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'loggerShape', 'localVaultDBOptsShape',
+      'makeBankOpts', 'bankVaultOpts', 'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'loggerShape', 'localVaultDBOpts',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -52,7 +52,7 @@ describe("the package's entry point", () => {
       'passphraseWayinRecord', 'passkeyWayinRecord', 'wayinRecord', 'gateRecord', 'vaultRecord', 'vaultSparse', 'vaultStamp', 'vaultTombstone', 'vaultDraft', 'gateSparse', 'passphraseWayinSparse', 'passkeyWayinSparse',
       'boxRecord', 'boxSparse', 'boxDamaged', 'boxStamp', 'leaseRecord', 'leaseStamp', 'deviceRecord', 'whisper', 'sidecar', 'capacity',
       'vaultRecordExpectation', 'boxGetExpectation', 'boxExpectation', 'vaultDelExpectation', 'boxDelExpectation', 'boxDeletion',
-      'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOptsShape', 'maskOpts', 'idbOpts',
+      'makeBankOpts', 'bankVaultOpts', 'vaultBag', 'bankBag', 'localVaultDBOpts', 'maskOpts', 'idbOpts',
       'vaultDBShape', 'deviceDBShape', 'clockShape', 'clockReading', 'keyDeriverShape', 'keyDeriverSpec', 'strengthChecker', 'passphraseVerdict', 'loggerShape', 'passkeyAnswer',
     ])
     const shapesModules: readonly object[] = [PX, CX, KX, FX, BX, VDX, DX, VX, OX, HX, MX]

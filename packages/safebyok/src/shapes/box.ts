@@ -165,7 +165,7 @@ export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, 
 export type BoxCiphered = Z.infer<typeof boxCiphered>
 // --
 
-// == [Seal]: boxBase, sealBoxProps, madeUnder, madeShape, MadeUnder
+// == [Seal]: boxBase, sealBoxProps, madeUnder, made, MadeUnder
 
 /** What `Box.seal` seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
  * `sealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
@@ -173,14 +173,14 @@ export type BoxCiphered = Z.infer<typeof boxCiphered>
  * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
  * is made under, and what a seal is made with, are taken from a `VaultSparse`, frozen.
  */
-export const { boxBase, sealBoxProps, madeUnder, madeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
+export const { boxBase, sealBoxProps, madeUnder, made } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
   const boxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
   const madeUnder = VX.vaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
   return {
     boxBase,
     sealBoxProps: obj({ boxlabel, sidecar: sidecar.default(() => ({})), base: boxBase.nullish() }).strict(),
     madeUnder,
-    madeShape:    obj({ madeUnder, now: epochMillis }),
+    made:         obj({ madeUnder, now: epochMillis }),
   }
 }, [FX])
 

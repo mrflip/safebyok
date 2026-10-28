@@ -19,7 +19,7 @@ import { makeWorld } from './vault/world'
 
 /** The validators made in a `Validator` call that the main entry leaves out, each exported from its own module for the package's own use: held to the same rules as those it exports. */
 const InPackage = {
-  boxBase: BX.boxBase, madeShape: BX.madeShape, madeUnder: BX.madeUnder, sealBoxProps: BX.sealBoxProps, freshPasskeyAnswer: VX.freshPasskeyAnswer, boxCiphered: BX.boxCiphered, leaseGrant: DX.leaseGrant, vaultStampButFormat: VX.vaultStampButFormat, whisperBag: BX.whisperBag,
+  boxBase: BX.boxBase, made: BX.made, madeUnder: BX.madeUnder, sealBoxProps: BX.sealBoxProps, freshPasskeyAnswer: VX.freshPasskeyAnswer, boxCiphered: BX.boxCiphered, leaseGrant: DX.leaseGrant, vaultStampButFormat: VX.vaultStampButFormat, whisperBag: BX.whisperBag,
   passphraseWayinHeader: VX.passphraseWayinHeader, passkeyWayinHeader: VX.passkeyWayinHeader, wayinkind: VX.wayinkind, device_id: FX.device_id, key_deriver_label: FX.key_deriver_label, credential_id: FX.credential_id,
   passphraseCleartext: VX.passphraseCleartext, listedBox: VDX.listedBox, listingAnswer: VDX.listingAnswer, storedVaultAnswer: VDX.storedVaultAnswer, storedRevision: VDX.storedRevision, storedVaultTok: VDX.storedVaultTok,
   declaredBoxes: OX.declaredBoxes, declaredBytes: OX.declaredBytes, leaseHoursAsMillis: OX.leaseHoursAsMillis, maxBoxes: OX.maxBoxes, maxWhisperBytes: OX.maxWhisperBytes, renewMinutesAsMillis: OX.renewMinutesAsMillis, staleMinutesAsMillis: OX.staleMinutesAsMillis, vaultMadeUnder: VX.vaultMadeUnder, callback: HX.callback,

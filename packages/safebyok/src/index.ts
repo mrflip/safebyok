@@ -26,7 +26,7 @@ export { boxDamageVals, boxDamaged, type BoxDamaged, BoxFormat, boxRecord, type 
 export type { BoxBase, DamagedBoxRecord, BoxCiphered, SealBoxProps, WhisperJson } from './shapes/box'
 export { deviceRecord, type DeviceRecord, DeviceRecordFormat, leaseRecord, type LeaseRecord, leaseStamp, type LeaseStamp, idbOpts } from './shapes/device'
 export { LeaseHours, MaxLeaseHours, MaxBoxes, MaxWhisperBytes, StaleMinutes, wallClock, makeBankOpts, bankVaultOpts, clockReading } from './shapes/bank-opts'
-export { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape, loggerShape, localVaultDBOptsShape } from './shapes/host-code'
+export { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape, loggerShape, localVaultDBOpts } from './shapes/host-code'
 export { PasskeySaltBytes, wayinKindVals, gateRecord, type GateRecord, gateSparse, type GateSparse, passkeyWayinRecord, type PasskeyWayinRecord, passkeyWayinSparse, type PasskeyWayinSparse, passphraseWayinRecord, type PassphraseWayinRecord, passphraseWayinSparse, type PassphraseWayinSparse, TombstoneFormat, VaultFormat, vaultRecord, type VaultRecord, vaultSparse, type VaultSparse, vaultStamp, type VaultStamp, vaultTombstone, type VaultTombstone, wayinRecord, type WayinRecord, isGated, vaultDraft, passkeyAnswer, strengthChecker, passphraseVerdict } from './shapes/vault'
 export type { PassphraseVerdict, DamagedVaultRecord, GatedVaultRecord, VaultDraft, VaultMadeUnder, PassphraseCleartext, PasskeyAnswer, PasskeyWayinSummary, PassphraseWayinSummary, WayinKind, WayinSummary, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader } from './shapes/vault'
 export { Wayin, PassphraseWayin, PasskeyWayin } from './wayin'

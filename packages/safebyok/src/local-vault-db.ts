@@ -43,7 +43,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
 export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  HX.localVaultDBOptsShape.parse(opts, { where: "In localVaultDB's options" })
+  HX.localVaultDBOpts.parse(opts, { where: "In localVaultDB's options" })
   return new StringStoreVaultDB(opts)
 }
 
