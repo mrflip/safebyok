@@ -1,5 +1,15 @@
 # TODO
 
+* Messages there, Phrases here
+* scrub "What a ..." sloptell everywhere
+* scrub "standing" everywhere
+* line wrap comments and md docs at 100 characters
+* sweep whiteboard into winboard
+* applabel, user_id, vaultlabel not part of BoxRecord???
+* The react demo walks around with the whisper flapping in the breeze
+  - offer the entry field from react
+  - offer the debugging components as safebyok-react/devonly
+
 Three shelves. **Roadmapped**: the order we build in, in flight or next, each a sprint or a thread.
 **Side quests**: straightforward, likely to be done, not needed yet; pick one up when the roadmap
 is blocked. **Soonish**: wanted, but a design question stands in the way; the note says which.

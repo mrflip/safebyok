@@ -13,7 +13,7 @@ import { heldLeaseOf } from './held-lease'
 import * as CX from './shapes/scopes'
 import { sameScope } from './names'
 import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 import { stableJsonify } from './stable-jsonify'
 import { LeaseFormat, type LeaseSparse, type LeaseRecord, type LeaseStamp } from './shapes/device'
 import * as DX from './shapes/device'
@@ -382,7 +382,7 @@ const BoxKeyUsage = { extractable: false, usage: ['decrypt'] } as const
 
 
 /** What a lease ciphers, bytes judged by their tag, so bytes from another realm (a test's jsdom, an iframe) pass; and what {@link Lease.sealProps} seals with, the whisper's bytes and nothing else. Each `parse` refuses 'bad_option'. */
-const { serializedBytes, leaseSealProps } = Validator('bad_option', ({ obj, bytes }) => ({
+const { serializedBytes, leaseSealProps } = Checkers('bad_option', ({ obj, bytes }) => ({
   serializedBytes: bytes(),
   leaseSealProps:  obj({ whisper: bytes() }).strict(),
 }))

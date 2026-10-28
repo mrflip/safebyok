@@ -197,6 +197,7 @@ export class Box implements Boxscope, BoxSparse {
       if (lease === null) { throw lockedError() }
       const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
       const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+      // FIX ME: why aren't we throwing here if deciphered.ok is false?
       // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
       try {
         // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
@@ -205,6 +206,7 @@ export class Box implements Boxscope, BoxSparse {
         if (deciphered.ok) { deciphered.val.fill(0) }
         throw err
       }
+      // FIX ME: should this be in or have its own finally block -- for no other reason than so I don't have to think?
       const whisperBytes = valOf(deciphered)
       try {
         const checked = BX.whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))

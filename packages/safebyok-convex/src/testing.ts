@@ -4,7 +4,7 @@ import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
-import { Validator } from 'safebyok'
+import { Checkers } from 'safebyok'
 
 /** A Convex deployment in memory that the real Convex clients talk to, unmodified, over a fake WebSocket.
  * A `ConvexClient` connects through {@link FakeDeployment.client}, and any other client, such as
@@ -110,7 +110,7 @@ type QueryModification =
   | { type: 'QueryRemoved', queryId: number }
 
 // What the options and the host hold, checked only: what is kept is the caller's own object, `this` and all.
-const { fakeHost, fakeDeploymentOpts } = Validator('bad_option', ({ obj, custom }) => {
+const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }) => {
   const fn = custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function')
   const logger = obj({ log: fn, warn: fn, error: fn, logVerbose: fn.optional() })
   return {
