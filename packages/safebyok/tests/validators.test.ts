@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import * as safebyok from '../src/index'
+import * as Safebyok from '../src/index'
 import * as PX from '../src/shapes/primitives'
 import * as VX from '../src/shapes/vault'
 import * as DX from '../src/shapes/device'
@@ -26,7 +26,7 @@ const InPackage = {
 }
 
 /** Each validator the main entry exports, by its name there. */
-const Exported = Object.fromEntries(Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)) as Record<string, Zod.ZodType>
+const Exported = Object.fromEntries(Object.entries(Safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)) as Record<string, Zod.ZodType>
 
 /** Every validator the package makes, those the main entry exports and its own. */
 const EveryValidator = { ...Exported, ...InPackage }
@@ -64,11 +64,11 @@ const refusalTextOf = (attempt: () => unknown): string => {
 
 describe("the validators the main entry exports", () => {
   it("parses a scope through vaultScope, exported by name", () => {
-    expect(safebyok.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+    expect(Safebyok.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
   it("refuses an empty vault_tok in safeParse, as the README's example shows", () => {
-    expect(safebyok.vault_tok.safeParse('').success).to.be.false
+    expect(Safebyok.vault_tok.safeParse('').success).to.be.false
   })
 
   it("throws a VaultError from each parse but the three primitives', whose parse is Zod's own, those the main entry leaves out included", () => {
@@ -79,7 +79,7 @@ describe("the validators the main entry exports", () => {
   })
 
   it("exports every validator as the same object its module exports", () => {
-    expect(safebyok.label).to.eq(PX.label)
+    expect(Safebyok.label).to.eq(PX.label)
   })
 
   it("leaves out the validators the package builds others from or checks its own steps with", () => {
