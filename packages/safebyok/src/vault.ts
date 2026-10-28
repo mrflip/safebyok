@@ -1,9 +1,12 @@
 import type { BoxListing, Capacity } from './shapes/vault-db'
-import { type Clock, type BadNewsHandler, callback } from './shapes/bank-opts'
+import type { Clock, BadNewsHandler } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
-import { Whisper, Sidecar, type BoxBase, type BoxDamaged, type BoxRecord, type BoxSparse } from './shapes/box'
+import type { BoxBase, BoxDamaged, BoxRecord, BoxSparse, Whisper, Sidecar } from './shapes/box'
+import * as BX from './shapes/box'
 import type { DeviceRecord } from './shapes/device'
-import { type WayinKind, type GatedVaultRecord, passphraseCleartext, wayinkind, type GateRecord, type GateSparse, VaultMadeUnder, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf } from './shapes/vault'
+import { type WayinKind, type GatedVaultRecord, type GateRecord, type GateSparse, type VaultRecord, type VaultSparse, type VaultStamp, gateSparseOf, isGated, vaultSparseOf, type VaultMadeUnder } from './shapes/vault'
+import * as VX from './shapes/vault'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, boxSparseOf, whisperBytesOf } from './box'
 import * as CX from './shapes/scopes'
@@ -246,7 +249,7 @@ export class Vault implements VaultStamp {
   /** Call `listener` after every snapshot change, returning the function that unsubscribes it. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    callback.parse(listener)
+    OX.callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -381,7 +384,7 @@ export class Vault implements VaultStamp {
   demandConsistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): void {
     const demandOpts = checkDemandOpts(opts)
     // Checked only: the thing itself is judged, as a Proving or a Gate is told apart by its class.
-    VaultMadeUnder.parse(thing)
+    VX.VaultMadeUnder.parse(thing)
     this.#demand(thing, { leaseBound: demandOpts?.leaseBound === true, call: 'demandConsistentWith' })
   }
 
@@ -393,7 +396,7 @@ export class Vault implements VaultStamp {
    */
   consistentWith(thing: VaultMadeUnder, opts?: { leaseBound?: boolean | undefined }): boolean {
     const leaseBound = checkDemandOpts(opts)?.leaseBound === true
-    VaultMadeUnder.parse(thing)
+    VX.VaultMadeUnder.parse(thing)
     return this.#inconsistencyWith(thing) === null && (! leaseBound || this.#leaseInForce() !== null)
   }
   // --
@@ -451,7 +454,7 @@ export class Vault implements VaultStamp {
   async checkStrength(passphrase: string): Promise<void> {
     try {
       this.#demandNotGone()
-      const verdict = await this.#strengthChecker(passphraseCleartext.parse(passphrase))
+      const verdict = await this.#strengthChecker(VX.passphraseCleartext.parse(passphrase))
       this.#demandNotGone()
       if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
     } catch (err) { throw this.#heardRefusal(err) }
@@ -493,7 +496,7 @@ export class Vault implements VaultStamp {
   async putWayin(slotlabel: WayinKind): Promise<Vault> {
     try {
       this.#demandNotGone()
-      wayinkind.parse(slotlabel)
+      VX.wayinkind.parse(slotlabel)
       await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
       const kindNow = (): GatingKind => {
@@ -525,7 +528,7 @@ export class Vault implements VaultStamp {
   async delWayin(slotlabel: WayinKind): Promise<Vault> {
     try {
       this.#demandNotGone()
-      wayinkind.parse(slotlabel)
+      VX.wayinkind.parse(slotlabel)
       if (slotlabel === 'passphrase') {
         throw new VaultError('passphrase_required', "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed.")
       }
@@ -602,7 +605,7 @@ export class Vault implements VaultStamp {
       const { boxlabel, sidecar } = putBoxProps.parse(props)
       const label = this.#checkedBoxlabel(boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
-      const given = whisper === undefined ? undefined : Whisper.parse(whisper)
+      const given = whisper === undefined ? undefined : BX.Whisper.parse(whisper)
       // Checked before the user is asked for anything: a call that cannot land never prompts. A
       // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
       this.#checkWhisperFits(given, sidecar ?? {})
@@ -673,7 +676,7 @@ export class Vault implements VaultStamp {
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
   async useWhisper<ResultT>(boxlabel: string, handed: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
-    callback.parse(handed)
+    OX.callback.parse(handed)
     const whisper = await this.getWhisper(boxlabel)
     // The callback's own throw is the host's, and is never told as the vault's bad news.
     return await handed(whisper)
@@ -1973,7 +1976,7 @@ export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
  * Its `parse` refuses 'bad_option' for props that are no object, a sidecar that is no JSON object,
  * or a field beside them, quoting none of it. The boxlabel is the caller's to check, as a name.
  */
-const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: Sidecar.optional() }).strict() }))
+const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: BX.Sidecar.optional() }).strict() }))
 
 /** The box `delBox()` removed. Storage keeps nothing of it. */
 export type DeletedBox = Readonly<{

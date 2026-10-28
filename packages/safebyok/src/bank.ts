@@ -1,4 +1,4 @@
-import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag } from './shapes/scopes'
+import type { BankBag, BankScope, VaultBag, VaultScope } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
@@ -13,7 +13,8 @@ import { type DeviceDB, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
-import { type BankVaultOpts, type MakeBankOpts, callback } from './shapes/bank-opts'
+import type { BankVaultOpts, MakeBankOpts } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { KeptLease } from './lease'
@@ -143,7 +144,7 @@ export class Bank {
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    callback.parse(listener)
+    OX.callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -179,7 +180,7 @@ export class Bank {
    * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
    */
   demandConsistentWith(thing: BankBag): void {
-    bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScopeSays })
+    CX.bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScopeSays })
   }
   // --
 

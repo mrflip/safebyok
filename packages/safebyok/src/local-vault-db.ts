@@ -1,11 +1,11 @@
-import { BoxRecord } from './shapes/box'
+import type { BoxRecord } from './shapes/box'
 import type { VaultScope } from './shapes/scopes'
 import type { VaultRecord, VaultDraft } from './shapes/vault'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
-import { localVaultDBOptsShape } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
 import type { VaultRecordExpectation, StoredBox, StoredVault, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
@@ -43,7 +43,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
 export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  localVaultDBOptsShape.parse(opts, { where: "In localVaultDB's options" })
+  OX.localVaultDBOptsShape.parse(opts, { where: "In localVaultDB's options" })
   return new StringStoreVaultDB(opts)
 }
 

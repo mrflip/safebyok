@@ -1,7 +1,9 @@
 import { VaultError } from './errors'
 import * as HostErrorSanitizer from './host-error-sanitizer'
-import { passphraseVerdict, type PassphraseVerdict } from './shapes/vault'
-import { type VaultScope, vaultScope } from './shapes/scopes'
+import type { PassphraseVerdict } from './shapes/vault'
+import * as VX from './shapes/vault'
+import type { VaultScope } from './shapes/scopes'
+import * as CX from './shapes/scopes'
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
@@ -70,13 +72,13 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
  */
 export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
-  const told = vaultScope.parse(scope)
+  const told = CX.vaultScope.parse(scope)
   const check = async (passphrase: string): Promise<PassphraseVerdict> => {
     if (! passphrase.trim()) { return BlankVerdict }
-    let checked: ReturnType<typeof passphraseVerdict.safeParse>
+    let checked: ReturnType<typeof VX.passphraseVerdict.safeParse>
     try {
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
-      checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
+      checked = VX.passphraseVerdict.safeParse(await hostChecker(passphrase, told))
     } catch (err) {
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }

@@ -15,10 +15,12 @@ import type { Vault } from './vault'
 import { type Outcome, outcomeOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import * as HostErrorSanitizer from './host-error-sanitizer'
-import { freshPasskeyAnswer, isPrfSalt, passkeyAnswerShape, type PasskeyAnswer, type WayinKind, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, VaultMadeUnder, type VaultRecord, type VaultSparse, passphraseCleartext, type PassphraseCleartext } from './shapes/vault'
+import { isPrfSalt, type PasskeyAnswer, type WayinKind, type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, type VaultRecord, type VaultSparse, type PassphraseCleartext, type VaultMadeUnder } from './shapes/vault'
+import * as VX from './shapes/vault'
 import type { LeaseRecord } from './shapes/device'
 import { adorn, decorate } from './helpers'
-import { prf_salt_b64, salt_b64, vault_key_wayin_wrapped, type VaultKeyWayinWrapped } from './shapes/fields'
+import type { VaultKeyWayinWrapped } from './shapes/fields'
+import * as FX from './shapes/fields'
 import { PasskeyWayin, PassphraseWayin, Wayin, isSaltOf, wayinCtxOf } from './wayin'
 
 /** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more.
@@ -157,7 +159,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    * @example const wrapped = await proving.wrappedWith(vaultKey, proving.header)
    */
   async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<VaultKeyWayinWrapped> {
-    return vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault.stamp, visible)))
+    return FX.vault_key_wayin_wrapped.parse(await wrapKeyUnder(this.#wayinKey, vaultKey, wayinCtxOf(this.vault.stamp, visible)))
   }
 
   /** Demand that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
@@ -212,11 +214,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const record = await sealLeaseRecord(held, vaultKey, { leaseMillis: tools.leaseMillis, now: tools.now() })
     // Nothing is awaited between these demands and the write.
     demandOn(tools, this, gating)
-    demandOn(tools, VaultMadeUnder.parse(record), gating)
+    demandOn(tools, VX.VaultMadeUnder.parse(record), gating)
     const put = await tools.tryPutLease(record)
     // A lock or a decline meanwhile refuses as found, never as the device store's failure.
     demandOn(tools, this, gating)
-    demandOn(tools, VaultMadeUnder.parse(put.ok ? put.val : record), gating)
+    demandOn(tools, VX.VaultMadeUnder.parse(put.ok ? put.val : record), gating)
     return tools.holdLease(Lease.make(this.vault, valOf(put)))
   }
 
@@ -280,7 +282,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
    * @example await PassphraseProving.seal(vault, { slotlabel: 'passphrase' }, chosen, { gating })
    */
   static async seal(vault: Vault, header: PassphraseWayinHeader | FreshHeader<'passphrase'>, passphrase: string, opts: { gating: ProvingGating }): Promise<PassphraseProving> {
-    const cleartext = passphraseCleartext.parse(passphrase)
+    const cleartext = VX.passphraseCleartext.parse(passphrase)
     const tools = toolsOf(vault)
     const { gate_epoch: gateEpoch } = tools.vaultRecord()
     const { keyDeriver } = tools
@@ -339,7 +341,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
    * @example await PasskeyProving.seal(vault, { slotlabel: 'passkey' }, await createPasskey(opts), { gating })
    */
   static async seal(vault: Vault, header: PasskeyWayinHeader | FreshHeader<'passkey'>, answer: PasskeyAnswer, opts: { gating: ProvingGating }): Promise<PasskeyProving> {
-    const checked = passkeyAnswerShape.parse(answer)
+    const checked = VX.passkeyAnswerShape.parse(answer)
     const { prfBytes } = checked
     try {
       const tools = toolsOf(vault)
@@ -366,7 +368,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 const mintedPassphraseHeader = (tools: ProvingTools): PassphraseWayinHeader => ({
   wayinkind:         'passphrase',
   key_deriver_label: tools.keyDeriver.key_deriver_label,
-  salt_b64:          salt_b64.parse(toB64(randomBytes(tools.keyDeriver.salt_bytes))),
+  salt_b64:          FX.salt_b64.parse(toB64(randomBytes(tools.keyDeriver.salt_bytes))),
   device_id:         tools.deviceId(),
   registered_at:     tools.now(),
 })
@@ -385,11 +387,11 @@ const checkedPassphraseHeader = (header: PassphraseWayinHeader, keyDeriver: KeyD
 
 /** A fresh passkey header: the credential and salt the answer came over, this device's id, and the time now, as `tools` hands them. */
 const mintedPasskeyHeader = (tools: ProvingTools, answer: PasskeyAnswer): PasskeyWayinHeader => {
-  const { credential_id, prf_salt_b64: prfSalt } = freshPasskeyAnswer.parse(answer)
+  const { credential_id, prf_salt_b64: prfSalt } = VX.freshPasskeyAnswer.parse(answer)
   return {
     wayinkind:     'passkey',
     credential_id,
-    prf_salt_b64:  prf_salt_b64.parse(prfSalt),
+    prf_salt_b64:  FX.prf_salt_b64.parse(prfSalt),
     device_id:     tools.deviceId(),
     registered_at: tools.now(),
   }

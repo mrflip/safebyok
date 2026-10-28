@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
-import type { label, user_id } from './primitives'
+import type * as PX from './primitives'
 import { never } from 'zod'
 import { Validator } from '../checks/validator'
 
@@ -12,16 +12,16 @@ export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user
 // == [Names]: Applabel, Vaultlabel, Boxlabel, UserId
 
 /** The app's label, as a host writes it to `Bank.make`: a {@link label}, which every scope opens with. */
-export type Applabel = Z.infer<typeof label>
+export type Applabel = Z.infer<typeof PX.label>
 
 /** The label of one of a user's vaults, as a host writes it to `bank.ensureVault`: a {@link label}, such as `main`. */
-export type Vaultlabel = Z.infer<typeof label>
+export type Vaultlabel = Z.infer<typeof PX.label>
 
 /** A box's label within its vault, as a host writes it to `putBox` and `getBox`: a {@link label}, such as `anthropic`. */
-export type Boxlabel = Z.infer<typeof label>
+export type Boxlabel = Z.infer<typeof PX.label>
 
 /** The signed-in user's stable, opaque id from the host's own auth, as {@link user_id} checks it: the one name in a scope that is not a label. */
-export type UserId = Z.infer<typeof user_id>
+export type UserId = Z.infer<typeof PX.user_id>
 // --
 
 // == [Fieldnames]: each scope's fieldnames, in the order its scopepath joins them

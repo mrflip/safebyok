@@ -2,10 +2,10 @@
 
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
-import { BoxDamaged, BoxRecord, type BoxSparse } from './box'
-import type * as BX from './box'
-import { VaultSparse } from './vault'
-import { revision_tok } from './fields'
+import type { BoxSparse, BoxDamaged } from './box'
+import * as BX from './box'
+import * as VX from './vault'
+import * as FX from './fields'
 
 // == [Expectations]: VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion
 
@@ -58,9 +58,9 @@ export type BoxDeletion = Z.infer<typeof BoxDeletion>
  * An expectation keeps only the fields it compares, so a whole record handed as one is read for
  * those alone.
  */
-export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof }) => {
-  const VaultRecordExpectation = VaultSparse.pick({ vault_tok: true, gate_epoch: true })
-  const BoxGetExpectation = VaultSparse.pick({ vault_tok: true })
+export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion } = Validator('bad_record', ({ obj, uint, oneof, revision_tok }) => {
+  const VaultRecordExpectation = VX.VaultSparse.pick({ vault_tok: true, gate_epoch: true })
+  const BoxGetExpectation = VX.VaultSparse.pick({ vault_tok: true })
   return {
     VaultRecordExpectation,
     BoxGetExpectation,
@@ -69,7 +69,7 @@ export const { VaultRecordExpectation, BoxGetExpectation, BoxExpectation, VaultD
     BoxDelExpectation:     BoxGetExpectation.extend({ revision_tok: revision_tok.nullable() }),
     BoxDeletion:           obj({ outcome: oneof(['deleted', 'deleted_other', 'absent']) }),
   }
-})
+}, [FX])
 // --
 
 // == [Capacity]: Capacity
@@ -103,7 +103,7 @@ export type Capacity = Z.infer<typeof Capacity>
  *
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow as StoredBox['box'] }
  */
-export type StoredBox = { boxlabel: string, box: Z.input<typeof BoxRecord> | Z.input<typeof BX.BoxSparse> }
+export type StoredBox = { boxlabel: string, box: Z.input<typeof BX.BoxRecord> | Z.input<typeof BX.BoxSparse> }
 
 /** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. A vault read hands it back beside the vault record's fields. */
 export type BoxListing = Readonly<{
@@ -130,15 +130,15 @@ export type StoredVault = BoxListing & {
  * vault record as stored, and its listing, each sound box an object to judge, each damaged one a
  * {@link BoxDamaged}.
  */
-export const { ListedBox, StoredRevision, StoredVaultAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
-  ListedBox:         BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
+export const { ListedBox, StoredRevision, StoredVaultAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk, revision_tok }) => ({
+  ListedBox:         BX.BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
   StoredRevision:    obj({ revision_tok }),
   StoredVaultAnswer: obj({ vault: unk }).loose(),
-  ListingAnswer:     obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BoxDamaged) }).loose(),
-}))
+  ListingAnswer:     obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BX.BoxDamaged) }).loose(),
+}), [FX])
 
 /** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */
 export const { StoredVaultTok } = Validator('bad_record', () => ({
-  StoredVaultTok: VaultSparse.pick({ vault_tok: true }),
+  StoredVaultTok: VX.VaultSparse.pick({ vault_tok: true }),
 }))
 // --

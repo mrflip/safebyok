@@ -9,7 +9,8 @@ import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type Outcome, bad, good, valOf } from './outcome'
 import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, freshPasskeyAnswer, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated } from './shapes/vault'
+import * as VX from './shapes/vault'
 import type { Vault } from './vault'
 
 /** Each kind of gating, by the change its attempt makes: see {@link Gating}. */
@@ -446,7 +447,7 @@ export class RaisedGating implements ProvingGating {
 // == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
-const checkText = (given: unknown): void => { passphraseCleartext.parse(given) }
+const checkText = (given: unknown): void => { VX.passphraseCleartext.parse(given) }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
 const checkTexts = (current: unknown, next: unknown): void => {
@@ -455,18 +456,18 @@ const checkTexts = (current: unknown, next: unknown): void => {
 }
 
 /** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswerShape` checks: an answer already used among them. */
-const checkPasskey = (passkey: unknown): void => { passkeyAnswerShape.parse(passkey) }
+const checkPasskey = (passkey: unknown): void => { VX.passkeyAnswerShape.parse(passkey) }
 
 /** Refuse 'bad_option' unless the passphrase is text and the passkey's answer one a new passkey gives, over a fresh salt. */
 const checkNewPasskey = (passphrase: unknown, passkey: unknown): void => {
   checkText(passphrase)
-  freshPasskeyAnswer.parse(passkey)
+  VX.freshPasskeyAnswer.parse(passkey)
 }
 
 /** Refuse 'bad_option' unless the first passphrase is text and the passkey's answer, when given, one a new passkey gives. */
 const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
   checkText(passphrase)
-  if (passkey !== undefined) { freshPasskeyAnswer.parse(passkey) }
+  if (passkey !== undefined) { VX.freshPasskeyAnswer.parse(passkey) }
 }
 
 /** The two halves of a declined call's message, by gating kind: what the user was asked to do, and what remains once they decline. */

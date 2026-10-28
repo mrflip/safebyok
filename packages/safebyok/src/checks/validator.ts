@@ -4,7 +4,7 @@ import * as Zod from 'zod'
 import type * as Z from 'zod'
 import { RefusalKindVals, VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
-import { EpochMillis, label, user_id } from '../shapes/primitives'
+import * as PX from '../shapes/primitives'
 
 // == [Kit]: isBytes, Kit, KitWith, Merged
 
@@ -39,8 +39,8 @@ export const Kit = {
   /** A safe integer, 0 or more: an epoch or a count. */
   uint:    Zod.int().nonnegative(),
   bool:    Zod.boolean(),
-  label, applabel: label, vaultlabel: label, boxlabel: label, user_id,
-  epochMillis: EpochMillis,
+  label: PX.label, applabel: PX.label, vaultlabel: PX.label, boxlabel: PX.label, user_id: PX.user_id,
+  epochMillis: PX.EpochMillis,
 } as const
 
 /** The kit a builder gets: {@link Kit}, with the given modules' exports spread in beneath it. */

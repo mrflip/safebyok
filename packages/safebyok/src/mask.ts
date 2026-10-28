@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { maskOpts } from './shapes/mask'
+import * as MX from './shapes/mask'
 import { codePointsOf } from './text'
 
 /** How `mask` shows a whisper: how many characters to reveal, and how many stars to hide it behind. */
@@ -74,7 +74,7 @@ export const mask = (whisper: string, opts?: MaskOpts): string => {
   if (typeof whisper !== 'string') {
     throw new VaultError('bad_whisper', 'mask masks a whisper that is a string.')
   }
-  const { head, tail, minStars, maxLen } = maskOpts.parse(opts ?? {})
+  const { head, tail, minStars, maxLen } = MX.maskOpts.parse(opts ?? {})
   if (whisper === '') { return '' }
   const safeToButcher = plainLine(whisper)
   const butchered = butcher(codePointsOf(safeToButcher), { head, tail, minStars, maxLen })

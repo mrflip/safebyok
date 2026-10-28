@@ -1,5 +1,6 @@
 import type * as Z from 'zod'
-import { DeviceRecord, DeviceRecordFormat, LeaseRecord } from './shapes/device'
+import { DeviceRecordFormat, type DeviceRecord, type LeaseRecord } from './shapes/device'
+import * as DX from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
 import * as Scopepath from './scopepath'
@@ -48,7 +49,7 @@ export abstract class DeviceDB {
   async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#parseOrDel('getLease', LeaseRecord, leaseScopepath, raw)
+    return await this.#parseOrDel('getLease', DX.LeaseRecord, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
@@ -94,7 +95,7 @@ export abstract class DeviceDB {
   async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
     const deviceScopepath = Scopepath.device(scope)
     const raw = await storeAnswer('getDeviceRecord', () => this.doGetDeviceRecord(deviceScopepath))
-    return deviceRecordFor(deviceScopepath, await this.#parseOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw))
+    return deviceRecordFor(deviceScopepath, await this.#parseOrDel('getDeviceRecord', DX.DeviceRecord, deviceScopepath, raw))
   }
 
   /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
@@ -258,7 +259,7 @@ class MemoryDeviceDB extends DeviceDB {
  * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
  */
 export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
-  const checked = DeviceRecord.safeParse(stored)
+  const checked = DX.DeviceRecord.safeParse(stored)
   if (! checked.success || Scopepath.device(checked.data) !== Scopepath.device(record)) { return record }
   const kept = checked.data
   if (kept.highest_vault_epoch >= record.highest_vault_epoch) { return kept }
@@ -273,12 +274,12 @@ export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): Devic
  */
 export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vault_epoch: number): DeviceRecord => {
   const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
-  return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
+  return DX.DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
 /** `answer`, a device record filed under `deviceScopepath`, checked: the record, or null for one that fails its check or names another scope, as for none. */
 const deviceRecordFor = (deviceScopepath: Scopepath.DeviceScopepath, answer: unknown): DeviceRecord | null => {
-  const checked = DeviceRecord.safeParse(answer)
+  const checked = DX.DeviceRecord.safeParse(answer)
   if (! checked.success || Scopepath.device(checked.data) !== deviceScopepath) { return null }
   return checked.data
 }

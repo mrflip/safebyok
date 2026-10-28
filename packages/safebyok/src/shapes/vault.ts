@@ -6,7 +6,7 @@ import { Validator } from '../checks/validator'
 import * as Phrases from '../phrases'
 import { fromB64OrNull } from '../crypto'
 import type { StrengthChecker } from '../passphrase-strength'
-import { credential_id, device_id, key_deriver_label, prf_salt_b64, salt_b64, vault_key_wayin_wrapped, vault_tok } from './fields'
+import * as FX from './fields'
 
 // == [Formats]: VaultFormat, TombstoneFormat
 
@@ -50,7 +50,7 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
  * @example VaultRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {
+export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis, key_deriver_label, salt_b64, device_id, vault_key_wayin_wrapped, credential_id, prf_salt_b64, vault_tok }) => {
   const PassphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
@@ -126,7 +126,7 @@ export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecor
   const PasskeyWayinHeader = PasskeyWayinRecord.omit({ vault_key_wayin_wrapped: true })
 
   return { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader }
-})
+}, [FX])
 
 /** A passphrase wayin as stored: the vaultKey wrapped under the passphraseKey the passphrase and this wayin's passphraseSalt make.
  * Every other field is visible, and bound into that wrap, so a wayin altered or moved to another
@@ -334,7 +334,7 @@ export const PrfAnswerBytes = 32
  * @example passkeyAnswerShape.parse(await askPasskey(vault.snapshot.gate))
  * @example passkeyAnswerShape.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
-export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes }) => ({
+export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes, credential_id }) => ({
   passkeyAnswerShape: obj({
     /** Base64url, as `PublicKeyCredential.id` gives it. */
     credential_id,
@@ -342,7 +342,7 @@ export const { passkeyAnswerShape } = Validator('bad_option', ({ obj, str, bytes
     /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
     prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
   }),
-}))
+}), [FX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take

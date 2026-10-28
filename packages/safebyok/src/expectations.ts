@@ -1,7 +1,8 @@
-import { revision_tok } from './shapes/fields'
+import * as FX from './shapes/fields'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type VaultRecord, VaultSparse, type VaultTombstone } from './shapes/vault'
+import { TombstoneFormat, type VaultRecord, type VaultTombstone } from './shapes/vault'
+import * as VX from './shapes/vault'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './shapes/vault-db'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
@@ -65,7 +66,7 @@ export const vaultMeets = (stored: unknown, expected: Pick<VaultDelExpectation, 
 /** The `vault_epoch` of a stored row, a vault record or a tombstone, as a whole number from zero: zero where the row shows none that reads so.
  * A damaged vault record can show no `vault_epoch`; its deletion still leaves a tombstone.
  */
-const epochOf = (stored: unknown): number => VaultSparse.shape.vault_epoch.safeParse(fieldOf(stored, 'vault_epoch')).data ?? 0
+const epochOf = (stored: unknown): number => VX.VaultSparse.shape.vault_epoch.safeParse(fieldOf(stored, 'vault_epoch')).data ?? 0
 
 /** The vault record an update stores over `stored`, once it has met it: `vaultRecord`, its `vault_epoch` the stored one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2). It hands back the type it
@@ -132,6 +133,6 @@ export const boxRefusalOf = (storedVaultRecord: unknown, storedBox: unknown, exp
  */
 export const deletionOf = (storedBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (storedBox === undefined || storedBox === null) { return { outcome: 'absent' } }
-  const storedRevision = revision_tok.safeParse(fieldOf(storedBox, 'revision_tok')).data ?? null
+  const storedRevision = FX.revision_tok.safeParse(fieldOf(storedBox, 'revision_tok')).data ?? null
   return { outcome: storedRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
 }

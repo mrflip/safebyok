@@ -4,7 +4,8 @@ import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { type Outcome, outcomeOf, refusalOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { BoxFormat, BoxRecord, BoxSparse, MadeShape, MadeUnderShape, SealBoxProps, Sidecar, Whisper, type MadeUnder } from './shapes/box'
+import { BoxFormat, type BoxSparse, type Sidecar, type MadeUnder, type BoxRecord, type SealBoxProps, type Whisper } from './shapes/box'
+import * as BX from './shapes/box'
 import type { VaultStamp } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import type { Boxscope, VaultScope } from './shapes/scopes'
@@ -119,8 +120,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' }, madeUnder)   // throws 'bad_record': no box record
    */
   static make(vault: VaultOfBox, record: BoxRecord, madeUnder: MadeUnder): Box {
-    const checked = BoxRecord.parse(record)
-    return new this(vault, MadeUnderShape.parse(madeUnder), checked, null)
+    const checked = BX.BoxRecord.parse(record)
+    return new this(vault, BX.MadeUnderShape.parse(madeUnder), checked, null)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
@@ -145,8 +146,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
   static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> {
-    const { boxlabel, sidecar, base } = SealBoxProps.parse(props)
-    const { madeUnder, now } = MadeShape.parse(made)
+    const { boxlabel, sidecar, base } = BX.SealBoxProps.parse(props)
+    const { madeUnder, now } = BX.MadeShape.parse(made)
     const whisperBytes = whisperBytesOf(whisper)
     try {
       vault.demandConsistentWith(madeUnder, { leaseBound: true })
@@ -164,7 +165,7 @@ export class Box implements Boxscope, BoxSparse {
       }, { whisper: whisperBytes })
       // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
       vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
-      return new Box(vault, madeUnder, BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
+      return new Box(vault, madeUnder, BX.BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
     } catch (err) {
       throw refusalOf(err)
     } finally {
@@ -206,7 +207,7 @@ export class Box implements Boxscope, BoxSparse {
       }
       const whisperBytes = valOf(deciphered)
       try {
-        const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+        const checked = BX.Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
         if (! checked.success) {
           throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
         }
@@ -245,7 +246,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 // == [Helpers]: whisperBytesOf, parseJsonOrNull, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
-export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(Whisper.parse(whisper)))
+export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(BX.Whisper.parse(whisper)))
 
 /** `text` parsed as JSON, or null when it is none. */
 const parseJsonOrNull = (text: string): unknown => {

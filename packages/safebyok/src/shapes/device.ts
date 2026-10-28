@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
-import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
+import * as FX from './fields'
 
 // == [Lease]: LeaseFormat, isLeaseKey, LeaseRecord, LeaseStamp, LeaseSparse, LeaseGrant
 
@@ -29,7 +29,7 @@ export const isLeaseKey = (val: unknown): val is CryptoKey => (
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
  * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
  */
-export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
+export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis, vault_tok, vault_key_lease_wrapped }) => ({
   LeaseRecord: obj({
     format:            lit(LeaseFormat),
     applabel,
@@ -45,7 +45,7 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
     ask_passphrase_at: epochMillis,
   }).strict(),
-}))
+}), [FX])
 export type LeaseRecord = Z.infer<typeof LeaseRecord>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
@@ -83,7 +83,7 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
 // A field added here bumps the format: a device whose safebyok predates the field discards the
 // record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
 // its next read raises it again.
-export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
+export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel, device_id }) => ({
   DeviceRecord: obj({
     format:              lit(DeviceRecordFormat),
     applabel,
@@ -94,7 +94,7 @@ export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, appla
     /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */
     highest_vault_epoch: uint,
   }).strict().readonly(),
-}))
+}), [FX])
 export type DeviceRecord = Z.infer<typeof DeviceRecord>
 // --
 

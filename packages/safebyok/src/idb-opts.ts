@@ -1,4 +1,4 @@
-import { idbOpts } from './shapes/device'
+import * as DX from './shapes/device'
 
 /** The options the IndexedDB device store and `browserOpts` share, and their parser. Only the type is public, through `safebyok/idb`. */
 
@@ -16,4 +16,4 @@ export type IdbOpts = {
  * @example parseDbName({ dbName: 'acme' }, 'idbDeviceDB')  // 'acme'
  * @example parseDbName({ dbname: 'acme' }, 'browserOpts')  // throws 'bad_option': "In browserOpts's options: There is a field it does not take ..."
  */
-export const parseDbName = (opts: IdbOpts | undefined, callname: string): string => idbOpts.parse(opts ?? {}, { where: `In ${callname}'s options` }).dbName
+export const parseDbName = (opts: IdbOpts | undefined, callname: string): string => DX.idbOpts.parse(opts ?? {}, { where: `In ${callname}'s options` }).dbName

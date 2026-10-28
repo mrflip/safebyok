@@ -1,4 +1,4 @@
-import { loggerShape } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
@@ -59,7 +59,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
-  loggerShape.parse(candidate)
+  OX.loggerShape.parse(candidate)
   const known = guardedFor.get(candidate)
   if (known !== undefined) { return known }
   const made = guarded(candidate)

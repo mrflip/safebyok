@@ -4,8 +4,8 @@ import type * as Z from 'zod'
 import { record } from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
-import { box_key_wrapped, revision_tok, vault_tok, whisper_ciphered } from './fields'
-import { VaultSparse } from './vault'
+import * as FX from './fields'
+import * as VX from './vault'
 
 // == [Whisper and sidecar]: WhisperJson, Whisper, isPlainBag, whisperBag, Sidecar
 
@@ -83,7 +83,7 @@ export const BoxFormat = 'safebyok-box-v8'
  *
  * @example BoxRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no box
  */
-export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
+export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis, revision_tok, box_key_wrapped, whisper_ciphered }) => ({
   BoxRecord: obj({
     format:                 lit(BoxFormat),
     boxlabel,
@@ -106,7 +106,7 @@ export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epoc
     /** When this revision was written: a store of the same whisper moves it too. */
     written_at:             epochMillis,
   }).strict(),
-}))
+}), [FX])
 export type BoxRecord = Z.infer<typeof BoxRecord>
 
 /** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
@@ -139,9 +139,9 @@ export const BoxDamageVals = ['damaged', 'newer_format'] as const
  *     if (box.damage === 'newer_format') { offerUpdate() } else { offerRemove(box.boxlabel) }
  *   }
  */
-export const { BoxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel }) => ({
+export const { BoxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel, revision_tok }) => ({
   BoxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(BoxDamageVals) }).strict(),
-}))
+}), [FX])
 export type BoxDamaged = Z.infer<typeof BoxDamaged>
 
 /** A box's stamp: its {@link BoxSparse}, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
@@ -150,16 +150,16 @@ export type BoxDamaged = Z.infer<typeof BoxDamaged>
  *
  * @example BoxStamp.parse({ ...sparse, vault_tok: box.vault_tok })   // sparse: box.record but its two ciphered fields
  */
-export const { BoxStamp } = Validator('bad_record', () => ({
+export const { BoxStamp } = Validator('bad_record', ({ vault_tok }) => ({
   // Strict: every field a box shows is bound, and one beside them would be shown but not bound.
   BoxStamp: BoxSparse.extend({ vault_tok }).strict(),
-}))
+}), [FX])
 export type BoxStamp = Z.infer<typeof BoxStamp>
 
 /** The check of a box's two ciphered fields, as {@link BoxCiphered} has them, every other field a box record holds dropped unread. Its `parse` refuses 'bad_record'. */
-export const { CipheredShape } = Validator('bad_record', ({ obj }) => ({
+export const { CipheredShape } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
   CipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
-}))
+}), [FX])
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Z.infer<typeof CipheredShape>
@@ -173,16 +173,16 @@ export type BoxCiphered = Z.infer<typeof CipheredShape>
  * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
  * is made under, and what a seal is made with, are taken from a {@link VaultSparse}, frozen.
  */
-export const { BoxBase, SealBoxProps, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis }) => {
+export const { BoxBase, SealBoxProps, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
   const BoxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
-  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
+  const MadeUnderShape = VX.VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
   return {
     BoxBase,
     SealBoxProps: obj({ boxlabel, sidecar: Sidecar.default(() => ({})), base: BoxBase.nullish() }).strict(),
     MadeUnderShape,
     MadeShape:    obj({ madeUnder: MadeUnderShape, now: epochMillis }),
   }
-})
+}, [FX])
 
 /** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
  * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
