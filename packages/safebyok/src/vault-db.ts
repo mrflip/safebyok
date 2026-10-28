@@ -683,7 +683,7 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
  * @example
  *   protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
  *     const { vaultRow, boxRows } = await this.getVaultRows(scope)   // one transaction
- *     return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
+ *     return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row as StoredBox['box'] }))) }
  *   }
  */
 export const splitStoredBoxes = (rows: readonly StoredBox[]): { boxes: BoxSparse[], damagedBoxes: BoxDamaged[] } => (

@@ -359,14 +359,16 @@ A read answers the vault as one atomic step read it: `doGetVault` and `doEnsureV
 `StoredVault`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
 tombstone, or null) and the box rows split by `splitStoredBoxes`, which judges each row's damage
 so your adapter never does. Hand it each row as a `StoredBox`: the boxlabel it is filed under,
-from its scopepath or its column, beside the record exactly as stored.
+from its scopepath or its column, beside the record exactly as stored. `StoredBox.box` is typed
+as what a row should hold, so cast the row once where you read it from storage; the split's check
+backs that cast, and lists a row that is not so as damaged.
 
 ```ts
-import { splitStoredBoxes, type StoredVault } from 'safebyok'
+import { splitStoredBoxes, type StoredBox, type StoredVault } from 'safebyok'
 
 protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
   const { vaultRow, boxRows } = await this.getVaultRows(scope)   // one transaction
-  return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
+  return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row as StoredBox['box'] }))) }
 }
 ```
 

@@ -71,7 +71,7 @@ class MapVaultDB extends VaultDB {
   private storedBoxes(scope: VaultScope): StoredBox[] {
     const prefix = Scopepath.withinVaultScopepathPrefix(scope)
     const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
-    return [...this.rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, row]) => ({ boxlabel: ckey.slice(prefix.length), box: row }))
+    return [...this.rows].filter(([ckey]) => isWithinVault(ckey)).map(([ckey, row]) => ({ boxlabel: ckey.slice(prefix.length), box: row as StoredBox['box'] }))
   }
 
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) {
@@ -1036,9 +1036,9 @@ describe("splitStoredBoxes", () => {
   it("splits the rows an adapter read into the sound and the damaged, each sorted by boxlabel, as its example hands them up", () => {
     const rows: StoredBox[] = [
       { boxlabel: 'openai',    box: TH.boxOf('openai', 'two') },
-      { boxlabel: 'mistral',   box: 'not a box' },
+      { boxlabel: 'mistral',   box: 'not a box' as unknown as StoredBox['box'] },
       { boxlabel: 'anthropic', box: omit(TH.boxOf('anthropic', 'one'), ['box_key_wrapped', 'whisper_ciphered']) },
-      { boxlabel: 'cohere',    box: { ...TH.boxOf('cohere', 'four'), format: 'safebyok-box-v9' } },
+      { boxlabel: 'cohere',    box: { ...TH.boxOf('cohere', 'four'), format: 'safebyok-box-v9' } as unknown as StoredBox['box'] },
       { boxlabel: 'Bad Label', box: TH.boxOf('Bad Label', 'five') },
     ]
     expect(splitStoredBoxes(rows)).to.deep.equal({

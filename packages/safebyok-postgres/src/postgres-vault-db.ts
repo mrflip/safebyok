@@ -1,5 +1,5 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredVault, VaultRecord, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, VaultRecord, VaultDraft } from 'safebyok'
 import * as Columns from './columns'
 import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -485,7 +485,7 @@ const storedVaultOf = (row: unknown): StoredVault => {
   return {
     // A row goes up as stored, whatever its cells hold: the base class judges the record, and the split each box.
     vault: vaultRecordOfRow(Columns.recordOf(row, VaultRowColumns)),
-    ...splitStoredBoxes(sparseBoxes.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, BoxSparseColumns) }))),
+    ...splitStoredBoxes(sparseBoxes.map((box) => ({ boxlabel: box['boxlabel'] as string, box: Columns.recordOf(box, BoxSparseColumns) as StoredBox['box'] }))),
   }
 }
 

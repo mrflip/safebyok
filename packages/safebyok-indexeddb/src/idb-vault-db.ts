@@ -168,9 +168,9 @@ const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<Stored
  */
 const storedBoxesOf = (ckeys: IDBValidKey[], rows: unknown[]): StoredBox[] => (
   ckeys
-    .map((ckey, idx) => ({ ckey, box: rows[idx] }))
-    .filter((stored): stored is { ckey: Scopepath.BoxScopepath, box: unknown } => Scopepath.isBox(stored.ckey))
-    // A row goes to the split as stored, whatever it holds: the split judges it.
+    .map((ckey, idx) => ({ ckey, box: rows[idx] as StoredBox['box'] }))
+    .filter((stored): stored is { ckey: Scopepath.BoxScopepath, box: StoredBox['box'] } => Scopepath.isBox(stored.ckey))
+    // A row goes to the split as stored, whatever it holds, cast to the shape a row should hold: the split judges it.
     .map(({ ckey, box }) => ({ boxlabel: Scopepath.boxscope(ckey).boxlabel, box }))
 )
 
