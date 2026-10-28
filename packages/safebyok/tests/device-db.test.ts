@@ -39,7 +39,7 @@ describe("memoryDeviceDB", () => {
     await TH.expectBad(memoryDeviceDB().tryGetLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
   })
 
-  it("throws from a throwing verb the VaultError its try form resolves as err: a store's throw as storage_unavailable from both forms, that throw its cause", async () => {
+  it("throws from a throwing verb the VaultError its try form resolves as err: a store's throw as storage_unavailable from both forms, neither keeping that throw", async () => {
     await expect(memoryDeviceDB().getLease({ ...TH.scopeOf('u1'), user_id: 'u^1' })).rejects.toThrow(VaultError)
     const shelf = new Error('the shelf fell over')
     class DownDeviceDB extends DeviceDB {
@@ -53,13 +53,13 @@ describe("memoryDeviceDB", () => {
       protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
     }
     const thrown = await TH.expectRefusal(new DownDeviceDB().getLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(thrown.cause).to.eq(shelf)
+    expect(thrown.cause).to.be.undefined
     const refused = await TH.expectBad(new DownDeviceDB().tryGetLease(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(refused.cause).to.eq(shelf)
+    expect(refused.cause).to.be.undefined
     expect(refused.message).to.eq(thrown.message)
     // A store that throws before its promise is caught the same.
     const sync = await TH.expectRefusal(new DownDeviceDB().putLease(await TH.leaseOf('u1')), 'storage_unavailable')
-    expect(sync.cause).to.eq(shelf)
+    expect(sync.cause).to.be.undefined
   })
 
   it("passes a VaultError the store throws through both forms with its kind, and a browser's SecurityError as storage_blocked", async () => {
@@ -77,7 +77,7 @@ describe("memoryDeviceDB", () => {
     await TH.expectRefusal(new RefusingDeviceDB().getLease(TH.scopeOf('u1')), 'not_permitted')
     await TH.expectBad(new RefusingDeviceDB().tryGetLease(TH.scopeOf('u1')), 'not_permitted')
     const thrown = await TH.expectRefusal(new RefusingDeviceDB().delLease(TH.scopeOf('u1')), 'storage_blocked')
-    expect(thrown.cause).to.eq(blocked)
+    expect(thrown.cause).to.be.undefined
     await TH.expectBad(new RefusingDeviceDB().tryDelLease(TH.scopeOf('u1')), 'storage_blocked')
   })
 })
@@ -276,7 +276,7 @@ describe("DeviceDB, the base class", () => {
     const record = await TH.leaseOf('u1')
     const quoting = new Error(`could not store ${JSON.stringify({ ...record, lease_key: 'the leaseKey, as a careless store might print it' })}`)
     const deviceDB = new ScriptedDeviceDB(() => Promise.reject(quoting))
-    const err = await TH.expectBad(deviceDB.putLease(record), 'storage_unavailable')
+    const err = await TH.expectBad(deviceDB.tryPutLease(record), 'storage_unavailable')
     expect(err.cause).to.be.undefined
     expect(err.meta).to.be.undefined
     expect(err.message).to.match(/The device store threw Error\.$/)
