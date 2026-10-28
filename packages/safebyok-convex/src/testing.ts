@@ -12,7 +12,7 @@ import { Validator } from 'safebyok'
  * adapter, a binding, or an app that holds a Convex client.
  *
  * `convex-test` runs the host's safebyok functions and the component beneath; this answers the
- * sync-protocol messages a client sends for queries and mutations, as convex 1.46 sends them. It
+ * sync-protocol messages a client sends for queries and mutations, as convex 1.47 sends them. It
  * imports `convex` and `safebyok` and nothing else: `convex-test` stays with you, and its
  * `defineTestApp(...).defineModules(...)` is the `host`.
  *
