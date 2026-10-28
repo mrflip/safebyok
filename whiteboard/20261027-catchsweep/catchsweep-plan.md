@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). Open, each PR's base `main`: 7 (#327, `c51b7274`, filed, stands on #321's tip, so on main's history); 3 (#330, `854be0c6`, rebased onto main, pass-through built, second review); 8 (#328, `795701d2`, on #321's tip, second review); 9 (#331, `e1601ff3`, on #327, in review); 2 (#325, `5e486337`, on #316's tip) reviewed and flagged, waits unfiled for the Coach's two TOP rows. Nine threads; restack of the open five at the wrap-up.
+**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). Open, each PR's base `main`: 7 (#327, `c51b7274`, filed, stands on #321's tip, so on main's history); 3 (#330, `854be0c6`, rebased onto main, pass-through built, second review); 8 (#328, `c0c83fda`, second review fixed, filing); 9 (#331, `e1601ff3`, on #327, in review); 2 (#325, `5e486337`, on #316's tip) reviewed and flagged, waits unfiled for the Coach's two TOP rows. Nine threads; restack of the open five at the wrap-up.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -313,6 +313,7 @@ Changeset: `safebyok` minor naming `StringStore.get`/`put`/`del`, `Refusals.stal
 cut from thread 6's tip once it files, beside thread 3; restacked at the wrap-up. Review `medium`.
 
 *Review:* medium, fixed at `b1ec666f`: 3 fixes (doc blocks of `Birth` and `StaleDelMessage` lead with the thing; three test titles say deletes/getter; the demo's `readSession` → `getSession`), 6 minor left. Pure rename under `-w`; `lease.ts` touched only at `tryGet`'s name and doc. Left: `notes/security.md` `#takeOwnWrite`/`#judgeRead`/`#boxReadRefusal` stale and `one-at-a-time.ts`'s `readStorage` example (the worker, in its rulings pass); `#parsedOrDel` named for what it returns (settled with `doDelUnparsed`); the trythrow changeset introducing and retiring `tryRead` in one release (Cleanup, restack); STYLE.md l.596/699 "Read and open the box" (Open Matters row); umbrella prose around renamed members (documentarian).
+*Review, round 2* (b1ec666f...795701d2): fixed at `c0c83fda`, 4 fixes (convex README's `getBox` shape said `read`; a release-note line saying `doDelUnparsed(scopepath, isSound)` replaces `doDelUnreadable`, since `20261027-device_db_class.md` is unreleased and names the old hook; an `UnknownReadAnswers` row for the retired `{ read: true, box_stored }` shape, refused `corrupt_record`; `GetBoxAnswer`'s doc opener), 6 minor left, all prose for the documentarian (Cleanup): `GetBoxOutOfDateMessage`, idb's "unreadable" message, `UnreadableCases` and test titles, `PutBoxAnswer`'s and four other "What a" openers, `isGetBoxAnswer`'s doc, `.changeset/20261022-lease_box.md`'s `{ read, box_stored }`. The e2e convex assertion was not run (needs a deployment).
 
 ### 9. saying_story: the saying is a Story, exported, inferred from its shape
 
