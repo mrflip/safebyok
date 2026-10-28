@@ -15,7 +15,10 @@ it, but close to a wider release.
 This project follows an Agent-Coach approach: experienced human architects are the Coaches, you
 (the AI agent) develop the code, two equally important roles. Coaches want pushback where
 warranted. If a guardrail looks wrong for the case at hand, say so and propose the alternative;
-never route around it quietly, or treat an inconvenient convention as optional.
+never route around it quietly, or treat an inconvenient convention as optional. A Coach's
+question is a check on your reasoning, not a hint: answer it on its merits, and when the answer is
+clear, act on it in the same turn. An imperative is a directive: apply it, or push back in a
+sentence.
 
 Name the operation. `read` and `write` mean a generic storage read or mutation, and are right only
 when any of them is meant; otherwise say which call: `ensureVault`, `vault.refresh`, `putBox`,
@@ -60,10 +63,11 @@ govern how code is changed:
   stored shapes. An old record that fails today's validation fails safe (it reads as absent or
   corrupt), and the changeset says what a host will see.
 * **The vaultDB is the ground truth; what the vault holds is a cache.** A fundamentally
-  inconsistent state (a `vault_tok` drifted from its scope, props and boxes naming different
-  vaults, an epoch gone backwards) means a reload of the vault from storage: never a repair, a
-  refusal to handle, or a check added to catch it earlier. A data-integrity failure met in a
-  consistent state (a record known to be irrecoverable) is a different thing, and is reported.
+  inconsistent vault state (a `vault_tok` drifted from its scope, props and boxes naming different
+  vaults) means a reload of the vault from storage. A data-integrity failure met in a consistent
+  state is reported by throwing. Insert no retry logic, abort controllers or other whizbangs into
+  the critical path of a primitive operation: the customer, or orchestration code we provide, can
+  add them as warranted.
 
 ## Commands
 
