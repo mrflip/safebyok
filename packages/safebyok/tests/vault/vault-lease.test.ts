@@ -686,7 +686,7 @@ describe("an unlock this device cannot keep a lease for", () => {
     const trouble = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
     TH.spyOnDeviceHook(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(TH.unlock(vault, 'pw one'), 'storage_blocked')
-    expect(err.cause).to.eq(trouble)
+    expect(err.cause).to.be.undefined
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(await world.getLease()).to.be.null
     await TH.unlock(vault, 'pw one')

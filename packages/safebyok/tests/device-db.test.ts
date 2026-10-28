@@ -217,13 +217,25 @@ describe("DeviceDB, the base class", () => {
     expect(raisedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
   })
 
-  it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting", async () => {
+  it("says a SecurityError as 'storage_blocked', keeping nothing of the store's error, never rejecting", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
     const deviceDB = new ScriptedDeviceDB(() => Promise.reject(blocked))
     const err = await TH.expectBad(deviceDB.delDeviceRecord(TH.scopeOf('u1')), 'storage_blocked')
-    expect(err.cause).to.eq(blocked)
+    expect(err.cause).to.be.undefined
     expect(err.message).to.match(/erasing its record of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
+    expect(err.message).to.not.include('insecure')
+  })
+
+  it("keeps nothing of a store's throw that quotes the record it was handed: not as its cause, not in its message or meta", async () => {
+    const record = await TH.leaseOf('u1')
+    const quoting = new Error(`could not store ${JSON.stringify({ ...record, lease_key: 'the leaseKey, as a careless store might print it' })}`)
+    const deviceDB = new ScriptedDeviceDB(() => Promise.reject(quoting))
+    const err = await TH.expectBad(deviceDB.putLease(record), 'storage_unavailable')
+    expect(err.cause).to.be.undefined
+    expect(err.meta).to.be.undefined
+    expect(TH.thrownText(err)).to.not.include(record.vault_tok)
+    expect(TH.thrownText(err)).to.not.include('careless')
   })
 
   const ThrownCases = [
@@ -236,10 +248,10 @@ describe("DeviceDB, the base class", () => {
   ] as const
 
   for (const [thrown, refusalkind, blurb] of ThrownCases) {
-    it(`says ${blurb} as '${refusalkind}', what was thrown its cause`, async () => {
+    it(`says ${blurb} as '${refusalkind}', keeping nothing of what was thrown`, async () => {
       const deviceDB = new ScriptedDeviceDB(vi.fn<() => Promise<never>>().mockRejectedValue(thrown))
       const err = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), refusalkind)
-      expect(err.cause).to.eq(thrown)
+      expect(err.cause).to.be.undefined
     })
   }
 

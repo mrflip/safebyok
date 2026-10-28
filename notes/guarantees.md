@@ -11,7 +11,8 @@ a bug: report it, do not amend the guarantee. **Changing any file named under *W
 guarantees are kept* means reading *The guarantees* first and checking the change against them.**
 
 Last verified against the code 2026-10-27, on `main` after #302, with
-[#305](https://github.com/mrflip/safebyok/pull/305) applied.
+[#305](https://github.com/mrflip/safebyok/pull/305) applied; the access points, G5 and G8 amended
+2026-10-28 for [#316](https://github.com/mrflip/safebyok/pull/316) and the aead_narrow thread.
 
 ## Where the guarantees are kept
 
@@ -30,7 +31,9 @@ these guarantees until shown otherwise.
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
 (`passphrase-strength.ts`, `guardStrengthChecker`) and `requestCleartext` (`vault-opts.ts`,
-`parseRequestCleartext`). The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque.
+`parseRequestCleartext`). The `DeviceDB` (`device-db.ts`, `idb.ts`) stores the leaseKey opaque,
+and what a store throws is replaced at `deviceTrouble` (`device-db.ts`), which keeps nothing of it
+(G8).
 
 ## The construction
 
@@ -144,13 +147,14 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 `#unwrap` with `RewrapUsage` in `resealWayinFor` and `grantLease`, handed to `wrappedWith`
 (`wrapKeyUnder`) and `sealLeaseRecord` (`wrapKeyUnder` under the leaseKey). Operates, as a
 non-extractable one-usage handle in a local: `checkWayin` (`#unwrap`, `CheckUsage`);
-`Lease.#vaultKeyOrNull` in `cipheredWith` (`wrapKey`) and `decipherWith` (`unwrapKey`).
+`Lease.#vaultKeyOrNull` in `cipheredWith` (`wrapKey`) and `decipherWith` (`unwrapKey`), handed to
+`#openedOrNull`.
 Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped` (DeviceDB).
 
 **boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.cipheredWith`, wrapped by
 `wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
-`unwrapKeyUnder` in `Lease.decipherWith`, used by `decipherBytes`. Stored only as
-`box_key_wrapped`.
+`unwrapKeyUnder` in `Lease.#openedOrNull`, for `decipherWith`, used by `decipherBytes`. Stored
+only as `box_key_wrapped`.
 
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `sealLeaseRecord`, called by
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
@@ -223,7 +227,8 @@ safebyok's protection*). Kept by: `lease.ts`, `idb.ts`, `types.ts`. Checked by:
 extractable*).
 
 **G5. A boxKey is a local.** Fresh and extractable only to be wrapped, in `Lease.cipheredWith`;
-unwrapped non-extractable, `decrypt` only, in `decipherWith`; dropped at the end of each.
+unwrapped non-extractable, `decrypt` only, in `#openedOrNull` for `decipherWith`; dropped at the
+end of each.
 
 **G6. The whisper's bytes are zeroed; its value is the host's.** `putBox` validates the host's
 value and takes a `structuredClone` (`Whisper`), serializes it (`whisperBytesOf`), and zeroes the
@@ -243,13 +248,20 @@ kind, a limit or a field name. Every validator's refusal quotes no input: `tests
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced, never kept as a `cause`: `deriverThrewRefusal` (kind only, logged), `guardStrengthChecker`
 (nothing), `parseRequestCleartext` (kind only, logged). A WebCrypto failure is caught and replaced
-(`wrongProof`, `damaged_lease`, `damaged_box`). `unexpectedError` keeps a foreign throw as `cause`
-only where the thrower heard no secret: storage adapters and the device store. The logger hears
-messages, a story bag of kinds and calls, and `VaultError`s; `Proving.toJSON`, `Lease.toJSON` and
-`Wayin.toJSON` show no key material, and a lease that will not read is warned of without its
-record. *Host obligations, documented:* a `strengthChecker`'s `reason` becomes the
-`weak_passphrase` message, so it must not quote the passphrase (CUSTOMIZATION.md); a `DeviceDB`'s
-thrown error rides as a `cause`, so it must not echo the record it was handed.
+(`wrongProof`, `damaged_lease`, `damaged_box`), and each such catch holds that one WebCrypto call
+alone, its ctx built before it (`Proving.#unwrap`, `Lease.#vaultKeyOrNull`, `Lease.#openedOrNull`),
+so a bug in building the ctx never reads as a wrong proof or a damaged box. A device-store
+failure's cause never crosses to the host: `deviceTrouble` (`device-db.ts`) keeps neither what the
+store threw nor its message, reading only its `name`, as a `DeviceDB` is handed every lease
+record and the logger hands a condition to the host whole (`tests/device-db.test.ts`, *keeps
+nothing of a store's throw that quotes the record*). `unexpectedError` keeps a foreign throw as
+`cause` only where the thrower heard no secret: storage adapters, and a bug met inside a Lease or
+Box method, which the throwing form's one catch (`refusalOf`, `outcome.ts`) makes a VaultError of,
+never raw (the Vault and Bank forms map one in their `try` form). The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
+`Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
+not read is warned of without its record. *Host obligation, documented:* a `strengthChecker`'s
+`reason` becomes the `weak_passphrase` message, so it must not quote the passphrase
+(CUSTOMIZATION.md).
 
 **G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a

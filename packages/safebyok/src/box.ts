@@ -3,7 +3,7 @@ import type * as Z from 'zod'
 import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
-import { type Outcome, outcomeOf, valOf } from './outcome'
+import { type Outcome, outcomeOf, refusalOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
 import { revision_tok } from './shapes/fields'
@@ -58,7 +58,9 @@ type MadeUnder = Z.infer<typeof MadeUnderShape>
  * Misuse refuses before anything is ciphered: 'bad_whisper' for a whisper JSON cannot carry, and
  * 'bad_option' for props amiss, as {@link SealBoxProps} checks them (a boxlabel that is not a
  * label, a sidecar JSON cannot carry, a malformed base, or a field but `boxlabel`, `sidecar` and
- * `base`), or a malformed `madeUnder` or `made`. No refusal quotes what the call was handed.
+ * `base`), or a malformed `madeUnder` or `made`. No refusal quotes what the call was handed. A bug
+ * met in a seal or an extract (a throw that is no VaultError) arrives as 'unexpected_error', never
+ * raw; each `try` form is one {@link outcomeOf} over its throwing form.
  *
  * @example
  *   const box = await vault.getBox('anthropic_api_key')
@@ -194,6 +196,8 @@ export class Box implements Boxscope, BoxSparse {
       // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
       vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
       return new Box(vault, madeUnder, BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
+    } catch (err) {
+      throw refusalOf(err)
     } finally {
       whisperBytes.fill(0)
     }
@@ -217,28 +221,32 @@ export class Box implements Boxscope, BoxSparse {
    * @example const whisper = await box.extractWhisper()
    */
   async extractWhisper(): Promise<Whisper> {
-    this.#vault.demandConsistentWith(this, { leaseBound: true })
-    const lease = heldLeaseOf(this.#vault)
-    if (lease === null) { throw lockedError() }
-    const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
-    const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
-    // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
     try {
-      // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
-      this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
-    } catch (err) {
-      if (deciphered.ok) { deciphered.val.fill(0) }
-      throw err
-    }
-    const whisperBytes = valOf(deciphered)
-    try {
-      const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
-      if (! checked.success) {
-        throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
+      this.#vault.demandConsistentWith(this, { leaseBound: true })
+      const lease = heldLeaseOf(this.#vault)
+      if (lease === null) { throw lockedError() }
+      const { box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...visible } = this.#record
+      const deciphered = await lease.tryDecipherWith({ box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered }, visible)
+      // What the decipher brought, a refusal included, is used only while the box is still consistent with the vault in hand, and, for a decipher that came, its lease in force.
+      try {
+        // A lease that refused its own use (damaged_lease) has dropped itself: only the vault half is asked then.
+        this.#vault.demandConsistentWith(this, { leaseBound: deciphered.ok })
+      } catch (err) {
+        if (deciphered.ok) { deciphered.val.fill(0) }
+        throw err
       }
-      return checked.data
-    } finally {
-      whisperBytes.fill(0)
+      const whisperBytes = valOf(deciphered)
+      try {
+        const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+        if (! checked.success) {
+          throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
+        }
+        return checked.data
+      } finally {
+        whisperBytes.fill(0)
+      }
+    } catch (err) {
+      throw refusalOf(err)
     }
   }
 

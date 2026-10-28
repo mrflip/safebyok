@@ -15,7 +15,9 @@ export const StorageTroubleMessage = "The vault's storage could not be reached, 
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
- *   backend holds: ciphertext and unencrypted fields.
+ *   backend holds: ciphertext and unencrypted fields. True of a `VaultDB` adapter, never of the
+ *   device store, which is handed lease records: `DeviceDB` replaces what its store throws with a
+ *   condition that keeps nothing of it.
  * @param message - What failed, when there is more to say than that storage failed: which read or
  *   write it was, say. Never quotes a record or a name.
  *

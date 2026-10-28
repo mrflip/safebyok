@@ -5,6 +5,7 @@ import { Box, type SealBoxProps, boxSparseOf } from '../src/box'
 import { BoxDamaged, BoxRecord, BoxSparse, BoxStamp } from '../src/shapes/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
 import { Lease } from '../src/lease'
+import { VaultError } from '../src/errors'
 import { localVaultDB } from '../src/local-vault-db'
 import { type Outcome, valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
@@ -576,5 +577,32 @@ describe("box.extractWhisper", () => {
     const bytes = await TH.expectGood(deciphering.mock.results[0]?.value as Promise<Outcome<Uint8Array>>)
     expect([...bytes].every((byte) => byte === 0)).to.be.true
   })
+})
+
+describe("the Box try pairs, met by a bug", () => {
+  const Pairs: readonly [verb: string, throwing: (vault: TH.LeasedSlice, box: Box) => Promise<unknown>, trying: (vault: TH.LeasedSlice, box: Box) => Promise<Outcome<unknown>>][] = [
+    ['Box.seal',           (vault) => Box.seal(vault, { boxlabel: 'anthropic_api_key' }, Secret, vault.making()),  (vault) => Box.trySeal(vault, { boxlabel: 'anthropic_api_key' }, Secret, vault.making())],
+    ['box.extractWhisper', (_vault, box) => box.extractWhisper(),                                                  (_vault, box) => box.tryExtractWhisper()],
+  ]
+
+  for (const [verb, throwing, trying] of Pairs) {
+    it(`${verb} throws a bug met inside as 'unexpected_error', the throw its cause, and its try form resolves it as a bad Outcome of that kind`, async () => {
+      const { vault, box } = await sealedOf()
+      const bug = new TypeError('the demand is broken')
+      vault.demandConsistentWith = () => { throw bug }
+      const thrown = await TH.expectRefusal(throwing(vault, box), 'unexpected_error')
+      expect(thrown.cause).to.eq(bug)
+      const resolved = await TH.expectBad(trying(vault, box), 'unexpected_error')
+      expect(resolved.cause).to.eq(bug)
+    })
+
+    it(`${verb} passes a VaultError thrown inside through with its kind kept, from both forms`, async () => {
+      const { vault, box } = await sealedOf()
+      const refusal = new VaultError('not_permitted', 'This test says no.')
+      vault.demandConsistentWith = () => { throw refusal }
+      expect(await TH.expectRefusal(throwing(vault, box), 'not_permitted')).to.eq(refusal)
+      expect(await TH.expectBad(trying(vault, box), 'not_permitted')).to.eq(refusal)
+    })
+  }
 })
 // --
