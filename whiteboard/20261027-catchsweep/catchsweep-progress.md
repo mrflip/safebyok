@@ -53,7 +53,13 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   wrapper); by the Coach's ruling the worker is moving the mapping into each throwing body, one catch
   around the one `do*` call, before review. `KeptLease.read`'s store call is `deviceDB.tryGetLease(scope)`
   (thread 1 renamed the method `tryRead`: a small restack conflict in `lease.ts`).
-* **Thread 4 (where_prefix, #317):** a validator's `parse` takes a saying, `parse(val, { where?,
+* **Thread 4 (where_prefix, #317), filed 2026-10-28 at `9f8fa55b`:** the catch-up over #301 also retired
+  `optionsRefusal` (`options.ts`), the helper #301 had lifted the options catch-rewrap into, converting its
+  three further callers (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`, `localVaultDB` in
+  `local-vault-db.ts`): nine sites. A check of options is now `schema.parse(opts, { where, advice })`,
+  and STYLE.md *Validation* names `optionsCheck` and `readBankOpts`. Threads touching `vault-opts.ts`,
+  `options.ts`, `local-vault-db.ts` or either `idb-opts.ts` (5, 8) meet this at their catch-up.
+  Earlier: a validator's `parse` takes a saying, `parse(val, { where?,
   advice? })`, framed in `refusalOf`. Zod has no whole-message framing hook. `Refusing<SchemaT>` must
   stay `SchemaT & {...}`: `Omit<SchemaT, 'parse'>` breaks every place a validator is handed to a
   function typed on `Z.ZodType` (`vault-db.ts`). The two `idb-opts.ts` stay two files (no shared
