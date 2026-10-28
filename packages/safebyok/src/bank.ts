@@ -8,7 +8,7 @@ import * as Scopepath from './scopepath'
 import * as CX from './shapes/scopes'
 import { verifyConsistent } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
-import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
+import { type DeviceDB, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
@@ -230,8 +230,8 @@ export class Bank {
   // == [Bank: vaults]: ensureVault, reopenVault, closeVault, closeVaults, clearCachedVault, delDamagedVault
 
   /** The Vault object for the vault `bag` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
-   * It says hello first. A birth reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.ensureVault`
-   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.tryRaiseDeviceRecord}.
+   * It says hello first. A birth reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.ensureVault`
+   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.raiseDeviceRecord}.
    * `VaultDB.ensureVault` resolves the vault as stored, or stores a new, gateless one in one
    * transaction; past a tombstone, a new life, its counter carried on. A lease of the vault's ways
    * in that has not ended, and ends no later than `leaseHours` from now, is taken up: the vault is
@@ -553,16 +553,15 @@ export class Bank {
 
   /** `#bear`'s read, judgment and raise, from `parts`' stores.
    * The device record is read first, so a raise another tab's own write made is never held against
-   * a read served before that write landed. Each record the device store hands back is checked
-   * ({@link deviceRecordFor}): one that fails reads as none. Nothing is born below the record:
-   * 'vault_behind'.
+   * a read served before that write landed. A record that fails its check reads as none, as
+   * {@link DeviceDB.getDeviceRecord} hands it back. Nothing is born below the record: 'vault_behind'.
    */
   async #bearFrom(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry, parts: VaultParts): Promise<Vault> {
     const { deviceDB } = parts
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
     const refreshedAt = Math.floor(parts.clock.now())
-    const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.tryGetDeviceRecord(scope)))
+    const recordBefore = await deviceDB.getDeviceRecord(scope)
     this.#demandHeld(vaultScopepath, entry)
     const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), KeptLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
@@ -571,7 +570,7 @@ export class Bank {
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
     const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
-    const record = deviceRecordFor(scope, valOf(await deviceDB.tryRaiseDeviceRecord(raising))) ?? raising
+    const record = await deviceDB.raiseDeviceRecord(raising) ?? raising
     this.#demandHeld(vaultScopepath, entry)
     const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
