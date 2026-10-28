@@ -104,7 +104,7 @@ describe("KnockKnock", () => {
     knockAs('Banana')
     await TH.answerPassphraseDialog()
     await screen.findByText('Banana who? Banana split, gotta run!')
-    expect(anthropic.seen.map((request) => request.apiKeyHeader)).to.deep.equal(['sk-ant-test-not-a-real-key'])
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal(['sk-ant-test-not-a-real-key'])
     expect(container.outerHTML).to.not.include('sk-ant-test-not-a-real-key')
   })
 

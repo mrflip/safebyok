@@ -102,7 +102,7 @@ describe("fakeAnthropic", () => {
     const anthropic = TH.fakeAnthropic(200, 'Banana who? Banana split, gotta run!')
     expect(await tellKnockKnockJoke('sk-ant-fake-key', 'Banana', anthropic.fetchFn)).to.eq('Banana who? Banana split, gotta run!')
     expect(anthropic.seen).to.have.lengthOf(1)
-    expect(anthropic.seen[0]?.apiKeyHeader).to.eq('sk-ant-fake-key')
+    expect(anthropic.seen[0]?.apiKey).to.eq('sk-ant-fake-key')
     expect(anthropic.seen[0]?.url).to.include('/v1/messages')
     expect(JSON.stringify(anthropic.seen[0]?.body.messages)).to.include('Banana')
   })
