@@ -38,6 +38,12 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   are the category words); Convex `GetBoxAnswer.read` → `got`; `doDelUnreadable(scopepath, isReadable)`
   → `doDelUnparsed(scopepath, isSound)`.
 * The Coach cleared the memory directory on purpose (2026-10-28).
+* The Coach merged #316, #317, #324 and #321 at 01:56 (2026-10-28); main is `1f357d52`. Every open
+  thread branch stands on a commit now in main's history, so none conflicts with the merge; thread 3's
+  branch was catch-up rebased onto main by `file-thread` before its rework (the rebase pushed under a
+  lease by the orchestrator, 854be0c6).
+* Thread 3's pass-through (2026-10-28): `hostThrew(err)` in `vault-resolvers.ts`; `Refusals.unexpectedError`'s
+  shared sentence no longer applies to the crossing, since the graphql package no longer calls it.
 
 ## Discoveries by thread
 
