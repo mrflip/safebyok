@@ -31,7 +31,14 @@ flag cleared a task late at unmount. The Coach: ordinary React, nothing in the c
     the button; a passkey touched while hidden unlocks once shown). The Activity, Suspense and
     unmount-gap tests fail against the old hook's semantics, checked by swapping it in; the
     lock-landing one passed before too, and pins it.
-  * **Changeset** `.changeset/20261028-activity_mount.md`, safebyok-react patch.
+  * **Changeset** `.changeset/20261028-activity_mount.md`, safebyok-react patch; and
+    `-2`, safebyok patch, for the spent answer.
+  * **Tests, the spent answer**: `gating.test.ts` *a passkey's answer handed to an attempt* (4:
+    gating over, in flight, a lock before the seal, absent_wayin left unspent), failing without
+    the fix; `when-shown.test.tsx` 15 (`isShown`, its example); the button's hidden touch now
+    zeroed and pressed again; `gating-modal.test.tsx` a put_passkey made while hidden zeroed, and
+    the typo's answer zeroed. `notes/guarantees.md` (table, access points, G2) and
+    `notes/security.md` amended.
 
 * **Decisions taken**:
   * **The hook stays, with a new contract, rather than going.** "State updates on an unmounted
@@ -46,10 +53,22 @@ flag cleared a task late at unmount. The Coach: ordinary React, nothing in the c
     that hop let a host's own `await vault.ensureUnlocked()` resume, and raise the next gating,
     before the first dialog's `onDone` closed it: GatingModal's host example test failed on it.
     `goOn` therefore runs synchronously while shown, as the old `isMounted()` check did.
-  * **A press settled while hidden waits for the next step.** A passkey the user touched while the
-    button was hidden is attempted once it shows again; one touched after it unmounted is never
-    attempted, as the existing test "never unlocks with a passkey the user touched after it
-    unmounted" has it.
+  * **A passkey's answer is tried now or never** (reversed 2026-10-28, on the Coach's review; this
+    entry first had a press settled while hidden wait, its answer parked until the dialog showed).
+    Parking held the PRF bytes, as good as the passphrase, for as long as the hide lasted, and
+    never zeroed them if the dialog was unmounted while hidden: against `notes/guarantees.md`
+    (the answer lives "one seal"; G2, G7). `useWhenShown` now hands back `isShown` beside
+    `whenShown`. `PasskeyPress` and `PutPasskeyForm` attempt at once while shown, else zero the
+    answer untried and take a press again once shown; only the outcome waits, as on the
+    passphrase path. Both zero the answer once its one attempt is done (`attemptOnce`,
+    `passkey.ts`), as the core leaves a correctably refused one unspent.
+  * **The core spends the answer an attempt is handed** (`spendAnswer`, `gating.ts`; the Coach
+    asked for it beside the react fix). Before, only `PasskeyProving.seal` zeroed it, so an
+    attempt refused before the seal (`gating_landed`, `attempt_in_flight`, `bad_option`, a lock
+    landing first) left the bytes. Every outcome now zeroes it but a refusal the user can correct,
+    which the README promises leaves it to hand in again (a mistyped passphrase in `put_passkey`).
+    A host retrying with the same answer after misuse meets `bad_option`; one `vault-wayins` test
+    did, and now hands in a fresh one. Its own changeset, `-2`, safebyok patch.
   * **Suspense now waits too.** A dialog a Suspense boundary hides meets what settled once it
     shows again, rather than while hidden; same outcome, later.
 
