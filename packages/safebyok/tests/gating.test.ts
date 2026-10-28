@@ -7,11 +7,12 @@ import type { StrengthChecker } from '../src/passphrase-strength'
 import type { KeyDeriver } from '../src/key-deriver'
 import { heldLeaseOf } from '../src/held-lease'
 import type { Vault } from '../src/vault'
+import type { PasskeyAnswer } from '../src/shapes/vault'
 import * as TH from './test-helpers'
 import { MinuteMillis } from '../src/consts'
 import { makeWorld, makeRacingWorld, vaultWithPasskey, storedVaultRecordOf, SevenDaysMillis } from './vault/world'
 
-// == [Helpers]: World, lockedVaultIn, weakIsWeak, deletingUnderThrowingDialog
+// == [Helpers]: World, lockedVaultIn, weakIsWeak, deletingUnderThrowingDialog, isSpent
 
 type World = ReturnType<typeof makeWorld>
 
@@ -23,6 +24,9 @@ const lockedVaultIn = async (world: World, overrides: Partial<TH.BornVaultOpts>)
   TH.closeVault(maker)
   return await world.open(overrides)
 }
+
+/** Whether every byte of `passkey`'s answer is zero: spent, it opens nothing again. */
+const isSpent = (passkey: PasskeyAnswer) => passkey.prfBytes.every((byte) => byte === 0)
 
 /** A strength checker that finds `weak` weak, and every other passphrase strong. */
 const weakIsWeak: StrengthChecker = (passphrase) => (passphrase === 'weak' ? { strong: false, reason: 'Too easy to guess.' } : { strong: true })
@@ -276,6 +280,72 @@ describe("a gating's attempts", () => {
     const unlock = TH.asKind(await dialog.asked(1), 'unlock_vault')
     await TH.expectGood(unlock.attemptPassphrase('pw there'))
     await TH.expectGood(again)
+  })
+})
+// --
+
+// == [Spent answers]: a passkey's answer zeroed by every attempt but one the user can correct
+
+describe("a passkey's answer handed to an attempt", () => {
+  it("is spent by an attempt after the gating settled, which tries nothing", async () => {
+    const { world, vault: maker } = await vaultWithPasskey()
+    await maker.lock()
+    TH.closeVault(maker)
+    const dialog = TH.heldDialog()
+    const vault = await world.open({ requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
+    await TH.expectGood(gating.attemptPassphrase('pw'))
+    await TH.expectGood(ensuring)
+    const laptop = await TH.passkeyOf('laptop')
+    await TH.expectBad(gating.attemptPasskey(laptop), 'gating_landed')
+    expect(isSpent(laptop)).to.be.true
+  })
+
+  it("is spent by an attempt refused attempt_in_flight, which tries nothing: the attempt under way goes on", async () => {
+    const world = makeRacingWorld()
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
+    const deriving = world.holdNextDerive()
+    const first = gating.attemptPassphrase('pw')
+    await deriving.reached
+    const laptop = await TH.passkeyOf('laptop')
+    await TH.expectBad(gating.attemptPasskey(laptop), 'attempt_in_flight')
+    expect(isSpent(laptop)).to.be.true
+    deriving.release()
+    await TH.expectGood(first)
+    await TH.expectGood(ensuring)
+  })
+
+  it("is spent when a lock lands before it is sealed: a put_passkey whose passphrase was still deriving refuses gating_landed", async () => {
+    const world = makeRacingWorld()
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
+    const putting = vault.tryPutWayin('passkey')
+    const gating = TH.asKind(await dialog.asked(), 'put_passkey')
+    const deriving = world.holdNextDerive()
+    const phone = await TH.passkeyOf('phone')
+    const attempting = gating.attempt('pw', phone)
+    await deriving.reached
+    await vault.lock()
+    deriving.release()
+    await TH.expectBad(attempting, 'gating_landed')
+    await TH.expectBad(putting, 'vault_locked')
+    expect(isSpent(phone)).to.be.true
+  })
+
+  it("is left unspent by a refusal the user can correct before it is sealed, to hand in again: absent_wayin, for a vault with no passkey", async () => {
+    const dialog = TH.heldDialog()
+    const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
+    const ensuring = vault.tryEnsureUnlocked()
+    const gating = TH.asKind(await dialog.asked(), 'unlock_vault')
+    const laptop = await TH.passkeyOf('laptop')
+    await TH.expectBad(gating.attemptPasskey(laptop), 'absent_wayin')
+    expect(isSpent(laptop)).to.be.false
+    await TH.expectGood(gating.attemptPassphrase('pw'))
+    await TH.expectGood(ensuring)
   })
 })
 // --
