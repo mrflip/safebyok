@@ -26,7 +26,9 @@ import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
  * It follows the vault as it changes -- a passkey added brings its button; whether it chooses or
  * unlocks is its gating's kind, fixed when raised -- and handed another gating, it starts afresh,
  * keeping nothing typed for the last. Taken away, it lets go: an attempt or advice still
- * under way finishes unheard, calling `onDone` no more and showing nothing. It calls `onDone` once.
+ * under way finishes unheard, calling `onDone` no more and showing nothing. Hidden by an
+ * `<Activity>` or a Suspense boundary, it waits: what settles meanwhile, a lock landing among it,
+ * is met once it shows again. It calls `onDone` once.
  *
  * The refusals an attempt meets it handles as `attemptRefusalFlavor` groups them. The ones the
  * user can correct -- a wrong passphrase or passkey, a weak new passphrase, or a way in that cannot

@@ -2,7 +2,7 @@
  * safebyok-react's test helpers: everything `safebyok/testing` has, a fake WebAuthn
  * authenticator, a render that hears what React reports, a promise held for the test to settle,
  * a count of the state updates React schedules, and a way to have Suspense hide what it holds.
- * Star-import it as `TH`
+ * Those that need JSX are in `test-helpers-react.tsx`, which it re-exports. Star-import it as `TH`
  * (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -14,6 +14,7 @@ import type { PassphraseGating } from '../src/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'
+export * from './test-helpers-react'
 
 /**
  * `ui` rendered as Testing Library's `render` does, and `reported`: each error a boundary caught,

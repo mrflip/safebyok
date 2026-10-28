@@ -970,4 +970,85 @@ describe("PassphraseModal", () => {
     }
   })
   // --
+
+  // == [While hidden]: an Activity hiding it
+  describe("while an Activity hides it", () => {
+    // Each call is held under way while the host hides the dialog -- in a tab not shown, say --
+    // and settles before it shows it again. React keeps a hidden dialog's state; the dialog meets
+    // what settled once it shows again, and its host hears it then.
+
+    it("answers unlocked once it shows again, when its unlock succeeds while hidden", async () => {
+      const unlocking = TH.held()
+      const heard: DialogAnswer[] = []
+      const dialog = <PassphraseModal gating={TH.gatingUnlockingWith(() => unlocking.promise)} onDone={(answer) => { heard.push(answer) }} />
+      const { rerender } = render(TH.inActivity('visible', dialog))
+      TH.submitPassphrase('pw')
+      rerender(TH.inActivity('hidden', dialog))
+      await act(async () => {
+        unlocking.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(heard).to.deep.equal([])
+      await act(async () => {
+        rerender(TH.inActivity('visible', dialog))
+        await TH.wakeupAtNextTick()
+      })
+      expect(heard).to.deep.equal(['unlocked'])
+    })
+
+    it("shows a refusal that lands while it is hidden once it shows again, the gating left open", async () => {
+      const unlocking = TH.held()
+      const heard: DialogAnswer[] = []
+      const dialog = <PassphraseModal gating={TH.gatingUnlockingWith(() => unlocking.promise)} onDone={(answer) => { heard.push(answer) }} />
+      const { rerender } = render(TH.inActivity('visible', dialog))
+      TH.submitPassphrase('pw')
+      rerender(TH.inActivity('hidden', dialog))
+      await act(async () => {
+        unlocking.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.'))
+        await TH.wakeupAtNextTick()
+      })
+      await act(async () => {
+        rerender(TH.inActivity('visible', dialog))
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.')
+      expect(heard).to.deep.equal([])
+    })
+
+    it("closes, answering declined, once it shows again after a lock landed while it was hidden", async () => {
+      const landing = TH.held()
+      const heard: DialogAnswer[] = []
+      const dialog = <PassphraseModal gating={TH.gatingOf(vaultInState('locked'), { lockLanded: landing.promise })} onDone={(answer) => { heard.push(answer) }} />
+      const { rerender } = render(TH.inActivity('visible', dialog))
+      rerender(TH.inActivity('hidden', dialog))
+      await act(async () => {
+        landing.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(heard).to.deep.equal([])
+      await act(async () => {
+        rerender(TH.inActivity('visible', dialog))
+        await TH.wakeupAtNextTick()
+      })
+      expect(heard).to.deep.equal(['declined'])
+    })
+
+    it("says the advice that came back while it was hidden, once it shows again", async () => {
+      const answering = TH.held<string | null>()
+      const dialog = <PassphraseModal gating={TH.gatingOf(vaultInState('novel'))} passphraseAdvice={() => answering.promise} onDone={noop} />
+      const { rerender } = render(TH.inActivity('visible', dialog))
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      rerender(TH.inActivity('hidden', dialog))
+      await act(async () => {
+        answering.resolve('Longer is stronger.')
+        await TH.wakeupAtNextTick()
+      })
+      await act(async () => {
+        rerender(TH.inActivity('visible', dialog))
+        await TH.wakeupAtNextTick()
+      })
+      expect(adviceRegion().textContent).to.eq('Longer is stronger.')
+    })
+  })
+  // --
 })
