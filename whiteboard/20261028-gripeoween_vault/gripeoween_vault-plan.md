@@ -182,6 +182,14 @@ length, keeps its name. Surfaces: `shapes/bank-opts.ts`, `vault-opts.ts`, `vault
 the snapshot's `freshness` doc. Exported, so a minor changeset says what a host renames; no
 alias. One question for the Coach, under *For the Coach*; build on the assumption stated there
 if it is not answered by the time this thread is cut.
+*Orchestrator (2026-10-28, ruled in chat):* two stored-field bounds land here too, so that a vault
+record always fits a push payload (Postgres NOTIFY's 8000 bytes) and the vault guarantee can be
+stated without a size caveat: a passphrase salt at most 512 bytes (`MaxSaltBytes` is 65,536
+today, `consts.ts:36`), a passkey `credential_id` at most 1023 bytes (WebAuthn's own cap; unbounded
+in `shapes/fields.ts`). Bounded the way the storage numbers are: a default a host may raise, and
+the guarantee loosens when it does; the record check refuses past the bound in force. A stored
+record past the default is damage under this version (pre-1.0: no reading of older shapes). A
+patch changeset; the bound's doc block says what loosens.
 
 ## For the Coach
 
