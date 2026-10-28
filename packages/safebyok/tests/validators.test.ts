@@ -62,7 +62,7 @@ const refusalTextOf = (attempt: () => unknown): string => {
 }
 
 describe("the validators the main entry exports", () => {
-  it("parses a scope, as the README's example shows", () => {
+  it("parses a scope through vaultScope, exported by name", () => {
     expect(safebyok.vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
