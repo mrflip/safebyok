@@ -578,7 +578,7 @@ describe("when storage says the user is no longer signed in", () => {
     })
   }
 
-  it("locks when a background refresh meets it, and tells the logger, having nobody to throw to", async () => {
+  it("locks when a background refresh meets it, and tells the logger under 'refresh', having nobody to throw to", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.vaultDB, 'tryGetVault').mockResolvedValue(bad(signedOut()))
@@ -587,7 +587,7 @@ describe("when storage says the user is no longer signed in", () => {
     await vi.waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('locked') })
     expect(await world.getLease()).to.be.null
     await vi.waitFor(() => { expect(world.logged.map((heard) => heard.level)).to.deep.equal(['log', 'warn']) })
-    expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'untrustedStorage' } })
+    expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'refresh' } })
     expect(world.logged[0]?.message).to.match(/no longer serves the user/)
   })
 
@@ -641,7 +641,7 @@ describe("when storage says the user is no longer signed in", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("locks all the same, and throws the refusal, when the device store will not erase the lease", async () => {
+  it("locks all the same, and throws the refusal, when the device store will not erase the lease, warning under the call that met it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const stuck = new Error('the device store is read-only')
@@ -650,7 +650,7 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(await world.getLease()).to.not.be.null
-    expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
+    expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'getWhisper' } })
     expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('storage_unavailable')
     expect(world.logged[0]?.err?.cause).to.eq(stuck)
   })
