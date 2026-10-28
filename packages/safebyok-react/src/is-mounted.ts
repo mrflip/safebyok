@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
-/**
- * A function that answers true from the commit that mounts the component until it unmounts, for
+/** A function that answers true from the commit that mounts the component until it unmounts, for
  * an async handler to ask once its await settles: a component gone meanwhile -- its host took it
  * away, another vault remounted it, or the page that showed it closed -- is touched no more,
  * neither its state nor the callbacks its host handed it. True from the commit itself, so that a
