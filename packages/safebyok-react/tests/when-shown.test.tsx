@@ -2,21 +2,24 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Activity, StrictMode, Suspense, useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
-import { useWhenShown } from '../src/when-shown'
+import { type WhenShown, useWhenShown } from '../src/when-shown'
 import * as TH from './test-helpers'
 
-/** What useWhenShown hands back. */
-type WhenShown = ReturnType<typeof useWhenShown>
-
-/** A component that hands its useWhenShown to `grab` at each render. */
+/** A component that hands its `whenShown` to `grab` at each render. */
 const Grabber = ({ grab }: { grab: (whenShown: WhenShown) => void }) => {
-  grab(useWhenShown())
+  grab(useWhenShown().whenShown)
+  return null
+}
+
+/** A component that hands its `isShown` to `grab` at each render. */
+const ShownGrabber = ({ grab }: { grab: (isShown: () => boolean) => void }) => {
+  grab(useWhenShown().isShown)
   return null
 }
 
 /** The useWhenShown @example: a button whose handler awaits `unlocking`, then tells `onDone` once it shows. */
 const Unlocker = ({ unlocking, onDone }: { unlocking: () => Promise<undefined>, onDone: (unlocked: boolean) => void }) => {
-  const whenShown = useWhenShown()
+  const { whenShown } = useWhenShown()
   const submit = async () => {
     await unlocking()
     await whenShown(() => { onDone(true) })
@@ -24,7 +27,18 @@ const Unlocker = ({ unlocking, onDone }: { unlocking: () => Promise<undefined>, 
   return <button type="button" onClick={() => { void submit() }}>Unlock</button>
 }
 
-/** A useWhenShown that never goes on, for a test that grabbed none. */
+/** The second useWhenShown @example: a button whose handler awaits `asking`'s answer, then hands it to `onAnswer` if it shows, and zeroes it if not. */
+const Asker = ({ asking, onAnswer }: { asking: () => Promise<Uint8Array>, onAnswer: (answer: Uint8Array) => void }) => {
+  const { isShown } = useWhenShown()
+  const press = async () => {
+    const answer = await asking()
+    if (! isShown()) { answer.fill(0); return }
+    onAnswer(answer)
+  }
+  return <button type="button" onClick={() => { void press() }}>Ask</button>
+}
+
+/** A whenShown that never goes on, for a test that grabbed none. */
 const never: WhenShown = () => new Promise(() => undefined)
 
 /** Hands `whenShown` a handler that only notes it went on, and answers whether it has yet. */
@@ -180,6 +194,47 @@ describe("useWhenShown", () => {
     rerender(<Grabber grab={grab} />)
     expect(grabbed).to.have.lengthOf(2)
     expect(grabbed[0]).to.equal(grabbed[1])
+    const asked: (() => boolean)[] = []
+    const grabShown = (isShown: () => boolean) => { asked.push(isShown) }
+    const { rerender: rerenderShown } = render(<ShownGrabber grab={grabShown} />)
+    rerenderShown(<ShownGrabber grab={grabShown} />)
+    expect(asked).to.have.lengthOf(2)
+    expect(asked[0]).to.equal(asked[1])
+  })
+
+  it("says whether the component shows now: from the commit that mounts it, not while an Activity hides it, and not once it has unmounted", () => {
+    const asked: (() => boolean)[] = []
+    const grab = (isShown: () => boolean) => { asked.push(isShown) }
+    const shown = (mode: 'visible' | 'hidden') => <Activity mode={mode}><ShownGrabber grab={grab} /></Activity>
+    const { rerender, unmount } = render(shown('visible'))
+    const [isShown = () => true] = asked
+    expect(isShown()).to.be.true
+    rerender(shown('hidden'))
+    expect(isShown()).to.be.false
+    rerender(shown('visible'))
+    expect(isShown()).to.be.true
+    unmount()
+    expect(isShown()).to.be.false
+  })
+
+  it("lets a handler zero an answer that comes back while an Activity hides the component, never keeping it for it to show again, as its second example shows", async () => {
+    const asking = TH.held<Uint8Array>()
+    const heard: Uint8Array[] = []
+    const shown = (mode: 'visible' | 'hidden') => (
+      <Activity mode={mode}><Asker asking={() => asking.promise} onAnswer={(answer) => { heard.push(answer) }} /></Activity>
+    )
+    const { rerender } = render(shown('visible'))
+    fireEvent.click(screen.getByText('Ask'))
+    rerender(shown('hidden'))
+    const answer = new Uint8Array(32).fill(7)
+    await act(async () => {
+      asking.resolve(answer)
+      await TH.wakeupAtNextTick()
+    })
+    expect(answer.every((byte) => byte === 0)).to.be.true
+    rerender(shown('visible'))
+    await settle()
+    expect(heard).to.deep.equal([])
   })
 
   it("lets a handler tell its host once its await settles, while the component shows, as its example has it", async () => {

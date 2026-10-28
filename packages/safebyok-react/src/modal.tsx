@@ -32,7 +32,7 @@ const useAnswerOnce = (gating: Gating, onDone: (answer: DialogAnswer) => void) =
     answered.current = true
     onDoneRef.current(answer)
   }, [])
-  const whenShown = useWhenShown()
+  const { whenShown } = useWhenShown()
   useEffect(() => {
     let current = true
     void gating.lockLanded.then(() => whenShown(() => { if (current) { done('declined') } }))
@@ -110,10 +110,9 @@ export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
  * A form's state around its attempts, for the dialog that `done` answers and `source` names:
  * the `gripe` it shows, `meet`, what it does with a refusal (as `attemptRefusalFlavor` groups
  * them), `fail`, which has the next render throw to the dialog's boundary what an event handler
- * met, `attempt`, one submit's attempt and what follows it, and `whenShown`, which a handler goes
- * on through after each await (`useWhenShown`). A refusal to show in place becomes the gripe; one
- * that ends the gating closes the dialog, answering `declined`; a second attempt while one runs
- * changes nothing.
+ * met, `attempt`, one submit's attempt and what follows it, and `whenShown` and `isShown`, as
+ * `useWhenShown` has them. A refusal to show in place becomes the gripe; one that ends the gating
+ * closes the dialog, answering `declined`; a second attempt while one runs changes nothing.
  */
 export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
   const [gripe, setGripe] = useState<Gripe | null>(null)
@@ -122,7 +121,7 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
   // A dialog gone meanwhile -- its host took it away, another gating remounted it, or the page
   // closed -- touches neither its state nor its host's onDone again. One hidden meanwhile meets
   // the outcome once it shows again.
-  const whenShown = useWhenShown()
+  const { whenShown, isShown } = useWhenShown()
   const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
   if (failure !== null) { throw forBoundary(failure.err, source) }
 
@@ -146,7 +145,7 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
     })
   }
 
-  return { gripe, setGripe, meet, fail, attempt, whenShown }
+  return { gripe, setGripe, meet, fail, attempt, whenShown, isShown }
 }
 
 /** What a {@link ModalForm} is handed. */
@@ -396,7 +395,7 @@ export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, vault:
     setSaid(null)
   }
   useLayoutEffect(() => { creatingNow.current = creating }, [creating])
-  const whenShown = useWhenShown()
+  const { whenShown } = useWhenShown()
   const hear = async (typed: string) => {
     asked.current += 1
     if (typed === '') { setSaid(null); return }

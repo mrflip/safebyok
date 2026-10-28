@@ -1,12 +1,26 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type RequestCleartext, type StrengthChecker, type Vault } from 'safebyok'
+import { type PasskeyAnswer, type RequestCleartext, type StrengthChecker, type Vault } from 'safebyok'
 import { GatingModal } from '../src/gating-modal'
 import type { DialogAnswer } from '../src/modal'
 import * as TH from './test-helpers'
 
-// == [Test helpers]: Passphrase, vaultOf, answersOf, typeInto, submit, theGripe
+// == [Test helpers]: made, Passphrase, vaultOf, answersOf, typeInto, submit, theGripe, isSpent
+
+const made = vi.hoisted(() => [] as (PasskeyAnswer | null)[])
+
+// Each answer createPasskey hands the dialog is noted in `made`, so a test can see what became of
+// its bytes.
+vi.mock('../src/passkey', async (importOriginal) => {
+  const passkey = await importOriginal<typeof import('../src/passkey')>()
+  const createPasskeyNoting: typeof passkey.createPasskey = async (opts) => {
+    const answer = await passkey.createPasskey(opts)
+    made.push(answer)
+    return answer
+  }
+  return { ...passkey, createPasskey: createPasskeyNoting }
+})
 
 /** The passphrase every vault here is made with: an obvious fake. */
 const Passphrase = 'correct horse battery staple'
@@ -42,6 +56,9 @@ const theGripe = async () => {
   await waitFor(() => { expect(screen.getByRole('alert').textContent).to.not.eq('') })
   return screen.getByRole('alert').textContent
 }
+
+/** Whether every byte of `answer` is zero: spent, it opens nothing again. */
+const isSpent = (answer: PasskeyAnswer | null | undefined) => answer?.prfBytes.every((byte) => byte === 0) ?? false
 
 /** A strength checker that finds `weak` weak, and every other passphrase strong. */
 const weakIsWeak: StrengthChecker = (passphrase) => (passphrase === 'weak' ? { strong: false, reason: 'Too easy to guess.' } : { strong: true })
@@ -266,16 +283,19 @@ describe("GatingModal, put_passkey", () => {
     expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
-  it("shows a wrong passphrase in place, the passkey made for it unused, and makes another at the next submit", async () => {
+  it("shows a wrong passphrase in place, the passkey made for it unused and its answer zeroed, and makes another at the next submit", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const vault = await vaultOf()
     const { gating } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
     const { heard, onDone } = answersOf()
+    made.length = 0
     render(<GatingModal gating={gating} onDone={onDone} />)
     typeInto('vault passphrase', 'not it')
     submit()
     expect(await theGripe()).to.match(/didn't unlock the vault/)
     expect(vault.snapshot.gate?.passkey).to.be.null
+    const [mistyped] = made
+    expect(isSpent(mistyped)).to.be.true
     typeInto('vault passphrase', Passphrase)
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
@@ -290,6 +310,45 @@ describe("GatingModal, put_passkey", () => {
     typeInto('vault passphrase', Passphrase)
     submit()
     expect(await theGripe()).to.match(/offers no passkeys/)
+  })
+
+  it("never tries a passkey made while an Activity hides the dialog, zeroing its answer: once it shows again, the next submit makes another and adds it", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const vault = await vaultOf()
+    const { gating: raised, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
+    const attempt = vi.fn(raised.attempt)
+    const gating = { ...raised, attempt }
+    const touching = TH.held()
+    const answered = TH.held()
+    const fakeCreate = navigator.credentials.create.bind(navigator.credentials)
+    vi.spyOn(navigator.credentials, 'create').mockImplementation(async (options) => {
+      await touching.promise
+      const credential = await fakeCreate(options)
+      answered.resolve(undefined)
+      return credential
+    })
+    const { heard, onDone } = answersOf()
+    made.length = 0
+    const dialog = (mode: 'visible' | 'hidden') => TH.inActivity(mode, <GatingModal gating={gating} onDone={onDone} />)
+    const { rerender } = render(dialog('visible'))
+    typeInto('vault passphrase', Passphrase)
+    submit()
+    rerender(dialog('hidden'))
+    await act(async () => {
+      touching.resolve(undefined)
+      await answered.promise
+      await TH.wakeupAtNextTick()
+    })
+    expect(attempt).not.toHaveBeenCalled()
+    const [madeHidden] = made
+    expect(isSpent(madeHidden)).to.be.true
+    rerender(dialog('visible'))
+    submit()
+    await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
+    await TH.expectGood(raising)
+    expect(attempt).toHaveBeenCalledOnce()
+    expect(authenticator.credentialIds()).to.have.lengthOf(2)
+    expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(authenticator.credentialIds()[1])
   })
 
   it("makes one passkey at a time, however often the user submits while it asks", async () => {
