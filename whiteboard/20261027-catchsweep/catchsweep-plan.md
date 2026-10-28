@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `5fcdc037`, reviewed clean, filing); 9 (#331, `881c1bbe`, second review fixed, filing with the red-commit fold and the catch-up onto main); 2 (#325, `6e2f1927`, second review at high underway). Then the three restack into one line. Ten threads.
+**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `0c2a6278`, filed on main); 9 (#331, `881c1bbe`, second review fixed, filing with the red-commit fold and the catch-up onto main); 2 (#325, `6e2f1927`, second review at high underway). Then the three restack into one line. Ten threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
