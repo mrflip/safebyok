@@ -155,7 +155,7 @@ To be deleted at 1.0.0.
 | `#checkStanding()`, `StandingGating`, `standsBeside`    | `#demandNotGone()`, `OutsideGating`, `leavesInForce`    |
 | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords`, `putVaultRecord`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `delDamagedVault`, each resolving an `Outcome` | `tryGetVault`, `tryEnsureVault`, ... resolve the `Outcome`; `getVault`, `ensureVault`, ... resolve the answer or throw the refusal |
 | `DeviceDB.getLease`, `putLease`, `delLease`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`, each resolving an `Outcome` | `tryGetLease`, `tryPutLease`, ... resolve the `Outcome`; `getLease`, `putLease`, ... resolve the answer or throw what the store threw |
-| `HeededVaultDB`'s `Thrown<>` mapping; `ProvingTools.putLease` | `Pick<VaultDB, ...>` of the throwing forms; `ProvingTools.tryPutLease` |
+| `HeededVaultDB`'s `Thrown<>` mapping; `ProvingTools.putLease` | `Pick<VaultDB, ...>` of the throwing forms, then (2026-10-28, heed_inline) gone: `RefusalPolicy.heed` is deleted, and the vault calls each `VaultDB` `try` form itself; `ProvingTools.tryPutLease` |
 | `StringStore.read`, `write`, `erase`; `readJson`         | `StringStore.get`, `put`, `del`; `getJson` (the rename pass of 2026-10-28: no operation is a `read` or a `write`) |
 | `KeptLease.tryRead`                                    | `KeptLease.tryGet`                                      |
 | `registerLeaseReader(vault, read)`                     | `registerLeaseGetter(vault, getLease)`                  |

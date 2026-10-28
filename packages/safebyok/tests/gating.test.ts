@@ -39,7 +39,7 @@ const deletingUnderThrowingDialog = async (refusing: boolean) => {
   const deleting = vault.tryDel()
   await TH.eventually(() => asked.gating !== null)
   const gating = TH.asKind(asked.gating as unknown as Gating, 'del_vault')
-  if (refusing) { vi.spyOn(world.vaultDB, 'tryDelVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached.")) }
+  if (refusing) { vi.spyOn(world.vaultDB, 'tryDelVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', "Storage could not be reached."))) }
   const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
   const attempting = gating.attempt('pw')
   await writing.reached
@@ -530,7 +530,7 @@ describe("a lock or a decline landing during an attempt", () => {
       const gating = TH.asKind(await dialog.asked(), 'del_vault')
       let lockLanded = false
       void gating.lockLanded.then(() => { lockLanded = true })
-      vi.spyOn(world.vaultDB, 'tryDelVault').mockRejectedValueOnce(new VaultError('storage_unavailable', "Storage could not be reached."))
+      vi.spyOn(world.vaultDB, 'tryDelVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', "Storage could not be reached.")))
       const writing = TH.holdNextCall(world.vaultDB, 'tryDelVault')
       const attempting = gating.attempt('pw')
       await writing.reached

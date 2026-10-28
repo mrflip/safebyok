@@ -1,6 +1,4 @@
-import { VaultError, isVaultError } from './errors'
-import type { Outcome } from './outcome'
-import type { VaultDB } from './vault-db'
+import { isVaultError } from './errors'
 
 /** What a vault does with a refusal from storage beyond throwing it: lock, or nothing more. */
 export type RefusalResponse = 'lock' | 'none'
@@ -20,47 +18,3 @@ export type RefusalResponse = 'lock' | 'none'
 export const decide = (refusal: unknown): RefusalResponse => (
   isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'vault_behind') ? 'lock' : 'none'
 )
-
-/** The VaultDB verbs a vault calls, by their throwing forms' names. */
-type HeededVerb = 'getVault' | 'ensureVault' | 'putVaultRecord' | 'getBox' | 'putBox' | 'delBox' | 'delVault'
-
-/** The verbs a vault calls on its VaultDB, in their throwing forms: each answers with its value and refuses by rejecting. */
-export type HeededVaultDB = Pick<VaultDB, HeededVerb | 'subscribe'>
-
-/** `vaultDB`'s verbs in their throwing forms, each resolving its value or rejecting with its refusal once `onRefusal` has heard it.
- * So the vault meets every storage refusal, a background refresh's included. A refused verb waits
- * for `onRefusal`: one that never settles holds the call with it. Each verb's `try` form is looked
- * up on `vaultDB` as it is called, so a test's spy on `tryGetVault` is heard. `subscribe` passes
- * through.
- *
- * @param onRefusal - What the vault does about a refusal. Whatever it throws is dropped, so the
- *   caller hears the refusal itself.
- */
-export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promise<void>): HeededVaultDB => {
-  const heeding = async <ValT>(call: () => Promise<Outcome<ValT>>): Promise<ValT> => {
-    const { ok, val, err } = await call()
-    if (ok) { return val }
-    // The vault drops its vaultKey before its onRefusal asks the device store anything, so a store that never settles holds nothing open.
-    await heard(onRefusal, err)
-    throw err
-  }
-  return {
-    getVault:         (...args) => heeding(() => vaultDB.tryGetVault(...args)),
-    ensureVault:      (...args) => heeding(() => vaultDB.tryEnsureVault(...args)),
-    putVaultRecord:   (...args) => heeding(() => vaultDB.tryPutVaultRecord(...args)),
-    getBox:           (...args) => heeding(() => vaultDB.tryGetBox(...args)),
-    putBox:           (...args) => heeding(() => vaultDB.tryPutBox(...args)),
-    delBox:           (...args) => heeding(() => vaultDB.tryDelBox(...args)),
-    delVault:         (...args) => heeding(() => vaultDB.tryDelVault(...args)),
-    subscribe:        (...args) => vaultDB.subscribe(...args),
-  }
-}
-
-/** `onRefusal(refusal)`, awaited, anything it throws dropped. */
-const heard = async (onRefusal: (refusal: VaultError) => Promise<void>, refusal: VaultError) => {
-  try {
-    await onRefusal(refusal)
-  } catch {
-    // The refusal, rethrown by the caller, is what the vault's caller must act on.
-  }
-}
