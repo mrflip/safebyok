@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { BoxSparse, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
@@ -104,12 +104,12 @@ class ConvexVaultDB extends VaultDB {
   }
 
   // The component answers each box as its row holds it; the split judges each, as for any backend.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     const answer = await refusing(() => this.client.query(this.api.getVault, { ...scope }))
     return answer === null ? { vault: null, boxes: [], damagedBoxes: [] } : { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const answer = await refusing(() => this.client.mutation(this.api.ensureVault, { draft }))
     return { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }

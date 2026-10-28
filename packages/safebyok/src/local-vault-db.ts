@@ -8,7 +8,7 @@ import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
 import * as Phrases from './phrases'
 import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
-import type { VaultRecordExpectation, StoredBox, VaultReadResponse, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
+import type { VaultRecordExpectation, StoredBox, StoredVault, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -76,11 +76,11 @@ class StringStoreVaultDB extends VaultDB {
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
   // read of a vault reads its record and its boxes in one such step.
-  protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
     return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)), ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
-  protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
       const stored = readJson(this.store, vaultScopepath)

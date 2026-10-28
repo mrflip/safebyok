@@ -1,5 +1,5 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 
@@ -153,12 +153,12 @@ class UrqlVaultDB extends VaultDB {
 
   // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in
   // one step, and splits its boxes, which this VaultDB's base class checks again.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     const { safebyokGetVault } = await this.asked(GetVaultDoc, scopeOut(scope))
     return vaultReadOf(safebyokGetVault)
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultRecordFields) })
     return vaultReadOf(safebyokEnsureVault)
   }
@@ -253,7 +253,7 @@ const scopeOut = ({ applabel, user_id, vaultlabel }: VaultScope) => ({ applabel,
  * A field the answer leaves out altogether is no answer, as from a server that does not serve
  * safebyok-graphql's schema and checks no operation against its own.
  */
-const vaultReadOf = (sent: unknown): VaultReadResponse => {
+const vaultReadOf = (sent: unknown): StoredVault => {
   if (sent === undefined) { throw new Error('The GraphQL server answered without the vault it was asked for: is it serving safebyok-graphql?') }
   if (sent === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
   const { vault, boxes, damagedBoxes } = sent as Record<string, unknown>
@@ -261,7 +261,7 @@ const vaultReadOf = (sent: unknown): VaultReadResponse => {
     vault:        recordOf(vault, VaultRecordFields),
     boxes:        recordsOf(boxes, BoxSparseFields),
     damagedBoxes: recordsOf(damagedBoxes, BoxDamagedFields),
-  } as VaultReadResponse
+  } as StoredVault
 }
 
 /** Each record of `sent`, rebuilt from `fields` alone; `sent` as it came when it is no list. */

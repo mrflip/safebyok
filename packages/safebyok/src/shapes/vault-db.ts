@@ -91,7 +91,7 @@ export const { Capacity } = Validator('bad_record', ({ obj, union, int, uint, li
 export type Capacity = Z.infer<typeof Capacity>
 // --
 
-// == [Read answers]: StoredBox, BoxListing, VaultReadResponse, ListedBox, StoredRevision, ReadAnswer, ListingAnswer, StoredVaultTok
+// == [Read answers]: StoredBox, BoxListing, StoredVault, ListedBox, StoredRevision, StoredVaultAnswer, ListingAnswer, StoredVaultTok
 
 /** One box row as read, for {@link splitStoredBoxes}: the boxlabel the row is filed under, and its record exactly as stored.
  * Take `boxlabel` from the row's scopepath or column, never from its record: a damaged box is
@@ -114,7 +114,7 @@ export type BoxListing = Readonly<{
  *
  * @example { vault: storedRow ?? null, ...splitStoredBoxes(boxRows) }
  */
-export type VaultReadResponse = BoxListing & {
+export type StoredVault = BoxListing & {
   /** The row in the vault record's place, exactly as read and with no cast: a vault record, damaged or not, a tombstone where a store keeps one there, or null for none. */
   vault: unknown
 }
@@ -122,15 +122,16 @@ export type VaultReadResponse = BoxListing & {
 /** The checks of what an adapter hands up from a vault read, each refusing 'bad_record'.
  * `ListedBox` is a box whole or without its two ciphered fields, so a projecting backend is checked
  * as one handing whole records. `StoredRevision` is the one field of a damaged box the listing
- * keeps, where the record holds it as text: the revision a write over it names. `ReadAnswer` and
- * `ListingAnswer` are a vault read's answer: its vault record as stored, and its listing, each
- * sound box an object to judge, each damaged one a {@link BoxDamaged}.
+ * keeps, where the record holds it as text: the revision a write over it names. `StoredVaultAnswer`
+ * and `ListingAnswer` are the two halves of a {@link StoredVault} as an adapter answered it: its
+ * vault record as stored, and its listing, each sound box an object to judge, each damaged one a
+ * {@link BoxDamaged}.
  */
-export const { ListedBox, StoredRevision, ReadAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
-  ListedBox:      BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
-  StoredRevision: obj({ revision_tok }),
-  ReadAnswer:     obj({ vault: unk }).loose(),
-  ListingAnswer:  obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BoxDamaged) }).loose(),
+export const { ListedBox, StoredRevision, StoredVaultAnswer, ListingAnswer } = Validator('bad_record', ({ obj, arr, unk }) => ({
+  ListedBox:         BoxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
+  StoredRevision:    obj({ revision_tok }),
+  StoredVaultAnswer: obj({ vault: unk }).loose(),
+  ListingAnswer:     obj({ boxes: arr(obj({ boxlabel: unk }).loose()), damagedBoxes: arr(BoxDamaged) }).loose(),
 }))
 
 /** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */

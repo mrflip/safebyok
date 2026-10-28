@@ -83,7 +83,7 @@ added or folded into through the subagent, and no other entry changes.
   a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
   field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
   its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
-  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `ReadAnswer`, `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
+  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `StoredVaultAnswer` (amended 2026-10-28 (db_hooks): named `ReadAnswer` when this was written), `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
   `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
   `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
@@ -140,7 +140,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
-  adapter adds one line and never judges (amended 2026-10-27 (tidy): `VaultReadResponse.vault` is typed `unknown`, as `StoredBox.box` is, so an
+  adapter adds one line and never judges (amended 2026-10-27 (tidy): `StoredVault.vault` (amended 2026-10-28 (db_hooks): named `VaultReadResponse` when this was written) is typed `unknown`, as `StoredBox.box` is, so an
   adapter hands rows up uncast; the base class checks them as before). A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
   `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
   naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision

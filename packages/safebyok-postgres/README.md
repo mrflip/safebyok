@@ -252,7 +252,7 @@ The client half, a VaultDB over `fetch`, to hand `Bank.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -266,8 +266,8 @@ export class RouteVaultDB extends VaultDB {
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
   // A vault crosses as the server's VaultDB split it, which this VaultDB's base class checks again.
-  protected async doGetVault(scope: VaultScope) { return await this.call('getVault', scope) as VaultReadResponse }
-  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return await this.call('ensureVault', draft) as VaultReadResponse }
+  protected async doGetVault(scope: VaultScope) { return await this.call('getVault', scope) as StoredVault }
+  protected async doEnsureVault(draft: VaultRecord & { gate: null }) { return await this.call('ensureVault', draft) as StoredVault }
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultRecord', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }

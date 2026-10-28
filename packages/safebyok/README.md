@@ -356,16 +356,16 @@ your rows. A listing passes over a row under the vault's prefix that `isBox` rej
 failing the read: no verb reaches it, so it holds no box.
 
 A read answers the vault as one atomic step read it: `doGetVault` and `doEnsureVault` resolve a
-`VaultReadResponse`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
+`StoredVault`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
 tombstone, or null) and the box rows split by `splitStoredBoxes`, which judges each row's damage
 so your adapter never does. Hand it each row as a `StoredBox`: the boxlabel it is filed under,
 from its scopepath or its column, beside the record exactly as stored.
 
 ```ts
-import { splitStoredBoxes, type VaultReadResponse } from 'safebyok'
+import { splitStoredBoxes, type StoredVault } from 'safebyok'
 
-protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
-  const { vaultRow, boxRows } = await this.readVaultRows(scope)   // one transaction
+protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  const { vaultRow, boxRows } = await this.getVaultRows(scope)   // one transaction
   return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
 }
 ```

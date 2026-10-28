@@ -9,7 +9,7 @@ import { LeaseGrant } from '../src/lease'
 import { PasskeyWayinHeader, PassphraseWayinHeader, VaultMadeUnder, VaultStampButFormat, passphraseCleartext, wayinkind } from '../src/shapes/vault'
 import { credential_id, device_id, key_deriver_label } from '../src/shapes/fields'
 import { CipheredShape, whisperBag } from '../src/shapes/box'
-import { ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
+import { ListedBox, ListingAnswer, StoredVaultAnswer, StoredRevision, StoredVaultTok } from '../src/shapes/vault-db'
 import { declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis } from '../src/shapes/bank-opts'
 import { VaultError } from '../src/errors'
 import { Bank } from '../src/bank'
@@ -22,7 +22,7 @@ import { makeWorld } from './vault/world'
 const InPackage = {
   BoxBase, MadeShape, MadeUnderShape, SealBoxProps, freshPasskeyAnswer, CipheredShape, LeaseGrant, VaultStampButFormat, whisperBag,
   PassphraseWayinHeader, PasskeyWayinHeader, wayinkind, device_id, key_deriver_label, credential_id,
-  passphraseCleartext, ListedBox, ListingAnswer, ReadAnswer, StoredRevision, StoredVaultTok,
+  passphraseCleartext, ListedBox, ListingAnswer, StoredVaultAnswer, StoredRevision, StoredVaultTok,
   declaredBoxes, declaredBytes, leaseHoursAsMillis, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, VaultMadeUnder,
 }
 

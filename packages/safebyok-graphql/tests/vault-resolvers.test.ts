@@ -313,12 +313,12 @@ describe("vaultResolvers, refusing", () => {
     expect(refusalBehind(result.errors![0]).cause).to.eq(oops)
   })
 
-  it("sends a vaultDBFor that throws as bad_option with a generic message, keeping its own as the cause", async () => {
+  it("sends a vaultDBFor that throws a refusal of its own setup as unexpected_error with safebyok's message, keeping its own as the cause", async () => {
     const schema = TH.schemaOver(await TH.database(), () => postgresVaultDB({ client: null as never, user_id: 'u1' }))
     const result = await asked(schema, VaultOperations.safebyokGetVault, { ...u1 })
     const [crossed] = result.errors!
-    expect(crossed!.extensions).to.deep.equal({ kind: 'bad_option' })
-    expect(crossed!.message).to.include("its own setup is wrong")
+    expect(crossed!.extensions).to.deep.equal({ kind: 'unexpected_error' })
+    expect(crossed!.message).to.include("a bug")
     expect(crossed!.message).to.not.include('client')
     const ownRefusal = refusalBehind(crossed).cause as VaultError
     expect(ownRefusal.refusalkind).to.eq('bad_option')
@@ -335,13 +335,13 @@ describe("vaultResolvers, refusing", () => {
     }
   })
 
-  it("sends anything else vaultDBFor throws as bad_option too, before subscribing as before reading", async () => {
+  it("sends anything else vaultDBFor throws as unexpected_error too, before subscribing as before reading", async () => {
     const oops = new Error('AUTH_SECRET is not set')
     const schema = TH.schemaOver(await TH.database(), () => { throw oops })
     const read = await asked(schema, VaultOperations.safebyokGetVault, { ...u1 })
     const watched = await subscribe({ schema, document: parse(VaultOperations.safebyokVaultChanged), variableValues: { ...u1 }, contextValue: { user_id: 'u1' } }) as ExecutionResult
     for (const crossed of [read.errors![0], watched.errors![0]]) {
-      expect(crossed!.extensions).to.deep.equal({ kind: 'bad_option' })
+      expect(crossed!.extensions).to.deep.equal({ kind: 'unexpected_error' })
       expect(crossed!.message).to.not.include('AUTH_SECRET')
       expect(refusalBehind(crossed).cause).to.eq(oops)
     }

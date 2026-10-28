@@ -1,5 +1,5 @@
 import { Expectations, Refusals, Scopepath, VaultDB, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './box-range'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -48,12 +48,12 @@ class IdbVaultDB extends VaultDB {
 
   // The vault record and the scope's boxes are read in one transaction: no other tab's write lands
   // between them.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     return await this.shelf('readonly', (store) => vaultIn(store, scope))
   }
 
   // A tombstone in the vault record's row is no vault: a new life takes its place with the counter carried on.
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const { ensured, created } = await inOneTransaction(this.shelf, async (store) => {
       const vaultScopepath = Scopepath.vault(draft)
       const life = Expectations.newLifeOf(draft, await rowAt(store, vaultScopepath))
@@ -157,7 +157,7 @@ class IdbVaultDB extends VaultDB {
 }
 
 /** The vault of `scope` as stored, its vault record (null for none) and every box split by `splitStoredBoxes`, read in the transaction `store` belongs to. */
-const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<VaultReadResponse> => {
+const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<StoredVault> => {
   const range = boxRange(scope)
   const [vaultRecord, ckeys, rows] = await Promise.all([rowAt(store, Scopepath.vault(scope)), settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))])
   return { vault: vaultRecord ?? null, ...splitStoredBoxes(storedBoxesOf(ckeys, rows)) }

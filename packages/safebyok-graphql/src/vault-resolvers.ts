@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql'
-import { Refusals, VaultError, isVaultError } from 'safebyok'
+import { Refusals, VaultError, asStorageTrouble, isVaultError } from 'safebyok'
 import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
@@ -16,8 +16,9 @@ export type VaultResolversOpts<ContextT> = {
    * It is called for every vault field resolved, so it should be cheap, as `postgresVaultDB` is.
    * To refuse the request by a rule of your own, throw a VaultError of kind `not_permitted`
    * (`Refusals.notPermitted()`), or `identity_revoked` for a user your app knows is gone: each
-   * crosses as it is. Anything else it throws crosses as `bad_option` with a generic message, its
-   * own staying on the server. The VaultDB, not this, refuses a signed-out request.
+   * crosses as it is. Anything else it throws is a bug in the server's setup, and crosses as
+   * `unexpected_error` with safebyok's own message, what was thrown staying on the server as the
+   * cause. The VaultDB, not this, refuses a signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
@@ -93,13 +94,13 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
   // The server holds a name to its check and to its storage's limits, which every VaultDB verb
   // checks as a browser's vault does. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or the host's refusal of the request as it came, or a refusal saying the server could not make one. */
+  /** The request's VaultDB, or the host's refusal of the request thrown as it came; anything else `vaultDBFor` threw is the server's bug, `unexpected_error`. */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
     } catch (err) {
       if (isVaultError(err) && HostRefusalKinds.has(err.refusalkind)) { throw err }
-      throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
+      throw Refusals.unexpectedError(err)
     }
   }
   /** A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands it to the wire, or its refusal as a wire carries one.
@@ -153,9 +154,6 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
 /** The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user, by its own rules or as gone. */
 const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'identity_revoked'])
-
-/** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
-const MisconfiguredMessage = "The vault's server could not serve this request: its own setup is wrong, not the request. Retrying will not help until it is fixed; the server's logs say what is wrong."
 
 /** A vault as the server's VaultDB read it, as `SafebyokVault` carries it: its record as `vault`, beside its sound boxes and its damaged ones; null for none. */
 const relayedVault = (val: unknown): unknown => {
@@ -238,7 +236,7 @@ const noUnsubscribing = (): void => undefined
  * servers, gateways and APM tools log: {@link refusedBoxInBody} and {@link staleVaultRecordInBody} carry it in the body.
  */
 const crossing = (err: unknown): GraphQLError => {
-  const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
+  const refusal = asStorageTrouble(err)
   const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
