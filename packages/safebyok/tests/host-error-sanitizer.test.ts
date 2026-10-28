@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import * as Sanitizer from '../src/sanitizer'
+import * as HostErrorSanitizer from '../src/host-error-sanitizer'
 import * as TH from './test-helpers'
 
 /** An error from outside safebyok that quotes what it was handed, as a storage client's may. */
@@ -12,23 +12,23 @@ const quotingError = () => {
 /** A Proxy trap that throws, quoting a marker: stood in for every trap, so any access to the proxied throw fails loudly. */
 const quotingTrap = (): never => { throw new Error('read me and I quote: sk-ant-fake-trap') }
 
-describe("Sanitizer.refusalFor", () => {
+describe("HostErrorSanitizer.refusalFor", () => {
   it("is a VaultError of the kind and message asked for", () => {
-    const refusal = Sanitizer.refusalFor(quotingError(), 'storage_unavailable', 'Storage failed: try again shortly.')
+    const refusal = HostErrorSanitizer.refusalFor(quotingError(), 'storage_unavailable', 'Storage failed: try again shortly.')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.refusalkind).to.eq('storage_unavailable')
     expect(refusal.message).to.eq('Storage failed: try again shortly.')
   })
 
   it("carries nothing of the foreign error: no cause, no property, no text of it", () => {
-    const refusal = Sanitizer.refusalFor(quotingError(), 'bad_option', 'The note check threw.')
+    const refusal = HostErrorSanitizer.refusalFor(quotingError(), 'bad_option', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
     expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'refusalkind', 'family'])
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
   it("carries nothing of a foreign value thrown that is not an error", () => {
-    const refusal = Sanitizer.refusalFor({ note: 'sk-ant-fake-thrown-bag' }, 'bad_option', 'The note check threw.')
+    const refusal = HostErrorSanitizer.refusalFor({ note: 'sk-ant-fake-thrown-bag' }, 'bad_option', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
@@ -36,7 +36,7 @@ describe("Sanitizer.refusalFor", () => {
   it("reads nothing of the foreign throw: one whose every access, instanceof included, throws costs nothing", () => {
     const booby = new Proxy(() => undefined, { get: quotingTrap, set: quotingTrap, has: quotingTrap, deleteProperty: quotingTrap, ownKeys: quotingTrap, getOwnPropertyDescriptor: quotingTrap, defineProperty: quotingTrap, getPrototypeOf: quotingTrap, setPrototypeOf: quotingTrap, isExtensible: quotingTrap, preventExtensions: quotingTrap, apply: quotingTrap, construct: quotingTrap })
     expect(() => booby instanceof Error).to.throw('sk-ant-fake-trap')
-    const refusal = Sanitizer.refusalFor(booby, 'unexpected_error', 'The checker threw.')
+    const refusal = HostErrorSanitizer.refusalFor(booby, 'unexpected_error', 'The checker threw.')
     expect(refusal.refusalkind).to.eq('unexpected_error')
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
@@ -46,7 +46,7 @@ describe("Sanitizer.refusalFor", () => {
     const deriveOrRefuse = async (passphrase: string) => {
       let handed: unknown
       try { handed = await keyDeriver.deriveKeyBytes(passphrase) } catch (err) {
-        throw Sanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
+        throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
       }
       return handed
     }
@@ -61,7 +61,7 @@ describe("Sanitizer.refusalFor", () => {
       try {
         return await client.mutation()
       } catch (err) {
-        throw Sanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
+        throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
       }
     }
     const refusal = await TH.expectRefusal(putBox(), 'storage_unavailable')

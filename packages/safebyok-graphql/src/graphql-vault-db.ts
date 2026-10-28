@@ -1,4 +1,4 @@
-import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import { Refusals, HostErrorSanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
@@ -310,7 +310,7 @@ const refusalOf = (err: CombinedError): Error => {
   // the ones the server's VaultDB makes, and checkInts', so a validation error says the server
   // serves another schema.
   if (err.graphQLErrors.some(({ extensions: { code } }) => typeof code === 'string' && MisuseCodes.has(code))) {
-    return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
+    return HostErrorSanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
   }
   return err
 }

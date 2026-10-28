@@ -6,7 +6,7 @@ import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLa
 import { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, loggerShape, parseLogger } from './logger'
-import * as Sanitizer from './sanitizer'
+import * as HostErrorSanitizer from './host-error-sanitizer'
 import { type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from './passphrase-strength'
 import * as CX from './shapes/scopes'
 import type { Gating, RequestCleartext } from './gating'
@@ -117,7 +117,7 @@ const guardRequestCleartext = (host: RequestCleartext | null, logger: VaultLogge
 }
 
 /** The refusal in place of what `requestCleartext` threw, carrying nothing of it, as its dialog hears the passphrase. */
-const requestThrewRefusal = (thrown: unknown): VaultError => Sanitizer.refusalFor(thrown, 'unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
+const requestThrewRefusal = (thrown: unknown): VaultError => HostErrorSanitizer.refusalFor(thrown, 'unexpected_error', "The requestCleartext handed to Bank.make threw rather than resolving once its dialog closed, so this call was not answered. What it threw is left out of this report, as its dialog hears the passphrase: have it catch its own failures, and resolve.")
 
 /** Refuse 'bad_option' for a clock, its shape checked, that throws when read once, or reads outside 1981 to 2255. */
 const checkClockReads = (clock: Clock): void => {

@@ -1,7 +1,7 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
-import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
+import { Refusals, HostErrorSanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { BoxSparse, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
@@ -241,7 +241,7 @@ const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
     // quotes the call's arguments: scope, names, sidecars and ciphertext. The sanitizer drops it.
-    throw Sanitizer.refusalFor(err, 'storage_unavailable', ConvexTroubleMessage)
+    throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', ConvexTroubleMessage)
   }
 }
 

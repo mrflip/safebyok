@@ -58,9 +58,9 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  * message, so a driver's words stay in the cause (`Refusals.storageUnavailable`).
  *
  * @example
- *   try { return await vaultDB.getBox(scope, boxlabel, expected) } catch (err) { throw crossing(asStorageTrouble(err)) }   // a server relaying a verb: a refusal as it came, a driver's Error as storage_unavailable
+ *   try { return await vaultDB.getBox(scope, boxlabel, expected) } catch (err) { throw crossing(storageTroubleOf(err)) }   // a server relaying a verb: a refusal as it came, a driver's Error as storage_unavailable
  */
-export const asStorageTrouble = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.storageUnavailable(thrown))
+export const storageTroubleOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.storageUnavailable(thrown))
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *

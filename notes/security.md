@@ -978,7 +978,7 @@ added or folded into through the subagent, and no other entry changes.
   refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
   (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
   declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
-  (`src/outcome.ts`), `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
+  (`src/outcome.ts`), `storageTroubleOf` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
   bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
   lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` and `crossing`). a_fixes
   made it also recognize a `VaultError` of another copy of safebyok loaded beside this one (an ESM
@@ -1181,7 +1181,7 @@ added or folded into through the subagent, and no other entry changes.
   `data` is `{ kind, message }` with kind `identity_revoked`, `not_permitted` or `vault_full`
   (amended 2026-10-21 (store_rulings, #217): no longer `vault_full`, see the Convex component entry
   below) becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
-  it, through `Sanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
+  it, through `HostErrorSanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
   and its data was written by safebyok's server or the host's `getUserId`: function name, request id
   and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
   still carries nothing of Convex's error, since a dev deployment's validator error quotes the
@@ -2076,7 +2076,7 @@ added or folded into through the subagent, and no other entry changes.
   throw, and the one catch is `outcomeOf` (`src/outcome.ts`). Amended 2026-10-27 (outcome_default):
   `outcomeOf`'s default for a throw that is no `VaultError` is now `unexpected_error` (family `misuse`,
   never retried), the throw still its `cause`; it was `storage_unavailable`. An adapter's throw is still
-  made `storage_unavailable` by `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): applied once per hook call by the `VaultDB` hook table, `VaultDB.#hooks` / `adaptedHook` in `src/vault-db.ts`, which replaced `adapterAnswer`), and a caller
+  made `storage_unavailable` by `storageTroubleOf` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): applied once per hook call by the `VaultDB` hook table, `VaultDB.#hooks` / `adaptedHook` in `src/vault-db.ts`, which replaced `adapterAnswer`), and a caller
   wrapping a call out to storage passes `Refusals.storageUnavailable` for the retryable kind. `outcomeOf` is
   exported for an app wrapping its own calls: whatever such a body throws that is not a `VaultError` is kept,
   as it came, as the `cause`, so an app must not throw secret material from a body it wraps. `unexpectedError`
@@ -2128,7 +2128,7 @@ added or folded into through the subagent, and no other entry changes.
   `VaultDB` that forgot to unwrap another's answer, `valOf`) was refused as `bad_option`; before, a
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
   Amended 2026-10-27 (outcome_default): `adapterAnswer` (`src/vault-db.ts`; amended 2026-10-28 (db_hooks): gone, each verb now calls its hook through the table `VaultDB.#hooks` / `adaptedHook`) no longer refuses an
-  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble (`asStorageTrouble`, `src/outcome.ts`)
+  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble (`storageTroubleOf`, `src/outcome.ts`)
   (the check, `isOutcomeShaped`, has since been removed). A hook that resolves a still-wrapped `Outcome` now meets
   the ordinary answer checks: `corrupt_record` on every verb (for a write or deletion, whether it landed is
   not known) and `damaged_box` from `getBox`; `tests/vault-db.test.ts` pins that no wrapped answer is taken
@@ -2864,8 +2864,8 @@ added or folded into through the subagent, and no other entry changes.
   gets text-only checks, which is what the shipped server recipes already passed. The same holds
   for `delDamagedVault` and its verb. A `damaged_box` refusal no longer quotes the boxlabel,
   as `absent_box` already did not.
-* 2026-10-16: **a foreign error that may quote stays behind.** `Sanitizer.refusalFor`
-  (`src/sanitizer.ts`, exported as `Sanitizer`) is the one place that decides what of a foreign
+* 2026-10-16: **a foreign error that may quote stays behind.** `HostErrorSanitizer.refusalFor`
+  (`src/host-error-sanitizer.ts`, exported as `HostErrorSanitizer`) is the one place that decides what of a foreign
   error rides along on the refusal thrown in its place: today, nothing -- no `cause`, no text, no
   property. Two callers: a host's schema that throws (`bad_option`, as since #95), and
   `convexVaultDB`, which now throws every Convex failure that is not one of safebyok's own
@@ -3435,7 +3435,7 @@ added or folded into through the subagent, and no other entry changes.
   `vault_full` and `storage_unavailable` alike (amended 2026-10-21 (store_rulings, #217): `vault_full`
   is now an answer in `putBox`'s result, not a thrown error) -- because a Convex error on a dev deployment may
   quote the call's arguments (names, sidecars, ciphertext). Its refusals are made through
-  `Sanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
+  `HostErrorSanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
   browser console instead.
 * 2026-10-17 (thread 5b, store_base, G304): **GraphQL errors cross with no server text where they
   might quote.** In the browser, `graphqlVaultDB` (`safebyok-graphql/src/graphql-vault-db.ts`)

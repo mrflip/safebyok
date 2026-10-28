@@ -1,5 +1,5 @@
 import { Component, useState, type ReactNode } from 'react'
-import { Sanitizer, VaultError, isVaultError } from 'safebyok'
+import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
 
 /** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
 export type BoundaryProps = {
@@ -80,7 +80,7 @@ const LookFor: Record<BoundarySource, string> = {
  */
 export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
-    return Sanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LookFor[source]}`)
+    return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LookFor[source]}`)
   }
   if (err.cause === undefined) { return err }
   const message = `${err.message} (safebyok-react's ${source} left this error's cause out of its report to React: it may quote what the user typed.)`
