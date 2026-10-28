@@ -1,5 +1,6 @@
 import { type BadNewsHandler, type BankVaultOpts, type Clock, type MakeBankOpts, MaxBoxes, wallClock } from './shapes/bank-opts'
 import * as OX from './shapes/bank-opts'
+import * as HX from './shapes/host-code'
 import type { VaultScope } from './shapes/scopes'
 import { VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
@@ -25,23 +26,23 @@ export const isBag = (candidate: unknown) => typeof candidate === 'object' && ca
  * itself.
  */
 const { vaultDBGiven, deviceDBGiven, bankOptsRead } = Validator('bad_option', ({ custom, fn }) => {
-  const vaultDBGiven = custom<VaultDB>((candidate) => candidate instanceof VaultDB && OX.vaultDBShape.safeParse(candidate).success, Phrases.VaultDBShape)
-  const deviceDBGiven = custom<DeviceDB>((candidate) => candidate instanceof DeviceDB && OX.deviceDBShape.safeParse(candidate).success, Phrases.DeviceDBShape)
+  const vaultDBGiven = custom<VaultDB>((candidate) => candidate instanceof VaultDB && HX.vaultDBShape.safeParse(candidate).success, Phrases.VaultDBShape)
+  const deviceDBGiven = custom<DeviceDB>((candidate) => candidate instanceof DeviceDB && HX.deviceDBShape.safeParse(candidate).success, Phrases.DeviceDBShape)
   return {
     vaultDBGiven,
     deviceDBGiven,
     bankOptsRead: OX.makeBankOpts.extend({
       vaultDB:          vaultDBGiven,
       deviceDB:         deviceDBGiven,
-      keyDeriver:       OX.keyDeriverShape,
+      keyDeriver:       HX.keyDeriverShape,
       leaseHours:       OX.leaseHoursAsMillis,
       staleMinutes:     OX.staleMinutesAsMillis,
       onBadNews:        fn<BadNewsHandler>().nullable().default(null),
       requestCleartext: fn<RequestCleartext>().nullable().default(null),
-      clock:            OX.clockShape.optional(),
+      clock:            HX.clockShape.optional(),
       maxWhisperBytes:  OX.maxWhisperBytes,
       maxBoxes:         OX.maxBoxes,
-      logger:           OX.loggerShape.nullish(),
+      logger:           HX.loggerShape.nullish(),
     }),
   }
 })

@@ -12,9 +12,23 @@
 //   component/validators.ts) whose name starts with a capital is renamed lowerFirst, in value
 //   positions only (an expression, `typeof X`, a destructured binding, the Validator call's
 //   returned key, an import or export specifier). A type position keeps the name, the type's.
-// mode `ns`: every value import of a validator by name, from a shapes module (or the package's
-//   index), becomes a namespace: `import * as BX from './shapes/box'` and `BX.boxRecord`; types
-//   stay imported by name.
+// mode `ns`: every value import of a validator by name from a shapes module becomes a namespace:
+//   `import * as BX from './shapes/box'` and `BX.boxRecord`; types stay imported by name. One
+//   from the package's entry point stays a named import, as #322 left those (thread 27).
+//
+// Amended by thread 27 (winboard/20261025-restyle/thread-27-restyle_tidy.md), superseding
+// thread-22-validator_names.md's "For a later branch", which is kept as it was:
+//   1. Rebase onto `5254c7c6` (the moves).
+//   2. Run `ns`, then `rename`, then `verify`, under CORE_ONLY=1: each adapter, the demo and e2e
+//      before the core, whose src must still be pre-rename.
+//   3. Lowercase the `*Vals` with `perl -pi -e 's/\b(<lists>)\b/lcfirst($1)/ge'`.
+//   4. Rebase onto #322's tip. A conflict there is a name, and #322's side wins.
+//   5. #322 removed the `Validators` namespace export. A file that reached validators through it
+//      comes out of step 2 as `Validators.boxRecord`: make it `Safebyok`, the main entry
+//      star-imported (`perl -pi -e 's/import \{ Validators \} from/import * as Safebyok from/;
+//      s/\bValidators\./Safebyok./g'`), or import the one or two it reaches by name. A
+//      `Validators` destructured from a star import of the entry (convex's validators test) is
+//      mended by hand.
 'use strict'
 const path = require('path')
 const fs = require('fs')
@@ -43,7 +57,8 @@ const NsFor = {
 const nsOfFile = (fileName) => {
   if (fileName === ConvexValidators) { return CoreOnly ? null : 'CVX' }
   const rel = path.relative(CoreSrc, fileName)
-  if (rel === 'index.ts' || rel === 'validators.ts') { return 'Validators' }
+  // The package's entry points: a validator imported from one by name stays so, as #322 left it.
+  if (rel === 'index.ts' || rel === 'validators.ts') { return null }
   return NsFor[rel] ?? null
 }
 
@@ -276,7 +291,7 @@ const runNs = () => {
       if (! bindings) { continue }
       if (ts.isNamespaceImport(bindings)) {
         // An existing namespace under another name takes the module's one name.
-        if (ns !== 'Validators' && bindings.name.text !== ns) { renameNamespace(sf, bindings, ns) }
+        if (bindings.name.text !== ns) { renameNamespace(sf, bindings, ns) }
         continue
       }
       const moved = []     // { spec, imported, local, typeUses }
@@ -330,9 +345,6 @@ const runNs = () => {
       const spec = stmt.moduleSpecifier.getText(sf)
       const lines = []
       const needsValueNs = moved.some((entry) => entry.hasValue)
-      if (ns === 'Validators') {
-        if (! rest.includes('Validators') && ! hasNamed(sf, spec, 'Validators')) { rest.unshift('Validators') }
-      }
       const restAll = [...rest]
       const typeSpecs = keptTypes.map((name) => (clause.isTypeOnly ? name : `type ${name}`))
       const named = [...restAll, ...typeSpecs]
@@ -344,7 +356,7 @@ const runNs = () => {
         lines.push(`import ${allTypeOnly ? 'type ' : ''}${defaultPart}${named.length > 0 ? `{ ${named.join(', ')} }` : ''} from ${spec}`)
       }
       const existing = namespaceImportOf(sf, spec, ns)
-      if (ns !== 'Validators' && ! existing && ! added.has(ns)) {
+      if (! existing && ! added.has(ns)) {
         lines.push(`import ${needsValueNs ? '' : 'type '}* as ${ns} from ${spec}`)
         added.add(ns)
       } else if (existing && existing.importClause.isTypeOnly && needsValueNs) {
@@ -358,10 +370,6 @@ const runNs = () => {
 const namespaceImportOf = (sf, specText, ns) => sf.statements.find((stmt) => (
   ts.isImportDeclaration(stmt) && stmt.moduleSpecifier.getText(sf) === specText && stmt.importClause?.namedBindings
   && ts.isNamespaceImport(stmt.importClause.namedBindings) && stmt.importClause.namedBindings.name.text === ns
-))
-const hasNamed = (sf, specText, name) => sf.statements.some((stmt) => (
-  ts.isImportDeclaration(stmt) && stmt.moduleSpecifier.getText(sf) === specText && stmt.importClause?.namedBindings
-  && ts.isNamedImports(stmt.importClause.namedBindings) && stmt.importClause.namedBindings.elements.some((el) => el.name.text === name)
 ))
 
 const renameNamespace = (sf, bindings, ns) => {
@@ -382,6 +390,8 @@ const renameNamespace = (sf, bindings, ns) => {
 
 const runVerify = () => {
   // A validator named in a value import: made `type` where only its type is used, reported otherwise.
+  // A VALUE line for an import from the package's entry point is as #322 left it; one from a shapes
+  // module is a use `ns` missed.
   for (const sf of filesToEdit) {
     for (const stmt of sf.statements) {
       if (! ts.isImportDeclaration(stmt) || ! stmt.importClause || stmt.importClause.isTypeOnly) { continue }

@@ -1,6 +1,6 @@
 import * as DX from './shapes/device'
 
-/** The options the IndexedDB device store and `browserOpts` share, and their parser. Only the type is public, through `safebyok/idb`. */
+/** The options the IndexedDB device store and `browserOpts` share, and their parser. Only the type is public, through `safebyok/idb` and, beside `idbOpts`, the main entry. */
 
 export type IdbOpts = {
   /** The IndexedDB database to keep records in: a name, never empty. Default 'safebyok'. */

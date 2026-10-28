@@ -147,7 +147,7 @@ export class Box implements Boxscope, BoxSparse {
    */
   static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> {
     const { boxlabel, sidecar, base } = BX.sealBoxProps.parse(props)
-    const { madeUnder, now } = BX.madeShape.parse(made)
+    const { madeUnder, now } = BX.made.parse(made)
     const whisperBytes = whisperBytesOf(whisper)
     try {
       vault.demandConsistentWith(madeUnder, { leaseBound: true })
