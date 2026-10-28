@@ -197,6 +197,31 @@ describe("Validator", () => {
     expect(caught).to.not.be.instanceOf(Zod.ZodError)
   })
 
+  it("frames a refusal as the saying asks, where before the failures and advice after, each ending the failures in a period, as its first example shows", () => {
+    const bad = { applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' }
+    const plain = TH.expectSyncRefusal(() => vaultScope.parse(bad), 'bad_scope')
+    const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the bag naming the vault' }), 'bad_scope')
+    const advice = TH.expectSyncRefusal(() => vaultScope.parse(bad, { advice: 'Name it by its vaultlabel.' }), 'bad_scope')
+    const both = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the bag naming the vault', advice: 'Name it by its vaultlabel.' }), 'bad_scope')
+    expect(plain.message).to.match(/^vaultlabel: A label is [^.]*$/)
+    expect(where.message).to.eq(`In the bag naming the vault: ${plain.message}.`)
+    expect(advice.message).to.eq(`${plain.message}. Name it by its vaultlabel.`)
+    expect(both.message).to.eq(`In the bag naming the vault: ${plain.message}. Name it by its vaultlabel.`)
+    for (const refusal of [plain, where, advice, both]) { expect(refusal.meta).to.deep.equal({ fieldnames: ['vaultlabel'] }) }
+  })
+
+  it("parses with a saying as without one, and passes a saying of nothing by, framing a failure as the failures alone", () => {
+    expect(vaultScope.parse(scope, { where: 'In the scope' })).to.deep.equal(scope)
+    expect(vaultScope.parse(scope, {})).to.deep.equal(scope)
+    const err = TH.expectSyncRefusal(() => vaultScope.parse(null, { where: undefined, advice: undefined }), 'bad_scope')
+    expect(err.message).to.eq('Invalid input: expected object, received null')
+  })
+
+  it("refuses 'bad_option' for a saying that is none, a Zod parse context among them, whatever the input", () => {
+    TH.expectSyncRefusal(() => vaultScope.parse(scope, { error: () => 'quoted' } as object), 'bad_option')
+    TH.expectSyncRefusal(() => vaultScope.parse(null, { where: 7 } as object), 'bad_option')
+  })
+
   it("parses and then holds the result to another bag with parseConsistent, refusing its call's kind, as its first example shows", () => {
     expect(BoxSparse.parseConsistent(sparse, { ...scope, written_at: undefined, gate_epoch: 4 })).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => BoxSparse.parseConsistent(sparse, { ...scope, user_id: 'u2' }), 'bad_record')
