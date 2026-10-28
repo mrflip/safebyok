@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
-import { Refusals, VaultError, asStorageTrouble, isVaultError } from 'safebyok'
-import type { Outcome, RefusalKind, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
+import { VaultError, asStorageTrouble, isVaultError } from 'safebyok'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, in their `try` forms, the ones handing on records in place of those handing back summaries.
@@ -15,10 +15,12 @@ export type VaultResolversOpts<ContextT> = {
   /** The VaultDB for one request, made from your server's context: for the user your own auth signed in, never one the request names.
    * It is called for every vault field resolved, so it should be cheap, as `postgresVaultDB` is.
    * To refuse the request by a rule of your own, throw a VaultError of kind `not_permitted`
-   * (`Refusals.notPermitted()`), or `identity_revoked` for a user your app knows is gone: each
-   * crosses as it is. Anything else it throws is a bug in the server's setup, and crosses as
-   * `unexpected_error` with safebyok's own message, what was thrown staying on the server as the
-   * cause. The VaultDB, not this, refuses a signed-out request.
+   * (`Refusals.notPermitted()`), or `identity_revoked` for a user your app knows is gone. Every
+   * VaultError it throws crosses as it is, kind and message, those two and a `bad_option` from a
+   * misconfigured `postgresVaultDB` alike; anything else it throws is a bug in the server's
+   * setup, and crosses as `unexpected_error` whose message carries the thrown error's own, so the
+   * diagnostic reaches the browser developer. What was thrown stays on the server as the cause.
+   * The VaultDB, not this, refuses a signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
@@ -94,13 +96,12 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
   // The server holds a name to its check and to its storage's limits, which every VaultDB verb
   // checks as a browser's vault does. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or the host's refusal of the request thrown as it came; anything else `vaultDBFor` threw is the server's bug, `unexpected_error`. */
+  /** The request's VaultDB, or what `vaultDBFor` threw as {@link hostThrew} has it cross. */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
     } catch (err) {
-      if (isVaultError(err) && HostRefusalKinds.has(err.refusalkind)) { throw err }
-      throw Refusals.unexpectedError(err)
+      throw hostThrew(err)
     }
   }
   /** A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands it to the wire, or its refusal as a wire carries one.
@@ -152,8 +153,17 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
 }
 
-/** The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user, by its own rules or as gone. */
-const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'identity_revoked'])
+/** What a `vaultDBFor` threw, as it crosses: a VaultError as it came, kind and message; anything else an `unexpected_error` whose message carries the throw's own, the throw itself its cause.
+ * The host's own words cross on purpose. A `vaultDBFor` sees the server's configuration and its
+ * database, never a vault's contents, so a `TypeError` naming an unset variable or a driver's
+ * refusal of a pool reaches the developer debugging in the browser, where a sentence of
+ * safebyok's own would send them to the server's logs first.
+ */
+const hostThrew = (thrown: unknown): VaultError => {
+  if (isVaultError(thrown)) { return thrown }
+  const said = thrown instanceof Error ? thrown.message : String(thrown)
+  return new VaultError('unexpected_error', `The server's vaultDBFor threw, so no VaultDB served this request: ${said}`, { cause: thrown })
+}
 
 /** A vault as the server's VaultDB read it, as `SafebyokVault` carries it: its record as `vault`, beside its sound boxes and its damaged ones; null for none. */
 const relayedVault = (val: unknown): unknown => {

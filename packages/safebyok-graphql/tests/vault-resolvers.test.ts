@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import { GraphQLError, graphql, parse, subscribe } from 'graphql'
-import type { ExecutionResult, GraphQLSchema } from 'graphql'
+import type { ExecutionResult, GraphQLFormattedError, GraphQLSchema } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
@@ -29,6 +29,9 @@ const isLive = (result: object): result is AsyncGenerator<ExecutionResult> => ty
 
 /** The VaultError a GraphQL error crossed with, kept on the server as its cause. */
 const refusalBehind = (crossed: GraphQLError | undefined): VaultError => (crossed!.cause as GraphQLError).cause as VaultError
+
+/** A crossed error as the wire carries it: GraphQLError's `toJSON`, which is what `JSON.stringify` sends. */
+const wired = (crossed: GraphQLError | undefined): GraphQLFormattedError => crossed!.toJSON()
 
 /** A ServedVaultDB whose every verb is `answer`, and which keeps the onChange it is handed. */
 const fakeServed = (answer: () => Promise<unknown>) => {
@@ -313,16 +316,15 @@ describe("vaultResolvers, refusing", () => {
     expect(refusalBehind(result.errors![0]).cause).to.eq(oops)
   })
 
-  it("sends a vaultDBFor that throws a refusal of its own setup as unexpected_error with safebyok's message, keeping its own as the cause", async () => {
+  it("sends a vaultDBFor's refusal of its own setup as it is, kind and message, the refusal staying on the server as the cause and off the wire", async () => {
     const schema = TH.schemaOver(await TH.database(), () => postgresVaultDB({ client: null as never, user_id: 'u1' }))
     const result = await asked(schema, VaultOperations.safebyokGetVault, { ...u1 })
     const [crossed] = result.errors!
-    expect(crossed!.extensions).to.deep.equal({ kind: 'unexpected_error' })
-    expect(crossed!.message).to.include("a bug")
-    expect(crossed!.message).to.not.include('client')
-    const ownRefusal = refusalBehind(crossed).cause as VaultError
-    expect(ownRefusal.refusalkind).to.eq('bad_option')
-    expect(ownRefusal.message).to.include('client')
+    expect(crossed!.extensions).to.deep.equal({ kind: 'bad_option' })
+    expect(crossed!.message).to.include('postgresVaultDB needs a `client`')
+    expect(refusalBehind(crossed)).to.be.instanceOf(VaultError)
+    expect(refusalBehind(crossed).refusalkind).to.eq('bad_option')
+    expect(Object.keys(wired(crossed))).to.not.include('cause')
   })
 
   it("sends a VaultError vaultDBFor throws as it is, kind and message: the host refusing the request", async () => {
@@ -335,16 +337,28 @@ describe("vaultResolvers, refusing", () => {
     }
   })
 
-  it("sends anything else vaultDBFor throws as unexpected_error too, before subscribing as before reading", async () => {
+  it("sends anything else vaultDBFor throws as unexpected_error carrying its message, the throw itself staying on the server as the cause, before subscribing as before reading", async () => {
     const oops = new Error('AUTH_SECRET is not set')
     const schema = TH.schemaOver(await TH.database(), () => { throw oops })
     const read = await asked(schema, VaultOperations.safebyokGetVault, { ...u1 })
     const watched = await subscribe({ schema, document: parse(VaultOperations.safebyokVaultChanged), variableValues: { ...u1 }, contextValue: { user_id: 'u1' } }) as ExecutionResult
     for (const crossed of [read.errors![0], watched.errors![0]]) {
       expect(crossed!.extensions).to.deep.equal({ kind: 'unexpected_error' })
-      expect(crossed!.message).to.not.include('AUTH_SECRET')
+      expect(crossed!.message).to.include("The server's vaultDBFor threw")
+      expect(crossed!.message).to.include('AUTH_SECRET is not set')
       expect(refusalBehind(crossed).cause).to.eq(oops)
+      expect(Object.keys(wired(crossed))).to.not.include('cause')
+      expect(JSON.stringify(wired(crossed))).to.not.include('stack')
     }
+  })
+
+  it("carries a vaultDBFor's throw that is no Error as its text", async () => {
+    const schema = TH.schemaOver(await TH.database(), () => { throw 'the pool is not ready' }) // eslint-disable-line @typescript-eslint/only-throw-error -- a host's code may throw anything
+    const result = await asked(schema, VaultOperations.safebyokGetVault, { ...u1 })
+    const [crossed] = result.errors!
+    expect(crossed!.extensions).to.deep.equal({ kind: 'unexpected_error' })
+    expect(crossed!.message).to.include('the pool is not ready')
+    expect(refusalBehind(crossed).cause).to.eq('the pool is not ready')
   })
 })
 
