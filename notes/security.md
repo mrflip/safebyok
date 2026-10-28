@@ -467,7 +467,7 @@ added or folded into through the subagent, and no other entry changes.
   (`packages/safebyok/src/bank.ts`); the old one is never repaired (the Coach: "same scope, other vault_tok is a new
   life: reload").
   A gone Vault object writes no lease: `#grantLease` demands that the object is not gone before `putLease`, and
-  `#takeOwnWrite` takes nothing into the gone object's picture, so a change to the wayins that lands as the vault is
+  `#takeOwnPut` takes nothing into the gone object's picture, so a change to the wayins that lands as the vault is
   deleted leaves no fresh lease row in the DeviceDB (`packages/safebyok/src/vault.ts`).
   Amended 2026-10-23 (proving_gate): **`proving.grantLease()` makes two demands before `putLease`**: on the proving
   (its header still carried by the gate, its gating not landed: refusal `gating_landed`) and on the stored lease
@@ -518,7 +518,7 @@ added or folded into through the subagent, and no other entry changes.
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
   Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
-  The refresh (`#judgeRead` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  The refresh (`#judgeStored` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
   device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
   epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
   `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
@@ -612,8 +612,8 @@ added or folded into through the subagent, and no other entry changes.
   would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
   Amended 2026-10-27 (device_db_class): **one conditional discard now serves both records and both stores,
   and `DeviceDB` is an abstract base class, as `VaultDB` is, not an interface.** The base class parses every lease and device record a store hands
-  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnreadable(scopepath, isReadable)`
-  hook, which deletes the row only if `isReadable` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
+  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnparsed(scopepath, isSound)`
+  hook, which deletes the row only if `isSound` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
   host's own `DeviceDB` discard alike. The base class files each row under its Scopepath and calls the store's `do*` hook before awaiting anything,
   so a store sees one scope's calls in the order the vault made them. The race it closes: `idbDeviceDB.getDeviceRecord` deleted an unreadable device
   record unconditionally, in a transaction that began only after its read resolved, so a `raiseDeviceRecord` made after that read but landing before
@@ -1470,7 +1470,7 @@ added or folded into through the subagent, and no other entry changes.
   argument) and refuses `vault_mismatch` for none, a tombstone, or another life. The vault maps it to `vault_gone`
   and marks its picture stale so the next hello reads storage, rather than opening a box of a vault made anew
   elsewhere and calling it `damaged_box`.
-  Amended 2026-10-22 (bank): **a box read refused `vault_mismatch` makes the Vault object gone** (`#boxReadRefusal`,
+  Amended 2026-10-22 (bank): **a box read refused `vault_mismatch` makes the Vault object gone** (`#boxGetRefusal`,
   `packages/safebyok/src/vault.ts`; `vault_gone`, every later call the same, the bank's entry refused), where it
   stood marked stale for the next hello to discover. The old object is not repaired; the bank births another when
   asked. `invalid_box` (misuse) is a box the base class would not build,
@@ -1669,7 +1669,7 @@ added or folded into through the subagent, and no other entry changes.
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
-  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnreadable`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
+  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnparsed`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
   failure as a lost record. Amended 2026-10-21 (trust_lines): the mark keeps `vault_id` and the highest
   `unlock_epoch` only (`safebyok-mark-v5`); `vault_key_epoch` is removed, so the refusal of a lower one,
   the wayin check on it and the rotation case below no longer exist, and older vault props of the same
@@ -2280,7 +2280,7 @@ added or folded into through the subagent, and no other entry changes.
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
   against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
   lease (amended 2026-10-27 (device_db_class): the `DeviceDB` base class parses each lease record a store hands back and discards one that fails
-  through the store's `doDelUnreadable`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
+  through the store's `doDelUnparsed`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
   (Bound since: the sweep entry below.)

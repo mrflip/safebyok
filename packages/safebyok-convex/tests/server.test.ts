@@ -66,7 +66,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     const listed = await asU1.query(api.safebyok.getVault, { ...u1 })
     expect(listed?.vault).to.deep.equal(TH.gatelessOf('u1'))
-    expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await asU1.query(api.safebyok.watchVault, { ...u1 })).to.deep.equal({
       vault_tok: 'vault-tok-u1', gate_epoch: 0, boxes: [['anthropic_api_key', 'rev-a1']],
     })
@@ -153,7 +153,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
     const left = await asU1.query(api.safebyok.getVault, { ...u1 })
     expect(left?.vault).to.deep.equal(TH.gatelessOf('u1'))
     expect(left?.boxes).to.have.lengthOf(1)
-    expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await asU1.query(api.safebyok.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
 
   it("shows a user only their own vault: their listing holds none of another's boxes", async () => {

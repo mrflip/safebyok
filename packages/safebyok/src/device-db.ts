@@ -19,7 +19,7 @@ import { consistent } from './checks/validator'
  * resolves its answer or throws, and `tryGetLease` resolves the same as an {@link Outcome} and
  * never rejects. Each but `delAll` refuses 'bad_scope' for a scope whose names fail their checks
  * before your code sees it, and hands your `do*` method the row's {@link Scopepath}. A record read
- * back that fails its check reads as null, and is discarded through `doDelUnreadable`.
+ * back that fails its check reads as null, and is discarded through `doDelUnparsed`.
  *
  * A VaultError your code throws passes as it came, from either form; anything else it throws
  * becomes 'storage_blocked' where {@link isStorageBlocked} names it, else 'storage_unavailable',
@@ -30,7 +30,7 @@ import { consistent } from './checks/validator'
  * **Calls land in the order they were made.** Each verb calls its `do*` method before it awaits
  * anything, so a store that starts each call's work in the order it is called keeps one scope's
  * calls in the order the vault made them, awaited or not: a lock's `tryDelLease`, made after a
- * grant's `tryPutLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnreadable` each say what
+ * grant's `tryPutLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnparsed` each say what
  * else they owe.
  *
  * @example
@@ -49,7 +49,7 @@ export abstract class DeviceDB {
   async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#parsedOrDel('getLease', LeaseRecord, leaseScopepath, raw)
+    return await this.#parseOrDel('getLease', LeaseRecord, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
@@ -93,7 +93,7 @@ export abstract class DeviceDB {
   async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
     const deviceScopepath = Scopepath.device(scope)
     const raw = await storeAnswer('getDeviceRecord', () => this.doGetDeviceRecord(deviceScopepath))
-    return await this.#parsedOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
+    return await this.#parseOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
   }
 
   /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
@@ -144,19 +144,19 @@ export abstract class DeviceDB {
     return outcomeOf(() => this.delAll())
   }
 
-  /** `raw`, the row `verb` fetched under `scopepath`, parsed by `recordSchema`: the record, or null for none, or for one that does not parse, which it deletes through `doDelUnreadable`. */
-  async #parsedOrDel<RecordT>(verb: DeviceVerb, recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
+  /** Parse `raw`, the row `verb` fetched under `scopepath`, by `recordSchema`, resolving the record, or null for none; a row that does not parse is deleted through `doDelUnparsed`, and resolves null. */
+  async #parseOrDel<RecordT>(verb: DeviceVerb, recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
     if (raw === undefined || raw === null) { return null }
     const checked = recordSchema.safeParse(raw)
     if (checked.success) { return checked.data }
     // A record written since the read is newer than what was found, and stays: the store checks
     // the row again in the step that deletes it.
-    await storeAnswer(verb, () => this.doDelUnreadable(scopepath, (row) => recordSchema.safeParse(row).success))
+    await storeAnswer(verb, () => this.doDelUnparsed(scopepath, (row) => recordSchema.safeParse(row).success))
     return null
   }
   // --
 
-  // == [The half you write]: doGetLease, doPutLease, doDelLease, doGetDeviceRecord, doRaiseDeviceRecord, doDelDeviceRecord, doDelAll, doDelUnreadable
+  // == [The half you write]: doGetLease, doPutLease, doDelLease, doGetDeviceRecord, doRaiseDeviceRecord, doDelDeviceRecord, doDelAll, doDelUnparsed
 
   // --------------------------------------------------------------------------- the half you write
 
@@ -178,11 +178,11 @@ export abstract class DeviceDB {
   protected abstract doDelDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath): Promise<void>
   /** Delete every lease and device record this store keeps. */
   protected abstract doDelAll(): Promise<void>
-  /** Delete the row under `scopepath` if, and only if, `isReadable` is false of it as read in the same transaction that deletes it.
-   * A write made since the base class found the row unreadable may have stored a good record, and
-   * that record is never discarded. Hand `isReadable` the row exactly as stored, undefined for none.
+  /** Delete the row under `scopepath` if, and only if, `isSound` is false of it as read in the same transaction that deletes it.
+   * A write made since the base class found the row did not parse may have stored a good record, and
+   * that record is never discarded. Hand `isSound` the row exactly as stored, undefined for none.
    */
-  protected abstract doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean): Promise<void>
+  protected abstract doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean): Promise<void>
   // --
 }
 
@@ -237,8 +237,8 @@ class MemoryDeviceDB extends DeviceDB {
     return Promise.resolve()
   }
 
-  protected doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean): Promise<void> {
-    if (! isReadable(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) }
+  protected doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean): Promise<void> {
+    if (! isSound(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) }
     return Promise.resolve()
   }
 }

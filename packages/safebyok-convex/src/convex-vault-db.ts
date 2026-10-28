@@ -128,7 +128,7 @@ class ConvexVaultDB extends VaultDB {
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.query(this.api.getBox, { ...scope, boxlabel, expected }))
     if (! isGetBoxAnswer(answer)) { throw new VaultError('corrupt_record', GetBoxOutOfDateMessage) }
-    if (answer.read) { return answer.box_stored }
+    if (answer.got) { return answer.box_stored }
     throw Refusals.vaultMismatch()
   }
 
@@ -194,12 +194,12 @@ const PutOutOfDateMessage = "The vault's Convex functions answered a write in a 
 /** What a box read answered in a shape this client does not know says: whose version to fix. */
 const GetBoxOutOfDateMessage = "The vault's Convex functions answered a box read in a shape this version of safebyok-convex does not know, so nothing was read: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
 
-/** True when `answer` is a box read's answer as this version's component makes it: `read`, carrying the box or null, or a `vault_mismatch`. */
+/** True when `answer` is a box read's answer as this version's component makes it: `got`, carrying the box or null, or a `vault_mismatch`. */
 const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof GetBoxAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
-  const { read, refusalkind } = answer as { read?: unknown, refusalkind?: unknown }
-  if (read === true) { return 'box_stored' in answer }
-  return read === false && refusalkind === 'vault_mismatch'
+  const { got, refusalkind } = answer as { got?: unknown, refusalkind?: unknown }
+  if (got === true) { return 'box_stored' in answer }
+  return got === false && refusalkind === 'vault_mismatch'
 }
 
 /** True when `answer` is a box write's answer as this version's component makes it.

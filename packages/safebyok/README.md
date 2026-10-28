@@ -383,8 +383,8 @@ scopepath and the record as it is: a lease holds a non-extractable `CryptoKey`, 
 keep records by structured clone, never as JSON.
 
 * **Reads hand back the row as stored**, or `undefined` for none. The base class checks it: one
-  that fails its check reads as none, and the base class has `doDelUnreadable` discard it. That
-  deletes the row only if `isReadable` is still false of it as read in the same transaction, so
+  that fails its check reads as none, and the base class has `doDelUnparsed` discard it. That
+  deletes the row only if `isSound` is still false of it as read in the same transaction, so
   a record written since the read is never lost.
 * **The device record is raised, never lowered.** `doRaiseDeviceRecord(scopepath, raisedFrom)`
   reads the row, hands it to `raisedFrom` and writes what comes back, all in one transaction, so
@@ -421,9 +421,9 @@ class AcmeDeviceDB extends DeviceDB {
     await tx.done
   }
 
-  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
+  protected async doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
     const tx = (await appDB).transaction('safebyok_device', 'readwrite')
-    if (! isReadable(await tx.store.get(scopepath))) { await tx.store.delete(scopepath) }
+    if (! isSound(await tx.store.get(scopepath))) { await tx.store.delete(scopepath) }
     await tx.done
   }
 }

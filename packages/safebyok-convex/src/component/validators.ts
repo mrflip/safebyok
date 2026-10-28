@@ -105,17 +105,17 @@ export const BoxExpectation = zodToConvex(Validators.BoxExpectation)
  */
 export const Capacity = zodToConvex(Validators.Capacity)
 
-/** What a box read answers, from its one query's snapshot: `read`, with the box, or the refusal that read nothing.
- * A read carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
+/** What a box get answers, from its one query's snapshot: `got`, with the box, or the refusal that got nothing.
+ * `got: true` carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
  * `vault_mismatch`, when the scope's vault record is not the one expected, or none is stored, carries
  * nothing of it.
  *
- * @example { read: true, box_stored: stored }
- * @example { read: false, refusalkind: 'vault_mismatch' }
+ * @example { got: true, box_stored: stored }
+ * @example { got: false, refusalkind: 'vault_mismatch' }
  */
 export const GetBoxAnswer = v.union(
-  v.object({ read: v.literal(true), box_stored: v.nullable(BoxRecord) }),
-  v.object({ read: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+  v.object({ got: v.literal(true), box_stored: v.nullable(BoxRecord) }),
+  v.object({ got: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
 )
 
 /** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.

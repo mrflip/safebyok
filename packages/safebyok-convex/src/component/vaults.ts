@@ -92,10 +92,10 @@ export const getBox = query({
   handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof GetBoxAnswer>> => {
     const vaultRow = await findVaultRecordRow(ctx.db, scope)
     if (! Expectations.vaultMeets(vaultRow, expected)) {
-      return { read: false, refusalkind: 'vault_mismatch' }
+      return { got: false, refusalkind: 'vault_mismatch' }
     }
     const row = await findBoxRow(ctx.db, scope, boxlabel)
-    return { read: true, box_stored: row && boxOfRow(row) }
+    return { got: true, box_stored: row && boxOfRow(row) }
   },
 })
 

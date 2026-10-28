@@ -98,8 +98,8 @@ export const spoilableDeviceDB = () => {
     protected doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, raisedFrom(records.get(deviceScopepath))); return Promise.resolve() }
     protected doDelDeviceRecord(deviceScopepath: string) { records.delete(deviceScopepath); return Promise.resolve() }
     protected doDelAll() { rows.clear(); records.clear(); return Promise.resolve() }
-    protected doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
-      if (! isReadable(rowsOf(scopepath).get(scopepath))) { rowsOf(scopepath).delete(scopepath) }
+    protected doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
+      if (! isSound(rowsOf(scopepath).get(scopepath))) { rowsOf(scopepath).delete(scopepath) }
       return Promise.resolve()
     }
   }

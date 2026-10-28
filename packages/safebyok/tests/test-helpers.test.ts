@@ -1142,8 +1142,8 @@ class HostDeviceDB extends DeviceDB {
   }
   protected async doDelDeviceRecord(deviceScopepath: string) { await this.#touched(() => this.#rows.delete(deviceScopepath)) }
   protected async doDelAll() { await this.#touched(() => { this.#rows.clear() }) }
-  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
-    await this.#touched(() => { if (! isReadable(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) } })
+  protected async doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
+    await this.#touched(() => { if (! isSound(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) } })
   }
 
   /** What `touch` does to the map, in one synchronous step, or the throw of a store withheld. */
