@@ -425,9 +425,9 @@ describe("lease.cipheredWith, when the browser's WebCrypto fails under fresh key
 
   const FailingCases = [
     // what WebCrypto may fail at, which no key or record explains:
-    ['generateKey', 'the boxKey could not be made'],
-    ['wrapKey',     'the boxKey could not be wrapped under the vaultKey'],
-    ['encrypt',     'the whisper could not be ciphered'],
+    ["generateKey", 'the boxKey could not be made'],
+    ["wrapKey",     'the boxKey could not be wrapped under the vaultKey'],
+    ["encrypt",     'the whisper could not be ciphered'],
   ] as const
 
   for (const [verb, blurb] of FailingCases) {
