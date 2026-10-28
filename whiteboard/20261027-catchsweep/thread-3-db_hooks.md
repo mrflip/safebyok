@@ -1,6 +1,6 @@
 # Thread 3: db_hooks (2026-10-28)
 
-Branch `20261028-db_hooks`, PR #TBD, stacked on #321 (cut from its tip 496e3046). Justify: green
+Branch `20261028-db_hooks`, PR #330, stacked on #321 (cut from its tip 496e3046). Justify: green
 (core 3478 tests pass, 37 skipped; graphql 344; every package lints, typechecks, builds and fits its
 size budget).
 
