@@ -330,6 +330,16 @@ export default defineConfig([
     },
   },
 
+  // The root's scripts, and their tests, run git, date and the like from the PATH, as the shell
+  // that runs them does: an absolute path would make them machine-specific.
+  {
+    name: 'safebyok-workspace/scripts-run-from-the-path',
+    files: ['scripts/**/*.ts', 'tests/scripts/**/*.ts'],
+    rules: {
+      'sonarjs/no-os-command-from-path': 'off',
+    },
+  },
+
   // This file and any other loose script sit outside the TS project, so the
   // type-aware rules above cannot run on them. Last, so it wins.
   {

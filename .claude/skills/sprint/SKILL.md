@@ -26,21 +26,25 @@ sprint directory on in full, since workers read it from theirs.
 
 **`<sprint_name>-plan.md`**:
 
-* A header: date, mode (normal or YOLO, §4), the review level (`medium` unless the Coach named
-  another, or `none`), how many threads may run at once (3 unless the Coach named another), who
-  issued it, and a status line you keep current.
+* A header: date, mode (normal or YOLO, §4), the default **levels** -- the review level
+  (`medium`, or `none`), the worker's and the reviewer's model and effort (their agents' own),
+  and the style pass's model (`style-reviewer`'s pin) -- each unless the Coach named another, how
+  many threads may run at once (3 unless the Coach named another), who issued it, and a status
+  line you keep current.
 * *Read first*: the notes and files every worker needs beyond CLAUDE.md, by section where a
   section will do.
 * *Ground rules*: only what is particular to this sprint.
 * The threads, numbered, each with the Coach's text **verbatim** and then your gloss: what it
-  likely touches; the model it wants, if the Coach named one or it is small and mechanical enough
-  for `sonnet`; its **effort** (`low` to `max`), which is yours to choose unless the Coach named
-  one: lower for a mechanical change, higher where the work turns on judgment or on finding a
-  cause; the model its review's style pass wants, `opus` where the thread is mostly naming or
-  vocabulary; **what it depends on**; your **look-ahead**; and its **size**. Read the whole
-  request before writing any of this, because later threads bend earlier ones: a capability built
-  in thread 3 and reused in thread 5 is designed once, for both. A worker's context only grows,
-  so a thread that would build two features, or plainly run long, is two threads.
+  likely touches; its **levels**, where they differ from the defaults; **what it depends on**;
+  your **look-ahead**; and its **size**. Set a thread's levels as the Coach suggests or directs,
+  or as you judge: `sonnet` and a `low` review for a small, mechanical thread, a `high` review
+  for one that touches what `notes/guarantees.md` covers; a lower effort for a mechanical change,
+  a higher one where the work turns on judgment or on finding a cause; an `opus` style pass where
+  the thread is mostly naming or vocabulary. Revise a later thread's levels as the earlier ones
+  teach, and say so in its gloss. Read the whole request before writing any of this, because
+  later threads bend earlier ones: a capability built in thread 3 and reused in thread 5 is
+  designed once, for both. A worker's context only grows, so a thread that would build two
+  features, or plainly run long, is two threads.
 * *For the Coach*: anything already visible that needs a human.
 
 **Dependencies decide the base.** A thread depends on another when it builds on its code, or when
@@ -100,10 +104,11 @@ runs three steps.
 **Build.** `scripts/cut-thread <label> <base>` cuts its worktree from the base §1 gives it, and
 records that base for its reviewer and its filing. (Run the scripts as `<sprint root>/scripts/...`
 once the sprint has its worktree: the main checkout may be on a branch that lacks them.) Spawn
-one `thread-worker` with `run_in_background: true` (and the plan's `model` and `effort`, if it
-names them), never with `isolation`. The prompt is the whole handoff, re-sent on every one of the
-worker's turns: it carries what this thread needs from the plan and the progress document, and
-points to the rest by file and section.
+one `thread-worker` with `run_in_background: true`, the thread's worker model and effort where
+they differ from the agent's, and a `description` naming the thread (`Thread 3: vault_record`),
+never with `isolation`. The prompt is the whole handoff,
+re-sent on every one of the worker's turns: it carries what this thread needs from the plan and
+the progress document, and points to the rest by file and section.
 
 ```
 Thread <N> of sprint <sprint_name>. Sprint directory: <sprint root>/whiteboard/<YYYYMMDD-sprint_name>/.
@@ -118,19 +123,27 @@ Look-ahead: <what later threads need from this one, if anything>.
 Read: <the plan's *Read first*, and what else this thread needs, by section>.
 ```
 
+Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
+compaction with its best guess at the agent, by that `description`. To see where each agent
+stands, read the tail of the log every worktree shares,
+`"$(git rev-parse --git-common-dir)/ohai.log"`, rather than resume or wait on one; read it too
+as each report comes in, for the thread's compactions (§4).
+
 What a worker reports it went looking for in the plan or progress document is a gap in the
 handoffs: put it in the next ones. A background worker whose tools were refused (a permission it
 could not ask for) is re-run in the foreground, alone.
 
 **Review.** When the worker reports `ready`, spawn one `thread-reviewer` in the background with
-`isolation: "worktree"` -- unless the review level is `none` or the thread's diff holds no code,
-in which case say so and go straight to filing. Isolated, the reviewer and every agent it starts
-work in a worktree of their own, kept by the harness from the main checkout.
+`isolation: "worktree"` and the thread's reviewer model and effort -- unless the review level
+is `none` or the thread's diff holds no code, in which case say so and go straight to filing.
+Isolated, the reviewer and every agent it starts work in a worktree of their own, kept by the
+harness from the main checkout.
 
 ```
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
-Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if the plan names one>.
+Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if not the default>.
 The plan's gloss: <the thread's gloss, verbatim>.
+Compactions: <none | when, and before or after the worker's first justify>.
 ```
 
 The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branch>.sprintbase`
@@ -148,10 +161,17 @@ File thread <N> of sprint <sprint_name>. Worktree: <root>, branch <branch>, PR #
 scripts/file-thread stopped with: <its last lines>. Thread file: <sprint dir>/thread-<N>-<label>.md.
 ```
 
-Resuming the builder (SendMessage) instead is for work that needs what it knows: rework after a
-`flagged` review, or the answer to its blocking question. Once a thread files, one stacked on it
-may be cut. A `blocked` or `abandoned` worker gets no review: the review follows the resume that
-finishes it.
+Rework after a `flagged` review goes to a fresh `thread-worker` too, never to the builder:
+
+```
+Rework thread <N> of sprint <sprint_name>. Worktree: <root>, branch <branch>, PR #<n>.
+Thread file: <sprint dir>/thread-<N>-<label>.md. Review: the reviewer's comment on PR #<n>.
+Act on: <the finding, as a directive>.
+```
+
+Resuming the builder (SendMessage) is for the answer to its blocking question, which it needs
+mid-build. Once a thread files, one stacked on it may be cut. A `blocked` or `abandoned` worker
+gets no review: the review follows the resume that finishes it.
 
 ## 3. As each report comes in
 
@@ -195,15 +215,27 @@ Default rules, absent other guidance:
 * **Continue** past a `filed` thread with a `clean` or `fixed` review. Minor questions, and
   minor findings the reviewer left, ride along in the PR and the documents.
 * **A `flagged` review** -- a significant finding the reviewer may not act on -- is handled like
-  a worker's blocking question. If the fix is a two-way door and you are in YOLO, resume the
-  worker with the finding as a directive; it builds on the branch as it now stands, and reports
-  `ready` again. Then spawn a second reviewer over the new commits only (`<tip the first reviewer
-  left>...<the new tip>`). Never a third: what is still open after that is the Coach's.
+  a worker's blocking question. If the fix is a two-way door and you are in YOLO, hand it to a
+  fresh worker with the rework handoff (§2); it builds on the branch as it now stands, and
+  reports `ready` again. Then spawn a second reviewer over the new commits only
+  (`<tip the first reviewer left>...<the new tip>`). Never a third: what is still open after
+  that is the Coach's.
   Otherwise the finding is the Coach's: the thread waits, unfiled, in its worktree, with the
   reviewer's comment on its PR saying why.
 * **Resume** a `blocked` worker when you can supply what it lacks: an answer the plan or
   progress document already holds, or -- in YOLO -- a judgment call you can make and record. A
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
+* **A worker that compacts** is doing what its cap asks, until compaction starts to cost more
+  than it saves. The first: nothing to the worker; note it on the thread's *Progress* row and
+  in its review handoff, where the reviewer looks harder at what spans it. A second: the thread
+  outgrew one context, a planning lesson for the progress document; check later threads' glosses
+  for the same shape, and split any that have it. A third, or a second soon after the first:
+  the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
+  file up to date, and report `blocked` with what remains; then a fresh worker continues from
+  the thread file (the rework handoff, with *Continue* for *Act on*), or what remains becomes a
+  thread of its own. A worker whose result reads *Autocompact is thrashing* was stopped by the
+  harness for the same reason: its worktree stands as it left it, uncommitted work included, and
+  a fresh worker continues there.
 * **A trivial fix to closed work** -- a lint error, a typo -- in what another thread built, after
   its agent is done: hand it to the thread underway as a directive, to fix in its own branch,
   or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of

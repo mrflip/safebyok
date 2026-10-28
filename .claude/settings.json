@@ -12,5 +12,17 @@
       "mcp__claude_ai_Google_Sheets",
       "mcp__claude_ai_WebMCP_Evaluator"
     ]
+  },
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/ohai --hook"
+          }
+        ]
+      }
+    ]
   }
 }

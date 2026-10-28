@@ -33,6 +33,11 @@ thread. Before anything else:
 A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; the base,
 `git config branch.<branch>.sprintbase`.
 
+Sing out as thread-worker.md's *Singing out* says, in your own worktree: `scripts/ohai --begin
+--role thread-reviewer --sprint <sprint> --thread <N> --branch <the thread's branch> --model
+<your model id> reviewing`, then judging findings, fixing, proving, and the report you are
+about to make. Chain each onto the command it heralds.
+
 ## The job
 
 1. **Review.** `/code-review <level> <base-sha>...<tip-sha>`, with the level spelled out (it
@@ -54,8 +59,11 @@ A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; t
    names under *Where the guarantees are kept*, read that note's *The guarantees* section and
    check the diff against each guarantee. One the diff breaks is a *significant* finding, never a
    fix you make yourself.
-2. **Judge each finding** against the files. Make a fix, by hand, when it mends a correctness bug
-   or a hazard, is local, and stays within what the thread built. Leave a finding whose fix would
+2. **Judge each finding.** One `/code-review` reports as CONFIRMED was checked against the files
+   in its own verify pass: take its facts as found, and read the code only where you fix it.
+   Check the rest -- PLAUSIBLE, unverified, and `style-reviewer`'s -- against the files. Make a
+   fix, by hand, when it mends a correctness bug or a hazard, is local, and stays within what the
+   thread built. Leave a finding whose fix would
    - change a decision the worker or the plan recorded, or the thread's scope;
    - touch a cryptographic construction, the stored format, or the public surface beyond a
      plain bug in what the thread itself wrote;

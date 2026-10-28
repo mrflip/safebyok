@@ -19,7 +19,6 @@ const isolatedEnv = (home: string) => ({
   GIT_COMMITTER_EMAIL: 'tess@example.com',
 })
 
-// eslint-disable-next-line sonarjs/no-os-command-from-path -- the script names its branch by the system's date, so the test asks the same one
 const Today = execFileSync('date', ['+%Y%m%d'], { encoding: 'utf8' }).trim()
 
 describe('scripts/cut-thread', () => {
@@ -33,11 +32,9 @@ describe('scripts/cut-thread', () => {
     const origin = path.join(scratch, 'origin.git')
     const env = isolatedEnv(scratch)
     git = (...args: string[]) => (
-      // eslint-disable-next-line sonarjs/no-os-command-from-path -- naming an absolute git would make these tests machine-specific, and the script under test runs the installed git too
       execFileSync('git', ['-C', main, ...args], { encoding: 'utf8', env }).trim()
     )
     cut = (...args: string[]) => spawnSync(Script, ['--no-install', ...args], { cwd: main, encoding: 'utf8', env })
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above
     execFileSync('git', ['init', '--quiet', '--bare', '--initial-branch', 'main', origin], { env })
     mkdirSync(main)
     git('init', '--quiet', '--initial-branch', 'main')
