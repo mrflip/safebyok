@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `5fcdc037`, on main, in review); 9 (#331, `393cbef6`, on #327's old tip, second review); 2 (#325, on #316's tip, building its rulings). Each rebases onto main at filing, then the three are restacked into one line. Ten threads.
+**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `5fcdc037`, reviewed clean, filing); 9 (#331, `881c1bbe`, second review fixed, filing with the red-commit fold and the catch-up onto main); 2 (#325, `6e2f1927`, second review at high underway). Then the three restack into one line. Ten threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -337,6 +337,7 @@ Depends on: #317 (in the line); cut from the top of the line (#321's tip, or hig
 when a slot frees. Review `medium`.
 
 *Review:* medium, fixed at `a984cea5`: 1 fix (STYLE.md's glosses of the rule marked "Read as:", a reading pending the Coach), 1 significant left: `ConsistencyRefusal` unexported though public `Refusing.parseConsistent` names it (Open Matters row; the thread waits unfiled on it). Verified: the alias form `type Story = Z.infer<...>` fails (293 errors, TS7022 on `Validator`), so the interfaces stand; the type test pins both to their hand-written shapes. Minor left: `message`'s bare `custom` (Cleanup); `#327`'s changeset says "saying" (the worker edits it in #331 on resume); `Story` absent from VOCABULARY.md (row); STYLE.md bullet overlap and the namespacing clause beside a destructuring codebase (row); field tours in the two doc blocks (documentarian).
+*Review, round 2* (a984cea5...393cbef6, after the rulings): fixed at `881c1bbe`, 3 fixes (the changeset's `ConsistencyRefusal` wording; `Merged`'s doc states a relation, not its consumer; the `[Kit]` banner lists `Merged`), 2 minor (Cleanup): README *Validators* says nothing of the consistency exports or `parse(val, story?)`; the surface test pins runtime exports only. The two red commits c16df6f7/f02d2b88 fold into 3d4dcc8b at filing.
 
 ### 10. host_error_sanitizer: the sanitizer named for what it sanitizes; `storageTroubleOf`
 
@@ -350,6 +351,8 @@ name. `asStorageTrouble` → `storageTroubleOf` in `outcome.ts`, `vault-db.ts`'s
 graphql `crossing`, tests and notes, with #330's changeset amended in this branch to announce the new
 name. Names only; `safebyok` minor. Size: small. Depends on: the line's top (#328); cut from `0e48262e`
 2026-10-28. Review `medium`.
+
+*Review:* medium, clean at `5fcdc037`: 0 fixes, 2 minor. Every added line is the one-word substitution of its removed twin; old names survive only in spent CHANGELOGs and `human/`; #330's unspent changeset announces `storageTroubleOf`; G8 and *Where kept* point at `host-error-sanitizer.ts`. Left: `notes/security.md`'s seven renamed lines carry no amended marker (Open Matters row: state the exemption in the header, or add markers); two `notes/guarantees.md` lines a few characters over the prose wrap.
 
 ## Not in this sprint
 
