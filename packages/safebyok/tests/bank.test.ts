@@ -459,7 +459,7 @@ const supportConfirmedTheRestore = () => true
 const behindWorld = async () => {
   const { world, vault, older } = await rolledBackWorld()
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultScopepath, older)
+  world.dbStore.put(u1VaultScopepath, older)
   return { world, olderEpoch: (JSON.parse(older) as { vault_epoch: number }).vault_epoch }
 }
 

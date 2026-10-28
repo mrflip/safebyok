@@ -356,16 +356,16 @@ your rows. A listing passes over a row under the vault's prefix that `isBox` rej
 failing the read: no verb reaches it, so it holds no box.
 
 A read answers the vault as one atomic step read it: `doGetVault` and `doEnsureVault` resolve a
-`VaultReadResponse`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
+`StoredVault`, `{ vault, boxes, damagedBoxes }`, the vault record exactly as stored (or a
 tombstone, or null) and the box rows split by `splitStoredBoxes`, which judges each row's damage
 so your adapter never does. Hand it each row as a `StoredBox`: the boxlabel it is filed under,
 from its scopepath or its column, beside the record exactly as stored.
 
 ```ts
-import { splitStoredBoxes, type VaultReadResponse } from 'safebyok'
+import { splitStoredBoxes, type StoredVault } from 'safebyok'
 
-protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
-  const { vaultRow, boxRows } = await this.readVaultRows(scope)   // one transaction
+protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+  const { vaultRow, boxRows } = await this.getVaultRows(scope)   // one transaction
   return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
 }
 ```
@@ -383,8 +383,8 @@ scopepath and the record as it is: a lease holds a non-extractable `CryptoKey`, 
 keep records by structured clone, never as JSON.
 
 * **Reads hand back the row as stored**, or `undefined` for none. The base class checks it: one
-  that fails its check reads as none, and the base class has `doDelUnreadable` discard it. That
-  deletes the row only if `isReadable` is still false of it as read in the same transaction, so
+  that fails its check reads as none, and the base class has `doDelUnparsed` discard it. That
+  deletes the row only if `isSound` is still false of it as read in the same transaction, so
   a record written since the read is never lost.
 * **The device record is raised, never lowered.** `doRaiseDeviceRecord(scopepath, raisedFrom)`
   reads the row, hands it to `raisedFrom` and writes what comes back, all in one transaction, so
@@ -421,9 +421,9 @@ class AcmeDeviceDB extends DeviceDB {
     await tx.done
   }
 
-  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
+  protected async doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
     const tx = (await appDB).transaction('safebyok_device', 'readwrite')
-    if (! isReadable(await tx.store.get(scopepath))) { await tx.store.delete(scopepath) }
+    if (! isSound(await tx.store.get(scopepath))) { await tx.store.delete(scopepath) }
     await tx.done
   }
 }

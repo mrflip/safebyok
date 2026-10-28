@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import type { BoxSparse, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
@@ -104,12 +104,12 @@ class ConvexVaultDB extends VaultDB {
   }
 
   // The component answers each box as its row holds it; the split judges each, as for any backend.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     const answer = await refusing(() => this.client.query(this.api.getVault, { ...scope }))
     return answer === null ? { vault: null, boxes: [], damagedBoxes: [] } : { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const answer = await refusing(() => this.client.mutation(this.api.ensureVault, { draft }))
     return { vault: answer.vault, ...splitStoredBoxes(storedBoxesOf(answer.boxes)) }
   }
@@ -118,7 +118,7 @@ class ConvexVaultDB extends VaultDB {
   // transaction that decided it: the base class checks it.
   protected async doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.mutation(this.api.putVaultRecord, { vaultRecord, expected }))
-    if (! isPutVaultRecordAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
+    if (! isPutVaultRecordAnswer(answer)) { throw new VaultError('corrupt_record', PutOutOfDateMessage) }
     if (answer.landed) { return answer.vault_stored }
     throw Refusals.staleVaultRecord(answer.vault_stored)
   }
@@ -127,8 +127,8 @@ class ConvexVaultDB extends VaultDB {
   // read the box: the vault record and the box are one snapshot.
   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.query(this.api.getBox, { ...scope, boxlabel, expected }))
-    if (! isGetBoxAnswer(answer)) { throw new VaultError('corrupt_record', ReadOutOfDateMessage) }
-    if (answer.read) { return answer.box_stored }
+    if (! isGetBoxAnswer(answer)) { throw new VaultError('corrupt_record', GetBoxOutOfDateMessage) }
+    if (answer.got) { return answer.box_stored }
     throw Refusals.vaultMismatch()
   }
 
@@ -136,7 +136,7 @@ class ConvexVaultDB extends VaultDB {
   // each answer carries, the base class checks.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     const answer: unknown = await refusing(() => this.client.mutation(this.api.putBox, { ...scope, expected, box }))
-    if (! isPutBoxAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
+    if (! isPutBoxAnswer(answer)) { throw new VaultError('corrupt_record', PutOutOfDateMessage) }
     if (answer.landed) { return answer.box_stored }
     if (answer.refusalkind === 'vault_mismatch') { throw Refusals.vaultMismatch() }
     if (answer.refusalkind === 'vault_full') { throw Refusals.vaultFull(answer.capacity) }
@@ -189,17 +189,17 @@ const ConvexTransactionReadBytes = 16_777_216
 const storedBoxesOf = (rows: readonly Infer<typeof BoxSparse>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
 
 /** What a write answered in a shape this client does not know says: whose version to fix. */
-const OutOfDateMessage = "The vault's Convex functions answered a write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
+const PutOutOfDateMessage = "The vault's Convex functions answered a write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
 
 /** What a box read answered in a shape this client does not know says: whose version to fix. */
-const ReadOutOfDateMessage = "The vault's Convex functions answered a box read in a shape this version of safebyok-convex does not know, so nothing was read: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
+const GetBoxOutOfDateMessage = "The vault's Convex functions answered a box read in a shape this version of safebyok-convex does not know, so nothing was read: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
 
-/** True when `answer` is a box read's answer as this version's component makes it: `read`, carrying the box or null, or a `vault_mismatch`. */
+/** True when `answer` is a box read's answer as this version's component makes it: `got`, carrying the box or null, or a `vault_mismatch`. */
 const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof GetBoxAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
-  const { read, refusalkind } = answer as { read?: unknown, refusalkind?: unknown }
-  if (read === true) { return 'box_stored' in answer }
-  return read === false && refusalkind === 'vault_mismatch'
+  const { got, refusalkind } = answer as { got?: unknown, refusalkind?: unknown }
+  if (got === true) { return 'box_stored' in answer }
+  return got === false && refusalkind === 'vault_mismatch'
 }
 
 /** True when `answer` is a box write's answer as this version's component makes it.

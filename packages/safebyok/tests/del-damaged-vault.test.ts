@@ -48,21 +48,21 @@ describe("delDamagedVault", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    const before = world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)])
+    const before = world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.get(scopepath)])
     const lease = await world.getLease()
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'bad_option')
     expect(err.message).to.include('del()')
-    expect(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)])).to.deep.equal(before)
+    expect(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.get(scopepath)])).to.deep.equal(before)
     expect(await world.getLease()).to.deep.equal(lease)
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("refuses a vault record too damaged to name its vault, removing nothing, the lease included", async () => {
     const world = await damagedVaultWorld()
-    world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v1"}')
+    world.dbStore.put(u1VaultScopepath, '{"format":"safebyok-vault-v1"}')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'damaged_vault')
     expect(err.message).to.include('nothing was removed')
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq('{"format":"safebyok-vault-v1"}')
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq('{"format":"safebyok-vault-v1"}')
     expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
@@ -70,12 +70,12 @@ describe("delDamagedVault", () => {
   it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing deleted, the lease kept", async () => {
     const world = await damagedVaultWorld()
     const newer = JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v7' })
-    world.dbStore.write(u1VaultScopepath, newer)
+    world.dbStore.put(u1VaultScopepath, newer)
     const atOpen = await TH.expectRefusal(world.open(), 'newer_format')
     expect(atOpen.message).to.include('update the app')
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'newer_format')
     expect(err.message).to.include('newer version')
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(newer)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(newer)
     expect(world.dbStore.scopepaths().some((scopepath) => isU1Box(scopepath))).to.be.true
     expect(await world.getLease()).to.not.be.null
   })
@@ -99,10 +99,10 @@ describe("delDamagedVault", () => {
     const replacing = localVaultDB({
       store: {
         ...world.dbStore,
-        read: (ckey) => {
-          if (ckey !== u1VaultScopepath) { return world.dbStore.read(ckey) }
+        get: (ckey) => {
+          if (ckey !== u1VaultScopepath) { return world.dbStore.get(ckey) }
           looks += 1
-          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultRecordOf(world), vault_tok: 'made-anew' })
+          return looks === 1 ? world.dbStore.get(ckey) : JSON.stringify({ ...storedVaultRecordOf(world), vault_tok: 'made-anew' })
         },
       },
     })
@@ -146,17 +146,17 @@ describe("delDamagedVault", () => {
     await TH.unlock(vault, 'pw')
     TH.closeVault(vault)
     const vaultScopepath = Scopepath.vault({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
-    const vaultRecord = JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null') as object
-    world.dbStore.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
+    const vaultRecord = JSON.parse(world.dbStore.get(vaultScopepath) ?? 'null') as object
+    world.dbStore.put(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
     await delDamagedVault(opts)
-    expect(JSON.parse(world.dbStore.read(vaultScopepath) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
+    expect(JSON.parse(world.dbStore.get(vaultScopepath) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
   })
 
   it("raises this device's record to the tombstone's vault_epoch, keeping its device_id, so a restored copy of the damaged vault is behind", async () => {
     const world = await damagedVaultWorld()
     const before = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     await delDamagedVault(world.optsWith())
-    const tombstone = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as { vault_epoch: number }
+    const tombstone = JSON.parse(world.dbStore.get(u1VaultScopepath) ?? 'null') as { vault_epoch: number }
     const after = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
     expect(after?.highest_vault_epoch).to.eq(tombstone.vault_epoch)
     expect(after?.device_id).to.eq(before?.device_id)

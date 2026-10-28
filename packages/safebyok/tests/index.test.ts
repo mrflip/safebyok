@@ -13,7 +13,7 @@ describe("the package's entry point", () => {
       'Bank', 'Vault', 'CorrectableKindVals', 'GatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'Ciphered', 'DeviceRecord', 'DeviceRecordFormat', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxDamageVals', 'BoxDamaged', 'BoxFormat', 'BoxRecord', 'BoxSparse', 'BoxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'LeaseStamp', 'GateRecord', 'GateSparse', 'PasskeyWayinSparse', 'PassphraseWayinSparse', 'VaultFormat', 'VaultSparse', 'VaultStamp', 'VaultTombstone', 'TombstoneFormat', 'VaultRecord', 'VaultScope', 'isGated', 'Whisper', 'wallClock',
       'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'Validators',
-      'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
+      'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'asStorageTrouble', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
       'domStore', 'memoryStore',
       'stableJsonify',
@@ -57,7 +57,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the refusals an adapter throws and unexpectedError, and the comparisons a key-value adapter makes, each as one namespace", () => {
-    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'unexpectedError', 'staleWrite', 'staleVaultRecord', 'StaleVaultRecordMessage', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
+    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'storageUnavailable', 'unexpectedError', 'staleDel', 'StaleDelMessage', 'staleVaultRecord', 'StaleVaultRecordMessage', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
     expect(Object.keys(safebyok.Expectations)).to.have.members(['isTombstone', 'vaultRecordMeets', 'vaultRecordRefusalOf', 'vaultMeets', 'vaultRecordPutOf', 'newLifeOf', 'tombstoneOf', 'boxRefusalOf', 'deletionOf'])
   })
 })

@@ -6,8 +6,8 @@
  * @returns A function asking for a run of `task`, settling as the run it joins settles.
  *
  * @example
- *   const refresh = oneAtATime(readStorage)
- *   await Promise.all([refresh(), refresh(), refresh()])  // readStorage ran once, and all three shared it
+ *   const refresh = oneAtATime(refreshOnce)
+ *   await Promise.all([refresh(), refresh(), refresh()])  // refreshOnce ran once, and all three shared it
  */
 export const oneAtATime = (task: () => Promise<void>): (() => Promise<void>) => {
   // The run under way, which every call made meanwhile shares.

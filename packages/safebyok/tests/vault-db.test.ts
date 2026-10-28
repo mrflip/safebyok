@@ -2,7 +2,7 @@ import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, splitStoredBoxes, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
-import type { VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse } from '../src/shapes/vault-db'
+import type { VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault } from '../src/shapes/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
 import { VaultError, isVaultError } from '../src/errors'
 import { type Outcome, bad, good, valOf } from '../src/outcome'
@@ -44,11 +44,11 @@ class MapVaultDB extends VaultDB {
 
   private storedVaultRecord(scope: VaultScope) { return this.rows.get(Scopepath.vault(scope)) }
 
-  protected doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
     return Promise.resolve({ vault: this.rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(this.storedBoxes(scope)) })
   }
 
-  protected doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const life = Expectations.newLifeOf(draft, this.storedVaultRecord(draft))
     if (life) { this.rows.set(Scopepath.vault(draft), life) }
     return Promise.resolve({ vault: this.rows.get(Scopepath.vault(draft)), ...splitStoredBoxes(this.storedBoxes(draft)) })
@@ -137,7 +137,7 @@ class TroubledVaultDB extends MapVaultDB {
     this.failure = failure
   }
 
-  protected override doGetVault(): Promise<VaultReadResponse> { this.failure() }
+  protected override doGetVault(): Promise<StoredVault> { this.failure() }
   protected override doSubscribe(): () => void { this.failure() }
   protected override doPutBox(): Promise<unknown> { return Promise.reject(new Error('the backend dropped the connection')) }
 }
@@ -162,7 +162,7 @@ class RelayingVaultDB extends MapVaultDB {
     this.answer = answer
   }
 
-  protected override doGetVault(): Promise<VaultReadResponse> { return Promise.resolve(this.answer as VaultReadResponse) }
+  protected override doGetVault(): Promise<StoredVault> { return Promise.resolve(this.answer as StoredVault) }
 }
 
 /**
@@ -599,7 +599,7 @@ describe("the abstract VaultDB, deleting a vault whose vault record is damaged",
 
   it("refuses as damaged_vault, deleting nothing, an adapter that validates on the way up and so never hands the record over", async () => {
     class CheckedVaultDB extends MapVaultDB {
-      protected override doGetVault(): Promise<VaultReadResponse> {
+      protected override doGetVault(): Promise<StoredVault> {
         return Promise.reject(new VaultError('damaged_vault', 'did not read back'))
       }
     }
@@ -613,7 +613,7 @@ describe("the abstract VaultDB, deleting a vault whose vault record is damaged",
 
   it("wraps what the adapter throws as storage_unavailable, and checks the scope first", async () => {
     class DownVaultDB extends MapVaultDB {
-      protected override doGetVault(): Promise<VaultReadResponse> { return Promise.reject(new Error('connection reset')) }
+      protected override doGetVault(): Promise<StoredVault> { return Promise.reject(new Error('connection reset')) }
     }
     await TH.expectBad(new DownVaultDB().tryDelDamagedVault(TH.scopeOf('u1')), 'storage_unavailable')
     await TH.expectBad(new MapVaultDB().tryDelDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_scope')
@@ -802,7 +802,7 @@ describe("the abstract VaultDB, on a box write that misses", () => {
   }
 
   it("refuses as corrupt_record a stale write whose adapter does not say what is stored, saying nothing was written and the adapter needs a look", async () => {
-    const thrown = Refusals.staleWrite('del')
+    const thrown = Refusals.staleDel()
     const vaultDB = new RefusingVaultDB(thrown)
     const refusal = await TH.expectBad(vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two')), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
@@ -949,12 +949,12 @@ describe("the abstract VaultDB, reading how full a vault is", () => {
  * answer: each read hands back `good` of what it would answer, and each write `bad` of a stale one.
  */
 class ForgetfulVaultDB extends MapVaultDB {
-  protected override async doGetVault(scope: VaultScope): Promise<VaultReadResponse> { return good(await super.doGetVault(scope)) as unknown as VaultReadResponse }
+  protected override async doGetVault(scope: VaultScope): Promise<StoredVault> { return good(await super.doGetVault(scope)) as unknown as StoredVault }
   protected override async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return good(await super.doGetBox(scope, boxlabel, expected)) }
   protected override doPutVaultRecord(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleVaultRecord(null))) }
   protected override doPutBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleBox(null))) }
-  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
-  protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
+  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleDel())) }
+  protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleDel())) }
 }
 
 /** A MapVaultDB whose box reads and writes it hands on to `inner`, unwrapping each answer as an adapter must. */
@@ -978,6 +978,16 @@ describe("the abstract VaultDB, by what threw", () => {
     expect(await TH.expectingGood(vaultDB).tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
     vaultDB.inner.rows.set(u1AnthropicBoxScopepath, 'not a box')
     await TH.expectBad(vaultDB.tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'damaged_box')
+  })
+
+  it("reaches a do* hook on a store built over a VaultDB with Object.create, prototype and all, and makes its throw storage_unavailable, as it does an instance's", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(u1VaultScopepath, TH.vaultRecordOf('u1'))
+    const built = Object.create(vaultDB, { doGetVault: { value: () => Promise.reject(new Error('connection reset')) } }) as VaultDB
+    const refusal = await TH.expectBad(built.tryGetVault(TH.scopeOf('u1')), 'storage_unavailable')
+    expect((refusal.cause as Error).message).to.eq('connection reset')
+    const ofInstance = await vaultDB.getCapacity(TH.scopeOf('u1'))
+    expect(await TH.expectingGood(built).tryGetCapacity(TH.scopeOf('u1'))).to.deep.equal(ofInstance)
   })
 
   it("refuses a read answered with an Outcome still wrapped as an answer in another shape, never reading it as a record: corrupt_record, or damaged_box for a box", async () => {
@@ -1183,7 +1193,7 @@ describe("the abstract VaultDB, on an update of the vault record that misses", (
   }
 
   it("refuses as corrupt_record a stale write that does not say what is stored, saying nothing was written", async () => {
-    const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleWrite('del') })
+    const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleDel() })
     const refusal = await TH.expectBad(vaultDB.tryPutVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
     expect(refusal.message).to.match(/Refusals.staleVaultRecord/)
@@ -1650,7 +1660,7 @@ describe("VaultDB.getVaultRecords", () => {
 
   it("refuses as getVault does: a scope with a name that fails its check as bad_scope, the adapter's failure as storage_unavailable", async () => {
     class DownVaultDB extends MapVaultDB {
-      protected override doGetVault(): Promise<VaultReadResponse> { return Promise.reject(new Error('connection reset')) }
+      protected override doGetVault(): Promise<StoredVault> { return Promise.reject(new Error('connection reset')) }
     }
     await TH.expectBad(new MapVaultDB().tryGetVaultRecords({ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' }), 'bad_scope')
     await TH.expectBad(new DownVaultDB().tryGetVaultRecords(TH.scopeOf('u1')), 'storage_unavailable')
@@ -1682,8 +1692,8 @@ describe("the abstract VaultDB, its try pairs", () => {
 
   /** A MapVaultDB whose storage, if reached, fails the test. */
   class UntouchedVaultDB extends MapVaultDB {
-    protected override doGetVault(): Promise<VaultReadResponse> { throw new Error('storage was touched') }
-    protected override doEnsureVault(): Promise<VaultReadResponse> { throw new Error('storage was touched') }
+    protected override doGetVault(): Promise<StoredVault> { throw new Error('storage was touched') }
+    protected override doEnsureVault(): Promise<StoredVault> { throw new Error('storage was touched') }
   }
 
   for (const [verb, kind, throwing, trying] of TryPairCases) {

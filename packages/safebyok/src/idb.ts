@@ -112,13 +112,13 @@ class IdbDeviceDB extends DeviceDB {
     this.#ring()
   }
 
-  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean): Promise<void> {
+  protected async doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean): Promise<void> {
     await this.#shelf()('readwrite', (objects) => (
       new Promise<void>((resolve, reject) => {
-        const reading = objects.get(scopepath)
-        reading.addEventListener('error', () => { reject(reading.error ?? new Error('IndexedDB could not read a row it found unreadable.')) })
-        reading.addEventListener('success', () => {
-          if (! isReadable(reading.result)) { objects.delete(scopepath) }
+        const getting = objects.get(scopepath)
+        getting.addEventListener('error', () => { reject(getting.error ?? new Error('IndexedDB could not read a row it found unreadable.')) })
+        getting.addEventListener('success', () => {
+          if (! isSound(getting.result)) { objects.delete(scopepath) }
           resolve()
         })
       })

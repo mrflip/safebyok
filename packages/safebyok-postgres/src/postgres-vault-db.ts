@@ -1,5 +1,5 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope, splitStoredBoxes } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultReadResponse, VaultRecord, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredVault, VaultRecord, VaultDraft } from 'safebyok'
 import * as Columns from './columns'
 import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -322,13 +322,13 @@ class TablesVaultDB extends VaultDB {
     this.maxBoxes = maxBoxes
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     this.mustReach(scope)
     const { rows } = await this.sent(GetVaultSql, scopeParams(scope))
     return rows.length === 0 ? { vault: null, boxes: [], damagedBoxes: [] } : storedVaultOf(rows[0])
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     this.mustReach(draft)
     const { rows } = await this.sent(EnsureVaultSql, Columns.paramsOf(rowOfVaultRecord(draft), VaultRowColumns))
     return storedVaultOf(rows[0])
@@ -480,7 +480,7 @@ const MaxNameBytes = 640
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
 
 /** A vault as a statement read it, its vault record's columns beside its boxes as JSON text: the vault record as stored, and its boxes split, each under its own boxlabel column. */
-const storedVaultOf = (row: unknown): VaultReadResponse => {
+const storedVaultOf = (row: unknown): StoredVault => {
   const sparseBoxes = JSON.parse((row as { boxes: string }).boxes) as Record<string, unknown>[]
   return {
     // A row goes up as stored, whatever its cells hold: the base class judges the record, and the split each box.

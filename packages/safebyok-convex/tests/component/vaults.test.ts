@@ -100,9 +100,9 @@ describe("putVaultRecord", () => {
 describe("getBox and putBox", () => {
   it("has no box until one is written, then reads it back exactly, without its scope columns, answering as PutBoxAnswer's and GetBoxAnswer's first examples show", async () => {
     const CVX = await withVaultRecord()
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: null })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: null })
     expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
 
   it("resolves a write whose box expectation failed as stale_write, with the stored box as a read returns it, writing nothing, as PutBoxAnswer's second example shows", async () => {
@@ -110,31 +110,31 @@ describe("getBox and putBox", () => {
     await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
     expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: TH.noBoxYet })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('openai_api_key', 'o1'), expected: { ...TH.noBoxYet, revision_tok: 'rev-gone' } })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: null })
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
   })
 
   it("resolves a write whose vault record is not the one expected as vault_mismatch, carrying nothing of it, writing nothing, as PutBoxAnswer's third example shows", async () => {
     const CVX = await withVaultRecord()
     const answer = await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: { ...TH.noBoxYet, vault_tok: 'vault-tok-gone' } })
     expect(answer).to.deep.equal({ landed: false, refusalkind: 'vault_mismatch' })
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: null })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: null })
   })
 
   it("resolves a read whose vault record is not the one expected as vault_mismatch, carrying nothing of it, as GetBoxAnswer's second example shows", async () => {
     const CVX = await withVaultRecord()
     await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
     const answer = await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: { vault_tok: 'vault-tok-gone' } })
-    expect(answer).to.deep.equal({ read: false, refusalkind: 'vault_mismatch' })
+    expect(answer).to.deep.equal({ got: false, refusalkind: 'vault_mismatch' })
   })
 
   it("resolves a read in a scope holding no vault record, or only a tombstone, as vault_mismatch", async () => {
     const CVX = TH.componentTest()
     const unmade = await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })
-    expect(unmade).to.deep.equal({ read: false, refusalkind: 'vault_mismatch' })
+    expect(unmade).to.deep.equal({ got: false, refusalkind: 'vault_mismatch' })
     await TH.ensureGatedIn(CVX, TH.vaultRecordOf('u1'))
     await CVX.mutation(TH.vaults.delVault, { ...u1, expected: TH.thisVault })
     const deleted = await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })
-    expect(deleted).to.deep.equal({ read: false, refusalkind: 'vault_mismatch' })
+    expect(deleted).to.deep.equal({ got: false, refusalkind: 'vault_mismatch' })
   })
 
   it("stores a box's sidecar as the JSON value it was handed, and reads it back so", async () => {
@@ -144,7 +144,7 @@ describe("getBox and putBox", () => {
     const { boxes } = await allRows(CVX)
     const [row] = boxes
     expect(row?.sidecar).to.deep.equal(withSidecar.sidecar)
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: withSidecar })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: withSidecar })
   })
 })
 
@@ -264,12 +264,12 @@ describe("a real vault's records", () => {
 
     // Read back from Convex, and placed where the core keeps them, they open as before.
     const reread = memoryStore()
-    reread.write(real.vaultRecordCkey, JSON.stringify(await TH.storedVaultRecordIn(CVX, u1)))
+    reread.put(real.vaultRecordCkey, JSON.stringify(await TH.storedVaultRecordIn(CVX, u1)))
     for (const { ckey, box } of real.boxes) {
       const answer = await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: box.boxlabel, expected: { vault_tok: real.vaultRecord.vault_tok } })
-      const stored = answer.read ? answer.box_stored : null
+      const stored = answer.got ? answer.box_stored : null
       expect(stored).to.deep.equal(box)
-      reread.write(ckey, JSON.stringify(stored))
+      reread.put(ckey, JSON.stringify(stored))
     }
     const vault = await TH.openOver(reread)
     await TH.unlock(vault, TH.RealPassphrase)
@@ -296,8 +296,8 @@ describe("a real vault's records", () => {
 
 const memoryStoreHolding = (real: Awaited<ReturnType<typeof TH.realRecords>>) => {
   const store = memoryStore()
-  store.write(real.vaultRecordCkey, JSON.stringify(real.vaultRecord))
-  for (const { ckey, box } of real.boxes) { store.write(ckey, JSON.stringify(box)) }
+  store.put(real.vaultRecordCkey, JSON.stringify(real.vaultRecord))
+  for (const { ckey, box } of real.boxes) { store.put(ckey, JSON.stringify(box)) }
   return store
 }
 
@@ -396,7 +396,7 @@ describe("a vault's tally", () => {
     expect(await keptTally(CVX)).to.be.null
     const listed = await TH.boxesIn(CVX, u1)
     expect(listed.map((summary) => summary.boxlabel)).to.deep.equal(['anthropic_api_key', 'openai_api_key'])
-    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ read: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: 'anthropic_api_key', expected: TH.inThisVault })).to.deep.equal({ got: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     //
     await CVX.mutation(TH.vaults.putBox, { ...u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over('a1') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))

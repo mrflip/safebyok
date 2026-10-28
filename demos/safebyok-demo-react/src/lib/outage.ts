@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type VaultReadResponse, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
+import { VaultDB, VaultError, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type StoredVault, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -73,12 +73,12 @@ export class OutageVaultDB extends VaultDB {
 
   // The inner adapter's records verbs hand on each box as stored, which this adapter's own checks
   // read as its listing does.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     this.refuseWhileDown()
     return storedVaultOf(await this.inner.getVaultRecords(scope))
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     this.refuseWhileDown()
     return storedVaultOf(await this.inner.ensureVaultRecords(draft))
   }
@@ -137,7 +137,7 @@ export class OutageVaultDB extends VaultDB {
 }
 
 /** A vault as another VaultDB's records verbs hand it on, checked and split, or null for none, as this adapter's half answers: its record as `vault`, beside its boxes. */
-const storedVaultOf = (records: (VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null): VaultReadResponse => {
+const storedVaultOf = (records: (VaultRecord & { boxes: readonly BoxSparse[], damagedBoxes: readonly BoxDamaged[] }) | null): StoredVault => {
   if (records === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
   const { boxes, damagedBoxes, ...vault } = records
   return { vault, boxes, damagedBoxes }

@@ -1,5 +1,5 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 
@@ -153,14 +153,14 @@ class UrqlVaultDB extends VaultDB {
 
   // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in
   // one step, and splits its boxes, which this VaultDB's base class checks again.
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     const { safebyokGetVault } = await this.asked(GetVaultDoc, scopeOut(scope))
-    return vaultReadOf(safebyokGetVault)
+    return storedVaultOf(safebyokGetVault)
   }
 
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { draft: recordOf(draft, VaultRecordFields) })
-    return vaultReadOf(safebyokEnsureVault)
+    return storedVaultOf(safebyokEnsureVault)
   }
 
   // A write that lands answers with the vault record as the server's storage holds it; a stale
@@ -171,7 +171,7 @@ class UrqlVaultDB extends VaultDB {
     checkInts('vault record expectation', expected)
     const { vault_tok, gate_epoch } = expected
     const { safebyokPutVaultRecord } = await this.told(PutVaultRecordDoc, { vaultRecord: recordOf(vaultRecord, VaultRecordFields), expected: { vault_tok, gate_epoch } })
-    const answer = safebyokPutVaultRecord as WriteAnswer
+    const answer = safebyokPutVaultRecord as PutAnswer
     if (answer.landed) { return recordOf(answer.vault_stored, VaultRecordFields) }
     throw refusalOfAnswer(answer, 'vault_stored')
   }
@@ -191,7 +191,7 @@ class UrqlVaultDB extends VaultDB {
     checkInts('box', box)
     const { vault_tok, revision_tok } = expected
     const { safebyokPutBox } = await this.told(PutBoxDoc, { ...scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_tok, revision_tok } })
-    const answer = safebyokPutBox as WriteAnswer
+    const answer = safebyokPutBox as PutAnswer
     if (answer.landed) { return recordOf(answer.box_stored, BoxFields) }
     throw refusalOfAnswer(answer, 'box_stored')
   }
@@ -253,7 +253,7 @@ const scopeOut = ({ applabel, user_id, vaultlabel }: VaultScope) => ({ applabel,
  * A field the answer leaves out altogether is no answer, as from a server that does not serve
  * safebyok-graphql's schema and checks no operation against its own.
  */
-const vaultReadOf = (sent: unknown): VaultReadResponse => {
+const storedVaultOf = (sent: unknown): StoredVault => {
   if (sent === undefined) { throw new Error('The GraphQL server answered without the vault it was asked for: is it serving safebyok-graphql?') }
   if (sent === null) { return { vault: null, boxes: [], damagedBoxes: [] } }
   const { vault, boxes, damagedBoxes } = sent as Record<string, unknown>
@@ -261,7 +261,7 @@ const vaultReadOf = (sent: unknown): VaultReadResponse => {
     vault:        recordOf(vault, VaultRecordFields),
     boxes:        recordsOf(boxes, BoxSparseFields),
     damagedBoxes: recordsOf(damagedBoxes, BoxDamagedFields),
-  } as VaultReadResponse
+  } as StoredVault
 }
 
 /** Each record of `sent`, rebuilt from `fields` alone; `sent` as it came when it is no list. */
@@ -322,7 +322,7 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
 /** What a box write or an update of the vault record answers: `landed`, or the kind and message of its refusal, with the fact that kind carries (`box_stored`, `vault_stored` or `capacity`). */
-type WriteAnswer = {
+type PutAnswer = {
   landed:              boolean
   refusalkind?:        unknown
   message?:            unknown
@@ -336,7 +336,7 @@ type WriteAnswer = {
  * checks a record, and a `vault_full`'s as `getCapacity` checks its answer. An answer that says
  * neither a kind nor a message is the server's bug, `corrupt_record`.
  */
-const refusalOfAnswer = (answer: WriteAnswer, storedField: 'box_stored' | 'vault_stored'): VaultError => {
+const refusalOfAnswer = (answer: PutAnswer, storedField: 'box_stored' | 'vault_stored'): VaultError => {
   const { refusalkind, message, capacity } = answer
   if (typeof message !== 'string' || ! isKind(refusalkind)) {
     return new VaultError('corrupt_record', "The GraphQL server refused a write without saying why: is it serving safebyok-graphql of the same version as this app's client? Serve VaultSchemaSdl and vaultResolvers from it.")

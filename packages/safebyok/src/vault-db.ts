@@ -1,7 +1,7 @@
 import type * as Z from 'zod'
 import { BoxDamaged, BoxFormat, BoxRecord, type BoxSparse } from './shapes/box'
 import { boxSparseOf } from './box'
-import { type BoxListing, BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGetExpectation, Capacity, ListedBox, ListingAnswer, ReadAnswer, type StoredBox, StoredRevision, StoredVaultTok, VaultDelExpectation, type VaultReadResponse, VaultRecordExpectation } from './shapes/vault-db'
+import { type BoxListing, BoxDelExpectation, BoxDeletion, BoxExpectation, BoxGetExpectation, Capacity, ListedBox, ListingAnswer, type StoredBox, StoredRevision, type StoredVault, StoredVaultAnswer, StoredVaultTok, VaultDelExpectation, VaultRecordExpectation } from './shapes/vault-db'
 import type { VaultScope } from './shapes/scopes'
 import { TombstoneFormat, VaultDraft, VaultFormat, VaultRecord, VaultTombstone } from './shapes/vault'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
@@ -12,7 +12,7 @@ import * as Refusals from './refusals'
 import { isTombstone } from './expectations'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
-import { type Outcome, outcomeOf } from './outcome'
+import { type Outcome, asStorageTrouble, outcomeOf } from './outcome'
 import { byCodeUnit } from './text'
 
 // == [Options]: VaultDBOpts
@@ -32,6 +32,18 @@ export type VaultDBOpts = {
   logger?: VaultLogger | null | undefined
 }
 
+// --
+
+// == [Hook adapter]: adaptedHook
+
+/** `hook`, one `do*` method of an adapter called on the VaultDB handed first, as a verb calls it: its answer resolved, and a throw made storage trouble by {@link asStorageTrouble}. */
+const adaptedHook = <ArgsT extends unknown[], AnswerT>(hook: (...args: ArgsT) => Promise<AnswerT>) => async (...args: ArgsT): Promise<AnswerT> => {
+  try {
+    return await hook(...args)
+  } catch (err) {
+    throw asStorageTrouble(err)
+  }
+}
 // --
 
 /** Remote storage for vault records: extend it, and implement its `do*` methods against your backend.
@@ -57,7 +69,8 @@ export type VaultDBOpts = {
  *    and throws the refusal, as `valOf` does of an Outcome.
  *
  * Hand `super()` the host's {@link VaultDBOpts}. Never override the public verbs, but
- * `delDamagedVault` in an adapter that hands each call on to another VaultDB.
+ * `delDamagedVault` in an adapter that hands each call on to another VaultDB: `tryDelDamagedVault`,
+ * the form the package calls, derives from it.
  *
  * Every public verb is a try pair: `getVault` resolves its answer or throws its refusal, and
  * `tryGetVault` resolves the same as an {@link Outcome} and never rejects; {@link VaultDB.subscribe}
@@ -116,10 +129,26 @@ export abstract class VaultDB {
   abstract readonly maxNameBytes: number
   // --
 
-  // == [Constructor and logger]: #logger, constructor, logger
+  // == [Constructor, logger and hooks]: #logger, #hooks, constructor, logger
 
   /** The guarded logger this VaultDB was made with. */
   readonly #logger: VaultLogger
+
+  /** The `do*` hooks as the verbs call them, each adapted once by `adaptedHook` and handed the VaultDB first: its answer resolved, a throw that is no VaultError made `storage_unavailable`.
+   * `doSubscribe` is not among them: it answers at once, and `startedWatch` guards it.
+   */
+  // Static, and handed the instance: a host's store built over a VaultDB (`Object.create(vaultDB, { maxBoxes })`), or a Proxy of
+  // one, has no instance field of its own, and each hook is looked up on it as it is called, as `this.doGetVault(...)` would be.
+  static readonly #hooks = {
+    doGetVault:       adaptedHook((db: VaultDB, scope: VaultScope) => db.doGetVault(scope)),
+    doEnsureVault:    adaptedHook((db: VaultDB, draft: VaultDraft) => db.doEnsureVault(draft)),
+    doPutVaultRecord: adaptedHook((db: VaultDB, vaultRecord: VaultRecord, expected: VaultRecordExpectation) => db.doPutVaultRecord(vaultRecord, expected)),
+    doGetBox:         adaptedHook((db: VaultDB, scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) => db.doGetBox(scope, boxlabel, expected)),
+    doPutBox:         adaptedHook((db: VaultDB, scope: VaultScope, expected: BoxExpectation, box: BoxRecord) => db.doPutBox(scope, expected, box)),
+    doGetCapacity:    adaptedHook((db: VaultDB, scope: VaultScope) => db.doGetCapacity(scope)),
+    doDelBox:         adaptedHook((db: VaultDB, scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) => db.doDelBox(scope, boxlabel, expected)),
+    doDelVault:       adaptedHook((db: VaultDB, scope: VaultScope, expected: VaultDelExpectation) => db.doDelVault(scope, expected)),
+  }
 
   /** Settle the host's `logger` once, guarded, or the default logger when `opts` gives none.
    * Throws 'bad_option' for a `logger` that is not a VaultLogger. The base reads nothing else of
@@ -138,7 +167,7 @@ export abstract class VaultDB {
 
   // --
 
-  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultRecord, their try forms, readVault, ensuredVault
+  // == [Vault verbs]: getVault, ensureVault, getVaultRecords, ensureVaultRecords, putVaultRecord, their try forms, gottenVault, ensuredVault
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -156,7 +185,7 @@ export abstract class VaultDB {
    *   if (stored === null) { offerNewVault() }
    */
   getVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
-    return this.readVault(scope)
+    return this.gottenVault(scope)
   }
 
   /** The vault of `scope`, or null for none, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getVault}. */
@@ -192,13 +221,13 @@ export abstract class VaultDB {
    * parses its word on a damaged one.
    *
    * @example
-   *   const read = await vaultDB.getVaultRecords(scope)   // throws its refusal
-   *   if (read === null) { return null }
-   *   const { boxes, damagedBoxes, ...vault } = read
+   *   const got = await vaultDB.getVaultRecords(scope)   // throws its refusal
+   *   if (got === null) { return null }
+   *   const { boxes, damagedBoxes, ...vault } = got
    *   return { vault, boxes, damagedBoxes }   // what a server sends a browser's VaultDB
    */
   getVaultRecords(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
-    return this.readVault(scope)
+    return this.gottenVault(scope)
   }
 
   /** The vault of `scope` as a server relays it, as an {@link Outcome}: the non-throwing form of {@link VaultDB.getVaultRecords}. */
@@ -238,8 +267,8 @@ export abstract class VaultDB {
     if (outgoing.vault_tok !== expectation.vault_tok) {
       throw new VaultError('bad_record', "putVaultRecord replaces a vault's record within that vault: the vault record's vault_tok must be the expected one, as a vault_tok never changes.")
     }
-    const raw = await withStaleVaultRecordChecked(adapterAnswer(() => this.doPutVaultRecord(outgoing, expectation)), asked)
-    return checkWrittenVaultRecord(raw, outgoing)
+    const raw = await withStaleVaultRecordChecked(VaultDB.#hooks.doPutVaultRecord(this, outgoing, expectation), asked)
+    return checkPutVaultRecord(raw, outgoing)
   }
 
   /** The vault record as stored, as an {@link Outcome}: the non-throwing form of {@link VaultDB.putVaultRecord}. */
@@ -248,12 +277,12 @@ export abstract class VaultDB {
   }
 
   /** Read the vault of `scope` through `doGetVault`, its vault record and listing checked and frozen; null for none or a tombstone. */
-  private async readVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
+  private async gottenVault(scope: VaultScope): Promise<(VaultRecord & BoxListing) | null> {
     const asked = heldScope(this, scope)
-    const read = await adapterAnswer(() => this.doGetVault(asked))
-    const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
+    const answer = await VaultDB.#hooks.doGetVault(this, asked)
+    const raw = checkAnswer(StoredVaultAnswer, answer, 'a vault read').vault
     if (raw === null || raw === undefined || isTombstone(raw)) { return null }
-    return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(read) })
+    return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(answer) })
   }
 
   /** Ensure the vault of `draft` through `doEnsureVault`, once the draft is checked, handing it back as {@link VaultDB.getVault} does. */
@@ -261,9 +290,9 @@ export abstract class VaultDB {
     // A draft claims no counter, vault_epoch 0: the store sets it, and carries it on past a tombstone.
     const outgoing = checkOutgoing(VaultDraft, draft, 'novel vault record draft')
     const asked = heldScope(this, outgoing)
-    const read = await adapterAnswer(() => this.doEnsureVault(outgoing))
-    const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
-    return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(read) })
+    const answer = await VaultDB.#hooks.doEnsureVault(this, outgoing)
+    const raw = checkAnswer(StoredVaultAnswer, answer, 'a vault read').vault
+    return Object.freeze({ ...checkVaultRecord(raw, asked), ...checkedListing(answer) })
   }
   // --
 
@@ -283,7 +312,7 @@ export abstract class VaultDB {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, asked, boxlabel)
     const expectation = checkOutgoing(BoxGetExpectation, expected, 'box read expectation', 'read')
-    const raw = await adapterAnswer(() => this.doGetBox(asked, label, expectation))
+    const raw = await VaultDB.#hooks.doGetBox(this, asked, label, expectation)
     if (raw === null || raw === undefined) { return null }
     return checkStoredBox(raw, label)
   }
@@ -326,8 +355,8 @@ export abstract class VaultDB {
     if (recordBytes > this.maxRecordBytes) {
       throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
     }
-    const stored = await withMissChecked(adapterAnswer(() => this.doPutBox(asked, expectation, outgoing)), outgoing.boxlabel)
-    return checkWrittenBox(stored, outgoing)
+    const stored = await withMissChecked(VaultDB.#hooks.doPutBox(this, asked, expectation, outgoing), outgoing.boxlabel)
+    return checkPutBox(stored, outgoing)
   }
 
   /** The box as storage now holds it, as an {@link Outcome}: the non-throwing form of {@link VaultDB.putBox}. */
@@ -350,7 +379,7 @@ export abstract class VaultDB {
    */
   async getCapacity(scope: VaultScope): Promise<Capacity> {
     const asked = heldScope(this, scope)
-    const raw = await adapterAnswer(() => this.doGetCapacity(asked))
+    const raw = await VaultDB.#hooks.doGetCapacity(this, asked)
     return checkAnswer(Capacity, raw, 'a capacity reading')
   }
 
@@ -376,8 +405,8 @@ export abstract class VaultDB {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, asked, boxlabel)
     const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
-    const deletion = await adapterAnswer(() => this.doDelBox(asked, label, expectation))
-    if (deletion === null) { throw Refusals.staleWrite('del') }
+    const deletion = await VaultDB.#hooks.doDelBox(this, asked, label, expectation)
+    if (deletion === null) { throw Refusals.staleDel() }
     return checkAnswer(BoxDeletion, deletion, 'a deletion', 'landed')
   }
 
@@ -410,8 +439,8 @@ export abstract class VaultDB {
 
   /** Delete the vault of `scope` through `doDelVault`, resolving the tombstone it leaves, checked: `stale_write` when it removed nothing. */
   private async deletedVault(scope: VaultScope, expectation: VaultDelExpectation): Promise<VaultTombstone> {
-    const raw = await adapterAnswer(() => this.doDelVault(scope, expectation))
-    if (raw === null || raw === undefined) { throw Refusals.staleWrite('del') }
+    const raw = await VaultDB.#hooks.doDelVault(this, scope, expectation)
+    if (raw === null || raw === undefined) { throw Refusals.staleDel() }
     const tombstone = checkAnswer(VaultTombstone, raw, 'a vault deletion', 'landed')
     return verifyConsistent(tombstone, scope, { kind: 'corrupt_record', message: wrongAnswerSays('a vault deletion', 'landed') })
   }
@@ -439,8 +468,15 @@ export abstract class VaultDB {
    */
   async delDamagedVault(scope: VaultScope): Promise<VaultTombstone | null> {
     const asked = heldScope(this, scope)
-    const read = await readStoredVault(() => adapterAnswer(() => this.doGetVault(asked)))
-    const raw = checkAnswer(ReadAnswer, read, 'a vault read').vault
+    let answer: StoredVault
+    try {
+      answer = await VaultDB.#hooks.doGetVault(this, asked)
+    } catch (err) {
+      // A damaged_vault from the adapter itself, as a VaultDB handing its calls on to another meets, leaves the record, and so its vault_tok, out of reach.
+      if (isVaultError(err, 'damaged_vault')) { throw unnamedVaultRecord({ cause: err }) }
+      throw err
+    }
+    const raw = checkAnswer(StoredVaultAnswer, answer, 'a vault read').vault
     if (raw === null || raw === undefined || isTombstone(raw)) { return null }
     if (mayBeNewer(raw)) { throw newerVaultRecord() }
     if (isSoundVaultRecord(raw, asked)) {
@@ -527,14 +563,14 @@ export abstract class VaultDB {
    * is. No write may land between the reads: that is the whole of what this owes beyond them. An
    * adapter relaying a server's `getVaultRecords` answers what it was sent.
    */
-  protected abstract doGetVault(scope: VaultScope): Promise<VaultReadResponse>
+  protected abstract doGetVault(scope: VaultScope): Promise<StoredVault>
   /** Store `draft` if its scope holds no vault record, then read the vault as {@link VaultDB.doGetVault} does, all in one atomic step.
    * The vault record handed up is `draft`, or the one already there, untouched. Over a tombstone,
    * store `draft` with the tombstone's `vault_epoch`, and drop the tombstone in the same step:
    * `Expectations.newLifeOf` makes that record for a key-value backend. The boxes are of the vault
    * record handed up.
    */
-  protected abstract doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse>
+  protected abstract doEnsureVault(draft: VaultDraft): Promise<StoredVault>
   /** Replace the stored vault record with `vaultRecord` if, and only if, it has `expected.vault_tok` and `expected.gate_epoch`, resolving it as stored.
    * Store it with its `vault_epoch` the stored one plus one, whatever it carries, and resolve the
    * record read back in that same step. Otherwise write nothing, and throw
@@ -645,8 +681,8 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
  * Each list is sorted by boxlabel, and each entry frozen.
  *
  * @example
- *   protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
- *     const { vaultRow, boxRows } = await this.readVaultRows(scope)   // one transaction
+ *   protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+ *     const { vaultRow, boxRows } = await this.getVaultRows(scope)   // one transaction
  *     return { vault: vaultRow ?? null, ...splitStoredBoxes(boxRows.map((row) => ({ boxlabel: row.boxlabel, box: row }))) }
  *   }
  */
@@ -732,24 +768,12 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, withStaleVaultRecordChecked, unsaidVaultRecord, remade, boxStoredOf, invalidBox, callback, checked, checkOutgoing
+// == [Storage and listener guards]: withMissChecked, staleChecked, fullChecked, withStaleVaultRecordChecked, unsaidVaultRecord, remade, boxStoredOf, invalidBox, callback, checked, checkOutgoing
 
-/** An adapter's throw as a VaultError: a VaultError untouched, anything else `storage_unavailable`. */
-const asStorageTrouble = (err: unknown): VaultError => (isVaultError(err) ? err : Refusals.storageUnavailable(err))
-
-/** Call the adapter's `hook`, resolving its answer; a throw is made storage trouble by `asStorageTrouble`. */
-const adapterAnswer = async <AnswerT>(hook: () => Promise<AnswerT>): Promise<AnswerT> => {
+/** `putting`, a box write, with what its `stale_write` or `vault_full` says of storage checked by `staleChecked` or `fullChecked`. */
+const withMissChecked = async <ValT>(putting: Promise<ValT>, boxlabel: string): Promise<ValT> => {
   try {
-    return await hook()
-  } catch (err) {
-    throw asStorageTrouble(err)
-  }
-}
-
-/** `writing`, a box write, with what its `stale_write` or `vault_full` says of storage checked by `staleChecked` or `fullChecked`. */
-const withMissChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
-  try {
-    return await writing
+    return await putting
   } catch (err) {
     if (isVaultError(err, 'stale_write')) { throw staleChecked(err, boxlabel) }
     if (isVaultError(err, 'vault_full')) { throw fullChecked(err) }
@@ -775,13 +799,13 @@ const fullChecked = (err: VaultError): VaultError => {
   return remade(err, { capacity: capacity.data })
 }
 
-/** `writing`, an update of the vault record, its `stale_write`'s `vault_stored` checked as a read checks it.
- * A stored vault record that fails that check refuses as the read does: 'damaged_vault' or
+/** `putting`, an update of the vault record, its `stale_write`'s `vault_stored` checked as `getVault` checks a record.
+ * A stored vault record that fails that check refuses as `getVault` does: 'damaged_vault' or
  * 'newer_format'. A stale write that does not say what is stored refuses as `corrupt_record`.
  */
-const withStaleVaultRecordChecked = async <ValT>(writing: Promise<ValT>, scope: VaultScope): Promise<ValT> => {
+const withStaleVaultRecordChecked = async <ValT>(putting: Promise<ValT>, scope: VaultScope): Promise<ValT> => {
   try {
-    return await writing
+    return await putting
   } catch (err) {
     if (! isVaultError(err, 'stale_write')) { throw err }
     const said = err.meta ?? {}
@@ -837,7 +861,7 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodType<RecordT>, candidate: unk
 ))
 // --
 
-// == [Vault record checks]: checkVaultRecord, checkWrittenVaultRecord, damagedVaultRecord, damagedVaultRecordSays, unnamedVaultRecord, newerVaultRecord, mayBeNewer, readStoredVault, isSoundVaultRecord, others
+// == [Vault record checks]: checkVaultRecord, checkPutVaultRecord, damagedVaultRecord, damagedVaultRecordSays, unnamedVaultRecord, newerVaultRecord, mayBeNewer, isSoundVaultRecord, others
 
 /** A vault record read from storage for `scope`, once it passes its checks: 'newer_format' for a format a later version may write, 'damaged_vault' otherwise. */
 const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
@@ -848,10 +872,10 @@ const checkVaultRecord = (raw: unknown, scope: VaultScope): VaultRecord => {
   return verifyConsistent(vaultRecord, scope, { kind: 'damaged_vault', message: damagedVaultRecordSays('names a different app, user or vault than the one asked for') })
 }
 
-/** The vault record an adapter handed back as `written` landed: a vault record of its scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
-const checkWrittenVaultRecord = (raw: unknown, written: VaultRecord): VaultRecord => {
+/** The vault record an adapter handed back as `put` landed: a vault record of its scope, the same vault at the same `gate_epoch`; `corrupt_record` otherwise, quoting none of it. */
+const checkPutVaultRecord = (raw: unknown, put: VaultRecord): VaultRecord => {
   const stored = checkAnswer(VaultRecord, raw, 'an update of the vault record', 'landed')
-  const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = written
+  const { applabel, user_id, vaultlabel, vault_tok, gate_epoch } = put
   return verifyConsistent(stored, { applabel, user_id, vaultlabel, vault_tok, gate_epoch }, { kind: 'corrupt_record', message: wrongAnswerSays('an update of the vault record', 'landed') })
 }
 
@@ -877,16 +901,6 @@ const mayBeNewer = (raw: unknown): boolean => {
   return format !== undefined && format !== VaultFormat && format !== TombstoneFormat && ! OlderVaultRecordFormats.has(format)
 }
 
-/** Read the vault through `reading`; an adapter's own `damaged_vault`, from a VaultDB it hands on to, refuses as one too damaged to name, as its `vault_tok` is out of reach. */
-const readStoredVault = async (reading: () => Promise<VaultReadResponse>): Promise<VaultReadResponse> => {
-  try {
-    return await reading()
-  } catch (err) {
-    if (isVaultError(err, 'damaged_vault')) { throw unnamedVaultRecord({ cause: err }) }
-    throw err
-  }
-}
-
 /** True when `raw` reads back as the scope's vault record: what `getVault` would hand up rather than refuse. */
 const isSoundVaultRecord = (raw: unknown, scope: VaultScope): boolean => {
   try {
@@ -899,7 +913,7 @@ const isSoundVaultRecord = (raw: unknown, scope: VaultScope): boolean => {
 }
 // --
 
-// == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, wrongAnswerSays, jsonBytes
+// == [Box and answer checks]: checkStoredBox, damagedBox, checkPutBox, checkAnswer, wrongAnswer, wrongAnswerSays, jsonBytes
 
 /** A box read from storage, as `getBox` holds it: a box's shape, under the boxlabel it was asked for; 'damaged_box' otherwise. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
@@ -914,10 +928,10 @@ const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
  */
 const damagedBox = (said: string, opts?: ErrorOptions) => new VaultError('damaged_box', `That box's stored record ${said}, so it can't be read. It was left as it is; remove it, or store its whisper again over it.`, opts)
 
-/** The box an adapter handed back as `written` landed: a box's shape, under the boxlabel and at the revision written; `corrupt_record` otherwise, quoting neither. */
-const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
+/** The box an adapter handed back as `put` landed: a box's shape, under the boxlabel and at the revision put; `corrupt_record` otherwise, quoting neither. */
+const checkPutBox = (raw: unknown, put: BoxRecord): BoxRecord => {
   const box = checkAnswer(BoxRecord, raw, 'a box write', 'landed')
-  const { boxlabel, revision_tok } = written
+  const { boxlabel, revision_tok } = put
   return verifyConsistent(box, { boxlabel, revision_tok }, { kind: 'corrupt_record', message: wrongAnswerSays('a box write', 'landed') })
 }
 

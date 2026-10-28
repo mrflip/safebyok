@@ -10,7 +10,7 @@ import * as TH from '../../test-helpers'
 
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
-  for (const scopepath of deviceStore.scopepaths()) { deviceStore.erase(scopepath) }
+  for (const scopepath of deviceStore.scopepaths()) { deviceStore.del(scopepath) }
   await deviceDbInspector.wipe()
 })
 
@@ -24,7 +24,7 @@ describe("DeviceDBInspectionPanel", () => {
   })
 
   it("shows the fake auth's session beside it", () => {
-    deviceStore.write('session:safebyok_demo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
+    deviceStore.put('session:safebyok_demo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
     render(<DeviceDBInspectionPanel />)
     expect(screen.getByText(/"userlabel":"margo"/)).to.not.be.null
   })

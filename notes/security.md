@@ -83,7 +83,7 @@ added or folded into through the subagent, and no other entry changes.
   a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
   field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
   its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
-  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `ReadAnswer`, `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
+  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `StoredVaultAnswer` (amended 2026-10-28 (db_hooks): named `ReadAnswer` when this was written), `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
   `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
   `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
@@ -140,7 +140,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
   `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
-  adapter adds one line and never judges (amended 2026-10-27 (tidy): `VaultReadResponse.vault` is typed `unknown`, as `StoredBox.box` is, so an
+  adapter adds one line and never judges (amended 2026-10-27 (tidy): `StoredVault.vault` (amended 2026-10-28 (db_hooks): named `VaultReadResponse` when this was written) is typed `unknown`, as `StoredBox.box` is, so an
   adapter hands rows up uncast; the base class checks them as before). A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
   `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
   naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision
@@ -443,7 +443,7 @@ added or folded into through the subagent, and no other entry changes.
   public; the headline and the holder sentences above no longer hold.** The getter is removed and the Lease is the Vault
   object's own again: a host reaches no Lease, and so cannot decipher a box ciphertext through one; what an app reads
   of it is `vault.askPassphraseAt` (the deadline, from the snapshot) and `vault.leaseMillis`. The package reads the
-  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseReader(vault, read)`, called once
+  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseGetter(vault, getLease)`, called once
   in the Vault constructor with the first registration winning, and `heldLeaseOf(vault)`, used by `Box.seal`,
   `box.extractWhisper()` and a damaged lease dropping itself; exported from no entry point. The walk test above now
   finds no Lease either. Each copy of the package has its own registry, so a Vault object from one copy reads as locked
@@ -467,7 +467,7 @@ added or folded into through the subagent, and no other entry changes.
   (`packages/safebyok/src/bank.ts`); the old one is never repaired (the Coach: "same scope, other vault_tok is a new
   life: reload").
   A gone Vault object writes no lease: `#grantLease` demands that the object is not gone before `putLease`, and
-  `#takeOwnWrite` takes nothing into the gone object's picture, so a change to the wayins that lands as the vault is
+  `#takeOwnPut` takes nothing into the gone object's picture, so a change to the wayins that lands as the vault is
   deleted leaves no fresh lease row in the DeviceDB (`packages/safebyok/src/vault.ts`).
   Amended 2026-10-23 (proving_gate): **`proving.grantLease()` makes two demands before `putLease`**: on the proving
   (its header still carried by the gate, its gating not landed: refusal `gating_landed`) and on the stored lease
@@ -518,7 +518,7 @@ added or folded into through the subagent, and no other entry changes.
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
   Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
-  The refresh (`#judgeRead` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  The refresh (`#judgeStored` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
   device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
   epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
   `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
@@ -612,8 +612,8 @@ added or folded into through the subagent, and no other entry changes.
   would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
   Amended 2026-10-27 (device_db_class): **one conditional discard now serves both records and both stores,
   and `DeviceDB` is an abstract base class, as `VaultDB` is, not an interface.** The base class parses every lease and device record a store hands
-  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnreadable(scopepath, isReadable)`
-  hook, which deletes the row only if `isReadable` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
+  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnparsed(scopepath, isSound)`
+  hook, which deletes the row only if `isSound` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
   host's own `DeviceDB` discard alike. The base class files each row under its Scopepath and calls the store's `do*` hook before awaiting anything,
   so a store sees one scope's calls in the order the vault made them. The race it closes: `idbDeviceDB.getDeviceRecord` deleted an unreadable device
   record unconditionally, in a transaction that began only after its read resolved, so a `raiseDeviceRecord` made after that read but landing before
@@ -978,7 +978,7 @@ added or folded into through the subagent, and no other entry changes.
   refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
   (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
   declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
-  (`src/outcome.ts`), the `VaultDB` base's `asStorageTrouble` (`src/vault-db.ts`), the vault's
+  (`src/outcome.ts`), `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
   bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
   lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` and `crossing`). a_fixes
   made it also recognize a `VaultError` of another copy of safebyok loaded beside this one (an ESM
@@ -1470,7 +1470,7 @@ added or folded into through the subagent, and no other entry changes.
   argument) and refuses `vault_mismatch` for none, a tombstone, or another life. The vault maps it to `vault_gone`
   and marks its picture stale so the next hello reads storage, rather than opening a box of a vault made anew
   elsewhere and calling it `damaged_box`.
-  Amended 2026-10-22 (bank): **a box read refused `vault_mismatch` makes the Vault object gone** (`#boxReadRefusal`,
+  Amended 2026-10-22 (bank): **a box read refused `vault_mismatch` makes the Vault object gone** (`#boxGetRefusal`,
   `packages/safebyok/src/vault.ts`; `vault_gone`, every later call the same, the bank's entry refused), where it
   stood marked stale for the next hello to discover. The old object is not repaired; the bank births another when
   asked. `invalid_box` (misuse) is a box the base class would not build,
@@ -1669,7 +1669,7 @@ added or folded into through the subagent, and no other entry changes.
   `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
-  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnreadable`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
+  scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnparsed`, only while it still will not read; `deviceRecordFor` still checks the scope. `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
   failure as a lost record. Amended 2026-10-21 (trust_lines): the mark keeps `vault_id` and the highest
   `unlock_epoch` only (`safebyok-mark-v5`); `vault_key_epoch` is removed, so the refusal of a lower one,
   the wayin check on it and the rotation case below no longer exist, and older vault props of the same
@@ -2068,7 +2068,7 @@ added or folded into through the subagent, and no other entry changes.
   throw, and the one catch is `outcomeOf` (`src/outcome.ts`). Amended 2026-10-27 (outcome_default):
   `outcomeOf`'s default for a throw that is no `VaultError` is now `unexpected_error` (family `misuse`,
   never retried), the throw still its `cause`; it was `storage_unavailable`. An adapter's throw is still
-  made `storage_unavailable` by `asStorageTrouble` (`src/vault-db.ts`, through `adapterAnswer`), and a caller
+  made `storage_unavailable` by `asStorageTrouble` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): applied once per hook call by the `VaultDB` hook table, `VaultDB.#hooks` / `adaptedHook` in `src/vault-db.ts`, which replaced `adapterAnswer`), and a caller
   wrapping a call out to storage passes `Refusals.storageUnavailable` for the retryable kind. `outcomeOf` is
   exported for an app wrapping its own calls: whatever such a body throws that is not a `VaultError` is kept,
   as it came, as the `cause`, so an app must not throw secret material from a body it wraps. `unexpectedError`
@@ -2119,8 +2119,8 @@ added or folded into through the subagent, and no other entry changes.
   `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
   `VaultDB` that forgot to unwrap another's answer, `valOf`) was refused as `bad_option`; before, a
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
-  Amended 2026-10-27 (outcome_default): `adapterAnswer` (`src/vault-db.ts`) no longer refuses an
-  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble
+  Amended 2026-10-27 (outcome_default): `adapterAnswer` (`src/vault-db.ts`; amended 2026-10-28 (db_hooks): gone, each verb now calls its hook through the table `VaultDB.#hooks` / `adaptedHook`) no longer refuses an
+  `Outcome`-shaped answer as `bad_option`; it is only a try/catch passing a throw on as storage trouble (`asStorageTrouble`, `src/outcome.ts`)
   (the check, `isOutcomeShaped`, has since been removed). A hook that resolves a still-wrapped `Outcome` now meets
   the ordinary answer checks: `corrupt_record` on every verb (for a write or deletion, whether it landed is
   not known) and `damaged_box` from `getBox`; `tests/vault-db.test.ts` pins that no wrapped answer is taken
@@ -2280,7 +2280,7 @@ added or folded into through the subagent, and no other entry changes.
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
   against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
   lease (amended 2026-10-27 (device_db_class): the `DeviceDB` base class parses each lease record a store hands back and discards one that fails
-  through the store's `doDelUnreadable`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
+  through the store's `doDelUnparsed`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
   (Bound since: the sweep entry below.)

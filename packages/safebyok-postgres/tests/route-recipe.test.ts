@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDamaged, BoxDelExpectation, VaultReadResponse, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary, VaultDraft } from 'safebyok'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDamaged, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, WayinSummary, VaultDraft } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -114,8 +114,8 @@ class RouteVaultDB extends VaultDB {
   }
 
   // A vault crosses as the server's VaultDB split it, which this VaultDB's base class checks again.
-  protected async doGetVault(scope: VaultScope) { return await this.call('getVault', scope) as VaultReadResponse }
-  protected async doEnsureVault(draft: VaultDraft) { return await this.call('ensureVault', draft) as VaultReadResponse }
+  protected async doGetVault(scope: VaultScope) { return await this.call('getVault', scope) as StoredVault }
+  protected async doEnsureVault(draft: VaultDraft) { return await this.call('ensureVault', draft) as StoredVault }
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation) { return this.call('putVaultRecord', vaultRecord, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return this.call('getBox', scope, boxlabel, expected) }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }

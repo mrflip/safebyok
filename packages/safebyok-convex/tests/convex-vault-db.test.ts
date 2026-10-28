@@ -134,8 +134,9 @@ const UnknownAnswers = [
 /** Answers a box read might meet from a component of another version: none this client knows. */
 const UnknownReadAnswers = [
   [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
-  [{ read: true },                                           'a read carrying no box_stored, not even null'],
-  [{ read: false, refusalkind: 'stale_write' },              'a refusal of a kind no read makes'],
+  [{ got: true },                                            'a read carrying no box_stored, not even null'],
+  [{ got: false, refusalkind: 'stale_write' },               'a refusal of a kind no read makes'],
+  [{ read: true, box_stored: null },                         'the answer of a component that still says read, not got'],
 ] as const
 
 describe("convexVaultDB, answered by a component of another version", () => {

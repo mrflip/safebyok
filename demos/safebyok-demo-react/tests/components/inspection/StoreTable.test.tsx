@@ -48,14 +48,14 @@ describe("StoreTable", () => {
 describe("useStoreRows", () => {
   it("snaps a store's rows sorted by ckey, flavored by what they hold, and follows its writes", () => {
     const store = memoryStore()
-    store.write('session:acme', '{"userlabel":"margo"}')
-    store.write('account:acme', '{"whisper_ciphered":{}}')
+    store.put('session:acme', '{"userlabel":"margo"}')
+    store.put('account:acme', '{"whisper_ciphered":{}}')
     const { result } = renderHook(() => useStoreRows(store))
     expect(result.current).to.deep.equal([
       { ckey: 'account:acme', text: '{"whisper_ciphered":{}}', flavor: 'ciphered' },
       { ckey: 'session:acme', text: '{"userlabel":"margo"}',   flavor: 'plain' },
     ])
-    act(() => { store.erase('account:acme') })
+    act(() => { store.del('account:acme') })
     expect(result.current.map((row) => row.ckey)).to.deep.equal(['session:acme'])
   })
 })
@@ -96,8 +96,8 @@ describe("useIdbRows", () => {
 describe("the wipe buttons", () => {
   it("WipeStoreButton erases every row of its store, once the user confirms", () => {
     const store = memoryStore()
-    store.write('session:acme', '{}')
-    store.write('account:acme', '{}')
+    store.put('session:acme', '{}')
+    store.put('account:acme', '{}')
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     render(<WipeStoreButton store={store} storeTitle="the fake auth accounts" />)
     fireEvent.click(screen.getByRole('button', { name: 'wipe' }))
@@ -107,7 +107,7 @@ describe("the wipe buttons", () => {
 
   it("WipeStoreButton leaves the store be when the user thinks better of it", () => {
     const store = memoryStore()
-    store.write('session:acme', '{}')
+    store.put('session:acme', '{}')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     render(<WipeStoreButton store={store} storeTitle="this device's session" />)
     fireEvent.click(screen.getByRole('button', { name: 'wipe' }))

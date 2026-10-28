@@ -25,7 +25,7 @@ export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 
 /** `err` as the outcome of a call that was refused.
  *
- * @example bad(Refusals.staleWrite('del'))  // { ok: false, err }
+ * @example bad(Refusals.staleDel())  // { ok: false, err }
  */
 export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
 
@@ -50,6 +50,17 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
     return bad(isVaultError(err) ? err : otherwise(err))
   }
 }
+
+/** `thrown`, what a call out to storage threw, as the refusal a storage verb throws: a VaultError as it came, anything else `storage_unavailable` with `thrown` its cause.
+ * The line every `VaultDB` verb applies to what its adapter's `do*` hook threw, for a server or an
+ * adapter that relays a VaultDB's throw onward: a retry may help, where `outcomeOf`'s
+ * `unexpected_error` says it will not. A `storage_unavailable` it makes carries safebyok's own
+ * message, so a driver's words stay in the cause (`Refusals.storageUnavailable`).
+ *
+ * @example
+ *   try { return await vaultDB.getBox(scope, boxlabel, expected) } catch (err) { throw crossing(asStorageTrouble(err)) }   // a server relaying a verb: a refusal as it came, a driver's Error as storage_unavailable
+ */
+export const asStorageTrouble = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.storageUnavailable(thrown))
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *

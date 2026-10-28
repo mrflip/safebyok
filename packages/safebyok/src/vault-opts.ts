@@ -121,14 +121,14 @@ const requestThrewRefusal = (thrown: unknown): VaultError => Sanitizer.refusalFo
 
 /** Refuse 'bad_option' for a clock, its shape checked, that throws when read once, or reads outside 1981 to 2255. */
 const checkClockReads = (clock: Clock): void => {
-  let reading: unknown
+  let now: unknown
   try {
-    reading = clock.now()
+    now = clock.now()
   } catch (err) {
     // The host's own error rides along as the cause, unquoted.
     throw new VaultError('bad_option', "The clock passed to Bank.make threw when read: its now() must return epoch milliseconds, as Date.now() does. The clock's own error is this error's cause.", { cause: err })
   }
-  if (! clockReading.safeParse(reading).success) {
+  if (! clockReading.safeParse(now).success) {
     throw new VaultError('bad_option', "The clock passed to Bank.make read a time outside 1981 to 2255: its now() must return epoch milliseconds, as Date.now() does, not seconds or microseconds.")
   }
 }

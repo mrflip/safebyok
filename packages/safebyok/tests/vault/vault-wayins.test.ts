@@ -19,7 +19,7 @@ import { makeWorld, storedVaultRecordOf, vaultWithPasskey,SevenDaysMillis, u1Vau
 // == [Passphrase]: countingDeriver, putWayin with a passphrase, the passphrase
 
 /** Everything in the store behind `world`'s vaultDB, as text: what a call that writes nothing leaves exactly as it was. */
-const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.read(scopepath)]))
+const storeDumpOf = (world: ReturnType<typeof makeWorld>): string => JSON.stringify(world.dbStore.scopepaths().map((scopepath) => [scopepath, world.dbStore.get(scopepath)]))
 
 /** `opts` without the vault's names: what Bank.make takes. */
 const bankOptsOf = ({ vaultlabel: _vaultlabel, ...bankOpts }: TH.BornVaultOpts) => bankOpts
@@ -318,7 +318,7 @@ describe("the vault's passphrase", () => {
     const vault = await world.open()
     await TH.unlock(vault, 'a very memorable passphrase')
     await TH.putWayin(vault, 'a very memorable passphrase', 'another memorable passphrase')
-    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.get(scopepath)).join('\n')
     expect(everything).to.not.include('memorable')
   })
 
@@ -327,9 +327,9 @@ describe("the vault's passphrase", () => {
     const { gate: _gate, ...rest } = TH.vaultRecordOf('u1')
     const oldText = JSON.stringify({ ...rest, format: 'safebyok-vault-v3', key_deriver_label: 'test_digest_v0', passphrase_salt_b64: 'c2FsdA', vault_key_passphrase_wrapped: TH.fakeCiphered('old') })
     const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-    world.dbStore.write(vaultScopepath, oldText)
+    world.dbStore.put(vaultScopepath, oldText)
     await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(world.dbStore.read(vaultScopepath)).to.eq(oldText)
+    expect(world.dbStore.get(vaultScopepath)).to.eq(oldText)
   })
 
   it("vault record in the list shape, safebyok-vault-v4, reads as damaged, and is left as it is", async () => {
@@ -337,9 +337,9 @@ describe("the vault's passphrase", () => {
     const { gate: { passphrase }, ...rest } = TH.vaultRecordOf('u1')
     const listed = { ...passphrase, wayin_id: 'wayin-one', wayinlabel: 'passphrase' }
     const oldText = JSON.stringify({ ...rest, format: 'safebyok-vault-v4', wayins: [listed] })
-    world.dbStore.write(u1VaultScopepath, oldText)
+    world.dbStore.put(u1VaultScopepath, oldText)
     await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(oldText)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(oldText)
   })
 })
 // --
@@ -604,7 +604,7 @@ describe("the vault's passkey", () => {
 
   it("the backend holds no passkey's answer, only its credential and salt (Contract: putWayin, Guarantees)", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.get(scopepath)).join('\n')
     expect(everything).to.not.include(toB64(laptop.prfBytes))
     expect(everything).to.include(laptop.credential_id)
     expect(everything).to.include(laptop.prf_salt_b64)
@@ -612,10 +612,10 @@ describe("the vault's passkey", () => {
 
   it("removal is not revocation: a copy of the vault record from before still opens with the removed passkey (Contract: delWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const kept = world.dbStore.read(u1VaultScopepath) ?? ''
+    const kept = world.dbStore.get(u1VaultScopepath) ?? ''
     await TH.delWayin(vault, 'pw')
     const copy = makeWorld()
-    copy.dbStore.write(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, kept)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -1068,7 +1068,7 @@ const Changes: readonly (readonly [string, (vault: Vault) => Promise<unknown>])[
 ]
 
 /** The vault record as the backend holds it, as text: what a refused change leaves exactly as it was. */
-const storedText = (world: ReturnType<typeof makeWorld>) => world.dbStore.read(u1VaultScopepath)
+const storedText = (world: ReturnType<typeof makeWorld>) => world.dbStore.get(u1VaultScopepath)
 
 describe("a change to the ways in, refused, changes nothing stored (Contract: putWayin and delWayin, Refuses)", () => {
   afterEach(() => { vi.restoreAllMocks() })
@@ -1141,7 +1141,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
 
     it(`${callTitle} refuses damaged_vault when the vault record it reads fails its checks`, async () => {
       const { world, vault } = await vaultWithPasskey()
-      world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
+      world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
       const before = storedText(world)
       await TH.expectRefusal(change(vault), 'damaged_vault')
       expect(storedText(world)).to.eq(before)
@@ -1149,7 +1149,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
 
     it(`${callTitle} refuses newer_format when the vault record it reads is of a form a newer safebyok writes`, async () => {
       const { world, vault } = await vaultWithPasskey()
-      world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v9' }))
+      world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), format: 'safebyok-vault-v9' }))
       const before = storedText(world)
       await TH.expectRefusal(change(vault), 'newer_format')
       expect(storedText(world)).to.eq(before)
@@ -1160,7 +1160,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
       const older = storedText(world) ?? ''
       await TH.putWayin(vault, 'pw', 'pw newer')
       await TH.putWayin(vault, 'pw newer', 'pw')
-      world.dbStore.write(u1VaultScopepath, older)
+      world.dbStore.put(u1VaultScopepath, older)
       let refused: unknown = null
       try {
         await change(vault)
@@ -1211,7 +1211,7 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
     const kept = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', 'pw two')
     const copy = makeWorld()
-    copy.dbStore.write(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, kept)
     const thief = await copy.open()
     await TH.unlock(thief, 'pw')
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -1222,7 +1222,7 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
     const kept = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', await TH.passkeyOf('phone'))
     const copy = makeWorld()
-    copy.dbStore.write(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, kept)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')

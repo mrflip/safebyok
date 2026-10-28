@@ -6,7 +6,7 @@ import type { VaultError } from '../../src/errors'
 import type { RequestCleartext } from '../../src/gating'
 import { valOf } from '../../src/outcome'
 import { Vault } from '../../src/vault'
-import { heldLeaseOf, registerLeaseReader } from '../../src/held-lease'
+import { heldLeaseOf, registerLeaseGetter } from '../../src/held-lease'
 import { Lease } from '../../src/lease'
 import { MaxWhisperBytes, MaxBoxes } from '../../src/shapes/bank-opts'
 import { VaultScope } from '../../src/shapes/scopes'
@@ -201,9 +201,9 @@ describe("putBox, the box it seals and stores", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
     const planted = JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: { note: 'planted' } })
-    world.dbStore.write(u1BoxScopepath('anthropic'), planted)
+    world.dbStore.put(u1BoxScopepath('anthropic'), planted)
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'mended' } }), 'damaged_box')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(planted)
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.eq(planted)
   })
 
   it("reads nothing for a whole store, writing over the revision the listing in hand shows and keeping its registered_at", async () => {
@@ -269,7 +269,7 @@ describe("vault.delBox, what it removed", () => {
     await there.putBox({ boxlabel: 'anthropic' }, 'sk-theirs')
     const { outcome } = await vault.delBox('anthropic')
     expect(outcome).to.eq('deleted_other')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
   })
 })
 
@@ -286,7 +286,7 @@ describe("the lease a vault holds", () => {
   it("keeps the reader the Vault object registered as it was made: a second registration changes nothing", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    registerLeaseReader(vault, () => null)
+    registerLeaseGetter(vault, () => null)
     expect(heldLeaseOf(vault)).to.not.be.null
   })
 
@@ -378,7 +378,7 @@ describe("the times a vault keeps", () => {
     const storedAt = world.clock.now()
     const row = storedRowOf(world, 'anthropic') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify(row))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify(row))
     world.advance(60_000)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ registered_at: storedAt + 60_000, written_at: storedAt + 60_000, sidecar: {} })
@@ -389,14 +389,14 @@ describe("the times a vault keeps", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: { note: 'INJECTED' } }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: { note: 'INJECTED' } }))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-2')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-2')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({})
     expect(storedRowOf(world, 'anthropic')['sidecar']).to.deep.equal({})
     // A sidecar given with the store is written as given, over the planted one.
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: { note: 'INJECTED' } }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: { note: 'INJECTED' } }))
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'mended' } }, 'sk-fake-3')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'mended' })
   })
@@ -406,7 +406,7 @@ describe("the times a vault keeps", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const planted = Date.UTC(2001, 0, 1)
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), registered_at: planted }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), registered_at: planted }))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     world.advance(60_000)
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -419,8 +419,8 @@ describe("the times a vault keeps", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'respaced', sidecar: { note: 'work' } }, 'sk-fake-one')
     await vault.putBox({ boxlabel: 'reordered', sidecar: { alpha: 1, beta: { gamma: 3, delta: [2, 1] } } }, 'sk-fake-two')
-    world.dbStore.write(u1BoxScopepath('respaced'), JSON.stringify(storedRowOf(world, 'respaced'), null, 2))
-    world.dbStore.write(u1BoxScopepath('reordered'), JSON.stringify({ ...storedRowOf(world, 'reordered'), sidecar: { beta: { delta: [2, 1], gamma: 3 }, alpha: 1 } }))
+    world.dbStore.put(u1BoxScopepath('respaced'), JSON.stringify(storedRowOf(world, 'respaced'), null, 2))
+    world.dbStore.put(u1BoxScopepath('reordered'), JSON.stringify({ ...storedRowOf(world, 'reordered'), sidecar: { beta: { delta: [2, 1], gamma: 3 }, alpha: 1 } }))
     const fresh = await world.openUnlocked('pw')
     expect(fresh.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['reordered', 'respaced'])
     expect(fresh.getSnapshot().damagedBoxes).to.deep.equal([])
@@ -460,13 +460,13 @@ describe("the times a vault keeps", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const box = JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: world.clock.now() + 0.5 })
-    world.dbStore.write(u1BoxScopepath('anthropic'), box)
+    world.dbStore.put(u1BoxScopepath('anthropic'), box)
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(box)
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.eq(box)
     const vaultRecord = JSON.stringify({ ...storedVaultRecordOf(world), registered_at: world.clock.now() + 0.5 })
-    world.dbStore.write(u1VaultScopepath, vaultRecord)
+    world.dbStore.put(u1VaultScopepath, vaultRecord)
     await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(vaultRecord)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(vaultRecord)
   })
 
   it("never quotes the boxlabel of a damaged box it refuses, which may be a key pasted by mistake", async () => {
@@ -476,10 +476,10 @@ describe("the times a vault keeps", () => {
     await vault.putBox({ boxlabel: pasted }, 'sk-fake')
     await vault.putBox({ boxlabel: 'other' }, 'sk-fake-two')
     const row = storedRowOf(world, pasted)
-    world.dbStore.write(u1BoxScopepath(pasted), JSON.stringify({ ...row, written_at: world.clock.now() + 0.5 }))
+    world.dbStore.put(u1BoxScopepath(pasted), JSON.stringify({ ...row, written_at: world.clock.now() + 0.5 }))
     const storedDamaged = await TH.expectRefusal(vault.getWhisper(pasted), 'damaged_box')
     // The other box's ciphertext, moved under this boxlabel: it will not open here.
-    world.dbStore.write(u1BoxScopepath(pasted), JSON.stringify({ ...row, whisper_ciphered: storedRowOf(world, 'other')['whisper_ciphered'] }))
+    world.dbStore.put(u1BoxScopepath(pasted), JSON.stringify({ ...row, whisper_ciphered: storedRowOf(world, 'other')['whisper_ciphered'] }))
     const unopened = await TH.expectRefusal(vault.getWhisper(pasted), 'damaged_box')
     expect(TH.thrownText(storedDamaged) + TH.thrownText(unopened)).to.not.include('sk_ant_fake')
   })
@@ -490,9 +490,9 @@ describe("the times a vault keeps", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const { registered_at: _registered, written_at: _written, ...row } = storedRowOf(world, 'anthropic')
     const olden = JSON.stringify({ ...row, created_at: '2026-10-14T00:00:00.000Z', updated_at: '2026-10-14T00:00:00.000Z' })
-    world.dbStore.write(u1BoxScopepath('anthropic'), olden)
+    world.dbStore.put(u1BoxScopepath('anthropic'), olden)
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.eq(olden)
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.eq(olden)
   })
 
   it("refuses stored vault record from before its time was renamed, leaving it as it is", async () => {
@@ -500,9 +500,9 @@ describe("the times a vault keeps", () => {
     await world.openUnlocked('pw')
     const { registered_at: _registered, ...row } = storedVaultRecordOf(world)
     const olden = JSON.stringify({ ...row, created_at: '2026-10-14T00:00:00.000Z', updated_at: '2026-10-14T00:00:00.000Z' })
-    world.dbStore.write(u1VaultScopepath, olden)
+    world.dbStore.put(u1VaultScopepath, olden)
     await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(olden)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(olden)
   })
 })
 // --
@@ -526,7 +526,7 @@ describe("the sidecar", () => {
     expect(storedRowOf(world, 'omitted')['sidecar']).to.deep.equal({})
     expect(storedRowOf(world, 'emptied')['sidecar']).to.deep.equal({})
     const { sidecar: _gone, ...sidecarless } = storedRowOf(world, 'omitted')
-    world.dbStore.write(u1BoxScopepath('omitted'), JSON.stringify(sidecarless))
+    world.dbStore.put(u1BoxScopepath('omitted'), JSON.stringify(sidecarless))
     const fresh = await world.open()
     expect(fresh.getSnapshot().damagedBoxes[0]).to.deep.include({ boxlabel: 'omitted', damage: 'damaged' })
     expect(await fresh.getWhisper('emptied')).to.eq('sk-fake-two')
@@ -985,7 +985,7 @@ describe("the vault's names", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     for (const planted of ['OpenAI: work', 'key \u{D83D}', 'bell\u{7}']) {
-      world.dbStore.write(u1PlantedScopepath(planted), JSON.stringify({ ...storedRowOf(world, 'anthropic'), boxlabel: planted }))
+      world.dbStore.put(u1PlantedScopepath(planted), JSON.stringify({ ...storedRowOf(world, 'anthropic'), boxlabel: planted }))
     }
     const fresh = await world.openUnlocked('pw')
     expect(boxlabelsOf(fresh)).to.deep.equal(['anthropic'])
@@ -1119,7 +1119,7 @@ describe("vault.getBox", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedBoxOf(world), sidecar: { note: 'planted' } }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedBoxOf(world), sidecar: { note: 'planted' } }))
     const box = await gotBox(vault)
     expect(box.sidecar).to.deep.equal({ note: 'planted' })
     await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
@@ -1276,7 +1276,7 @@ describe("box.extractWhisper, through a vault", () => {
     const told: VaultError[] = []
     const vault = await world.openUnlocked('pw', { onBadNews: (news) => { told.push(news) } })
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'work account' } }, 'sk-fake')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedBoxOf(world), sidecar: { note: 'planted' } }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedBoxOf(world), sidecar: { note: 'planted' } }))
     const err = await TH.expectBad(vault.tryGetWhisper('anthropic'), 'damaged_box')
     expect(told).to.deep.equal([err])
     expect(err.message).to.not.include('sk-fake')

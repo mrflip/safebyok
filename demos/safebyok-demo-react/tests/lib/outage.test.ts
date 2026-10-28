@@ -56,7 +56,7 @@ describe("OutageVaultDB, while up", () => {
     await TH.ensureGated(vaultDB, vaultRecord)
     await TH.expectingGood(vaultDB).tryPutBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // a record that names its boxlabel but will not read back as a box
-    store.write(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
+    store.put(Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic' }), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), written_at: 'later' }))
     const read = await TH.expectingGood(vaultDB).tryGetVault(scope)
     expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
     expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
@@ -70,7 +70,7 @@ const damagedOver = async () => {
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await TH.ensureGated(vaultDB, vaultRecord)
   await TH.expectingGood(vaultDB).tryPutBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
-  store.write(Scopepath.vault(scope), JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
+  store.put(Scopepath.vault(scope), JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 

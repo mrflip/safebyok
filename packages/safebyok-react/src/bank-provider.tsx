@@ -88,9 +88,9 @@ const useVaultFor = (hookname: string, vaultlabel: string): Vault | null => {
 /** {@link useListedVault}'s work, for `hookname`: the bank, and its listing of the vault, asked for when the bank lists none, and misuse thrown. */
 const useListed = (hookname: string, vaultlabel: string): { bank: Bank | null, bankVault: BankVault | null } => {
   const { bank } = useProvided(hookname)
-  const readListed = useCallback(() => (bank === null ? null : bank.bankVaultOf({ vaultlabel })), [bank, vaultlabel])
+  const getListed = useCallback(() => (bank === null ? null : bank.bankVaultOf({ vaultlabel })), [bank, vaultlabel])
   // The server renders with no bank, as the client's first render does: nothing listed on either.
-  const bankVault = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, readListed, getNothing)
+  const bankVault = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, getListed, getNothing)
   const unasked = bank !== null && bankVault === null
   useEffect(() => {
     if (! unasked) { return }

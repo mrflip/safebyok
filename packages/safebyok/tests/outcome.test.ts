@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good, outcomeOf, valOf } from '../src/outcome'
+import { type Outcome, asStorageTrouble, bad, good, outcomeOf, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -14,7 +14,7 @@ describe("good and bad", () => {
   })
 
   it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
-    const err = Refusals.staleWrite('del')
+    const err = Refusals.staleDel()
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
@@ -106,5 +106,27 @@ describe("valOf", () => {
     expect(valOf(good('vault record'))).to.eq('vault record')
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => valOf(bad(refusal))).to.throw(refusal)
+  })
+})
+
+describe("asStorageTrouble", () => {
+  it("hands back a VaultError as the same object, and makes storage_unavailable of anything else, the throw its cause, as its example shows", () => {
+    const refusal = new VaultError('vault_mismatch', 'Another vault is stored there.')
+    expect(asStorageTrouble(refusal)).to.eq(refusal)
+    const dropped = new Error('connection terminated unexpectedly')
+    const trouble = asStorageTrouble(dropped)
+    expect(trouble.refusalkind).to.eq('storage_unavailable')
+    expect(trouble.cause).to.eq(dropped)
+    expect(trouble.message).to.not.include('terminated')
+  })
+
+  it("makes storage_unavailable of a thrown string, or of nothing, with a cause that is never null, as Refusals.storageUnavailable does", () => {
+    for (const thrown of ['socket closed', undefined, null]) {
+      const trouble = asStorageTrouble(thrown)
+      expect(trouble.refusalkind).to.eq('storage_unavailable')
+      expect(trouble.message).to.eq(Refusals.storageUnavailable(thrown).message)
+      expect(trouble.cause).to.not.be.null
+      expect(trouble.cause).to.not.be.undefined
+    }
   })
 })

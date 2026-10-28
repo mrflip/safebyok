@@ -50,7 +50,7 @@ describe("memoryDeviceDB", () => {
       protected doRaiseDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelAll(): Promise<void> { return Promise.resolve() }
-      protected doDelUnreadable(): Promise<void> { return Promise.resolve() }
+      protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
     }
     const thrown = await TH.expectRefusal(new DownDeviceDB().getLease(TH.scopeOf('u1')), 'storage_unavailable')
     expect(thrown.cause).to.eq(shelf)
@@ -72,7 +72,7 @@ describe("memoryDeviceDB", () => {
       protected doRaiseDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelAll(): Promise<void> { return Promise.resolve() }
-      protected doDelUnreadable(): Promise<void> { return Promise.resolve() }
+      protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
     }
     await TH.expectRefusal(new RefusingDeviceDB().getLease(TH.scopeOf('u1')), 'not_permitted')
     await TH.expectBad(new RefusingDeviceDB().tryGetLease(TH.scopeOf('u1')), 'not_permitted')
@@ -183,7 +183,7 @@ class ScriptedDeviceDB extends DeviceDB {
   protected doRaiseDeviceRecord(...args: unknown[]) { return this.#heard('doRaiseDeviceRecord', args) as Promise<void> }
   protected doDelDeviceRecord(...args: unknown[]) { return this.#heard('doDelDeviceRecord', args) as Promise<void> }
   protected doDelAll(...args: unknown[]) { return this.#heard('doDelAll', args) as Promise<void> }
-  protected doDelUnreadable(...args: unknown[]) { return this.#heard('doDelUnreadable', args) as Promise<void> }
+  protected doDelUnparsed(...args: unknown[]) { return this.#heard('doDelUnparsed', args) as Promise<void> }
 
   #heard(hookname: string, args: unknown[]): Promise<unknown> {
     this.calls.push(hookname)
@@ -225,17 +225,17 @@ describe("DeviceDB, the base class", () => {
 
   for (const [verb, row] of UnreadableCases) {
     it(`reads a row that fails its check through ${verb} as none, and has the store discard it only while it still fails`, async () => {
-      let isReadable: ((candidate: unknown) => boolean) | undefined
+      let isSound: ((candidate: unknown) => boolean) | undefined
       const deviceDB = new ScriptedDeviceDB((hookname, args) => {
-        if (hookname === 'doDelUnreadable') { isReadable = args[1] as (candidate: unknown) => boolean }
-        return hookname === 'doDelUnreadable' ? undefined : row
+        if (hookname === 'doDelUnparsed') { isSound = args[1] as (candidate: unknown) => boolean }
+        return hookname === 'doDelUnparsed' ? undefined : row
       })
       const found: Promise<Outcome<unknown>> = verb === 'getLease' ? deviceDB.tryGetLease(TH.scopeOf('u1')) : deviceDB.tryGetDeviceRecord(TH.scopeOf('u1'))
       expect(await TH.expectGood(found)).to.be.null
-      expect(deviceDB.calls.at(-1)).to.eq('doDelUnreadable')
-      expect(isReadable?.(row)).to.be.false
-      expect(isReadable?.(undefined)).to.be.false
-      expect(isReadable?.(verb === 'getLease' ? await TH.leaseOf('u1') : TH.deviceRecordOf('u1'))).to.be.true
+      expect(deviceDB.calls.at(-1)).to.eq('doDelUnparsed')
+      expect(isSound?.(row)).to.be.false
+      expect(isSound?.(undefined)).to.be.false
+      expect(isSound?.(verb === 'getLease' ? await TH.leaseOf('u1') : TH.deviceRecordOf('u1'))).to.be.true
     })
   }
 

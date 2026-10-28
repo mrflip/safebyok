@@ -8,6 +8,7 @@ import * as Scopepath from './scopepath'
 import * as CX from './shapes/scopes'
 import { verifyConsistent } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
+import * as Refusals from './refusals'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
@@ -214,14 +215,16 @@ export class Bank {
    *
    * @example await bank.hello()   // bank.lifecycle: 'ready'
    */
-  async hello(): Promise<Bank> { return valOf(await this.tryHello()) }
+  async hello(): Promise<Bank> {
+    try {
+      valOf(await this.#initialize())
+      return this
+    } catch (err) { throw refusalOf(err) }
+  }
 
   /** Load the libraries the vaults share, as an {@link Outcome}: the non-throwing form of {@link Bank.hello}. */
   async tryHello(): Promise<Outcome<Bank>> {
-    return outcomeOf(async () => {
-      valOf(await this.#initialize())
-      return this
-    })
+    return outcomeOf(() => this.hello())
   }
   // --
 
@@ -252,14 +255,16 @@ export class Bank {
    * @example const vault = await bank.ensureVault({ vaultlabel: 'main' })
    * @example const vault = await bank.ensureVault({ vaultlabel: 'work' }, { vaultDB: workVaultDB })   // a vault stored elsewhere
    */
-  async ensureVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Vault> { return valOf(await this.tryEnsureVault(bag, opts)) }
+  async ensureVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Vault> {
+    try {
+      const parts = this.#vaultPartsFor(bag, opts)
+      return await this.#ensureEntry(parts)
+    } catch (err) { throw refusalOf(err) }
+  }
 
   /** The Vault object for the vault `bag` names, as an {@link Outcome}: the non-throwing form of {@link Bank.ensureVault}. */
   async tryEnsureVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
-    return outcomeOf(async () => {
-      const parts = this.#vaultPartsFor(bag, opts)
-      return this.#ensureEntry(parts)
-    })
+    return outcomeOf(() => this.ensureVault(bag, opts))
   }
 
   /** Let the vault `bag` names go, and birth it anew: a Vault object of what storage holds now, as {@link Bank.ensureVault} says.
@@ -267,15 +272,17 @@ export class Bank {
    *
    * @example const vault = await bank.reopenVault({ vaultlabel: 'main' })   // after 'vault_gone', say
    */
-  async reopenVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Vault> { return valOf(await this.tryReopenVault(bag, opts)) }
+  async reopenVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Vault> {
+    try {
+      const parts = this.#vaultPartsFor(bag, opts)
+      this.#letGoOf(Scopepath.vault(parts))
+      return await this.#ensureEntry(parts)
+    } catch (err) { throw refusalOf(err) }
+  }
 
   /** Let the vault go and birth it anew, as an {@link Outcome}: the non-throwing form of {@link Bank.reopenVault}. */
   async tryReopenVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<Vault>> {
-    return outcomeOf(async () => {
-      const parts = this.#vaultPartsFor(bag, opts)
-      this.#letGoOf(Scopepath.vault(parts))
-      return this.#ensureEntry(parts)
-    })
+    return outcomeOf(() => this.reopenVault(bag, opts))
   }
 
   /** Let the vault `bag` names go: its Vault object is gone, every call on it refusing 'vault_gone', and it leaves the bank's listing.
@@ -321,11 +328,8 @@ export class Bank {
    *     await bank.ensureVault({ vaultlabel: 'main' })
    *   }
    */
-  async clearCachedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<void> { valOf(await this.tryClearCachedVault(bag, opts)) }
-
-  /** Forget what this device keeps of the vault, as an {@link Outcome}: the non-throwing form of {@link Bank.clearCachedVault}. */
-  async tryClearCachedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
-    return outcomeOf(async () => {
+  async clearCachedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<void> {
+    try {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
       valOf(await parts.deviceDB.tryDelDeviceRecord(scope))
@@ -333,7 +337,12 @@ export class Bank {
       // Let go once both are erased, so an ask the letting go brings -- a mounted useVault's --
       // reads neither.
       this.#letGoOf(Scopepath.vault(scope))
-    })
+    } catch (err) { throw refusalOf(err) }
+  }
+
+  /** Forget what this device keeps of the vault, as an {@link Outcome}: the non-throwing form of {@link Bank.clearCachedVault}. */
+  async tryClearCachedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
+    return outcomeOf(() => this.clearCachedVault(bag, opts))
   }
 
   /** Delete the vault `bag` names, whose birth was refused 'damaged_vault' -- its vault record, every box, and this device's lease of it -- and let it go: the way out of 'damaged_vault'.
@@ -356,11 +365,8 @@ export class Bank {
    *     await bank.ensureVault({ vaultlabel: 'main' })
    *   }
    */
-  async delDamagedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<void> { valOf(await this.tryDelDamagedVault(bag, opts)) }
-
-  /** Delete a vault refused 'damaged_vault', as an {@link Outcome}: the non-throwing form of {@link Bank.delDamagedVault}. */
-  async tryDelDamagedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
-    return outcomeOf(async () => {
+  async delDamagedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<void> {
+    try {
       const scope = this.#vaultScopeOf(bag)
       const parts = vaultPartsOf(this.#parts, scope, opts)
       const vaultScopepath = Scopepath.vault(scope)
@@ -373,7 +379,12 @@ export class Bank {
         throw err
       }
       this.#letGoOf(vaultScopepath)
-    })
+    } catch (err) { throw refusalOf(err) }
+  }
+
+  /** Delete a vault refused 'damaged_vault', as an {@link Outcome}: the non-throwing form of {@link Bank.delDamagedVault}. */
+  async tryDelDamagedVault(bag: VaultBag, opts?: BankVaultOpts): Promise<Outcome<void>> {
+    return outcomeOf(() => this.delDamagedVault(bag, opts))
   }
   // --
 
@@ -551,10 +562,10 @@ export class Bank {
     const { deviceDB } = parts
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
-    const readAt = Math.floor(parts.clock.now())
+    const refreshedAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.tryGetDeviceRecord(scope)))
     this.#demandHeld(vaultScopepath, entry)
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, readAt)), KeptLease.tryRead(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
+    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), KeptLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
@@ -563,7 +574,7 @@ export class Bank {
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.tryRaiseDeviceRecord(raising))) ?? raising
     this.#demandHeld(vaultScopepath, entry)
-    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 
@@ -625,7 +636,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, refusalOf, goneError, behindError, otherStoresError, otherScopeSays
 
 /** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
 const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
@@ -661,6 +672,9 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   const { applabel, user_id, vaultlabel } = scope
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
+
+/** The refusal `thrown` makes, for a public call to throw: a VaultError as it came, else 'unexpected_error', the throw its cause. */
+const refusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown))
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 

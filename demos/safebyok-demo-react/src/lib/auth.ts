@@ -56,12 +56,12 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     return reading.success ? { user_id: randomId(), userlabel, registered_at: reading.data } : null
   }
 
-  let session: Session | null = readSession()
+  let session: Session | null = getSession()
   const listeners = new Set<() => void>()
   const bump = () => { listeners.forEach((listener) => { listener() }) }
 
-  function readSession(): Session | null {
-    const text = deviceStore.read(sessionCkey)
+  function getSession(): Session | null {
+    const text = deviceStore.get(sessionCkey)
     if (text === null) { return null }
     try {
       const parsed: unknown = JSON.parse(text)
@@ -69,7 +69,7 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
         return parsed as Session
       }
     } catch { /* fall through: a mangled session reads as signed out */ }
-    deviceStore.erase(sessionCkey)
+    deviceStore.del(sessionCkey)
     return null
   }
 
@@ -87,29 +87,29 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
         return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }
       const ckey = accountCkey(checked.data)
-      const existing = dbStore.read(ckey)
+      const existing = dbStore.get(ckey)
       const account = existing === null ? newAccount(checked.data) : JSON.parse(existing) as Account
       if (account === null) {
         return Promise.reject(new Error("The demo's clock read no time between 1981 and 2255, in epoch milliseconds: check what it was handed."))
       }
-      if (existing === null) { dbStore.write(ckey, JSON.stringify(account)) }
+      if (existing === null) { dbStore.put(ckey, JSON.stringify(account)) }
       session = { user_id: account.user_id, userlabel: account.userlabel }
-      deviceStore.write(sessionCkey, JSON.stringify(session))
+      deviceStore.put(sessionCkey, JSON.stringify(session))
       bump()
       return Promise.resolve(session)
     },
 
     signOut: () => {
       session = null
-      deviceStore.erase(sessionCkey)
+      deviceStore.del(sessionCkey)
       bump()
     },
 
     deleteAccount: () => {
       if (session === null) { return Promise.resolve() }
-      dbStore.erase(accountCkey(session.userlabel))
+      dbStore.del(accountCkey(session.userlabel))
       session = null
-      deviceStore.erase(sessionCkey)
+      deviceStore.del(sessionCkey)
       bump()
       return Promise.resolve()
     },

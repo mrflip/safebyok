@@ -234,7 +234,7 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
  * @param vault - The Vault object to read into: anything with a `refresh()`.
  *
  * @example
- *   world.dbStore.write(boxCkey, spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
+ *   world.dbStore.put(boxCkey, spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
  *   await TH.readAfresh(vault)              // the snapshot shows it
  */
 export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Promise<void> => {

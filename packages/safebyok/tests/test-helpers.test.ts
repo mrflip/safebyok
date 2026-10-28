@@ -16,7 +16,7 @@ import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
 import { PasskeySaltBytes, VaultRecord, type VaultDraft } from '../src/shapes/vault'
 import { VaultScope } from '../src/shapes/scopes'
-import type { Capacity, VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, VaultReadResponse } from '../src/shapes/vault-db'
+import type { Capacity, VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault } from '../src/shapes/vault-db'
 import type { DeviceRecord, LeaseRecord } from '../src/shapes/device'
 import * as Refusals from '../src/refusals'
 import * as Scopepath from '../src/scopepath'
@@ -1142,8 +1142,8 @@ class HostDeviceDB extends DeviceDB {
   }
   protected async doDelDeviceRecord(deviceScopepath: string) { await this.#touched(() => this.#rows.delete(deviceScopepath)) }
   protected async doDelAll() { await this.#touched(() => { this.#rows.clear() }) }
-  protected async doDelUnreadable(scopepath: string, isReadable: (row: unknown) => boolean) {
-    await this.#touched(() => { if (! isReadable(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) } })
+  protected async doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
+    await this.#touched(() => { if (! isSound(this.#rows.get(scopepath))) { this.#rows.delete(scopepath) } })
   }
 
   /** What `touch` does to the map, in one synchronous step, or the throw of a store withheld. */
@@ -1389,16 +1389,16 @@ class RoundTripVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes ?? Infinity
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<VaultReadResponse> {
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
     if (! this.opts.readsApart) { return await this.backend.atomically((rows) => vaultIn(rows, scope, this.opts.listsToLimit ? this.maxBoxes : Infinity)) }
     const vault = await this.backend.atomically((rows) => rows.get(Scopepath.vault(scope)) ?? null)
     return { vault, ...splitStoredBoxes(await this.backend.atomically((rows) => boxesIn(rows, scope))) }
   }
 
   // What it hands back is the vault as the step that checked, or that wrote, left it.
-  protected async doEnsureVault(draft: VaultDraft): Promise<VaultReadResponse> {
+  protected async doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     const vaultScopepath = Scopepath.vault(draft)
-    const seen: { vault: VaultReadResponse } = { vault: { vault: null, boxes: [], damagedBoxes: [] } }
+    const seen: { vault: StoredVault } = { vault: { vault: null, boxes: [], damagedBoxes: [] } }
     const absent = (rows: Rows) => {
       seen.vault = vaultIn(rows, draft)
       return Expectations.newLifeOf(draft, rows.get(vaultScopepath)) !== null
@@ -1522,7 +1522,7 @@ class RoundTripVaultDB extends VaultDB {
 const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string }) => Expectations.vaultMeets(rows.get(Scopepath.vault(scope)), expected)
 
 /** The vault of `scope` in `rows`: its vault record, or null, and its boxes. */
-const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): VaultReadResponse => (
+const vaultIn = (rows: Rows, scope: VaultScope, listedUpTo = Infinity): StoredVault => (
   { vault: rows.get(Scopepath.vault(scope)) ?? null, ...splitStoredBoxes(boxesIn(rows, scope).slice(0, listedUpTo)) }
 )
 
@@ -1682,8 +1682,8 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
     const ringNow = () => { for (const listener of listeners) { listener() } }
     const earlyStore: StringStore = {
       ...store,
-      write:     (ckey, text) => { ringNow(); store.write(ckey, text) },
-      erase:     (ckey) => { ringNow(); store.erase(ckey) },
+      put:       (ckey, text) => { ringNow(); store.put(ckey, text) },
+      del:       (ckey) => { ringNow(); store.del(ckey) },
       subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     }
     const checks = TH.vaultDBTimingChecks(() => localVaultDB({ store: earlyStore }), { pushes: true })

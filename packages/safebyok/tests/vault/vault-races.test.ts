@@ -742,7 +742,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const row = storedRowOf(world, 'anthropic')
     const wrapped = row['whisper_ciphered'] as { cipher_iv_b64: string, ciphertext_b64: string }
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, whisper_ciphered: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, whisper_ciphered: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }))
     await TH.wakeupAtNextTick()
     const getVaultRecord = vi.spyOn(world.vaultDB, 'tryGetVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
@@ -757,7 +757,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const row = storedRowOf(world, 'anthropic')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
     const getVaultRecord = vi.spyOn(deafDB, 'tryGetVault').mockResolvedValue(bad(down))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
@@ -1002,7 +1002,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a store over a damaged box, a sound one written over it meanwhile elsewhere, never deletes theirs: its write is refused as stale, and the next store writes over theirs", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await TH.readAfresh(here)
     expect(here.getSnapshot().damagedBoxes[0]?.boxlabel).to.eq('anthropic')
     const theirs = { revisionTok: '' }
@@ -1030,7 +1030,7 @@ describe("versioned updates: two devices writing at once", () => {
       const read = valOf(await getVault(...args))
       return good(read === null ? null : { ...read, boxes: [], damagedBoxes: [] })
     })
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await TH.readAfresh(here)
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
     expect(here.getSnapshot().damagedBoxes).to.have.lengthOf(0)
@@ -1079,7 +1079,7 @@ describe("versioned updates: two devices writing at once", () => {
     const getBox = vi.spyOn(hereDB, 'tryGetBox')
     await TH.expectRefusal(here.delBox('anthropic'), 'absent_box')
     expect(getBox).not.toHaveBeenCalled()
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
   })
 
   it("a deletion names the revision its listing shows, and warns of nothing when that is what it deleted", async () => {
@@ -1102,7 +1102,7 @@ describe("versioned updates: two devices writing at once", () => {
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
     })
     await here.delBox('anthropic')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
     const told = world.logged.filter((heard) => heard.story?.['call'] === 'delBox')
     expect(told).to.have.lengthOf(1)
@@ -1117,7 +1117,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a deletion over a damaged box written over meanwhile elsewhere deletes theirs all the same, and warns that the box shown was a damaged one, with damaged: true, naming neither", async () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
-    world.dbStore.write(u1BoxScopepath('anthropic'), '{"not": json')
+    world.dbStore.put(u1BoxScopepath('anthropic'), '{"not": json')
     await Promise.all([TH.readAfresh(here), TH.readAfresh(there)])
     expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
     expect(there.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: null, damage: 'damaged' }])
@@ -1129,7 +1129,7 @@ describe("versioned updates: two devices writing at once", () => {
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
     })
     await here.delBox('anthropic')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
     // Theirs deleted the damaged record it was shown, and so warned of nothing; this one, of theirs.
     const told = world.logged.filter((heard) => heard.story?.['call'] === 'delBox')
@@ -1144,7 +1144,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a deletion over a box listed damaged with a readable revision, written over meanwhile elsewhere, deletes theirs all the same, and warns of the damaged box shown with damaged: true, naming neither", async () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     const damagedRevision = String(storedRowOf(world, 'anthropic')['revision_tok'])
     await Promise.all([TH.readAfresh(here), TH.readAfresh(there)])
     expect(here.getSnapshot().damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: damagedRevision, damage: 'damaged' }])
@@ -1157,7 +1157,7 @@ describe("versioned updates: two devices writing at once", () => {
     const delBox = vi.spyOn(hereDB, 'tryDelBox')
     await here.delBox('anthropic')
     expect(delBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: damagedRevision })
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
     const told = world.logged.filter((heard) => heard.story?.['call'] === 'delBox')
     expect(told).to.have.lengthOf(1)
     expect(told[0]).to.deep.include({ level: 'warn' })
@@ -1237,7 +1237,7 @@ describe("refreshes, one at a time", () => {
       }
     })
     // Each write rings the storage watch, which asks for a refresh.
-    for (const ii of [1, 2, 3]) { world.dbStore.write('elsewhere', String(ii)) }
+    for (const ii of [1, 2, 3]) { world.dbStore.put('elsewhere', String(ii)) }
     await vi.waitFor(() => { expect(reads).toHaveBeenCalledTimes(1) })
     await vi.waitFor(() => { expect(tally.inFlight).to.eq(0) })
     await TH.wakeupAtNextTick()
@@ -1251,17 +1251,17 @@ describe("refreshes, one at a time", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().freshness).to.eq('timely')
-    const sound = world.dbStore.read(u1VaultScopepath) ?? ''
-    world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v6"}')
+    const sound = world.dbStore.get(u1VaultScopepath) ?? ''
+    world.dbStore.put(u1VaultScopepath, '{"format":"safebyok-vault-v6"}')
     await TH.wakeupAtNextTick()
     for (const ii of [1, 2]) {
-      world.dbStore.write('elsewhere', String(ii))
+      world.dbStore.put('elsewhere', String(ii))
       await TH.wakeupAtNextTick()
     }
     expect(vault.getSnapshot().freshness).to.eq('refused')
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }]])
-    world.dbStore.write(u1VaultScopepath, sound)
+    world.dbStore.put(u1VaultScopepath, sound)
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().freshness).to.eq('timely')
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'log'])

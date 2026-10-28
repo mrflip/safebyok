@@ -116,8 +116,8 @@ export const madeWorld = async () => {
   TH.closeVault(made)
   const spoil = () => {
     const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-    const vaultRecord = JSON.parse(store.read(vaultScopepath) ?? 'null') as object
-    store.write(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
+    const vaultRecord = JSON.parse(store.get(vaultScopepath) ?? 'null') as object
+    store.put(vaultScopepath, JSON.stringify({ ...vaultRecord, gate_epoch: 'one' }))
   }
   return { store, vaultDB, deviceDB, props, spoil }
 }

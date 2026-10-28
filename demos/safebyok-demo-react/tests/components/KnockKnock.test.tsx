@@ -178,8 +178,8 @@ describe("KnockKnock", () => {
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const boxScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic_api_key' })
     // A record with no sidecar: damaged, but its record still names its revision.
-    const row = JSON.parse(store.read(boxScopepath) ?? '{}') as object
-    store.write(boxScopepath, JSON.stringify({ ...row, sidecar: undefined }))
+    const row = JSON.parse(store.get(boxScopepath) ?? '{}') as object
+    store.put(boxScopepath, JSON.stringify({ ...row, sidecar: undefined }))
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/stored Anthropic key is damaged/)
     fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
@@ -200,8 +200,8 @@ describe("KnockKnock", () => {
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const boxScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic_api_key' })
-    const row = JSON.parse(store.read(boxScopepath) ?? '{}') as object
-    store.write(boxScopepath, JSON.stringify({ ...row, format: 'safebyok-box-v99' }))
+    const row = JSON.parse(store.get(boxScopepath) ?? '{}') as object
+    store.put(boxScopepath, JSON.stringify({ ...row, format: 'safebyok-box-v99' }))
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/written by a newer version of this app: update the app/)
     expect(screen.queryByRole('button', { name: 'replace it' })).to.be.null
@@ -213,14 +213,14 @@ describe("KnockKnock", () => {
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const boxScopepath = Scopepath.box({ ...TH.scopeOf('u1'), boxlabel: 'anthropic_api_key' })
-    store.write(boxScopepath, '{"not": json')
+    store.put(boxScopepath, '{"not": json')
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/stored Anthropic key is damaged/)
     expect(screen.queryByRole('button', { name: 'replace it' })).to.be.null
     fireEvent.click(screen.getByRole('button', { name: 'remove it' }))
     await TH.answerPassphraseDialog()
     fireEvent.click(await screen.findByRole('button', { name: 'add your key' }))
-    expect(store.read(boxScopepath)).to.be.null
+    expect(store.get(boxScopepath)).to.be.null
   })
 
   it("shows a refused save beside the key form, asking for no passphrase first: here, a key over the vault's limit", async () => {

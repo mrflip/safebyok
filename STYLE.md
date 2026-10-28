@@ -90,8 +90,8 @@ spreads a narrower: `export const WayinKindVals = [...] as const`,
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
 `VaultTombstone`, `VaultSnapshot`; never a bare `Stamp`. A sparse thing is `-Sparse`
 (`BoxSparse`), never `-Listing`, which reads as the list or what holds it, nor `-Listed`: a sparse
-shape turns up well beyond listings. A response is named for the operation's family, not a
-moment: `VaultReadResponse`.
+shape turns up well beyond listings. What an adapter hands up unchecked is `Stored-` and what it
+holds (`StoredVault`, `StoredBox`): named for what storage holds, not for the call that read it.
 
 **The stamp is the bound fields.** Say *stamp* for the fields a thing's cryptography is bound to,
 where you would write "the bound fields", "what the tag authenticates" or "the binding".
@@ -477,7 +477,7 @@ the scope.
 * **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
   `gate_epoch` names the gate it was granted under, as a foreign key would.
 * **What one atomic step reads travels together**, its halves apart until checked, so damaged
-  data cannot collide with its own fields: `{ vault, boxes }` (`VaultReadResponse`). Checked, it
+  data cannot collide with its own fields: `{ vault, boxes }` (`StoredVault`). Checked, it
   is the thing it describes, written out where it is used: a vault's record and its box listing
   are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
 
@@ -622,7 +622,7 @@ rows with it.
 * **Name every reach across a seam**: storage, a decryption, the user, a timer, an injected
   interface, a public call it goes through. One sentence with `{@link}`s: `Reads {@link
   DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` Private members too, down to the
-  private call that holds the reach, named in backticks (`Reads the box through #readBox`).
+  private call that holds the reach, named in backticks (`Gets the box through #getBox`).
   Never the order of steps.
 * **Say what a member does and when to call it, never who calls it.** A list of callers, or of
   what each does with the result, belongs to those callers and goes stale. A rule its callers
@@ -697,7 +697,7 @@ After, and renamed from `#storedBase`, as the line showed the name was wrong:
 
 ```ts
 /** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
- * Reads through `#readBox`, and decrypts the whisper under the lease in hand. The write then
+ * Gets through `#getBox`, and decrypts the whisper under the lease in hand. The put then
  * lands only over the revision read.
  */
 async #fillFromStored(boxlabel: string, ...)

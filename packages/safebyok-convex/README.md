@@ -82,7 +82,7 @@ mistake for the first request.
   `meta.capacity`. The limits are the component's, not your app's or the client's to set.
 * **Reads from another vault.** A `getBox` carries the `vault_tok` of the vault its reader
   holds the key for, and reads the box only while that vault record is stored, in the same query.
-  Otherwise it resolves `{ read: false, refusalkind: 'vault_mismatch' }`, reading nothing more:
+  Otherwise it resolves `{ got: false, refusalkind: 'vault_mismatch' }`, reading nothing more:
   the vault was deleted, or made anew, since the reader read it.
 * **One version, both ends.** A client meeting a `getBox` or `putBox` answer in a shape it does not know --
   a component deployed from another version of this package -- refuses with kind
@@ -232,7 +232,7 @@ the core's own records, scopes and expectations.
 | `getVault`                | query    | `{ ...scope }`                                                              | `{ vault, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order, for the client to split with `splitStoredBoxes`; or null |
 | `ensureVault`             | mutation | `{ draft }`, gateless vault record                                           | `{ vault, boxes }` as stored afterwards: the draft, or another device's, with its boxes |
 | `putVaultRecord`          | mutation | `{ vaultRecord, expected: { vault_tok, gate_epoch } }`                      | `{ landed: true, vault_stored }`, the vault record as stored (its `vault_epoch` one up) if written; else `{ landed: false, vault_stored }`, the stored vault record or null |
-| `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ read: true, box_stored }`, the `BoxRecord` or null, if the vault is the one expected; else `{ read: false, refusalkind: 'vault_mismatch' }` |
+| `getBox`                  | query    | `{ ...scope, boxlabel, expected: { vault_tok } }`                           | `{ got: true, box_stored }`, the `BoxRecord` or null, if the vault is the one expected; else `{ got: false, refusalkind: 'vault_mismatch' }` |
 | `putBox`               | mutation | `{ ...scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the stored box (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ ...scope }`                                                              | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
 | `delBox`               | mutation | `{ ...scope, boxlabel, expected: { vault_tok, revision_tok } }`             | `{ outcome }` if the vault is the one expected -- `deleted`, `deleted_other` or `absent` -- null if not |

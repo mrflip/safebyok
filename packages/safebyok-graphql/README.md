@@ -105,9 +105,13 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, user_i
   when it opened. To refuse a signed-in user by a rule of your own, throw
   `Refusals.notPermitted('...')` (from `safebyok`) here: it crosses as it is, kind and message,
   and locks nothing; a `VaultError` of kind `identity_revoked` crosses likewise, and locks the
-  vault, so throw it only for a user your app knows is gone. Anything else it throws is your
-  server's setup gone wrong, and crosses as `bad_option` saying only that: its own message stays
-  on your server, as the cause. Let the VaultDB, not `vaultDBFor`, refuse a request signed out.
+  vault, so throw it only for a user your app knows is gone. Every `VaultError` it throws crosses
+  as it is, a `bad_option` from a misconfigured `postgresVaultDB` among them. Anything else it
+  throws is your server's setup gone wrong, a bug, and crosses as `unexpected_error` carrying the
+  thrown error's message, so the diagnostic reaches you in the browser. It reaches every browser,
+  not only yours: throw nothing there whose message names a credential or a connection string.
+  What was thrown stays on your server, as the cause. Let the VaultDB, not `vaultDBFor`, refuse a
+  request signed out.
 * **Who may reach a vault** is the VaultDB's to say. `postgresVaultDB`, made for the signed-in
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
