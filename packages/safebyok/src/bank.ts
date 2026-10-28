@@ -2,13 +2,12 @@ import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag, 
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
-import { type Outcome, good, outcomeOf, valOf } from './outcome'
+import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
 import * as CX from './shapes/scopes'
 import { verifyConsistent } from './checks/validator'
 import * as RefusalPolicy from './refusal-policy'
-import * as Refusals from './refusals'
 import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
 import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
@@ -636,7 +635,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, refusalOf, goneError, behindError, otherStoresError, otherScopeSays
+// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
 
 /** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
 const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
@@ -672,9 +671,6 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   const { applabel, user_id, vaultlabel } = scope
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
-
-/** The refusal `thrown` makes, for a public call to throw: a VaultError as it came, else 'unexpected_error', the throw its cause. */
-const refusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : Refusals.unexpectedError(thrown))
 
 const goneError = () => new VaultError('vault_gone', 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).')
 
