@@ -91,6 +91,7 @@ prefix names the part of the package the commit is about, never the kind of chan
 | `docs`    | `README.md`, `PROCESS.md`, `STYLE.md`, `notes/`, `CLAUDE.md` and other directives to agents   |
 | `demo`    | the playground apps under `demos/`                                                                                                     |
 | `plan`    | `whiteboard/` plans and `human/` entries                                                                                               |
+| `style`   | the `style-reviewer` agent's commits: its fixes of STYLE.md's hand-kept mechanical rules, one per rule family, wherever in the repository they fall |
 | `rel`     | the Version PR's one commit, made by the release workflow: version bumps, CHANGELOG entries, spent changesets. Never typed by hand       |
 | `tests`   | tests and fixtures, when the tests themselves are the work                                                                             |
 
