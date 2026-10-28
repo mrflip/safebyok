@@ -1,6 +1,6 @@
 # Thread 26: a dialog hidden by Activity, and the unmount gap (2026-10-28)
 
-Branch `20261028-activity_mount`, PR #PR, on main. Justify: green (root 289, core 3500 / 37
+Branch `20261028-activity_mount`, PR [#350](https://github.com/mrflip/safebyok/pull/350), on main. Justify: green (root 289, core 3500 / 37
 skipped, react 322, indexeddb 167 / 11, postgres 322 / 15, convex 375 / 9, graphql 345 / 15,
 fastkey 49, demo 230 / 17, e2e 107 / 116).
 
@@ -67,3 +67,7 @@ flag cleared a task late at unmount. The Coach: ordinary React, nothing in the c
     default-lane commit run in a Scheduler task after the commit's microtasks. Inside `act` the
     gap cannot be seen, which is why the gap test drives a bare `createRoot` with
     `IS_REACT_ACT_ENVIRONMENT` off.
+
+* **For the Coach**:
+  * **Suspense now waits as Activity does** (open on the PR): a dialog a Suspense boundary hides
+    meets what settled once it shows again, not while hidden. Same outcome, later. Rec: keep.
