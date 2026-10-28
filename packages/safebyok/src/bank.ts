@@ -180,7 +180,7 @@ export class Bank {
    * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
    */
   demandConsistentWith(thing: BankBag): void {
-    CX.bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScopeSays })
+    CX.bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScope })
   }
   // --
 
@@ -433,7 +433,7 @@ export class Bank {
 
   /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise, the comparison {@link Bank.demandConsistentWith} makes. */
   #vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: Phrases.VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: Phrases.otherScopeSays })
+    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: Phrases.VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: Phrases.otherScope })
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
 
@@ -667,9 +667,9 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 
-const goneError = () => new VaultError('vault_gone', Phrases.GoneWhileOpening)
+const goneError = () => new VaultError('vault_gone', Phrases.VaultGoneWhileOpening)
 
-const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStores)
+const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStoresThanHeld)
 
-const behindError = () => new VaultError('vault_behind', Phrases.BehindOnOpen)
+const behindError = () => new VaultError('vault_behind', Phrases.VaultBehindWhileOpening)
 // --
