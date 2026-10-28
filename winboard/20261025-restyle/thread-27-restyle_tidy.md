@@ -15,8 +15,8 @@ The tidy after #322. The Coach approved every item. Each item is one commit, in 
     has the new row. `callback` joins the in-package validators held to the no-quoting test.
   * **3. The Shape suffix** (`6e2620ca`): `localVaultDBOptsShape` is now `localVaultDBOpts`, with a
     changeset line. STYLE.md *Naming* now says a validator takes no `Shape` suffix. The five public
-    checks of a host's code are the exception. A module-private validator follows the rule where
-    its plain name is free. Module-private: `madeShape` became `made`, since nothing named `made`
+    checks of a host's code are the exception. An in-package validator follows the rule where
+    its plain name is free. In-package: `madeShape` became `made`, since nothing named `made`
     shares a scope with it (box.ts reaches it as `BX.made.parse(made)`). Both `listenerShape`s
     (idb.ts, string-store.ts) keep the suffix under the exception, because each sits beside the
     `listener` it checks. `Phrases.leaseHoursShape` and the other `Phrases.*Shape` are sentences,
@@ -50,6 +50,16 @@ The tidy after #322. The Coach approved every item. Each item is one commit, in 
     `import { Validators }` comes out of the rename as `Validators.boxRecord`, and step 5 turns
     it into `Safebyok.x` with one perl line. `node --check` passes. The script was **not** run
     against a pre-#322 tree.
+* **Review round** (2026-10-28): the reviewer's five commits (`4895f9e1` to `a7b4c58d`): the
+  [Limits] banner names ClockReading; the changeset says `localVaultDBOptsShape` is gone with no
+  alias and the type exports are additions; STYLE.md's HX row indented; host-code.ts's doc block
+  covers keyDeriverShape's field checks; the type-export test retitled. Then, at the orchestrator's
+  word: #322's unreleased changeset no longer lists `localVaultDBOptsShape` among the names kept;
+  STYLE.md's Shape paragraph says "in-package", not "module-private" (`BX.made` is exported from
+  shapes/box.ts). Minor findings left: `Clock` and `wallClock` stay in bank-opts.ts beside
+  clockShape's move (taste); host-code.ts's member doc blocks repeat its header (a documentarian
+  matter); `callback`'s `@example` has no test; `IdbOpts`, `MaskOpts` and `LocalVaultDBOpts` are
+  hand-written, not `Z.infer` of their validators.
 * **Decisions taken**:
   * Item 2 also moved the four store and library checks. They are the same kind of check,
     a host's object judged by the verbs the vault calls. Keeping them in bank-opts would have
@@ -67,7 +77,7 @@ The tidy after #322. The Coach approved every item. Each item is one commit, in 
 * **Discoveries**:
   * The narrower logger.ts import moved no size budget. idbDeviceDB measured 28.063 kB before
     and after, so whatever pulls bank-opts into that bundle is not logger.ts alone.
-  * `HX.callback` does exactly what the two module-private `listenerShape`s do. They could use it,
+  * `HX.callback` does exactly what the two in-package `listenerShape`s do. They could use it,
     at the price of idb.ts and string-store.ts importing `shapes/host-code`.
 * **For the Coach**:
   * **listenerShape → HX.callback?** Rec: yes, in a later tidy. It removes two copies of one
