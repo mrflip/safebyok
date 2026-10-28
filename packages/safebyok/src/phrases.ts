@@ -224,7 +224,7 @@ export const RenewPastLease = "ensureUnlocked()'s renewMinutes is as long as the
 export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force."
 // --
 
-// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultGoneWhilePuttingBox
+// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultDeletedWhilePuttingBox
 
 /** Why a call naming a box the vault does not hold refuses. */
 export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
@@ -248,7 +248,7 @@ export const noRoomForBox = (maxVaultBytes: number): string => `This vault has n
 export const VaultGoneWhileGettingBox = "The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored."
 
 /** Why a box is not stored into a vault deleted, or deleted and made anew, on another device as it was being stored. */
-export const VaultGoneWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
+export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
 // == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew

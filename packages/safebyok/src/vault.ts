@@ -1743,7 +1743,7 @@ export class Vault implements VaultStamp {
     if (put.ok) { return put }
     await this.#onStorageRefusal(put)
     if (! isVaultError(put.err, 'vault_mismatch')) { return put }
-    return bad(new VaultError('stale_write', Phrases.VaultGoneWhilePuttingBox, { cause: put.err }))
+    return bad(new VaultError('stale_write', Phrases.VaultDeletedWhilePuttingBox, { cause: put.err }))
   }
 
   /** Update the box listing with `stored`, a record this vault's own write just landed, and publish it, returning `stored` as a {@link Box} made under the picture in hand. */
