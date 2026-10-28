@@ -88,6 +88,13 @@ describe("OutageVaultDB, deleting a damaged vault", () => {
     await TH.expectBad(vaultDB.tryDelDamagedVault(scope), 'storage_unavailable')
     expect(store.scopepaths()).to.have.lengthOf(2)
   })
+
+  it("refuses from its throwing form by rejecting, so a caller's catch hears it", async () => {
+    const { store, outage, vaultDB } = await damagedOver()
+    outage.setDown(true)
+    await TH.expectRefusal(vaultDB.delDamagedVault(scope), 'storage_unavailable')
+    expect(store.scopepaths()).to.have.lengthOf(2)
+  })
 })
 
 // Each refusal is checked against the host's own copy of the package too: the provider branches
