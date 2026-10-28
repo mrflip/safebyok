@@ -33,7 +33,7 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   `MadeShape.parse`, `BoxRecord.parse` and `VaultOfBox` from `src/shapes/`.
 * **Thread 6 (store_trynames, #321):** every public `VaultDB` verb (`getVaultRecords`/`ensureVaultRecords`
   included, beyond the plan's list) and every `DeviceDB` verb is a try pair; bodies moved whole into the
-  throwing form, `tryX = outcomeOf(() => this.X(...))`. `DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>`;
+  throwing form, `tryX = outcomeOf(() => this.X(...))`. ``DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>``;
   `HeededVaultDB = Pick<VaultDB, HeededVerb | 'subscribe'>` (`Thrown<>` gone); `heed` calls the try forms.
   `ServedVaultDB` (graphql), `VaultDBVerbs` (`safebyok/testing`) and `vault-opts.ts`'s duck-type shapes
   name the try forms. `ProvingTools.putLease` is `tryPutLease` (pulled forward from *Not in this sprint*).
