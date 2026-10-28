@@ -1,7 +1,16 @@
 # Thread 1: trythrow (2026-10-28)
 
-Branch `20261028-trythrow`, PR [#316](https://github.com/mrflip/safebyok/pull/316), stacked on [#311](https://github.com/mrflip/safebyok/pull/311).
-Justify: green (safebyok 3423 tests passed, 37 skipped; every package's lint, typecheck, build and size budget green).
+Branch `20261028-trythrow`, PR [#316](https://github.com/mrflip/safebyok/pull/316), on main ([#311](https://github.com/mrflip/safebyok/pull/311), it was stacked on, merged).
+Justify: green (safebyok 3445 tests passed, 37 skipped; every package's lint, typecheck, build and size budget green).
+
+Catch-up rebase at filing, 2026-10-28: #311 and then [#301](https://github.com/mrflip/safebyok/pull/301)
+(validator_ducks) merged under the branch. #301 moved the shape validators into `src/shapes/` and
+replaced the `checked*` helpers `lease.ts` and `box.ts` called, so the conflict was in the five
+try pairs this thread moves: resolved by keeping thread 1's structure (body in the throwing
+method, the `try` form one hop) with main's names inside it (`serializedBytes.parse`,
+`BoxSparse.parse`, `CipheredShape.parse`, `LeaseSealProps.parse`, `SealBoxProps.parse`,
+`MadeShape.parse`, `BoxRecord.parse`, `VaultOfBox`). The inner AEAD `outcomeOf` calls are as
+they were. No behaviour from either side was dropped; no repair commit was needed.
 
 The Coach's naming rule of 2026-10-27: a function resolving an Outcome is `tryVerbFoo`, one that
 throws or returns the foo is `verbFoo`, and the body lives in the throwing one. Behaviour is kept:
