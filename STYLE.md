@@ -22,6 +22,30 @@ is a bug.
   make: `check`, not `namesCheck`; `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Box, BoxKinds } from './box'`.
+* **A validator is reached through a namespace, never imported by name** (the Coach,
+  2026-10-28: "files are not supposed to naked-import validators"), in every file of every
+  package, tests included. A shapes module (`src/shapes/`) is star-imported under one short name
+  ending in `X`, the same in every file, as a module of types is under one ending in `T`; its
+  types are still imported by name. Or a `Validator` call takes the module as a source and its
+  builder names what it uses, as a record names the field validators it is made of:
+
+  ```ts
+  import * as CX from './shapes/scopes'
+  import * as FX from './shapes/fields'
+  import type { VaultScope } from './shapes/scopes'
+
+  const { applabel, user_id } = CX.bankScope.parse(opts)
+  export const { cipheredShape } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
+    cipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
+  }), [FX])
+  ```
+
+  The names: `PX` primitives, `FX` fields, `CX` scopes, `BX` box, `DX` device, `VX` vault,
+  `VDX` vault-db, `OX` bank-opts, `KX` key-deriver-spec, `MX` mask; outside the core,
+  `Validators` from `safebyok`, and `CVX` for safebyok-convex's own Convex validators. Not the
+  Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`. With the
+  validator out of the file's scope, a local or parameter keeps its VOCABULARY.md name:
+  `Box.seal(vault, props, whisper)`, a mock's `vaultRecord`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
 * **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
@@ -78,13 +102,17 @@ thing's stage in its life is its `lifecycle`.
 
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
-`Input` appended** (`dragForceInput`).
-A shape's validator is the exception: it takes its type's name (`export const { BoxSparse } =
-...`, `type BoxSparse = Z.infer<typeof BoxSparse>`), for it checks no one parameter.
+`Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and takes its
+type's name with the first letter lowered: lowerCamelCase beside its ModuleCase type (the Coach,
+2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
+BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { Validators, type BoxSparse } from
+'safebyok'` and calls `Validators.boxSparse.parse(row)`.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
-spreads a narrower: `export const WayinKindVals = [...] as const`,
-`wayinkind = oneof(WayinKindVals)`, `export type WayinKind = typeof WayinKindVals[number]`.
+spreads a narrower: `export const wayinKindVals = [...] as const`,
+`wayinkind = oneof(wayinKindVals)`, `export type WayinKind = typeof wayinKindVals[number]`. The
+list of values is `fooThingVals`, lowerCamelCase as its checker is: `VX.wayinkind`,
+`VX.wayinKindVals`, `type WayinKind`.
 
 **A thing's shapes are named for their purpose, prefixed with the type**, from the fixed set in
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
@@ -177,7 +205,7 @@ The tag smushing above is for a label that names a thing (`boxlabel`).
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: never an ISO string, never a `Date`. The
 clock seam (`Clock.now()`) already yields it, every index sorts it, and one convention means no
-parsing at any boundary. A field named `*_at` holds one, checked by `EpochMillis`.
+parsing at any boundary. A field named `*_at` holds one, checked by `epochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
@@ -308,7 +336,7 @@ host's callback returns (a strength checker's verdict, a key deriver's output). 
 a refusal with a `kind` the caller can branch on.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
-handed, and checks it, in one parse: `const { applabel, user_id } = bankScope.parse(thing)`,
+handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`,
 `dragForceInput.parse({ thing, vel })` (the Coach, 2026-10-27: "validators [are] the principal
 means of, in one line, extracting and validating local data"). Never a hand-pick
 (`{ applabel: x.applabel, ... }`) where a schema exists, and never an if-then precondition, or a
@@ -356,11 +384,11 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 
 * **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one
   schema a line, and nothing added per line, neither a wrapper call nor an annotation.
-* Modules of validators in `sources` (star imports, `[FooValidators]`) are spread into the kit
+* Modules of validators in `sources` (star imports, `[FX]`) are spread into the kit
   beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
   bringing names into scope.
 * The primitives the kit hands out (`shapes/primitives.ts`) are plain Zod, and so is a variation
-  made directly from a validator (`VaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
+  made directly from a validator (`VX.vaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
   use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
 * **One input, one validator.** A function checks what it is handed with one validator, never a
   cascade of validators each taking a part of the input and refusing with its own kind. Checks
