@@ -26,10 +26,3 @@ allowBuilds:
 # is made, and each one is recorded in notes/security.md.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
-
-# A hot release, exempt by exact version (PROCESS.md, *Dependencies*): convex-helpers 0.1.129
-# (published 2026-10-21T23:13Z) resolves its entry points to .d.ts, where 0.1.128 resolved them to
-# .ts sources that erasableSyntaxOnly refuses (0.1.129 still ships a src/ of .ts no import reaches). The Coach approved taking it a day early; it passes seven days at
-# 2026-10-28 23:13 UTC. After that, delete this entry and return the devDependency pins to ranges.
-minimumReleaseAgeExclude:
-  - convex-helpers@0.1.129
