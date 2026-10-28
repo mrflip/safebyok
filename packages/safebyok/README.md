@@ -398,8 +398,7 @@ keep records by structured clone, never as JSON.
   `storage_unavailable`. Neither keeps what your store threw, not as a `cause` and not its message,
   only its `name` (`QuotaExceededError`, say), which ends the condition's message: a device store
   is handed every lease record, and an error of its own may quote one, while the logger hands a
-  condition to your code whole. Every verb resolves an `Outcome`
-  and never rejects.
+  condition to your code whole. Every verb resolves an `Outcome` and never rejects.
 
 ```ts
 import { openDB } from 'idb'
