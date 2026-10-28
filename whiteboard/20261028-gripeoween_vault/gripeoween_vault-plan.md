@@ -161,6 +161,23 @@ That is a behaviour-bearing change to the snapshot, so the model is no longer `s
 worker inherits the orchestrator's. Struck: `#watchStorage`/`#watchRefresh` → `#subscribeToStorage`/`#refreshOnRing` (thread 2b
 names the watch). Also `#storedBase` → `#fillFromStored` (GW-02's
 `vault.ts` part, STYLE.md's own example), from thread 2's review.
+*Orchestrator (2026-10-28, the Coach in chat, reading `putBox`):* two more renames land here.
+(a) `#ensureUnlocked(renewMillis)` → `#doEnsureUnlocked`, the worker under the public
+`ensureUnlocked()`, as `#doRefresh` already sits under `#refresh`; and the two take one shape:
+the public the host's bag (`{ renewMinutes }`, parsed at the door), the private the same bag in
+the millis the vault keeps (`{ minMillisToAutolock }`), never a bare `0` a reader has to look up.
+(b) The horizons go on one scheme, `{min,max}Millis<What>`, a bound named for what it bounds:
+`renewMillis` → `minMillisToAutolock` (the lease must last at least this long past now, or the
+call asks), `staleMillis` → `maxMillisSinceRefresh` (the snapshot may be at most this old, or the
+call reads), so `#refreshIfStale(staleMillis)` reads `#refreshIfStale(maxMillisSinceRefresh)`.
+`leaseMillis` is a length, not a bound, and keeps its name unless the Coach's answer below says
+otherwise. The rename runs through `vault-opts.ts`'s parsed bank opts (`parseRenewMinutes`,
+`parseStaleMinutes`, the `leaseMillis`/`staleMillis` fields), `gating.ts`'s `takeUp(gating,
+renewMillis)` and `run(renewMillis | null)`, and `#fitsTakeUp`. The host-facing options
+(`renewMinutes`, `staleMinutes`, `leaseHours`) stay as they are unless the Coach rules below: the
+parse at the door is where the host's word becomes the vault's (STYLE.md, *clear intent at the
+door, clean data inside*). Two questions for the Coach, under *For the Coach*; build on the
+assumptions stated there if they are not answered by the time this thread is cut.
 
 ## For the Coach
 
@@ -168,3 +185,10 @@ names the watch). Also `#storedBase` → `#fillFromStored` (GW-02's
   with a call the threads will follow unless you rule otherwise.
 * `whiteboard/20261028-gripeoween/` is untracked in the main checkout; this sprint carries only
   its two vault files.
+* Thread 4's horizon scheme, two questions. (1) *autolock* is a new cast word: VOCABULARY.md says
+  the lease is "dropped, by a timer, and the vault locks" at `ask_passphrase_at`, and names no
+  event. Add *autolock* to VOCABULARY.md as that event, or name the bound in the cast's words
+  (`minMillisToAskPassphrase`)? The plan assumes *autolock* is added. (2) Do the host-facing
+  options follow the scheme (`maxMinutesSinceRefresh`, `minMinutesToAutolock` in place of
+  `staleMinutes`, `renewMinutes`), or stay short at the door and take the scheme's name at the
+  parse? The plan assumes they stay; pre-1.0, either is a changeset line, not a shim.
