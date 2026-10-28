@@ -121,7 +121,7 @@ export class Box implements Boxscope, BoxSparse {
    */
   static make(vault: VaultOfBox, record: BoxRecord, madeUnder: MadeUnder): Box {
     const checked = BX.boxRecord.parse(record)
-    return new this(vault, BX.madeUnderShape.parse(madeUnder), checked, null)
+    return new this(vault, BX.madeUnder.parse(madeUnder), checked, null)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.

@@ -66,7 +66,7 @@ export const { sidecar } = Validator('bad_option', () => ({ sidecar: whisperBag 
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
-// == [The record]: BoxFormat, boxRecord, boxSparse, DamagedBoxRecord, boxDamageVals, boxDamaged, boxStamp, cipheredShape, BoxCiphered
+// == [The record]: BoxFormat, boxRecord, boxSparse, DamagedBoxRecord, boxDamageVals, boxDamaged, boxStamp, boxCiphered, BoxCiphered
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
 export const BoxFormat = 'safebyok-box-v8'
@@ -157,15 +157,15 @@ export const { boxStamp } = Validator('bad_record', ({ vault_tok }) => ({
 export type BoxStamp = Z.infer<typeof boxStamp>
 
 /** The check of a box's two ciphered fields, as {@link BoxCiphered} has them, every other field a box record holds dropped unread. Its `parse` refuses 'bad_record'. */
-export const { cipheredShape } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
-  cipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
+export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
+  boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
 }), [FX])
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
-export type BoxCiphered = Z.infer<typeof cipheredShape>
+export type BoxCiphered = Z.infer<typeof boxCiphered>
 // --
 
-// == [Seal]: boxBase, sealBoxProps, madeUnderShape, madeShape, MadeUnder
+// == [Seal]: boxBase, sealBoxProps, madeUnder, madeShape, MadeUnder
 
 /** What `Box.seal` seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
  * `sealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
@@ -173,14 +173,14 @@ export type BoxCiphered = Z.infer<typeof cipheredShape>
  * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
  * is made under, and what a seal is made with, are taken from a `VaultSparse`, frozen.
  */
-export const { boxBase, sealBoxProps, madeUnderShape, madeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
+export const { boxBase, sealBoxProps, madeUnder, madeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
   const boxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
-  const madeUnderShape = VX.vaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
+  const madeUnder = VX.vaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
   return {
     boxBase,
     sealBoxProps: obj({ boxlabel, sidecar: sidecar.default(() => ({})), base: boxBase.nullish() }).strict(),
-    madeUnderShape,
-    madeShape:    obj({ madeUnder: madeUnderShape, now: epochMillis }),
+    madeUnder,
+    madeShape:    obj({ madeUnder, now: epochMillis }),
   }
 }, [FX])
 
@@ -193,5 +193,5 @@ export type BoxBase = Z.infer<typeof boxBase>
 export type SealBoxProps = Z.input<typeof sealBoxProps>
 
 /** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A `VaultSparse` carries them. */
-export type MadeUnder = Z.infer<typeof madeUnderShape>
+export type MadeUnder = Z.infer<typeof madeUnder>
 // --

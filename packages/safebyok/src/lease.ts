@@ -189,7 +189,7 @@ export class Lease implements LeaseSparse {
    */
   async decipherWith(ciphered: BoxCiphered, visible: BoxSparse): Promise<Uint8Array> {
     try {
-      const sealed = BX.cipheredShape.parse(ciphered)
+      const sealed = BX.boxCiphered.parse(ciphered)
       const header = BX.boxSparse.parse(visible)
       this.#demand()
       const vaultKey = await this.#vaultKeyOrNull('unwrapKey')

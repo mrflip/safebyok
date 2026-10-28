@@ -14,6 +14,7 @@ Validators, old -> new, at the main entry and in `Validators` alike:
 * `GateRecord` -> `gateRecord`; `GateSparse` -> `gateSparse`; `WayinRecord` -> `wayinRecord`
 * `PassphraseWayinRecord` -> `passphraseWayinRecord`; `PasskeyWayinRecord` -> `passkeyWayinRecord`; `PassphraseWayinSparse` -> `passphraseWayinSparse`; `PasskeyWayinSparse` -> `passkeyWayinSparse`
 * In `Validators` only: `VaultDraft` -> `vaultDraft`; `Capacity` -> `capacity`; `VaultRecordExpectation` -> `vaultRecordExpectation`; `BoxGetExpectation` -> `boxGetExpectation`; `BoxExpectation` -> `boxExpectation`; `VaultDelExpectation` -> `vaultDelExpectation`; `BoxDelExpectation` -> `boxDelExpectation`; `BoxDeletion` -> `boxDeletion`
+* Not exported, the package's own: `MadeUnderShape` -> `madeUnder` and `CipheredShape` -> `boxCiphered`, each named for its type (`MadeUnder`, `BoxCiphered`).
 * `VaultScope` -> `vaultScope`. `VaultScope` was the same object as `Validators.vaultScope` under a second name: the main entry now exports it as `vaultScope`, and `Validators.VaultScope` is gone. The type `VaultScope` is unchanged.
 
 Lists of values, old -> new:

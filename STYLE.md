@@ -35,8 +35,8 @@ is a bug.
   import type { VaultScope } from './shapes/scopes'
 
   const { applabel, user_id } = CX.bankScope.parse(opts)
-  export const { cipheredShape } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
-    cipheredShape: obj({ box_key_wrapped, whisper_ciphered }),
+  export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
+    boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
   }), [FX])
   ```
 
