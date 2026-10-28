@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** planned, six threads; waiting for PR #311's rebase onto main before threads 1, 6 and 4 are cut.
+**Status:** #311 rebased onto main (41f44f69, 2026-10-28). Threads 1, 6 and 4 building in `/workspace/byok-trythrow`, `/workspace/byok-store_trynames`, `/workspace/byok-where_prefix`; 5 queued; 2 waits on 1; 3 waits on 6.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
