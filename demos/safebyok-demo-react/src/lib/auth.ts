@@ -56,11 +56,11 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     return reading.success ? { user_id: randomId(), userlabel, registered_at: reading.data } : null
   }
 
-  let session: Session | null = readSession()
+  let session: Session | null = getSession()
   const listeners = new Set<() => void>()
   const bump = () => { listeners.forEach((listener) => { listener() }) }
 
-  function readSession(): Session | null {
+  function getSession(): Session | null {
     const text = deviceStore.get(sessionCkey)
     if (text === null) { return null }
     try {
