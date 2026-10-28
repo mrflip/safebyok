@@ -1,5 +1,14 @@
 merge_queue:
   skip_intermediate_results: true
+  max_parallel_checks: 5
+queue_rules:
+  - name: default
+    merge_method: merge
+    batch_size: { min: 1, max: 6 }
+    queue_conditions:            # gate to enter: cheap PR checks
+      - check-success = ci
+    merge_conditions:            # evaluated on Mergify's draft PR
+      - check-success = ci-full
 scopes:
   source:
     files:
