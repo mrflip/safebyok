@@ -1,6 +1,6 @@
 # Thread 21: bank phrases (2026-10-28)
 
-Branch `20261028-bank_phrases`, PR #TBD, stacked on #301 (its base stays main). Justify: see PR. Re-runs thread 19 (#307, superseded) on the rewritten #301, plus three of the Coach's rulings.
+Branch `20261028-bank_phrases`, PR #319, stacked on #301 (its base stays main). Justify: green. Re-runs thread 19 (#307, superseded) on the rewritten #301, plus three of the Coach's rulings.
 
 * **Built**:
   * `parseVaultBag` is gone from `packages/safebyok/src/bank.ts`; `#vaultScopeOf` parses with `CX.vaultBag.parse(bag)`, so a bad bag refuses 'bad_scope' with the validator's own message. #301 had already made the vault bag a duck over a Vault object, its snapshot and a BankVault, and bank.test.ts tests it; it stays.
