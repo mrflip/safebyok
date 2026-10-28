@@ -159,8 +159,8 @@ Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped`
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
 `device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
 handed to hold; read back by `KeptLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
-answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#takeStorage`
-(whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
+answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#loadFromStorage`
+(`#applyVault`, whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
 which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
 `vault.#lockNow`, `del-damaged-vault.ts` and the bank. Neither the Vault nor the Bank holds a
 record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
@@ -259,7 +259,7 @@ key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in 
 `KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
 `Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryGet` (`lease.ts`) checks what
 `DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
-the vault's refresh (`#takeStorage`, whose `leavesInForce` reads the kept stamp) and its take-ups
+the vault's refresh (`#loadFromStorage` and `#applyVault`, whose `leavesInForce` reads the kept stamp) and its take-ups
 (`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`
 ([#305](https://github.com/mrflip/safebyok/pull/305)). A `Box` reaches the Lease through the
 module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving

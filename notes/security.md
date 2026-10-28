@@ -382,7 +382,7 @@ added or folded into through the subagent, and no other entry changes.
   settled with, so an attempt never reports success over a gating a lock settled first. `seal` requires its `{ gating }`, with no
   default to a gating that never lands, so no later internal caller can reopen the hole by omitting it.
 * 2026-10-23 (primitives sprint, thread 9, gating): **each attempt reads storage afresh first.** `hello({ staleMinutes: 0 })`
-  through the refresh join (`#freshen`), then a demand that the Vault object is not gone and the gating has not landed, so a
+  through the refresh join (the `freshen` gating tool's closure in the Vault constructor; amended 2026-10-28 (vault_refresh): was `#freshen`, same behaviour), then a demand that the Vault object is not gone and the gating has not landed, so a
   passphrase another device has replaced opens nothing here; a vault whose gate another device set while the user typed
   refuses a first gate `gate_made_elsewhere` without trying the typed text against the winner's gate.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the order of checks and seals within a chain.** `change_passphrase` seals and checks
@@ -518,7 +518,7 @@ added or folded into through the subagent, and no other entry changes.
   object made anew still refuses the older copy as `vault_behind`, if the record has seen a higher `vault_epoch`. Box writes expect no epoch and land in
   rolled-back storage (already noted as relaxed: a restored backup that rolls back boxes alone goes unnoticed).
   Amended 2026-10-24 (refresh_rulings): **the behind check now runs BEFORE the older-read test, so this entry's consequence no longer holds.**
-  The refresh (`#judgeStored` / `#takePicture`, `packages/safebyok/src/vault.ts`) tests `vault_behind` (a read whose `vault_epoch` is below the
+  The refresh (`#doRefresh` / `#applyVault`, `packages/safebyok/src/vault.ts`; amended 2026-10-28 (vault_refresh): were `#judgeStored` / `#takePicture`) tests `vault_behind` (a read whose `vault_epoch` is below the
   device record's `highest_vault_epoch`) first. Before, a Vault object that had seen the newer copy (say epoch 6) and read storage restored to
   epoch 5 ignored it as a late read of its own write for its whole life: gate writes refused, but it kept listing the restored boxes, and a
   `putBox` without a whisper could write into them. Now it refuses `vault_behind` and locks (lease dropped and erased from the device store), as
@@ -1611,7 +1611,7 @@ added or folded into through the subagent, and no other entry changes.
   vault deleted and made anew elsewhere (new `vault_id`), landing during the unwrap left this device
   unlocked under the new props with the old key, indefinitely, defeating the epoch's revocation. The
   lease is left for the next hello, which discards it as not fitting. Also 2026-10-19 (a_sec, #203):
-  a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
+  a storage read (`#doRefresh`; amended 2026-10-28 (vault_refresh): was `#takeStorage`) that finds the vault props changed from those held (a new
   `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
   before any further await: it drops the key, stands down any take-up, and (for a different
   `vault_id`) empties the box listing; only then does it erase the lease and list the boxes (amended 2026-10-22 (primitives sprint, thread 5 (demand)):
@@ -2095,9 +2095,9 @@ added or folded into through the subagent, and no other entry changes.
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
   and the `HeededVaultDB` wrapper are deleted; the vault holds a plain `VaultDB` and at each of its six call sites
-  (`tryDelBox`, `tryGetVault` in `#takeStorage`, `tryDelVault`, `tryPutVaultRecord`, `tryGetBox`, `tryPutBox`) calls the `try` form, and on a bad
+  (`tryDelBox`, `tryGetVault` in `#doRefresh` (amended 2026-10-28 (vault_refresh): was `#takeStorage`), `tryDelVault`, `tryPutVaultRecord`, `tryGetBox`, `tryPutBox`) calls the `try` form, and on a bad
   Outcome awaits `#onStorageRefusal(refused)` before throwing it. `RefusalPolicy.decide` stays the one pure policy
-  (`identity_revoked` and `vault_behind` answer 'lock'), and the `behind` verdict in `#takeStorage` goes through the same call.
+  (`identity_revoked` and `vault_behind` answer 'lock'), and the `behind` verdict in `#doRefresh` (amended 2026-10-28 (vault_refresh): was `#takeStorage`) goes through the same call.
   The lock has landed and the lease erase has settled before the direct caller hears the throw, a background refresh's refusal
   included, as before, now at each site by convention: a comment on `#vaultDB` says every site must call the `try` form,
   and a vault test pins the order for each verb.)
