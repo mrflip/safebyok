@@ -113,7 +113,9 @@ added or folded into through the subagent, and no other entry changes.
   without it, and a Proving keeps the tools in a non-enumerable protected field. A host holding a Vault object can find the getter with
   `Object.getOwnPropertySymbols(Vault.prototype)` and so reach `ProvingTools`: `vaultRecord()` (the vault record in hand, gate wraps included),
   `demand`, `keyDeriver`, `logger`, `leaseMillis`, `now()`, `deviceId()`, `putLease(record)` (writes a lease record to the host's own DeviceDB) and
-  `holdLease(record)` (returns a `Lease` object for a record the caller supplies). The lease registry in `src/held-lease.ts` stays a WeakMap, as
+  `holdLease(lease)` (takes a `Lease` object that `Proving.grantLease` made with `Lease.make(this.vault, valOf(put))` from the record `putLease`
+  stored, and has the vault hold it, expiry armed and snapshot replaced; rebased onto #305, the lease record does not cross into `src/vault.ts`).
+  The lease registry in `src/held-lease.ts` stays a WeakMap, as
   `tests/vault/vault-boxes.test.ts` "the Vault object's public surface" walks symbol-keyed getters and asserts no Lease is reachable from a Vault
   object without a method call; amended 2026-10-27 (tidy): `ProvingInside` is `ProvingTools` and `GatingInside` is `GatingTools`; both extend a base `VaultPrivateTools` of
   `keyDeriver`, `leaseMillis` and `demand`, and are kept apart on purpose: `ProvingTools` alone holds `putLease` and `holdLease`, the power to grant
