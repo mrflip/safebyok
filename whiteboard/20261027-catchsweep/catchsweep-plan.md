@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), each PR's base `main`: merging #324 merges all three. 6 (#321) reviewed, catch-up rebase in a worker's hands; 2 (#325, on #316) in review; 3, 7 and 8 wait on 6. Eight threads.
+**Status:** the line stands at #316, #317 (`eed4c606`), #324 (`3359a418`), #321 (`496e3046`), each PR's base `main`: merging #321 merges all four. 2 (#325, on #316) reviewed and flagged on its two declared deviations, waits unfiled for the Coach; 3 and 7 cut from #321's tip and building; 8 queued (cap 3). Eight threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -98,6 +98,17 @@ adapters, not of the device store; say so there. (d) `notes/guarantees.md`: a se
 saying a device-store failure's cause never crosses to the host, and *Where the guarantees are
 kept* if `device-db.ts` now keeps one. Changeset: patch, saying a device-store condition's `cause`
 is gone. Size: medium. Review `high`. Depends on: thread 1 (same lines of `lease.ts` and `box.ts`).
+
+*Review:* (high, 2026-10-28) flagged: fixed one (a Proving-side `bad_record` test, `5e486337`); left the
+two declared deviations for the Coach (no inner catch in the cipher body, so a failing cipher step refuses
+`unexpected_error` before the post-wait demand; a vault stamp failing its check is `bad_record` and the
+vault stays unlocked), both rows. Minor, left: G8's wording falsifiable as written (orchestrator's call:
+restate as the checkable invariant, on resume); the Lease/Box class docs claim "any method" while the
+argument parses sit before the try (orchestrator's call: narrow the claims, parses stay; thread 7 puts
+whole bodies inside the try); `deviceTrouble`'s message tail is developer prose (row); `PasskeyProving.seal`
+keeps the old shape (later thread, Cleanup); internals narrated in doc blocks (documentarian). The thread
+waits unfiled at `5e486337` until the Coach rules; its worker is then resumed with the rulings and the two
+doc fixes, and files.
 
 ### 3. db_hooks: the VaultDB's hooks adapted once
 
