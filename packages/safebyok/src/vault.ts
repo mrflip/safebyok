@@ -22,7 +22,7 @@ import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { type DeviceDB, deviceRecordFor, deviceRecordOf } from './device-db'
+import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
 import { registerLeaseGetter } from './held-lease'
@@ -260,7 +260,7 @@ export class Vault implements VaultStamp {
   /** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
    * Never prompts. Within `staleMinutes` of the last read it re-settles without reading, unless that
    * read failed or found storage it could not trust. One that reads while a read is under way
-   * shares it. Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside
+   * shares it. Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then
    * {@link DeviceDB.tryGetLease}.
    *
    * It takes no lease up: another tab's unlock shows here at the next {@link Vault.ensureUnlocked}.
@@ -284,7 +284,7 @@ export class Vault implements VaultStamp {
       this.#demandNotGone()
       const helloOpts = checkHelloOpts(given)
       const staleMillis = helloOpts?.staleMinutes === undefined ? this.#staleMillis : parseStaleMinutes(helloOpts.staleMinutes, 'hello')
-      await this.#helloWithin(staleMillis)
+      await this.#refreshIfStale(staleMillis)
       // The bank may have let the vault go while storage was read.
       this.#demandNotGone()
       return this
@@ -305,7 +305,7 @@ export class Vault implements VaultStamp {
   async refresh(): Promise<Vault> {
     try {
       this.#demandNotGone()
-      await this.#helloWithin(0)
+      await this.#refreshIfStale(0)
       // The bank may have let the vault go while storage was read.
       this.#demandNotGone()
       return this
@@ -494,7 +494,7 @@ export class Vault implements VaultStamp {
     try {
       this.#demandNotGone()
       wayinkind.parse(slotlabel)
-      await this.#helloWithin(this.#staleMillis)
+      await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
       const kindNow = (): GatingKind => {
         if (isGated(this.#vaultRecord)) { return slotlabel === 'passphrase' ? 'change_passphrase' : 'put_passkey' }
@@ -529,7 +529,7 @@ export class Vault implements VaultStamp {
       if (slotlabel === 'passphrase') {
         throw new VaultError('passphrase_required', "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed.")
       }
-      await this.#helloWithin(this.#staleMillis)
+      await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
       const kindNow = (): GatingKind => {
         if (! isGated(this.#vaultRecord) || this.#vaultRecord.gate.passkey === null) {
@@ -754,7 +754,7 @@ export class Vault implements VaultStamp {
     try {
       this.#demandNotGone()
       // Judged on a picture within staleMinutes, as putWayin's and delWayin's are: a stale novel one may be gated by now.
-      await this.#helloWithin(this.#staleMillis)
+      await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
       this.#gatedRecord()
       await this.#gatingFor(() => 'del_vault', 'del')
@@ -767,7 +767,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Let this Vault object go, for the bank: it is gone, every call refusing 'vault_gone'. Not a lock: nothing stored is erased, and the lease stays for the next Vault object. */
-  [letGo](): void { this.#letGo(null) }
+  [letGo](): void { this.#becomeGone(null) }
 
   /** The refusal every call on this Vault object meets once it is gone, or null while it is not: ask it of one whose read may have found the vault deleted or made anew before its birth settled. */
   get [goneBy](): VaultError | null { return this.#goneBy?.() ?? null }
@@ -854,7 +854,13 @@ export class Vault implements VaultStamp {
     }
     this.#gatingTools = {
       ...tools,
-      freshen:      async (gating) => await this.#freshen(gating),
+      freshen:      async (gating) => {
+        this.#demandNotGone()
+        await this.#refreshIfStale(0)
+        this.#demandNotGone()
+        if (gating.landed) { throw gatingLandedError() }
+        return this.#vaultRecord
+      },
       putGate:      async (gate, call) => await this.#putGate(gate, call),
       delVault:     async (proving) => await this.#delVault(proving),
       afterDel:     async (vaultEpoch) => { await this.#afterDel(vaultEpoch) },
@@ -862,7 +868,7 @@ export class Vault implements VaultStamp {
       heardRefusal: (thrown) => this.#heardRefusal(thrown),
       request:      this.#requestCleartext,
     }
-    this.#takePicture({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
+    this.#applyVault({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
     this.#takeUpAtBirth(born.leaseKept)
     this.#watchStorage()
     Object.freeze(this)
@@ -980,81 +986,80 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Refreshing]: refresh, refreshOnce, takeStorage, judgeStored, takePicture, refreshedAt, helloWithin, watchStorage
+  // == [Refreshing]: refresh, oneRefreshAtATime, doRefresh, loadFromStorage, onRefreshRefused, applyVault, refreshIfStale, refreshedAt, forceNextRefresh, watchStorage
 
-  /** Refresh the picture from storage through `#refreshOnce`, one refresh at a time: a call made while one runs shares it. */
-  readonly #refresh = oneAtATime(() => this.#refreshOnce())
+  // The refresh under way, which a call made while it runs shares.
+  readonly #oneRefreshAtATime = oneAtATime(() => this.#doRefresh())
 
-  /** Refresh the picture from storage through `#takeStorage`, once.
-   * One that fails leaves the picture as it stood, but for its freshness, and has the next hello
-   * refresh. One that succeeds after the watch warned of failing refreshes logs that they recovered.
+  /** Refresh from storage through `#doRefresh`, one refresh at a time: a call made while one runs shares it.
+   * One that succeeds after the watch warned of failing refreshes logs that they recovered.
    */
-  async #refreshOnce() {
-    try {
-      await this.#takeStorage()
-    } catch (err) {
-      this.#refreshRefused = true
-      this.#refreshedAt = FarPast
-      this.#replaceSnapshot()
-      throw err
-    }
+  async #refresh(): Promise<void> {
+    await this.#oneRefreshAtATime()
     if (! this.#watchWarned) { return }
     this.#watchWarned = false
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
   }
 
-  /** Get the vault record, listing and this device's lease, judge them against the picture in hand by `#judgeStored`, take what it finds new, and raise this device's record to it.
-   * Reads {@link DeviceDB.tryGetDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.tryGet}, the lease kept.
-   * A vault judged `behind` locks the vault as storage it cannot trust, and refuses 'vault_behind'.
+  /** Read storage through `#loadFromStorage`, judge what it found against the picture in hand, take what is new, and raise this device's record to it.
+   * A refusal of the vault's storage meets `#onStorageRefusal` first. The vault deleted, or made anew
+   * under another `vault_tok`, makes this Vault object gone, refusing 'vault_gone' or 'vault_remade'.
+   * A vault below this device's record is storage it cannot trust: it locks, as `#onStorageRefusal`
+   * says, and refuses 'vault_behind'. A vault older than the picture but not below the record
+   * (`isOlderPicture`), or one read for a Vault object let go meanwhile, is ignored. A refused
+   * refresh leaves the picture as it stood, but for its freshness, as `#onRefreshRefused` says.
    */
-  async #takeStorage() {
+  async #doRefresh(): Promise<void> {
     const refreshedAt = this.#clockNow()
     const leasesSeen = this.#leasesHeld
-    // The device record is read first, so a raise this device's own write made is never held
-    // against a read served before that write landed.
-    const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.tryGetDeviceRecord(this.#scope)))
-    // Let go meanwhile: read no more, as the judgment would ignore what came.
-    if (this.#goneBy !== null) { return }
-    const [stored, leaseKept] = await Promise.all([this.#vaultDB.tryGetVault(this.#scope), KeptLease.tryGet(this.#deviceDB, this.#scope)])
-    if (! stored.ok) {
-      await this.#onStorageRefusal(stored)
-      throw stored.err
-    }
-    const verdict = this.#judgeStored(stored.val, record)
-    if (verdict === 'ignore') { return }
-    if (verdict === 'behind') {
-      // Storage serving an older copy is not to be trusted with an unlocked vault: the verdict is
-      // the vault's own, met as a refusal of storage's would be.
-      const behind = bad(behindError())
-      await this.#onStorageRefusal(behind)
-      throw behind.err
-    }
-    const { boxes, damagedBoxes, ...fresh } = verdict
-    this.#takePicture({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
-    await this.#raiseRecordAfter(fresh.vault_epoch, 'refresh')
+    try {
+      const { record, stored, leaseKept } = await this.#loadFromStorage()
+      if (! stored.ok) {
+        await this.#onStorageRefusal(stored)
+        throw stored.err
+      }
+      // Let go meanwhile: what came is ignored.
+      if (this.#goneBy !== null) { return }
+      const found = stored.val
+      if (found?.vault_tok !== this.#vaultRecord.vault_tok) {
+        const refusal = found === null ? goneError() : remadeError()
+        this.#becomeGone(refusal)
+        throw refusal
+      }
+      if (record !== null && found.vault_epoch < record.highest_vault_epoch) {
+        // Storage serving an older copy is not to be trusted with an unlocked vault: the verdict is
+        // the vault's own, met as a refusal of storage's would be.
+        const behind = bad(behindError())
+        await this.#onStorageRefusal(behind)
+        throw behind.err
+      }
+      if (isOlderPicture(this.#vaultRecord, found)) { return }
+      const { boxes, damagedBoxes, ...fresh } = found
+      this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
+      await this.#noteEpochSeen(fresh.vault_epoch, 'refresh')
+    } catch (err) { throw this.#onRefreshRefused(err) }
   }
 
-  /** Judge `stored`, the vault as `VaultDB.getVault` found it, against the picture in hand and `record`, this device's record as got before it: the vault to take, `ignore`, or `behind`.
-   * A Vault object let go meanwhile ignores it. The vault deleted, or made anew under another
-   * `vault_tok`, makes this Vault object gone, refusing 'vault_gone' or 'vault_remade'. A vault below
-   * the record's highest `vault_epoch` is `behind`. One older than the picture but not below the
-   * record (`isOlderPicture`) is ignored.
+  /** Read this device's record of the scope, then the vault and its listing, then this device's lease, and nothing else: the three answers as one plain object.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then {@link KeptLease.tryGet},
+   * the lease kept. The device record's read throws its refusal; the other two answer Outcomes.
    */
-  #judgeStored(stored: (VaultRecord & BoxListing) | null, record: DeviceRecord | null): (VaultRecord & BoxListing) | 'ignore' | 'behind' {
-    if (this.#goneBy !== null) { return 'ignore' }
-    if (stored === null) {
-      const gone = goneError()
-      this.#letGo(gone)
-      throw gone
-    }
-    if (stored.vault_tok !== this.#vaultRecord.vault_tok) {
-      const remade = remadeError()
-      this.#letGo(remade)
-      throw remade
-    }
-    if (record !== null && stored.vault_epoch < record.highest_vault_epoch) { return 'behind' }
-    if (isOlderPicture(this.#vaultRecord, stored)) { return 'ignore' }
-    return stored
+  async #loadFromStorage() {
+    // Read the device record before storage, or a write of this device's own that bumps the record
+    // while storage's answer is in flight has that answer, served before the write landed, judged
+    // behind a record it could not have known.
+    const record = await this.#deviceDB.getDeviceRecord(this.#scope)
+    const stored = await this.#vaultDB.tryGetVault(this.#scope)
+    const leaseKept = await KeptLease.tryGet(this.#deviceDB, this.#scope)
+    return { record, stored, leaseKept }
+  }
+
+  /** Mark the refresh that met `err` refused, and return `err` for its caller to throw: the snapshot's freshness says `refused`, and the next hello refreshes (`#forceNextRefresh`), whatever its staleMinutes says. */
+  #onRefreshRefused(err: unknown): unknown {
+    this.#refreshRefused = true
+    this.#forceNextRefresh()
+    this.#replaceSnapshot()
+    return err
   }
 
   /** Replace the picture with `found`, what one refresh or the birth found, and publish it: vault record and listing together, never a vault beside another's boxes.
@@ -1064,7 +1069,7 @@ export class Vault implements VaultStamp {
    * None is taken up here. A refresh finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
-  #takePicture(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: KeptLease | null, refreshedAt: number, leasesSeen: number }) {
+  #applyVault(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: KeptLease | null, refreshedAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1086,14 +1091,19 @@ export class Vault implements VaultStamp {
     this.#tellWayinNews(damagedWayins, shownWayins)
   }
 
-  // When the last refresh to succeed began, by the vault's clock: what a hello's staleMinutes
-  // are counted from. FarPast after a refresh that failed, so the next hello refreshes.
-  #refreshedAt = FarPast
-
   /** Refresh through `#refresh` once the last refresh began `staleMillis` ago or more, and replace the snapshot either way, so a lease run out meanwhile shows. */
-  async #helloWithin(staleMillis: number): Promise<void> {
+  async #refreshIfStale(staleMillis: number): Promise<void> {
     if (this.#clockNow() - this.#refreshedAt >= staleMillis) { await this.#refresh() }
     this.#replaceSnapshot()
+  }
+
+  // When the last refresh to succeed began, by the vault's clock: what a hello's staleMinutes
+  // are counted from. FarPast once `#forceNextRefresh` says the next hello must refresh.
+  #refreshedAt = FarPast
+
+  /** Have the next hello refresh, whatever its staleMinutes says. */
+  #forceNextRefresh() {
+    this.#refreshedAt = FarPast
   }
 
   /** Start the vault's watch on storage, `VaultDB.subscribe`, each ring refreshing: call it once, at birth. Letting the vault go ends it. */
@@ -1102,13 +1112,13 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Device record]: raiseRecordAfter
+  // == [Device record]: noteEpochSeen
 
   /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryRaiseDeviceRecord}: never a refusal.
    * A device store that fails to keep it is warned of: a missed raise only weakens the check for a
    * vault served behind what this device has seen, until a later read raises it.
    */
-  async #raiseRecordAfter(vaultEpoch: number, call: VaultCall): Promise<void> {
+  async #noteEpochSeen(vaultEpoch: number, call: VaultCall): Promise<void> {
     const raised = await this.#deviceDB.tryRaiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
     if (raised.ok) { return }
     this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, raised.err)
@@ -1199,7 +1209,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, freshen, delVault, afterDel
+  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, delVault, afterDel
 
   // The pending gating, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
@@ -1215,7 +1225,7 @@ export class Vault implements VaultStamp {
    * never prompts. It demands nothing once unlocked: demand the lease before using it.
    */
   async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
-    await this.#helloWithin(this.#staleMillis)
+    await this.#refreshIfStale(this.#staleMillis)
     // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
     this.#demandNotGone()
     for (;;) {
@@ -1286,15 +1296,6 @@ export class Vault implements VaultStamp {
     this.#gating?.landLock(told)
   }
 
-  /** Read storage now through `#helloWithin`, resolving the vault record in hand: 'gating_landed' once `gating` has landed. Make it an attempt's first step. */
-  async #freshen(gating: RaisedGating): Promise<VaultRecord> {
-    this.#demandNotGone()
-    await this.#helloWithin(0)
-    this.#demandNotGone()
-    if (gating.landed) { throw gatingLandedError() }
-    return this.#vaultRecord
-  }
-
   /** Delete the vault `proving` proved, with `VaultDB.delVault` expecting the `vault_tok` and `gate_epoch` in hand, resolving the tombstone's `vault_epoch`.
    * A deletion storage refused refuses as the demand after it finds the vault, else as storage
    * refused it. One that landed is this vault's, by its expectation, whatever a read has made of the
@@ -1316,8 +1317,8 @@ export class Vault implements VaultStamp {
   async #afterDel(vaultEpoch: number): Promise<void> {
     const erased = this.#lockNow()
     // The bank hears it, and births the next life when asked.
-    this.#letGo(goneError())
-    await this.#raiseRecordAfter(vaultEpoch, 'del')
+    this.#becomeGone(goneError())
+    await this.#noteEpochSeen(vaultEpoch, 'del')
     const done = await erased
     if (! done.ok) {
       this.#logger.warn("The vault was deleted, but this device's lease of it could not be erased: no Vault object takes it up, as it names the vault deleted.", { call: 'del' }, done.err)
@@ -1349,7 +1350,7 @@ export class Vault implements VaultStamp {
     this.#demand(stored, { call })
     // The picture takes it first, so the record raised after never outruns the picture.
     this.#takeOwnPut(next)
-    await this.#raiseRecordAfter(next.vault_epoch, call)
+    await this.#noteEpochSeen(next.vault_epoch, call)
     this.#demand(stored, { call })
     return stored
   }
@@ -1366,12 +1367,12 @@ export class Vault implements VaultStamp {
     if (winner === undefined) { return err }
     if (winner?.vault_tok !== gate.vault_tok) {
       const told = winner === null ? goneError() : remadeError()
-      this.#letGo(told)
+      this.#becomeGone(told)
       return told
     }
     if (gate.base_epoch === 0 && isGated(winner)) {
       // The gate stored is another device's: the next hello reads it, whatever staleMinutes says.
-      this.#refreshedAt = FarPast
+      this.#forceNextRefresh()
       return gateMadeElsewhereError()
     }
     // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
@@ -1394,7 +1395,7 @@ export class Vault implements VaultStamp {
 
   // --
 
-  // == [Locking and expiry]: lockNow, onStorageRefusal, letGo, dropLease, armExpiry, disarmExpiry
+  // == [Locking and expiry]: lockNow, onStorageRefusal, becomeGone, dropLease, armExpiry, disarmExpiry
 
   // Every lock goes through here. Nothing is awaited before the erase is issued, so the device
   // store applies it after any lease write already issued: a grant under way when it lands is
@@ -1419,7 +1420,7 @@ export class Vault implements VaultStamp {
    */
   async #onStorageRefusal(refused: BadOutcome) {
     const refusal = refused.err
-    if (UntrustedStorageKinds.some((kind) => isVaultError(refusal, kind))) { this.#refreshedAt = FarPast }
+    if (UntrustedStorageKinds.some((kind) => isVaultError(refusal, kind))) { this.#forceNextRefresh() }
     if (RefusalPolicy.decide(refusal) !== 'lock') { return }
     const why = refusal.refusalkind === 'vault_behind'
       ? 'Storage handed back an older copy of the vault than this device has seen'
@@ -1438,20 +1439,20 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Make this Vault object gone for good: every call refuses 'vault_remade' when `told` is that, else 'vault_gone'.
+  /** Make this Vault object gone for good: every call refuses 'vault_remade' when `refusal` is that, else 'vault_gone'.
    * The pending gating lands as a lock lands it, its waiters refusing so; the lease is dropped from
-   * memory, erasing nothing; and the watch on storage ends. `told`, for a Vault object gone of
+   * memory, erasing nothing; and the watch on storage ends. `refusal`, for a Vault object gone of
    * itself, is what `onGone` hears: pass null when the bank lets it go. A second call does nothing.
    */
-  #letGo(told: VaultError | null) {
+  #becomeGone(refusal: VaultError | null) {
     if (this.#goneBy !== null) { return }
-    this.#goneBy = told?.refusalkind === 'vault_remade' ? remadeError : goneError
+    this.#goneBy = refusal?.refusalkind === 'vault_remade' ? remadeError : goneError
     this.#landGating(this.#goneBy())
     this.#dropLease()
     // A second unsubscribe would count down a watch an adapter shares.
     this.#unsubscribeDB?.()
     this.#unsubscribeDB = null
-    if (told !== null) { this.#onGone(told) }
+    if (refusal !== null) { this.#onGone(refusal) }
   }
 
   /** Drop the lease from memory, erasing nothing, and publish the snapshot reckoned at `now`.
@@ -1641,7 +1642,7 @@ export class Vault implements VaultStamp {
   #boxGetRefusal(err: VaultError): VaultError {
     if (! isVaultError(err, 'vault_mismatch')) { return err }
     const gone = new VaultError('vault_gone', 'The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored.', { cause: err })
-    this.#letGo(gone)
+    this.#becomeGone(gone)
     return gone
   }
   // --

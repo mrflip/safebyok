@@ -6,7 +6,6 @@ import * as Scopepath from './scopepath'
 import { VaultError, isVaultError, thrownNameOf } from './errors'
 import { type Outcome, outcomeOf } from './outcome'
 import { isStorageBlocked } from './refusals'
-import { consistent } from './checks/validator'
 
 /** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device record. Extend it, and implement its `do*` methods against your store.
  * Nothing here ever goes to the backend. A {@link LeaseRecord} holds a non-extractable leaseKey, a
@@ -87,13 +86,15 @@ export abstract class DeviceDB {
   // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll, their try forms
 
   /** Read this device's record of one scope, or null for none. The bank judges what it says.
+   * A record misfiled under the scope, naming another, reads as none, as a malformed one does: it
+   * never reaches a way in.
    *
    * @example await deviceDB.getDeviceRecord({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
    */
   async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
     const deviceScopepath = Scopepath.device(scope)
     const raw = await storeAnswer('getDeviceRecord', () => this.doGetDeviceRecord(deviceScopepath))
-    return await this.#parseOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
+    return deviceRecordFor(deviceScopepath, await this.#parseOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw))
   }
 
   /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
@@ -104,22 +105,23 @@ export abstract class DeviceDB {
     return outcomeOf(() => this.getDeviceRecord(scope))
   }
 
-  /** Store `record` as this device's record of its scope, never lowering what is stored, resolving the record as stored.
+  /** Store `record` as this device's record of its scope, never lowering what is stored, resolving the record as stored, or null where that fails its check.
    * The store keeps what {@link raisedDeviceRecord} makes of the stored record and `record`, in one
-   * transaction, so a tab that saw less never lowers what another saw.
+   * transaction, so a tab that saw less never lowers what another saw. Hand it a record
+   * {@link deviceRecordOf} made: one that fails its check may be stored as it came, and resolves null.
    */
-  async raiseDeviceRecord(record: DeviceRecord): Promise<DeviceRecord> {
+  async raiseDeviceRecord(record: DeviceRecord): Promise<DeviceRecord | null> {
     let raised = record
     const deviceScopepath = Scopepath.device(record)
     await storeAnswer('raiseDeviceRecord', () => this.doRaiseDeviceRecord(deviceScopepath, (stored) => {
       raised = raisedDeviceRecord(stored, record)
       return raised
     }))
-    return raised
+    return deviceRecordFor(deviceScopepath, raised)
   }
 
-  /** The device record as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.raiseDeviceRecord}. */
-  tryRaiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> {
+  /** The device record as stored, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.raiseDeviceRecord}. */
+  tryRaiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord | null>> {
     return outcomeOf(() => this.raiseDeviceRecord(record))
   }
 
@@ -274,16 +276,10 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
   return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
-/** `answer`, a device record a DeviceDB handed back for `scope`, checked: the record, or null for one that fails its check or names another scope, as for none.
- * Read every device record through it, so a record misfiled under another scope, or malformed,
- * never reaches a way in.
- *
- * @example deviceRecordFor(scope, await deviceDB.getDeviceRecord(scope))          // the record, or null
- * @example deviceRecordFor(scope, { ...record, user_id: 'someone-else' })             // null
- */
-export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
+/** `answer`, a device record filed under `deviceScopepath`, checked: the record, or null for one that fails its check or names another scope, as for none. */
+const deviceRecordFor = (deviceScopepath: Scopepath.DeviceScopepath, answer: unknown): DeviceRecord | null => {
   const checked = DeviceRecord.safeParse(answer)
-  if (! checked.success || ! consistent(checked.data, scope)) { return null }
+  if (! checked.success || Scopepath.device(checked.data) !== deviceScopepath) { return null }
   return checked.data
 }
 
