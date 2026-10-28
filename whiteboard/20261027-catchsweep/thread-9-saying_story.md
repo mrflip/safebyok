@@ -1,7 +1,8 @@
 # Thread 9: saying_story (2026-10-28)
 
-Branch `20261028-saying_story`, PR #331, stacked on #327. Justify: green (core 3476 passed, 37
-skipped; every package green; size budget within limits).
+Branch `20261028-saying_story`, PR #331, stacked on #327 (base `c51b7274`; main has since merged
+#327, #330 and #328). Justify: green (core 3476 passed, 37 skipped; every package green; size
+budget within limits).
 
 * **Built**: in `packages/safebyok/src/checks/validator.ts`, `Saying` → `Story` and `SayingShape` →
   `StoryShape`; `parse(val, story?)` and every doc block follow ("saying" is "story" in prose, in
@@ -32,15 +33,41 @@ skipped; every package green; size budget within limits).
   - `Refusing`'s doc block, now a host's, says it is what a `Validator` call returns under each name.
 * **Deviations**: none from the plan beyond the interface form above.
 * **Discoveries**:
-  - `ConsistencyRefusal` is not exported, though `Refusing.parseConsistent`'s signature names it,
-    so a host typing that argument must write `Parameters<typeof X.parseConsistent>[2]`. Not asked
-    for; left for the Coach (below).
   - `ConsistencyRefusalShape`'s `message` checks the function arm with a bare `custom(...)` where
     the kit's `fn<...>()` would say `FunctionExpected`; behaviour kept, as the thread is names and
     types. A Cleanup candidate.
   - "story" collides with nothing in VOCABULARY.md; "saying" appears there only as prose.
+  - The zxcvbn strength checker's `PlainSaying`, `SayingForWarning` and `saying` are a weak
+    passphrase's reason sentence, not a Story, so the sweep left them; the #317 near-collision row
+    is moot now the type is `Story`. Every other "saying" in the repo is the plain participle.
+* **Review round** (the Coach's rulings, 2026-10-28, built on `a984cea5`):
+  - *Interfaces over the inferred types*: accepted as built; the comment above the two stays.
+  - *Exports*. The Coach: "Don't be chary with the exports. It's really frustrating for a lib
+    contributor to be denied things at arms reach. It's a lil baby tiny library right now, we can be
+    forgiven churn but not surliness." Followed as: every type an exported signature of
+    `checks/validator.ts` names is exported from the module and `src/index.ts`. Added:
+    `ConsistencyRefusal` (named by `Refusing.parseConsistent`, `demandConsistent`,
+    `verifyConsistent`) and `Merged` (named by `KitWith`; was module-private). The changeset names
+    each. Not widened to the three `consistent` functions, which are not types (open matter).
+  - *"story" replaces "saying" everywhere*: the sweep found one remaining place meaning the Story,
+    `.changeset/20261028-where_prefix.md` (#327's note, on this branch), changed in its own commit.
+  - *STYLE.md's Shapes bullet*: the reading is now the rule's own wording; namespacing is the
+    object a `Validator` call returns or the module's star import, conventionally `CX`, which the
+    codebase uses for `shapes/scopes` (`import * as CX from './shapes/scopes'`); the "common checks
+    folder" gloss (`src/checks/`, `src/shapes/`) kept as settled.
+  - *`Stored-` prefix* (from #330's review): the sentence it amends is main's (#330), not on this
+    base, so the paragraph here carries main's sentence verbatim plus the clause: the prefix names
+    what storage holds, checked or not (`StoredVaultTok`, `StoredRevision`). **The restack will
+    conflict on this paragraph** (both sides add text at the same spot): take this branch's side,
+    which is main's sentence with the clause.
+  - *Doc-block lead verb* (from #328's review): the rule and its worked example lead "Get and open
+    the box", the body "Gets through `#getBox`", the body line written exactly as main (#328) has
+    it, so the restack merges it clean.
+  - *VOCABULARY.md*: a **story** row in *Names, records and times*, in the Coach's words: "a
+    controlled record of what is happening, suitable for logs or refusals".
+  - STYLE.md's edits are one `docs:` commit; the exports and changeset one `api:`; the sweep one;
+    VOCABULARY.md one `docs:`.
 * **For the Coach**:
-  - Export `ConsistencyRefusal` beside `Story` and `Refusing`? Recommendation: yes, one word in
-    `src/index.ts` and a line in the changeset; a follow-up or a resume of this thread.
-  - Confirm the two glosses of the rule in STYLE.md: namespacing (object of a `Validator` call, or a
-    star import) and "the common checks folder" (`src/checks/` and `src/shapes/`).
+  - Export `consistent`, `demandConsistent` and `verifyConsistent` from `safebyok` too, in the
+    exports ruling's spirit? They are functions, not types, so this round did not. Recommendation:
+    yes, in a Cleanup; a host holding a `Refusing` already reaches `parseConsistent`.
