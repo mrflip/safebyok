@@ -191,6 +191,16 @@ listing each rename, `patch` per adapter whose docs or tests changed. Size: larg
 nothing beyond #311. Look-ahead: thread 3 rewrites these verbs' insides right after; keep each verb's
 body whole so its diff stays small.
 
+*Review:* (medium, 2026-10-28) fixed: `deviceRecordFor`'s example unwrapped the throwing form with
+`valOf` (`d5cf3fb3`); the demo's `OutageVaultDB.delDamagedVault` override lost its `async` with the
+Outcome (`16aea6b8`); six `return await` outside a try in the demo (`999d9ce0`, style). Nothing
+significant. Minor, left: `delDamagedVaultIn`'s `bad_option` names `tryDelDamagedVault` where the class
+doc says override `delDamagedVault` (thread 3 aligns); ~70 test locals hold a try form under the throwing
+verb's name (a sweep after the sprint, Cleanup); try-twin doc examples in `vault-db.ts`/`device-db.ts`
+show the other twin's answer (documentarian after thread 3, Cleanup); `return await` outside a try on
+dedented lines; `#readableOf`'s `doDelUnreadable` failure reported under the reading verb (as before);
+conformance suites exercise the try forms only (recorded decision).
+
 ### 7. vault_bank_flip: the Vault's and Bank's try pairs in the one-catch form
 
 Coach, 2026-10-28, on thread 1's open matter: "I'm happier with the throwing body doing a try catch
