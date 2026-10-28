@@ -15,16 +15,16 @@ type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safePars
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
   ['SafebyokVaultScope',         Safebyok.vaultScope.unwrap(), []],
-  ['SafebyokVaultRecord',        Safebyok.vaultRecord, []],
-  ['SafebyokVaultRecordInput',   Safebyok.vaultRecord, []],
-  ['SafebyokGate',               Safebyok.gateRecord,  []],
-  ['SafebyokGateInput',          Safebyok.gateRecord,  []],
-  ['SafebyokBox',                Safebyok.boxRecord,   []],
-  ['SafebyokBoxInput',           Safebyok.boxRecord,   []],
-  ['SafebyokBoxSparse',          Safebyok.boxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
-  ['SafebyokBoxDamaged',         Safebyok.boxDamaged,  []],
-  ['SafebyokCiphered',           Safebyok.ciphered,    []],
-  ['SafebyokCipheredInput',      Safebyok.ciphered,    []],
+  ['SafebyokVaultRecord',        Safebyok.vaultRecord,         []],
+  ['SafebyokVaultRecordInput',   Safebyok.vaultRecord,         []],
+  ['SafebyokGate',               Safebyok.gateRecord,          []],
+  ['SafebyokGateInput',          Safebyok.gateRecord,          []],
+  ['SafebyokBox',                Safebyok.boxRecord,           []],
+  ['SafebyokBoxInput',           Safebyok.boxRecord,           []],
+  ['SafebyokBoxSparse',          Safebyok.boxRecord,           ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBoxDamaged',         Safebyok.boxDamaged,          []],
+  ['SafebyokCiphered',           Safebyok.ciphered,            []],
+  ['SafebyokCipheredInput',      Safebyok.ciphered,            []],
 ] as const
 
 /** The fields of the object or input type `typename`, by name. */
