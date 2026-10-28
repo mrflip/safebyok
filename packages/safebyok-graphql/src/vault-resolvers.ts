@@ -96,7 +96,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
   // The server holds a name to its check and to its storage's limits, which every VaultDB verb
   // checks as a browser's vault does. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or what `vaultDBFor` threw as {@link hostThrew} has it cross. */
+  /** The request's VaultDB, or what `vaultDBFor` threw as `hostThrew` has it cross. */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
