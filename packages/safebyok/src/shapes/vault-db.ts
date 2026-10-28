@@ -1,7 +1,7 @@
 /** What a VaultDB's verbs take and answer: the expectations a write is proven against, a vault's capacity, and the answers of a vault read. Each `parse` refuses 'bad_record'. */
 
 import type * as Z from 'zod'
-import { Validator } from '../checks/validator'
+import { Checker, Checkers, objCheck } from '../checks/validator'
 import type { BoxSparse, BoxDamaged } from './box'
 import * as BX from './box'
 import * as VX from './vault'
@@ -58,7 +58,7 @@ export type BoxDeletion = Z.infer<typeof boxDeletion>
  * An expectation keeps only the fields it compares, so a whole record handed as one is read for
  * those alone.
  */
-export const { vaultRecordExpectation, boxGetExpectation, boxExpectation, vaultDelExpectation, boxDelExpectation, boxDeletion } = Validator('bad_record', ({ obj, uint, oneof, revision_tok }) => {
+export const { vaultRecordExpectation, boxGetExpectation, boxExpectation, vaultDelExpectation, boxDelExpectation, boxDeletion } = Checkers('bad_record', ({ obj, uint, oneof, revision_tok }) => {
   const vaultRecordExpectation = VX.vaultSparse.pick({ vault_tok: true, gate_epoch: true })
   const boxGetExpectation = VX.vaultSparse.pick({ vault_tok: true })
   return {
@@ -82,12 +82,12 @@ export const { vaultRecordExpectation, boxGetExpectation, boxExpectation, vaultD
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */
-export const { capacity } = Validator('bad_record', ({ obj, union, int, uint, lit }) => {
+export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
   // A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
   // safe integer, as Bank.make keeps a declared limit: past this check, no limit is infinite.
   const roomLimit = union([int.positive(), lit(Infinity)]).transform((most) => Math.min(most, Number.MAX_SAFE_INTEGER))
   const room      = obj({ used: uint, max: roomLimit })
-  return { capacity: obj({ boxes: room, bytes: room }) }
+  return { boxes: room, bytes: room }
 })
 export type Capacity = Z.infer<typeof capacity>
 // --
@@ -130,7 +130,7 @@ export type StoredVault = BoxListing & {
  * vault record as stored, and its listing, each sound box an object to judge, each damaged one a
  * {@link BoxDamaged}.
  */
-export const { listedBox, storedRevision, storedVaultAnswer, listingAnswer } = Validator('bad_record', ({ obj, arr, unk, revision_tok }) => ({
+export const { listedBox, storedRevision, storedVaultAnswer, listingAnswer } = Checkers('bad_record', ({ obj, arr, unk, revision_tok }) => ({
   listedBox:         BX.boxRecord.partial({ box_key_wrapped: true, whisper_ciphered: true }),
   storedRevision:    obj({ revision_tok }),
   storedVaultAnswer: obj({ vault: unk }).loose(),
@@ -138,7 +138,5 @@ export const { listedBox, storedRevision, storedVaultAnswer, listingAnswer } = V
 }), [FX])
 
 /** The one field of a stored vault record a deletion needs, as the record's own check has it, every other field dropped unread. */
-export const { storedVaultTok } = Validator('bad_record', () => ({
-  storedVaultTok: VX.vaultSparse.pick({ vault_tok: true }),
-}))
+export const storedVaultTok = Checker(() => VX.vaultSparse.pick({ vault_tok: true }))
 // --

@@ -20,7 +20,7 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
       'Bank', 'Vault', 'correctableKindVals', 'gatingKindVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'ciphered', 'deviceRecord', 'DeviceRecordFormat', 'epochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'boxDamageVals', 'boxDamaged', 'BoxFormat', 'boxRecord', 'boxSparse', 'boxStamp', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'passkeyWayinRecord', 'PasskeySaltBytes', 'passphraseWayinRecord', 'sidecar', 'StaleMinutes', 'wayinRecord', 'wayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'leaseRecord', 'leaseStamp', 'gateRecord', 'gateSparse', 'passkeyWayinSparse', 'passphraseWayinSparse', 'VaultFormat', 'vaultSparse', 'vaultStamp', 'vaultTombstone', 'TombstoneFormat', 'vaultRecord', 'vaultScope', 'isGated', 'whisper', 'wallClock',
-      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Validator', 'consistent', 'demandConsistent', 'verifyConsistent',
+      'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'UserIdPattern', 'label', 'user_id', 'Kit', 'Checkers', 'Checker', 'objCheck', 'consistent', 'demandConsistent', 'verifyConsistent',
       'VaultError', 'RefusalFamilyForKind', 'refusalFamilyVals', 'refusalKindVals', 'isCondition', 'isVaultError', 'storageTroubleOf', 'outcomeOf', 'unexpectedError', 'valOf',
       'VaultDB', 'splitStoredBoxes', 'Scopepath', 'Expectations', 'Refusals', 'HostErrorSanitizer', 'localVaultDB', 'memoryDeviceDB', 'DeviceDB', 'deviceRecordOf',
       'bankScope', 'boxscope', 'bankScopepath', 'vaultScopepath', 'leaseScopepath', 'deviceScopepath', 'boxScopepath', 'vaultBag', 'bankBag', 'keyDeriverSpec', 'maskOpts', 'idbOpts',
@@ -42,7 +42,7 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
-  it("exports each validator a host or an adapter calls by name, no namespace of them, each the object its module makes, and Validator and its kit to make more", () => {
+  it("exports each validator a host or an adapter calls by name, no namespace of them, each the object its module makes, and Checkers, Checker, objCheck and their kit to make more", () => {
     const validatorsByName = Object.entries(safebyok).filter(([_exportname, exported]) => exported instanceof Zod.ZodType)
     expect(validatorsByName.map(([exportname]) => exportname)).to.have.members([
       'epochMillis', 'label', 'user_id',
@@ -58,7 +58,9 @@ describe("the package's entry point", () => {
     for (const [exportname, exported] of validatorsByName) {
       expect(shapesModules.some((shapesModule) => (shapesModule as Record<string, unknown>)[exportname] === exported), exportname).to.be.true
     }
-    expect(safebyok.Validator('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
+    expect(safebyok.Checkers('bad_option', ({ str }) => ({ named: str })).named.safeParse('acme').success).to.be.true
+    expect(safebyok.Checker(({ str }) => str).safeParse('acme').success).to.be.true
+    expect(safebyok.objCheck(({ str }) => ({ named: str })).safeParse({ named: 'acme' }).success).to.be.true
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {

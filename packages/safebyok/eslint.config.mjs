@@ -222,7 +222,7 @@ export default defineConfig([
     },
   },
 
-  // Zod comes in as `zod`, classic, the one flavour: every schema in src/ is made in a Validator
+  // Zod comes in as `zod`, classic, the one flavour: every schema in src/ is made in a Checkers
   // call, which hands its builder Zod's makers. Classic is the larger library (the same five
   // validators bundle to some 25 kB gzipped, against 7 kB in mini), a cost the Coach accepted for
   // its ergonomics; named and star imports shake alike. `zod/mini` would bundle a second Zod beside
@@ -234,7 +234,7 @@ export default defineConfig([
       'no-restricted-imports': ['error', {
         paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
           name:    otherPath,
-          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Validator call, which hands its builder Zod's makers: one Zod, classic, bundles.",
+          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Checkers call, which hands its builder Zod's makers: one Zod, classic, bundles.",
         })),
       }],
     },

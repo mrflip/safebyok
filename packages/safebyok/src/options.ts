@@ -1,12 +1,12 @@
 import type * as Z from 'zod'
-import { type KitWith, Validator } from './checks/validator'
+import { type KitWith, Checkers } from './checks/validator'
 
 /** Make a check of a host's options bag, which hands the bag back as given when it is left out or every field passes `fieldsOf`.
  * It refuses 'bad_option' otherwise, so a misspelt option is never quietly ignored. The message
  * names each field it judged, counts a field it does not take without naming it, quotes no value,
  * and ends with `said`.
  *
- * @param fieldsOf - Each field the bag may hold, and its schema, from the `Validator` kit; make
+ * @param fieldsOf - Each field the bag may hold, and its schema, from the `Checkers` kit; make
  *   one `.optional()` to let it be left out.
  *
  * @example
@@ -15,7 +15,7 @@ import { type KitWith, Validator } from './checks/validator'
  *   checkStoreOpts({ note: 'work' })              // throws: bad_option, "There is a field it does not take ...: it takes only sidecar. ..."
  */
 export const optionsCheck = (fieldsOf: (kit: KitWith<readonly []>) => Z.ZodRawShape, said: string) => {
-  const { optionsBag } = Validator('bad_option', (kit) => ({ optionsBag: kit.obj(fieldsOf(kit)).strict().optional() }))
+  const { optionsBag } = Checkers('bad_option', (kit) => ({ optionsBag: kit.obj(fieldsOf(kit)).strict().optional() }))
   return <Bag>(candidate: Bag): Bag => {
     optionsBag.parse(candidate, { advice: said })
     return candidate

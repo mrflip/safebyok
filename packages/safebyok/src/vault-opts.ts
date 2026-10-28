@@ -12,7 +12,7 @@ import { type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker
 import * as CX from './shapes/scopes'
 import type { Gating, RequestCleartext } from './gating'
 import * as Phrases from './phrases'
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 
 /** True for any object but null, an array included. */
 export const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
@@ -24,7 +24,7 @@ export const isBag = (candidate: unknown) => typeof candidate === 'object' && ca
  * bank keeps what it was handed: the clock, the key deriver and the logger are read from the bag
  * itself.
  */
-const { vaultDBGiven, deviceDBGiven, bankOptsRead } = Validator('bad_option', ({ custom, fn }) => {
+const { vaultDBGiven, deviceDBGiven, bankOptsRead } = Checkers('bad_option', ({ custom, fn }) => {
   const vaultDBGiven = custom<VaultDB>((candidate) => candidate instanceof VaultDB && OX.vaultDBShape.safeParse(candidate).success, Phrases.VaultDBShape)
   const deviceDBGiven = custom<DeviceDB>((candidate) => candidate instanceof DeviceDB && OX.deviceDBShape.safeParse(candidate).success, Phrases.DeviceDBShape)
   return {

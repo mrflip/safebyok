@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { record } from 'zod'
 import * as Phrases from '../phrases'
-import { Validator } from '../checks/validator'
+import { Checker, Checkers, objCheck } from '../checks/validator'
 import * as FX from './fields'
 import * as VX from './vault'
 
@@ -38,7 +38,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
-export const { whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
+export const { whisper, whisperBag } = Checkers('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
   const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
   // An object is judged whole, so a refusal's path never holds one of its keys, which are the caller's own.
   const whisperMembers = record(str, whisperJson)
@@ -62,7 +62,7 @@ export const { whisper, whisperBag } = Validator('bad_whisper', ({ lazy, union, 
  * @example sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
  * @example sidecar.safeParse('work account').success           // false: a sidecar is an object -- { note: 'work account' }
  */
-export const { sidecar } = Validator('bad_option', () => ({ sidecar: whisperBag }))
+export const sidecar = Checker(() => whisperBag, 'bad_option')
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
@@ -83,30 +83,28 @@ export const BoxFormat = 'safebyok-box-v8'
  *
  * @example boxRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no box
  */
-export const { boxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis, revision_tok, box_key_wrapped, whisper_ciphered }) => ({
-  boxRecord: obj({
-    format:                 lit(BoxFormat),
-    boxlabel,
-    revision_tok,
-    /** This box's boxKey, wrapped under the vaultKey. */
-    box_key_wrapped,
-    /** The whisper, ciphered under this box's boxKey. */
-    whisper_ciphered,
-    /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
-    whisper_codec:          lit('json_v1'),
-    /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
-    whisper_schema_version: lit(1),
-    /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
-     * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
-     * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
-     */
-    sidecar:                sidecar,
-    /** When this boxlabel was first stored: every later store carries it forward. */
-    registered_at:          epochMillis,
-    /** When this revision was written: a store of the same whisper moves it too. */
-    written_at:             epochMillis,
-  }).strict(),
-}), [FX])
+export const boxRecord = Checker(({ obj, lit, boxlabel, epochMillis, revision_tok, box_key_wrapped, whisper_ciphered }) => obj({
+  format:                 lit(BoxFormat),
+  boxlabel,
+  revision_tok,
+  /** This box's boxKey, wrapped under the vaultKey. */
+  box_key_wrapped,
+  /** The whisper, ciphered under this box's boxKey. */
+  whisper_ciphered,
+  /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
+  whisper_codec:          lit('json_v1'),
+  /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
+  whisper_schema_version: lit(1),
+  /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
+   * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
+   * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
+   */
+  sidecar:                sidecar,
+  /** When this boxlabel was first stored: every later store carries it forward. */
+  registered_at:          epochMillis,
+  /** When this revision was written: a store of the same whisper moves it too. */
+  written_at:             epochMillis,
+}).strict(), 'bad_record', [FX])
 export type BoxRecord = Z.infer<typeof boxRecord>
 
 /** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
@@ -116,9 +114,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  *
  * @example boxSparse.parse(listed)   // { format, boxlabel, revision_tok, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at }
  */
-export const { boxSparse } = Validator('bad_record', () => ({
-  boxSparse: boxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip(),
-}))
+export const boxSparse = Checker(() => boxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true }).strip())
 export type BoxSparse = Z.infer<typeof boxSparse>
 
 /** A box record as storage may hold it: typed as a {@link BoxRecord} is written, though it may fail its check and read back damaged. */
@@ -139,9 +135,9 @@ export const boxDamageVals = ['damaged', 'newer_format'] as const
  *     if (box.damage === 'newer_format') { offerUpdate() } else { offerRemove(box.boxlabel) }
  *   }
  */
-export const { boxDamaged } = Validator('bad_record', ({ obj, oneof, boxlabel, revision_tok }) => ({
-  boxDamaged: obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict(),
-}), [FX])
+export const boxDamaged = Checker(({ obj, oneof, boxlabel, revision_tok }) => (
+  obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict()
+), 'bad_record', [FX])
 export type BoxDamaged = Z.infer<typeof boxDamaged>
 
 /** A box's stamp: its {@link BoxSparse}, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
@@ -150,16 +146,14 @@ export type BoxDamaged = Z.infer<typeof boxDamaged>
  *
  * @example boxStamp.parse({ ...sparse, vault_tok: box.vault_tok })   // sparse: box.record but its two ciphered fields
  */
-export const { boxStamp } = Validator('bad_record', ({ vault_tok }) => ({
+export const boxStamp = Checker(({ vault_tok }) => (
   // Strict: every field a box shows is bound, and one beside them would be shown but not bound.
-  boxStamp: boxSparse.extend({ vault_tok }).strict(),
-}), [FX])
+  boxSparse.extend({ vault_tok }).strict()
+), 'bad_record', [FX])
 export type BoxStamp = Z.infer<typeof boxStamp>
 
 /** The check of a box's two ciphered fields, as {@link BoxCiphered} has them, every other field a box record holds dropped unread. Its `parse` refuses 'bad_record'. */
-export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
-  boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
-}), [FX])
+export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), 'bad_record', [FX])
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Z.infer<typeof boxCiphered>
@@ -173,7 +167,7 @@ export type BoxCiphered = Z.infer<typeof boxCiphered>
  * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
  * is made under, and what a seal is made with, are taken from a `VaultSparse`, frozen.
  */
-export const { boxBase, sealBoxProps, madeUnder, madeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
+export const { boxBase, sealBoxProps, madeUnder, madeShape } = Checkers('bad_option', ({ obj, boxlabel, epochMillis, revision_tok }) => {
   const boxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
   const madeUnder = VX.vaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
   return {

@@ -2,7 +2,7 @@
 
 import { string as zodString } from 'zod'
 import type * as Z from 'zod'
-import { Validator } from '../checks/validator'
+import { Checker, Checkers, objCheck } from '../checks/validator'
 import * as Phrases from '../phrases'
 import { fromB64OrNull } from '../crypto'
 import type { StrengthChecker } from '../passphrase-strength'
@@ -26,7 +26,7 @@ export const wayinKindVals = ['passphrase', 'passkey'] as const
  *
  * @example wayinkind.safeParse('passkey').success   // true
  */
-export const { wayinkind } = Validator('bad_option', ({ oneof }) => ({ wayinkind: oneof(wayinKindVals) }))
+export const wayinkind = Checker(({ oneof }) => oneof(wayinKindVals), 'bad_option')
 export type WayinKind = typeof wayinKindVals[number]
 
 /** How many random bytes a passkey wayin's `prf_salt_b64` holds.
@@ -50,7 +50,7 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
  * @example vaultRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no vault record
  * @example vaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
-export const { passphraseWayinRecord, passkeyWayinRecord, wayinRecord, gateRecord, vaultRecord, vaultSparse, vaultStamp, vaultStampButFormat, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse, passphraseWayinHeader, passkeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis, key_deriver_label, salt_b64, device_id, vault_key_wayin_wrapped, credential_id, prf_salt_b64, vault_tok }) => {
+export const { passphraseWayinRecord, passkeyWayinRecord, wayinRecord, gateRecord, vaultRecord, vaultSparse, vaultStamp, vaultStampButFormat, vaultTombstone, gateSparse, passphraseWayinSparse, passkeyWayinSparse, passphraseWayinHeader, passkeyWayinHeader } = Checkers('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis, key_deriver_label, salt_b64, device_id, vault_key_wayin_wrapped, credential_id, prf_salt_b64, vault_tok }) => {
   const passphraseWayinRecord = obj({
     wayinkind:               lit('passphrase'),
     /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
@@ -194,10 +194,10 @@ export type VaultStampButFormat = Z.infer<typeof vaultStampButFormat>
  * @example vaultMadeUnder.parse(box)                          // { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
  * @example vaultMadeUnder.parse({ gate_epoch: 1 })            // throws 'bad_option', "vault_tok: ..."
  */
-export const { vaultMadeUnder } = Validator('bad_option', () => ({
-  vaultMadeUnder: vaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
-    .partial({ applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true }),
-}))
+export const vaultMadeUnder = Checker(() => (
+  vaultSparse.pick({ vault_tok: true, applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
+    .partial({ applabel: true, user_id: true, vaultlabel: true, vault_epoch: true, gate_epoch: true })
+), 'bad_option')
 
 /** What a thing carries of the vault it was made under, as `vault.demandConsistentWith` judges it: the vault's `vault_tok`, and whichever of its scope and epochs the thing carries.
  * A Box, a Lease, a Gate, a Proving, a snapshot and a vault record are each one. A field the
@@ -212,9 +212,7 @@ export type VaultMadeUnder = Z.infer<typeof vaultMadeUnder>
 export type GatedVaultRecord = VaultRecord & { gate: GateRecord }
 
 /** The check of a {@link VaultDraft}, as `VaultDB.ensureVault` takes one. Its `parse` refuses 'bad_record'. */
-export const { vaultDraft } = Validator('bad_record', ({ lit }) => ({
-  vaultDraft: vaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict(),
-}))
+export const vaultDraft = Checker(({ lit }) => vaultSparse.extend({ vault_epoch: lit(0), gate_epoch: lit(0), gate: lit(null) }).strict())
 
 /** A novel vault record, as `bank.ensureVault` drafts it and `VaultDB.ensureVault` first stores it: no gate, `gate_epoch` 0, and `vault_epoch` 0, as the store sets the counter.
  *
@@ -317,9 +315,7 @@ export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
  * @example passphraseCleartext.parse(typed)   // a PassphraseCleartext, for the key deriver
  * @example passphraseCleartext.parse(42)      // throws 'bad_option', "A passphrase is the text the user typed, as a string"
  */
-export const { passphraseCleartext } = Validator('bad_option', () => ({
-  passphraseCleartext: zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(),
-}))
+export const passphraseCleartext = Checker(() => zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(), 'bad_option')
 
 /** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
@@ -334,15 +330,13 @@ export const PrfAnswerBytes = 32
  * @example passkeyAnswer.parse(await askPasskey(vault.snapshot.gate))
  * @example passkeyAnswer.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
  */
-export const { passkeyAnswer } = Validator('bad_option', ({ obj, str, bytes, credential_id }) => ({
-  passkeyAnswer: obj({
-    /** Base64url, as `PublicKeyCredential.id` gives it. */
-    credential_id,
-    prf_salt_b64:  str.min(1),
-    /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
-    prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
-  }),
-}), [FX])
+export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
+  /** Base64url, as `PublicKeyCredential.id` gives it. */
+  credential_id,
+  prf_salt_b64:  str.min(1),
+  /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
+  prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
+}), 'bad_option', [FX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
@@ -360,9 +354,9 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
  * @example freshPasskeyAnswer.parse(await createPasskey(opts))   // passes
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
  */
-export const { freshPasskeyAnswer } = Validator('bad_option', () => ({
-  freshPasskeyAnswer: passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] }),
-}))
+export const freshPasskeyAnswer = Checker(() => (
+  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] })
+), 'bad_option')
 // --
 
 // == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
@@ -373,7 +367,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
 )
 
 /** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
-export const { strengthChecker, passphraseVerdict } = Validator('bad_option', ({ custom, union, obj, lit, str }) => ({
+export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ custom, union, obj, lit, str }) => ({
   strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
   passphraseVerdict: union([
     obj({ strong: lit(true) }),
