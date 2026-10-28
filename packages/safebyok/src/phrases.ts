@@ -161,7 +161,7 @@ export const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the ba
 export const otherScopeSays = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
-export const GoneWhileOpening = 'The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault).'
+export const GoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."
 
 /** Why options naming other stores than the vault the bank holds was born from refuse. */
 export const OtherStores = "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
