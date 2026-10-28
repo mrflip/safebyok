@@ -276,7 +276,7 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
   return DeviceRecord.parse({ format: DeviceRecordFormat, applabel, user_id, vaultlabel, device_id, highest_vault_epoch })
 }
 
-/** `answer`, a device record filed under `deviceScopepath`, checked: the record, or null for one that fails its check or names another scope, as for none. What each verb resolves a device record through. */
+/** `answer`, a device record filed under `deviceScopepath`, checked: the record, or null for one that fails its check or names another scope, as for none. */
 const deviceRecordFor = (deviceScopepath: Scopepath.DeviceScopepath, answer: unknown): DeviceRecord | null => {
   const checked = DeviceRecord.safeParse(answer)
   if (! checked.success || Scopepath.device(checked.data) !== deviceScopepath) { return null }
