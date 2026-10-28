@@ -1,6 +1,6 @@
 # Thread 4: where_prefix, one parse, said where (2026-10-28)
 
-Branch `20261028-where_prefix`, PR #TBD, stacked on #311 (`20261027-proving_tidy`, on main).
+Branch `20261028-where_prefix`, PR #317, stacked on #311 (`20261027-proving_tidy`, on main).
 Justify: green; core 3426 passed, 37 skipped; indexeddb 167 passed, 11 skipped; every package built,
 size budgets kept.
 
