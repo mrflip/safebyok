@@ -802,7 +802,7 @@ describe("the abstract VaultDB, on a box write that misses", () => {
   }
 
   it("refuses as corrupt_record a stale write whose adapter does not say what is stored, saying nothing was written and the adapter needs a look", async () => {
-    const thrown = Refusals.staleWrite('del')
+    const thrown = Refusals.staleDel()
     const vaultDB = new RefusingVaultDB(thrown)
     const refusal = await TH.expectBad(vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two')), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
@@ -953,8 +953,8 @@ class ForgetfulVaultDB extends MapVaultDB {
   protected override async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation) { return good(await super.doGetBox(scope, boxlabel, expected)) }
   protected override doPutVaultRecord(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleVaultRecord(null))) }
   protected override doPutBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleBox(null))) }
-  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
-  protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleWrite('del'))) }
+  protected override doDelBox(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleDel())) }
+  protected override doDelVault(): Promise<unknown> { return Promise.resolve(bad(Refusals.staleDel())) }
 }
 
 /** A MapVaultDB whose box reads and writes it hands on to `inner`, unwrapping each answer as an adapter must. */
@@ -1193,7 +1193,7 @@ describe("the abstract VaultDB, on an update of the vault record that misses", (
   }
 
   it("refuses as corrupt_record a stale write that does not say what is stored, saying nothing was written", async () => {
-    const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleWrite('del') })
+    const vaultDB = new StalePropsVaultDB({ refusal: Refusals.staleDel() })
     const refusal = await TH.expectBad(vaultDB.tryPutVaultRecord(TH.vaultRecordOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'corrupt_record')
     expect(refusal.message).to.match(/nothing was written/)
     expect(refusal.message).to.match(/Refusals.staleVaultRecord/)

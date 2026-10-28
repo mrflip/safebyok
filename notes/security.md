@@ -443,7 +443,7 @@ added or folded into through the subagent, and no other entry changes.
   public; the headline and the holder sentences above no longer hold.** The getter is removed and the Lease is the Vault
   object's own again: a host reaches no Lease, and so cannot decipher a box ciphertext through one; what an app reads
   of it is `vault.askPassphraseAt` (the deadline, from the snapshot) and `vault.leaseMillis`. The package reads the
-  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseReader(vault, read)`, called once
+  Lease through a module-private WeakMap registry (`src/held-lease.ts`): `registerLeaseGetter(vault, getLease)`, called once
   in the Vault constructor with the first registration winning, and `heldLeaseOf(vault)`, used by `Box.seal`,
   `box.extractWhisper()` and a damaged lease dropping itself; exported from no entry point. The walk test above now
   finds no Lease either. Each copy of the package has its own registry, so a Vault object from one copy reads as locked

@@ -51,7 +51,7 @@ export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
 /** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
 export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
   const call = fn()
-  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
+  return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {
@@ -77,15 +77,15 @@ class StringStoreVaultDB extends VaultDB {
   // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
   // read of a vault reads its record and its boxes in one such step.
   protected doGetVault(scope: VaultScope): Promise<StoredVault> {
-    return soon(() => ({ vault: readJson(this.store, Scopepath.vault(scope)), ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
+    return soon(() => ({ vault: getJson(this.store, Scopepath.vault(scope)), ...splitStoredBoxes(this.storedBoxesOf(scope)) }))
   }
 
   protected doEnsureVault(draft: VaultDraft): Promise<StoredVault> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(draft)
-      const stored = readJson(this.store, vaultScopepath)
+      const stored = getJson(this.store, vaultScopepath)
       const life = Expectations.newLifeOf(draft, stored)
-      if (life) { this.store.write(vaultScopepath, JSON.stringify(life)) }
+      if (life) { this.store.put(vaultScopepath, JSON.stringify(life)) }
       return { vault: life ?? stored, ...splitStoredBoxes(this.storedBoxesOf(draft)) }
     })
   }
@@ -93,18 +93,18 @@ class StringStoreVaultDB extends VaultDB {
   protected doPutVaultRecord(vaultRecord: VaultRecord, expected: VaultRecordExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(vaultRecord)
-      const stored = readJson(this.store, vaultScopepath)
+      const stored = getJson(this.store, vaultScopepath)
       const refusal = Expectations.vaultRecordRefusalOf(stored, expected)
       if (refusal) { throw refusal }
-      this.store.write(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, stored)))
-      return readJson(this.store, vaultScopepath)
+      this.store.put(vaultScopepath, JSON.stringify(Expectations.vaultRecordPutOf(vaultRecord, stored)))
+      return getJson(this.store, vaultScopepath)
     })
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Scopepath.vault(scope)), expected)) { throw Refusals.vaultMismatch() }
-      return readJson(this.store, Scopepath.box({ ...scope, boxlabel }))
+      if (! Expectations.vaultMeets(getJson(this.store, Scopepath.vault(scope)), expected)) { throw Refusals.vaultMismatch() }
+      return getJson(this.store, Scopepath.box({ ...scope, boxlabel }))
     })
   }
 
@@ -114,7 +114,7 @@ class StringStoreVaultDB extends VaultDB {
       .filter(Scopepath.withinVaultScopepathPred(scope))
       // A row under the vault's prefix that is no box's scopepath holds no box a verb can reach: it is passed over.
       .filter((scopepath) => Scopepath.isBox(scopepath))
-      .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.read(boxScopepath) }))
+      .map((boxScopepath) => ({ boxlabel: Scopepath.boxscope(boxScopepath).boxlabel, text: this.store.get(boxScopepath) }))
       // A row erased since the scopepaths were read is gone; one that is not JSON goes up as its text.
       .filter((row): row is { boxlabel: string, text: string } => row.text !== null)
       // A row is handed to the split as stored, whatever it holds: the split judges it.
@@ -125,11 +125,11 @@ class StringStoreVaultDB extends VaultDB {
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
       const boxScopepath = Scopepath.box({ ...scope, boxlabel: box.boxlabel })
-      const storedText = this.store.read(boxScopepath)
-      const refusal = Expectations.boxRefusalOf(readJson(this.store, Scopepath.vault(scope)), storedText === null ? null : jsonOrText(storedText), expected)
+      const storedText = this.store.get(boxScopepath)
+      const refusal = Expectations.boxRefusalOf(getJson(this.store, Scopepath.vault(scope)), storedText === null ? null : jsonOrText(storedText), expected)
       if (refusal) { throw refusal }
-      this.store.write(boxScopepath, JSON.stringify(box))
-      return readJson(this.store, boxScopepath)
+      this.store.put(boxScopepath, JSON.stringify(box))
+      return getJson(this.store, boxScopepath)
     })
   }
 
@@ -138,7 +138,7 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => {
       const texts = this.store.scopepaths()
         .filter(Scopepath.withinVaultScopepathPred(scope))
-        .map((scopepath) => this.store.read(scopepath))
+        .map((scopepath) => this.store.get(scopepath))
         .filter((text): text is string => text !== null)
       const bytesUsed = texts.reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
       return { boxes: { used: texts.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
@@ -147,12 +147,12 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Scopepath.vault(scope)), expected)) { return null }
+      if (! Expectations.vaultMeets(getJson(this.store, Scopepath.vault(scope)), expected)) { return null }
       const boxScopepath = Scopepath.box({ ...scope, boxlabel })
       // A row that is not JSON is still deleted, and reported as holding no revision.
-      const text = this.store.read(boxScopepath)
+      const text = this.store.get(boxScopepath)
       const deletion = Expectations.deletionOf(text === null ? null : jsonOrText(text), expected)
-      this.store.erase(boxScopepath)
+      this.store.del(boxScopepath)
       return deletion
     })
   }
@@ -161,15 +161,15 @@ class StringStoreVaultDB extends VaultDB {
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return soon(() => {
       const vaultScopepath = Scopepath.vault(scope)
-      const tombstone = Expectations.tombstoneOf(readJson(this.store, vaultScopepath), scope, expected)
+      const tombstone = Expectations.tombstoneOf(getJson(this.store, vaultScopepath), scope, expected)
       if (tombstone === null) { return null }
       // Every row under the vault's prefix goes, a box's or not.
       const isWithinVault = Scopepath.withinVaultScopepathPred(scope)
       for (const scopepath of this.store.scopepaths()) {
-        if (isWithinVault(scopepath)) { this.store.erase(scopepath) }
+        if (isWithinVault(scopepath)) { this.store.del(scopepath) }
       }
-      this.store.write(vaultScopepath, JSON.stringify(tombstone))
-      return readJson(this.store, vaultScopepath)
+      this.store.put(vaultScopepath, JSON.stringify(tombstone))
+      return getJson(this.store, vaultScopepath)
     })
   }
 
@@ -190,7 +190,7 @@ const jsonOrText = (text: string): unknown => {
 }
 
 /** The row under `scopepath` as {@link jsonOrText} reads it, or null when there is none. */
-const readJson = (store: StringStore, scopepath: string): unknown => {
-  const text = store.read(scopepath)
+const getJson = (store: StringStore, scopepath: string): unknown => {
+  const text = store.get(scopepath)
   return text === null ? null : jsonOrText(text)
 }

@@ -245,12 +245,12 @@ export class Lease implements LeaseSparse {
   }
 }
 
-/** A lease as this device's store kept it, read but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.tryRead} hands the bank's birth read and the vault's refresh and pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
+/** A lease as this device's store kept it, fetched but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.tryGet} hands the bank's birth, the vault's refresh and its pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
  * Its own fields are its {@link LeaseSparse}, which a revocation check compares; the leaseKey and
  * the wrap stay inside, for the Lease that {@link KeptLease.leaseOn} makes once a Vault object takes
  * it up. Frozen, and shown in a spread, JSON or a log line by its sparse fields alone.
  *
- * @example const kept = valOf(await KeptLease.tryRead(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
+ * @example const kept = valOf(await KeptLease.tryGet(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
  * @example const lease = kept.leaseOn(vault)   // Lease.make, of the record kept inside
  */
 export class KeptLease implements LeaseSparse {
@@ -286,16 +286,16 @@ export class KeptLease implements LeaseSparse {
 
   /** This device's lease on `scope`, as `deviceDB` keeps it, held closed; null for none. `DeviceDB.tryGetLease`, its answer checked as a {@link LeaseRecord} of `scope`.
    * What the store hands back that is no lease of this scope reads as none, left where it lies:
-   * another vault's, or a host store's mistake, which the next grant writes over. A read about to
+   * another vault's, or a host store's mistake, which the next grant writes over. A caller about to
    * take the lease up passes `told`, and its logger is warned once under `told.call`, quoting
-   * nothing of the record; the refresh's read, which asks only whether the lease in hand still
-   * stands beside it, passes none and says nothing. The store's own refusal comes through as the
+   * nothing of the record; the refresh, which asks only whether the lease in hand still stands
+   * beside it, passes none and says nothing. The store's own refusal comes through as the
    * outcome.
    *
-   * @example const kept = valOf(await KeptLease.tryRead(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
-   * @example const beside = valOf(await KeptLease.tryRead(deviceDB, scope))   // the refresh's look, told to no one
+   * @example const kept = valOf(await KeptLease.tryGet(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
+   * @example const beside = valOf(await KeptLease.tryGet(deviceDB, scope))   // the refresh's look, told to no one
    */
-  static async tryRead(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
+  static async tryGet(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
     const kept = await deviceDB.tryGetLease(scope)
     if (! kept.ok) { return kept }
     if (kept.val === null) { return good(null) }

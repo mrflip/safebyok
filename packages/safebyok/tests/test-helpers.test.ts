@@ -1682,8 +1682,8 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
     const ringNow = () => { for (const listener of listeners) { listener() } }
     const earlyStore: StringStore = {
       ...store,
-      write:     (ckey, text) => { ringNow(); store.write(ckey, text) },
-      erase:     (ckey) => { ringNow(); store.erase(ckey) },
+      put:       (ckey, text) => { ringNow(); store.put(ckey, text) },
+      del:       (ckey) => { ringNow(); store.del(ckey) },
       subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     }
     const checks = TH.vaultDBTimingChecks(() => localVaultDB({ store: earlyStore }), { pushes: true })

@@ -35,22 +35,16 @@ export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
 )
 
-/** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
-export const StaleWriteVals = ['del'] as const
-export type StaleWrite = typeof StaleWriteVals[number]
-
-/** The message of each stale write: what changed under the writer, and to read again. */
-const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
-  del: 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
-}
+/** What a stale deletion says: what changed under the deleter, and to read the vault again. A box put's stale refusal is {@link staleBox}, and an update of the vault record's {@link staleVaultRecord}. */
+export const StaleDelMessage = 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.'
 
 /** A `stale_write` refusal of a deletion: what it expected is no longer stored, so nothing was removed.
  * The `VaultDB` base class throws it when an adapter's deletion answers null. An adapter that hands
  * each call on to another VaultDB passes it on as it came.
  *
- * @example throw Refusals.staleWrite('del')
+ * @example throw Refusals.staleDel()
  */
-export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
+export const staleDel = (): VaultError => new VaultError('stale_write', StaleDelMessage)
 
 /** A `stale_write` refusal of a box write, carrying what is stored under its boxlabel as `meta.box_stored`. Throw it from `doPutBox`.
  * The `VaultDB` base class checks `boxStored` as `getBox` checks a record, so a caller meets a

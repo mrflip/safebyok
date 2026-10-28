@@ -42,14 +42,14 @@ import { consistent } from './checks/validator'
 export abstract class DeviceDB {
   // == [Lease verbs]: getLease, putLease, delLease, their try forms
 
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryRead`, which checks it and holds it closed; the vault judges whether it still fits.
+  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryGet`, which checks it and holds it closed; the vault judges whether it still fits.
    *
    * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
   async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#readableOf('getLease', LeaseRecord, leaseScopepath, raw)
+    return await this.#parsedOrDel('getLease', LeaseRecord, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
@@ -93,7 +93,7 @@ export abstract class DeviceDB {
   async getDeviceRecord(scope: VaultScope): Promise<DeviceRecord | null> {
     const deviceScopepath = Scopepath.device(scope)
     const raw = await storeAnswer('getDeviceRecord', () => this.doGetDeviceRecord(deviceScopepath))
-    return await this.#readableOf('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
+    return await this.#parsedOrDel('getDeviceRecord', DeviceRecord, deviceScopepath, raw)
   }
 
   /** This device's record of one scope, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getDeviceRecord}.
@@ -144,8 +144,8 @@ export abstract class DeviceDB {
     return outcomeOf(() => this.delAll())
   }
 
-  /** `raw`, a row `verb` read under `scopepath`, through `recordSchema`: the record, or null for none, or for one that fails, which it discards through `doDelUnreadable`. */
-  async #readableOf<RecordT>(verb: DeviceVerb, recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
+  /** `raw`, the row `verb` fetched under `scopepath`, parsed by `recordSchema`: the record, or null for none, or for one that does not parse, which it deletes through `doDelUnreadable`. */
+  async #parsedOrDel<RecordT>(verb: DeviceVerb, recordSchema: Z.ZodType<RecordT>, scopepath: string, raw: unknown): Promise<RecordT | null> {
     if (raw === undefined || raw === null) { return null }
     const checked = recordSchema.safeParse(raw)
     if (checked.success) { return checked.data }

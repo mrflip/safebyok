@@ -27,7 +27,7 @@ const rowFlavor = (text: string): StoreRow['flavor'] => {
 
 const snapStoreRows = (store: StringStore): StoreRow[] => (
   store.scopepaths().toSorted((one, two) => one.localeCompare(two)).map((ckey) => {
-    const text = store.read(ckey) ?? ''
+    const text = store.get(ckey) ?? ''
     return { ckey, text, flavor: rowFlavor(text) }
   })
 )
@@ -110,7 +110,7 @@ export const StoreTable = ({ rows }: { rows: StoreRow[] }) => {
 export const WipeStoreButton = ({ store, storeTitle }: { store: StringStore, storeTitle: string }) => {
   const wipe = () => {
     if (! globalThis.confirm(`Wipe every row of ${storeTitle}?`)) { return }
-    for (const scopepath of store.scopepaths()) { store.erase(scopepath) }
+    for (const scopepath of store.scopepaths()) { store.del(scopepath) }
   }
   return <button className="mini danger" onClick={wipe}>wipe</button>
 }

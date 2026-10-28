@@ -264,12 +264,12 @@ describe("a real vault's records", () => {
 
     // Read back from Convex, and placed where the core keeps them, they open as before.
     const reread = memoryStore()
-    reread.write(real.vaultRecordCkey, JSON.stringify(await TH.storedVaultRecordIn(CVX, u1)))
+    reread.put(real.vaultRecordCkey, JSON.stringify(await TH.storedVaultRecordIn(CVX, u1)))
     for (const { ckey, box } of real.boxes) {
       const answer = await CVX.query(TH.vaults.getBox, { ...u1, boxlabel: box.boxlabel, expected: { vault_tok: real.vaultRecord.vault_tok } })
       const stored = answer.read ? answer.box_stored : null
       expect(stored).to.deep.equal(box)
-      reread.write(ckey, JSON.stringify(stored))
+      reread.put(ckey, JSON.stringify(stored))
     }
     const vault = await TH.openOver(reread)
     await TH.unlock(vault, TH.RealPassphrase)
@@ -296,8 +296,8 @@ describe("a real vault's records", () => {
 
 const memoryStoreHolding = (real: Awaited<ReturnType<typeof TH.realRecords>>) => {
   const store = memoryStore()
-  store.write(real.vaultRecordCkey, JSON.stringify(real.vaultRecord))
-  for (const { ckey, box } of real.boxes) { store.write(ckey, JSON.stringify(box)) }
+  store.put(real.vaultRecordCkey, JSON.stringify(real.vaultRecord))
+  for (const { ckey, box } of real.boxes) { store.put(ckey, JSON.stringify(box)) }
   return store
 }
 

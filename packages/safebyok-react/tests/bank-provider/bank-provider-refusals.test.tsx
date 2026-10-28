@@ -200,7 +200,7 @@ describe("BankProvider", () => {
     it("keeps a vault holding the newer copy in hand when a later read meets an older one, as for a vault found behind: locked, its trouble vault_behind, the entry still timely", async () => {
       const world = await madeWorld()
       const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-      const older = world.store.read(vaultScopepath) ?? ''
+      const older = world.store.get(vaultScopepath) ?? ''
       // This device changes the passphrase, so its record of the vault is newer than `older`.
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
@@ -210,7 +210,7 @@ describe("BankProvider", () => {
       render(<BankProvider {...world.props} user_id="u1" logger={spy.logger}><Grab /><Probe /></BankProvider>)
       await expectShown('unlocked')
       // Storage hands back the older copy; the vault's read refuses it, keeping the newer in hand.
-      world.store.write(vaultScopepath, older)
+      world.store.put(vaultScopepath, older)
       const shown = latest().vault
       expect(shown).to.not.be.null
       await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_behind') } })
@@ -225,12 +225,12 @@ describe("BankProvider", () => {
     it("hands down a vault storage serves older than this device has seen as the entry's refusal, vault_behind, and no vault, asking again not mending it", async () => {
       const world = await madeWorld()
       const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-      const older = world.store.read(vaultScopepath) ?? ''
+      const older = world.store.get(vaultScopepath) ?? ''
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
       // Storage hands back the older copy before the provider's birth reads it.
-      world.store.write(vaultScopepath, older)
+      world.store.put(vaultScopepath, older)
       const { Grab, latest } = grabber()
       render(<BankProvider {...world.props} user_id="u1"><Grab /><Probe /></BankProvider>)
       await expectShown('refused: vault_behind')
@@ -242,7 +242,7 @@ describe("BankProvider", () => {
     it("keeps a vault a later read finds behind in hand, locked, its trouble vault_behind, the entry still timely", async () => {
       const world = await madeWorld()
       const vaultScopepath = Scopepath.vault(TH.scopeOf('u1'))
-      const older = world.store.read(vaultScopepath) ?? ''
+      const older = world.store.get(vaultScopepath) ?? ''
       // Deaf to the other tab's write, so that the vault first meets the newer copy as the older.
       const deafDB = localVaultDB({ store: { ...world.store, subscribe: neverRings } })
       const { Grab, latest } = grabber()
@@ -252,7 +252,7 @@ describe("BankProvider", () => {
       const changer = await TH.settledVault({ ...world.props, vaultlabel: 'main', user_id: 'u1' })
       await TH.putWayin(changer, 'correct horse', 'another horse')
       TH.closeVault(changer)
-      world.store.write(vaultScopepath, older)
+      world.store.put(vaultScopepath, older)
       const shown = latest().vault
       await act(async () => { if (shown !== null) { await TH.expectRefusal(TH.readAfresh(shown), 'vault_behind') } })
       await expectShown('locked')

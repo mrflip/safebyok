@@ -3,23 +3,23 @@ import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
 /** The smallest storage the local adapters need: text by scopepath, with a `subscribe` so the vault and an inspector can watch it.
- * The supplied {@link memoryStore} and {@link domStore} call each listener in turn as a write or an
- * erase lands. One that throws stops no other and fails no write: what it threw goes to the default
+ * The supplied {@link memoryStore} and {@link domStore} call each listener in turn as a put or a
+ * del lands. One that throws stops no other and fails no put: what it threw goes to the default
  * logger, and to the platform's `reportError` where there is one. Their `subscribe` refuses
  * 'bad_option' for a listener that is not a function.
  */
 export type StringStore = {
   /** The stored text under `scopepath`, or null for none. */
-  read(scopepath: string): string | null
-  write(scopepath: string, text: string): void
-  erase(scopepath: string): void
+  get(scopepath: string): string | null
+  put(scopepath: string, text: string): void
+  del(scopepath: string): void
   /** Every scopepath currently stored, in no particular order. */
   scopepaths(): string[]
-  /** Call `listener` after any write or erase; returns the unsubscribe. */
+  /** Call `listener` after any put or del; returns the unsubscribe. */
   subscribe(listener: () => void): () => void
 }
 
-/** What a store's `subscribe` is handed: a function to call after each write or erase. Its `parse` refuses 'bad_option'. */
+/** What a store's `subscribe` is handed: a function to call after each put or del. Its `parse` refuses 'bad_option'. */
 const { ListenerShape } = Validator('bad_option', ({ fn }) => ({ ListenerShape: fn<() => void>() }))
 
 /** The listeners of one store, and the `ring` that calls them. */
@@ -48,15 +48,15 @@ const callQuietly = (listener: () => void) => {
  *
  * @example
  *   const store = memoryStore()
- *   store.write('greeting', 'hi'); store.read('greeting')  // 'hi'
+ *   store.put('greeting', 'hi'); store.get('greeting')  // 'hi'
  */
 export const memoryStore = (): StringStore => {
   const bag = new Map<string, string>()
   const bell = makeBell()
   return {
-    read:       (scopepath) => bag.get(scopepath) ?? null,
-    write:      (scopepath, text) => { bag.set(scopepath, text); bell.ring() },
-    erase:      (scopepath) => { bag.delete(scopepath); bell.ring() },
+    get:        (scopepath) => bag.get(scopepath) ?? null,
+    put:        (scopepath, text) => { bag.set(scopepath, text); bell.ring() },
+    del:        (scopepath) => { bag.delete(scopepath); bell.ring() },
     scopepaths: () => [...bag.keys()],
     subscribe: bell.subscribe,
   }
@@ -70,14 +70,14 @@ export const memoryStore = (): StringStore => {
  *
  * @example
  *   const dbStore = domStore(localStorage, 'safebyok-demo:db:')
- *   dbStore.write('greeting', 'hi')   // lands at 'safebyok-demo:db:greeting'
+ *   dbStore.put('greeting', 'hi')   // lands at 'safebyok-demo:db:greeting'
  */
 export const domStore = (webStorage: Storage, prefix: string): StringStore => {
   const bell = makeBell()
   return {
-    read:       (scopepath) => webStorage.getItem(prefix + scopepath),
-    write:      (scopepath, text) => { webStorage.setItem(prefix + scopepath, text); bell.ring() },
-    erase:      (scopepath) => { webStorage.removeItem(prefix + scopepath); bell.ring() },
+    get:        (scopepath) => webStorage.getItem(prefix + scopepath),
+    put:        (scopepath, text) => { webStorage.setItem(prefix + scopepath, text); bell.ring() },
+    del:        (scopepath) => { webStorage.removeItem(prefix + scopepath); bell.ring() },
     scopepaths: () => {
       const found: string[] = []
       for (let ii = 0; ii < webStorage.length; ii += 1) {

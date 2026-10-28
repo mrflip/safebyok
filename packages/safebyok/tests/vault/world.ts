@@ -114,12 +114,12 @@ export const spoilableDeviceDB = () => {
 
 /** The stored row of the box `boxlabel`, as the backend holds it. */
 export const storedRowOf = (world: ReturnType<typeof makeWorld>, boxlabel: string): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1BoxScopepath(boxlabel)) ?? 'null') as Record<string, unknown>
+  JSON.parse(world.dbStore.get(u1BoxScopepath(boxlabel)) ?? 'null') as Record<string, unknown>
 )
 
 /** The vault's stored props, as the backend holds them. */
 export const storedVaultRecordOf = (world: ReturnType<typeof makeWorld>): Record<string, unknown> => (
-  JSON.parse(world.dbStore.read(u1VaultScopepath) ?? 'null') as Record<string, unknown>
+  JSON.parse(world.dbStore.get(u1VaultScopepath) ?? 'null') as Record<string, unknown>
 )
 
 /** The ckeys of every row `user_id`'s vault has in storage: its vault record and its boxes. */
@@ -129,8 +129,8 @@ export const rowsOf = (world: ReturnType<typeof makeWorld>, user_id: string) => 
 
 /** u1's stored vault record in `world`, its gate's way in of `wayinkind` spoiled by `spoil`. */
 export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
-  const vaultRecord = JSON.parse(world.dbStore.read(u1VaultScopepath) ?? '{}') as Record<string, unknown> & { gate: Record<string, Record<string, unknown>> }
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, [wayinkind]: { ...vaultRecord.gate[wayinkind], ...spoil } } }))
+  const vaultRecord = JSON.parse(world.dbStore.get(u1VaultScopepath) ?? '{}') as Record<string, unknown> & { gate: Record<string, Record<string, unknown>> }
+  world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...vaultRecord, gate: { ...vaultRecord.gate, [wayinkind]: { ...vaultRecord.gate[wayinkind], ...spoil } } }))
 }
 
 /** A world whose `u1` vault, with a box and a lease, has had its stored vault record spoiled. */
@@ -139,7 +139,7 @@ export const damagedVaultWorld = async () => {
   const vault = await world.openUnlocked('pw')
   await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
   TH.closeVault(vault)
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
+  world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return world
 }
 
@@ -196,8 +196,8 @@ export const rolledBackWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await addLaptopPasskey(vault)
-  const older = world.dbStore.read(u1VaultScopepath) ?? ''
+  const older = world.dbStore.get(u1VaultScopepath) ?? ''
   await TH.delWayin(vault, 'pw')
-  const newer = world.dbStore.read(u1VaultScopepath) ?? ''
+  const newer = world.dbStore.get(u1VaultScopepath) ?? ''
   return { world, vault, older, newer }
 }

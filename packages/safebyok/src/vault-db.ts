@@ -406,7 +406,7 @@ export abstract class VaultDB {
     const label = heldBoxlabel(this, asked, boxlabel)
     const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
     const deletion = await VaultDB.#hooks.doDelBox(this, asked, label, expectation)
-    if (deletion === null) { throw Refusals.staleWrite('del') }
+    if (deletion === null) { throw Refusals.staleDel() }
     return checkAnswer(BoxDeletion, deletion, 'a deletion', 'landed')
   }
 
@@ -440,7 +440,7 @@ export abstract class VaultDB {
   /** Delete the vault of `scope` through `doDelVault`, resolving the tombstone it leaves, checked: `stale_write` when it removed nothing. */
   private async deletedVault(scope: VaultScope, expectation: VaultDelExpectation): Promise<VaultTombstone> {
     const raw = await VaultDB.#hooks.doDelVault(this, scope, expectation)
-    if (raw === null || raw === undefined) { throw Refusals.staleWrite('del') }
+    if (raw === null || raw === undefined) { throw Refusals.staleDel() }
     const tombstone = checkAnswer(VaultTombstone, raw, 'a vault deletion', 'landed')
     return verifyConsistent(tombstone, scope, { kind: 'corrupt_record', message: wrongAnswerSays('a vault deletion', 'landed') })
   }

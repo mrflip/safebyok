@@ -80,7 +80,7 @@ export const BoxFormat = 'safebyok-box-v8'
  * sidecar or time; a new vault format leaves it open. Its `parse` is strict, and refuses
  * 'bad_record': a field this version does not know is damage.
  *
- * @example BoxRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no box
+ * @example BoxRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no box
  */
 export const { BoxRecord } = Validator('bad_record', ({ obj, lit, boxlabel, epochMillis }) => ({
   BoxRecord: obj({

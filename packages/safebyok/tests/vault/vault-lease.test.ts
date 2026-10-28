@@ -669,7 +669,7 @@ describe("the lease, kept on this device alone", () => {
     await world.openUnlocked('pw')
     const lease = await world.getLease()
     expect(lease).to.not.be.null
-    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.read(scopepath)).join('\n')
+    const everything = world.dbStore.scopepaths().map((scopepath) => world.dbStore.get(scopepath)).join('\n')
     expect(everything).to.not.include(lease?.vault_key_lease_wrapped.ciphertext_b64)
     expect(everything).to.not.include('ask_passphrase_at')
     expect(everything).to.not.include(lease?.format)

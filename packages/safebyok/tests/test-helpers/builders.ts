@@ -16,7 +16,7 @@ import type { VaultDB } from '../../src/vault-db'
 import { good, valOf } from '../../src/outcome'
 import { VaultError } from '../../src/errors'
 import { Lease, sealLeaseRecord } from '../../src/lease'
-import { registerLeaseReader } from '../../src/held-lease'
+import { registerLeaseGetter } from '../../src/held-lease'
 import { vaultRecordHeldBy } from '../../src/proving'
 import { scriptedRequestCleartext } from './gating'
 import { quietLogger } from './logging'
@@ -136,7 +136,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
   })
   slice.lease = Lease.make(slice, leaseRecord)
   // A box and a lease read the lease the slice holds as they read a Vault object's.
-  registerLeaseReader(slice, () => slice.lease)
+  registerLeaseGetter(slice, () => slice.lease)
   return slice
 }
 

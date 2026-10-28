@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { heldLeaseOf, registerLeaseReader } from '../src/held-lease'
+import { heldLeaseOf, registerLeaseGetter } from '../src/held-lease'
 import { Lease } from '../src/lease'
 import { makeVaultKey } from '../src/crypto'
 import * as TH from './test-helpers'
@@ -19,11 +19,11 @@ describe("heldLeaseOf", () => {
   })
 })
 
-describe("registerLeaseReader", () => {
+describe("registerLeaseGetter", () => {
   it("registers a vault's reader once, as its example shows: a second registration changes nothing", async () => {
     const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
     const held = vault.lease
-    registerLeaseReader(vault, () => null)
+    registerLeaseGetter(vault, () => null)
     expect(heldLeaseOf(vault)).to.eq(held)
   })
 })

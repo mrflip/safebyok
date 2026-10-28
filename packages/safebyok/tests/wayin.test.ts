@@ -43,7 +43,7 @@ const lockedWorld = async (opts: { passkey?: boolean } = {}) => {
 
 /** `world`'s stored vault record with `changes` written over it, a Vault object opened on it afresh, and the record as stored. */
 const reopenedWith = async (world: ReturnType<typeof makeWorld>, changes: Record<string, unknown>) => {
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), ...changes }))
+  world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), ...changes }))
   const vault = await world.open()
   return { vault, stored: storedRecordOf(world) }
 }

@@ -140,7 +140,7 @@ describe("hello", () => {
     const vault = await world.openUnlocked('pw')
     const reads = vi.spyOn(world.vaultDB, 'tryGetVault')
     reads.mockResolvedValueOnce(bad(unreachable()))
-    world.dbStore.write('elsewhere', '{}')
+    world.dbStore.put('elsewhere', '{}')
     await TH.wakeupAtNextTick()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
     expect(vault.getSnapshot()).to.deep.include({ freshness: 'refused', trouble: null })
@@ -219,7 +219,7 @@ describe("hello", () => {
     const vault = await world.openUnlocked('pw')
     await vault.lock()
     vi.spyOn(world.vaultDB, 'tryGetVault').mockResolvedValueOnce(bad(unreachable()))
-    world.dbStore.write('elsewhere', '{}')
+    world.dbStore.put('elsewhere', '{}')
     await TH.wakeupAtNextTick()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(vault.getSnapshot()).to.deep.include({ freshness: 'refused' })
@@ -542,7 +542,7 @@ describe("a hello that fails", () => {
   it("says a stored vault record that does not parse as damaged_vault, which the snapshot keeps as its trouble", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
-    world.dbStore.write(u1VaultScopepath, '{"format":"safebyok-vault-v6"}')
+    world.dbStore.put(u1VaultScopepath, '{"format":"safebyok-vault-v6"}')
     const err = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault')
     expect(vault.getSnapshot().trouble).to.eq(err)
   })
@@ -554,7 +554,7 @@ describe("a hello that fails", () => {
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'not_permitted')
     expect(vault.getSnapshot().freshness).to.eq('refused')
     // Any write rings the store's change bell, and the vault reads again.
-    world.dbStore.write('elsewhere', '{}')
+    world.dbStore.put('elsewhere', '{}')
     await TH.wakeupAtNextTick()
     expect(TH.stateOf(vault.getSnapshot())).to.eq('novel')
     expect(vault.getSnapshot()).to.deep.include({ freshness: 'timely', trouble: null })
@@ -599,7 +599,7 @@ describe("a hello that fails", () => {
 const damagedBoxWorld = async () => {
   const world = makeWorld()
   await seedVault(world)
-  world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
+  world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
   return world
 }
 
@@ -612,7 +612,7 @@ const bornThenDamaged = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   await seedVault(world)
   const vault = await world.open({ vaultDB: world.deafVaultDB(), ...overrides })
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
+  world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return { world, vault }
 }
 
@@ -637,9 +637,9 @@ const behindWorld = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const here = await world.openUnlocked('pw')
   const there = await world.open({ vaultDB: world.deafVaultDB(), ...overrides })
   await addLaptopPasskey(here)
-  const older = world.dbStore.read(u1VaultScopepath) ?? ''
+  const older = world.dbStore.get(u1VaultScopepath) ?? ''
   await TH.delWayin(here, 'pw')
-  const restoreOlder = () => { world.dbStore.write(u1VaultScopepath, older) }
+  const restoreOlder = () => { world.dbStore.put(u1VaultScopepath, older) }
   return { world, here, there, older, restoreOlder }
 }
 
@@ -793,7 +793,7 @@ describe("vault.hello, by the Contract", () => {
     const { told, onBadNews } = newsKeeper()
     await seedVault(world)
     const vault = await world.open({ onBadNews, vaultDB: world.deafVaultDB() })
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
     expect(await vault.hello({ staleMinutes: 0 })).to.eq(vault)
     expect(vault.snapshot.boxes).to.deep.equal([])
     expect(vault.snapshot.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: storedRowOf(world, 'anthropic')['revision_tok'], damage: 'damaged' }])
@@ -880,7 +880,7 @@ describe("vault.hello, by the Contract", () => {
     expect(there.getSnapshot().gate?.passkey).to.be.null
     expect(there.getSnapshot()).to.deep.include({ trouble: err, freshness: 'refused' })
     expect(await world.getLease()).to.be.null
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(older)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(older)
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
@@ -906,7 +906,7 @@ describe("vault.hello, by the Contract", () => {
     expect(here.getSnapshot().gate?.passkey).to.be.null
     expect(here.getSnapshot()).to.deep.include({ trouble: err, freshness: 'refused' })
     expect(await world.getLease()).to.be.null
-    expect(world.dbStore.read(u1VaultScopepath)).to.eq(older)
+    expect(world.dbStore.get(u1VaultScopepath)).to.eq(older)
     expect(await recordEpochIn(world)).to.eq(3)
   })
 
@@ -1017,7 +1017,7 @@ describe("onBadNews, by the Contract", () => {
     const world = makeWorld()
     const { told, onBadNews } = newsKeeper()
     await world.open({ onBadNews })
-    world.dbStore.write(u1VaultScopepath, JSON.stringify({ format: 'safebyok-vault-v6', gate_epoch: 'one' }))
+    world.dbStore.put(u1VaultScopepath, JSON.stringify({ format: 'safebyok-vault-v6', gate_epoch: 'one' }))
     await vi.waitFor(() => { expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault']) })
   })
 
@@ -1311,7 +1311,7 @@ describe("onBadNews, as it is told", () => {
     await seedVault(world)
     const seen: string[][] = []
     const vault: Vault = await world.open({ vaultDB: world.deafVaultDB(), onBadNews: () => { seen.push(vault.snapshot.damagedBoxes.map((box) => box.boxlabel)) } })
-    world.dbStore.write(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
+    world.dbStore.put(u1BoxScopepath('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
     await vault.hello({ staleMinutes: 0 })
     expect(seen).to.deep.equal([['anthropic']])
   })

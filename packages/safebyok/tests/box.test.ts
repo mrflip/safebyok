@@ -91,7 +91,7 @@ const boxIn = (vault: TH.LeasedSlice, record: BoxRecord): Box => Box.make(vault,
 const otherCopyBox = async (): Promise<unknown> => {
   vi.resetModules()
   const { Box: OtherBox } = await import('../src/box')
-  const { registerLeaseReader: otherRegister } = await import('../src/held-lease')
+  const { registerLeaseGetter: otherRegister } = await import('../src/held-lease')
   // Each copy reads a vault's lease through its own registry: the other copy's vault registers there too.
   const vault = await vaultOf()
   otherRegister(vault, () => vault.lease)

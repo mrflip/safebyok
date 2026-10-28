@@ -622,7 +622,7 @@ rows with it.
 * **Name every reach across a seam**: storage, a decryption, the user, a timer, an injected
   interface, a public call it goes through. One sentence with `{@link}`s: `Reads {@link
   DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` Private members too, down to the
-  private call that holds the reach, named in backticks (`Reads the box through #readBox`).
+  private call that holds the reach, named in backticks (`Gets the box through #getBox`).
   Never the order of steps.
 * **Say what a member does and when to call it, never who calls it.** A list of callers, or of
   what each does with the result, belongs to those callers and goes stale. A rule its callers
@@ -697,7 +697,7 @@ After, and renamed from `#storedBase`, as the line showed the name was wrong:
 
 ```ts
 /** Read and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
- * Reads through `#readBox`, and decrypts the whisper under the lease in hand. The write then
+ * Gets through `#getBox`, and decrypts the whisper under the lease in hand. The put then
  * lands only over the revision read.
  */
 async #fillFromStored(boxlabel: string, ...)

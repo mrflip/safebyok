@@ -49,18 +49,17 @@ describe("Refusals.unexpectedError", () => {
   })
 })
 
-describe("Refusals.staleWrite", () => {
-  for (const what of Refusals.StaleWriteVals) {
-    it(`refuses a ${what} write as stale_write, saying to read again, with no cause`, () => {
-      const refusal = Refusals.staleWrite(what)
-      expect(refusal.refusalkind).to.eq('stale_write')
-      expect(refusal.message).to.match(/Read (it|the vault) again before retrying\./)
-      expect(refusal).to.not.have.property('cause')
-    })
-  }
+describe("Refusals.staleDel", () => {
+  it("refuses a deletion as stale_write, saying to read the vault again, with no cause", () => {
+    const refusal = Refusals.staleDel()
+    expect(refusal.refusalkind).to.eq('stale_write')
+    expect(refusal.message).to.eq(Refusals.StaleDelMessage)
+    expect(refusal.message).to.match(/Read the vault again before retrying\./)
+    expect(refusal).to.not.have.property('cause')
+  })
 
-  it("says which write was refused", () => {
-    expect(Refusals.staleWrite('del').message).to.include('this removal was refused')
+  it("says that a removal was refused", () => {
+    expect(Refusals.staleDel().message).to.include('this removal was refused')
   })
 })
 
@@ -208,7 +207,7 @@ describe("Refusals.isStorageBlocked", () => {
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('del'), Refusals.staleVaultRecord(null), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull({ boxes: { used: 3, max: 3 }, bytes: { used: 0, max: Infinity } }), Refusals.notPermitted(), Refusals.storageBlocked()]
+    const refusals = [Refusals.staleDel(), Refusals.staleVaultRecord(null), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull({ boxes: { used: 3, max: 3 }, bytes: { used: 0, max: Infinity } }), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })

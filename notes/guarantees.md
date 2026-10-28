@@ -158,7 +158,7 @@ Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped`
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
 `device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
-handed to hold; read back by `KeptLease.tryRead` (`lease.ts`), which checks `DeviceDB.getLease`'s
+handed to hold; read back by `KeptLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
 answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#takeStorage`
 (whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
 which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
@@ -212,7 +212,7 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `provin
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
-`KeptLease.tryRead`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
+`KeptLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. A record read back whose key is extractable, of another
@@ -257,7 +257,7 @@ becomes the `weak_passphrase` message, so it must not quote the passphrase (CUST
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
 key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`,
 `KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
-`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryRead` (`lease.ts`) checks what
+`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryGet` (`lease.ts`) checks what
 `DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
 the vault's refresh (`#takeStorage`, whose `leavesInForce` reads the kept stamp) and its take-ups
 (`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`

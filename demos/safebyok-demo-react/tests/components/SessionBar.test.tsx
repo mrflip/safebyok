@@ -96,7 +96,7 @@ describe("SessionBar", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
-    expect(dbStore.read('account:acme:margo')).to.be.null
+    expect(dbStore.get('account:acme:margo')).to.be.null
     // This provider's user_id is not the auth's: it stays on u1, and still asks for nothing anew.
     await TH.expectProbeState('none')
     await new Promise((resolve) => { setTimeout(resolve, 50) })

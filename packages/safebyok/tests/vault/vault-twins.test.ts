@@ -70,7 +70,7 @@ const twinsOf = (vault: Vault, callname: TwinName) => {
 const damagedUnderfoot = async (overrides?: Partial<TH.BornVaultOpts>) => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB(), ...overrides })
-  world.dbStore.write(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
+  world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...storedVaultRecordOf(world), gate_epoch: 'one' }))
   return { world, vault }
 }
 

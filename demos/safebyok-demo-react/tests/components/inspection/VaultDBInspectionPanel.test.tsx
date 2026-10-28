@@ -10,7 +10,7 @@ import * as TH from '../../test-helpers'
 // The panel reads module-level stores, so each test leaves them as it found them: empty.
 afterEach(async () => {
   outage.setDown(false)
-  for (const scopepath of dbStore.scopepaths()) { dbStore.erase(scopepath) }
+  for (const scopepath of dbStore.scopepaths()) { dbStore.del(scopepath) }
   await vaultDbInspector.wipe()
 })
 
@@ -23,7 +23,7 @@ describe("VaultDBInspectionPanel", () => {
   })
 
   it("shows the fake auth's account rows beside them", () => {
-    dbStore.write('account:safebyok_demo:margo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
+    dbStore.put('account:safebyok_demo:margo', '{"user_id":"user_0123456789abcdef","userlabel":"margo"}')
     render(<VaultDBInspectionPanel />)
     expect(screen.getByText(/"userlabel":"margo"/)).to.not.be.null
   })

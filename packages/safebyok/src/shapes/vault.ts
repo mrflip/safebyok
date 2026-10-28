@@ -42,7 +42,7 @@ export const PasskeySaltBytes = 32
  * it strips the rest: a Vault object, its record or its snapshot passes as its stamp or its sparse
  * shape.
  *
- * @example VaultRecord.safeParse(await myBackend.readRow(id)).success   // false for a row that is no vault record
+ * @example VaultRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no vault record
  * @example VaultSparse.parse(omit(record, ['gate']))                    // the record without its gate
  */
 export const { PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, GateRecord, VaultRecord, VaultSparse, VaultStamp, VaultStampButFormat, VaultTombstone, GateSparse, PassphraseWayinSparse, PasskeyWayinSparse, PassphraseWayinHeader, PasskeyWayinHeader } = Validator('bad_record', ({ obj, uint, int, lit, discrim, applabel, user_id, vaultlabel, epochMillis }) => {

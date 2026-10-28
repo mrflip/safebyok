@@ -562,10 +562,10 @@ export class Bank {
     const { deviceDB } = parts
     // Picked out, frozen, for the stores: a host's store is handed the scope, never the parts.
     const scope = CX.vaultScope.parse(parts)
-    const readAt = Math.floor(parts.clock.now())
+    const refreshedAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.tryGetDeviceRecord(scope)))
     this.#demandHeld(vaultScopepath, entry)
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, readAt)), KeptLease.tryRead(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
+    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), KeptLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
@@ -574,7 +574,7 @@ export class Bank {
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = deviceRecordFor(scope, valOf(await deviceDB.tryRaiseDeviceRecord(raising))) ?? raising
     this.#demandHeld(vaultScopepath, entry)
-    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, readAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 

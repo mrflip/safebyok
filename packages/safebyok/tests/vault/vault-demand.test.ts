@@ -468,7 +468,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     sealing.release()
     await TH.expectRefusal(putting, 'vault_locked')
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
@@ -496,7 +496,7 @@ describe("a lock landing during a box call", () => {
     await vault.lock()
     deleting.release()
     await removing
-    expect(world.dbStore.read(u1BoxScopepath('anthropic'))).to.be.null
+    expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 })

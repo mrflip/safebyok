@@ -10,43 +10,43 @@ const throwFromLogger = () => { throw new Error('a logger that throws') }
 describe("memoryStore", () => {
   it("reads back what was written, and null where nothing was", () => {
     const store = memoryStore()
-    expect(store.read('greeting')).to.be.null
-    store.write('greeting', 'hi')
-    expect(store.read('greeting')).to.eq('hi')
+    expect(store.get('greeting')).to.be.null
+    store.put('greeting', 'hi')
+    expect(store.get('greeting')).to.eq('hi')
   })
 
   it("erases, and erasing what isn't there is quietly fine", () => {
     const store = memoryStore()
-    store.write('greeting', 'hi')
-    store.erase('greeting')
-    store.erase('greeting')
-    expect(store.read('greeting')).to.be.null
+    store.put('greeting', 'hi')
+    store.del('greeting')
+    store.del('greeting')
+    expect(store.get('greeting')).to.be.null
   })
 
   it("lists every scopepath it holds", () => {
     const store = memoryStore()
-    store.write('one', '1')
-    store.write('two', '2')
+    store.put('one', '1')
+    store.put('two', '2')
     expect(store.scopepaths()).to.have.members(['one', 'two'])
   })
 
-  it("rings subscribers on write and erase, and unsubscribing silences them", () => {
+  it("rings subscribers on put and del, and unsubscribing silences them", () => {
     const store = memoryStore()
     let heardCount = 0
     const unsubscribe = store.subscribe(() => { heardCount += 1 })
-    store.write('one', '1')
-    store.erase('one')
+    store.put('one', '1')
+    store.del('one')
     expect(heardCount).to.eq(2)
     unsubscribe()
-    store.write('two', '2')
+    store.put('two', '2')
     expect(heardCount).to.eq(2)
   })
 
   it("refuses a listener that is not a function as it subscribes, so no later write meets it", () => {
     const store = memoryStore()
     expect(() => store.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /^Expected a function$/)
-    store.write('one', '1')
-    expect(store.read('one')).to.eq('1')
+    store.put('one', '1')
+    expect(store.get('one')).to.eq('1')
   })
 })
 
@@ -68,12 +68,12 @@ describe("domStore", () => {
     const webStorage = mapStorage()
     const dbStore = domStore(webStorage, 'safebyok-demo:db:')
     const deviceStore = domStore(webStorage, 'safebyok-demo:device:')
-    dbStore.write('greeting', 'hi')
-    deviceStore.write('other', 'there')
+    dbStore.put('greeting', 'hi')
+    deviceStore.put('other', 'there')
     expect(webStorage.getItem('safebyok-demo:db:greeting')).to.eq('hi')
-    expect(dbStore.read('greeting')).to.eq('hi')
+    expect(dbStore.get('greeting')).to.eq('hi')
     expect(dbStore.scopepaths()).to.deep.equal(['greeting'])
-    dbStore.erase('greeting')
+    dbStore.del('greeting')
     expect(webStorage.getItem('safebyok-demo:db:greeting')).to.be.null
     expect(deviceStore.scopepaths()).to.deep.equal(['other'])
   })
@@ -90,7 +90,7 @@ describe("the stores' bell", () => {
     const thrown = new Error('a listener that throws')
     for (const store of [memoryStore(), domStore(mapStorage(), 'acme:')]) {
       store.subscribe(() => { throw thrown })
-      store.write('greeting', 'hi')
+      store.put('greeting', 'hi')
     }
     expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([
       ['error', { call: 'StringStore' }, thrown],
@@ -104,7 +104,7 @@ describe("the stores' bell", () => {
     try {
       const store = memoryStore()
       store.subscribe(() => { throw new Error('a listener that throws') })
-      store.write('greeting', 'hi')
+      store.put('greeting', 'hi')
       expect(consoleError).toHaveBeenCalledOnce()
       expect(String(consoleError.mock.calls[0]?.[0])).to.match(/^safebyok: A listener of a string store threw/)
     } finally {
@@ -116,8 +116,8 @@ describe("the stores' bell", () => {
     setDefaultLogger({ log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger })
     const store = memoryStore()
     store.subscribe(() => { throw new Error('a listener that throws') })
-    expect(() => { store.write('greeting', 'hi') }).to.not.throw()
-    expect(store.read('greeting')).to.eq('hi')
+    expect(() => { store.put('greeting', 'hi') }).to.not.throw()
+    expect(store.get('greeting')).to.eq('hi')
   })
 
   it("reports a listener that throws something other than an Error as it was thrown", () => {
@@ -126,7 +126,7 @@ describe("the stores' bell", () => {
     try {
       const store = memoryStore()
       store.subscribe(() => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
-      store.write('greeting', 'hi')
+      store.put('greeting', 'hi')
       expect(reported).to.deep.equal(['a string, thrown'])
     } finally {
       vi.unstubAllGlobals()
@@ -142,8 +142,8 @@ describe("the stores' bell", () => {
       const heard: string[] = []
       store.subscribe(() => { heard.push('one'); throw thrown })
       store.subscribe(() => { heard.push('two') })
-      expect(() => { store.write('greeting', 'hi') }).to.not.throw()
-      expect(store.read('greeting')).to.eq('hi')
+      expect(() => { store.put('greeting', 'hi') }).to.not.throw()
+      expect(store.get('greeting')).to.eq('hi')
       expect(heard).to.deep.equal(['one', 'two'])
       expect(reported).to.deep.equal([thrown])
     } finally {

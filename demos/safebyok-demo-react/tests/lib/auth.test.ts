@@ -14,7 +14,7 @@ const makeWorld = () => {
 }
 
 /** The account row the fake auth keeps for margo, as it is stored: null if there is none. */
-const margosAccount = (dbStore: StringStore): unknown => JSON.parse(dbStore.read('account:acme:margo') ?? 'null')
+const margosAccount = (dbStore: StringStore): unknown => JSON.parse(dbStore.get('account:acme:margo') ?? 'null')
 
 describe("createAuth", () => {
   it("starts signed out", () => {
@@ -28,7 +28,7 @@ describe("createAuth", () => {
     expect(session.userlabel).to.eq('margo')
     expect(session.user_id).to.match(/^user_[0-9a-f]{16}$/)
     expect(auth.getSnapshot()).to.eq(session)
-    expect(dbStore.read('account:acme:margo')).to.not.be.null
+    expect(dbStore.get('account:acme:margo')).to.not.be.null
   })
 
   it("stamps a new account with the clock's time, in epoch milliseconds", async () => {
@@ -70,7 +70,7 @@ describe("createAuth", () => {
       const dbStore = memoryStore()
       const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore(), clock: { now: () => reading } })
       await expect(auth.signIn('margo')).rejects.toThrow(/clock read no time between 1981 and 2255/)
-      expect(dbStore.read('account:acme:margo')).to.be.null
+      expect(dbStore.get('account:acme:margo')).to.be.null
       expect(auth.getSnapshot()).to.be.null
     })
   }
@@ -107,8 +107,8 @@ describe("createAuth", () => {
     await auth.signIn('margo')
     auth.signOut()
     expect(auth.getSnapshot()).to.be.null
-    expect(deviceStore.read('session:acme')).to.be.null
-    expect(dbStore.read('account:acme:margo')).to.not.be.null
+    expect(deviceStore.get('session:acme')).to.be.null
+    expect(dbStore.get('account:acme:margo')).to.not.be.null
   })
 
   it("deleting the account removes its row and the session", async () => {
@@ -116,15 +116,15 @@ describe("createAuth", () => {
     await auth.signIn('margo')
     await auth.deleteAccount()
     expect(auth.getSnapshot()).to.be.null
-    expect(dbStore.read('account:acme:margo')).to.be.null
+    expect(dbStore.get('account:acme:margo')).to.be.null
   })
 
   it("a mangled device session reads as signed out, not as a crash", () => {
     const { dbStore, deviceStore } = makeWorld()
-    deviceStore.write('session:acme', 'not even json')
+    deviceStore.put('session:acme', 'not even json')
     const reloaded = createAuth({ applabel: 'acme', dbStore, deviceStore })
     expect(reloaded.getSnapshot()).to.be.null
-    expect(deviceStore.read('session:acme')).to.be.null
+    expect(deviceStore.get('session:acme')).to.be.null
   })
 
   it("tells listeners about sign-in and sign-out", async () => {

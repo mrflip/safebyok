@@ -14,7 +14,7 @@ describe("good and bad", () => {
   })
 
   it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
-    const err = Refusals.staleWrite('del')
+    const err = Refusals.staleDel()
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
