@@ -1,6 +1,6 @@
 # Thread 4: where_prefix, one parse, said where (2026-10-28)
 
-Branch `20261028-where_prefix`, PR #317, stacked on #311 (`20261027-proving_tidy`, on main).
+Branch `20261028-where_prefix`, PR #317, on main (cut from #311, rebased over #301 and #313 at filing).
 Justify: green; core 3426 passed, 37 skipped; indexeddb 167 passed, 11 skipped; every package built,
 size budgets kept.
 
@@ -53,3 +53,25 @@ size budgets kept.
 * **For the Coach**: whether a host-passed Zod `ParseContext` refusing 'bad_option' (rather than
   being ignored, as before) is the behaviour wanted. My read: yes, the type never promised Zod's
   context would be honoured and the doc says only `parse` is ours; a quiet ignore hid that.
+
+## Catch-up over #301 (2026-10-28, at filing)
+
+`scripts/file-thread` stopped on a conflict with main: #301 (validator_ducks) had moved the shapes
+to `src/shapes/`, renamed `checkMakeBankOpts` to `readBankOpts`, typed `parseVaultBag` as
+`VaultBag`, reworded the two `parseDbName` refusals and the vault bag's advice, and lifted the
+catch-rewrap into a helper, `optionsRefusal` (`options.ts`), with eight callers. Resolved with
+main's structure and wording and this thread's saying inside it (tag `prerebase-where_prefix`
+marks the tip before the rebase). Three decisions:
+
+* **`optionsRefusal` is gone.** It was the catch-and-rethrow this thread removes, as a helper;
+  leaving it with callers would contradict the STYLE.md paragraph this thread writes. Its three
+  callers beyond the six named sites (`parseStaleMinutes`, `parseRenewMinutes` in `vault-opts.ts`,
+  `localVaultDB` in `local-vault-db.ts`) are each one parse with a saying, so the thread converts
+  nine sites, not six; the changeset says nine. It was never exported from an entry point. Every
+  message reads as before: `parseStaleMinutes`'s `where` is `In hello's options: staleMinutes`,
+  so the framed message is `In hello's options: staleMinutes: <failures>.`, as the catch wrote it.
+* **Main's wording wins** where the two sides said different things: both `parseDbName`s say
+  `In <callname>'s options`, and `VaultBagAdvice` is #301's sentence (a Vault object, its snapshot
+  or a BankVault will do), under the reviewer's doc block.
+* **STYLE.md's *Validation* paragraph** names `optionsCheck` and `readBankOpts`, main's name for
+  `checkMakeBankOpts`.
