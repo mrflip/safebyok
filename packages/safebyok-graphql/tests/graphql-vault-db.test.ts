@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Client, CombinedError, fetchExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import { GraphQLError, buildSchema, type GraphQLSchema } from 'graphql'
@@ -53,7 +53,7 @@ const thisVault = { vault_tok: 'vault-tok-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
 const vaultIn = (schema: GraphQLSchema) => TH.settledVault({
-  applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
+  applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
 })
 
 /** A fetch with no network behind it. */
@@ -144,7 +144,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: 3 })
     const refusal = await TH.expectRefusal(TH.settledVault({
-      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, maxBoxes: 4,
+      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger, maxBoxes: 4,
     }), 'bad_option')
     expect(refusal.message).to.include('3 boxes')
   })
@@ -444,11 +444,14 @@ describe("graphqlVaultDB, hearing other writes", () => {
   })
 
   it("hears nothing through a Client that has no way to send subscriptions", async () => {
+    // urql says on the console, as such a client's own warning, that no exchange handles a subscription.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
     const { heard, onChange } = TH.changeCounter()
     const unsubscribe = vaultDB.subscribe(u1, onChange)
     await TH.aWhile()
     expect(heard.count).to.eq(0)
+    expect(String(warn.mock.calls[0]?.[0])).to.include('No exchange has handled operations of kind "subscription"')
     unsubscribe()
   })
 })

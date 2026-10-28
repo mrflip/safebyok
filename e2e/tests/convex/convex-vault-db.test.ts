@@ -25,9 +25,9 @@ afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
 
-/** A real `ConvexReactClient` on `deployment`, signed in as `subject`, or as no one. */
+/** A real `ConvexReactClient` on `deployment`, signed in as `subject`, or as no one, its own console logging off: it prints each refused mutation, and these tests refuse them on purpose. */
 const connectReact = (deployment: Deployment, subject: string | null) => (
-  deployment.connectWith(subject, (address, opts) => new ConvexReactClient(address, opts))
+  deployment.connectWith(subject, (address, opts) => new ConvexReactClient(address, { ...opts, logger: false }))
 )
 
 /**
@@ -182,7 +182,8 @@ describe("convexVaultDB.subscribe", () => {
 
     it(`calls onChange over a ${clientTitle} when a sign-out fails its watch, so the vault looks again`, async () => {
       const deployment = deploy()
-      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
+      const spy = TH.spyLogger()
+      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok, logger: spy.logger })
       await TH.ensureGated(here, TH.vaultRecordOf('u1'))
       const watch = await settledWatch(here)
       deployment.signOut()
@@ -192,7 +193,8 @@ describe("convexVaultDB.subscribe", () => {
 
     it(`subscribes calmly over a ${clientTitle} while signed out, and throws nothing later`, async () => {
       const deployment = deploy()
-      const here = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
+      const spy = TH.spyLogger()
+      const here = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok, logger: spy.logger })
       const unsubscribe = here.subscribe(u1, () => undefined)
       // The refused watch arrives with the next round trip; an error thrown from inside the
       // client's socket would fail this test as unhandled.
@@ -243,7 +245,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const deployment = deploy()
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()
-      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
+      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok, logger: spy.logger })
       const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
       await TH.unlock(vault, TH.RealPassphrase)
       await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
