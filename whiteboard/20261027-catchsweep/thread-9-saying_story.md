@@ -1,6 +1,6 @@
 # Thread 9: saying_story (2026-10-28)
 
-Branch `20261028-saying_story`, PR (pending), stacked on #327. Justify: green (core 3476 passed, 37
+Branch `20261028-saying_story`, PR #331, stacked on #327. Justify: green (core 3476 passed, 37
 skipped; every package green; size budget within limits).
 
 * **Built**: in `packages/safebyok/src/checks/validator.ts`, `Saying` → `Story` and `SayingShape` →
