@@ -16,8 +16,10 @@ type Deployment = FakeDeployment<ReturnType<typeof TH.hostWith>>
 
 // Every deployment a test makes is closed after it, so no client keeps its socket's timers alive.
 const deployments: Deployment[] = []
+// These tests refuse mutations on purpose, and a client logs each as an error: a spy catches them, so
+// the output stays clean.
 const deploy = (getUserId: GetUserId = TH.bySubject) => {
-  const deployment = fakeDeployment(TH.hostWith(getUserId))
+  const deployment = fakeDeployment(TH.hostWith(getUserId), { logger: TH.spyLogger().logger })
   deployments.push(deployment)
   return deployment
 }
@@ -25,9 +27,9 @@ afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
 
-/** A real `ConvexReactClient` on `deployment`, signed in as `subject`, or as no one, its own console logging off: it prints each refused mutation, and these tests refuse them on purpose. */
+/** A real `ConvexReactClient` on `deployment`, signed in as `subject`, or as no one. */
 const connectReact = (deployment: Deployment, subject: string | null) => (
-  deployment.connectWith(subject, (address, opts) => new ConvexReactClient(address, { ...opts, logger: false }))
+  deployment.connectWith(subject, (address, opts) => new ConvexReactClient(address, opts))
 )
 
 /**
