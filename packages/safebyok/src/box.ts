@@ -59,8 +59,8 @@ type MadeUnder = Z.infer<typeof MadeUnderShape>
  * 'bad_option' for props amiss, as {@link SealBoxProps} checks them (a boxlabel that is not a
  * label, a sidecar JSON cannot carry, a malformed base, or a field but `boxlabel`, `sidecar` and
  * `base`), or a malformed `madeUnder` or `made`. No refusal quotes what the call was handed. A bug
- * met in a seal or an extract (a throw that is no VaultError) arrives as 'unexpected_error', never
- * raw; each `try` form is one {@link outcomeOf} over its throwing form.
+ * met in a seal or an extract past its argument checks (a throw that is no VaultError) arrives as
+ * 'unexpected_error', never raw; each `try` form is one {@link outcomeOf} over its throwing form.
  *
  * @example
  *   const box = await vault.getBox('anthropic_api_key')
