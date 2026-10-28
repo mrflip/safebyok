@@ -56,7 +56,7 @@ is a bug.
   | `VX`  | `src/shapes/vault.ts`                           |
   | `VDX` | `src/shapes/vault-db.ts`                        |
   | `OX`  | `src/shapes/bank-opts.ts`                       |
-| `HX`  | `src/shapes/host-code.ts`                       |
+  | `HX`  | `src/shapes/host-code.ts`                       |
   | `KX`  | `src/shapes/key-deriver-spec.ts`                |
   | `MX`  | `src/shapes/mask.ts`                            |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
