@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** thread 1 (#316) filed, on main; 4 (#317) reviewed, filing (catch-up rebase over #301 in a worker's hands); 6 (#321) ready, reworking DeviceDB's throwing forms per the ruling before review; 2 building on 1; 5 building on main; 3 and 7 wait on 6. Seven threads.
+**Status:** thread 1 (#316) filed, on main; 4 (#317) reviewed, filing (catch-up rebase over #301 in a worker's hands); 6 (#321) ready, reworking DeviceDB's throwing forms per the ruling before review; 2 building on 1; 5 building on main; 3, 7 and 8 wait on 6. Eight threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -116,6 +116,20 @@ server-side and no diagnosis, where today it is `bad_option` "its own setup is w
 not help". Changeset: `safebyok-graphql` patch naming the kind change; `safebyok` patch if an
 export is added. `pnpm size:budget` may move `vault-db`'s line; follow the rule. Size: medium.
 Depends on: **thread 6** (it rewrites the same verbs): cut from thread 6's tip once it files.
+*Orchestrator (2026-10-28):* the Coach has asked that `read` and `write` names go (thread 8).
+The ones inside `vault-db.ts` are this thread's, since it rewrites those lines: the private helper
+`readVault` (backs `getVault` and `getVaultRecords`) pairs with `ensuredVault` as `gottenVault`;
+`readStoredVault` goes as above; `checkWrittenVaultRecord`/`checkWrittenBox` become
+`checkPutVaultRecord`/`checkPutBox` with their `written` parameter `put`; the `writing` parameters
+of `withMissChecked` and `withStaleVaultRecordChecked` become `putting`; locals named `read` become
+`answer` or `got`; the validator `ReadAnswer` becomes `StoredVaultAnswer`; and the exported type
+`VaultReadResponse` (the answer of `doGetVault` and `doEnsureVault`, so not a "get") becomes
+`StoredVault`, every adapter and `safebyok-graphql`'s `vaultReadOf` following (the worker checks it
+does not clash with `StoredBox`/`StoredVaultTok` usage). The doc example at l.735
+`this.readVaultRows(scope)` becomes `getVaultRows`. The `safebyok` changeset turns `minor` and names
+`VaultReadResponse` → `StoredVault`. Nothing else of thread 8's touches `vault-db.ts` but the two
+`staleWrite(...)` call sites (l.466, l.500), which thread 8 renames; the restack reconciles.
+
 
 ### 4. where_prefix: one parse, said where
 
@@ -194,6 +208,65 @@ the throwing form. The `Vault[provingTools]` route that hands `#badOutcome` to a
 note) follows the same one-catch form. Empty changeset unless a refusal changes. Size: medium,
 mechanical but wide. Depends on: thread 6 (it renames the store calls inside these same bodies): cut
 from thread 6's tip once it files.
+
+### 8. read_names: no operation is a `read` or a `write`
+
+Coach (2026-10-28): "I keep trying to stamp out `read` in favor of a specific semantic: find (get
+first by criterion), get (fetch by a unique key, composite is ok), ensure (get, creating first if
+absent). Would you have some thread fix the name read, and write if it's also broken?"
+
+Gloss, from a survey of every identifier under `packages/*/src` (2026-10-28; line numbers on
+#311's tip). Rename each operation for what it does; a mutation takes its own verb (`put`, `raise`,
+`del`); the try-pair rule holds (`tryVerbFoo` resolves an Outcome, `verbFoo` throws or returns the
+foo). The renames that need no ruling:
+
+* `string-store.ts` `StringStore.read`/`write` → `get`/`put` (`erase` → `del` for the set), in
+  `memoryStore`, `domStore`, the doc example, the validator at `local-vault-db.ts` l.57 and its nine
+  callers there; `local-vault-db.ts` `readJson` → `getJson`.
+* `lease.ts` `KeptLease.tryRead` (thread 1's name for `read`) → `KeptLease.tryGet`: this device's
+  kept lease for the scope, by its unique key. Callers `bank.ts` l.550, `vault.ts` l.976 and l.1450;
+  `notes/guarantees.md` names it (fix there too).
+* `held-lease.ts` `readers` → `leaseGetters`, `registerLeaseReader(vault, read)` →
+  `registerLeaseGetter(vault, getLease)`.
+* `refusals.ts` `staleWrite(what)` → `staleDel()`, dropping `StaleWriteVals`/`StaleWrite` (the list
+  holds only `'del'`) and renaming `StaleWriteSaid` → `StaleDelMessage`, like `StaleBoxMessage`;
+  callers `vault-db.ts` l.466, l.500. The *kind* `'stale_write'` waits on a ruling (below).
+* `device-db.ts` `#readableOf` → `#parsedOrDel` (parses a fetched row, deleting it if it does not
+  parse). `doDelUnreadable` waits on a ruling (below).
+* `vault.ts` (all private): `#readBox` → `#getBox` (it gets the box by label through
+  `VaultDB.getBox`; a `#` name sits apart from the public `getBox`; `#fetchBox` if the worker finds
+  it confusing), `#boxReadRefusal` → `#boxGetRefusal`, `#writeOver` → `#putOver`, `#takeOwnWrite` →
+  `#takeOwnPut`, `#gateWriteRefusal` → `#gatePutRefusal`, local `readFirst` → `getFirst`, locals
+  `read`/`written` holding Outcomes → `got`/`put`. The refresh family, `#readStorage`, `#readRefused`,
+  `#readAt`, `#judgeRead`, `#takePicture`'s `readAt` field, `BirthRead` with its `readAt`, and
+  `bank.ts` l.547 `readAt`: the operation is the vault's refresh (one `VaultDB.getVault`, judged
+  against the picture), none of find/get/ensure, so name it for the refresh: `#refreshOnce`,
+  `#refreshRefused`, `#refreshedAt`, `#judgeGotten`, `refreshedAt`, `Birth`; the worker takes these
+  or proposes better in its thread file, one name per thing. Section banners `[Reading storage]`
+  and `[Writing boxes]` follow.
+* `idb.ts` local `reading` → `getting`; `vault-opts.ts` l.354 local `reading` → `now`.
+* `safebyok-graphql` `vaultReadOf` → `storedVaultOf` (as postgres names it), `WriteAnswer` →
+  `PutAnswer`; `safebyok-convex` `ReadOutOfDateMessage` → `GetBoxOutOfDateMessage` (and
+  `OutOfDateMessage` → `PutOutOfDateMessage` beside it); `safebyok-react` `readListed` → `getListed`.
+* Doc examples: `vault-record.ts` l.24 and `box.ts` l.30 `myBackend.readRow(id)` → `getRow`.
+
+Keep: `clockReading` (the noun "a clock reading", public through `Validators`); the Convex platform
+limits `ConvexTransactionReadBytes`/`ConvexTransactionWrittenDocuments`; `DatabaseReader`/`Writer`
+and `ReadableStream` (platform types); `readonly`. Not this thread: the ~700 prose uses of "read"
+and "write" in doc blocks and messages (a documentarian run, after the renames settle); the
+`vault-db.ts` internals (thread 3's, above).
+
+Waiting on the Coach, each a row; the worker leaves them as they are until the orchestrator sends
+the ruling, and takes them in this thread if it comes before `ready`: the stored field `written_at`
+(a format bump; Rec keep); the refusal kind `'stale_write'` (a wire value; Rec `'stale_del'`, named
+in the changeset); Convex `GetBoxAnswer.read` (a protocol field between component and client; Rec
+`got`, in lockstep); `doDelUnreadable(scopepath, isReadable)` (a protected adapter hook in every
+DeviceDB; Rec `doDelUnparsed(scopepath, isSound)`).
+
+Changeset: `safebyok` minor naming `StringStore.get`/`put`/`del`, `Refusals.staleDel`,
+`registerLeaseGetter`; patch for each adapter package touched. Size: medium, mechanical. Depends on:
+**thread 6** (`device-db.ts`, `lease.ts`'s `tryGetLease` line) and thread 1 (`KeptLease.tryRead`):
+cut from thread 6's tip once it files, beside thread 3; restacked at the wrap-up. Review `medium`.
 
 ## Not in this sprint
 

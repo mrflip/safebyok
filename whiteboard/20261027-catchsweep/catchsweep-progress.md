@@ -21,6 +21,15 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   Thread 2 applies it to the Lease and Box forms thread 1 made; thread 7 (new) to the Vault and Bank
   pairs. The passkey `SecurityError` branch stays.
 
+## Rulings and requests (2026-10-28, later)
+
+* The Coach: no operation is named `read` or `write`; `find` (first by criterion), `get` (by unique
+  key), `ensure` (get, creating if absent), or the mutation's own verb. Thread 8 (`read_names`) in
+  the plan carries the survey; `vault-db.ts`'s own `read`/`write` names are thread 3's.
+* The Coach wants #316 and #317 as one mergeable line first: #317 is restacked onto #316 once it
+  files; thread 2 then stands on #317. A large rename is coming on main; each thread meets it at
+  its catch-up rebase.
+
 ## Discoveries by thread
 
 * **Thread 1 (trythrow, #316):** the `try` form is `outcomeOf(() => this.x(...))`, one hop, not a
