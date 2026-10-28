@@ -511,12 +511,14 @@ const bankIn = (world: ReturnType<typeof makeWorld>, overrides?: Partial<TH.Born
 }
 
 describe("when storage says the user is no longer signed in", () => {
-  /** Each vault call that reaches storage, the storage verb it reaches, and the call. */
-  const RevokedCallCases: readonly (readonly [string, 'tryGetVault' | 'tryGetBox' | 'tryPutBox' | 'tryPutVaultRecord', (vault: Vault) => Promise<unknown>])[] = [
+  /** Each vault call that reaches storage, the storage verb it reaches, and the call: one per `VaultDB` verb the vault calls. */
+  const RevokedCallCases: readonly (readonly [string, 'tryGetVault' | 'tryGetBox' | 'tryPutBox' | 'tryPutVaultRecord' | 'tryDelBox' | 'tryDelVault', (vault: Vault) => Promise<unknown>])[] = [
     ['getWhisper()',       'tryGetBox',          (vault) => vault.getWhisper('anthropic')],
     ['putBox()',           'tryPutBox',          (vault) => vault.putBox({ boxlabel: 'openai' }, 'sk-fake-two')],
+    ['delBox()',           'tryDelBox',          (vault) => vault.delBox('anthropic')],
     ['an unlock',          'tryGetVault',        async (vault) => { await vault.lock(); await TH.unlock(vault, 'pw one') }],
     ['putWayin()',         'tryPutVaultRecord',   (vault) => TH.putWayin(vault, 'pw one', 'pw two')],
+    ['del()',              'tryDelVault',         (vault) => TH.del(vault, 'pw one')],
   ]
 
   for (const [callTitle, verb, call] of RevokedCallCases) {
@@ -539,6 +541,42 @@ describe("when storage says the user is no longer signed in", () => {
       // Signed in again: the passphrase it had still opens it, and the box is still there.
       await TH.unlock(vault, 'pw one')
       expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-one')
+    })
+
+  }
+
+  /** The calls whose caller awaits the storage verb itself, one per `VaultDB` verb the vault calls: a gating's waiters (putWayin) hear the lock as it lands, before the erase, and are not here. */
+  const DirectCallCases: readonly (readonly [string, 'tryGetVault' | 'tryGetBox' | 'tryPutBox' | 'tryDelBox' | 'tryDelVault', (vault: Vault) => Promise<unknown>])[] = [
+    ['getWhisper()',       'tryGetBox',          (vault) => vault.getWhisper('anthropic')],
+    ['putBox()',           'tryPutBox',          (vault) => vault.putBox({ boxlabel: 'openai' }, 'sk-fake-two')],
+    ['delBox()',           'tryDelBox',          (vault) => vault.delBox('anthropic')],
+    ['refresh()',          'tryGetVault',        (vault) => vault.refresh()],
+    ['del()',              'tryDelVault',         (vault) => TH.del(vault, 'pw one')],
+  ]
+
+  for (const [callTitle, verb, call] of DirectCallCases) {
+    it(`has locked, and erased this device's lease, before the caller of ${callTitle} hears the refusal`, async () => {
+      const world = makeWorld()
+      const vault = await world.openUnlocked('pw one')
+      await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake-one')
+      await TH.wakeupAtNextTick()
+      // The erase lands in the device store, and its answer waits at the latch: a caller that heard
+      // the refusal while it waited was not made to wait for the erase.
+      const erasing = TH.holdNextAnswer(world.deviceDB, 'tryDelLease')
+      vi.spyOn(world.vaultDB, verb).mockResolvedValueOnce(bad(signedOut()))
+      let heard = false
+      const calling = (async () => {
+        await TH.expectRefusal(call(vault), 'identity_revoked')
+        heard = true
+      })()
+      await erasing.reached
+      expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
+      expect(await world.getLease()).to.be.null
+      await TH.wakeupAtNextTick()
+      await TH.wakeupAtNextTick()
+      expect(heard).to.be.false
+      erasing.release()
+      await calling
     })
   }
 
