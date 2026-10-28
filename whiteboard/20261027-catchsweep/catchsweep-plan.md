@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). The open line, each PR's base `main`: #327 (`32d91c7d`) → #330 (`e7285b66`) → #328 (`0e48262e`); merging #328 merges all three. Underway on the Coach's rulings of 2026-10-28: 10 host_error_sanitizer (building, on #328); 9 (#331, on #327's old tip `c51b7274`) taking exports, STYLE.md edits, the saying sweep and the VOCABULARY entry; 2 (#325, on #316's tip) taking its four rulings and a new WebCrypto refusal kind. Each gets a second review, then rebases over the top and files. Ten threads.
+**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `5fcdc037`, on main, in review); 9 (#331, `393cbef6`, on #327's old tip, second review); 2 (#325, on #316's tip, building its rulings). Each rebases onto main at filing, then the three are restacked into one line. Ten threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they

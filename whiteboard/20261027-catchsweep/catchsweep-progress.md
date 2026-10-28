@@ -55,6 +55,8 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   is `storageTroubleOf` (thread 10); the Vault's rewraps stay, `heed` is another session's.
 * *Orchestrator:* four of thread 2's rows had been flipped before the sweep bookmark and sat unacted
   until a full read of the tab on the Coach's word; a sweep that comes back empty now ends with a full read.
+* The Coach merged #327, #330 and #328 at 02:56 (2026-10-28); main is `f84d61bb`. Threads 9, 2 and 10
+  stand on commits in main's history; each catches up onto main at filing.
 
 ## Discoveries by thread
 
