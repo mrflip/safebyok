@@ -30,7 +30,28 @@ describe("Sanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
-  it("stands in for a storage client's failure, as its example throws it", async () => {
+  it("reads nothing of the foreign throw: one whose every property is a getter that throws costs nothing", () => {
+    const booby = new Proxy({}, { get: () => { throw new Error('read me and I quote: sk-ant-fake-trap') }, ownKeys: () => { throw new Error('sk-ant-fake-trap') } })
+    const refusal = Sanitizer.refusalFor(booby, 'unexpected_error', 'The checker threw.')
+    expect(refusal.refusalkind).to.eq('unexpected_error')
+    expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
+  })
+
+  it("stands in for a key deriver's throw quoting the passphrase, as its first example shows", async () => {
+    const keyDeriver = { deriveKeyBytes: (passphrase: string) => Promise.reject(new TypeError(`cannot derive ${passphrase}`)) }
+    const deriveOrRefuse = async (passphrase: string) => {
+      let handed: unknown
+      try { handed = await keyDeriver.deriveKeyBytes(passphrase) } catch (err) {
+        throw Sanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
+      }
+      return handed
+    }
+    const refusal = await TH.expectRefusal(deriveOrRefuse('pw-the-passphrase'), 'unexpected_error')
+    expect(refusal.cause).to.be.undefined
+    expect(TH.thrownText(refusal)).to.not.include('pw-the-passphrase')
+  })
+
+  it("stands in for a storage client's failure, as its second example shows", async () => {
     const client = { mutation: () => Promise.reject(quotingError()) }
     const putBox = async () => {
       try {
