@@ -1,8 +1,8 @@
 # Thread 3: db_hooks (2026-10-28)
 
 Branch `20261028-db_hooks`, PR #330, stacked on #321 (cut from its tip 496e3046). Justify: green
-(core 3478 tests pass, 37 skipped; graphql 344; every package lints, typechecks, builds and fits its
-size budget).
+(core 3478 tests pass, 37 skipped; graphql 345; every package lints, typechecks, builds and fits its
+size budget). Reworked 2026-10-28 after the Coach's ruling on `vaultDBOf` (below).
 
 * **Built**:
   - `vault-db.ts`: the `do*` hooks are adapted once, in `VaultDB`'s private **static** table
@@ -14,10 +14,14 @@ size budget).
     `unnamedVaultRecord({ cause })` there, with a running comment saying why.
   - `outcome.ts` exports **`asStorageTrouble(thrown)`**, added to `index.ts` and `index.test.ts`'s
     surface list, with tests in `outcome.test.ts`. `safebyok-graphql`'s `crossing` calls it.
-  - `vault-resolvers.ts` `vaultDBOf`: `not_permitted` and `identity_revoked` from `vaultDBFor` still
-    cross as they came; anything else is `Refusals.unexpectedError(err)` (was `bad_option` with
-    `MisconfiguredMessage`, now deleted). `VaultResolversOpts`' doc, the graphql README and its two
-    tests follow.
+  - `vault-resolvers.ts` `vaultDBOf`: what `vaultDBFor` threw passes through, as **`hostThrew`**
+    (module-level, replacing `HostRefusalKinds`) has it cross: every VaultError as it came, kind and
+    message; anything else `unexpected_error` whose message is "The server's vaultDBFor threw, so no
+    VaultDB served this request: " + the throw's `.message` (or `String` of it), the throw itself its
+    `cause`. The cause stays server-side as before (`crossing`'s `defineProperty`, never in
+    `extensions`). `MisconfiguredMessage` is gone. `VaultResolversOpts`' doc, the graphql README, the
+    changeset and the two wire tests follow (they assert the message crosses and the cause does not:
+    `wired()` is the GraphQLError's `toJSON`); one new test for a throw that is no Error.
   - Renames: `VaultReadResponse` → **`StoredVault`** (shapes, index, vault-db, local-vault-db, the
     convex, graphql, indexeddb and postgres adapters, the postgres README and route recipe, the demo's
     `outage.ts`, the core README, STYLE.md l.94 and l.480, the core tests); `ReadAnswer` →
@@ -43,11 +47,17 @@ size budget).
     `Refusals.storageUnavailable` as `otherwise`, so the pass-a-VaultError rule has one home; it is
     used by a server package that never touches the `VaultDB` class; and `vault-db.ts` exports
     nothing but the class and its helpers for adapters.
-  - **`vaultDBOf` keeps the two-kind pass-through** (`HostRefusalKinds`), reading "a VaultError from
-    the host's `vaultDBFor` passes through as today" as today's pass-through. A `bad_option` from
-    `postgresVaultDB({ client: null })` is a server bug too, and crossing it as `bad_option` would
-    tell the browser developer their `Bank.make` options are wrong. The reviewer's test for it now
-    expects `unexpected_error`, cause kept.
+  - **`vaultDBOf` passes everything through** (ruled; *For the Coach*). The first build kept
+    today's two kinds and made the rest `unexpected_error` with safebyok's fixed sentence, on the
+    thought that a `bad_option` from `postgresVaultDB({ client: null })` would misdirect the browser
+    developer. The Coach ruled for the diagnostics. G8 holds: a `vaultDBFor` sees the server's
+    configuration and database, never vault material, so its message is the host's own to show.
+    `hostThrew` keeps `{ cause: thrown }` plainly (a `throw null` keeps a null cause; `Refusals`'
+    "nothing was thrown" stand-in is an adapter convention, not needed here).
+  - `Refusals.unexpectedError` is no longer called in `safebyok-graphql`: its shared sentence
+    ("what was thrown is this error's cause") described the crossing badly, as the review noted;
+    with `hostThrew` building its own message the sentence no longer applies there, and it needs no
+    crossing-specific variant.
   - **`delDamagedVaultIn` is unchanged.** Thread 6's reviewer named a `bad_option` message there
     naming `tryDelDamagedVault`; no such message exists on the branch (the file's only mention is
     the call `vaultDB.tryDelDamagedVault(scope)`, which `bank.test.ts` and `del-damaged-vault.test.ts`
@@ -68,7 +78,12 @@ size budget).
     rules out instance `#fields` reached from any verb; `#logger` survives only because no verb
     path reads it before a failure. Worth a line in STYLE.md's *Stateful objects* if more private
     state is ever added to `VaultDB`.
+* **Suppressions**: one `eslint-disable-line @typescript-eslint/only-throw-error` in
+  `vault-resolvers.test.ts`, on the test that throws a bare string from `vaultDBFor`, as
+  `outcome.test.ts` and `vault-db.test.ts` do for the same reason.
 * **For the Coach**:
-  - **`vaultDBOf`'s pass-through**: two kinds, as today, or every VaultError? Kept at two
-    (*Decisions*); say if a host's own `storage_unavailable` or `bad_scope` from `vaultDBFor` should
-    cross as itself.
+  - **`vaultDBOf`'s pass-through** -- *ruled 2026-10-28*: "I think I'd figure out pretty quick what
+    was happening if my graphql server gave me a postgres error. Much more slowly if you flush all
+    my lovely diagnostics down the can. Pass errors through." Built: every VaultError crosses as
+    itself; a non-VaultError crosses as `unexpected_error` carrying its message; the cause stays
+    server-side.
