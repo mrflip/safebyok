@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. Open, each PR's base `main`: 10 (#333, `0c2a6278`, filed on main); 9 (#331, `881c1bbe`, second review fixed, filing with the red-commit fold and the catch-up onto main); 2 (#325, `6e2f1927`, second review at high underway). Then the three restack into one line. Ten threads.
+**Status:** merged to main 2026-10-28: #316, #317, #324, #321 (01:56) and #327, #330, #328 (02:56); main `f84d61bb`. The last line, each PR's base `main`: #333 (`0c2a6278`, on main) → #331 (`ce9769fe`); merging #331 merges both. 2 (#325, `7b4c99ed`, second review fixed) is filing with its catch-up and the sprint's two folds (bank.ts `refusalOf` onto outcome.ts's; the DeviceDB doc's cause clause), then restacks onto #331 as the top. Ten threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -120,6 +120,8 @@ whole bodies inside the try); `deviceTrouble`'s message tail is developer prose 
 keeps the old shape (later thread, Cleanup); internals narrated in doc blocks (documentarian). The thread
 waits unfiled at `5e486337` until the Coach rules; its worker is then resumed with the rulings and the two
 doc fixes, and files.
+
+*Review, round 2* (5e486337...6e2f1927, high, after the rulings): fixed at `7b4c99ed`, 4 fixes (`crypto_failed` tests for `Box.seal` and `vault.putBox`, with G6's zeroing asserted; `decipherWith`'s doc says a WebCrypto fault there reads `damaged_box`, never `crypto_failed`; `thrownNameOf`'s doc and G8 say a host's own store error carries whatever name the host gave it, kept until a redact lands; double-quoted test inputs), 7 minor: the inner catch takes any throw inside the WebCrypto wrappers (the design); `leaseBound: ciphered.ok` skips the lease demand for every bad outcome (Your calls: as ruled); the "… threw Name." builder duplicated (redact thread); `let` through the inner try (taste); `putBox`'s doc lacks `crypto_failed` (taken at filing); the kind's place in `RefusalKindVals` (taste); the sibling sites (Cleanup).
 
 ### 3. db_hooks: the VaultDB's hooks adapted once
 
