@@ -625,17 +625,13 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+// == [Helpers]: VaultBagAdvice, parseVaultBag, loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError, otherScopeSays
+
+/** What a refusal of the bag naming a vault says to do. */
+const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
 /** `bag` as {@link vaultBag} hands it back, or its refusal, 'bad_scope', saying it was the bag naming the vault and what that bag takes. */
-const parseVaultBag = (bag: unknown): VaultBag => {
-  try {
-    return vaultBag.parse(bag)
-  } catch (err) {
-    if (! isVaultError(err, 'bad_scope')) { throw err }
-    throw new VaultError('bad_scope', `In the bag naming the vault: ${err.message}. That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do.`, err.meta === undefined ? {} : { meta: err.meta })
-  }
-}
+const parseVaultBag = (bag: unknown): VaultBag => vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: VaultBagAdvice })
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {

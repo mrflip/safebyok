@@ -1,4 +1,4 @@
-import { Validator, Validators, VaultError, isVaultError, type VaultDBOpts } from 'safebyok'
+import { Validator, Validators, type VaultDBOpts } from 'safebyok'
 
 /** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
 export type IdbVaultDBOpts = VaultDBOpts & {
@@ -17,19 +17,12 @@ const { idbVaultDBOpts } = Validator('bad_option', ({ unk }) => ({
  * Kind 'bad_option' for anything else, a field the options do not take among them, naming the call
  * the host made, quoting none of it.
  *
- * @param said - The function the host called, as the refusal names it.
+ * @param callname - The function the host called, as the refusal names it.
  *
  * @example parseDbName({ dbName: 'acme' }, 'idbVaultDB')  // 'acme'
  * @example parseDbName(undefined, 'idbVaultDB')           // 'safebyok'
  */
-export const parseDbName = (opts: IdbVaultDBOpts | undefined, said: string): string => {
-  try {
-    return idbVaultDBOpts.parse(opts ?? {}).dbName
-  } catch (err) {
-    if (! isVaultError(err, 'bad_option')) { throw err }
-    throw new VaultError('bad_option', `In ${said}'s options: ${err.message}.`, err.meta === undefined ? {} : { meta: err.meta })
-  }
-}
+export const parseDbName = (opts: IdbVaultDBOpts | undefined, callname: string): string => idbVaultDBOpts.parse(opts ?? {}, { where: `In ${callname}'s options` }).dbName
 
 /** The name of the change bell that every write to the shelf in `dbName` rings, in every tab.
  * Other tabs, and other versions of this package running in them, listen by this name: it never changes.
