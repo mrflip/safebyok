@@ -58,13 +58,16 @@ describe("fakeDeployment", () => {
     expect(closed).toHaveBeenCalledOnce()
   })
 
-  it("logs nowhere by default: a client's refused mutation prints nothing", async () => {
+  it("logs quietly by default: a client's log is dropped, and its refused mutation reaches the console as the error it is", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
     const deployment = deploy()
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
-    expect(consoleError).toHaveBeenCalledTimes(0)
+    expect(consoleError).toHaveBeenCalledOnce()
+    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyok:ensureVault\)\]/)
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
 
@@ -100,12 +103,25 @@ describe("fakeDeployment", () => {
     expect(tally.heard).to.deep.equal(['error'])
   })
 
-  it("lets the console have the client's own lines when asked for it with true", async () => {
+  it("says all it hears to the console when handed the console itself", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
-    const deployment = deploy({ logger: true })
+    const deployment = deploy({ logger: console })
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(consoleError).toHaveBeenCalledOnce()
+  })
+
+  it("refuses a host or options it cannot run, as 'bad_option', quoting none of what it was handed", () => {
+    const host = TH.hostWith(TH.bySubject)
+    const refuse = (attempt: () => unknown) => TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option'))
+    refuse(() => fakeDeployment({ api: host.api } as never))
+    refuse(() => fakeDeployment({ createTest: host.createTest } as never))
+    refuse(() => fakeDeployment(null as never))
+    refuse(() => fakeDeployment(host, { loger: console } as never))
+    refuse(() => fakeDeployment(host, { logger: true } as never))
+    refuse(() => fakeDeployment(host, { logger: { log: () => undefined, warn: () => undefined } } as never))
+    const quoted = refuse(() => fakeDeployment(host, { logger: 'fake-secret-value' } as never))
+    expect(quoted).to.not.include('fake-secret-value')
   })
 
   it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {

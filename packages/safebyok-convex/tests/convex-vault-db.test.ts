@@ -18,8 +18,10 @@ type Deployment = FakeDeployment<ReturnType<typeof TH.hostWith>>
 
 // Every deployment a test makes is closed after it, so no client keeps its socket's timers alive.
 const deployments: Deployment[] = []
+// These tests refuse mutations on purpose, and a client logs each as an error: a spy catches them, so
+// the output stays clean.
 const deploy = (getUserId: GetUserId = TH.bySubject) => {
-  const deployment = fakeDeployment(TH.hostWith(getUserId))
+  const deployment = fakeDeployment(TH.hostWith(getUserId), { logger: TH.spyLogger().logger })
   deployments.push(deployment)
   return deployment
 }
