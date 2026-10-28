@@ -1,6 +1,6 @@
 # Thread 6: store_trynames (2026-10-28)
 
-Branch `20261028-store_trynames`, PR #TBD, stacked on #311 (merged into main at 41f44f69). Justify: green
+Branch `20261028-store_trynames`, PR #321, stacked on #311 (merged into main at 41f44f69). Justify: green
 (core 3443 tests pass, 37 skipped; graphql 344 pass; every package lints, typechecks, builds and
 fits its size budget).
 
