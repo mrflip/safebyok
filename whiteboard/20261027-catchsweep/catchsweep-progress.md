@@ -40,7 +40,13 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   helpers in `lease.ts` and `box.ts` are gone; the bodies call `serializedBytes.parse`,
   `BoxSparse.parse`, `CipheredShape.parse`, `LeaseSealProps.parse`, `SealBoxProps.parse`,
   `MadeShape.parse`, `BoxRecord.parse` and `VaultOfBox` from `src/shapes/`.
-* **Thread 6 (store_trynames, #321):** every public `VaultDB` verb (`getVaultRecords`/`ensureVaultRecords`
+* **Thread 6 (store_trynames, #321), filed 2026-10-28 at `53226d32`, restacked onto #324:** the catch-up over
+  #301 moved the rename into `src/shapes/bank-opts.ts`: `vaultDBShape`/`deviceDBShape` name the try forms,
+  so a host's hand-rolled VaultDB fake must carry `tryDelDamagedVault` (`Bank.make` refuses 'bad_option'
+  without it; said in the PR body). `tests/vault/world.ts` `VaultDBVerbsUsed` gained it. `vault-races.test.ts`
+  took main's expectation (the store's `invalid_box` passes through as itself). Restack with the
+  316-317-324 line met three one-line conflicts (`KeptLease.tryRead` beside `tryEnsureVault`/`tryGetLease`),
+  both sides taken. Earlier: every public `VaultDB` verb (`getVaultRecords`/`ensureVaultRecords`
   included, beyond the plan's list) and every `DeviceDB` verb is a try pair; bodies moved whole into the
   throwing form, `tryX = outcomeOf(() => this.X(...))`. ``DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>``;
   `HeededVaultDB = Pick<VaultDB, HeededVerb | 'subscribe'>` (`Thrown<>` gone); `heed` calls the try forms.
