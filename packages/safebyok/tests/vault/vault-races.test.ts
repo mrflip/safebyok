@@ -418,6 +418,8 @@ describe("a first unlock that loses the race midway, a refresh taking the other 
     const here = await world.open({ deviceDB: memoryDeviceDB() })
     // The first key the chain unwraps is the vaultKey, in grantLease, after its gate is stored.
     TH.beforeNextCall(crypto.subtle, 'unwrapKey', async () => {
+      // The other device unlocks the gate this one stored once its watch has read it in.
+      await TH.eventually(() => here.snapshot.gate !== null)
       await TH.unlock(here, 'pw two')
       await TH.putWayin(here, 'pw two', 'pw three')
       await TH.eventually(() => TH.cheatGetVaultEpoch(there).gate_epoch === 2)
