@@ -278,7 +278,7 @@ export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vau
  * Read every device record through it, so a record misfiled under another scope, or malformed,
  * never reaches a way in.
  *
- * @example deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))   // the record, or null
+ * @example deviceRecordFor(scope, await deviceDB.getDeviceRecord(scope))          // the record, or null
  * @example deviceRecordFor(scope, { ...record, user_id: 'someone-else' })             // null
  */
 export const deviceRecordFor = (scope: VaultScope, answer: unknown): DeviceRecord | null => {
