@@ -975,7 +975,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Read the vault record, listing and this device's lease, judge them against the picture in hand by `#judgeRead`, take what it finds new, and raise this device's record to it.
-   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.read}, the lease kept.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link KeptLease.tryRead}, the lease kept.
    * A read judged `behind` locks the vault as storage it cannot trust, and refuses 'vault_behind'.
    */
   async #takeStorage() {
@@ -986,7 +986,7 @@ export class Vault implements VaultStamp {
     const record = deviceRecordFor(this.#scope, valOf(await this.#deviceDB.getDeviceRecord(this.#scope)))
     // Let go meanwhile: read no more, as the judgment would ignore what came.
     if (this.#goneBy !== null) { return }
-    const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), KeptLease.read(this.#deviceDB, this.#scope)])
+    const [read, leaseKept] = await Promise.all([this.#vaultDB.getVault(this.#scope), KeptLease.tryRead(this.#deviceDB, this.#scope)])
     const verdict = this.#judgeRead(read, record)
     if (verdict === 'ignore') { return }
     if (verdict === 'behind') {
@@ -1452,7 +1452,7 @@ export class Vault implements VaultStamp {
     return lease
   }
 
-  /** Take up the lease in this device's store, read with {@link KeptLease.read}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
+  /** Take up the lease in this device's store, read with {@link KeptLease.tryRead}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
    * Make it a gating's first step, before the host is asked. A gating landed while the store is
    * read takes nothing up. A lease that does not fit is left where it lies, never erased: it may be
    * another tab's, and the next grant writes over it. A record that is no lease of this scope reads
@@ -1460,7 +1460,7 @@ export class Vault implements VaultStamp {
    * at its first use, 'damaged_lease'.
    */
   async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
-    const kept = await KeptLease.read(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
+    const kept = await KeptLease.tryRead(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
     this.#demandNotGone()
     if (gating.landed) { return false }
     const found = valOf(kept)
@@ -1471,7 +1471,7 @@ export class Vault implements VaultStamp {
     return true
   }
 
-  /** Take up `kept`, the lease the vault's birth found in this device's store ({@link KeptLease.read}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
+  /** Take up `kept`, the lease the vault's birth found in this device's store ({@link KeptLease.tryRead}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
    * One that does not fit is left where it lies, never erased: it may be another tab's, of another
    * life, and a grant writes over it. Its wrap is not tried: a damaged one refuses at its first
    * use, 'damaged_lease'.

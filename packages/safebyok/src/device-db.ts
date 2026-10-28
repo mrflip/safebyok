@@ -37,7 +37,7 @@ import { consistent } from './checks/validator'
 export abstract class DeviceDB {
   // == [Lease verbs]: getLease, putLease, delLease
 
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.read`, which checks it and holds it closed; the vault judges whether it still fits.
+  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryRead`, which checks it and holds it closed; the vault judges whether it still fits.
    *
    * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
    */

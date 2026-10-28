@@ -554,7 +554,7 @@ export class Bank {
     const readAt = Math.floor(parts.clock.now())
     const recordBefore = deviceRecordFor(scope, valOf(await deviceDB.getDeviceRecord(scope)))
     this.#demandHeld(vaultScopepath, entry)
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), KeptLease.read(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
+    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.ensureVault(draftOf(scope, readAt)), KeptLease.tryRead(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
