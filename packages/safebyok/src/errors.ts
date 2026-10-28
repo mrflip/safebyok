@@ -224,7 +224,9 @@ export const listedKindOf = (thrown: unknown): RefusalKind | null => (
   isVaultError(thrown) && (RefusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
 )
 
-/** The `name` of `thrown` when it is an object carrying a string one (an Error's or a DOMException's class name), else null: all a refusal keeps of an error that may quote what its thrower was handed.
+/** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.
+ * An Error's or a DOMException's is its class name; a host's own error carries whatever name the
+ * host gave it, kept as it is until a redact lands.
  *
  * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
  * @example thrownNameOf('a bare string')  // null
