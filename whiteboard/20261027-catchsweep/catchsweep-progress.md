@@ -47,6 +47,14 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   The ruling's one obligation, now in the graphql README and `vaultDBFor`'s doc: what a `vaultDBFor`
   throws reaches every browser, so a host throws nothing there whose message names a credential or a
   connection string. A `redactHostThrow` option would be a later thread if a Coach wants a belt too.
+* Rulings of 2026-10-28, later: a WebCrypto throw gets a refusal kind of its own (thread 2); the device
+  store's error name is kept, nothing else ("We will at some soon point add redact"); `Story` replaces
+  "saying" everywhere and joins VOCABULARY.md as "a controlled record of what is happening, suitable for
+  logs or refusals"; the validators module's star import is conventionally `CX`; exports are generous
+  (ground rules); `sanitizer.ts` is `host-error-sanitizer.ts` / `HostErrorSanitizer`; `asStorageTrouble`
+  is `storageTroubleOf` (thread 10); the Vault's rewraps stay, `heed` is another session's.
+* *Orchestrator:* four of thread 2's rows had been flipped before the sweep bookmark and sat unacted
+  until a full read of the tab on the Coach's word; a sweep that comes back empty now ends with a full read.
 
 ## Discoveries by thread
 

@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). The open line, restacked 2026-10-28, each PR's base `main`: #327 (`32d91c7d`, on main) → #330 (`e7285b66`) → #328 (`0e48262e`, justify green; size budgets rerun; trythrow and read_names release notes trimmed of internal names): merging #328 merges all three. Waiting on the Coach, unfiled: 9 (#331, `a984cea5`, still on #327's old tip `c51b7274`; rebased over #328 when its rows rule) and 2 (#325, `5e486337`, on #316's tip; its two TOP rows). Nine threads.
+**Status:** #316, #317, #324 and #321 merged to main 2026-10-28 01:56 (main `1f357d52`). The open line, each PR's base `main`: #327 (`32d91c7d`) → #330 (`e7285b66`) → #328 (`0e48262e`); merging #328 merges all three. Underway on the Coach's rulings of 2026-10-28: 10 host_error_sanitizer (building, on #328); 9 (#331, on #327's old tip `c51b7274`) taking exports, STYLE.md edits, the saying sweep and the VOCABULARY entry; 2 (#325, on #316's tip) taking its four rulings and a new WebCrypto refusal kind. Each gets a second review, then rebases over the top and files. Ten threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -46,6 +46,10 @@ thread 2 is cut from thread 1's tip (same lines of `lease.ts`); threads 1, 3, 4 
   to put it near where used); use Validator; namespace it, using Validator or a star-import."
 * **No cause carrying secret material** reaches a host's logger or a thrown error. A device-store
   record holds a key handle; the vault record and box records hold ciphertext and headers.
+* **Don't be chary with the exports** (the Coach, 2026-10-28): "It's really frustrating for a lib
+  contributor to be denied things at arms reach. It's a lil baby tiny library right now, we can be
+  forgiven churn but not surliness." A type an exported signature names is exported; the `minor`
+  changeset names it.
 * Each export's doc block is written for its caller; a changed refusal is named in it.
 * A `@ts-expect-error` or `eslint-disable-line` is reported in the PR and the thread file.
 
@@ -333,6 +337,19 @@ Depends on: #317 (in the line); cut from the top of the line (#321's tip, or hig
 when a slot frees. Review `medium`.
 
 *Review:* medium, fixed at `a984cea5`: 1 fix (STYLE.md's glosses of the rule marked "Read as:", a reading pending the Coach), 1 significant left: `ConsistencyRefusal` unexported though public `Refusing.parseConsistent` names it (Open Matters row; the thread waits unfiled on it). Verified: the alias form `type Story = Z.infer<...>` fails (293 errors, TS7022 on `Validator`), so the interfaces stand; the type test pins both to their hand-written shapes. Minor left: `message`'s bare `custom` (Cleanup); `#327`'s changeset says "saying" (the worker edits it in #331 on resume); `Story` absent from VOCABULARY.md (row); STYLE.md bullet overlap and the namespacing clause beside a destructuring codebase (row); field tours in the two doc blocks (documentarian).
+
+### 10. host_error_sanitizer: the sanitizer named for what it sanitizes; `storageTroubleOf`
+
+Coach (2026-10-28), on the sanitizer row: "let's call it hostErrorSanitizer, there's all sorts of things
+need sanitizing"; and on #330's review row, `asStorageTrouble` → `storageTroubleOf` (took the Rec).
+
+Gloss: `packages/safebyok/src/sanitizer.ts` → `host-error-sanitizer.ts`, the namespace export
+`Sanitizer` → `HostErrorSanitizer` (`src/index.ts`, `passphrase-strength.ts`, `proving.ts`,
+`vault-opts.ts`, the test file, `notes/security.md` through its sonnet pass); `refusalFor` keeps its
+name. `asStorageTrouble` → `storageTroubleOf` in `outcome.ts`, `vault-db.ts`'s hook table, the
+graphql `crossing`, tests and notes, with #330's changeset amended in this branch to announce the new
+name. Names only; `safebyok` minor. Size: small. Depends on: the line's top (#328); cut from `0e48262e`
+2026-10-28. Review `medium`.
 
 ## Not in this sprint
 

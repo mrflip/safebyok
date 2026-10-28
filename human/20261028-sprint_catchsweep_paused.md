@@ -32,3 +32,5 @@ sanitizer.ts) reset to drafting.
 test titles; `ConsistencyRefusalShape.message`'s bare `custom`; `prerebase-*` tags to delete after the
 merges; sweep *Resolved* into `catchsweep-resolutions.md`; close the sprint PR #314; remove the
 worktrees `/workspace/byok-saying_story` and `/workspace/byok-aead_narrow` once they file.
+
+**Resumed 2026-10-28**, later the same day: the Coach ruled every waiting row; threads 2 and 9 build their rulings, thread 10 (host_error_sanitizer, `storageTroubleOf`) is cut from the top of the line. This note stands as the record of the pause.
