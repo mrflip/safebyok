@@ -67,6 +67,14 @@ Doc blocks move with the body (STYLE.md: the doc block sits on the throwing one)
 unless a refusal changes. Size: small. Depends on: nothing beyond #311. Look-ahead: thread 2 edits
 the same methods right after; keep the inner `outcomeOf` calls intact so its diff is small.
 
+*Review:* (medium, 2026-10-28) fixed: the changeset said a bug leaves every throwing form raw, where
+`Box.seal`, `extractWhisper` and `sealProps` reach the step below through its `try` form, so only a
+bug in a throwing method's own lines comes raw; reworded (`7e568558`). Left, minor: `notes/security.md`
+l.248 names `Lease.tryCipheredWith` for a body now in `cipheredWith` (to thread 2, through the sonnet
+subagent); no test of the raw path or of the `try` forms' mapping (to thread 2, after the Coach's
+ruling that the throwing form owns the catch); #305's pending changeset still introduces
+`KeptLease.read` (release notes show the name born and renamed in one release; left).
+
 ### 2. aead_narrow: catch the one call, and no cause from the device store
 
 Orchestrator's proposal, accepted by the Coach ("implement your other proposals").
