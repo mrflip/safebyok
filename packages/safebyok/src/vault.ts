@@ -704,9 +704,13 @@ export class Vault implements VaultStamp {
    * @example await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
   async useWhisper<ResultT>(boxlabel: string, handed: (whisper: Whisper) => ResultT | Promise<ResultT>): Promise<ResultT> {
-    callback.parse(handed)
-    const whisper = await this.getWhisper(boxlabel)
-    // The callback's own throw is the host's, and is never told as the vault's bad news.
+    let whisper: Whisper
+    try {
+      this.#demandNotGone()
+      callback.parse(handed)
+      whisper = await this.getWhisper(boxlabel)
+    } catch (err) { throw this.#onRefused(err) }
+    // Outside the try: the callback's own throw is the host's, never converted or told as the vault's bad news.
     return await handed(whisper)
   }
 
