@@ -1,4 +1,4 @@
-import type { LeaseRecord, DeviceRecord } from '../../src/types/types'
+import type { LeaseRecord, DeviceRecord } from '../../src/shapes/device'
 import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
@@ -144,7 +144,7 @@ export const damagedVaultWorld = async () => {
 }
 
 /** The verbs Bank.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultRecord', 'getBox', 'putBox', 'delBox', 'delVault', 'delDamagedVault', 'subscribe'] as const
 
 /** Every verb of a DeviceDB, by name: a class instance's verbs are on its prototype, where `Object.keys` never finds them. */
 export const DeviceDBVerbs = ['getLease', 'putLease', 'delLease', 'getDeviceRecord', 'raiseDeviceRecord', 'delDeviceRecord', 'delAll'] as const satisfies readonly DeviceVerb[]

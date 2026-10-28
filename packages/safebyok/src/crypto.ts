@@ -4,19 +4,9 @@
  */
 
 import { base64urlnopad } from '@scure/base'
-import type * as Z from 'zod'
 import { VaultError } from './errors'
-import { Validator } from './checks/validator'
+import type { Ciphered } from './shapes/fields'
 import { stableJsonify } from './stable-jsonify'
-
-/** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
-export const { Ciphered } = Validator('bad_record', ({ obj, str }) => ({
-  Ciphered: obj({
-    cipher_iv_b64:  str.min(1),
-    ciphertext_b64: str.min(1),
-  }).strict(),
-}))
-export type Ciphered = Z.infer<typeof Ciphered>
 
 /** `count` cryptographically secure random bytes, from the platform. */
 export const randomBytes = (count: number): Uint8Array => (

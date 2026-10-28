@@ -459,7 +459,7 @@ describe("BankProvider", () => {
       )
       await expectShown('boundary')
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
-      expect((caught[0] as VaultError).message).to.match(/requestCleartext is a function/)
+      expect((caught[0] as VaultError).message).to.match(/^In Bank.make's options: requestCleartext: Expected a function/)
     })
 
     it("unlocks ahead of time through ensureUnlocked, on a button", async () => {

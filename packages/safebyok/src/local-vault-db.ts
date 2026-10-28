@@ -1,13 +1,15 @@
-import { BoxRecord } from './box'
-import type { VaultScope } from './types/types'
-import type { VaultRecord, VaultDraft } from './vault-record'
-import { VaultError } from './errors'
+import { BoxRecord } from './shapes/box'
+import type { VaultScope } from './shapes/scopes'
+import type { VaultRecord, VaultDraft } from './shapes/vault'
 import type { StringStore } from './string-store'
 import * as Scopepath from './scopepath'
 import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { Validator } from './checks/validator'
-import { type VaultDBOpts, VaultDB, type VaultRecordExpectation, type StoredBox, type VaultReadResponse, splitStoredBoxes, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import * as Phrases from './phrases'
+import { optionsRefusal } from './options'
+import { type VaultDBOpts, VaultDB, splitStoredBoxes } from './vault-db'
+import type { VaultRecordExpectation, StoredBox, VaultReadResponse, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultDelExpectation } from './shapes/vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -43,18 +45,18 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
 export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  if (! localVaultDBOptsShape.safeParse(opts).success) {
-    throw new VaultError('bad_option', 'localVaultDB takes one bag of options: a `store` (a StringStore, such as memoryStore() or domStore(localStorage, prefix)), and optionally a `logger`.')
+  try {
+    localVaultDBOptsShape.parse(opts)
+  } catch (err) {
+    throw optionsRefusal(err, (message) => `In localVaultDB's options: ${message}.`)
   }
   return new StringStoreVaultDB(opts)
 }
 
-const isFunction = (candidate: unknown) => typeof candidate === 'function'
-
 /** The check of what {@link localVaultDB} is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
-export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, custom }) => {
-  const call = custom(isFunction)
-  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }) }) }
+export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
+  const call = fn()
+  return { localVaultDBOptsShape: obj({ store: obj({ read: call, write: call, erase: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
 })
 
 class StringStoreVaultDB extends VaultDB {

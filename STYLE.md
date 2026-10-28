@@ -222,7 +222,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * **Build for ease of maintenance, not ease of implementation.** A module's customer uses one
   method; that method should read whole on its own, without tracing into a generic.
 * **Don't DRY short bodies through a generic.** Spelled out, a maker and its inverse read as
-  mirror images, each clear at a glance (`CX` is the core's checks, `checks/core-checks.ts`):
+  mirror images, each clear at a glance (`CX` is the core's scope checks, `shapes/scopes.ts`):
 
   ```ts
   export const box = (scope: Boxscope): BoxScopepath => {
@@ -304,12 +304,16 @@ package's exports; `Class.make` and any constructor taking outside input; a host
 host's callback returns (a strength checker's verdict, a key deriver's output). A failure there is
 a refusal with a `kind` the caller can branch on.
 
-**For preconditions.** Check a function's input with Zod in general,
-`dragForceInput.parse({ thing, vel })`, above all where a validator is already written. A
-module-local variation is welcome, made directly or in a `Validator` call at module level, never
-in a call per function call. Where it is warranted (a rule Zod does not express naturally, a
-refusal that needs its own message), add a specific check or checks, inline or in a helper, and
-keep the Zod parse beside them wherever it still does useful work.
+**For preconditions, one line is the norm.** A function pulls what it needs out of what it was
+handed, and checks it, in one parse: `const { applabel, user_id } = bankScope.parse(thing)`,
+`dragForceInput.parse({ thing, vel })` (the Coach, 2026-10-27: "validators [are] the principal
+means of, in one line, extracting and validating local data"). Never a hand-pick
+(`{ applabel: x.applabel, ... }`) where a schema exists, and never an if-then precondition, or a
+`safeParse` followed by a sentence of its own, where a parse says the same: the refusal a
+`Validator` makes names the failing field, which is what a developer who hits it needs. A
+module-local variation is welcome, made in a `Validator` call at module level, never in a call per
+function call. Add a specific check beside the parse only for a rule Zod does not express
+naturally, or a comparison with what the callee holds.
 
 * **A module's entrypoints are its exports.** An export assesses what its types cannot carry and
   its sources have not already checked; a private helper trusts its exported caller. Past the
@@ -379,7 +383,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
   made in a `Validator` call does (`src/checks/validator.ts`), and a check of options catches its
-  refusal only to prefix the call's name and say what to do (`optionsCheck`, `checkMakeBankOpts`).
+  refusal only to prefix the call's name and say what to do (`optionsCheck`, `optionsRefusal`).
   Never `Z.config`, which is the host's Zod too. Zod's English names a refused value's type, never
   the value.
 * **A refusal never repeats a value from its input** (the Coach, 2026-10-26). It may name the
@@ -393,9 +397,12 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 rest, so a vault record, a Vault object or a bank's listing handed in as a scope comes out as just
 the scope.
 
-* A bag a person typed gets `obj({ ... }).strict()`: stripping would quietly drop a misspelt option. So
-  does a stored record (`.strict()`): a field this version does not know is damage, or a newer
-  `format`. A scope, taken out of whatever carries it, strips (`.strip()`).
+* **Accept whatever is legitimately offered.** A shape taken out of whatever carries it, a scope, a
+  stamp or a sparse shape, strips: a Vault object, its record or its snapshot passes as any of
+  them. A strict check is the exception, and says beside it why that site needs it.
+* A bag of options a person typed gets `obj({ ... }).strict()`: stripping would quietly drop a
+  misspelt option. So does a stored record: a field this version does not know is damage, or a
+  newer `format`. So does a box's stamp, as a field beside its own would be shown but not bound.
 * **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is
   bound into storage and crypto, so refuse instead. A structural transform is fine: a scopepath's
   validator splits it into its parts before checking them.
@@ -445,7 +452,7 @@ the scope.
   `VaultRecord | VaultTombstone | DamagedVaultRecord | null` says present, dead, broken, missing;
   `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
 * **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
-  validator yet waits in `types.ts`, and leaves it when one is written.
+  validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.

@@ -1,13 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as ZClassic from 'zod'
-import { Box, BoxRecord } from '../../src/box'
+import { Box } from '../../src/box'
+import { BoxRecord, type Whisper, type Sidecar } from '../../src/shapes/box'
 import type { VaultError } from '../../src/errors'
 import type { RequestCleartext } from '../../src/gating'
 import { valOf } from '../../src/outcome'
 import { Vault } from '../../src/vault'
 import { heldLeaseOf, registerLeaseReader } from '../../src/held-lease'
 import { Lease } from '../../src/lease'
-import { type Whisper, MaxWhisperBytes, type Sidecar, MaxBoxes, VaultScope } from '../../src/types/types'
+import { MaxWhisperBytes, MaxBoxes } from '../../src/shapes/bank-opts'
+import { VaultScope } from '../../src/shapes/scopes'
 import { FarFuture } from '../../src/consts'
 import { MaxLabelChars, MaxUserIdChars } from '../../src/checks/primitives'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
@@ -582,12 +584,15 @@ describe("the sidecar", () => {
   it("refuses a prop beside `boxlabel` and `sidecar`, or props that are no object, as 'bad_option', writing nothing: a note is kept in the sidecar, not beside it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const misfits = [{ boxlabel: 'anthropic', note: 'work account' }, { boxlabel: 'anthropic', sidcar: { note: 'work account' } }, { boxlabel: 'anthropic', sidecar: {}, note: 'work account' }, 'work account']
+    const misfits = [{ boxlabel: 'anthropic', note: 'work account' }, { boxlabel: 'anthropic', sidcar: { note: 'work account' } }, { boxlabel: 'anthropic', sidecar: {}, note: 'work account' }]
     for (const props of misfits) {
-      const err = await TH.expectRefusal(vault.putBox(props as never, 'sk-fake'), 'bad_option')
-      expect(err.message).to.include('sidecar')
+      const err = await TH.expectRefusal(vault.putBox(props, 'sk-fake'), 'bad_option')
+      expect(err.message).to.include('it takes only boxlabel, sidecar')
       expect(err.message).to.not.include('work account')
     }
+    const unbagged = await TH.expectRefusal(vault.putBox('work account' as never, 'sk-fake'), 'bad_option')
+    expect(unbagged.message).to.include('expected object')
+    expect(unbagged.message).to.not.include('work account')
     expect(world.dbStore.scopepaths().filter((scopepath) => isU1Box(scopepath))).to.have.lengthOf(0)
     await vault.putBox({ boxlabel: 'anthropic', sidecar: undefined }, 'sk-fake')
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({})
@@ -1179,7 +1184,7 @@ describe("useWhisper", () => {
     const world = makeWorld()
     const vault = await world.open()
     const err = await TH.expectRefusal(vault.useWhisper('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
-    expect(err.message).to.include('callback function')
+    expect(err.message).to.include('Expected a function')
   })
 })
 // --
@@ -1203,7 +1208,7 @@ describe("box.extractWhisper, through a vault", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
     const record = storedBoxOf(world)
-    const checks = vi.spyOn(BoxRecord, 'safeParse')
+    const checks = vi.spyOn(BoxRecord, 'parse')
     const box = Box.make(vault, record, TH.cheatGetVaultEpoch(vault))
     expect(checks).toHaveBeenCalledTimes(1)
     checks.mockClear()

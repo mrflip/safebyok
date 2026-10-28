@@ -8,11 +8,8 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type BadOutcome, type Outcome, bad, good, valOf } from './outcome'
-import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, checkFreshSalt, checkedPasskeyAnswer, headerOf } from './proving'
-import type { PasskeyAnswer } from './types/types'
-import { type GatedVaultRecord, type VaultRecord, type VaultSparse, isGated } from './vault-record'
-import { passphraseCleartext } from './types/type-aliases'
-import * as Phrases from './phrases'
+import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, freshPasskeyAnswer } from './proving'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
 import type { Vault } from './vault'
 
 /** Each kind of gating, by the change its attempt makes: see {@link Gating}. */
@@ -300,7 +297,7 @@ export class RaisedGating implements ProvingGating {
         ...common,
         gatingkind:        'unlock_vault',
         attemptPassphrase: attemptOf(checkText, async (passphrase: string) => { await this.#unlockByPassphrase(passphrase) }),
-        attemptPasskey:    attemptOf(checkedPasskeyAnswer, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }),
+        attemptPasskey:    attemptOf(checkPasskey, async (passkey: PasskeyAnswer) => { await this.#unlockByPasskey(passkey) }),
       }),
       change_passphrase: () => ({ ...common, gatingkind: 'change_passphrase', attempt: attemptOf(checkTexts, async (current: string, next: string) => { await this.#changePassphrase(current, next) }) }),
       put_passkey:       () => ({ ...common, gatingkind: 'put_passkey', attempt: attemptOf(checkNewPasskey, async (passphrase: string, passkey: PasskeyAnswer) => { await this.#putPasskey(passphrase, passkey) }) }),
@@ -324,7 +321,7 @@ export class RaisedGating implements ProvingGating {
   async #initializeGate(passphrase: string, passkey: PasskeyAnswer | undefined): Promise<void> {
     const held = await this.#tools.freshen(this)
     if (isGated(held)) { throw gateMadeElsewhereError() }
-    await this.#strengthUnder(passphrase, { vault_tok: held.vault_tok, gate_epoch: held.gate_epoch })
+    await this.#strengthUnder(passphrase, held)
     const [passphraseProving, passkeyProving] = await Promise.all([
       PassphraseProving.seal(this.#vault, { slotlabel: 'passphrase' }, passphrase, { gating: this }),
       passkey === undefined ? undefined : PasskeyProving.seal(this.#vault, { slotlabel: 'passkey' }, passkey, { gating: this }),
@@ -410,7 +407,7 @@ export class RaisedGating implements ProvingGating {
    * A vault moved on, a lock or a decline meanwhile refuses as found, never 'weak_passphrase'; a
    * gate made elsewhere meanwhile, for a `thing` made on a vault with none, is 'gate_made_elsewhere'.
    */
-  async #strengthUnder(passphrase: string, thing: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>): Promise<void> {
+  async #strengthUnder(passphrase: string, thing: VaultMadeUnder): Promise<void> {
     const verdict = await this.#vault.tryCheckStrength(passphrase)
     this.#tools.demand(thing, this.call, { firstGate: thing.gate_epoch === 0 })
     if (this.landed) { throw gatingOverError() }
@@ -446,12 +443,10 @@ export class RaisedGating implements ProvingGating {
   // --
 }
 
-// == [Refusals]: checkText, checkTexts, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
+// == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
-const checkText = (given: unknown): void => {
-  if (! passphraseCleartext.safeParse(given).success) { throw new VaultError('bad_option', `${Phrases.PassphraseNotText}.`) }
-}
+const checkText = (given: unknown): void => { passphraseCleartext.parse(given) }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
 const checkTexts = (current: unknown, next: unknown): void => {
@@ -459,16 +454,19 @@ const checkTexts = (current: unknown, next: unknown): void => {
   checkText(next)
 }
 
+/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswerShape` checks: an answer already used among them. */
+const checkPasskey = (passkey: unknown): void => { passkeyAnswerShape.parse(passkey) }
+
 /** Refuse 'bad_option' unless the passphrase is text and the passkey's answer one a new passkey gives, over a fresh salt. */
 const checkNewPasskey = (passphrase: unknown, passkey: unknown): void => {
   checkText(passphrase)
-  checkFreshSalt(checkedPasskeyAnswer(passkey))
+  freshPasskeyAnswer.parse(passkey)
 }
 
 /** Refuse 'bad_option' unless the first passphrase is text and the passkey's answer, when given, one a new passkey gives. */
 const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
   checkText(passphrase)
-  if (passkey !== undefined) { checkFreshSalt(checkedPasskeyAnswer(passkey)) }
+  if (passkey !== undefined) { freshPasskeyAnswer.parse(passkey) }
 }
 
 /** The two halves of a declined call's message, by gating kind: what the user was asked to do, and what remains once they decline. */

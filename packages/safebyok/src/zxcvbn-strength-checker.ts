@@ -1,6 +1,6 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
 import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
-import type { VaultScope } from './types/types'
+import type { VaultScope } from './shapes/scopes'
 import { codePointsOf } from './text'
 
 /** The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked.

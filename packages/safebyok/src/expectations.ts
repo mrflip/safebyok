@@ -1,8 +1,11 @@
-import { BoxRecord } from './box'
+import { revision_tok } from './shapes/fields'
 import type { VaultError } from './errors'
 import * as Refusals from './refusals'
-import { TombstoneFormat, type VaultRecord, type VaultTombstone, type VaultDraft } from './vault-record'
-import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './vault-db'
+import { TombstoneFormat, type VaultRecord, VaultSparse, type VaultTombstone } from './shapes/vault'
+import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultRecordExpectation } from './shapes/vault-db'
+import type { VaultScope } from './shapes/scopes'
+import * as CX from './shapes/scopes'
+import { fieldOf } from './helpers'
 
 /** The comparisons a key-value adapter makes inside its one atomic step: whether what is stored is what a write expects, and what to store or refuse.
  * Import it whole: `import { Expectations } from 'safebyok'`, then
@@ -27,11 +30,6 @@ export const isTombstone = (stored: unknown): boolean => fieldOf(stored, 'format
 
 /** The row `stored` as a vault record: itself, or null for none or for a tombstone. */
 const liveRecordOf = (stored: unknown): unknown => (isTombstone(stored) ? null : stored ?? null)
-
-/** The field `field` of a stored row, or undefined when the row is no object or has none. */
-const fieldOf = (stored: unknown, field: string): unknown => (
-  typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>)[field] : undefined
-)
 
 /** True when the stored vault record is `expected`'s vault at its gate epoch, as an update of the vault record needs (VAULTDB.md, line 3.2).
  *
@@ -67,10 +65,7 @@ export const vaultMeets = (stored: unknown, expected: Pick<VaultDelExpectation, 
 /** The `vault_epoch` of a stored row, a vault record or a tombstone, as a whole number from zero: zero where the row shows none that reads so.
  * A damaged vault record can show no `vault_epoch`; its deletion still leaves a tombstone.
  */
-const epochOf = (stored: unknown): number => {
-  const val = fieldOf(stored, 'vault_epoch')
-  return typeof val === 'number' && Number.isSafeInteger(val) && val >= 0 ? val : 0
-}
+const epochOf = (stored: unknown): number => VaultSparse.shape.vault_epoch.safeParse(fieldOf(stored, 'vault_epoch')).data ?? 0
 
 /** The vault record an update stores over `stored`, once it has met it: `vaultRecord`, its `vault_epoch` the stored one plus one, whatever `vaultRecord` carries.
  * The store moves the counter, never the writer (VAULTDB.md, line 3.2). It hands back the type it
@@ -90,7 +85,7 @@ export const vaultRecordPutOf = <RecordT extends Pick<VaultRecord, 'vault_epoch'
  *   const life = Expectations.newLifeOf(draft, stored)
  *   if (life) { write(life) }
  */
-export const newLifeOf = <DraftT extends Pick<VaultDraft, 'vault_epoch'>>(draft: DraftT, stored: unknown): DraftT | null => {
+export const newLifeOf = <DraftT extends Pick<VaultRecord, 'vault_epoch'>>(draft: DraftT, stored: unknown): DraftT | null => {
   if (stored === null || stored === undefined) { return draft }
   return isTombstone(stored) ? { ...draft, vault_epoch: epochOf(stored) } : null
 }
@@ -104,16 +99,10 @@ export const newLifeOf = <DraftT extends Pick<VaultDraft, 'vault_epoch'>>(draft:
  *
  * @example Expectations.tombstoneOf(stored, scope, { vault_tok: 'v1', gate_epoch: 2 })   // while v1 is stored at gate 2
  */
-export const tombstoneOf = (stored: unknown, scope: Pick<VaultTombstone, 'applabel' | 'user_id' | 'vaultlabel'>, expected: VaultDelExpectation): VaultTombstone | null => {
+export const tombstoneOf = (stored: unknown, scope: VaultScope, expected: VaultDelExpectation): VaultTombstone | null => {
   if (fieldOf(stored, 'vault_tok') !== expected.vault_tok) { return null }
   if (expected.gate_epoch !== null && fieldOf(stored, 'gate_epoch') !== expected.gate_epoch) { return null }
-  return {
-    format:      TombstoneFormat,
-    applabel:    scope.applabel,
-    user_id:     scope.user_id,
-    vaultlabel:  scope.vaultlabel,
-    vault_epoch: epochOf(stored) + 1,
-  }
+  return { format: TombstoneFormat, ...CX.vaultScope.parse(scope), vault_epoch: epochOf(stored) + 1 }
 }
 
 /** The refusal a box write meets from the stored vault record and box, or null when it may land.
@@ -143,6 +132,6 @@ export const boxRefusalOf = (storedVaultRecord: unknown, storedBox: unknown, exp
  */
 export const deletionOf = (storedBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (storedBox === undefined || storedBox === null) { return { outcome: 'absent' } }
-  const storedRevision = BoxRecord.shape.revision_tok.safeParse(fieldOf(storedBox, 'revision_tok')).data ?? null
+  const storedRevision = revision_tok.safeParse(fieldOf(storedBox, 'revision_tok')).data ?? null
   return { outcome: storedRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
 }

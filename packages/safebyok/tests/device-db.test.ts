@@ -3,7 +3,8 @@ import { DeviceDB, deviceRecordFor, deviceRecordOf, memoryDeviceDB, raisedDevice
 import { VaultError } from '../src/errors'
 import type { Outcome } from '../src/outcome'
 import * as Scopepath from '../src/scopepath'
-import type { DeviceRecord, LeaseRecord, VaultScope } from '../src/types/types'
+import type { DeviceRecord, LeaseRecord } from '../src/shapes/device'
+import type { VaultScope } from '../src/shapes/scopes'
 import * as TH from './test-helpers'
 
 TH.describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
@@ -75,7 +76,8 @@ describe("raisedDeviceRecord", () => {
 
 describe("deviceRecordOf", () => {
   it("builds the record from the scope's parsed names alone, frozen: a Vault object passes as its scope, as its example shows", () => {
-    const holder = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', lock: () => undefined }
+    // A Vault object's methods are its prototype's: its own fields are its stamp.
+    const holder = Object.defineProperty({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, 'lock', { value: () => undefined })
     const record = deviceRecordOf(holder, 'device-one', 3)
     expect(record).to.deep.equal(TH.deviceRecordOf('u1', { highest_vault_epoch: 3 }))
     expect(Object.isFrozen(record)).to.be.true
