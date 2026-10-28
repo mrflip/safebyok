@@ -31,6 +31,19 @@ disagree. Thread 1 (#316) filed 2026-10-28 at `a4bbef6b`, rebased onto main (`f2
   helpers in `lease.ts` and `box.ts` are gone; the bodies call `serializedBytes.parse`,
   `BoxSparse.parse`, `CipheredShape.parse`, `LeaseSealProps.parse`, `SealBoxProps.parse`,
   `MadeShape.parse`, `BoxRecord.parse` and `VaultOfBox` from `src/shapes/`.
+* **Thread 6 (store_trynames, #321):** every public `VaultDB` verb (`getVaultRecords`/`ensureVaultRecords`
+  included, beyond the plan's list) and every `DeviceDB` verb is a try pair; bodies moved whole into the
+  throwing form, `tryX = outcomeOf(() => this.X(...))`. `DeviceVerb = Exclude<keyof DeviceDB, `try${string}`>`;
+  `HeededVaultDB = Pick<VaultDB, HeededVerb | 'subscribe'>` (`Thrown<>` gone); `heed` calls the try forms.
+  `ServedVaultDB` (graphql), `VaultDBVerbs` (`safebyok/testing`) and `vault-opts.ts`'s duck-type shapes
+  name the try forms. `ProvingTools.putLease` is `tryPutLease` (pulled forward from *Not in this sprint*).
+  The private helpers `readVault`/`ensuredVault`/`deletedVault` are still shared by two public verbs
+  each (thread 3's ground). The `outcomeOf(() => this.#vaultDB.X(...))` rewraps in `vault.ts` stay:
+  each feeds a `#demandAfterWait` before the answer is judged. *Orchestrator:* the DeviceDB throwing
+  forms came out rejecting with the store's raw error (the mapping sat in `deviceOutcomeOf`, the try
+  wrapper); by the Coach's ruling the worker is moving the mapping into each throwing body, one catch
+  around the one `do*` call, before review. `KeptLease.read`'s store call is `deviceDB.tryGetLease(scope)`
+  (thread 1 renamed the method `tryRead`: a small restack conflict in `lease.ts`).
 * **Thread 4 (where_prefix, #317):** a validator's `parse` takes a saying, `parse(val, { where?,
   advice? })`, framed in `refusalOf`. Zod has no whole-message framing hook. `Refusing<SchemaT>` must
   stay `SchemaT & {...}`: `Omit<SchemaT, 'parse'>` breaks every place a validator is handed to a

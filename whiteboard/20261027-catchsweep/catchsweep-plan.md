@@ -5,7 +5,7 @@ Mode: normal. Review level: `medium`, `high` for thread 2 (it touches `proving.t
 Coach (flip), 2026-10-27, after a sonnet audit of every `try`/`catch` under `packages/*/src` and the
 orchestrator's reading of the wrappers in `vault-db.ts`, `lease.ts` and `proving.ts`.
 
-**Status:** thread 1 (#316) filed, on main; 2 building on it; 4 (#317) in review; 6 building; 5 queued; 3 and 7 wait on 6. Seven threads.
+**Status:** thread 1 (#316) filed, on main; 4 (#317) reviewed, filing (catch-up rebase over #301 in a worker's hands); 6 (#321) ready, reworking DeviceDB's throwing forms per the ruling before review; 2 building on 1; 5 building on main; 3 and 7 wait on 6. Seven threads.
 
 **Base.** Every thread stands on PR [#311](https://github.com/mrflip/safebyok/pull/311)
 (`20261027-proving_tidy`, rebased onto main by a separate agent first). The Coach: "stack if they
@@ -130,6 +130,15 @@ on the `Validator` call, or a parse variant taking the place; STYLE.md *Validati
 delete the seven catches; the duplicate `idb-opts.ts` becomes one file re-exported, if the
 packages' boundary allows, else say why not. Messages a host sees keep their wording. Empty
 changeset unless wording changes. Size: small. Depends on: nothing beyond #311.
+
+*Review:* (medium, 2026-10-28) fixed: `Saying` and `VaultBagAdvice` doc blocks lead with what each is;
+`Refusing.parse`'s doc says a saying that is none refuses 'bad_option' (`04a0208c`); the changeset counts
+six converted checks, not seven, and names the ParseContext refusal (`9f4f3690`). Significant, left:
+a Zod `ParseContext` handed to `parse` now refuses 'bad_option'; the Coach ruled keep it (2026-10-28).
+Minor, left: `Saying`/`Refusing` not importable from `safebyok` (row); `Saying` near the strength
+checker's `PlainSaying` (row); hand-written `Saying` beside `SayingShape` (pattern row, with
+`ConsistencyRefusal`); `framed` a participle beside `fooOf` names (taste); `checkBankVaultOpts`'s
+message untested (Cleanup); `optionsCheck`'s `said` parameter now passed as `advice` (Cleanup).
 
 ### 5. one_sanitizer: a host function threw and may have heard a secret
 
