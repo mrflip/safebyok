@@ -2,9 +2,9 @@
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
-import { RefusalKindVals, VaultError, type RefusalKind } from '../errors'
+import { refusalKindVals, VaultError, type RefusalKind } from '../errors'
 import * as Phrases from '../phrases'
-import { EpochMillis, label, user_id } from './primitives'
+import * as PX from '../shapes/primitives'
 
 // == [Kit]: isBytes, Kit, KitWith, Merged
 
@@ -39,8 +39,8 @@ export const Kit = {
   /** A safe integer, 0 or more: an epoch or a count. */
   uint:    Zod.int().nonnegative(),
   bool:    Zod.boolean(),
-  label, applabel: label, vaultlabel: label, boxlabel: label, user_id,
-  epochMillis: EpochMillis,
+  label: PX.label, applabel: PX.label, vaultlabel: PX.label, boxlabel: PX.label, user_id: PX.user_id,
+  epochMillis: PX.epochMillis,
 } as const
 
 /** The kit a builder gets: {@link Kit}, with the given modules' exports spread in beneath it. */
@@ -65,7 +65,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * refuses 'bad_option', whatever the input.
  *
  * Only `parse` changes: `safeParse` and `parseAsync` are Zod's own. A schema sliced from a
- * validator outside a `Validator` call (`VaultSparse.pick(...)`) throws a ZodError; make the slice
+ * validator outside a `Validator` call (`vaultSparse.pick(...)`) throws a ZodError; make the slice
  * in a call of its own where it should refuse. A validator nested in another refuses with the
  * outer one's kind.
  *
@@ -89,16 +89,16 @@ export type Merged<SourcesT extends readonly object[]> =
  *   vaultScope.parse(bag, { where: 'In the bag naming the vault', advice: 'Name it by its vaultlabel.' })  // throws 'bad_scope', "In the bag naming the vault: vaultlabel: A label is <...>. Name it by its vaultlabel."
  *   vaultScope.parseConsistent(box, bank.scope)  // box's scope, once it is the bank's app and user: 'bad_scope' otherwise
  * @example
- *   export const { BoxRecord, BoxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
- *     const BoxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
- *     const BoxSparse = BoxRecord.omit({ whisper_ciphered: true })
- *     return { BoxRecord, BoxSparse }
+ *   export const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
+ *     const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
+ *     const boxSparse = boxRecord.omit({ whisper_ciphered: true })
+ *     return { boxRecord, boxSparse }
  *   })
- *   BoxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
+ *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
  * @example
- *   export const { VaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, GateRecord }) => {
- *     const VaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: GateRecord.nullable() }).strict()
- *     return { VaultRecord }
+ *   export const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
+ *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
+ *     return { vaultRecord }
  *   }, [GateChecks])
  */
 export const Validator = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
@@ -123,7 +123,7 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
 /** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then holds the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
 const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT): Refusing<SchemaT> => {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
-    const framing = story === undefined ? {} : Checks.StoryShape.parse(story)
+    const framing = story === undefined ? {} : Checks.story.parse(story)
     const result = schema.safeParse(val, InEnglish)
     if (result.success) { return result.data }
     throw refusalOf(kind, result.error, framing)
@@ -201,7 +201,7 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
 export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {
-  const { kind, message } = Checks.ConsistencyRefusalShape.parse(refusal)
+  const { kind, message } = Checks.consistencyRefusal.parse(refusal)
   const fieldnames = disagreeing(bag, other)
   if (fieldnames.length === 0) { return true }
   const said = typeof message === 'function' ? message(fieldnames) : message
@@ -219,8 +219,8 @@ export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, 
 
 /** The names of the fields `bag` and `other` both define and hold apart, frozen: each bag checked to be an object first. */
 const disagreeing = (bag: object, other: object): readonly string[] => {
-  const ours = Checks.Bag.parse(bag)
-  const theirs: Partial<Record<string, unknown>> = Checks.Bag.parse(other)
+  const ours = Checks.bag.parse(bag)
+  const theirs: Partial<Record<string, unknown>> = Checks.bag.parse(other)
   return Object.freeze(Object.entries(ours)
     .filter(([ckey, val]) => val !== undefined && theirs[ckey] !== undefined && theirs[ckey] !== val)
     .map(([ckey]) => ckey))
@@ -229,21 +229,21 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 
 // == [Checks]: Checks, ConsistencyRefusal, Story
 
-/** The checks this module makes for itself, under one name: `Bag`, any object, taken as it is, so a getter still reads; `ConsistencyRefusalShape`, what a disagreement refuses with; and `StoryShape`, the words around a parse's refusal. Made below {@link Validator} and its refusals, which the call needs. */
+/** The checks this module makes for itself, under one name: `bag`, any object, taken as it is, so a getter still reads; `consistencyRefusal`, what a disagreement refuses with; and `story`, the words around a parse's refusal. Made below {@link Validator} and its refusals, which the call needs. */
 const Checks = Validator('bad_option', ({ custom, obj, oneof, str, union }) => ({
-  Bag:                     custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
-  ConsistencyRefusalShape: obj({
-    kind:    oneof(RefusalKindVals),
+  bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
+  consistencyRefusal: obj({
+    kind:    oneof(refusalKindVals),
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
-  StoryShape:              obj({ where: str.optional(), advice: str.optional() }).strict(),
+  story:              obj({ where: str.optional(), advice: str.optional() }).strict(),
 }))
 
 // Each is an interface extending its Z.infer, not a type alias of it: Refusing names both, and
 // each is read off a Refusing, a loop TypeScript follows only through an interface's deferred members.
 /** What a disagreement refuses with: its `kind`, and its `message`, a sentence or one made from the names of the fields that disagree, never their values. */
-export interface ConsistencyRefusal extends Z.infer<typeof Checks.ConsistencyRefusalShape> {}
+export interface ConsistencyRefusal extends Z.infer<typeof Checks.consistencyRefusal> {}
 
 /** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
-export interface Story extends Z.infer<typeof Checks.StoryShape> {}
+export interface Story extends Z.infer<typeof Checks.story> {}
 // --

@@ -1,11 +1,12 @@
-import { type BadNewsHandler, type BankVaultOpts, type Clock, type MakeBankOpts, MaxBoxes, bankVaultOpts, clockReading, clockShape, declaredBoxes, declaredBytes, deviceDBShape, keyDeriverShape, leaseHoursAsMillis, makeBankOpts, maxBoxes, maxWhisperBytes, renewMinutesAsMillis, staleMinutesAsMillis, vaultDBShape, wallClock } from './shapes/bank-opts'
+import { type BadNewsHandler, type BankVaultOpts, type Clock, type MakeBankOpts, MaxBoxes, wallClock } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import type { VaultScope } from './shapes/scopes'
 import { VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
-import { type VaultLogger, loggerShape, parseLogger } from './logger'
+import { type VaultLogger, parseLogger } from './logger'
 import * as HostErrorSanitizer from './host-error-sanitizer'
 import { type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from './passphrase-strength'
 import * as CX from './shapes/scopes'
@@ -24,23 +25,23 @@ export const isBag = (candidate: unknown) => typeof candidate === 'object' && ca
  * itself.
  */
 const { vaultDBGiven, deviceDBGiven, bankOptsRead } = Validator('bad_option', ({ custom, fn }) => {
-  const vaultDBGiven = custom<VaultDB>((candidate) => candidate instanceof VaultDB && vaultDBShape.safeParse(candidate).success, Phrases.VaultDBShape)
-  const deviceDBGiven = custom<DeviceDB>((candidate) => candidate instanceof DeviceDB && deviceDBShape.safeParse(candidate).success, Phrases.DeviceDBShape)
+  const vaultDBGiven = custom<VaultDB>((candidate) => candidate instanceof VaultDB && OX.vaultDBShape.safeParse(candidate).success, Phrases.VaultDBShape)
+  const deviceDBGiven = custom<DeviceDB>((candidate) => candidate instanceof DeviceDB && OX.deviceDBShape.safeParse(candidate).success, Phrases.DeviceDBShape)
   return {
     vaultDBGiven,
     deviceDBGiven,
-    bankOptsRead: makeBankOpts.extend({
+    bankOptsRead: OX.makeBankOpts.extend({
       vaultDB:          vaultDBGiven,
       deviceDB:         deviceDBGiven,
-      keyDeriver:       keyDeriverShape,
-      leaseHours:       leaseHoursAsMillis,
-      staleMinutes:     staleMinutesAsMillis,
+      keyDeriver:       OX.keyDeriverShape,
+      leaseHours:       OX.leaseHoursAsMillis,
+      staleMinutes:     OX.staleMinutesAsMillis,
       onBadNews:        fn<BadNewsHandler>().nullable().default(null),
       requestCleartext: fn<RequestCleartext>().nullable().default(null),
-      clock:            clockShape.optional(),
-      maxWhisperBytes,
-      maxBoxes,
-      logger:           loggerShape.nullish(),
+      clock:            OX.clockShape.optional(),
+      maxWhisperBytes:  OX.maxWhisperBytes,
+      maxBoxes:         OX.maxBoxes,
+      logger:           OX.loggerShape.nullish(),
     }),
   }
 })
@@ -54,7 +55,7 @@ export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => deviceDBGiven.pa
 /** `opts` as handed to `bank.ensureVault` and its siblings, once a bag of no field it does not take, or left out: 'bad_option' otherwise, naming the call. Its stores are checked by {@link vaultPartsOf}. */
 const checkBankVaultOpts = (opts: BankVaultOpts | undefined): BankVaultOpts => {
   if (opts === undefined) { return {} }
-  bankVaultOpts.parse(opts, { where: "In bank.ensureVault's options" })
+  OX.bankVaultOpts.parse(opts, { where: "In bank.ensureVault's options" })
   return opts
 }
 
@@ -80,19 +81,19 @@ export const BoxFixedBytes = 512
 
 /** How Bank.make reads each limit an adapter declares. */
 const DeclaredLimitFor = {
-  maxRecordBytes: declaredBytes,
-  maxVaultBytes:  declaredBytes,
-  maxBoxes:       declaredBoxes,
+  maxRecordBytes: OX.declaredBytes,
+  maxVaultBytes:  OX.declaredBytes,
+  maxBoxes:       OX.declaredBoxes,
 } as const
 
 /** `staleMinutes`, as `hello()` is handed it, in the milliseconds the vault keeps: 'bad_option', naming `where`, out of range.
  *
  * @example parseStaleMinutes(0.5, 'hello')   // 30000
  */
-export const parseStaleMinutes = (candidate: unknown, where: string): number => staleMinutesAsMillis.parse(candidate, { where: `In ${where}'s options: staleMinutes` })
+export const parseStaleMinutes = (candidate: unknown, where: string): number => OX.staleMinutesAsMillis.parse(candidate, { where: `In ${where}'s options: staleMinutes` })
 
 /** `ensureUnlocked()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
-export const parseRenewMinutes = (candidate: unknown): number => renewMinutesAsMillis.parse(candidate, { where: "In ensureUnlocked's options: renewMinutes" })
+export const parseRenewMinutes = (candidate: unknown): number => OX.renewMinutesAsMillis.parse(candidate, { where: "In ensureUnlocked's options: renewMinutes" })
 
 /** The host's {@link RequestCleartext}, guarded: it resolves once the host's resolves, and refuses 'unexpected_error' for whatever the host's throws, carrying none of it, so no refusal of the host's is mistaken for the vault's. */
 export type GuardedRequestCleartext = (gating: Gating) => Promise<void>
@@ -128,7 +129,7 @@ const checkClockReads = (clock: Clock): void => {
     // The host's own error rides along as the cause, unquoted.
     throw new VaultError('bad_option', "The clock passed to Bank.make threw when read: its now() must return epoch milliseconds, as Date.now() does. The clock's own error is this error's cause.", { cause: err })
   }
-  if (! clockReading.safeParse(now).success) {
+  if (! OX.clockReading.safeParse(now).success) {
     throw new VaultError('bad_option', "The clock passed to Bank.make read a time outside 1981 to 2255: its now() must return epoch milliseconds, as Date.now() does, not seconds or microseconds.")
   }
 }

@@ -2,7 +2,7 @@
 
 import { MaxSaltBytes, PassphraseKeyBytes } from '../consts'
 import * as Phrases from '../phrases'
-import { Validator } from './validator'
+import { Validator } from '../checks/validator'
 
 /** The fewest salt bytes Argon2id takes: its reference code and `@noble/hashes` refuse fewer. */
 const MinArgon2SaltBytes = 8

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord } from '../../src/shapes/vault'
-import { VaultScope } from '../../src/shapes/scopes'
+import type { PasskeyAnswer, GatedVaultRecord, PassphraseVerdict } from '../../src/shapes/vault'
+import * as VX from '../../src/shapes/vault'
+import { type VaultScope } from '../../src/shapes/scopes'
 import { VaultError } from '../../src/errors'
 import { type Outcome, bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
@@ -9,7 +10,7 @@ import { memoryDeviceDB } from '../../src/device-db'
 import { Bank } from '../../src/bank'
 import { toB64 } from '../../src/crypto'
 import * as Scopepath from '../../src/scopepath'
-import { StrongVerdict, type PassphraseVerdict, type StrengthChecker } from '../../src/passphrase-strength'
+import { StrongVerdict, type StrengthChecker } from '../../src/passphrase-strength'
 import { zxcvbnStrengthChecker } from '../../src/zxcvbn-strength-checker'
 import { PasskeyWayin, PassphraseWayin, Wayin } from '../../src/wayin'
 import * as TH from '../test-helpers'
@@ -969,7 +970,7 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
 
   it("makes its ways in from the vault record as storage holds it, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const stored = VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
+    const stored = VX.vaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
     const passphrase = Wayin.make(stored, stored.gate.passphrase, { keyDeriver: TH.testDeriver })
     const passkey = Wayin.make(stored, stored.gate.passkey ?? TH.passkeyWayinOf('none'), { keyDeriver: TH.testDeriver })
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])

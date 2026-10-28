@@ -1,11 +1,11 @@
-/** What a device keeps of a vault: its lease, and its device record. Each `parse` refuses 'bad_record', and each record is strict. */
+/** What a device keeps of a vault: its lease, what a lease is granted, and its device record, each `parse` refusing 'bad_record', each record strict; and the IndexedDB device store's options. */
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
-import { device_id, vault_key_lease_wrapped, vault_tok } from './fields'
+import * as FX from './fields'
 
-// == [Lease]: LeaseFormat, isLeaseKey, LeaseRecord, LeaseStamp, LeaseSparse
+// == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, leaseStamp, LeaseSparse, leaseGrant
 
 /** The `format` a {@link LeaseRecord} carries, in its stamp. */
 export const LeaseFormat = 'safebyok-lease-v1'
@@ -29,8 +29,8 @@ export const isLeaseKey = (val: unknown): val is CryptoKey => (
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
  * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
  */
-export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis }) => ({
-  LeaseRecord: obj({
+export const { leaseRecord } = Validator('bad_record', ({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis, vault_tok, vault_key_lease_wrapped }) => ({
+  leaseRecord: obj({
     format:            lit(LeaseFormat),
     applabel,
     user_id,
@@ -45,8 +45,8 @@ export const { LeaseRecord } = Validator('bad_record', ({ obj, int, lit, custom,
     /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
     ask_passphrase_at: epochMillis,
   }).strict(),
-}))
-export type LeaseRecord = Z.infer<typeof LeaseRecord>
+}), [FX])
+export type LeaseRecord = Z.infer<typeof leaseRecord>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
@@ -54,14 +54,19 @@ export type LeaseRecord = Z.infer<typeof LeaseRecord>
  *
  * @example { format: 'safebyok-lease-v1', ...scope, vault_tok: 'Qm9vdA', gate_epoch: 2, ask_passphrase_at: 1_900_000_000_000 }
  */
-export const { LeaseStamp } = Validator('bad_record', () => ({ LeaseStamp: LeaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }).strip() }))
-export type LeaseStamp = Z.infer<typeof LeaseStamp>
+export const { leaseStamp } = Validator('bad_record', () => ({ leaseStamp: leaseRecord.omit({ lease_key: true, vault_key_lease_wrapped: true }).strip() }))
+export type LeaseStamp = Z.infer<typeof leaseStamp>
 
 /** A lease's sparse shape, as a log line or a listing shows it: the same fields as its {@link LeaseStamp}. A Lease's own fields are these. */
 export type LeaseSparse = LeaseStamp
+
+/** What `sealLeaseRecord` grants, the scope, the vault record it was proven against, and the deadline, held to what its record will hold. It refuses 'bad_record'. */
+export const { leaseGrant } = Validator('bad_record', () => ({
+  leaseGrant: leaseRecord.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true }),
+}))
 // --
 
-// == [Device record]: DeviceRecordFormat, DeviceRecord
+// == [Device record]: DeviceRecordFormat, deviceRecord
 
 /** The `format` a {@link DeviceRecord} carries. */
 export const DeviceRecordFormat = 'safebyok-device-v1'
@@ -78,8 +83,8 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
 // A field added here bumps the format: a device whose safebyok predates the field discards the
 // record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
 // its next read raises it again.
-export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel }) => ({
-  DeviceRecord: obj({
+export const { deviceRecord } = Validator('bad_record', ({ obj, uint, lit, applabel, user_id, vaultlabel, device_id }) => ({
+  deviceRecord: obj({
     format:              lit(DeviceRecordFormat),
     applabel,
     user_id,
@@ -89,6 +94,15 @@ export const { DeviceRecord } = Validator('bad_record', ({ obj, uint, lit, appla
     /** The highest `vault_epoch` this device has seen the scope's vault at, in any of its lives. */
     highest_vault_epoch: uint,
   }).strict().readonly(),
-}))
-export type DeviceRecord = Z.infer<typeof DeviceRecord>
+}), [FX])
+export type DeviceRecord = Z.infer<typeof deviceRecord>
+// --
+
+// == [IndexedDB options]: DefaultDbName, idbOpts
+
+/** The IndexedDB database a device store keeps its records in when its options name none. */
+const DefaultDbName = 'safebyok'
+
+/** The check of `IdbOpts`: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
+export const { idbOpts } = Validator('bad_option', ({ obj, str }) => ({ idbOpts: obj({ dbName: str.min(1).default(DefaultDbName) }).strict() }))
 // --

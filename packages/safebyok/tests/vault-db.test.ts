@@ -8,12 +8,13 @@ import { VaultError, isVaultError } from '../src/errors'
 import { type Outcome, bad, good, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
-import { type BoxRecord, BoxSparse } from '../src/shapes/box'
+import type { BoxRecord, BoxSparse } from '../src/shapes/box'
+import * as BX from '../src/shapes/box'
 import type { VaultScope } from '../src/shapes/scopes'
 import type { VaultRecord, VaultDraft } from '../src/shapes/vault'
 import * as Scopepath from '../src/scopepath'
 import * as Expectations from '../src/expectations'
-import { MaxUserIdChars } from '../src/checks/primitives'
+import { MaxUserIdChars } from '../src/shapes/primitives'
 import * as TH from './test-helpers'
 
 // == [Test adapters]: MapVaultDB, TroubledVaultDB, RingingVaultDB, MisreportingVaultDB, MisreportedCases
@@ -867,7 +868,7 @@ describe("the abstract VaultDB, a box write refused for room", () => {
     })
   }
 
-  it("reads a box in the vault it lies in, and refuses one in a vault made anew as vault_mismatch, as getBox's example shows, its expectation as BoxGetExpectation's example builds it", async () => {
+  it("reads a box in the vault it lies in, and refuses one in a vault made anew as vault_mismatch, as getBox's example shows, its expectation as boxGetExpectation's example builds it", async () => {
     const vaultDB = new MapVaultDB()
     const vaultRecord = await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
     await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
@@ -1030,7 +1031,7 @@ describe("the abstract VaultDB, by what threw", () => {
 })
 
 /** A sound box's listing entry: its record but the two ciphered fields. */
-const sparseOf = (boxlabel: string, tag: string): BoxSparse => BoxSparse.parse(omit(TH.boxOf(boxlabel, tag), ['box_key_wrapped', 'whisper_ciphered']))
+const sparseOf = (boxlabel: string, tag: string): BoxSparse => BX.boxSparse.parse(omit(TH.boxOf(boxlabel, tag), ['box_key_wrapped', 'whisper_ciphered']))
 
 describe("splitStoredBoxes", () => {
   it("splits the rows an adapter read into the sound and the damaged, each sorted by boxlabel, as its example hands them up", () => {

@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { keyDeriverSpec } from './checks/key-deriver-spec-checks'
+import * as KX from './shapes/key-deriver-spec'
 import type { KeyDeriver } from './key-deriver'
 
 /** A keyDeriverSpec: Argon2id's whole parameter set, under the keyDeriverLabel a vault records.
@@ -111,7 +111,7 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
  *   // throws 'bad_option': that label is reserved
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
-  const spec = keyDeriverSpec.parse(candidate)
+  const spec = KX.keyDeriverSpec.parse(candidate)
   checkSuppliedSpecKept(spec)
   return spec
 }

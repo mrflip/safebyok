@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { PasskeyProving, PassphraseProving, OutsideGating, passphraseKeyOf } from '../src/proving'
-import { type PasskeyAnswer, type GatedVaultRecord, VaultRecord, type PasskeyWayinRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
-import { prf_salt_b64 } from '../src/shapes/fields'
+import { type PasskeyAnswer, type GatedVaultRecord, type PasskeyWayinRecord, headerOf } from '../src/shapes/vault'
+import * as VX from '../src/shapes/vault'
+import * as FX from '../src/shapes/fields'
 import type { Vault } from '../src/vault'
 import { PasskeyWayin, PassphraseWayin, Wayin, wayinCtxOf } from '../src/wayin'
 import * as TH from './test-helpers'
@@ -19,7 +20,7 @@ const vaultRecord = TH.vaultRecordOf('u1')
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 /** The gated vault record `world` stores now. */
-const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
+const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VX.vaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
 
 /** The passkey way in `stored` holds: the test's vault was given one. */
 const passkeyRecordOf = (stored: GatedVaultRecord): PasskeyWayinRecord => {
@@ -76,7 +77,7 @@ const resealedPassphrase = async (vault: Vault, stored: GatedVaultRecord): Promi
 
 /** The passphraseKey the test deriver makes of `pw` over `saltB64`: the key a proving of `pw` over that salt holds. */
 const passphraseKeyOver = async (saltB64: string): Promise<CryptoKey> => (
-  await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), fromB64(saltB64), TH.spyLogger().logger)
+  await passphraseKeyOf(TH.testDeriver, VX.passphraseCleartext.parse('pw'), fromB64(saltB64), TH.spyLogger().logger)
 )
 
 /** The vaultKey's raw bytes, to compare two handles on it. */
@@ -250,7 +251,7 @@ describe("a passphrase's way in, as a proving seals it", () => {
     const { passphrase: two } = await novelWayins()
     expect(one).to.be.instanceOf(PassphraseWayin)
     const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passphrase: one.record }) })
-    expect(VaultRecord.safeParse(record).success).to.be.true
+    expect(VX.vaultRecord.safeParse(record).success).to.be.true
     expect(one.record).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
     expect(one.record.salt_b64).to.not.eq(two.record.salt_b64)
   })
@@ -309,7 +310,7 @@ describe("a passkey's way in, as a proving seals it", () => {
     const { passkey: wayin } = await novelPasskey(answer)
     expect(wayin).to.be.instanceOf(PasskeyWayin)
     const record = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: wayin.record }) })
-    expect(VaultRecord.safeParse(record).success).to.be.true
+    expect(VX.vaultRecord.safeParse(record).success).to.be.true
     expect(wayin).to.include({ wayinkind: 'passkey', credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(JSON.stringify(wayin.record)).to.not.include(prfB64)
   })
@@ -473,7 +474,7 @@ describe("a passkey's way in's ctx", () => {
     const { vault, stored } = await lockedWorld({ passkey: true })
     const laptop = await TH.passkeyOf('laptop')
     const { prf_salt_b64: otherSalt } = await TH.passkeyOf('elsewhere')
-    const header = { ...headerOf(passkeyRecordOf(stored)), prf_salt_b64: prf_salt_b64.parse(otherSalt) }
+    const header = { ...headerOf(passkeyRecordOf(stored)), prf_salt_b64: FX.prf_salt_b64.parse(otherSalt) }
     const proving = await PasskeyProving.seal(vault, header, { ...laptop, prf_salt_b64: otherSalt }, { gating: OutsideGating })
     await TH.expectRefusal(proving.demandOpens(), 'wrong_passkey')
   })

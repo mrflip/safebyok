@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Scopepath, VaultError, delDamagedVault, isVaultError, label, localVaultDB, memoryDeviceDB } from 'safebyok'
+import { Scopepath, VaultError, delDamagedVault, isVaultError, localVaultDB, label, memoryDeviceDB } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, BankVaultExample, hushConsole, noop } from './world'

@@ -67,30 +67,30 @@ added or folded into through the subagent, and no other entry changes.
   not repeated here)" stand-in) is deleted: it leaked anyway, a lowercase secret of 32 characters or fewer passing it.
   (2) A path holds only our field names and array indices. The kit hands out no record maker (`rec`), since a Zod record's keys enter the issue
   path. The one record we had, the whisper/sidecar bag (`whisperBag`, `src/types/types.ts`), is a `custom` check that judges the object whole (a
-  record `safeParse` inside its predicate), so no whisper or sidecar key reaches a refusal; before, `Sidecar` refusals put a first-level key in
-  the path (`Whisper`'s union never did). A host's own `Validator` that imports Zod's `record` itself sees that record's keys in its refusals; the
+  record `safeParse` inside its predicate), so no whisper or sidecar key reaches a refusal; before, `sidecar` refusals put a first-level key in
+  the path (`whisper`'s union never did; amended 2026-10-28 (validator_names): the validators were named `Sidecar` and `Whisper` when this was written). A host's own `Validator` that imports Zod's `record` itself sees that record's keys in its refusals; the
   `Kit` doc says so.
   (3) The bank's misuse hints are gone. `Bank.make`'s pre-parse key scan and renamed-option map (`RenamedMakeBankOpts`) are deleted; its options
   are a strict schema whose refusal counts unknown options and lists those it takes. `checkNoStoresIn` is deleted (see the bank_per_user entry
   amended): a `vaultDB` or `deviceDB` in the bank's first bag is ignored, so the vault silently takes the bank's own stores (amended 2026-10-27 (thread 17, validators_trim): the first bag is strict now, and a `vaultDB` or `deviceDB` in it is refused `bad_scope`; see the bank_per_user entry, thread 7, below). `optionsCheck`'s hint
   chosen by whether the input was a plain object is gone.
   (4) `parseKeyDeriverSpec` refuses in one fixed sentence listing every field's bounds, reading nothing of the failure (`SpecLimitForField` is
-  gone). Its check `keyDeriverSpec` moved to `src/checks/key-deriver-spec-checks.ts`, a module of its own, so a bundle of `argon2idWebV1Deriver`
+  gone). Its check `keyDeriverSpec` moved to `src/shapes/key-deriver-spec.ts` (amended 2026-10-28 (validator_names): `src/checks/key-deriver-spec-checks.ts` when this was written), a module of its own, so a bundle of `argon2idWebV1Deriver`
   alone still drops Zod.
   (5) `Wayin.make` refuses with its schema's own `bad_record`, no cause, no re-labelling (`damagedWayinUnless` deleted); a damaged wayin met on
   unlock is still `damaged_wayin`.
-  (6) Every validator a host or a storage adapter needs is public: the main entry exports `Validators` (a namespace of 66 validators, those a host or
+  (6) Every validator a host or a storage adapter needs is public: the main entry exports each by name (63 validators, those a host or
   a storage adapter calls or builds on, being what is stored or crosses the VaultDB/DeviceDB seams, the scopes and scopepaths, each token and ciphered
   field, the options and objects a host passes and what its callbacks return, plus every validator the main entry exports by name), `Validator` and
-  its `Kit`. (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
-  pieces, such as `BoxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `LeaseGrant`, `StoredVaultAnswer` (amended 2026-10-28 (db_hooks): named `ReadAnswer` when this was written), `ListingAnswer`, the stamps picked from a carrier, `Bank.make`'s per-option field checks and
-  `passphraseCleartext`, are no longer in the namespace; they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
-  `input` unless a caller asks Zod for it). `label`, `user_id` and `EpochMillis` are plain Zod.
+  its `Kit`. (amended 2026-10-28 (validator_names): this read "the main entry exports `Validators` (a namespace of 66 validators" when written; the namespace and `src/validators.ts` are gone, and the same validator objects are exported from the main entry by name, a host importing them by name or as `import * as Safebyok from 'safebyok'`; nothing a validator accepts or refuses changed; the count of validators the main entry exports by name is 63, where this entry said 66 until the same thread counted them from the test that lists them.) (amended 2026-10-27 (thread 17, validators_trim): this once read "every validator the package makes, about 95". The internal construction
+  pieces, such as `boxBase` (amended 2026-10-27 (validator_ducks): named `BaseShape` when this was written; the validator and its type strip what else their carrier holds), `leaseGrant`, `storedVaultAnswer` (amended 2026-10-28 (db_hooks): named `ReadAnswer` when this was written), `listingAnswer` (amended 2026-10-28 (validator_names): named `BoxBase`, `LeaseGrant`, `StoredVaultAnswer` and `ListingAnswer` when this was written), the stamps picked from a carrier, `Bank.make`'s per-option field checks and
+  `passphraseCleartext`, are no longer exported from the main entry (amended 2026-10-28 (validator_names): "in the namespace" when this was written); they stay exported from their own modules for in-package use only.) A validator's `parse` throws a `VaultError` that quotes no input; its `safeParse` is Zod's own (a `ZodError`, whose issues carry no
+  `input` unless a caller asks Zod for it). `label`, `user_id` and `epochMillis` (amended 2026-10-28 (validator_names): `EpochMillis` when this was written) are plain Zod.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
   options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
-  asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not.)
+  asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not; amended 2026-10-28 (validator_names): the namespace is gone, and this holds for every validator, exported from the main entry by name or not.)
   (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
-  `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/idb-opts.ts`) is strict too, so
+  `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/shapes/device.ts`; amended 2026-10-28 (validator_names): `src/idb-opts.ts` when this was written) is strict too, so
   `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
   `safebyok-indexeddb`'s options extend the core's.
   (9) amended 2026-10-27 (parse_consistent, branch `20261027-parse_consistent`, stacked on PR #295; the Coach's loosening of STYLE.md's "a
@@ -181,19 +181,19 @@ added or folded into through the subagent, and no other entry changes.
   same `vault_tok` now stops every wayin, box and lease of that vault from opening, as altering `vault_tok` already did: the wrap's ctx no longer
   matches, and the refusal for the right passphrase is `wrong_passphrase` (`proving.ts`: "the stored vault may be damaged"), which misleads. Nothing
   in `packages/safebyok/src` rewrites a vault record's `registered_at` after the vault is born (`draftOf` in `bank.ts` sets it once); it is read,
-  carried and bound. The fields bound are exactly the stamps' schemas: `VaultStamp` is the vault record's `format`, `applabel`, `user_id`,
-  `vaultlabel`, `vault_tok`, `registered_at` (`vault-record.ts`); `BoxStamp` is `BoxSparse` plus `vault_tok` (`box.ts`); `LeaseStamp` is
-  `LeaseRecord` less `lease_key` and `vault_key_lease_wrapped` (`lease.ts`). A field its schema fixes (`format`, `whisper_codec` `json_v1`,
+  carried and bound. The fields bound are exactly the stamps' schemas: `vaultStamp` is the vault record's `format`, `applabel`, `user_id`,
+  `vaultlabel`, `vault_tok`, `registered_at` (`vault-record.ts`); `boxStamp` is `boxSparse` plus `vault_tok` (`box.ts`); `leaseStamp` is
+  `leaseRecord` less `lease_key` and `vault_key_lease_wrapped` (`lease.ts`) (amended 2026-10-28 (validator_names): named `VaultStamp`, `BoxStamp`, `BoxSparse`, `LeaseStamp` and `LeaseRecord` when this was written). A field its schema fixes (`format`, `whisper_codec` `json_v1`,
   `whisper_schema_version` 1) is a literal in the strict record, so a stamp holding another value is refused `bad_record` at its parse, before
   `cipherCtx` is called: a ctx is built only from a parsed stamp.
   (7) Amended 2026-10-27 (validator_ducks): **a Box or box record handed in as the vault's stamp would pass, and bind the box's own
   `registered_at` as the vault's; considered, and declined.** `wayinCtxOf` (`wayin.ts`) and `leaseCtxOf`, `boxCtxOf` (`lease.ts`) take the
-  vault's stamp by a plain strip parse (`VaultStamp`, `VaultStampButFormat`, `LeaseStamp`, each stripping unknown fields): whatever carries the
+  vault's stamp by a plain strip parse (`vaultStamp`, `vaultStampButFormat`, `leaseStamp`, each stripping unknown fields; amended 2026-10-28 (validator_names): named `VaultStamp`, `VaultStampButFormat`, `LeaseStamp` and, below, `BoxStamp` when this was written): whatever carries the
   stamp (a Vault object, a vault record) passes, and only the stamp's fields are bound. A Box or a box record carries the vault's scope and
   `vault_tok` and a `registered_at` of its own, so it passes too, and the box's (when it was first stored) is bound into a ctx as the vault's
   (when the vault was made). No caller passes one. A guard was built and withdrawn (2026-10-27): the Coach's direction is that a shape taken from
   a thing accepts whatever is legitimately offered, with strict checks only where they are genuinely needed, rather than defending against a
-  future caller's mistake. A box's own stamp (`BoxStamp`, in `boxCtxOf`) stays strict: every field a box shows is bound, and a field beside
+  future caller's mistake. A box's own stamp (`boxStamp`, in `boxCtxOf`) stays strict: every field a box shows is bound, and a field beside
   them would be shown but not bound. The format-less vault stamp a box or lease binds takes any vault format, so a new vault format leaves them
   open; the wayin's ctx, which binds the format, refuses another.
 * 2026-10-26 (restyle sprint, thread 8, branch `20261026-vault_record`): **the vault props become the vault record, strict, with the gate nested;
@@ -272,14 +272,14 @@ added or folded into through the subagent, and no other entry changes.
   quoting nothing) and passes on only the parsed value. A host's `KeyDeriver.deriveKeyBytes` still takes a plain string. The
   cleartext check accepts a blank passphrase; whether a blank one is wrong is the gating's to say, as before.
   (4) A salt's check in the record stays its shape only (non-empty text). Its length and base64url form are still judged per wayin
-  (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt` (amended 2026-10-27 (validator_ducks): now `freshPasskeyAnswer.parse`, `src/proving.ts`, run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses)), so a salt of the wrong length or not base64url leaves that wayin
+  (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt` (amended 2026-10-27 (validator_ducks): now `freshPasskeyAnswer.parse`, `src/shapes/vault.ts` (amended 2026-10-28 (validator_names): `src/proving.ts` when this was written), run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses)), so a salt of the wrong length or not base64url leaves that wayin
   `damaged_wayin` while the vault's other wayin still opens, where checking it in the record would make the whole vault record damaged.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
   with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
 * 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
   strict; a refusal repeats only keys shaped like our field names; classic Zod loads and sets its global locale.**
   (1) Every stored-record schema (vault props gated and gateless, the passphrase and passkey wayin records, the tombstone, the box record, the
-  lease record, the device record, `Ciphered`) is a strict object: a field this version does not write is refused on the way in (a `VaultDB` verb
+  lease record, the device record, `ciphered`) is a strict object (amended 2026-10-28 (validator_names): `Ciphered` when this was written): a field this version does not write is refused on the way in (a `VaultDB` verb
   `bad_record`, a box `invalid_box`, before the adapter sees it) and reads back as damage (`damaged_vault`, `damaged_box`), where an unknown field
   was silently stripped. A lease or device record in this device's store holding an unknown field is discarded and read as absent, as any lease
   or device record failing its check already was; for the device record that drops its `highest_vault_epoch` rollback watermark. This leans on
@@ -332,7 +332,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **every gating kind is asked through the provider's own dialog.**
   `change_passphrase`, `put_passkey`, `del_passkey` and `del_vault` join `unlock_vault` and `initialize_gate` in `GatingModal`, each proven
   by the current passphrase and shown only while the user's gesture is in hand (`navigator.userActivation`), as before. A refusal the core
-  leaves the gating open for (`CorrectableKindVals`) shows in place and nothing retries. Misuse, or a non-`VaultError`, reaches React's
+  leaves the gating open for (`correctableKindVals`; amended 2026-10-28 (validator_names): `CorrectableKindVals` when this was written) shows in place and nothing retries. Misuse, or a non-`VaultError`, reaches React's
   `onCaughtError` through `forBoundary`, which drops any `cause` (it may quote what the user typed); the report's source is named `GatingModal`.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **a declined gating's refusal is worded by kind.**
   `declinedError(gatingkind, asked)` (`packages/safebyok/src/gating.ts`) is still kind `vault_locked`; its message names what was asked and
@@ -612,7 +612,7 @@ added or folded into through the subagent, and no other entry changes.
   would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
   Amended 2026-10-27 (device_db_class): **one conditional discard now serves both records and both stores,
   and `DeviceDB` is an abstract base class, as `VaultDB` is, not an interface.** The base class parses every lease and device record a store hands
-  back (`LeaseRecord`, `DeviceRecord`); one that fails reads as none and is discarded through the store's `doDelUnparsed(scopepath, isSound)`
+  back (`leaseRecord`, `deviceRecord`; amended 2026-10-28 (validator_names): `LeaseRecord` and `DeviceRecord` when this was written); one that fails reads as none and is discarded through the store's `doDelUnparsed(scopepath, isSound)`
   hook, which deletes the row only if `isSound` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
   host's own `DeviceDB` discard alike. The base class files each row under its Scopepath and calls the store's `do*` hook before awaiting anything,
   so a store sees one scope's calls in the order the vault made them. The race it closes: `idbDeviceDB.getDeviceRecord` deleted an unreadable device
@@ -766,7 +766,7 @@ added or folded into through the subagent, and no other entry changes.
   (no wrap under it is ever written). The trade: the core holds no UI and calls no host code inside
   the change. A new passkey's salt is checked at the call's door, before any key derivation
   (amended 2026-10-21 (wayin_rules): `checkFreshSalt` in `wayin.ts` is now `checkSaltShape` in `proof.ts`, called once, in
-  `newProofOf` (amended 2026-10-27 (validator_ducks): the check is now `freshPasskeyAnswer.parse` in `src/proving.ts`, still run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses); the repeat inside `Wayin.seal`'s passkey keying is gone, so `Wayin.seal` called
+  `newProofOf` (amended 2026-10-27 (validator_ducks): the check is now `freshPasskeyAnswer.parse` in `src/shapes/vault.ts` (amended 2026-10-28 (validator_names): `src/proving.ts` when this was written), still run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses); the repeat inside `Wayin.seal`'s passkey keying is gone, so `Wayin.seal` called
   directly no longer refuses a misshapen salt, and such a way in would read as damaged at every later
   unlock. It checks shape only: a `prfSaltB64` that is base64url of exactly 32 bytes, `bad_option`
   otherwise. There is no list of salts and nothing checks freshness; the host mints the salt.) (2) A
@@ -896,13 +896,13 @@ added or folded into through the subagent, and no other entry changes.
   locals only.
 * 2026-10-19 (thread a_sec2, #206): **`Lease.grant` validates its input.** `Lease.grant(vault,
   holder, vaultKeyPair, askPassphraseAt)` parses `holder`'s `vault_id` and `unlock_epoch` and
-  `askPassphraseAt` with `LeaseRecord`'s own Zod checks at entry and lets a bad input throw as
+  `askPassphraseAt` with `leaseRecord`'s own Zod checks (amended 2026-10-28 (validator_names): `LeaseRecord` when this was written, here and below) at entry and lets a bad input throw as
   misuse (the Coach: "run a good zod validator but don't catch"). A deadline that is no number used
   to grant a lease that never opened. Amended 2026-10-21 (b_simplify): `Lease.grant(vault, holder,
   vaultKeyPair)` takes no deadline; it computes its own, `vault.clock.now() + vault.leaseMillis`,
   floored and capped at `FarFuture`, read through the vault's accessors, and still parses `holder`
-  with `LeaseRecord`'s checks and throws a Zod error as misuse. It also parses the deadline it
-  computes against `LeaseRecord.shape.ask_passphrase_at`, throwing as misuse on a NaN or an
+  with `leaseRecord`'s checks and throws a Zod error as misuse. It also parses the deadline it
+  computes against `leaseRecord.shape.ask_passphrase_at`, throwing as misuse on a NaN or an
   out-of-range value, so a deadline that is no number is never bound into a lease's wrap or written. The lease reads the handle's public
   `leaseMillis` getter, so a host that `Object.defineProperty`s over the handle's `leaseMillis`
   changes its own lease length, as one overwriting the handle's `clock` already changed every model's
@@ -927,8 +927,8 @@ added or folded into through the subagent, and no other entry changes.
   through `deviceDB.tryPutLease`. leaseCtx (amended 2026-10-26 (cipher_ctx): see the entry of that date) is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
   applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
   'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
-  still open. `Lease.make(vault, record)` checks a record through the `LeaseRecord` Zod schema
-  (renamed from `Lease`) and refuses one this package does not write, or one naming another app,
+  still open. `Lease.make(vault, record)` checks a record through the `leaseRecord` Zod schema
+  (renamed from `Lease`; amended 2026-10-28 (validator_names): `LeaseRecord` when this was written) and refuses one this package does not write, or one naming another app,
   user or vault than its vault's, as `corrupt_record`, quoting nothing of it. `lease.tryOpen(holder)`
   refuses `vault_locked` before any unwrap when the holder's `vault_id` or `unlock_epoch` differ from
   the lease's, or the vault's clock is at or past `ask_passphrase_at`; it then unwraps under a ctx
@@ -1069,8 +1069,8 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-19 (thread B3, box); 2026-10-20 (placement): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
-  now `BoxRecord`, the stored contract, unchanged (`safebyok-box-v6`; amended 2026-10-21 (trust_lines): `safebyok-box-v8`). `Box.make(vault, record)`
-  validates through `BoxRecord` and refuses `bad_record`, quoting nothing and carrying no cause. The
+  now `boxRecord`, the stored contract, unchanged (`safebyok-box-v6`; amended 2026-10-21 (trust_lines): `safebyok-box-v8`). `Box.make(vault, record)`
+  validates through `boxRecord` (amended 2026-10-28 (validator_names): `BoxRecord` when this was written, here and above) and refuses `bad_record`, quoting nothing and carrying no cause. The
   record is kept as `box.props`: a copy, frozen, its two `Ciphered` objects frozen too, so a caller's
   later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
   the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them
@@ -1186,7 +1186,7 @@ added or folded into through the subagent, and no other entry changes.
   and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
   still carries nothing of Convex's error, since a dev deployment's validator error quotes the
   arguments. Residual: a host that puts something sensitive in its own `ConvexError` data sees it
-  ride as the cause. `SafebyokErrorKindVals` gains `not_permitted`: `getUserId` may throw
+  ride as the cause. `safebyokErrorKindVals` (amended 2026-10-28 (validator_names): `SafebyokErrorKindVals` when this was written) gains `not_permitted`: `getUserId` may throw
   `ConvexError({ kind: 'not_permitted', message })` to refuse a signed-in user (locks nothing) or
   `identity_revoked` (locks the vault). (2) `graphqlVaultDB` (`refusalOf`, `safebyok-graphql/src/graphql-vault-db.ts`):
   a server refusal with `extensions.kind` becomes the VaultError with the client-side GraphQL error
@@ -1666,7 +1666,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Amended 2026-10-22 (bank): **the device mark is replaced by the device record, and `rolled_back` by `vault_behind`; what follows describes the mark and no longer holds except where restated here.** Per scope, across the vault's lives, the DeviceDB holds `{ device_id, highest_vault_epoch }` (`packages/safebyok/src/device-db.ts`), written by `raiseDeviceRecord`: a store-side max in one transaction (IndexedDB: one readwrite transaction via idb-keyval `update`), so a tab that saw less never lowers it and the first `device_id` stored stays (the two-tabs write-back below no longer exists). It is raised at birth, after each refresh's take, after this device's own gate writes (first unlock, `putWayin`, `delWayin`) and after `del()` (to the tombstone's `vault_epoch`); `delDamagedVault` raises it to its tombstone's epoch instead of erasing it. The Coach's ruling (option A): one highest `vault_epoch` per scope, raised at each refresh too; `vault_epoch` is compared by <=, never bumped on reads. A birth (`bank.ensureVault`, `packages/safebyok/src/bank.ts`) whose fetched `vault_epoch` is below the record's highest births nothing; a refresh (`src/vault.ts`) refuses it as `vault_behind`, takes nothing, and locks (refusal policy 'lock', the lease erased as for `identity_revoked`). The refresh reads the record BEFORE `getVault`, and judges "older than the picture in hand" (same `vault_tok`, lower epoch: a late read of this tab's own write) BEFORE the behind check, so neither this tab's own write nor another tab's raise is a false `vault_behind`. The record spans lives, so a deletion's tombstone counter carries on in it, where the mark held one vault per scope. The only way out is `bank.clearCachedVault`, which erases the record and the lease and lets the Vault object go: a deliberate host action, never offered to the user as a prompt (the `delMark` recipe below is retired; amended 2026-10-22 (bank_provider): `useBank()` hands it to React hosts as the way past `vault_behind`; it weakens this check until the next birth, so it is for the user's or host's say only, and `BankProvider` never calls it) Residual: a device whose record was cleared, or that never saw the newer copy, cannot tell; a failed raise after a read or own write is a logger warning, not a refusal, so detection is weaker until a later read raises it. Amended 2026-10-22 (bank): **the device record is validated at the boundary.**
   `deviceRecordFor(scope, answer)` (`packages/safebyok/src/device-db.ts`; amended 2026-10-28 (vault_refresh): now the `DeviceDB` base class's `getDeviceRecord` and `raiseDeviceRecord`, as amended below) checks every record a DeviceDB hands back
   (`tryGetDeviceRecord` at birth and at each refresh, and `tryRaiseDeviceRecord`'s answer at birth) against the
-  `DeviceRecord` schema and the asked scope; one that fails, or names another scope, reads as none. At birth the
+  `deviceRecord` schema (amended 2026-10-28 (validator_names): `DeviceRecord` when this was written) and the asked scope; one that fails, or names another scope, reads as none. At birth the
   record is then started again under its own scope, and a malformed raise answer gives way to the record the bank
   handed over. So a malformed or misfiled record puts no `device_id` into a sealed wayin, and a record of another
   scope refuses no vault `vault_behind` (amended 2026-10-27 (device_db_class): the schema half of that check is now the `DeviceDB` base class's, which parses every device record before handing it back and discards one that fails through the store's `doDelUnparsed`, only while it still will not read; `deviceRecordFor` still checks the scope; amended 2026-10-28 (vault_refresh): `deviceRecordFor` is no longer exported or called by the vault or the bank, and the scope check lives in the base class too: `DeviceDB.getDeviceRecord(scope)` resolves a checked `DeviceRecord | null`, and a record filed under the scope that names another reads as none and stays stored, not discarded; `DeviceDB.raiseDeviceRecord(record)` resolves the record it stored, checked the same way, or null when that fails, which only a host's own record can, and the bank's birth then gives way to the record it handed over, so no caller can skip the check). `raisedDeviceRecord` is no longer exported: the base class owns the never-lower rule and hands the store's `doRaiseDeviceRecord(deviceScopepath, raisedFrom)` an updater it must call inside one read-modify-write transaction). Reading as none weakens the rollback check until the next raise, the same
@@ -1918,7 +1918,7 @@ added or folded into through the subagent, and no other entry changes.
   hands a `VaultError` back as it came and makes `unexpectedError` of anything else, so a bug inside never leaves raw (#316 had let it). No secret
   is added: the cause is the bug's own throw, from code that held key handles but no secret bytes a `TypeError` would quote.
   (4) Behaviour change, in the changeset (amended 2026-10-28 (aead_narrow, Coach ruling): a new refusal kind `crypto_failed`, family `condition`,
-  `RefusalKindVals` in `errors.ts`): `Lease.cipheredWith` holds its three WebCrypto calls (`makeBoxKey`, `wrapKeyUnder`, `cipherBytes`, arguments and
+  `refusalKindVals` in `errors.ts`; amended 2026-10-28 (validator_names): `RefusalKindVals` when this was written): `Lease.cipheredWith` holds its three WebCrypto calls (`makeBoxKey`, `wrapKeyUnder`, `cipherBytes`, arguments and
   both ctxs built before the `try`) in one catch that throws `cryptoFailed(err)`, a fault of the platform, not of the user or the record, where it
   was `unexpected_error` with the throw as `cause`. Nothing of WebCrypto's error is kept as `cause`, as WebCrypto was handed key handles and the
   whisper's bytes; only the error's `name` (a DOMException's, e.g. `OperationError`) ends the message, via `thrownNameOf` (the Coach: "a WebCrypto
@@ -2085,7 +2085,7 @@ added or folded into through the subagent, and no other entry changes.
   up unlocked against the user's last act. Doing it safely would need an atomic "shorten if still
   present" on `DeviceDB`, an interface hosts implement. An erase cannot resurrect anything and
   cannot slide; racing another tab's fresh unlock, it only makes that device ask again. A stored
-  deadline past `FarFuture` never reaches this check: it fails the record's `EpochMillis` bounds
+  deadline past `FarFuture` never reaches this check: it fails the record's `epochMillis` bounds (amended 2026-10-28 (validator_names): `EpochMillis` when this was written)
   and is erased first (the entry above). A handle already open keeps the deadline it opened
   with: the option is read at `Vault.make`.
 * 2026-10-14: the package was renamed `byok` → `safebyok` before any release, and its stored
@@ -2192,7 +2192,7 @@ added or folded into through the subagent, and no other entry changes.
   `condition`-family `VaultError` keeps only its `refusalkind`, under safebyok's own fixed message, with no `cause` and no
   `meta`; anything else refuses `unexpected_error` under a fixed message with no `cause`. The host's logger hears only
   `{ call: 'deriveKeyBytes', refusalkind }`, the `refusalkind` being the thrown `VaultError`'s only when it is one of
-  `RefusalKindVals` (`listedKindOf`, `src/errors.ts`; a kind off the list is the thrower's own text), else null; conditions are
+  `refusalKindVals` (amended 2026-10-28 (validator_names): `RefusalKindVals` when this was written; `listedKindOf`, `src/errors.ts`; a kind off the list is the thrower's own text), else null; conditions are
   not logged. This is the rule `requestCleartext` (thread 9b, same helper) and the strength checker's guard already follow; the
   strength checker's `load()`, which hears no passphrase, keeps its `cause`. A deriver's own text is lost to the caller:
   safebyok-fastkey's `bad_option` asking for `'wasm-unsafe-eval'` in the CSP reaches the host as `unexpected_error`, with the
@@ -2248,8 +2248,8 @@ added or folded into through the subagent, and no other entry changes.
   own clients then refuse as `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box` or
   `damaged_vault`). Amended 2026-10-27 (thread 18, convex_helpers; the Coach's yes for the dependency):
   the component's argument, return and table validators are now made from the core's exported Zod
-  validators (`Validators.VaultRecord`, `BoxRecord`, the expectations, `Capacity`, `VaultTombstone`,
-  `VaultDraft`, `boxscope`) by `zodToConvex` from `convex-helpers/server/zod4`. `convex-helpers`
+  validators (`Safebyok.vaultRecord` (amended 2026-10-28 (validator_names): `Validators.vaultRecord` when this was written; the core's main entry now exports each validator by name and the component's `src/component/validators.ts` star-imports it as `Safebyok`), `boxRecord`, the expectations, `capacity`, `vaultTombstone`,
+  `vaultDraft`, `boxscope`; amended 2026-10-28 (validator_names): named `VaultRecord`, `BoxRecord`, `Capacity`, `VaultTombstone` and `VaultDraft` when this was written) by `zodToConvex` from `convex-helpers/server/zod4`. `convex-helpers`
   (^0.1.129) and `zod` are peer dependencies the host installs, so their code now runs inside the
   component's server functions, bundled by the host's Convex CLI; it holds no key material and only
   shapes validators. Where Convex has no check, the component is looser than the core: names and
@@ -2320,7 +2320,7 @@ added or folded into through the subagent, and no other entry changes.
   A host's `putBox()` sidecar is checked against the stored box's own schema before anything is
   written (an unchecked over-long sidecar once made every later `hello()` refuse the vault as
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
-  against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
+  against `leaseRecord` (amended 2026-10-28 (validator_names): `LeaseRecord` when this was written) by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
   lease (amended 2026-10-27 (device_db_class): the `DeviceDB` base class parses each lease record a store hands back and discards one that fails
   through the store's `doDelUnparsed`, only while it still will not read; `Lease.make` keeps the scope check). `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
@@ -3247,7 +3247,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-23 (proving_gate): the zeroing is in `src/proving.ts` (`passphraseKeyOf`, as before), and
   `PasskeyProving.seal` likewise zeroes the answer's PRF bytes (`prfBytes.fill(0)`) in a `finally` once the HKDF key is
   imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
-  Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswerShape.parse`, `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
+  Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswer.parse` (amended 2026-10-28 (validator_names): `passkeyAnswerShape.parse` when this was written), `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot

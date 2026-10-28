@@ -3,45 +3,45 @@
 import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
-import type { label, user_id } from '../checks/primitives'
+import type * as PX from './primitives'
 import { never } from 'zod'
 import { Validator } from '../checks/validator'
 
-export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from '../checks/primitives'
+export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from './primitives'
 
 // == [Names]: Applabel, Vaultlabel, Boxlabel, UserId
 
 /** The app's label, as a host writes it to `Bank.make`: a {@link label}, which every scope opens with. */
-export type Applabel = Z.infer<typeof label>
+export type Applabel = Z.infer<typeof PX.label>
 
 /** The label of one of a user's vaults, as a host writes it to `bank.ensureVault`: a {@link label}, such as `main`. */
-export type Vaultlabel = Z.infer<typeof label>
+export type Vaultlabel = Z.infer<typeof PX.label>
 
 /** A box's label within its vault, as a host writes it to `putBox` and `getBox`: a {@link label}, such as `anthropic`. */
-export type Boxlabel = Z.infer<typeof label>
+export type Boxlabel = Z.infer<typeof PX.label>
 
 /** The signed-in user's stable, opaque id from the host's own auth, as {@link user_id} checks it: the one name in a scope that is not a label. */
-export type UserId = Z.infer<typeof user_id>
+export type UserId = Z.infer<typeof PX.user_id>
 // --
 
 // == [Fieldnames]: each scope's fieldnames, in the order its scopepath joins them
 
 /** The fieldnames of a bank's scope, in the order its scopepath joins them. */
-export const BankScopepathFieldnameVals = ['applabel', 'user_id'] as const
+export const bankScopepathFieldnameVals = ['applabel', 'user_id'] as const
 /** The fieldnames of a vault's scope, in the order its scopepath joins them: its bank's, then its vaultlabel. */
-export const VaultScopepathFieldnameVals = [...BankScopepathFieldnameVals, 'vaultlabel'] as const
+export const vaultScopepathFieldnameVals = [...bankScopepathFieldnameVals, 'vaultlabel'] as const
 /** The fieldnames of a box's scope, in the order its scopepath joins them: its vault's, then its boxlabel. */
-export const BoxScopepathFieldnameVals = [...VaultScopepathFieldnameVals, 'boxlabel'] as const
+export const boxScopepathFieldnameVals = [...vaultScopepathFieldnameVals, 'boxlabel'] as const
 
 /** A fieldname of a bank's scope. */
-export type BankScopepathFieldname = typeof BankScopepathFieldnameVals[number]
+export type BankScopepathFieldname = typeof bankScopepathFieldnameVals[number]
 /** A fieldname of a vault's scope. */
-export type VaultScopepathFieldname = typeof VaultScopepathFieldnameVals[number]
+export type VaultScopepathFieldname = typeof vaultScopepathFieldnameVals[number]
 /** A fieldname of a box's scope. */
-export type BoxScopepathFieldname = typeof BoxScopepathFieldnameVals[number]
+export type BoxScopepathFieldname = typeof boxScopepathFieldnameVals[number]
 // --
 
-// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, VaultScope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
+// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
 
 /** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
 const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
@@ -75,12 +75,6 @@ export type BankScope = Z.infer<typeof bankScope>
 export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
-
-/** The applabel, user_id and vaultlabel that name one vault. Its `parse` hands back a frozen copy, or refuses 'bad_scope'.
- * Each label is a `label`, and the user_id a `user_id`. A scope carrying more fields passes, the
- * rest left out: a vault record, or a Vault object, passes as its scope.
- */
-export const VaultScope = vaultScope
 // --
 
 // == [Bags]: vaultBag, bankBag, VaultBag, BankBag

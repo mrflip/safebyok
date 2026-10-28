@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { VaultError, type RefusalKind, type RefusalMeta } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { type GatedVaultRecord, VaultRecord, headerOf, passphraseCleartext } from '../src/shapes/vault'
-import { PasskeyProving, PassphraseProving, OutsideGating, freshPasskeyAnswer, passphraseKeyOf, provingTools } from '../src/proving'
+import { type GatedVaultRecord, headerOf } from '../src/shapes/vault'
+import * as VX from '../src/shapes/vault'
+import { PasskeyProving, PassphraseProving, OutsideGating, passphraseKeyOf, provingTools } from '../src/proving'
 import { wayinCtxOf } from '../src/wayin'
 import type { Vault } from '../src/vault'
 import { heldLeaseOf } from '../src/held-lease'
@@ -12,7 +13,7 @@ import * as TH from './test-helpers'
 import { makeRacingWorld, makeWorld, storedVaultRecordOf, vaultWithPasskey } from './vault/world'
 
 /** The gated vault record `world` stores now. */
-const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
+const storedRecordOf = (world: ReturnType<typeof makeWorld>): GatedVaultRecord => VX.vaultRecord.parse(storedVaultRecordOf(world)) as GatedVaultRecord
 
 /** A world holding `u1`'s vault with the passphrase `pw`, locked, and its stored vault record. */
 const lockedWorld = async () => {
@@ -313,7 +314,7 @@ describe("proving.grantLease", () => {
 
 describe("passphraseKeyOf", () => {
   it("makes the non-extractable passphraseKey, as its example shows", async () => {
-    const wayinKey = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), new Uint8Array(16).fill(7), TH.spyLogger().logger)
+    const wayinKey = await passphraseKeyOf(TH.testDeriver, VX.passphraseCleartext.parse('pw'), new Uint8Array(16).fill(7), TH.spyLogger().logger)
     expect(wayinKey.extractable).to.be.false
     expect(wayinKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
   })
@@ -364,7 +365,7 @@ const keepingDeriver = () => {
 }
 
 /** The passphraseKey of 'pw' over {@link saltBytes}, by `keyDeriver`. */
-const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
+const keyBy = async (keyDeriver: KeyDeriver) => await passphraseKeyOf(keyDeriver, VX.passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
 
 /** A key deriver handing back `handed` whatever it is asked. */
 const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as Uint8Array) })
@@ -372,7 +373,7 @@ const handingBack = (handed: unknown): KeyDeriver => ({ ...TH.testDeriver, deriv
 describe("passphraseKeyOf, deriving", () => {
   it("is the key deriver's bytes over the passphrase and salt, derived once: the same two make the same key", async () => {
     const { keyDeriver, derivations } = countingDeriver()
-    const wayinKey = await passphraseKeyOf(keyDeriver, passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
+    const wayinKey = await passphraseKeyOf(keyDeriver, VX.passphraseCleartext.parse('pw'), saltBytes, TH.spyLogger().logger)
     expect(derivations).toHaveBeenCalledOnce()
     expect(derivations.mock.calls[0]?.[0]).to.eq('pw')
     expect([...derivations.mock.calls[0]?.[1] ?? []]).to.deep.equal(bytesOf(7, 16))
@@ -381,9 +382,9 @@ describe("passphraseKeyOf, deriving", () => {
 
   it("makes another key of another passphrase, or another salt", async () => {
     const wayinKey = await keyBy(TH.testDeriver)
-    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pW'), saltBytes, TH.spyLogger().logger)
+    const otherPassphrase = await passphraseKeyOf(TH.testDeriver, VX.passphraseCleartext.parse('pW'), saltBytes, TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherPassphrase)).rejects.toThrow()
-    const otherSalt = await passphraseKeyOf(TH.testDeriver, passphraseCleartext.parse('pw'), new Uint8Array(16), TH.spyLogger().logger)
+    const otherSalt = await passphraseKeyOf(TH.testDeriver, VX.passphraseCleartext.parse('pw'), new Uint8Array(16), TH.spyLogger().logger)
     await expect(wrapsAlike(wayinKey, otherSalt)).rejects.toThrow()
   })
 
@@ -416,7 +417,7 @@ describe("passphraseKeyOf, when its key deriver throws", () => {
   for (const [thrown, kind, loggedKind, blurb] of DeriverThrowCases) {
     it(`${blurb}, keeping nothing of the throw: no cause, text or property, and nothing in the log`, async () => {
       const spy = TH.spyLogger()
-      const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, passphraseCleartext.parse('pw-the-passphrase'), saltBytes, spy.logger), kind)
+      const err = await TH.expectRefusal(passphraseKeyOf({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }, VX.passphraseCleartext.parse('pw-the-passphrase'), saltBytes, spy.logger), kind)
       expect(err).to.not.eq(thrown)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
@@ -542,24 +543,24 @@ const SaltShapeCases = [
 describe("freshPasskeyAnswer", () => {
   it("passes an answer over a fresh 32-byte salt, as its first example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    expect(freshPasskeyAnswer.parse(answer).prfBytes).to.eq(answer.prfBytes)
+    expect(VX.freshPasskeyAnswer.parse(answer).prfBytes).to.eq(answer.prfBytes)
   })
 
   it("refuses an answer over a salt too short as bad_option, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    TH.expectSyncRefusal(() => freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }), 'bad_option')
+    TH.expectSyncRefusal(() => VX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }), 'bad_option')
   })
 
   for (const [saltB64, blurb] of SaltShapeCases) {
     it(`refuses an answer over ${blurb} as bad_option, naming the field and createPasskey`, async () => {
       const answer = await TH.passkeyOf('laptop', saltB64)
-      const err = TH.expectSyncRefusal(() => freshPasskeyAnswer.parse(answer), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.freshPasskeyAnswer.parse(answer), 'bad_option')
       expect(err.message).to.match(/^prf_salt_b64: .*createPasskey/)
     })
   }
 
-  it("refuses what is no passkey's answer as passkeyAnswerShape does, bad_option", () => {
-    TH.expectSyncRefusal(() => freshPasskeyAnswer.parse({ credential_id: 'abc' }), 'bad_option')
+  it("refuses what is no passkey's answer as passkeyAnswer does, bad_option", () => {
+    TH.expectSyncRefusal(() => VX.freshPasskeyAnswer.parse({ credential_id: 'abc' }), 'bad_option')
   })
 
   it("refuses a second sealing with an answer already used, its bytes zeroed at the first, as bad_option", async () => {

@@ -5,7 +5,8 @@ import { type DeviceDB, deviceRecordOf } from './device-db'
 import { randomId } from './crypto'
 import type { VaultScope } from './shapes/scopes'
 import type { VaultDB } from './vault-db'
-import { type MakeBankOpts, makeBankOpts } from './shapes/bank-opts'
+import type { MakeBankOpts } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import { parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Bank.make's options and the vault's label: which vault, and the two stores it lives in. */
@@ -13,7 +14,7 @@ export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'v
 
 /** The check of {@link delDamagedVault}'s one bag: Bank.make's options, each its own to check, and the `vaultlabel`. Its `parse` refuses 'bad_option' for anything else, a misspelt field among them, counted and never named. */
 const { delDamagedVaultOpts } = Validator('bad_option', ({ unk }) => ({
-  delDamagedVaultOpts: makeBankOpts.extend({ vaultlabel: unk, strengthChecker: unk.optional() }),
+  delDamagedVaultOpts: OX.makeBankOpts.extend({ vaultlabel: unk, strengthChecker: unk.optional() }),
 }))
 
 /** Delete a vault whose birth refuses it as `damaged_vault`: its vault record, every box, and this device's lease of it.

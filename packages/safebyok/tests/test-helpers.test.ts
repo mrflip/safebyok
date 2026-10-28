@@ -6,16 +6,19 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank, DeviceDB, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
-import { Ciphered } from '../src/shapes/fields'
+import * as FX from '../src/shapes/fields'
 import { fromB64, makeVaultKey, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good, valOf } from '../src/outcome'
 import { Box } from '../src/box'
-import { BoxRecord } from '../src/shapes/box'
+import type { BoxRecord } from '../src/shapes/box'
+import * as BX from '../src/shapes/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultRecord, type VaultDraft } from '../src/shapes/vault'
-import { VaultScope } from '../src/shapes/scopes'
+import { PasskeySaltBytes, type VaultDraft, type VaultRecord } from '../src/shapes/vault'
+import * as VX from '../src/shapes/vault'
+import type { VaultScope } from '../src/shapes/scopes'
+import * as CX from '../src/shapes/scopes'
 import type { Capacity, VaultRecordExpectation, VaultDelExpectation, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault } from '../src/shapes/vault-db'
 import type { DeviceRecord, LeaseRecord } from '../src/shapes/device'
 import * as Refusals from '../src/refusals'
@@ -704,19 +707,19 @@ describe("testDeriver", () => {
 describe("the fixtures", () => {
   it("fakeCiphered: a shape-valid Ciphered named by its tag, as its first example shows", () => {
     expect(TH.fakeCiphered('a1')).to.deep.equal({ cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' })
-    expect(Ciphered.safeParse(TH.fakeCiphered('a1')).success).to.be.true
+    expect(FX.ciphered.safeParse(TH.fakeCiphered('a1')).success).to.be.true
   })
 
   it("fakeCiphered: fills a box's ciphered field without a parse, as its second example shows", () => {
     const box = TH.boxOf('anthropic', 'a1', { whisper_ciphered: TH.fakeCiphered('SUPERSECRET') })
     expect(box.whisper_ciphered).to.deep.equal({ cipher_iv_b64: 'iv-SUPERSECRET', ciphertext_b64: 'ct-SUPERSECRET' })
-    expect(BoxRecord.safeParse(box).success).to.be.true
+    expect(BX.boxRecord.safeParse(box).success).to.be.true
   })
 
   it("scopeOf: the user's main vault in acme, or the one named", () => {
     expect(TH.scopeOf('u1')).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
     expect(TH.scopeOf('u1', 'spare')).to.deep.equal({ applabel: 'acme', user_id: 'u1', vaultlabel: 'spare' })
-    expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
+    expect(CX.vaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
   it("vaultSliceOf: the scope, vault token, key deriver, lease length and clock a box, way in or lease reads, as its first example shows", () => {
@@ -787,7 +790,7 @@ describe("the fixtures", () => {
   })
 
   it("vaultRecordOf: a shape-valid VaultRecord, with any field overridden", () => {
-    expect(VaultRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.true
+    expect(VX.vaultRecord.safeParse(TH.vaultRecordOf('u1')).success).to.be.true
     expect(TH.vaultRecordOf('u1', { gate_epoch: 2 })).to.deep.equal({ ...TH.vaultRecordOf('u1'), gate_epoch: 2 })
   })
 
@@ -821,7 +824,7 @@ describe("the fixtures", () => {
 
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
     const vaultRecord = TH.vaultRecordOf('u1', { gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) })
-    expect(VaultRecord.safeParse(vaultRecord).success).to.be.true
+    expect(VX.vaultRecord.safeParse(vaultRecord).success).to.be.true
     expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', credential_id: 'cred-laptop' })
     expect(TH.passkeyWayinOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
   })
@@ -840,7 +843,7 @@ describe("the fixtures", () => {
   })
 
   it("boxOf: a shape-valid BoxRecord, with any field overridden", () => {
-    expect(BoxRecord.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
+    expect(BX.boxRecord.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
     expect(TH.boxOf('anthropic_api_key', 'a1').revision_tok).to.eq('rev-a1')
     expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } }).sidecar).to.deep.equal({ note: 'work account' })
   })

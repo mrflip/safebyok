@@ -1,4 +1,4 @@
-import { type BankBag, type BankScope, type VaultBag, type VaultScope, bankBag } from './shapes/scopes'
+import type { BankBag, BankScope, VaultBag, VaultScope } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
@@ -14,12 +14,13 @@ import { loadStrengthChecker } from './passphrase-strength'
 import { loadKeyDeriver } from './key-deriver-spec'
 import { reportToPlatform } from './report-error'
 import type { BankVaultOpts, MakeBankOpts } from './shapes/bank-opts'
+import * as OX from './shapes/bank-opts'
 import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
 import { KeptLease } from './lease'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
-import { type VaultDB, callback } from './vault-db'
+import type { VaultDB } from './vault-db'
 import { byCodeUnit } from './text'
 import { asError } from './logger'
 
@@ -143,7 +144,7 @@ export class Bank {
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    callback.parse(listener)
+    OX.callback.parse(listener)
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
@@ -179,7 +180,7 @@ export class Bank {
    * @example bank.demandConsistentWith({ user_id: 'u2' })   // throws 'bad_scope' in u1's bank: a bank serves one user
    */
   demandConsistentWith(thing: BankBag): void {
-    bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScopeSays })
+    CX.bankBag.parseConsistent(thing, this.#scope, { message: Phrases.otherScope })
   }
   // --
 
@@ -432,7 +433,7 @@ export class Bank {
 
   /** The scope of the vault `bag` names, frozen, once it holds only names that pass their checks and is of the bank's scope: 'bad_scope' otherwise, the comparison {@link Bank.demandConsistentWith} makes. */
   #vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: Phrases.VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: Phrases.otherScopeSays })
+    const { vaultlabel } = verifyConsistent(CX.vaultBag.parse(bag, { where: 'In the bag naming the vault', advice: Phrases.VaultBagAdvice }), this.#scope, { kind: 'bad_scope', message: Phrases.otherScope })
     return Object.freeze({ applabel: this.#scope.applabel, user_id: this.#scope.user_id, vaultlabel })
   }
 
@@ -666,9 +667,9 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
 
-const goneError = () => new VaultError('vault_gone', Phrases.GoneWhileOpening)
+const goneError = () => new VaultError('vault_gone', Phrases.VaultGoneWhileOpening)
 
-const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStores)
+const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStoresThanHeld)
 
-const behindError = () => new VaultError('vault_behind', Phrases.BehindOnOpen)
+const behindError = () => new VaultError('vault_behind', Phrases.VaultBehindWhileOpening)
 // --

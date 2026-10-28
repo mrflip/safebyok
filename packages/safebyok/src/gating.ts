@@ -8,14 +8,15 @@
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { Gate } from './gate'
 import { type Outcome, bad, good, valOf } from './outcome'
-import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools, freshPasskeyAnswer } from './proving'
-import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated, passkeyAnswerShape, passphraseCleartext } from './shapes/vault'
+import { PasskeyProving, PassphraseProving, type Proving, type ProvingGating, type VaultPrivateTools } from './proving'
+import { type PasskeyAnswer, type GatedVaultRecord, type VaultRecord, type VaultMadeUnder, headerOf, isGated } from './shapes/vault'
+import * as VX from './shapes/vault'
 import type { Vault } from './vault'
 
 /** Each kind of gating, by the change its attempt makes: see {@link Gating}. */
-export const GatingKindVals = ['initialize_gate', 'unlock_vault', 'change_passphrase', 'put_passkey', 'del_passkey', 'del_vault'] as const
+export const gatingKindVals = ['initialize_gate', 'unlock_vault', 'change_passphrase', 'put_passkey', 'del_passkey', 'del_vault'] as const
 /** The kind of a {@link Gating}: `initialize_gate`, `unlock_vault`, `change_passphrase`, `put_passkey`, `del_passkey` or `del_vault`. */
-export type GatingKind = typeof GatingKindVals[number]
+export type GatingKind = typeof gatingKindVals[number]
 
 /** The refusals of this device's own store, which a grant after `putWayin`'s or `delWayin`'s change to the ways in only warns of. */
 const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable', 'storage_blocked'])
@@ -25,7 +26,7 @@ const DeviceStoreKinds: ReadonlySet<RefusalKind> = new Set(['storage_unavailable
  * in that is gone or stored damaged ('absent_wayin', 'damaged_wayin'), or a passkey this browser
  * cannot ask ('passkey_unavailable'), leaves the other way in to try, or Cancel.
  */
-export const CorrectableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
+export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase', 'absent_wayin', 'damaged_wayin', 'passkey_unavailable'] as const
 
 /** The vault call a gating was raised by, as the logger names it. */
 export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
@@ -96,7 +97,7 @@ export type DelVaultGating = GatingCommon & {
 
 /** One request for cleartext, handed to the host's {@link RequestCleartext}: a discriminated union on `gatingkind`, each kind carrying its one typed attempt beside `decline` and `lockLanded`.
  * Call the attempt on each submit. It runs the kind's whole chain and resolves the vault, or the
- * refusal. A refusal the user can correct ({@link CorrectableKindVals}) leaves the gating open:
+ * refusal. A refusal the user can correct ({@link correctableKindVals}) leaves the gating open:
  * show it in place and ask again. Any other outcome, success among them, settles the gating, and
  * every call waiting on it hears it: close the dialog. A second attempt while one runs refuses
  * 'attempt_in_flight'; one after the gating settled, 'gating_landed'. A malformed argument refuses
@@ -277,7 +278,7 @@ export class RaisedGating implements ProvingGating {
       return settled.ok ? good(this.#vault) : bad(settled.err)
     } catch (err) {
       const refused = bad(this.#tools.heardRefusal(err))
-      if (! (CorrectableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
+      if (! (correctableKindVals as readonly string[]).includes(refused.err.refusalkind)) { this.settle(refused) }
       return refused
     } finally {
       this.#attempting = false
@@ -446,7 +447,7 @@ export class RaisedGating implements ProvingGating {
 // == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
-const checkText = (given: unknown): void => { passphraseCleartext.parse(given) }
+const checkText = (given: unknown): void => { VX.passphraseCleartext.parse(given) }
 
 /** Refuse 'bad_option' unless both passphrases are text. */
 const checkTexts = (current: unknown, next: unknown): void => {
@@ -454,19 +455,19 @@ const checkTexts = (current: unknown, next: unknown): void => {
   checkText(next)
 }
 
-/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswerShape` checks: an answer already used among them. */
-const checkPasskey = (passkey: unknown): void => { passkeyAnswerShape.parse(passkey) }
+/** Refuse 'bad_option' unless the passkey's answer is one, as `passkeyAnswer` checks: an answer already used among them. */
+const checkPasskey = (passkey: unknown): void => { VX.passkeyAnswer.parse(passkey) }
 
 /** Refuse 'bad_option' unless the passphrase is text and the passkey's answer one a new passkey gives, over a fresh salt. */
 const checkNewPasskey = (passphrase: unknown, passkey: unknown): void => {
   checkText(passphrase)
-  freshPasskeyAnswer.parse(passkey)
+  VX.freshPasskeyAnswer.parse(passkey)
 }
 
 /** Refuse 'bad_option' unless the first passphrase is text and the passkey's answer, when given, one a new passkey gives. */
 const checkFirstGate = (passphrase: unknown, passkey?: unknown): void => {
   checkText(passphrase)
-  if (passkey !== undefined) { freshPasskeyAnswer.parse(passkey) }
+  if (passkey !== undefined) { VX.freshPasskeyAnswer.parse(passkey) }
 }
 
 /** The two halves of a declined call's message, by gating kind: what the user was asked to do, and what remains once they decline. */

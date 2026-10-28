@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CorrectableKindVals, VaultError, type RefusalKind } from 'safebyok'
+import { correctableKindVals, VaultError, type RefusalKind } from 'safebyok'
 import { attemptRefusalFlavor } from '../src/attempt-refusals'
 
 const FlavorCases: readonly (readonly [RefusalKind, string, string])[] = [
@@ -32,7 +32,7 @@ describe("attemptRefusalFlavor, as the Contract's Gating groups its attempt's re
   }
 
   it("shows in place exactly the kinds the core leaves a gating open for", () => {
-    for (const kind of CorrectableKindVals) { expect(attemptRefusalFlavor(new VaultError(kind, 'A refusal.'))).to.eq('in_place') }
+    for (const kind of correctableKindVals) { expect(attemptRefusalFlavor(new VaultError(kind, 'A refusal.'))).to.eq('in_place') }
   })
 
   it("sends a failure that is no VaultError to the boundary", () => {

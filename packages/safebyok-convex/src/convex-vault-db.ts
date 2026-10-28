@@ -4,7 +4,7 @@ import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, HostErrorSanitizer, VaultDB, VaultError, splitStoredBoxes } from 'safebyok'
 import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredBox, StoredVault, VaultRecord, VaultScope, VaultDraft } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
-import type { BoxSparse, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer } from './component/validators'
+import type * as CVX from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -186,7 +186,7 @@ const ConvexDocumentBytes = 1_048_576
 const ConvexTransactionReadBytes = 16_777_216
 
 /** Sparse boxes as `splitStoredBoxes` takes them: each under its own boxlabel field, which is the column it is stored under. */
-const storedBoxesOf = (rows: readonly Infer<typeof BoxSparse>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
+const storedBoxesOf = (rows: readonly Infer<typeof CVX.boxSparse>[]): StoredBox[] => rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
 
 /** What a write answered in a shape this client does not know says: whose version to fix. */
 const PutOutOfDateMessage = "The vault's Convex functions answered a write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
@@ -195,7 +195,7 @@ const PutOutOfDateMessage = "The vault's Convex functions answered a write in a 
 const GetBoxOutOfDateMessage = "The vault's Convex functions answered a box read in a shape this version of safebyok-convex does not know, so nothing was read: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
 
 /** True when `answer` is a box read's answer as this version's component makes it: `got`, carrying the box or null, or a `vault_mismatch`. */
-const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof GetBoxAnswer> => {
+const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof CVX.getBoxAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
   const { got, refusalkind } = answer as { got?: unknown, refusalkind?: unknown }
   if (got === true) { return 'box_stored' in answer }
@@ -206,7 +206,7 @@ const isGetBoxAnswer = (answer: unknown): answer is Infer<typeof GetBoxAnswer> =
  * That is `landed`, and for a refusal its kind, each with the field that kind carries. What those
  * fields hold, the base class checks; this tells only one version's answer from another's, or from null.
  */
-const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> => {
+const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof CVX.putBoxAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
   const { landed, refusalkind } = answer as { landed?: unknown, refusalkind?: unknown }
   if (landed === true) { return 'box_stored' in answer }
@@ -217,7 +217,7 @@ const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> =
 }
 
 /** True when `answer` is an update of the vault record's answer as this version's component makes it: `landed` or not, carrying the vault record it wrote, or the one it found stored. */
-const isPutVaultRecordAnswer = (answer: unknown): answer is Infer<typeof PutVaultRecordAnswer> => {
+const isPutVaultRecordAnswer = (answer: unknown): answer is Infer<typeof CVX.putVaultRecordAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }
   const { landed } = answer as { landed?: unknown }
   return (landed === true || landed === false) && 'vault_stored' in answer

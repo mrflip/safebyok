@@ -45,7 +45,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   })
 
   it("refuse a name holding the scopepath delimiter, in every place a name goes", () => {
-    for (const fieldname of CX.BoxScopepathFieldnameVals) {
+    for (const fieldname of CX.boxScopepathFieldnameVals) {
       const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }), 'bad_scope')
       expect(err.meta?.fieldnames).to.deep.equal([fieldname])
       expect(err.message).to.not.include('a^b')
@@ -83,9 +83,9 @@ describe("CX.bankScopepath, CX.vaultScopepath and CX.boxScopepath", () => {
 
 describe("the scopepath fieldnames", () => {
   it("list each scope's names in the order its scopepath joins them, each a field its scope validator checks", () => {
-    expect(CX.BankScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id'])
-    expect(CX.VaultScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel'])
-    expect(CX.BoxScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel', 'boxlabel'])
-    expect(Object.keys(CX.boxscope.unwrap().shape)).to.deep.equal([...CX.BoxScopepathFieldnameVals])
+    expect(CX.bankScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id'])
+    expect(CX.vaultScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel'])
+    expect(CX.boxScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel', 'boxlabel'])
+    expect(Object.keys(CX.boxscope.unwrap().shape)).to.deep.equal([...CX.boxScopepathFieldnameVals])
   })
 })

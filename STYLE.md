@@ -22,6 +22,55 @@ is a bug.
   make: `check`, not `namesCheck`; `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Box, BoxKinds } from './box'`.
+* **Our files reach validators through a namespace**, tests included (the Coach, 2026-10-28:
+  "files are not supposed to naked-import validators"). Not because a named import is
+  forbidden -- "It's not illegal, it's just unwieldy" (the Coach, 2026-10-28) -- but because a
+  file that names many validators grows a long import list that churns with every one it takes up
+  or drops, and puts in scope names its locals want (`vaultRecord`, `whisper`). No lint rule
+  holds it, and a file outside the core that reaches one or two imports them by name
+  (safebyok-indexeddb's `idbOpts`, the demo's `label`). A shapes module (`src/shapes/`) is star-imported under one short name
+  ending in `X`, the same in every file, as a module of types is under one ending in `T`; its
+  types are still imported by name. Or a `Validator` call takes the module as a source and its
+  builder names what it uses, as a record names the field validators it is made of:
+
+  ```ts
+  import * as CX from './shapes/scopes'
+  import * as FX from './shapes/fields'
+  import type { VaultScope } from './shapes/scopes'
+
+  const { applabel, user_id } = CX.bankScope.parse(opts)
+  export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
+    boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
+  }), [FX])
+  ```
+
+  The names, one to a module and the same in every file:
+
+  | Name  | Module                                          |
+  | ----- | ----------------------------------------------- |
+  | `PX`  | `src/shapes/primitives.ts`                      |
+  | `FX`  | `src/shapes/fields.ts`                          |
+  | `CX`  | `src/shapes/scopes.ts`                          |
+  | `BX`  | `src/shapes/box.ts`                             |
+  | `DX`  | `src/shapes/device.ts`                          |
+  | `VX`  | `src/shapes/vault.ts`                           |
+  | `VDX` | `src/shapes/vault-db.ts`                        |
+  | `OX`  | `src/shapes/bank-opts.ts`                       |
+  | `KX`  | `src/shapes/key-deriver-spec.ts`                |
+  | `MX`  | `src/shapes/mask.ts`                            |
+  | `CVX` | safebyok-convex's `src/component/validators.ts` |
+
+  Not the Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`.
+  Outside the core, the main entry exports each validator by name and holds no namespace of
+  them: a file that reaches many star-imports it as `Safebyok` (`import * as Safebyok from
+  'safebyok'`, then `Safebyok.vaultRecord`). With the validator out of the file's scope, a local
+  or parameter keeps its VOCABULARY.md name: `Box.seal(vault, props, whisper)`, a mock's
+  `vaultRecord`.
+* **The core's `src/shapes/` holds the validators a module exports**, one module to a concern,
+  and no other module exports one. A validator a module keeps to itself stays beside its one user, made in a
+  `Validator` call at module level (lease.ts's `leaseSealProps`, vault.ts's `putBoxProps`,
+  checks/validator.ts's `Checks`): moving it to `src/shapes/` would export what no other module
+  calls.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
 * **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
@@ -78,13 +127,17 @@ thing's stage in its life is its `lifecycle`.
 
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
-`Input` appended** (`dragForceInput`).
-A shape's validator is the exception: it takes its type's name (`export const { BoxSparse } =
-...`, `type BoxSparse = Z.infer<typeof BoxSparse>`), for it checks no one parameter.
+`Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and takes its
+type's name with the first letter lowered: lowerCamelCase beside its ModuleCase type (the Coach,
+2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
+BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { boxSparse, type BoxSparse } from
+'safebyok'` and calls `boxSparse.parse(row)`.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
-spreads a narrower: `export const WayinKindVals = [...] as const`,
-`wayinkind = oneof(WayinKindVals)`, `export type WayinKind = typeof WayinKindVals[number]`.
+spreads a narrower: `export const wayinKindVals = [...] as const`,
+`wayinkind = oneof(wayinKindVals)`, `export type WayinKind = typeof wayinKindVals[number]`. The
+list of values is `fooThingVals`, lowerCamelCase as its checker is: `VX.wayinkind`,
+`VX.wayinKindVals`, `type WayinKind`.
 
 **A thing's shapes are named for their purpose, prefixed with the type**, from the fixed set in
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,
@@ -177,7 +230,7 @@ The tag smushing above is for a label that names a thing (`boxlabel`).
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: never an ISO string, never a `Date`. The
 clock seam (`Clock.now()`) already yields it, every index sorts it, and one convention means no
-parsing at any boundary. A field named `*_at` holds one, checked by `EpochMillis`.
+parsing at any boundary. A field named `*_at` holds one, checked by `epochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
@@ -308,7 +361,7 @@ host's callback returns (a strength checker's verdict, a key deriver's output). 
 a refusal with a `kind` the caller can branch on.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
-handed, and checks it, in one parse: `const { applabel, user_id } = bankScope.parse(thing)`,
+handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`,
 `dragForceInput.parse({ thing, vel })` (the Coach, 2026-10-27: "validators [are] the principal
 means of, in one line, extracting and validating local data"). Never a hand-pick
 (`{ applabel: x.applabel, ... }`) where a schema exists, and never an if-then precondition, or a
@@ -356,11 +409,11 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 
 * **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one
   schema a line, and nothing added per line, neither a wrapper call nor an annotation.
-* Modules of validators in `sources` (star imports, `[FooValidators]`) are spread into the kit
+* Modules of validators in `sources` (star imports, `[FX]`) are spread into the kit
   beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
   bringing names into scope.
-* The primitives the kit hands out (`checks/primitives.ts`) are plain Zod, and so is a variation
-  made directly from a validator (`VaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
+* The primitives the kit hands out (`shapes/primitives.ts`) are plain Zod, and so is a variation
+  made directly from a validator (`VX.vaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
   use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
 * **One input, one validator.** A function checks what it is handed with one validator, never a
   cascade of validators each taking a part of the input and refusing with its own kind. Checks
@@ -462,7 +515,7 @@ the scope.
   Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
   hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
   local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
-  namespaced as the object a `Validator` call returns (`Checks.StoryShape`), or through its
+  namespaced as the object a `Validator` call returns (`Checks.story`), or through its
   module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
   `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
   type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
@@ -670,8 +723,9 @@ rows with it.
   or leaving an optional parameter out means, a return the first line doesn't cover. A `@param`
   is the parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner
   named it.`
-* Each `{@link}` names something in scope in its file: add a type-only import, or write the name
-  as plain code. A private member is always plain code, in backticks: never a `{@link}`.
+* Each `{@link}` names something in scope in its file; anything else is plain code, in
+  backticks, never a type-only import made for the link, which `no-unused-vars` refuses. A
+  private member is always plain code, in backticks: never a `{@link}`.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would grep for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
@@ -809,6 +863,8 @@ when that reads better), `@stylistic/quotes` (the convention above is kept by ha
 `@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
 kept by hand), `@stylistic/no-multi-spaces` (parallel construction is padded into columns, *Build
 for maintenance*), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
+No rule holds validators to a namespace (*Imports*): a named import of one is unwieldy, not
+wrong.
 
 **`@typescript-eslint/no-unused-vars` passes only a named ignore**: its ignore patterns are
 `^_[a-zA-Z0-9]`, so `_scopepathkind` passes and a bare `_` does not (*Build for maintenance*).

@@ -1,49 +1,19 @@
 import { deepFreeze } from 'es-toolkit'
-import type * as Z from 'zod'
 import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
 import { type Outcome, outcomeOf, refusalOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { BoxFormat, BoxRecord, BoxSparse, Sidecar, Whisper } from './shapes/box'
-import { revision_tok } from './shapes/fields'
-import { type VaultStamp, VaultSparse } from './shapes/vault'
+import { BoxFormat, type BoxSparse, type Sidecar, type MadeUnder, type BoxRecord, type SealBoxProps, type Whisper } from './shapes/box'
+import * as BX from './shapes/box'
+import type { VaultStamp } from './shapes/vault'
 import type { ConsistencyWith } from './types/type-aliases'
 import type { Boxscope, VaultScope } from './shapes/scopes'
-import { Validator } from './checks/validator'
 
-// == [Box]: VaultOfBox, BoxBase, SealBoxProps, MadeUnderShape, MadeShape, MadeUnder, Box, record, baseRevisionTok, make, seal, extractWhisper
+// == [Box]: VaultOfBox, Box, record, baseRevisionTok, make, seal, extractWhisper
 
 /** The vault a box lies in, as far as a box reads it: its scope and `vault_tok`, and its demand. A Vault object is one. */
 type VaultOfBox = ConsistencyWith<VaultScope & Pick<VaultStamp, 'vault_tok'>>
-
-/** What {@link Box.seal} seals a whisper with, and what a box is made under: each `parse` refuses 'bad_option', naming the field, quoting none of it.
- * `SealBoxProps` holds the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if
- * any, and nothing else: a boxlabel that is not a label refuses as the rest do. `BoxBase` takes
- * the revision and `registered_at` of whatever carries them, a Box or a listing's entry. What a box
- * is made under, and what a seal is made with, are taken from a {@link VaultSparse}, frozen.
- */
-export const { BoxBase, SealBoxProps, MadeUnderShape, MadeShape } = Validator('bad_option', ({ obj, boxlabel, epochMillis }) => {
-  const BoxBase = obj({ revision_tok: revision_tok.nullable(), registered_at: epochMillis.optional() })
-  const MadeUnderShape = VaultSparse.pick({ applabel: true, user_id: true, vaultlabel: true, vault_tok: true, vault_epoch: true, gate_epoch: true }).readonly()
-  return {
-    BoxBase,
-    SealBoxProps: obj({ boxlabel, sidecar: Sidecar.default(() => ({})), base: BoxBase.nullish() }).strict(),
-    MadeUnderShape,
-    MadeShape:    obj({ madeUnder: MadeUnderShape, now: epochMillis }),
-  }
-})
-
-/** The box a sealed box replaces, as far as a seal reads it: the revision it is written over (null for none), and the `registered_at` it carries forward, where known.
- * A {@link Box} read from storage is one, as is a listing's {@link BoxSparse} or {@link BoxDamaged}.
- */
-export type BoxBase = Z.infer<typeof BoxBase>
-
-/** What {@link Box.seal} seals a whisper with: the boxlabel, the sidecar (`{}` when left out), and the box it replaces, if any. */
-export type SealBoxProps = Z.input<typeof SealBoxProps>
-
-/** What a box holds of the vault it was made under: the vault's scope, the `vault_tok` the read, write or seal expected, and both epochs, as the vault showed them then. A {@link VaultSparse} carries them. */
-type MadeUnder = Z.infer<typeof MadeUnderShape>
 
 /** One revision of one box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show, and what it was made under.
  * A box revision is never rewritten, so every field a Box shows is fixed for its life, and frozen
@@ -56,7 +26,7 @@ type MadeUnder = Z.infer<typeof MadeUnderShape>
  * {@link Box.seal}, not yet stored. `box.extractWhisper()` opens it under the lease the vault holds.
  *
  * Misuse refuses before anything is ciphered: 'bad_whisper' for a whisper JSON cannot carry, and
- * 'bad_option' for props amiss, as {@link SealBoxProps} checks them (a boxlabel that is not a
+ * 'bad_option' for props amiss, as `sealBoxProps` checks them (a boxlabel that is not a
  * label, a sidecar JSON cannot carry, a malformed base, or a field but `boxlabel`, `sidecar` and
  * `base`), or a malformed `madeUnder` or `made`. No refusal quotes what the call was handed. A bug
  * met in a seal or an extract past its argument checks (a throw that is no VaultError) arrives as
@@ -150,8 +120,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' }, madeUnder)   // throws 'bad_record': no box record
    */
   static make(vault: VaultOfBox, record: BoxRecord, madeUnder: MadeUnder): Box {
-    const checked = BoxRecord.parse(record)
-    return new this(vault, MadeUnderShape.parse(madeUnder), checked, null)
+    const checked = BX.boxRecord.parse(record)
+    return new this(vault, BX.madeUnder.parse(madeUnder), checked, null)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under the vault's lease; not yet stored: `vault.putBox` stores one.
@@ -176,8 +146,8 @@ export class Box implements Boxscope, BoxSparse {
    * @example const next = await Box.seal(vault, { boxlabel: box.boxlabel, sidecar: box.sidecar, base: box }, 'sk-ant-...', { madeUnder, now })   // next.baseRevisionTok: box.revision_tok
    */
   static async seal(vault: VaultOfBox, props: SealBoxProps, whisper: Whisper, made: { madeUnder: MadeUnder, now: number }): Promise<Box> {
-    const { boxlabel, sidecar, base } = SealBoxProps.parse(props)
-    const { madeUnder, now } = MadeShape.parse(made)
+    const { boxlabel, sidecar, base } = BX.sealBoxProps.parse(props)
+    const { madeUnder, now } = BX.madeShape.parse(made)
     const whisperBytes = whisperBytesOf(whisper)
     try {
       vault.demandConsistentWith(madeUnder, { leaseBound: true })
@@ -195,7 +165,7 @@ export class Box implements Boxscope, BoxSparse {
       }, { whisper: whisperBytes })
       // What the seal brought, a refusal included, is used only while the vault is still as the box is made under.
       vault.demandConsistentWith(madeUnder, { leaseBound: sealed.ok })
-      return new Box(vault, madeUnder, BoxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
+      return new Box(vault, madeUnder, BX.boxRecord.parse(valOf(sealed)), base?.revision_tok ?? null)
     } catch (err) {
       throw refusalOf(err)
     } finally {
@@ -237,7 +207,7 @@ export class Box implements Boxscope, BoxSparse {
       }
       const whisperBytes = valOf(deciphered)
       try {
-        const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
+        const checked = BX.whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
         if (! checked.success) {
           throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
         }
@@ -276,7 +246,7 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 // == [Helpers]: whisperBytesOf, parseJsonOrNull, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
-export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(Whisper.parse(whisper)))
+export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(BX.whisper.parse(whisper)))
 
 /** `text` parsed as JSON, or null when it is none. */
 const parseJsonOrNull = (text: string): unknown => {

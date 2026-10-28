@@ -26,7 +26,7 @@ these guarantees until shown otherwise.
 | `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
-| `packages/safebyok/src/types/types.ts` | the `LeaseRecord` and `Whisper` checks, which say what a stored leaseKey and a whisper are |
+| `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
@@ -130,7 +130,7 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
 `bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt`,
-`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswerShape`, `isAllZero`),
+`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isAllZero`),
 `checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
 `PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
 `subtle.deriveKey`), and `prfBytes.fill(0)`.
@@ -170,7 +170,7 @@ record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `tryPutBox` → `#checkWhisperFits`
 (`whisperBytesOf`, zeroed) → `#sealAndPutBox` → `Box.seal`, `trySeal` → `checkedWhisper`
-(`Whisper`, a `structuredClone`) → `whisperBytesOf` (`stableJsonify`, `TextEncoder`) →
+(`whisper`, a `structuredClone`) → `whisperBytesOf` (`stableJsonify`, `TextEncoder`) →
 `lease.sealProps`, `trySealProps` → `cipheredWith` (`cipherBytes`), bytes zeroed in both.
 Out: `vault.getWhisper`, `tryGetWhisper`, `useWhisper` → `box.extractWhisper`,
 `tryExtractWhisper` → `lease.decipherWith` (`decipherBytes`) → `TextDecoder`, parse, zero →
@@ -232,7 +232,7 @@ unwrapped non-extractable, `decrypt` only, in `#openedOrNull` for `decipherWith`
 end of each.
 
 **G6. The whisper's bytes are zeroed; its value is the host's.** `putBox` validates the host's
-value and takes a `structuredClone` (`Whisper`), serializes it (`whisperBytesOf`), and zeroes the
+value and takes a `structuredClone` (`whisper`), serializes it (`whisperBytesOf`), and zeroes the
 bytes once ciphered, refused or not (`Box.seal`, `Lease.cipheredWith`, and the sizing copy
 in `#checkWhisperFits`). `extractWhisper` decodes the deciphered bytes, parses them, zeroes them,
 and hands the parsed value to the host. A `Box` holds its record, ciphertext, never a whisper.

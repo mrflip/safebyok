@@ -5,12 +5,10 @@ import { VaultError } from 'safebyok'
 import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
-import {
-  Boxscope, Capacity, NovelVaultRecord, VaultAnswer, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GetBoxAnswer, PutBoxAnswer, PutVaultRecordAnswer, VaultTombstone, VaultRecord, VaultScope, VaultSignature,
-} from './component/validators'
+import * as CVX from './component/validators'
 
 export type { ComponentApi } from './component-api'
-export { SafebyokErrorKindVals } from './refusals'
+export { safebyokErrorKindVals } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
 /** The host app's answer to "who is calling?": the signed-in user's id as the vault scopes it, or null, undefined or empty for no one.
@@ -99,72 +97,72 @@ export class SafebyokComponent {
 
     return {
       getVault: publicQuery({
-        args:    { ...VaultScope.fields },
-        returns: v.nullable(VaultAnswer),
+        args:    { ...CVX.vaultScope.fields },
+        returns: v.nullable(CVX.vaultAnswer),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },
       }),
       ensureVault: publicMutation({
-        args:    { draft: NovelVaultRecord },
-        returns: VaultAnswer,
+        args:    { draft: CVX.novelVaultRecord },
+        returns: CVX.vaultAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.draft.user_id)
           return await ctx.runMutation(vaults.ensureVault, args)
         },
       }),
       putVaultRecord: publicMutation({
-        args:    { vaultRecord: VaultRecord, expected: VaultRecordExpectation },
-        returns: PutVaultRecordAnswer,
+        args:    { vaultRecord: CVX.vaultRecord, expected: CVX.vaultRecordExpectation },
+        returns: CVX.putVaultRecordAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultRecord.user_id)
           return await ctx.runMutation(vaults.putVaultRecord, args)
         },
       }),
       getBox: publicQuery({
-        args:    { ...Boxscope.fields, expected: BoxGetExpectation },
-        returns: GetBoxAnswer,
+        args:    { ...CVX.boxscope.fields, expected: CVX.boxGetExpectation },
+        returns: CVX.getBoxAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getBox, args)
         },
       }),
       putBox: publicMutation({
-        args:    { ...VaultScope.fields, expected: BoxExpectation, box: BoxRecord },
-        returns: PutBoxAnswer,
+        args:    { ...CVX.vaultScope.fields, expected: CVX.boxExpectation, box: CVX.boxRecord },
+        returns: CVX.putBoxAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.putBox, args)
         },
       }),
       getCapacity: publicQuery({
-        args:    { ...VaultScope.fields },
-        returns: Capacity,
+        args:    { ...CVX.vaultScope.fields },
+        returns: CVX.capacity,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.getCapacity, args)
         },
       }),
       delBox: publicMutation({
-        args:    { ...Boxscope.fields, expected: BoxDelExpectation },
-        returns: v.nullable(BoxDeletion),
+        args:    { ...CVX.boxscope.fields, expected: CVX.boxDelExpectation },
+        returns: v.nullable(CVX.boxDeletion),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delBox, args)
         },
       }),
       delVault: publicMutation({
-        args:    { ...VaultScope.fields, expected: VaultDelExpectation },
-        returns: v.nullable(VaultTombstone),
+        args:    { ...CVX.vaultScope.fields, expected: CVX.vaultDelExpectation },
+        returns: v.nullable(CVX.vaultTombstone),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       watchVault: publicQuery({
-        args:    { ...VaultScope.fields },
-        returns: VaultSignature,
+        args:    { ...CVX.vaultScope.fields },
+        returns: CVX.vaultSignature,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.user_id)
           return await ctx.runQuery(vaults.watchVault, args)

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, expectTypeOf } from 'vitest'
 import { LeaseHours, type MakeBankOpts } from '../../src/shapes/bank-opts'
 import { FarFuture, ForeverMillis, MaxSaltBytes, MinuteMillis } from '../../src/consts'
-import { MaxUserIdChars } from '../../src/checks/primitives'
+import { MaxUserIdChars } from '../../src/shapes/primitives'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'

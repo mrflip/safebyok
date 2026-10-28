@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { VaultScope } from '../../src/shapes/scopes'
+import { type VaultScope } from '../../src/shapes/scopes'
 import { StaleMinutes } from '../../src/shapes/bank-opts'
 import type { LeaseRecord } from '../../src/shapes/device'
 import { MinuteMillis } from '../../src/consts'

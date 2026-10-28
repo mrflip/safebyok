@@ -1,4 +1,4 @@
-/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults, the stores and libraries a host hands in, and the limits. Each `parse` refuses 'bad_option'. */
+/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults, the stores and libraries a host hands in, and the limits; and the checks of a logger, `localVaultDB`'s options and a callback. Each `parse` refuses 'bad_option'. */
 
 import type * as Z from 'zod'
 import { MinuteMillis, ForeverMillis, FarPast, FarFuture, MaxSaltBytes } from '../consts'
@@ -7,11 +7,12 @@ import type { DeviceDB } from '../device-db'
 import type { RequestCleartext } from '../gating'
 import type { KeyDeriver } from '../key-deriver'
 import type { VaultLogger } from '../logger'
-import { type StrengthChecker, DefaultStrengthChecker, strengthChecker } from '../passphrase-strength'
+import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
-import { key_deriver_label } from './fields'
+import * as FX from './fields'
+import * as VX from './vault'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock
 
@@ -184,7 +185,7 @@ export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, u
     maxBoxes:               anyOpt,
     logger:                 anyOpt,
     // A function default is read as the factory for one, so the default checker is handed back by one.
-    strengthChecker:        strengthChecker.default(() => DefaultStrengthChecker),
+    strengthChecker:        VX.strengthChecker.default(() => DefaultStrengthChecker),
   } satisfies Record<keyof MakeBankOpts, Z.ZodType>).strict()
   const bankVaultOpts = obj({
     vaultDB:  anyOpt,
@@ -208,7 +209,7 @@ const HourMillis = 60 * MinuteMillis
  * Where an option is an object, it is only checked: Bank.make keeps what it was handed, prototype
  * and all.
  */
-export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, fn, lit, str, num, int }) => {
+export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, fn, lit, str, num, int, key_deriver_label }) => {
   const verb = fn()
   // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
   const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))
@@ -243,5 +244,26 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
       load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
     }, Phrases.KeyDeriverShape),
   }
+}, [FX])
+// --
+
+// == [Host code and adapters' options]: loggerShape, localVaultDBOptsShape, callback
+
+/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
+export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
+  const loggerCall = fn<VaultLogger['log']>()
+  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape) }
 })
+
+/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
+  const call = fn()
+  return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
+})
+
+/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
+ *
+ * @example this.#listeners.add(callback.parse(listener))
+ */
+export const { callback } = Validator('bad_option', ({ fn }) => ({ callback: fn() }))
 // --

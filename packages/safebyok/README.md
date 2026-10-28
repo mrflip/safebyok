@@ -269,7 +269,7 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, r
   storage holds it, and only `getWhisper()` proves it unaltered. It is stored as the JSON object it
   is, so a backend may keep it as JSON it can query (a Postgres `jsonb` column) and reorder its
   keys: the box binds it with its keys sorted, so the same value opens however storage orders it.
-* **Its shape is yours.** The vault checks only that it is a JSON object (`Sidecar`; anything
+* **Its shape is yours.** The vault checks only that it is a JSON object (`sidecar`; anything
   else, a bare string, array or null among them, is `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
   `putBox()`, the box keeps the sidecar it has: the call reads the box and opens it first; a new box's is `{}`, as
   is one written over a record that will not open. Given with the whisper, nothing is read: the box is
@@ -302,24 +302,26 @@ read, so lowering it strands nothing.
 
 ## Validators
 
-The checks a host or a storage adapter calls or builds on are exported, each under its own name,
-in the `Validators` namespace: the stored records (`Validators.VaultRecord`,
-`Validators.BoxRecord`), the scopes and scopepaths, each stored field (`Validators.vault_tok`),
+The checks a host or a storage adapter calls or builds on are exported from the main entry, each
+under its own name, lowerCamelCase beside its type: the stored records (`vaultRecord`,
+`boxRecord`), the scopes and scopepaths, each stored field (`vault_tok`),
 the options `Bank.make`, its calls and its stores take, the objects a host hands in (a store, a
 clock, a key deriver, a logger) and what their callbacks return, and the expectations a `VaultDB`
 is handed. The pieces the package builds those from are its own. Each is Zod, made in a
 `Validator` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
 `bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and
-`EpochMillis` are plain Zod, the names they are all made of.
+`epochMillis` are plain Zod, the names they are all made of. Import each by name, as below, or
+the whole main entry (`import * as Safebyok from 'safebyok'`, then `Safebyok.vaultRecord.parse(row)`):
+there is no namespace of validators.
 
 ```ts
-import { Validator, Validators } from 'safebyok'
+import { Validator, vault_tok } from 'safebyok'
 
 const { sidebarOpts } = Validator('bad_option', ({ obj, bool, vaultlabel }) => ({
   sidebarOpts: obj({ vaultlabel, collapsed: bool.optional() }).strict(),
 }))
 sidebarOpts.parse({ vaultlabel: 'work', collapsed: true })
-Validators.vault_tok.safeParse(storedRow.vault_tok).success
+vault_tok.safeParse(storedRow.vault_tok).success
 ```
 
 A refusal names each failing field and says what it must be, in Zod's English, and never repeats
@@ -524,7 +526,7 @@ const requestCleartext: RequestCleartext = async (gating) => {
   (`attempt(current, next)`), `put_passkey` (`attempt(passphrase, passkey)`), `del_passkey` and
   `del_vault` (`attempt(passphrase)`).
 * **The attempt runs the whole change** and resolves an `Outcome`. The refusals a user can
-  correct (`CorrectableKindVals`) leave the gating open: show them in place and ask again.
+  correct (`correctableKindVals`) leave the gating open: show them in place and ask again.
   They are `wrong_passphrase`, `wrong_passkey`, `weak_passphrase` and `same_passphrase`, and a
   way in gone or stored damaged (`absent_wayin`, `damaged_wayin`) or a passkey this browser
   cannot ask (`passkey_unavailable`), where the other way in, or Cancel, is the user's next
@@ -989,7 +991,7 @@ A retry predicate never retries `family: 'misuse'` or `vault_locked`, and may re
 `vaultDB.getBox(...)` resolves the record or throws it. `outcomeOf(thunk)` makes an `Outcome` of
 any body that throws, and `valOf(outcome)` hands back its `val` or throws its `err`. A throw that
 is no `VaultError` becomes `unexpected_error`, which a retry predicate never retries: wrap a call
-out to your own storage as `outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `RefusalKindVals`, and the
+out to your own storage as `outcomeOf(thunk, Refusals.storageUnavailable)`. The kinds are `refusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.
@@ -1289,6 +1291,6 @@ carries `damaged: true` beside `call`, so a host can branch on it. A `delBox()` 
 left to delete -- another device or tab deleted the box first -- is `absent_box`, as storage
 answers it: the vault reads no box beforehand.
 
-In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`RefusalFamilyVals`:
+In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`refusalFamilyVals`:
 `misuse`, `condition`, `bad_news`), and `isCondition(err)` is true for a `VaultError` of the
 condition or bad news family: show or retry those, and let anything else reach an error boundary.

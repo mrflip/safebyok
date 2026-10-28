@@ -6,7 +6,8 @@ import { cipherCtx, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/cr
 import { Lease, sealLeaseRecord } from '../src/lease'
 import { VaultError } from '../src/errors'
 import type { Outcome } from '../src/outcome'
-import { LeaseStamp, LeaseRecord } from '../src/shapes/device'
+import type { LeaseRecord } from '../src/shapes/device'
+import * as DX from '../src/shapes/device'
 import type { VaultSparse, VaultStampButFormat } from '../src/shapes/vault'
 import { FarFuture, ForeverMillis, MinuteMillis } from '../src/consts'
 import * as TH from './test-helpers'
@@ -130,12 +131,12 @@ describe("sealLeaseRecord", () => {
   })
 })
 
-describe("LeaseStamp", () => {
+describe("leaseStamp", () => {
   it("is the lease record but its key material, as its example shows: what a lease shows, and its format", async () => {
     const { lease_key: _leaseKey, vault_key_lease_wrapped: _wrapped, ...stamped } = await TH.leaseOf('u1')
-    expect(LeaseStamp.parse(stamped)).to.deep.equal(stamped)
+    expect(DX.leaseStamp.parse(stamped)).to.deep.equal(stamped)
     expect(Object.keys(stamped)).to.have.members(['format', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'gate_epoch', 'ask_passphrase_at'])
-    expect(LeaseStamp.parse(await TH.leaseOf('u1')), 'taken from the record, its key material left out').to.not.have.any.keys('lease_key', 'vault_key_lease_wrapped')
+    expect(DX.leaseStamp.parse(await TH.leaseOf('u1')), 'taken from the record, its key material left out').to.not.have.any.keys('lease_key', 'vault_key_lease_wrapped')
   })
 })
 
@@ -178,7 +179,7 @@ describe("Lease.make", () => {
     expect(Object.keys(lease)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(lease))).to.deep.equal(visible)
     expect(TH.jsonOf(lease)).to.deep.equal(TH.shownOf(lease))
-    expect(LeaseStamp.parse(TH.shownOf(lease))).to.deep.equal(TH.shownOf(lease))
+    expect(DX.leaseStamp.parse(TH.shownOf(lease))).to.deep.equal(TH.shownOf(lease))
     expect(lease.format).to.eq('safebyok-lease-v1')
     const wrapped = record.vault_key_lease_wrapped
     for (const hidden of ['lease_key', 'vault_key_lease_wrapped', 'CryptoKey', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {
@@ -217,8 +218,8 @@ describe("Lease.make", () => {
     const forCiphering = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
     TH.expectSyncRefusal(() => Lease.make(onVault, { ...record, lease_key: extractable }), 'corrupt_record')
     TH.expectSyncRefusal(() => Lease.make(onVault, { ...record, lease_key: forCiphering }), 'corrupt_record')
-    expect(LeaseRecord.safeParse({ ...record, lease_key: extractable }).success).to.be.false
-    expect(LeaseRecord.safeParse(record).success).to.be.true
+    expect(DX.leaseRecord.safeParse({ ...record, lease_key: extractable }).success).to.be.false
+    expect(DX.leaseRecord.safeParse(record).success).to.be.true
   })
 
   it("refuses a record naming another user as 'corrupt_record', as its third example shows: it is another vault's", async () => {
