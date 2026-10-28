@@ -14,13 +14,13 @@ describe("heldLeaseOf", () => {
     expect(heldLeaseOf(vault)).to.be.null
   })
 
-  it("is null for anything no reader was registered for", () => {
+  it("is null for anything no getter was registered for", () => {
     expect(heldLeaseOf({})).to.be.null
   })
 })
 
 describe("registerLeaseGetter", () => {
-  it("registers a vault's reader once, as its example shows: a second registration changes nothing", async () => {
+  it("registers a vault's getter once, as its example shows: a second registration changes nothing", async () => {
     const vault = await TH.leasedSliceOf('u1', await makeVaultKey())
     const held = vault.lease
     registerLeaseGetter(vault, () => null)

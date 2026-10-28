@@ -15,7 +15,7 @@ describe("memoryStore", () => {
     expect(store.get('greeting')).to.eq('hi')
   })
 
-  it("erases, and erasing what isn't there is quietly fine", () => {
+  it("deletes, and deleting what isn't there is quietly fine", () => {
     const store = memoryStore()
     store.put('greeting', 'hi')
     store.del('greeting')
