@@ -4,7 +4,7 @@
   four threads stack in one line, so one runs at a time).
 * **Issued by:** the Coach (flip), `/sprint gripeoween-vault YOLO /turbochat`, with: *"your job is
   to modify interfaces there have been no public releases, do not include back-compat"*.
-* **Status:** planned; thread 1 underway.
+* **Status:** planned; thread 1 underway. Sprint doc: https://claude.ai/artifact/EunK4WYVspRmtVNmnStttk
 
 The Coach's request is the preplan beside this file, `gripeoween-vault-preplan.md` (copied from
 the untracked `whiteboard/20261028-gripeoween/` in the main checkout), with its raw material
