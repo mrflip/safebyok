@@ -141,9 +141,10 @@ BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { boxSparse, type 
 public checks of a host's code are the exception (`shapes/host-code.ts`): `vaultDBShape`,
 `deviceDBShape`, `clockShape`, `keyDeriverShape` and `loggerShape` keep it, so `vaultDB`,
 `deviceDB`, `clock`, `keyDeriver` and `logger` stay free for the locals and options that want
-them. A module-private validator follows the rule where its plain name collides with nothing
-(`BX.made`), and keeps the suffix, under the same exception, where it would: idb.ts's and
-string-store.ts's `listenerShape` sits beside the `listener` it checks. A sentence in `phrases.ts`
+them. An in-package validator, one the main entry does not export, follows the rule where its
+plain name collides with nothing (`BX.made`), and keeps the suffix, under the same exception,
+where it would: idb.ts's and string-store.ts's `listenerShape` sits beside the `listener` it
+checks. A sentence in `phrases.ts`
 named for the shape it describes (`Phrases.VaultDBShape`) is a phrase, not a validator.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
