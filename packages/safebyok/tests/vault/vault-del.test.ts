@@ -67,11 +67,19 @@ describe("delBox and del()", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
-    // The watch's read, rung by the put, lands before the delete, never after it with the box still listed.
-    await TH.readAfresh(vault)
     await vault.delBox('anthropic')
     expect(vault.getSnapshot().boxes).to.have.lengthOf(0)
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
+  })
+
+  it("delBox right after putBox lists no box once it resolves, nor once the watch's reads, rung by both, have landed", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await vault.delBox('anthropic')
+    expect(vault.getSnapshot().boxes).to.have.lengthOf(0)
+    await TH.aWhile()
+    expect(vault.getSnapshot().boxes).to.have.lengthOf(0)
   })
 
   it("del() removes every trace of this vault but its tombstone, and only this vault: the Vault object is gone after", async () => {

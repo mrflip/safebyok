@@ -929,6 +929,11 @@ export class Vault implements VaultStamp {
   // and the damaged apart, each sorted by boxlabel, each list frozen.
   #boxes: readonly BoxSparse[] = Object.freeze([])
   #damagedBoxes: readonly BoxDamaged[] = Object.freeze([])
+  // The box writes of this Vault object's own that landed in the listing since the last refresh
+  // began, by boxlabel: the revision each stored, or null for a deletion. A box write leaves alone
+  // the epochs that would show a read older than it. Refreshes run one at a time, so it is that
+  // refresh's alone.
+  #landedSinceRefresh = new Map<string, string | null>()
   // The lease this Vault object holds, opened: the one place it keeps the vaultKey. Dropping it locks.
   #lease: Lease | null = null
   // How many leases this Vault object has held, the last of them the one in hand: a read of this
@@ -1027,16 +1032,21 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Refreshing]: refresh, oneRefreshAtATime, doRefresh, loadFromStorage, onRefreshRefused, applyVault, refreshIfStale, refreshedAt, forceNextRefresh, watchStorage
+  // == [Refreshing]: refresh, refreshes, tellReadsRecovered, doRefresh, loadFromStorage, onRefreshRefused, applyVault, refreshIfStale, refreshedAt, forceNextRefresh, watchStorage
 
-  // The refresh under way, which a call made while it runs shares.
-  readonly #oneRefreshAtATime = oneAtATime(() => this.#doRefresh())
+  // The refresh under way, which a call made while it runs shares, and the one the watch asks to follow it.
+  readonly #refreshes = oneAtATime(() => this.#doRefresh())
 
   /** Refresh from storage through `#doRefresh`, one refresh at a time: a call made while one runs shares it.
    * One that succeeds after the watch warned of failing refreshes logs that they recovered.
    */
   async #refresh(): Promise<void> {
-    await this.#oneRefreshAtATime()
+    await this.#refreshes.join()
+    this.#tellReadsRecovered()
+  }
+
+  /** Log that storage reads again, once a refresh succeeds after the watch warned of failing ones; nothing otherwise. */
+  #tellReadsRecovered() {
     if (! this.#watchWarned) { return }
     this.#watchWarned = false
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
@@ -1047,12 +1057,16 @@ export class Vault implements VaultStamp {
    * under another `vault_tok`, makes this Vault object gone, refusing 'vault_gone' or 'vault_remade'.
    * A vault below this device's record is storage it cannot trust: it locks, as `#onStorageRefusal`
    * says, and refuses 'vault_behind'. A vault older than the picture but not below the record
-   * (`isOlderPicture`), or one read for a Vault object let go meanwhile, is ignored. A refused
-   * refresh leaves the picture as it stood, but for its freshness, as `#onRefreshRefused` says.
+   * (`isOlderPicture`), one listing a box otherwise than a box write of this Vault object's own
+   * that landed during the read left it (`showsLanded`), or one read for a Vault object let go
+   * meanwhile, is ignored. A refused refresh leaves the picture as it stood, but for its
+   * freshness, as `#onRefreshRefused` says.
    */
   async #doRefresh(): Promise<void> {
     const refreshedAt = this.#clockNow()
     const leasesSeen = this.#leasesHeld
+    this.#landedSinceRefresh = new Map()
+    const landed = this.#landedSinceRefresh
     try {
       const { record, stored, leaseKept } = await this.#loadFromStorage()
       if (! stored.ok) {
@@ -1074,7 +1088,7 @@ export class Vault implements VaultStamp {
         await this.#onStorageRefusal(behind, 'refresh')
         throw behind.err
       }
-      if (isOlderPicture(this.#vaultRecord, found)) { return }
+      if (isOlderPicture(this.#vaultRecord, found) || ! showsLanded(found, landed)) { return }
       const { boxes, damagedBoxes, ...fresh } = found
       this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
       await this.#noteEpochSeen(fresh.vault_epoch, 'refresh')
@@ -1740,6 +1754,7 @@ export class Vault implements VaultStamp {
   #updateBoxListingOf(stored: BoxRecord): Box {
     const box = Box.make(this, stored, vaultSparseOf(this.#vaultRecord))
     const entry = boxSparseOf(stored)
+    this.#landedSinceRefresh.set(entry.boxlabel, entry.revision_tok)
     this.#boxes = Object.freeze([...this.#boxes.filter((listed) => listed.boxlabel !== entry.boxlabel), entry].toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel)))
     this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((listed) => listed.boxlabel !== entry.boxlabel))
     this.#replaceSnapshot()
@@ -1749,6 +1764,7 @@ export class Vault implements VaultStamp {
   /** Drop the box `deleted` names, which a delete just removed, from the listing, once `deleted` is demanded consistent, and publish it, returning `deleted` frozen. The demand is not lease-bound: a lock meanwhile lets it land. */
   #dropBoxListingOf(deleted: DeletedBox): DeletedBox {
     this.#demand(deleted, { call: 'delBox' })
+    this.#landedSinceRefresh.set(deleted.boxlabel, null)
     this.#boxes = Object.freeze(this.#boxes.filter((box) => box.boxlabel !== deleted.boxlabel))
     this.#damagedBoxes = Object.freeze(this.#damagedBoxes.filter((box) => box.boxlabel !== deleted.boxlabel))
     this.#replaceSnapshot()
@@ -1759,14 +1775,16 @@ export class Vault implements VaultStamp {
   // == [Watching]: watchRefresh, unsubscribeDB
 
   // Watch the backend so boxes written elsewhere (another tab, the inspector's reset button) show
-  // up without a manual refresh, through the refresh, joining one under way. A failure here has
-  // nobody to throw to, so it leaves the snapshot as it was and tells any bad news it met. It
-  // leaves the snapshot's freshness `refused`, and warns once for a failing streak; the next read
-  // that succeeds says so once. A read that finds the vault gone has made the Vault object gone,
-  // and told the bank.
+  // up without a manual refresh. A ring while a refresh reads waits it out and refreshes once more,
+  // every ring meanwhile sharing that one: the read under way may have begun before the change
+  // rung. A failure here has nobody to throw to, so it leaves the snapshot as it was and tells any
+  // bad news it met. It leaves the snapshot's freshness `refused`, and warns once for a failing
+  // streak; the next read that succeeds says so once. A read that finds the vault gone has made
+  // the Vault object gone, and told the bank.
   async #watchRefresh() {
     try {
-      await this.#refresh()
+      await this.#refreshes.runAfresh()
+      this.#tellReadsRecovered()
     } catch (err) {
       this.#reportBadNews(err)
       if (this.#goneBy !== null || this.#watchWarned) { return }
@@ -1892,6 +1910,14 @@ const frozenVaultRecord = (record: VaultRecord): VaultRecord => {
 const isOlderPicture = (inHand: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>, fresh: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 'gate_epoch'>): boolean => (
   inHand.vault_tok === fresh.vault_tok
   && (fresh.vault_epoch < inHand.vault_epoch || fresh.gate_epoch < inHand.gate_epoch)
+)
+
+/** True when `listing` shows each box as a write of this Vault object's own in `landed` left it: the revision a put stored, or no box where a deletion removed one. */
+const showsLanded = (listing: BoxListing, landed: ReadonlyMap<string, string | null>): boolean => (
+  [...landed].every(([boxlabel, revisionTok]) => {
+    const listed = [...listing.boxes, ...listing.damagedBoxes].find((box) => box.boxlabel === boxlabel)
+    return revisionTok === null ? listed === undefined : listed?.revision_tok === revisionTok
+  })
 )
 
 /** `next`, or `shown` when it holds the same: a snapshot's slice keeps its identity until what it holds changes. */

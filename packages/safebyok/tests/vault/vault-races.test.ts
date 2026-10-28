@@ -1102,8 +1102,6 @@ describe("versioned updates: two devices writing at once", () => {
     TH.beforeNextCall(hereDB, 'tryDelBox', async () => {
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
-      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
-      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
@@ -1131,8 +1129,6 @@ describe("versioned updates: two devices writing at once", () => {
       await there.delBox('anthropic')
       await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
       theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
-      // The watch's read, rung by theirs, lands before the delete, never after it with theirs still listed.
-      await TH.readAfresh(here)
     })
     await here.delBox('anthropic')
     expect(world.dbStore.get(u1BoxScopepath('anthropic'))).to.be.null
@@ -1227,7 +1223,7 @@ describe("the races the contract tests own, of a box write", () => {
 })
 
 describe("refreshes, one at a time", () => {
-  it("joins refreshes asked for while one runs: three rings at once cost one read, never two beside each other", async () => {
+  it("runs one refresh after the one under way for the rings that come while it reads: three rings at once cost two reads, never two beside each other", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const getVault = world.vaultDB.tryGetVault.bind(world.vaultDB)
@@ -1244,13 +1240,44 @@ describe("refreshes, one at a time", () => {
     })
     // Each write rings the storage watch, which asks for a refresh.
     for (const ii of [1, 2, 3]) { world.dbStore.put('elsewhere', String(ii)) }
-    await vi.waitFor(() => { expect(reads).toHaveBeenCalledTimes(1) })
+    await vi.waitFor(() => { expect(reads).toHaveBeenCalledTimes(2) })
     await vi.waitFor(() => { expect(tally.inFlight).to.eq(0) })
     await TH.wakeupAtNextTick()
-    expect(reads).toHaveBeenCalledTimes(1)
+    expect(reads).toHaveBeenCalledTimes(2)
     expect(tally.most).to.eq(1)
     vi.restoreAllMocks()
     TH.closeVault(vault)
+  })
+
+  it("shows a box written elsewhere while a refresh reads, its ring answered by the refresh after, never by the read begun before the write", async () => {
+    const { hereDB, here, there } = await twoDeviceWorld()
+    const answered = TH.holdNextAnswer(hereDB, 'tryGetVault')
+    const refreshing = here.refresh()
+    await answered.reached
+    await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
+    answered.release()
+    await refreshing
+    await TH.aWhile()
+    expect(here.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic'])
+  })
+
+  it("keeps the revision its own putBox stored, never showing the one before it that a read under way as the put landed lists", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-one')
+    await TH.readAfresh(here)
+    const answered = TH.holdNextAnswer(hereDB, 'tryGetVault')
+    await there.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-theirs')
+    await answered.reached
+    await here.putBox({ boxlabel: 'anthropic' }, 'sk-ant-fake-mine')
+    const mine = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    const shown: (string | undefined)[] = []
+    const unsubscribe = here.subscribe(() => { shown.push(here.getSnapshot().boxes[0]?.revision_tok) })
+    answered.release()
+    await TH.aWhile()
+    unsubscribe()
+    expect(shown.filter((revisionTok) => revisionTok !== mine)).to.deep.equal([])
+    expect(here.getSnapshot().boxes.map((box) => box.revision_tok)).to.deep.equal([mine])
+    expect(await here.getWhisper('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
   it("says freshness: 'refused' while the storage watch cannot read, warns once for the streak, and once when a read succeeds", async () => {
