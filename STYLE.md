@@ -457,13 +457,13 @@ the scope.
 * **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
   and module-local and good idea to put it near where used); use Validator; namespace it, using
-  Validator or a star-import." So the type is `Z.infer` of the shape, never a parallel written by
-  hand; the shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
-  local to one module, which keeps it beside its use; it is made in a `Validator` call; and it is
-  reached under a namespace, the object a `Validator` call returns (`Checks.StoryShape`) or a star
-  import (`Validators.vaultScope`). A good reason for an exception is said beside it. A type its
-  own validator's type names (`Story`, which `Refusing` names and a `Refusing` makes) is an
-  `interface` extending the `Z.infer`, whose members TypeScript resolves on demand.
+  Validator or a star-import." Read as: the type is `Z.infer` of the shape, never a parallel
+  written by hand; the shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it
+  is odd and local to one module, which keeps it beside its use; it is made in a `Validator` call;
+  and it is reached under a namespace, the object a `Validator` call returns (`Checks.StoryShape`)
+  or a star import (`Validators.vaultScope`). A good reason for an exception is said beside it. A
+  type its own validator's type names (`Story`, which `Refusing` names and a `Refusing` makes) is
+  an `interface` extending the `Z.infer`, whose members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
