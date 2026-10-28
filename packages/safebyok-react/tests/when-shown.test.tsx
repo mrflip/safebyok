@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Activity, StrictMode, Suspense, useLayoutEffect } from 'react'
+import { Activity, StrictMode, Suspense, useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { useWhenShown } from '../src/when-shown'
@@ -114,6 +114,41 @@ describe("useWhenShown", () => {
     await settle()
     expect(shownAgain()).to.be.false
     rerender(shown('visible'))
+    await settle()
+    expect(shownAgain()).to.be.true
+  })
+
+  it("waits again for a component an Activity hides once more in the commit that showed it", async () => {
+    const grabbed: WhenShown[] = []
+    const grab = (whenShown: WhenShown) => { grabbed.push(whenShown) }
+    const rehid: true[] = []
+    // Shown in `mode`, unless `rehiding` and a layout effect in the commit that showed it hid it
+    // again: React renders that update before any microtask runs.
+    const Host = ({ mode, rehiding }: { mode: 'visible' | 'hidden', rehiding: boolean }) => {
+      const [hiddenAgain, setHiddenAgain] = useState(false)
+      const rehide = () => {
+        if (! rehiding || hiddenAgain) { return }
+        rehid.push(true)
+        setHiddenAgain(true)
+      }
+      return (
+        <Activity mode={rehiding && hiddenAgain ? 'hidden' : mode}>
+          <Grabber grab={grab} />
+          <Committing committed={rehide} />
+        </Activity>
+      )
+    }
+    const { rerender } = render(<Host mode="visible" rehiding={false} />)
+    const [whenShown = never] = grabbed
+    rerender(<Host mode="hidden" rehiding={false} />)
+    const shownAgain = goesOn(whenShown)
+    await act(async () => {
+      rerender(<Host mode="visible" rehiding />)
+      await TH.wakeupAtNextTick()
+    })
+    expect(rehid).to.have.lengthOf(1)
+    expect(shownAgain()).to.be.false
+    rerender(<Host mode="visible" rehiding={false} />)
     await settle()
     expect(shownAgain()).to.be.true
   })

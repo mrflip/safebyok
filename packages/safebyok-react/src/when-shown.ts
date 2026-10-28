@@ -32,8 +32,10 @@ export const useWhenShown = (): (<ValT>(goOn: () => ValT) => Promise<Awaited<Val
   }, [])
   // `goOn` is called in the same turn while shown, never after an await: a host awaiting the call
   // the handler awaited would run first, and could raise another gating before hearing an answer.
+  // Asked again once woken: the commit that showed the component can hide or unmount it again,
+  // by a layout effect's update, before the woken handler's turn comes.
   return useCallback(async <ValT>(goOn: () => ValT): Promise<Awaited<ValT>> => {
-    if (! shown.current) { await new Promise<void>((showing) => { waiting.current.push(showing) }) }
+    while (! shown.current) { await new Promise<void>((showing) => { waiting.current.push(showing) }) }
     return await goOn()
   }, [])
 }
