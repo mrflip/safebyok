@@ -40,12 +40,33 @@ is a bug.
   }), [FX])
   ```
 
-  The names: `PX` primitives, `FX` fields, `CX` scopes, `BX` box, `DX` device, `VX` vault,
-  `VDX` vault-db, `OX` bank-opts, `KX` key-deriver-spec, `MX` mask; outside the core,
-  `Validators` from `safebyok`, and `CVX` for safebyok-convex's own Convex validators. Not the
-  Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`. With the
-  validator out of the file's scope, a local or parameter keeps its VOCABULARY.md name:
-  `Box.seal(vault, props, whisper)`, a mock's `vaultRecord`.
+  The names, one to a module and the same in every file:
+
+  | Name  | Module                                          |
+  | ----- | ----------------------------------------------- |
+  | `PX`  | `src/shapes/primitives.ts`                      |
+  | `FX`  | `src/shapes/fields.ts`                          |
+  | `CX`  | `src/shapes/scopes.ts`                          |
+  | `BX`  | `src/shapes/box.ts`                             |
+  | `DX`  | `src/shapes/device.ts`                          |
+  | `VX`  | `src/shapes/vault.ts`                           |
+  | `VDX` | `src/shapes/vault-db.ts`                        |
+  | `OX`  | `src/shapes/bank-opts.ts`                       |
+  | `KX`  | `src/shapes/key-deriver-spec.ts`                |
+  | `MX`  | `src/shapes/mask.ts`                            |
+  | `CVX` | safebyok-convex's `src/component/validators.ts` |
+
+  Not the Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`.
+  Outside the core, the main entry exports each validator by name and holds no namespace of
+  them: a file that reaches many star-imports it as `Safebyok` (`import * as Safebyok from
+  'safebyok'`, then `Safebyok.vaultRecord`). With the validator out of the file's scope, a local
+  or parameter keeps its VOCABULARY.md name: `Box.seal(vault, props, whisper)`, a mock's
+  `vaultRecord`.
+* **The core's `src/shapes/` holds the validators a module exports**, one module to a concern,
+  and no other module exports one. A validator a module keeps to itself stays beside its one user, made in a
+  `Validator` call at module level (lease.ts's `leaseSealProps`, vault.ts's `putBoxProps`,
+  checks/validator.ts's `Checks`): moving it to `src/shapes/` would export what no other module
+  calls.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
 * **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
@@ -490,7 +511,7 @@ the scope.
   Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
   hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
   local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
-  namespaced as the object a `Validator` call returns (`Checks.StoryShape`), or through its
+  namespaced as the object a `Validator` call returns (`Checks.storyShape`), or through its
   module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
   `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
   type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
