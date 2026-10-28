@@ -99,7 +99,7 @@ export type Merged<SourcesT extends readonly object[]> =
  *   export const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
  *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
  *     return { vaultRecord }
- *   }, [GX])
+ *   }, [GateChecks])
  */
 export const Validator = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
   kind: RefusalKind, build: (kit: KitWith<SourcesT>) => ValsT, sources?: SourcesT,

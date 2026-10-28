@@ -7,7 +7,7 @@ import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
 // kind, to show a validator nested in another refuses with the outer one's.
-const GX = Validator('bad_option', ({ obj, str, uint }) => {
+const GateChecks = Validator('bad_option', ({ obj, str, uint }) => {
   const passphraseWayinRecord = obj({ salt_b64: str.min(1), memory_kib: uint }).strict()
   const gateRecord            = obj({ passphrase: passphraseWayinRecord }).strict()
   return { passphraseWayinRecord, gateRecord }
@@ -28,7 +28,7 @@ const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, appl
 const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
   const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
   return { vaultRecord }
-}, [GX])
+}, [GateChecks])
 
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
 const sparse = { ...scope, boxlabel: 'openai', written_at: 1 }
@@ -69,7 +69,7 @@ describe("Validator", () => {
   })
 
   it("refuses a module's own validator with its own call's kind", () => {
-    TH.expectSyncRefusal(() => GX.gateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_option')
+    TH.expectSyncRefusal(() => GateChecks.gateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_option')
   })
 
   it("names every failing field, each with its check's sentence, in the message and meta.fieldnames", () => {
