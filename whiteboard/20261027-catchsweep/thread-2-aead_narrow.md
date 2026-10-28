@@ -1,8 +1,8 @@
 # Thread 2: aead_narrow (2026-10-28)
 
-Branch `20261028-aead_narrow`, PR pending, stacked on [#316](https://github.com/mrflip/safebyok/pull/316)
-(trythrow). Justify: pending (core suite 3464 passed, 37 skipped; lint and typecheck green on the
-changed files).
+Branch `20261028-aead_narrow`, PR [#325](https://github.com/mrflip/safebyok/pull/325), stacked on
+[#316](https://github.com/mrflip/safebyok/pull/316) (trythrow). Justify: green (safebyok 3464 passed,
+37 skipped, 19 added; every package's lint, typecheck, build and size budget green).
 
 The handoff's four parts are built. Each WebCrypto catch now holds exactly one WebCrypto call, with
 its ctx built before the `try`; each Lease and Box throwing form ends in one catch that makes a
