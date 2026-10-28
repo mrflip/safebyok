@@ -393,12 +393,12 @@ keep records by structured clone, never as JSON.
   anything, so a store that starts each call's work in the order it is called keeps that order,
   awaited or not: a lock's `tryDelLease`, made after a grant's `tryPutLease`, must erase it.
 * **What your store throws is a condition.** Every verb is a try pair: `getLease` resolves the
-  record or throws, and `tryGetLease` resolves an `Outcome` and never rejects. The vault calls the
-  `try` forms, which make of what your store throws a condition: a browser's refusal that holds
-  until something outside the app changes (`SecurityError`, `QuotaExceededError`,
+  record or throws its refusal, a `VaultError`, and `tryGetLease` resolves the same as an `Outcome`
+  and never rejects. Either way, what your store throws becomes a condition: a browser's refusal
+  that holds until something outside the app changes (`SecurityError`, `QuotaExceededError`,
   `NotSupportedError`) becomes `storage_blocked`, which a host shows without offering a retry, and
-  anything else `storage_unavailable`, what was thrown its `cause`. The throwing form throws what
-  your store threw, as it came.
+  anything else `storage_unavailable`, what was thrown its `cause`. A `VaultError` your store
+  throws passes as it came.
 
 ```ts
 import { openDB } from 'idb'
