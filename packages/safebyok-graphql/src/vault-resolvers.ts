@@ -19,7 +19,8 @@ export type VaultResolversOpts<ContextT> = {
    * VaultError it throws crosses as it is, kind and message, those two and a `bad_option` from a
    * misconfigured `postgresVaultDB` alike; anything else it throws is a bug in the server's
    * setup, and crosses as `unexpected_error` whose message carries the thrown error's own, so the
-   * diagnostic reaches the browser developer. What was thrown stays on the server as the cause.
+   * diagnostic reaches the browser developer, and every other browser: throw nothing whose message
+   * names a credential. What was thrown stays on the server as the cause.
    * The VaultDB, not this, refuses a signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
