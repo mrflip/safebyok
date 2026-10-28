@@ -1,7 +1,7 @@
 # Thread 6: store_trynames (2026-10-28)
 
 Branch `20261028-store_trynames`, PR #321, stacked on #311 (merged into main at 41f44f69). Justify: green
-(core 3443 tests pass, 37 skipped; graphql 344 pass; every package lints, typechecks, builds and
+(core 3444 tests pass, 37 skipped; graphql 344 pass; every package lints, typechecks, builds and
 fits its size budget).
 
 * **Built**: every public verb of `VaultDB` (`getVault`, `ensureVault`, `getVaultRecords`,
@@ -41,9 +41,21 @@ fits its size budget).
   - `getVault`/`getVaultRecords` and `ensureVault`/`ensureVaultRecords` keep the private
     `readVault`/`ensuredVault` as their shared body (two public verbs, one body), so thread 3's
     diff of the insides stays small.
-  - The DeviceDB's throwing form throws what the store threw, as it came (the handoff: the
-    wrapper moves to the `try` form). The class doc and README say so, and that the vault reads
-    through the `try` forms.
+  - **DeviceDB's throwing forms throw VaultErrors, as VaultDB's do** (the Coach's ruling of
+    2026-10-28: "I'm happier with the throwing body doing a try catch to fix its refusals -- that's
+    most of its job, it belongs there; then having the try version wrap as usual"). First built
+    with the mapping in the `try` form (`deviceOutcomeOf`), as the handoff read; reworked before
+    review: each throwing verb computes its scopepath before the `try` and wraps exactly its one
+    `do*` call in `storeAnswer(verb, hook)`, which passes a VaultError and makes anything else the
+    condition `deviceTrouble` makes (`storage_blocked`/`storage_unavailable`, as before);
+    `#readableOf`'s `doDelUnreadable` call is wrapped the same, under the reading verb. The `try`
+    forms are the plain one-hop `outcomeOf(() => this.X(...))`, so a base-class bug is
+    `unexpected_error` from a `try` form and thrown raw from the throwing one, as VaultDB's.
+    `deviceOutcomeOf` is gone. `deviceTrouble`'s signature, body and `cause` are untouched (thread
+    2's). Lines changed in `device-db.ts` for the rework: the class doc's throw paragraph (l.23-27),
+    each verb body and `try` form (l.47-139), `#readableOf`'s signature and its `doDelUnreadable`
+    call (l.141-150), the *Device trouble* banner and `storeAnswer` in place of `deviceOutcomeOf`
+    (l.284-293), and the `isVaultError` import (l.5).
 * **Deviations**: `ProvingTools.putLease` renamed to `tryPutLease` (proving.ts, vault.ts): a
   verb-shaped Outcome-resolving tool met in passing, per the plan's *Not in this sprint*. The
   patch changeset covers indexeddb, convex and react though only their tests changed, as the
@@ -61,14 +73,8 @@ fits its size budget).
   - For thread 1 (`trythrow`): `KeptLease.read`'s one changed line is `deviceDB.tryGetLease(scope)`
     and its `Pick<DeviceDB, 'tryGetLease'>`; their rename to `tryRead` meets it there.
 * **For the Coach**:
-  - **DeviceDB throwing forms are unmapped**: `deviceDB.getLease(scope)` rejects with the raw
-    store error (a `DOMException`), while `tryGetLease` resolves `storage_blocked` or
-    `storage_unavailable`. VaultDB's throwing forms, by contrast, throw VaultErrors, as
-    `adapterAnswer` maps each hook call inside the body. Should the device store map inside the
-    body too (an `adapterAnswer` of its own around each `do*` call, one wrapper per edge), so both
-    forms give VaultErrors? That changes what a base-class bug reads as (`unexpected_error`, not
-    `storage_unavailable`), so it is thread 2's or a later thread's. Recommendation: yes, in thread 2
-    beside `deviceTrouble`.
+  - ~~DeviceDB throwing forms are unmapped~~: settled by the Coach's standing ruling of 2026-10-28
+    and reworked before review (*Decisions taken*): both forms give VaultErrors.
   - **The `vault.ts` rewraps** (`outcomeOf(() => this.#vaultDB.X(...))` at `#tryDelBox`,
     `#delVault`, `#putGate`, `#readBox`, `#writeOver`'s caller): kept, each feeding a demand. If
     the Coach wants `heed` to hand Outcomes instead, so the rewraps go, that is a contract-shaped

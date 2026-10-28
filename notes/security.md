@@ -41,13 +41,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and a
-  `DeviceDB`'s throwing verb passes the store's error through unmapped.** `tryGetBox` resolves the Outcome; `getBox` resolves the
+* 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
+  forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
-  `del-damaged-vault.ts`, `RefusalPolicy.heed`) calls the `try` forms. For a `DeviceDB` the mapping of a store's throw into
-  `storage_blocked` or `storage_unavailable` lives in the `try` form; the throwing form throws what the store threw, as it
-  came, so a host calling a `DeviceDB`'s throwing verb directly sees the raw store error (a `DOMException` quoting what the
-  browser quotes). Only the host's own calls reach it: no refusal, log line or cause carries anything new.
+  `del-damaged-vault.ts`, `RefusalPolicy.heed`) calls the `try` forms. Each `DeviceDB` throwing verb wraps exactly its one
+  `do*` store call in `storeAnswer(verb, hook)`: a `VaultError` passes as it came, anything else becomes `deviceTrouble`'s
+  condition (`storage_blocked` where `isStorageBlocked` names the throw, else `storage_unavailable`, the throw its `cause`), so a
+  host calling `deviceDB.getLease` directly never sees the store's raw error. The `try` form is the plain `outcomeOf` of the
+  throwing one; only a bug in the base class's own lines is `unexpected_error` from a `try` form, or thrown raw from a throwing
+  form. No refusal, log line or cause carries anything new.
 * 2026-10-27 (ci_pacing): in `ci.yml` and `codeql.yml`, pushes to main share one concurrency group
   and run one at a time; a run waiting is replaced by a newer push, so a commit merged while
   another waited gets no CI or CodeQL run of its own, and the next commit's run covers it. Pull
@@ -953,9 +955,9 @@ added or folded into through the subagent, and no other entry changes.
   naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
   `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
-  `bad_option` (amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone, and `deviceOutcomeOf` is off the package's exports; amended 2026-10-27 (retire_standing): it is still a module-private helper of `src/device-db.ts`, which the `DeviceDB` verbs call.
+  `bad_option` (amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone, and `deviceOutcomeOf` is off the package's exports; amended 2026-10-27 (retire_standing): it is still a module-private helper of `src/device-db.ts`, which the `DeviceDB` verbs call; amended 2026-10-28 (store_trynames): `deviceOutcomeOf` is gone, the throwing verbs map through `storeAnswer` and `deviceTrouble`.
   `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `VaultDB` is, and its public `try` verbs (`tryGetLease`, `tryPutLease`, `tryDelLease`,
-  `tryGetDeviceRecord`, `tryRaiseDeviceRecord`, `tryDelDeviceRecord`, `tryDelAll`) make each Outcome themselves (amended 2026-10-28 (store_trynames): each has a throwing form without the `try`, which passes the store's error through as it came; see the entry at the top): a throw from the store's `do*` hook becomes
+  `tryGetDeviceRecord`, `tryRaiseDeviceRecord`, `tryDelDeviceRecord`, `tryDelAll`) make each Outcome themselves (amended 2026-10-28 (store_trynames): each has a throwing form without the `try`, which makes the same `deviceTrouble` condition for a store's throw, so both forms give `VaultError`s; see the entry at the top): a throw from the store's `do*` hook becomes
   `deviceTrouble`'s condition, `storage_blocked` for a `SecurityError`, `QuotaExceededError` or `NotSupportedError` and otherwise
   `storage_unavailable`, naming no scope and quoting no record, and a `VaultError` passes as it came; a scopepath the base class cannot file a row
   under is refused `bad_scope` before the store sees the call. `parseDeviceDB` (`vault-opts.ts`) requires `instanceof DeviceDB` plus the verbs'
@@ -3567,7 +3569,7 @@ added or folded into through the subagent, and no other entry changes.
   after a successful catch-up; a failed catch-up keeps its own message.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
   kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
-  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`; amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` is gone and `deviceOutcomeOf` is off the exports, the `DeviceDB` base class's public `try` verbs make the same mapping through `deviceTrouble` (amended 2026-10-28 (store_trynames): the throwing verbs do not, see the entry at the top); amended 2026-10-27 (retire_standing): `deviceOutcomeOf` remains as a module-private helper of `device-db.ts`) says a failure
+  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`; amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` is gone and `deviceOutcomeOf` is off the exports, the `DeviceDB` base class's public `try` verbs make the same mapping through `deviceTrouble` (amended 2026-10-28 (store_trynames): so do the throwing verbs, through `storeAnswer`, and `deviceOutcomeOf` is gone; see the entry at the top); amended 2026-10-27 (retire_standing): `deviceOutcomeOf` remains as a module-private helper of `device-db.ts`) says a failure
   named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
   retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it
