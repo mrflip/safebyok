@@ -10,7 +10,7 @@ import * as FX from './fields'
 
 // == [Stores and libraries]: vaultDBShape, deviceDBShape, clockShape, keyDeriverShape
 
-/** The checks of the stores and libraries Bank.make takes, each by the verbs the vault calls on it, each refusing 'bad_option'.
+/** The checks of the stores and libraries Bank.make takes, each by the verbs the vault calls on it and, for a keyDeriver, the fields it reads, each refusing 'bad_option'.
  * Bank.make keeps what it was handed, prototype and all.
  */
 export const { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape } = Validator('bad_option', ({ obj, fn, str, int, key_deriver_label }) => {
