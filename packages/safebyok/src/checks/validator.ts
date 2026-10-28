@@ -208,7 +208,7 @@ export const demandConsistent = (bag: object, other: object, refusal: Consistenc
   throw new VaultError(kind, said ?? Phrases.fieldsDisagree(fieldnames), { meta: { fieldnames } })
 }
 
-/** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. What a validator's `parseConsistent` calls on its parse.
+/** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`.
  *
  * @example const tombstone = verifyConsistent(answered, scope, { kind: 'corrupt_record' })   // the tombstone, when it is of the scope
  */
