@@ -34,7 +34,10 @@ sprint directory on in full, since workers read it from theirs.
 * *Ground rules*: only what is particular to this sprint.
 * The threads, numbered, each with the Coach's text **verbatim** and then your gloss: what it
   likely touches; the model it wants, if the Coach named one or it is small and mechanical enough
-  for `sonnet`; **what it depends on**; your **look-ahead**; and its **size**. Read the whole
+  for `sonnet`; its **effort** (`low` to `max`), which is yours to choose unless the Coach named
+  one: lower for a mechanical change, higher where the work turns on judgment or on finding a
+  cause; the model its review's style pass wants, `opus` where the thread is mostly naming or
+  vocabulary; **what it depends on**; your **look-ahead**; and its **size**. Read the whole
   request before writing any of this, because later threads bend earlier ones: a capability built
   in thread 3 and reused in thread 5 is designed once, for both. A worker's context only grows,
   so a thread that would build two features, or plainly run long, is two threads.
@@ -97,10 +100,10 @@ runs three steps.
 **Build.** `scripts/cut-thread <label> <base>` cuts its worktree from the base §1 gives it, and
 records that base for its reviewer and its filing. (Run the scripts as `<sprint root>/scripts/...`
 once the sprint has its worktree: the main checkout may be on a branch that lacks them.) Spawn
-one `thread-worker` with `run_in_background: true` (and the plan's `model`, if it names one),
-never with `isolation`. The prompt is the whole handoff, re-sent on every one of the worker's
-turns: it carries what this thread needs from the plan and the progress document, and points to
-the rest by file and section.
+one `thread-worker` with `run_in_background: true` (and the plan's `model` and `effort`, if it
+names them), never with `isolation`. The prompt is the whole handoff, re-sent on every one of the
+worker's turns: it carries what this thread needs from the plan and the progress document, and
+points to the rest by file and section.
 
 ```
 Thread <N> of sprint <sprint_name>. Sprint directory: <sprint root>/whiteboard/<YYYYMMDD-sprint_name>/.
@@ -126,7 +129,7 @@ work in a worktree of their own, kept by the harness from the main checkout.
 
 ```
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
-Range: <base-sha>...<tip-sha>. Review level: <level>.
+Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if the plan names one>.
 The plan's gloss: <the thread's gloss, verbatim>.
 ```
 

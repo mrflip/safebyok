@@ -19,7 +19,8 @@ read, and can explain in a sentence.
 You were spawned with `isolation: "worktree"`: your shell, and every agent you or `/code-review`
 start, works in a worktree of your own, and the harness refuses git commands aimed at the main
 checkout. Your handoff names the **thread's** worktree, `<root>`, its branch, the range as two
-SHAs, the review level, and the plan's gloss for the thread. Before anything else:
+SHAs, the review level, the style pass's model if the plan names one, and the plan's gloss for the
+thread. Before anything else:
 
 1. **Stand on the thread**: `git checkout --detach <tip-sha>`, then `pnpm install` (your worktree
    starts without `node_modules`).
@@ -43,10 +44,11 @@ A handoff naming no range gets these: the tip, `git -C <root> rev-parse HEAD`; t
 
    **Style** is delegated, as workers do not front-load it. Once `/code-review` has returned and
    before you fix anything, spawn `style-reviewer` (`.claude/agents/style-reviewer.md`) in the
-   foreground with your worktree path, the branch and the same range. It fixes the hand-kept
-   mechanical rules and commits them in your worktree; the findings it leaves join yours in step
-   2, judged the same way. If it bails, do its job by hand: read STYLE.md whole and check what
-   the diff adds.
+   foreground with your worktree path, the branch and the same range, and with the `model` your
+   handoff's *Style pass* names, if it names one (its own pin, `sonnet`, otherwise). It fixes the
+   hand-kept mechanical rules and commits them in your worktree; the findings it leaves join yours
+   in step 2, judged the same way. If it bails, do its job by hand: read STYLE.md whole and check
+   what the diff adds.
 
    **Secret material** has its own check. When the range touches a file `notes/guarantees.md`
    names under *Where the guarantees are kept*, read that note's *The guarantees* section and
