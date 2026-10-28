@@ -139,9 +139,10 @@ export class Lease implements LeaseSparse {
 
   /** `serialized` ciphered under a fresh boxKey, that boxKey wrapped under the vaultKey, both bound to `visible`: a box's two ciphered fields.
    * Each ctx is {@link boxCtxOf}'s, for `visible` and this lease's `vault_tok`. Nothing of either
-   * key outlives the call, and `serialized` is zeroed, ciphered or not. It refuses 'crypto_failed'
-   * when the browser's WebCrypto fails to make, wrap or cipher under the keys: a fault of the
-   * platform, which keeps nothing of the error but its name; the lease stays held.
+   * key outlives the call, and `serialized` is zeroed, ciphered or not. When the browser's
+   * WebCrypto fails to make, wrap or cipher under the keys, it refuses 'crypto_failed': a fault of
+   * the platform, not of the box or the lease. That refusal keeps nothing of the error but its
+   * name, and the lease stays held.
    *
    * @example const { box_key_wrapped, whisper_ciphered } = await lease.cipheredWith(whisperBytes, visible)
    */
@@ -182,7 +183,8 @@ export class Lease implements LeaseSparse {
   /** The bytes `ciphered` holds, its boxKey unwrapped under the vaultKey, both bound to `visible`: the inverse of {@link Lease.cipheredWith}.
    * It refuses 'damaged_box' when the boxKey will not unwrap or the bytes will not decipher under
    * the ctx: altered in storage, moved from another boxlabel or vault, or sealed under another
-   * vaultKey. The bytes are the caller's to zero.
+   * vaultKey. A fault of WebCrypto itself reads the same, as nothing tells it from a wrong key or
+   * an altered record: never 'crypto_failed'. The bytes are the caller's to zero.
    *
    * @example const whisperBytes = await lease.decipherWith(ciphered, visible)
    */
@@ -386,7 +388,9 @@ const { serializedBytes, LeaseSealProps } = Validator('bad_option', ({ obj, byte
   LeaseSealProps:  obj({ whisper: bytes() }).strict(),
 }))
 
-/** The refusal of a cipher the browser's WebCrypto failed under keys just made, `thrown` what it threw: a fault of the platform, of which only the error's name is kept. */
+/** The 'crypto_failed' refusal for a cipher the browser's WebCrypto failed under keys just made, `thrown` what it threw.
+ * Only the error's `name` is kept, ending the message: nothing else of `thrown`, not as a `cause`.
+ */
 const cryptoFailed = (thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
   const named = thrownName === null ? '' : ` WebCrypto threw ${thrownName}.`
