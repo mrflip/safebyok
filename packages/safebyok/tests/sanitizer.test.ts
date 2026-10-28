@@ -9,6 +9,9 @@ const quotingError = () => {
   return Object.assign(err, { args: { note: 'sk-ant-fake-in-a-property' } })
 }
 
+/** A Proxy trap that throws, quoting a marker: stood in for every trap, so any access to the proxied throw fails loudly. */
+const quotingTrap = (): never => { throw new Error('read me and I quote: sk-ant-fake-trap') }
+
 describe("Sanitizer.refusalFor", () => {
   it("is a VaultError of the kind and message asked for", () => {
     const refusal = Sanitizer.refusalFor(quotingError(), 'storage_unavailable', 'Storage failed: try again shortly.')
@@ -30,8 +33,9 @@ describe("Sanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
-  it("reads nothing of the foreign throw: one whose every property is a getter that throws costs nothing", () => {
-    const booby = new Proxy({}, { get: () => { throw new Error('read me and I quote: sk-ant-fake-trap') }, ownKeys: () => { throw new Error('sk-ant-fake-trap') } })
+  it("reads nothing of the foreign throw: one whose every access, instanceof included, throws costs nothing", () => {
+    const booby = new Proxy(() => undefined, { get: quotingTrap, set: quotingTrap, has: quotingTrap, deleteProperty: quotingTrap, ownKeys: quotingTrap, getOwnPropertyDescriptor: quotingTrap, defineProperty: quotingTrap, getPrototypeOf: quotingTrap, setPrototypeOf: quotingTrap, isExtensible: quotingTrap, preventExtensions: quotingTrap, apply: quotingTrap, construct: quotingTrap })
+    expect(() => booby instanceof Error).to.throw('sk-ant-fake-trap')
     const refusal = Sanitizer.refusalFor(booby, 'unexpected_error', 'The checker threw.')
     expect(refusal.refusalkind).to.eq('unexpected_error')
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
