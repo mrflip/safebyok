@@ -22,9 +22,13 @@ is a bug.
   make: `check`, not `namesCheck`; `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Box, BoxKinds } from './box'`.
-* **A validator is reached through a namespace, never imported by name** (the Coach,
-  2026-10-28: "files are not supposed to naked-import validators"), in every file of every
-  package, tests included. A shapes module (`src/shapes/`) is star-imported under one short name
+* **Our files reach validators through a namespace**, tests included (the Coach, 2026-10-28:
+  "files are not supposed to naked-import validators"). Not because a named import is
+  forbidden -- "It's not illegal, it's just unwieldy" (the Coach, 2026-10-28) -- but because a
+  file that names many validators grows a long import list that churns with every one it takes up
+  or drops, and puts in scope names its locals want (`vaultRecord`, `whisper`). No lint rule
+  holds it, and a file outside the core that reaches one or two imports them by name
+  (safebyok-indexeddb's `idbOpts`, the demo's `label`). A shapes module (`src/shapes/`) is star-imported under one short name
   ending in `X`, the same in every file, as a module of types is under one ending in `T`; its
   types are still imported by name. Or a `Validator` call takes the module as a source and its
   builder names what it uses, as a record names the field validators it is made of:
@@ -859,6 +863,8 @@ when that reads better), `@stylistic/quotes` (the convention above is kept by ha
 `@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
 kept by hand), `@stylistic/no-multi-spaces` (parallel construction is padded into columns, *Build
 for maintenance*), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
+No rule holds validators to a namespace (*Imports*): a named import of one is unwieldy, not
+wrong.
 
 **`@typescript-eslint/no-unused-vars` passes only a named ignore**: its ignore patterns are
 `^_[a-zA-Z0-9]`, so `_scopepathkind` passes and a bare `_` does not (*Build for maintenance*).
