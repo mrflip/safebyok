@@ -1,7 +1,7 @@
-/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults, the stores and libraries a host hands in, and the limits; and the checks of a logger, `localVaultDB`'s options and a callback. Each `parse` refuses 'bad_option'. */
+/** What `Bank.make` and `bank.ensureVault` take: their options, the defaults and the limits. Each `parse` refuses 'bad_option'. The shapes of the stores, libraries and callbacks a host hands in are `./host-code`'s. */
 
 import type * as Z from 'zod'
-import { MinuteMillis, ForeverMillis, FarPast, FarFuture, MaxSaltBytes } from '../consts'
+import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from '../consts'
 import type { VaultError } from '../errors'
 import type { DeviceDB } from '../device-db'
 import type { RequestCleartext } from '../gating'
@@ -11,7 +11,6 @@ import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-stre
 import type { VaultDB } from '../vault-db'
 import * as Phrases from '../phrases'
 import { Validator } from '../checks/validator'
-import * as FX from './fields'
 import * as VX from './vault'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock
@@ -195,7 +194,7 @@ export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, u
 })
 // --
 
-// == [Stores, libraries and limits]: vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape
+// == [Limits]: maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading, ClockReading
 
 /** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Bank.make reads it. */
 const UnlimitedBytes = Number.MAX_SAFE_INTEGER
@@ -205,12 +204,8 @@ const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 
 const HourMillis = 60 * MinuteMillis
 
-/** The checks of Bank.make's options and the adapters' declared limits, each refusing 'bad_option'.
- * Where an option is an object, it is only checked: Bank.make keeps what it was handed, prototype
- * and all.
- */
-export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockShape, clockReading, keyDeriverShape } = Validator('bad_option', ({ obj, union, fn, lit, str, num, int, key_deriver_label }) => {
-  const verb = fn()
+/** The checks of the numbers Bank.make takes, an adapter declares and a clock reads, each refusing 'bad_option'. Where the vault keeps a number in another form, its check reads it into that form. */
+export const { maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading } = Validator('bad_option', ({ union, lit, num, int }) => {
   // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
   const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))
   // A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps.
@@ -223,9 +218,6 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
   const someMinutes = union([num.gte(0, Phrases.MinutesShape), lit(Infinity)], Phrases.MinutesShape)
   const minutesToMillis = (minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis))
   return {
-    // The public verbs the bank and its vaults call on a VaultDB, beside its being an instance of the `VaultDB` base class.
-    vaultDBShape:         obj({ tryGetVault: verb, tryEnsureVault: verb, tryPutVaultRecord: verb, tryGetBox: verb, tryPutBox: verb, tryDelBox: verb, tryDelVault: verb, tryDelDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
-    deviceDBShape:        obj({ tryGetLease: verb, tryPutLease: verb, tryDelLease: verb, tryGetDeviceRecord: verb, tryRaiseDeviceRecord: verb, tryDelDeviceRecord: verb, tryDelAll: verb }, Phrases.DeviceDBShape),
     maxWhisperBytes:      int.positive().default(MaxWhisperBytes),
     maxBoxes:             int.positive().optional(),
     declaredBytes,
@@ -233,37 +225,11 @@ export const { vaultDBShape, deviceDBShape, maxWhisperBytes, maxBoxes, declaredB
     leaseHoursAsMillis,
     staleMinutesAsMillis: someMinutes.default(StaleMinutes).transform(minutesToMillis),
     renewMinutesAsMillis: someMinutes.default(0).transform(minutesToMillis),
-    clockShape:           obj({ now: fn<Clock['now']>() }),
     // A clock reading Bank.make accepts: epoch milliseconds from FarPast to FarFuture, a fraction allowed.
     clockReading:         num.gte(FarPast).lte(FarFuture),
-    keyDeriverShape:      obj({
-      algorithm:         str.optional(),
-      key_deriver_label,
-      salt_bytes:        int.gte(1).lte(MaxSaltBytes),
-      deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
-      load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
-    }, Phrases.KeyDeriverShape),
   }
-}, [FX])
-// --
-
-// == [Host code and adapters' options]: loggerShape, localVaultDBOptsShape, callback
-
-/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
-export const { loggerShape } = Validator('bad_option', ({ obj, fn }) => {
-  const loggerCall = fn<VaultLogger['log']>()
-  return { loggerShape: obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape) }
 })
 
-/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
-export const { localVaultDBOptsShape } = Validator('bad_option', ({ obj, fn }) => {
-  const call = fn()
-  return { localVaultDBOptsShape: obj({ store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }) }
-})
-
-/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
- *
- * @example this.#listeners.add(callback.parse(listener))
- */
-export const { callback } = Validator('bad_option', ({ fn }) => ({ callback: fn() }))
+/** A clock reading Bank.make accepts, as {@link clockReading} checks it: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
+export type ClockReading = Z.infer<typeof clockReading>
 // --

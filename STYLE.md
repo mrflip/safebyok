@@ -56,6 +56,7 @@ is a bug.
   | `VX`  | `src/shapes/vault.ts`                           |
   | `VDX` | `src/shapes/vault-db.ts`                        |
   | `OX`  | `src/shapes/bank-opts.ts`                       |
+  | `HX`  | `src/shapes/host-code.ts`                       |
   | `KX`  | `src/shapes/key-deriver-spec.ts`                |
   | `MX`  | `src/shapes/mask.ts`                            |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
@@ -76,8 +77,11 @@ is a bug.
 * **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
   its types come in under `Z`: `import type * as Z from 'zod'`. A module that builds outside a
   `Validator` call (the kit's own primitives) imports the builders under the same short names.
-* Tree-shaking is no reason to choose either: named and star imports shake identically (esbuild
-  0.27, rolldown 1.2).
+* Tree-shaking is no reason to choose either. Where a star import is reached only through its
+  members (`CX.bankScope`), it shakes as named imports do (esbuild 0.27, rolldown 1.2). One passed
+  as a value, as `[FX]` is to a `Validator` call, keeps the module's namespace object, and with it
+  every export the namespace names: about 0.2 kB in idbDeviceDB (`fields_exports` in
+  `dist/shapes/fields.js`). That cost is accepted for what the source buys the builder.
 * **Picking named fields needs no library**: destructure them from the parsed output. No
   `es-toolkit/compat` in this library. Where a pick by a list of names is truly needed, write
   `fieldnames.map((fieldname) => scope[fieldname])`: es-toolkit's core `pick` returns an object,
@@ -132,6 +136,16 @@ type's name with the first letter lowered: lowerCamelCase beside its ModuleCase 
 2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
 BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { boxSparse, type BoxSparse } from
 'safebyok'` and calls `boxSparse.parse(row)`.
+
+**A validator takes no `Shape` suffix**: `localVaultDBOpts`, not `localVaultDBOptsShape`. The five
+public checks of a host's code are the exception (`shapes/host-code.ts`): `vaultDBShape`,
+`deviceDBShape`, `clockShape`, `keyDeriverShape` and `loggerShape` keep it, so `vaultDB`,
+`deviceDB`, `clock`, `keyDeriver` and `logger` stay free for the locals and options that want
+them. An in-package validator, one the main entry does not export, follows the rule where its
+plain name collides with nothing (`BX.made`), and keeps the suffix, under the same exception,
+where it would: idb.ts's and string-store.ts's `listenerShape` sits beside the `listener` it
+checks. A sentence in `phrases.ts`
+named for the shape it describes (`Phrases.VaultDBShape`) is a phrase, not a validator.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
 spreads a narrower: `export const wayinKindVals = [...] as const`,

@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { Validator } from '../checks/validator'
-import type { BoxSparse, BoxDamaged } from './box'
+import type { BoxSparse, BoxDamaged, DamagedBoxRecord } from './box'
 import * as BX from './box'
 import * as VX from './vault'
 import * as FX from './fields'
@@ -97,13 +97,14 @@ export type Capacity = Z.infer<typeof capacity>
 /** One box row as read, for {@link splitStoredBoxes}: the boxlabel the row is filed under, and its record exactly as stored.
  * Take `boxlabel` from the row's scopepath or column, never from its record: a damaged box is
  * still named by it, and so deleted or written over. Hand `box` up as read, whole or without its
- * two ciphered fields: the split judges it, and a damaged row is listed as damaged. Its type is
- * the input of a {@link BoxRecord} or {@link BoxSparse}, which says what a row should hold, so
- * cast the row once where you read it from storage; the split's check is what backs that cast.
+ * two ciphered fields: the split judges it, and a damaged row is listed as damaged. Its type is a
+ * {@link DamagedBoxRecord}, or the input of a {@link BoxSparse}, which says what a row should
+ * hold, so cast the row once where you read it from storage; the split's check is what backs that
+ * cast.
  *
  * @example { boxlabel: Scopepath.boxscope(scopepath).boxlabel, box: storedRow as StoredBox['box'] }
  */
-export type StoredBox = { boxlabel: string, box: Z.input<typeof BX.boxRecord> | Z.input<typeof BX.boxSparse> }
+export type StoredBox = { boxlabel: string, box: DamagedBoxRecord | Z.input<typeof BX.boxSparse> }
 
 /** A vault's box listing, as a read of storage hands it up: the sound boxes and the damaged apart, each sorted by boxlabel. A vault read hands it back beside the vault record's fields. */
 export type BoxListing = Readonly<{
