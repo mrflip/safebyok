@@ -1,5 +1,0 @@
----
-"safebyok": minor
----
-
-**`Box.seal` takes the vault's whole stamp in `made.madeUnder`** (its scope, `vault_tok` and both epochs, as a `VaultSparse` holds them), where it took the epochs alone and gave the box the vault's own scope and `vault_tok`. It now demands that stamp consistent with the vault before and after its wait: one naming another vault refuses 'vault_remade', and epochs the vault is not at, 'gate_moved'. `vault.making()`-style callers handing a `VaultSparse` change nothing. **A validator made in a `Validator` call gains `parseConsistent(val, other, refusal?)`**: it parses `val`, then holds it to `other`, every field both define `===`, refusing the validator's kind, or the `refusal`'s kind and message. **Refusals that compare two bags now name the fields that disagree in `meta.fieldnames`**: 'damaged_vault' and 'corrupt_record' for a stored or written record of another scope or write, and `Lease.make`'s 'corrupt_record'. **A birth let go while it reads writes nothing more** (no vault record ensured, no device record raised) and refuses 'vault_gone' as before. No stored shape changed.
