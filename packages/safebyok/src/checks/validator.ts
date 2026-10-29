@@ -122,7 +122,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
 ): Refusing<SchemaT> => refusing(kind, build(kitWith(sources)))
 
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
- * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refuse_as`, the kind, 'bad_record'
+ * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refuseAs`, the kind, 'bad_record'
  * unless given, and `extras`, what it does with a field it does not take: 'strict', the default,
  * refuses it, and 'strip' drops it unread, as Zod's object does. Any other `opts` refuses
  * 'bad_option'. A check of the object whole (`.refine()`, `.readonly()`, a sentence of its own)
@@ -140,13 +140,13 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *   export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({
  *     box_key_wrapped,
  *     whisper_ciphered,
- *   }), { refuse_as: 'bad_record', extras: 'strip' }, [FX])
+ *   }), { refuseAs: 'bad_record', extras: 'strip' }, [FX])
  *   boxCiphered.parse(boxRecord)  // its two ciphered fields, the rest dropped
  */
 export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(
   build: (kit: KitWith<SourcesT>) => ShapeT, opts: RefusalKind | ObjCheckOpts = 'bad_record', sources?: SourcesT,
 ): Refusing<Z.ZodObject<ShapeT>> => {
-  const { refuse_as: kind, extras } = Checks.objCheckOpts.parse(typeof opts === 'string' ? { refuse_as: opts } : opts)
+  const { refuseAs: kind, extras } = Checks.objCheckOpts.parse(typeof opts === 'string' ? { refuseAs: opts } : opts)
   const fields = build(kitWith(sources))
   return refusing(kind, extras === 'strip' ? Kit.obj(fields) : Kit.obj(fields).strict())
 }
@@ -284,7 +284,7 @@ const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   }).strict(),
   story:              obj({ where: str.optional(), advice: str.optional() }).strict(),
   objCheckOpts:       obj({
-    refuse_as: oneof(refusalKindVals).default('bad_record'),
+    refuseAs: oneof(refusalKindVals).default('bad_record'),
     extras:    oneof(['strict', 'strip']).default('strict'),
   }).strict(),
 }))
@@ -297,6 +297,6 @@ export interface ConsistencyRefusal extends Z.infer<typeof Checks.consistencyRef
 /** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
 export interface Story extends Z.infer<typeof Checks.story> {}
 
-/** How an {@link objCheck} validator refuses: `refuse_as`, the kind, 'bad_record' unless given; and `extras`, 'strict' (the default) to refuse a field the object does not take, or 'strip' to drop it unread. */
+/** How an {@link objCheck} validator refuses: `refuseAs`, the kind, 'bad_record' unless given; and `extras`, 'strict' (the default) to refuse a field the object does not take, or 'strip' to drop it unread. */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 // --

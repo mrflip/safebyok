@@ -6,6 +6,7 @@ import type { VaultError } from '../errors'
 import type { DeviceDB } from '../device-db'
 import type { RequestCleartext } from '../gating'
 import type { KeyDeriver } from '../key-deriver'
+import type { LocalVaultDBOpts } from '../local-vault-db'
 import type { VaultLogger } from '../logger'
 import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
@@ -255,11 +256,14 @@ export const loggerShape = Checker(({ obj, fn }) => {
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
 }, 'bad_option')
 
-/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
-export const localVaultDBOptsShape = objCheck(({ obj, fn }) => {
+/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls, and a `logger`, which the VaultDB checks, and nothing else. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+export const localVaultDBOptsShape = objCheck(({ obj, fn, unk }) => {
   const call = fn()
-  return { store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }
-}, { refuse_as: 'bad_option', extras: 'strip' })
+  return {
+    store:  obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape),
+    logger: unk.optional(),
+  } satisfies Record<keyof LocalVaultDBOpts, Z.ZodType>
+}, 'bad_option')
 
 /** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
  *

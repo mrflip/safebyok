@@ -327,7 +327,7 @@ what it was handed: not a value, and not the name of a field it does not take, w
 listing the fields it does take. Your own validators made with `Checker`, `objCheck` or
 `Checkers` refuse the same way: `Checker` makes one, its kind `'bad_record'` unless given after
 the builder; `objCheck` makes one of an object from its fields, strict unless given
-`{ refuse_as, extras: 'strip' }`; `Checkers` makes several, returned by name.
+`{ refuseAs, extras: 'strip' }`; `Checkers` makes several, returned by name.
 
 ## Your own storage adapter
 

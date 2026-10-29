@@ -411,7 +411,7 @@ A validator made alone is made in a `Checker(kit => schema, kind?, sources?)` ca
 returns that one validator; its `kind` comes after the builder, and is `'bad_record'` unless
 given. `objCheck(kit => fields, opts?, sources?)` is a `Checker` whose builder returns an
 object's fields, the object strict unless `opts` says `extras: 'strip'`; `opts` is the kind, or
-`{ refuse_as, extras }`. Strict is the default, as a stored record or a bag a person typed wants
+`{ refuseAs, extras }`. Strict is the default, as a stored record or a bag a person typed wants
 it; a shape taken out of whatever carries it says `'strip'`. A check of the object whole
 (`.refine()`, `.readonly()`, a sentence of its own) goes inside a `Checker`: chained onto the
 validator a call returns, it would refuse as Zod does. `Checkers` stays for validators made
