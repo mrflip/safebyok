@@ -46,6 +46,17 @@ export class Trigger<SnapT, ValT> {
 
   get isTimely(): boolean { return this.#clock.now() < this.#launchAt }
 
+  isTimelyWithin(maxMillisSinceSuccess: number): boolean {
+    if (this.#lastSucceededAt === null) { return false }
+    return this.#clock.now() - this.#lastSucceededAt < maxMillisSinceSuccess
+  }
+
+  // A success that came some other way than a launch: an own write's answer, say.
+  noteSuccessNow(): void {
+    this.#lastSucceededAt = this.#clock.now()
+    this.scheduleLaunchAt(this.#lastSucceededAt + this.maxMillisSinceSuccess)
+  }
+
   get snapshot(): SnapT { return this.#doSnapshot() }
 
   async ensure(): Promise<SnapT> {
