@@ -88,7 +88,7 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
   const roomLimit = union([int.positive(), lit(Infinity)]).transform((most) => Math.min(most, Number.MAX_SAFE_INTEGER))
   const room      = obj({ used: uint, max: roomLimit })
   return { boxes: room, bytes: room }
-})
+}, { extras: 'strip' })
 export type Capacity = Z.infer<typeof capacity>
 // --
 

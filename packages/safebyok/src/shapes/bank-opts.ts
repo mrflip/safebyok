@@ -259,7 +259,7 @@ export const loggerShape = Checker(({ obj, fn }) => {
 export const localVaultDBOptsShape = objCheck(({ obj, fn }) => {
   const call = fn()
   return { store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape) }
-}, 'bad_option')
+}, { refuse_as: 'bad_option', extras: 'strip' })
 
 /** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
  *

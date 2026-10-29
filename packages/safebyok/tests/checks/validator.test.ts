@@ -31,6 +31,8 @@ const { vaultRecord } = Checkers('bad_record', ({ obj, uint, applabel, user_id, 
 }, [GateChecks])
 
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+/** An objCheck builder: a bank scope's fields. */
+const bankScopeOf = ({ applabel, user_id }: typeof Kit) => ({ applabel, user_id })
 const sparse = { ...scope, boxlabel: 'openai', written_at: 1 }
 const gate = { passphrase: { salt_b64: 'c2FsdA', memory_kib: 19_456 } }
 
@@ -278,14 +280,34 @@ describe("Checker", () => {
 })
 
 describe("objCheck", () => {
-  it("makes one validator of an object from its fields, stripping what it does not take, refusing 'bad_record' unless given a kind", () => {
-    const checkedScope = objCheck(({ applabel, user_id }) => ({ applabel, user_id }))
-    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+  it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind, as its first example shows", () => {
+    const checkedScope = objCheck(bankScopeOf)
+    expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
     expect(err.meta?.fieldnames).to.deep.equal(['applabel'])
+    const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
+    expect(extra.message).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only applabel, user_id. Check the spelling, or leave them out")
   })
 
-  it("takes a kind and a module of validators, as its example shows", () => {
+  it("drops a field it does not take, unread, under extras 'strip', as its second example shows", () => {
+    const checkedScope = objCheck(bankScopeOf, { refuse_as: 'bad_scope', extras: 'strip' })
+    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
+    TH.expectSyncRefusal(() => objCheck(bankScopeOf, { extras: 'strip' }).parse({}), 'bad_record')
+  })
+
+  it("refuses the kind refuse_as names, still strict where extras is left out", () => {
+    const checkedScope = objCheck(bankScopeOf, { refuse_as: 'bad_scope' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ ...scope }), 'bad_scope')
+  })
+
+  it("refuses 'bad_option' for opts that are none, whatever it would check", () => {
+    for (const opts of ['bad_kind', { extras: 'loose' }, { refuse_as: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
+      TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never), 'bad_option')
+    }
+  })
+
+  it("takes a kind and a module of validators", () => {
     const holder = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
     expect(holder.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
     TH.expectSyncRefusal(() => holder.parse({ gate, gate_epoch: -1 }), 'bad_option')

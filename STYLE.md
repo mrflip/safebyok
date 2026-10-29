@@ -409,17 +409,22 @@ export const { vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, 
 
 A validator made alone is made in a `Checker(kit => schema, kind?, sources?)` call, which
 returns that one validator; its `kind` comes after the builder, and is `'bad_record'` unless
-given. `objCheck(kit => fields, kind?, sources?)` is a `Checker` whose builder returns an
-object's fields, the object made with `obj`, stripping. A check of the object whole (`.strict()`,
-`.refine()`, a sentence of its own) goes inside a `Checker`: chained onto the validator a call
-returns, it would refuse as Zod does. `Checkers` stays for validators made together, sharing
-locals or built one from another.
+given. `objCheck(kit => fields, opts?, sources?)` is a `Checker` whose builder returns an
+object's fields, the object strict unless `opts` says `extras: 'strip'`; `opts` is the kind, or
+`{ refuse_as, extras }`. Strict is the default, as a stored record or a bag a person typed wants
+it; a shape taken out of whatever carries it says `'strip'`. A check of the object whole
+(`.refine()`, `.readonly()`, a sentence of its own) goes inside a `Checker`: chained onto the
+validator a call returns, it would refuse as Zod does. `Checkers` stays for validators made
+together, sharing locals or built one from another.
 
 ```ts
-export const boxDamaged = Checker(({ obj, oneof, boxlabel, revision_tok }) => (
-  obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict()
-), 'bad_record', [FX])
-export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), 'bad_record', [FX])
+export const boxDamaged = objCheck(({ oneof, boxlabel, revision_tok }) => ({
+  boxlabel,
+  revision_tok: revision_tok.nullable(),
+  damage:       oneof(boxDamageVals),
+}), 'bad_record', [FX])
+export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { extras: 'strip' }, [FX])
+export const boxStamp = Checker(({ vault_tok }) => boxSparse.extend({ vault_tok }).strict(), 'bad_record', [FX])
 ```
 
 * **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one

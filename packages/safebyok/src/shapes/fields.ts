@@ -2,17 +2,17 @@
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
-import { Checker, Checkers } from '../checks/validator'
+import { Checkers, objCheck } from '../checks/validator'
 
 export { epochMillis, type EpochMillis } from './primitives'
 
 // == [Ciphered]: ciphered
 
 /** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
-export const ciphered = Checker(({ obj, str }) => obj({
+export const ciphered = objCheck(({ str }) => ({
   cipher_iv_b64:  str.min(1),
   ciphertext_b64: str.min(1),
-}).strict())
+}))
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 

@@ -17,4 +17,4 @@ export const maskOpts = objCheck(({ union, lit, uint }) => {
     minStars: shownCount.default(6),
     maxLen:   resultLen.default(15),
   }
-}, 'bad_option')
+}, { refuse_as: 'bad_option', extras: 'strip' })

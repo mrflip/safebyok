@@ -83,7 +83,7 @@ export const BoxFormat = 'safebyok-box-v8'
  *
  * @example boxRecord.safeParse(await myBackend.getRow(id)).success   // false for a row that is no box
  */
-export const boxRecord = Checker(({ obj, lit, boxlabel, epochMillis, revision_tok, box_key_wrapped, whisper_ciphered }) => obj({
+export const boxRecord = objCheck(({ lit, boxlabel, epochMillis, revision_tok, box_key_wrapped, whisper_ciphered }) => ({
   format:                 lit(BoxFormat),
   boxlabel,
   revision_tok,
@@ -104,7 +104,7 @@ export const boxRecord = Checker(({ obj, lit, boxlabel, epochMillis, revision_to
   registered_at:          epochMillis,
   /** When this revision was written: a store of the same whisper moves it too. */
   written_at:             epochMillis,
-}).strict(), 'bad_record', [FX])
+}), 'bad_record', [FX])
 export type BoxRecord = Z.infer<typeof boxRecord>
 
 /** A box as a vault's listing shows it: every field of its record but the two ciphered ones, the sound boxes of a read. Its `parse` refuses 'bad_record'.
@@ -135,9 +135,11 @@ export const boxDamageVals = ['damaged', 'newer_format'] as const
  *     if (box.damage === 'newer_format') { offerUpdate() } else { offerRemove(box.boxlabel) }
  *   }
  */
-export const boxDamaged = Checker(({ obj, oneof, boxlabel, revision_tok }) => (
-  obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict()
-), 'bad_record', [FX])
+export const boxDamaged = objCheck(({ oneof, boxlabel, revision_tok }) => ({
+  boxlabel,
+  revision_tok: revision_tok.nullable(),
+  damage:       oneof(boxDamageVals),
+}), 'bad_record', [FX])
 export type BoxDamaged = Z.infer<typeof boxDamaged>
 
 /** A box's stamp: its {@link BoxSparse}, and the `vault_tok` of the vault it lies in. Its `parse` refuses 'bad_record'.
@@ -153,7 +155,7 @@ export const boxStamp = Checker(({ vault_tok }) => (
 export type BoxStamp = Z.infer<typeof boxStamp>
 
 /** The check of a box's two ciphered fields, as {@link BoxCiphered} has them, every other field a box record holds dropped unread. Its `parse` refuses 'bad_record'. */
-export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), 'bad_record', [FX])
+export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { extras: 'strip' }, [FX])
 
 /** A box's two ciphered fields: its boxKey wrapped under the vaultKey, and the whisper ciphered under that boxKey. */
 export type BoxCiphered = Z.infer<typeof boxCiphered>

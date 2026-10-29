@@ -336,7 +336,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prf_salt_b64:  str.min(1),
   /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
   prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
-}), 'bad_option', [FX])
+}), { refuse_as: 'bad_option', extras: 'strip' }, [FX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take

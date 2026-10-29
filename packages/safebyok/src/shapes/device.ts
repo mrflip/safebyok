@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
-import { Checker } from '../checks/validator'
+import { Checker, objCheck } from '../checks/validator'
 import * as FX from './fields'
 
 // == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, leaseStamp, LeaseSparse, leaseGrant
@@ -29,7 +29,7 @@ export const isLeaseKey = (val: unknown): val is CryptoKey => (
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
  * it ever goes to the backend. Its `parse` is strict, and refuses 'bad_record'.
  */
-export const leaseRecord = Checker(({ obj, int, lit, custom, applabel, user_id, vaultlabel, epochMillis, vault_tok, vault_key_lease_wrapped }) => obj({
+export const leaseRecord = objCheck(({ int, lit, custom, applabel, user_id, vaultlabel, epochMillis, vault_tok, vault_key_lease_wrapped }) => ({
   format:            lit(LeaseFormat),
   applabel,
   user_id,
@@ -43,7 +43,7 @@ export const leaseRecord = Checker(({ obj, int, lit, custom, applabel, user_id, 
   vault_key_lease_wrapped,
   /** The instant from which the lease no longer counts, and the vault asks for cleartext again. */
   ask_passphrase_at: epochMillis,
-}).strict(), 'bad_record', [FX])
+}), 'bad_record', [FX])
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
@@ -98,5 +98,5 @@ export type DeviceRecord = Z.infer<typeof deviceRecord>
 const DefaultDbName = 'safebyok'
 
 /** The check of `IdbOpts`: `dbName`, defaulted, and nothing else. Its `parse` refuses 'bad_option'. safebyok-indexeddb's options extend it. */
-export const idbOpts = Checker(({ obj, str }) => obj({ dbName: str.min(1).default(DefaultDbName) }).strict(), 'bad_option')
+export const idbOpts = objCheck(({ str }) => ({ dbName: str.min(1).default(DefaultDbName) }), 'bad_option')
 // --
