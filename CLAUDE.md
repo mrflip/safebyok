@@ -42,7 +42,7 @@ passphrase, the customer integrating the package, and the security reviewer read
   matters. Cleverness is rarely called for; if it seems to be, propose it.
 * **Validate at each module entrypoint**, every export, then write confident, paranoia-free code
   past it: a private helper trusts its exported caller.
-* **A validator a module exports is made in a `Validator` call** (STYLE.md, *Validation*), not in plain Zod.
+* **A validator a module exports is made in a `Checkers`, `Checker` or `objCheck` call** (STYLE.md, *Validation*), not in plain Zod.
 * **Take a part of a thing by parsing or destructuring, never by spreading it**: a spread drops
   its getters and copies every other field. Host code gets plain data, never the thing.
 * **Security first.** Where the stronger measure (Argon2id, say) is not available on every

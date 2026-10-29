@@ -1,40 +1,42 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
-import { type ConsistencyRefusal, Kit, type Story, Validator, consistent, demandConsistent, verifyConsistent } from '../../src/checks/validator'
+import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/checks/validator'
 import { type RefusalKind, VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
 // kind, to show a validator nested in another refuses with the outer one's.
-const GateChecks = Validator('bad_option', ({ obj, str, uint }) => {
+const GateChecks = Checkers('bad_option', ({ obj, str, uint }) => {
   const passphraseWayinRecord = obj({ salt_b64: str.min(1), memory_kib: uint }).strict()
   const gateRecord            = obj({ passphrase: passphraseWayinRecord }).strict()
   return { passphraseWayinRecord, gateRecord }
 })
 
-const { bankScope, vaultScope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+const { bankScope, vaultScope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   return { bankScope, vaultScope }
 })
 
-const { boxRecord, boxSparse } = Validator('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
+const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
   const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
   const boxSparse = boxRecord.omit({ whisper_ciphered: true })
   return { boxRecord, boxSparse }
 })
 
-const { vaultRecord } = Validator('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
+const { vaultRecord } = Checkers('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
   const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
   return { vaultRecord }
 }, [GateChecks])
 
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+/** An objCheck builder: a bank scope's fields. */
+const bankScopeOf = ({ applabel, user_id }: typeof Kit) => ({ applabel, user_id })
 const sparse = { ...scope, boxlabel: 'openai', written_at: 1 }
 const gate = { passphrase: { salt_b64: 'c2FsdA', memory_kib: 19_456 } }
 
-describe("Validator", () => {
+describe("Checkers", () => {
   afterEach(() => { Zod.config({ customError: undefined }) })
 
   it("refuses a scope with a bad name as its call's kind, naming the field, as its first example shows", () => {
@@ -63,7 +65,7 @@ describe("Validator", () => {
   })
 
   it("repeats the keys of a schema keyed by its input in the refusal, as its doc warns", () => {
-    const { tagged } = Validator('bad_option', ({ label }) => ({ tagged: Zod.record(Zod.string(), label) }))
+    const { tagged } = Checkers('bad_option', ({ label }) => ({ tagged: Zod.record(Zod.string(), label) }))
     const err = TH.expectSyncRefusal(() => tagged.parse({ host_chosen_key: 'Not A Label' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['host_chosen_key'])
   })
@@ -80,7 +82,7 @@ describe("Validator", () => {
   })
 
   it("names eight failures at most, counting the rest", () => {
-    const { tenFields } = Validator('bad_option', ({ obj, label }) => ({
+    const { tenFields } = Checkers('bad_option', ({ obj, label }) => ({
       tenFields: obj(Object.fromEntries(Array.from({ length: 10 }, (_field, ii) => [`field${String(ii)}`, label]))),
     }))
     const err = TH.expectSyncRefusal(() => tenFields.parse({}), 'bad_option')
@@ -110,7 +112,7 @@ describe("Validator", () => {
   })
 
   it("names an unknown field's place by its path, never its name, and says when an object takes no fields", () => {
-    const { strictBag, holder } = Validator('bad_option', ({ obj }) => {
+    const { strictBag, holder } = Checkers('bad_option', ({ obj }) => {
       const strictBag = obj({}).strict()
       return { strictBag, holder: obj({ inner: strictBag }) }
     })
@@ -143,7 +145,7 @@ describe("Validator", () => {
       const tree: Zod.ZodType = lazy(() => union([num, arr(tree)]))
       return { piped: str.transform((text) => text.length).pipe(num), tree, holder: obj({ tree }).strict() }
     }
-    const made = Validator('bad_record', build)
+    const made = Checkers('bad_record', build)
     const plain = build(Kit)
     for (const valname of ['piped', 'holder'] as const) {
       expect(Zod.toJSONSchema(made[valname], { unrepresentable: 'any' })).to.deep.equal(Zod.toJSONSchema(plain[valname], { unrepresentable: 'any' }))
@@ -156,7 +158,7 @@ describe("Validator", () => {
   })
 
   it("makes each slice made in the call refuse: pick, omit, extend, partial, strict, strip and readonly", () => {
-    const slices = Validator('bad_record', ({ obj, int, applabel, user_id, vaultlabel }) => {
+    const slices = Checkers('bad_record', ({ obj, int, applabel, user_id, vaultlabel }) => {
       const record = obj({ applabel, user_id, vaultlabel, gate_epoch: int }).strict()
       return {
         record,
@@ -184,7 +186,7 @@ describe("Validator", () => {
   })
 
   it("lets a name the kit gives win over a module's, and a later module's over an earlier one's", () => {
-    const { checked } = Validator('bad_option', ({ uint, extra }) => ({ checked: Zod.object({ count: uint, extra }) }), [{ uint: Zod.string(), extra: Zod.number() }, { extra: Zod.boolean() }])
+    const { checked } = Checkers('bad_option', ({ uint, extra }) => ({ checked: Zod.object({ count: uint, extra }) }), [{ uint: Zod.string(), extra: Zod.number() }, { extra: Zod.boolean() }])
     expect(checked.parse({ count: 3, extra: true })).to.deep.equal({ count: 3, extra: true })
     TH.expectSyncRefusal(() => checked.parse({ count: 'three', extra: true }), 'bad_option')
     TH.expectSyncRefusal(() => checked.parse({ count: 3, extra: 1 }), 'bad_option')
@@ -239,7 +241,7 @@ describe("Validator", () => {
   })
 
   it("gives parseConsistent only to a validator of an object, by its type", () => {
-    const { checked } = Validator('bad_option', ({ str }) => ({ checked: str }))
+    const { checked } = Checkers('bad_option', ({ str }) => ({ checked: str }))
     expectTypeOf(boxSparse.parseConsistent).returns.toEqualTypeOf<Zod.output<typeof boxSparse>>()
     expectTypeOf(checked).not.toHaveProperty('parseConsistent')
   })
@@ -247,6 +249,68 @@ describe("Validator", () => {
   it("types a Story as optional where and advice, and a ConsistencyRefusal as a kind and an optional message, each read off its shape", () => {
     expectTypeOf<Story>().toEqualTypeOf<{ where?: string | undefined, advice?: string | undefined }>()
     expectTypeOf<ConsistencyRefusal>().toEqualTypeOf<{ kind: RefusalKind, message?: string | ((fieldnames: readonly string[]) => string) | undefined }>()
+  })
+})
+
+describe("Checker", () => {
+  it("makes one validator, refusing 'bad_record' unless given a kind, as its first example shows", () => {
+    const boxDamaged = Checker(({ obj, oneof, boxlabel, str }) => obj({ boxlabel, revision_tok: str.nullable(), damage: oneof(['damaged', 'newer_format']) }).strict())
+    expect(boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })).to.deep.equal({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })
+    const err = TH.expectSyncRefusal(() => boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'lost' }), 'bad_record')
+    expect(err.meta?.fieldnames).to.deep.equal(['damage'])
+  })
+
+  it("refuses the kind it is given, as its second example shows", () => {
+    const callback = Checker(({ fn }) => fn(), 'bad_option')
+    expect(callback.parse(Math.max)).to.eq(Math.max)
+    TH.expectSyncRefusal(() => callback.parse('listener'), 'bad_option')
+  })
+
+  it("spreads a module of validators into the kit, a nested one refusing with the outer call's kind", () => {
+    const holder = Checker(({ obj, gateRecord }) => obj({ gate: gateRecord }).strict(), 'bad_record', [GateChecks])
+    expect(holder.parse({ gate })).to.deep.equal({ gate })
+    TH.expectSyncRefusal(() => holder.parse({ gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
+  })
+
+  it("gives parseConsistent to a validator of an object, and refuses a disagreement as its kind", () => {
+    const checkedScope = Checker(({ obj, applabel, user_id }) => obj({ applabel, user_id }), 'bad_scope')
+    expectTypeOf(checkedScope.parseConsistent).returns.toEqualTypeOf<{ applabel: string, user_id: string }>()
+    TH.expectSyncRefusal(() => checkedScope.parseConsistent(scope, { user_id: 'u2' }), 'bad_scope')
+  })
+})
+
+describe("objCheck", () => {
+  it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind, as its first example shows", () => {
+    const checkedScope = objCheck(bankScopeOf)
+    expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
+    expect(err.meta?.fieldnames).to.deep.equal(['applabel'])
+    const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
+    expect(extra.message).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only applabel, user_id. Check the spelling, or leave them out")
+  })
+
+  it("drops a field it does not take, unread, under extras 'strip', as its second example shows", () => {
+    const checkedScope = objCheck(bankScopeOf, { refuseAs: 'bad_scope', extras: 'strip' })
+    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
+    TH.expectSyncRefusal(() => objCheck(bankScopeOf, { extras: 'strip' }).parse({}), 'bad_record')
+  })
+
+  it("refuses the kind refuseAs names, still strict where extras is left out", () => {
+    const checkedScope = objCheck(bankScopeOf, { refuseAs: 'bad_scope' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ ...scope }), 'bad_scope')
+  })
+
+  it("refuses 'bad_option' for opts that are none, whatever it would check", () => {
+    for (const opts of ['bad_kind', { extras: 'loose' }, { refuseAs: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
+      TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never), 'bad_option')
+    }
+  })
+
+  it("takes a kind and a module of validators", () => {
+    const holder = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
+    expect(holder.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
+    TH.expectSyncRefusal(() => holder.parse({ gate, gate_epoch: -1 }), 'bad_option')
   })
 })
 

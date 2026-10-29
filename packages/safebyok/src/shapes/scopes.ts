@@ -1,11 +1,11 @@
-/** The checks for scopes, the bags naming a vault, and scopepaths, made in {@link Validator}, with the names a scope is made of: a failed `parse` refuses 'bad_scope', quoting nothing. */
+/** The checks for scopes, the bags naming a vault, and scopepaths, made in {@link Checkers}, with the names a scope is made of: a failed `parse` refuses 'bad_scope', quoting nothing. */
 
 import type * as Z from 'zod'
 import { ScopepathDelimiter } from '../consts'
 import * as Phrases from '../phrases'
 import type * as PX from './primitives'
 import { never } from 'zod'
-import { Validator } from '../checks/validator'
+import { Checkers } from '../checks/validator'
 
 export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from './primitives'
 
@@ -55,7 +55,7 @@ const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimi
  * @example CX.vaultScopepath.parse('vault^acme^auth0|x^main')           // ['vault', 'acme', 'auth0|x', 'main']
  * @example CX.vaultScopepath.parse('lease^acme^u1^main')                // throws 'bad_scope': a lease's
  */
-export const { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath } = Validator('bad_scope', ({ obj, str, tuple, lit, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath } = Checkers('bad_scope', ({ obj, str, tuple, lit, applabel, user_id, vaultlabel, boxlabel }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
@@ -89,7 +89,7 @@ export type Boxscope = Z.infer<typeof boxscope>
  * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
  * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
  */
-export const { vaultBag, bankBag } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+export const { vaultBag, bankBag } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
   const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
   const store   = never(Phrases.StoreInVaultBag).optional()
   return { bankBag, vaultBag: bankBag.extend({ vaultlabel, vaultDB: store, deviceDB: store }) }

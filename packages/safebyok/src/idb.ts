@@ -4,7 +4,7 @@ import * as Scopepath from './scopepath'
 import { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import * as ChangeBell from './change-bell'
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 
 export type { IdbOpts } from './idb-opts'
 export * as ChangeBell from './change-bell'
@@ -148,7 +148,7 @@ class IdbDeviceDB extends DeviceDB {
 export type IdbRow = { scopepath: string, row: unknown }
 
 /** What an inspector's `subscribe` is handed: a function to call after each write. Its `parse` refuses 'bad_option'. */
-const { listenerShape } = Validator('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
+const { listenerShape } = Checkers('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
 
 /** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
  * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. Unlike the store, its `rows()`

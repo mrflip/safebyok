@@ -1,4 +1,4 @@
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
@@ -20,7 +20,7 @@ export type StringStore = {
 }
 
 /** What a store's `subscribe` is handed: a function to call after each put or del. Its `parse` refuses 'bad_option'. */
-const { listenerShape } = Validator('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
+const { listenerShape } = Checkers('bad_option', ({ fn }) => ({ listenerShape: fn<() => void>() }))
 
 /** The listeners of one store, and the `ring` that calls them. */
 const makeBell = () => {
