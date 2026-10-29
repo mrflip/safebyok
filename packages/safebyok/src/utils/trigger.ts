@@ -57,6 +57,12 @@ export class Trigger<SnapT, ValT> {
     this.scheduleLaunchAt(this.#lastSucceededAt + this.maxMillisSinceSuccess)
   }
 
+  // Timely by the given horizon, else by the scheduled launch; launch when not. A launch under way is joined.
+  async ensureTimelyWithin(maxMillisSinceSuccess?: number): Promise<void> {
+    const timely = maxMillisSinceSuccess === undefined ? this.isTimely : this.isTimelyWithin(maxMillisSinceSuccess)
+    if (! timely) { await this.launch() }
+  }
+
   get snapshot(): SnapT { return this.#doSnapshot() }
 
   async ensure(): Promise<SnapT> {

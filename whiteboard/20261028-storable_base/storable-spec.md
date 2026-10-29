@@ -1,3 +1,10 @@
+## Please Remember!!
+
+* `timely` is measured against the maxMillis number given. maxMillis of Infinity means go ahead! (*excluding a special case involving sparse data*)
+* Throwing exceptions is our job! The library offers simple brittle primitives that can be composed into resilient operations
+* Complex code cannot be safe, and safety is our top value. Short, clean stack traces make the code easy to reason about and review
+* The core use case -- storing a handful of API keys accessible only on-device -- is pretty chill. They'll be entered once, maybe modified on a schedule but who are we kidding, and the customer will only tolerate being re-prompted for a passphrase weekly or so. Updates will be very very infrequent, and most likely be from another tab, only occasionally from tablet to phone or whatever. Race conditions require pasting different value into different devices/tabs and hitting submit within the network response time. With all that said: (a) the library has potential past that use case, and (b) even if they don't care, we have to detect the edge cases and that means we have to name refusals and handle them somehow. The takeaway is not "we can allow unsafe handling", the takeaway is "we don't have to make edge cases ergonomic or even accept every edge case -- only to be clear what the outcome is".
+
 ## Notable changes:
 
 * customer always has durable access to the box -- no more mid-flight
@@ -18,18 +25,106 @@
 
 ## Mini-Vocabulary
 
-These terms are new within this design sprint, or bear important refinements over what's in VOCABULARY.md:
+These terms are new within this design sprint, or bear important refinements over what's in
+VOCABULARY.md. One line each; a second, struck-out line is a use found in the playground or the
+spec that conflicts with the first. `box`-only terms say so.
 
-* `edit(patch)`: public entrypoint to modify a storable
-* `storable`: a versioned-update record that coordinates local edits, lazy-updated cached state, tombstoning, and limits access when vault is locked or evicted.d
-// Fill in
+### Copies a storable keeps
 
-* `world`: a still-a-bit-hazy abstraction from the parts above the storable (that aren't its listing): for a vault, it's the bank or some pieces of it; for a box, it's the vault.
+* `central`: the latest record this device knows storage holds, frozen: full, sparse, a draft, or a tombstone.
+* `overlay`: the record fields edited here and not yet sent; null when none.
+  - ~~`edited`: the same, kept as a whole record rather than as the fields laid over central~~
+  - ~~`eager`: central with an optimistic update~~ (that is the record in hand, below)
+* `record`, the record in hand: central with the overlay laid over it; what the snapshot shows and what `send` writes.
+* `snapshot`: frozen plain data a host renders, the same object until something changes; never a whisper.
+* `cacheable`: what `receive` hands the listing to write to the device cache. May be sparse, full, or tombstone.
+  - ~~`cached`: the copy read from the deviceDB at warmup~~ (after warmup the cache is only written; the copy read is just the record a cold instance is born with)
+* `expose` (box): unseal and save the `#whisper` internally, get/set'able as `whisper` while unlocked. `veil` disables access. Lots of open questions here, you bet! Keep in mind that use of this function presumes a looser threat model and warrants different guarantees.
+* `held`: said of an instance the listing has, or of the record central holds, as against the one an answer brings.
+  - ~~`standing`, `stands`~~
+
+### Record forms
+
+* `full`, `record` (`BoxRecord`): every field storage holds.
+* `sparse` (`BoxSparse`): the record without its heavy fields (`gate`, `encrypted_whisper`). Certain listing queries and updated record notifications carry only the sparse form.
+* `dna`: scope and seed props handed to `build` ~~or `send` with `ifPresent: 'fetch'` (this will be sugar added later: build().send(ifPresent: 'fetch' maxMillis Infinity))~~.
+* `tombstone`: durable record of a deletion; scope, revision, times, `deleted: true`. _Explain, intelligibly: ~~An answer of nothing stored is one too, at the revision held.~~_
+* `stamp`: the fields the seal binds: without the full set of values, the encrypted value cannot be recovered. For box, its sparse form plus `vault_tok`.
+* `live`: an instance, (eg of `Box`); `pojo` (Plain Ol' Javascript Object): by implication, the fields of a datatype as plain properties and none if its methods (eg `mybox.record` or `{ ...mybox }`).
+
+
+* (If we need the term) `listed`: an instance the listing has; its central may be sparse or full -- not `held` _Can we make sure this is a thing? I likely prefer `listed` to held_
+
+* _(`draft`): I'm not convinced this is a thing, and don't want it named until we know why it needs special treatment. For both Box and Vault we can fill in defaults that look perfectly good in the data store just as they are if nothing is present._ ~~the sparse form at `revision_seq` 0, made here from a dna and not stored yet. A vault's draft is its full novel record, `gate` null.~~
+  - ~~a full record at revision 0, its ciphered fields filled with placeholders~~
+
+### Verbs on a storable
+
+* `hydrate(opts)`: make the world and then the record in hand timely, fetching each that is not. Calls made during a fetch join it.
+* `edit(patch, opts)`: lay a patch over the record in hand as the overlay, sealing what needs the vaultKey. Stores nothing. Needs the vault unlocked, whatever the patch holds.
+  - ~~`modify`~~
+* `send(patch, opts)`: edit, then write the record in hand under the next revision. The answer comes back through `receive`.
+* `del(opts)`: ask storage to delete the thing at the revision in hand. The tombstone comes back through `receive`.
+* `receive(fetched)`: take in what storage said of the thing: reconcile, adopt, settle; hand back `{ cacheable, badnews }`.
+* `reconcile(fetched)`: judge an answer against central and return the record that is central after it. Throws what cannot be made sense of. No verdicts, no overlay.
+  - ~~`deconflict`~~ ~~verdicts `older`, `same`, `adopt`, `gone`, `conflict`~~
+  - ~~`edit` reconciles the patch~~ (an edit lays over; only `receive` reconciles)
+* `adopt(central)`: hold a record as central, frozen, and replace the snapshot.
+  - ~~`assign`: copy the record's fields onto the instance~~ (there are no such fields: the snapshot reads the record)
+* `settle()`: act on the record now central beyond its fields, and return the bad news found in it. A vault judges its lease and ways in here. Called after every `receive` and once at birth.
+* `overlayOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.
+  - ~~`overlayPropsAndSealBeforeSettling`~~
+* `seal`, `unseal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, over the stamp; the reverse. `unsealWhisper` opens the stored whisper for one call.
+* `reseal` (box): unseal the stored whisper and edit it back in, sealed again.
+* `expose` (box): `unsealWhisper`, then keep the whisper open on the instance as `box.whisper`. `forgetWhisper` drops it; the box listing calls that as the vault locks.
+* `LOCKED` (box): what `box.whisper` reads while the vault is locked.
+
+### Guards and states
+
+* `timely`: fetched within its horizon. Of a storable, the record in hand; of the world, its own.
+* `hydrated`: the record in hand is full.
+* `gone`: central is a tombstone. The listing has let the instance go; every verb on it refuses the absent refusal.
+* `locked`, `unlocked`: the vault's lock, by the listing's word (`lockState`).
+* `storable` (adjective): a record can be written now: not gone, unlocked, and the record in hand full. `demandStorability` throws otherwise; `ensureTimelyStorability` hydrates first.
+* `isX`: boolean, never throws. `demandX`: synchronous, throws unless X. `ensureX`: async, makes X so or dies trying
+* `absent_box`, `absent_vault`: refusal when `ifAbsent: fail`
+
+### The listing
+
+* `listing`: the live instances of one kind of thing, by scope. It owns the watch, the cache writes, the bad news, and every storage call made for a thing.
+* `hello`: warm from the cache, start the watch, hydrate everything. `goodbye`: end the watch.
+* `make(dna | fetched)`: the one place an instance is born. Stores nothing.
+* `at(scope)`: the instance held, or null; reads nothing. `fetch(scope, opts)`: the instance, hydrated, or what `ifAbsent` says for one not held or found gone.
+* `deliver`: the pipeline for one answer: take the world, hand the record to `receive`, let a gone thing go, cache, tell bad news, publish.
+* `let go`: the listing drops an instance gone. `evict`: a vault taken away, with every box in it; the bank lets it go.
+* `publish`: replace the listing's snapshot and call its listeners.
+* `answer`: what a storage call resolves: the record or null, and the world it lies in.
+* `notice`: what the watch delivers: a record, sparse at least, and its world. Enters `deliver` like an answer.
+  - ~~`ring`~~ (a bare ring, with no record, is not a notice)
+* `fullFor`: the boxlabels the watch should push full records for: the hydrated ones.
+* `world`: what surrounds a listing: the bank for vaults, the vault for boxes. Supplies the clock, the lock, its own timeliness, and takes the world an answer carries (`takeWorld`).
+* `badnews`, `tellBadNews`: a refusal met in storage that nobody asked for (a damaged box, a damaged way in), told once to the host's `onBadNews`.
+* `adopt` schedules the trigger's launch now when a sparse record lands on a full one.
+
+### The trigger
+
+* `trigger`: the per-storable timer that knows when the record in hand last came whole and launches the next fetch.
+* `launch`: one fetch through the listing; calls made meanwhile join it.
+* `noteSuccessNow`: a whole record came some other way than a launch: a send's answer, a full notice.
+* `ensureTimelyWithin(millis)`: launch unless the last whole record is within `millis`; with no `millis`, unless the scheduled launch is still ahead.
+
+### Options
+
+* `maxMillisSinceRefresh`: how old the record in hand may be. `maxWorldMillis`: the same for the world (not acted on yet).
+* `ifAbsent`: `'create' | 'fail' | 'nil'`, what `fetch` does for a thing not held or found gone. `'fail'` unless given.
+* `ifPresent`: `'replace' | 'fail' | 'fetch'`, what `send` does with a draft when storage holds the thing (not acted on yet).
+* `reseal` (box): with no whisper given or exposed, seal the stored one again.
 
 ### Please avoid / Deprecated
 
 * `takeStorage`
 * `ring` -- use `notify`
+* `strobe`, `tickle`, `poke` -- these are jocular terms meaning activate or trigger and not method name suggestions
 
 * Avoid the terms
   - `standing`, `stands` (temporary? estimation? upright?)
@@ -408,6 +503,42 @@ Vault scope:    `applabel`, `user_id`, `vaultlabel`
 Box scope:      `applabel`, `user_id`, `vaultlabel`, `boxlabel`
 Revision:       `format`, `revision_tok`, `revision_seq`, `written_at`
 Whisper:        `whisper_schema_version`, `whisper_codec`, `whisper_ciphered`, `box_key_wrapped`
+
+### Box record, overlay, central
+
+Box payload has its `sidecar`, `whisper_ciphered`, and key metadata (`whisper_schema_version`, `whisper_codec`, `box_key_wrapped`)
+
+When do we seal? When can we send?
+
+* can you edit a box when locked? NO
+* can you send a signed box with a newer version when locked? I think so?, but it's easier to say NO
+* can you edit when untimely? No; customer can adjust what "untimely" means per-call
+* can you send when untimely? Also no, customer can adjust
+
+* When do we seal? I think it has to be at each edit, so that we can lock access and keep the uncommitted value
+* Can you access sidecar data when locked? NO. Customer can copy whatever they want from it already; they don't have the capability to lock/unlock
+
+| scenario     | `c` timely | `c` data | `overlay` | ... |
+| ------------ | ---------- | ------- | --------- | --- |
+| probably-new | no       | sparse     | box dna |
+| listed       |
+
+In the below, keep in mind that `timely` is against the maxMillis number given. Creating a new record
+is best done with maxBoxMillis: Infinity, and we will likely offer that as sugar.
+
+| scenario                | central           | timely | overlay        | `isHydrated` | `send` needs                    |
+| ----------------------- | ----------------- | ------ | -------------- | ------------ | ------------------------------- |
+| new dna, never fetched  | draft (sparse, 0) | no/∞   | dna            | no           | hydrate, unlock, a whisper      |
+| new dna, fetched absent | draft (sparse, 0) | yes    | dna            | no           | unlock, a whisper               |
+| warm from cache         | full              | no/∞   | none           | no           | hydrate (brings the whisper)    |
+| warm from cache         | sparse            | no     | none           | no           | hydrate (brings the whisper)    |
+| listed by a notice      | sparse            | no     | none           | no           | hydrate                         |
+| fetched                 | full              | yes    | none           | yes          | unlock                          |
+| fetched, sidecar edited | full              | yes    | `{ sidecar }`  | yes          | unlock (already proven at edit) |
+| fetched, whisper edited | full              | yes    | ciphered + key | yes          | unlock                          |
+| draft, whisper edited   | draft             | yes    | ciphered + key | yes          | unlock                          |
+| had full, rcvd sparse   | sparse (newer)    | yes    | kept           | no           | the strobe's fetch, then unlock |
+| had del, rcvd sparse    | tombstone         | yes    | dropped        | no           | nothing: gone, let go           |
 
 ### Performance & Overhead Breakdown
 

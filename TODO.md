@@ -6,7 +6,7 @@ is blocked. **Soonish**: wanted, but a design question stands in the way; the no
 What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your implementation.
 **Potential Optimizations**: a user-facing rough edge the core leaves alone for now, to keep its
 control flow simple (STYLE.md, *Control flow and refusals*), with the argument for smoothing it.
-
+* Boxscope was somehow called out as an exception without VaultScope getting it -- the thread to revert this must have died. MAke it BoxScope and BoxScopepath everywhere (also any zod checkers or var names)
 ## Loud
 
 What every adapter author and reviewer should have in front of them, and not lose in a shelf below.
