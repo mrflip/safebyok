@@ -90,11 +90,11 @@ export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   fireEvent.submit(form)
 }
 
-/** One request a {@link fakeAnthropic} heard: where it went, the API key it carried, its body. */
+/** One request a {@link fakeAnthropic} heard: where it went, the API key it carried (the SDK sends it as a bearer token), its body. */
 export type AnthropicRequest = {
-  url:          string
-  apiKeyHeader: string | null
-  body:         { model: string, messages: unknown[] }
+  url:    string
+  apiKey: string | null
+  body:   { model: string, messages: unknown[] }
 }
 
 /**
@@ -109,7 +109,7 @@ export type AnthropicRequest = {
  * @example
  *   const anthropic = TH.fakeAnthropic(200, 'Banana who? Banana split, gotta run!')
  *   await tellKnockKnockJoke('sk-ant-fake-key', 'Banana', anthropic.fetchFn)
- *   anthropic.seen[0]?.apiKeyHeader  // => 'sk-ant-fake-key'
+ *   anthropic.seen[0]?.apiKey  // => 'sk-ant-fake-key'
  */
 export const fakeAnthropic = (status: number, jokeText = '') => {
   const seen: AnthropicRequest[] = []
@@ -120,13 +120,13 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
       stop_reason: 'end_turn', stop_sequence: null,
       usage: { input_tokens: 10, output_tokens: 20 },
     }
-    : { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }
+    : { type: 'error', error: { type: 'authentication_error', message: 'invalid API key' } }
   const fetchFn: typeof fetch = async (input, init) => {
     const request = new Request(input, init)
     seen.push({
-      url:          request.url,
-      apiKeyHeader: request.headers.get('x-api-key'),
-      body:         JSON.parse(await request.text()) as AnthropicRequest['body'],
+      url:    request.url,
+      apiKey: request.headers.get('authorization')?.replace(/^Bearer /, '') ?? null,
+      body:   JSON.parse(await request.text()) as AnthropicRequest['body'],
     })
     return Response.json(reply, { status })
   }
