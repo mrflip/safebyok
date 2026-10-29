@@ -18,13 +18,98 @@
 
 ## Mini-Vocabulary
 
-These terms are new within this design sprint, or bear important refinements over what's in VOCABULARY.md:
+These terms are new within this design sprint, or bear important refinements over what's in
+VOCABULARY.md. One line each; a second, struck-out line is a use found in the playground or the
+spec that conflicts with the first. `box`-only terms say so.
 
-* `edit(patch)`: public entrypoint to modify a storable
-* `storable`: a versioned-update record that coordinates local edits, lazy-updated cached state, tombstoning, and limits access when vault is locked or evicted.d
-// Fill in
+### Copies a storable keeps
 
-* `world`: a still-a-bit-hazy abstraction from the parts above the storable (that aren't its listing): for a vault, it's the bank or some pieces of it; for a box, it's the vault.
+* `central`: the latest record this device knows storage holds, frozen: full, sparse, a draft, or a tombstone.
+* `overlay`: the record fields edited here and not yet sent; null when none.
+  - ~~`edited`: the same, kept as a whole record rather than as the fields laid over central~~
+  - ~~`eager`: central with an optimistic update~~ (that is the record in hand, below)
+* `record`, the record in hand: central with the overlay laid over it; what the snapshot shows and what `send` writes.
+* `snapshot`: frozen plain data a host renders, the same object until something changes; never a whisper.
+* `cacheable`: what `receive` hands the listing to write to the device cache: the sparse form, or the tombstone, of the record now central.
+  - ~~`cached`: the copy read from the deviceDB at warmup~~ (after warmup the cache is only written; the copy read is just the record a cold instance is born with)
+* `exposed` (box): the whisper kept open on the instance by `expose` or by setting `box.whisper`, until the vault locks.
+* `held`: said of an instance the listing has, or of the record central holds, as against the one an answer brings.
+  - ~~`standing`, `stands`~~
+
+### Record forms
+
+* `full`, `record` (`BoxRecord`): every field storage holds.
+* `sparse` (`BoxSparse`): the record without its heavy fields; what a listing, a notice and the cache carry.
+* `draft`: the sparse form at `revision_seq` 0, made here from a dna and not stored yet. A vault's draft is its full novel record, `gate` null.
+  - ~~a full record at revision 0, its ciphered fields filled with placeholders~~
+* `dna`: what a host hands `make`, or `fetch` with `ifAbsent: 'create'`: the scope and any record field it sets.
+  - ~~`Draft<ScopeT, RecordT>` as the name of that type~~
+* `tombstone`: what a deletion leaves: scope, revision, times, `deleted: true`. An answer of nothing stored is one too, at the revision held.
+* `stamp`: the fields the seal binds. Today a box's sparse form plus `vault_tok`; open question A narrows it.
+* `live`: an instance, a `Box`; `pojo`: plain fields and no methods, every other form.
+* `listed`: not used. Say `sparse` for the form, `held` for an instance the listing has.
+
+### Verbs on a storable
+
+* `hydrate(opts)`: make the world and then the record in hand timely, fetching each that is not. Calls made during a fetch join it.
+* `edit(patch, opts)`: lay a patch over the record in hand as the overlay, sealing what needs the vaultKey. Stores nothing.
+  - ~~`modify`~~
+* `send(patch, opts)`: edit, then write the record in hand under the next revision. The answer comes back through `receive`.
+* `del(opts)`: ask storage to delete the thing at the revision in hand. The tombstone comes back through `receive`.
+* `receive(fetched)`: take in what storage said of the thing: reconcile, adopt, settle; hand back `{ cacheable, badnews }`.
+* `reconcile(fetched)`: judge an answer against central and return the record that is central after it. Throws what cannot be made sense of. No verdicts, no overlay.
+  - ~~`deconflict`~~ ~~verdicts `older`, `same`, `adopt`, `gone`, `conflict`~~
+  - ~~`edit` reconciles the patch~~ (an edit lays over; only `receive` reconciles)
+* `adopt(central)`: hold a record as central, frozen, and replace the snapshot.
+  - ~~`assign`: copy the record's fields onto the instance~~ (there are no such fields: the snapshot reads the record)
+* `settle()`: act on the record now central beyond its fields, and return the bad news found in it. A vault judges its lease and ways in here. Called after every `receive` and once at birth.
+* `overlayOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.
+  - ~~`overlayPropsAndSealBeforeSettling`~~
+* `seal`, `unseal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, over the stamp; the reverse. `unsealWhisper` opens the stored whisper for one call.
+* `reseal` (box): unseal the stored whisper and edit it back in, sealed again.
+* `expose` (box): `unsealWhisper`, then keep the whisper open on the instance as `box.whisper`. `forgetWhisper` drops it; the box listing calls that as the vault locks.
+* `LOCKED` (box): what `box.whisper` reads while the vault is locked.
+
+### Guards and states
+
+* `timely`: fetched within its horizon. Of a storable, the record in hand; of the world, its own.
+* `hydrated`: the record in hand is full.
+* `gone`: central is a tombstone. The listing has let the instance go; every verb on it refuses the absent refusal.
+* `locked`, `unlocked`: the vault's lock, by the listing's word (`lockState`).
+* `storable` (adjective): a record can be written now: not gone, unlocked, and the record in hand full. `demandStorability` throws otherwise; `ensureTimelyStorability` hydrates first.
+* `isX`: yes or no, never throws. `demandX`: synchronous, throws unless X. `ensureX`: async, makes X so (STYLE.md, the triplet).
+* `absent refusal`: the refusal for a thing not stored, the listing's to name: `absent_box`, `absent_vault`.
+
+### The listing
+
+* `listing`: the live instances of one kind of thing, by scope. It owns the watch, the cache writes, the bad news, and every storage call made for a thing.
+* `hello`: warm from the cache, start the watch, hydrate everything. `goodbye`: end the watch.
+* `make(dna | fetched)`: the one place an instance is born. Stores nothing.
+* `at(scope)`: the instance held, or null; reads nothing. `fetch(scope, opts)`: the instance, hydrated, or what `ifAbsent` says for one not held or found gone.
+* `deliver`: the pipeline for one answer: take the world, hand the record to `receive`, let a gone thing go, cache, tell bad news, publish.
+* `let go`: the listing drops an instance gone. `evict`: a vault taken away, with every box in it; the bank lets it go.
+* `publish`: replace the listing's snapshot and call its listeners.
+* `answer`: what a storage call resolves: the record or null, and the world it lies in.
+* `notice`: what the watch delivers: a record, sparse at least, and its world. Enters `deliver` like an answer.
+  - ~~`ring`~~ (a bare ring, with no record, is not a notice)
+* `fullFor`: the boxlabels the watch should push full records for: the hydrated ones.
+* `world`: what surrounds a listing: the bank for vaults, the vault for boxes. Supplies the clock, the lock, its own timeliness, and takes the world an answer carries (`takeWorld`).
+* `badnews`, `tellBadNews`: a refusal met in storage that nobody asked for (a damaged box, a damaged way in), told once to the host's `onBadNews`.
+* `strobe`: not a thing of its own any more: `adopt` schedules the trigger's launch now when a sparse record lands on a full one.
+
+### The trigger
+
+* `trigger`: the per-storable timer that knows when the record in hand last came whole and launches the next fetch.
+* `launch`: one fetch through the listing; calls made meanwhile join it.
+* `noteSuccessNow`: a whole record came some other way than a launch: a send's answer, a full notice.
+* `ensureTimelyWithin(millis)`: launch unless the last whole record is within `millis`; with no `millis`, unless the scheduled launch is still ahead.
+
+### Options
+
+* `maxMillisSinceRefresh`: how old the record in hand may be. `maxWorldMillis`: the same for the world (not acted on yet).
+* `ifAbsent`: `'create' | 'fail' | 'nil'`, what `fetch` does for a thing not held or found gone. `'fail'` unless given.
+* `ifPresent`: `'replace' | 'fail' | 'fetch'`, what `send` does with a draft when storage holds the thing (not acted on yet).
+* `reseal` (box): with no whisper given or exposed, seal the stored one again.
 
 ### Please avoid / Deprecated
 
@@ -46,6 +131,184 @@ GOOD:
 * 'overlay' (replacing the local-copy #edited record).
 * `reconcile` (not deconflict)
 
+
+## The lifecycle, as built (2026-10-29)
+
+The code is `packages/safebyok/src/models/{storable,listing,box,box-listing}.ts`, typecheck and
+lint clean. This section says what it does, in order. The Coach's sections below it are the
+design it was built from and stay as written; where I departed, *Decisions* says so.
+
+### Birth
+
+`listing.make(input)` is the one place an instance is born, on three occasions: `hello`, for
+each copy in the device cache; `fetch` with `ifAbsent: 'create'`, for a scope not held; a notice
+for a scope not held. A dna is stamped (`revision_seq` 0, a fresh `revision_tok`, both times now)
+and completed by `draftOf` into the draft: for a box, the sparse form with an empty sidecar; for a
+vault, the novel record. A sparse record, a full one or a tombstone is held as it is. The
+constructor attaches the scope as the instance's only own fields, freezes central, and makes the
+trigger, due now but with no timer armed. Then `settle()` runs once, its bad news is told, and the
+listing publishes. No snapshot is made until something reads it.
+
+### hydrate
+
+The world first (`listing.ensureTimelyWorld`), then the record in hand: the trigger launches unless
+it is timely, and a launch is `listing.fetchRecordOf(this)`, which is `storeGet` then `deliver`.
+The world goes first because its answer may lock the vault or take the thing away. Hydrating
+resolves `this` even when the fetch found the thing gone: `fetch` is what applies `ifAbsent` to
+that.
+
+### edit
+
+Hydrate; demand not gone; `overlayOf(patch, opts)`, the concrete step; demand not gone again, as
+it awaited; lay the result over the overlay held, frozen; replace the snapshot. For a box,
+`overlayOf` parses the patch (`boxPatch`, 'bad_option'), lays the sidecar in as it is, and seals
+the whisper given, else the one exposed, else with `reseal` the one stored; a seal demands
+unlocked, a sidecar alone does not.
+
+### send
+
+Edit; `demandStorability`; the record in hand under `nextRevision()` with `written_at` now;
+`listing.putRecordOf`, which is `storePut` then `deliver`, so central is what storage now holds
+by the time it resolves; then the overlay is dropped, unless another edit replaced it meanwhile.
+A 'stale_write' refusal is delivered first, with the record the refusal carries, then thrown: central
+catches up, the overlay stays, and the host decides between them.
+
+### del
+
+Hydrate; demand not gone; demand unlocked; `listing.delRecordOf(this)`, which is `storeDel` at
+the revision in hand then `deliver`. The answer is a tombstone: the instance adopts it, the listing
+lets it go, and the snapshot shows no data.
+
+### receive
+
+`reconcile`, then `adopt` if the result is not the central already held, then `settle`; hand back
+the cacheable form of what is now central and the bad news. The listing passes null for nothing
+stored, and the storable turns that into a tombstone at the revision held.
+
+What `reconcile` returns, the answer against the record held:
+
+| answer                                       | result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| lower `revision_seq`                         | held (a read served before an own write) |
+| higher `revision_seq`                        | the answer                               |
+| same seq, another `revision_tok`             | throw 'corrupt_record'                   |
+| same, a tombstone, held is a draft           | held (absence confirms a draft)          |
+| same, a tombstone                            | the answer: gone                         |
+| same, held is a tombstone                    | held                                     |
+| same, held full and the answer sparse        | held                                     |
+| same, otherwise                              | the answer                               |
+
+`adopt` freezes the record as central and replaces the snapshot. A tombstone drops the overlay. A
+full record or a tombstone counts as a fetch that landed (`noteSuccessNow`). A sparse record over
+a full one schedules a launch now: the trigger's timer fetches the full record, which is the
+strobe. A sparse record over a sparse one schedules nothing: a thing never opened stays sparse.
+
+### Decisions that depart from the playground
+
+1. **A draft is the sparse form at revision 0**, not a full record with `''` for its ciphertext.
+   `isHydrated` is false for a draft, and `send` of a draft needs a whisper in the patch or
+   exposed, which is "there is a payload" in the Coach's timeliness rule.
+2. **Nothing stored is a tombstone at the revision held, and the thing is gone.** The spec said
+   "absence where a record was held: refuse". A box deleted on another device reads as absent
+   here, as the vaultDB keeps no box tombstones, so under that rule it would be refused on every
+   fetch and never let go. The vaultDB is the ground truth; the copy here is the one behind. The
+   draft is the exception: absence confirms it.
+3. **The instance's own fields are its scope and nothing else.** No `declare revision_tok`, no
+   `assign`. Everything that changes is read through `snapshot`, as STYLE.md's *Stateful objects
+   and snapshots* asks, and the instance is frozen. Open question G asks whether `box.sidecar`
+   is wanted as a getter anyway.
+4. **The snapshot is made on first read**, not in the constructor. A base constructor cannot
+   call `makeSnapshot`: the concrete class's private fields do not exist until its own
+   constructor runs after `super()`. Lazy keeps the identity contract and needs no hook.
+5. **The overlay is record fields** (`Partial<RecordT>`), frozen, accumulated across edits, and
+   it never carries a revision: `send` mints the next revision when it writes. So two edits then a
+   send mint one revision, and a newer central received meanwhile does not invalidate the
+   overlay's count. This is the reason behind open question A.
+6. **`edit` does not reconcile.** The playground's doc block had `receive` pass through
+   `reconcile` to merge the overlay and central; the spec said the overlay is not reconciled
+   against. The spec wins: central is adopted beneath the overlay, the snapshot shows the
+   overlay, and the host decides.
+7. **`send` drops its own overlay.** The listing cannot tell an own put's answer from a notice,
+   so `receive` cannot; `send` remembers the overlay it sent and drops it if it is still the one
+   held.
+8. **The strobe lives in `adopt`**, through `trigger.scheduleLaunchNow()`, and only when the
+   thing was hydrated. The listing no longer fires a `tryHydrate`.
+9. **`fetch` refuses unless `ifAbsent` says otherwise.** A typo'd boxlabel should not leave a
+   draft in the listing.
+10. **`revision_tok` is `randomId()`**, the existing maker; `mintRevisionTok` is gone.
+11. **The new `BoxSparse` and `BoxRecord` are intersections** of the existing shapes with
+    `Boxscope`, `Revision` and `Times`, so shapes/box is used and not modified. Their validators
+    wait on the match-up: `isBoxSparse` in box-listing.ts stands in, and says so.
+12. **`storable-things.ts` is deleted.** It broke the package's typecheck, and its notes are
+    below under *Notes carried from storable-things.ts*.
+
+### Open questions, in the order they matter
+
+A. **What the seal binds.** The spec says the sidecar will not be bound, and that some updates
+   need no unlock. A sidecar edit while locked writes a new revision, so the revision cannot be
+   bound either, or the ciphertext would refuse to open afterwards. That leaves the stamp as the
+   fields fixed for the box's life: the scope, `vault_tok`, `format`, `whisper_codec`,
+   `whisper_schema_version`, `registered_at`. That is a change to the construction (CLAUDE.md,
+   *Never invent cryptography*), so it is raised here and not made: today's `#seal` passes the
+   sparse form in hand, revision and all, and the comment on it points here. If the stamp keeps
+   the revision, then `edit` must mint the revision, every send must reseal, and a locked
+   sidecar edit is off the table.
+B. **A vault whose `vault_tok` differs from the copy held.** The spec says two things: at birth
+   from the cache, the cached copy is thrown away and the answer taken (the instance keeps its
+   identity); and under *Update the world*, a vault of another `vault_tok` means the Vault object
+   is gone and the bank births the next. Both are right, for a cold instance and for a live one.
+   The base class needs to know which it is: a flag set when the listing first hands the instance
+   out, or the rule that an instance born from the cache may be remade until its first full
+   answer. I lean to the second: it needs no flag.
+C. **A vault answer older than the copy held.** The generic rule ignores it (an own write's race).
+   The spec says `vault_behind`, lock, take nothing. The old code told them apart by reading the
+   device record before the vaultDB. In the new design the instance's central is the high-water
+   mark after warmup, so an older answer is either the benign race or a storage rollback, and the
+   revision alone cannot say which. Recommendation: the generic rule stands for the record; the
+   vault's `reconcile` adds one judgment, that a `gate_epoch` below the one held is
+   `vault_behind`, since the gate is what an unlocked vault must not trust a rollback of. An own
+   `putWayin` whose read-before-write answers after it is the one case that rule gets wrong, and
+   it is the case the old device-record ordering was for. If that case matters, central keeps
+   the `gate_epoch` of the last answer this device wrote, and the rule compares against that.
+D. **The trigger's timer.** It launches a fetch at `launchAt` on its own, so every storable
+   polls storage every `maxMillisSinceRefresh` for as long as the page lives. The seed recorded
+   the ruling that the timer stays as a mechanism; the policy of when it is armed is not written.
+   As built, it is armed on every success. A vault's `hello` could disarm the boxes' timers and
+   rely on the watch, with the horizon enforced only when a verb asks.
+E. **Should `del` demand unlocked?** Built so, reading "certain updates" in the spec's first
+   bullet to include a delete. A sidecar-only edit does not demand unlocked.
+F. **Does the listing's snapshot show drafts?** It does as built: a draft made by `fetch` with
+   `ifAbsent: 'create'` lists at revision 0 before its first send. A notice for an unheld scope
+   also makes a draft, which the notice replaces in the same tick.
+G. **Per-field getters on a Box.** The playground had `box.sidecar`. STYLE.md says read what
+   changes through the snapshot, so it is not built. `box.whisper` is the deliberate exception:
+   a secret is never in a snapshot.
+H. **`ifPresent` and `maxWorldMillis`** are declared and not acted on. `ifPresent` needs the
+   vaultDB's word on whether a put created or replaced; `maxWorldMillis` needs the world's own
+   trigger.
+I. **The lease counter** (`#leasesHeld` in vault.ts, the Coach's note below). It guards one race:
+   a lease granted between the start of a refresh's device-store read and its judgment. In the new
+   design the lease is read inside `settle`, after the answer, so the window is the read alone.
+   Proposal: `settle` remembers the lease held before its read and skips the judgment when the
+   lease changed during it. An identity compare, no counter, one name.
+
+### Notes carried from storable-things.ts
+
+The Coach's running comments in the deleted scratch file, kept here as they bear on the vault's
+`settle`:
+
+* On `#leasesHeld`: "I don't know what this counter is for but I'm skeptical it's needed. It
+  needs a better encapsulation and one name." (Question I.)
+* On `#judgeStored`: "reconcileOrThrow: if consistent, returns a ready-to-make ducktyped vault
+  object `{ ...props, boxes, lease }`."
+* On `#takePicture`: "adopting values, updating the snapshot (are there consequences to that),
+  stuff with the trouble queue, making new decisions about the lease, making new decisions about
+  error conditions, then updating the boxes, then updating the wayins. That's about 2/3rds of it.
+  Seems a bit action packed." In the new shape that is `adopt` (the record and snapshot), then
+  `settle` (the lease and the ways in), and the boxes are the box listing's, fed by `takeWorld`.
+* On `#raiseRecordAfter`: "Anyone new to the codebase will think raise means throw. Hasn't the
+  epoch already updated? Does this mean 'cache the record'?" Yes: it is the device cache write,
+  which is the listing's `saveCached` of what `receive` hands back.
 
 ## Local copies
 
