@@ -59,7 +59,7 @@ export type BoxOpts = StorableOpts<Boxscope, BoxRecord, BoxSparse> & { sealer: B
 /** One box, as its listing holds it: `boxListing.make` or `fetch` hands one out, never `new Box`.
  * Its whisper is never in the snapshot. `unsealWhisper` opens it for one call; `expose` keeps it
  * open on the instance as `whisper` until the vault locks. Both need the vault unlocked, as does
- * an edit that seals: a sidecar edit does not.
+ * every edit, a sidecar edit included (the spec's *Box record, overlay, central*).
  */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxSnapshot> {
   // The scope, attached by Storable's constructor.
@@ -171,10 +171,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return sidecar === undefined ? sealed : { ...sealed, sidecar }
   }
 
-  /** Seal `whisper` over the sparse record in hand, with `sidecar` laid in when given, through the sealer's `sealWhisper`; the bytes are zeroed after. Refuses 'vault_locked'. */
-  // The stamp carries the revision in hand, not the one `send` writes under: the spec's open question on what the seal binds.
+  /** Seal `whisper` over the sparse record in hand, with `sidecar` laid in when given, through the sealer's `sealWhisper`; the bytes are zeroed after. */
+  // The stamp carries the revision in hand, not the one `send` writes under: the spec's open question A, what the seal binds.
   async #seal(whisper: BX.Whisper, sidecar: BX.Sidecar | undefined): Promise<BX.BoxCiphered> {
-    this.demandUnlocked()
     const { sparse } = this
     if (sparse === null) { throw this.listing.absentRefusal(this.scope) }
     const stamp = sidecar === undefined ? sparse : { ...sparse, sidecar }

@@ -52,7 +52,7 @@ spec that conflicts with the first. `box`-only terms say so.
 ### Verbs on a storable
 
 * `hydrate(opts)`: make the world and then the record in hand timely, fetching each that is not. Calls made during a fetch join it.
-* `edit(patch, opts)`: lay a patch over the record in hand as the overlay, sealing what needs the vaultKey. Stores nothing.
+* `edit(patch, opts)`: lay a patch over the record in hand as the overlay, sealing what needs the vaultKey. Stores nothing. Needs the vault unlocked, whatever the patch holds.
   - ~~`modify`~~
 * `send(patch, opts)`: edit, then write the record in hand under the next revision. The answer comes back through `receive`.
 * `del(opts)`: ask storage to delete the thing at the revision in hand. The tombstone comes back through `receive`.
@@ -159,11 +159,13 @@ that.
 
 ### edit
 
-Hydrate; demand not gone; `overlayOf(patch, opts)`, the concrete step; demand not gone again, as
-it awaited; lay the result over the overlay held, frozen; replace the snapshot. For a box,
-`overlayOf` parses the patch (`boxPatch`, 'bad_option'), lays the sidecar in as it is, and seals
-the whisper given, else the one exposed, else with `reseal` the one stored; a seal demands
-unlocked, a sidecar alone does not.
+Hydrate; demand not gone and unlocked; `overlayOf(patch, opts)`, the concrete step; demand both
+again, as it awaited; lay the result over the overlay held, frozen; replace the snapshot. For a
+box, `overlayOf` parses the patch (`boxPatch`, 'bad_option'), lays the sidecar in as it is, and
+seals the whisper given, else the one exposed, else with `reseal` the one stored. Every edit
+needs the vault unlocked, a sidecar-only edit included: the Coach's *Box record, overlay,
+central*, below. The seal happens at the edit, so the overlay holds ciphertext and a lock can
+interdict the whisper while the unsent edit is kept.
 
 ### send
 
@@ -244,15 +246,19 @@ strobe. A sparse record over a sparse one schedules nothing: a thing never opene
 
 ### Open questions, in the order they matter
 
-A. **What the seal binds.** The spec says the sidecar will not be bound, and that some updates
-   need no unlock. A sidecar edit while locked writes a new revision, so the revision cannot be
-   bound either, or the ciphertext would refuse to open afterwards. That leaves the stamp as the
-   fields fixed for the box's life: the scope, `vault_tok`, `format`, `whisper_codec`,
-   `whisper_schema_version`, `registered_at`. That is a change to the construction (CLAUDE.md,
-   *Never invent cryptography*), so it is raised here and not made: today's `#seal` passes the
-   sparse form in hand, revision and all, and the comment on it points here. If the stamp keeps
-   the revision, then `edit` must mint the revision, every send must reseal, and a locked
-   sidecar edit is off the table.
+A. **What the seal binds.** The spec says the sidecar will not be bound. With every edit
+   needing the vault unlocked (the Coach's note below the Props table), the sidecar could stay
+   bound after all; the live question is the revision. As built, `edit` seals over the revision in
+   hand and `send` mints the next one, so a stamp that binds `revision_tok` or `written_at` would
+   refuse to open what `send` wrote. Two ways out: (1) the stamp binds only what is fixed for the
+   box's life (the scope, `vault_tok`, `format`, `whisper_codec`, `whisper_schema_version`,
+   `registered_at`), and the revision and sidecar ride unbound, as the spec's "sidecar will not be
+   bound" already leans; or (2) `edit` mints the next revision into the overlay and seals under
+   it, and `send` writes that revision, resealing when central moved meanwhile (a second seal,
+   unlocked anyway). Either is a change to what the construction binds (CLAUDE.md, *Never invent
+   cryptography*), so it is raised and not made: today's `#seal` passes the sparse form in hand,
+   and the comment on it points here. I lean to (1): the seal then depends on nothing `send`
+   changes, and a stale write is storage's refusal alone.
 B. **A vault whose `vault_tok` differs from the copy held.** The spec says two things: at birth
    from the cache, the cached copy is thrown away and the answer taken (the instance keeps its
    identity); and under *Update the world*, a vault of another `vault_tok` means the Vault object
@@ -276,7 +282,11 @@ D. **The trigger's timer.** It launches a fetch at `launchAt` on its own, so eve
    As built, it is armed on every success. A vault's `hello` could disarm the boxes' timers and
    rely on the watch, with the horizon enforced only when a verb asks.
 E. **Should `del` demand unlocked?** Built so, reading "certain updates" in the spec's first
-   bullet to include a delete. A sidecar-only edit does not demand unlocked.
+   bullet to include a delete, and the Coach's note that a send while locked is a NO. Every
+   `edit` demands unlocked too, after that note. The one reading of the note I am unsure of is
+   "can you access sidecar data when locked? NO": VOCABULARY.md and the spec's *More* section
+   say the sidecar shows while locked, so I took it as "edit", not "read". If it means read, the
+   snapshot must hide the sidecar while locked, which is a one-line change in `makeSnapshot`.
 F. **Does the listing's snapshot show drafts?** It does as built: a draft made by `fetch` with
    `ifAbsent: 'create'` lists at revision 0 before its first send. A notice for an unheld scope
    also makes a draft, which the notice replaces in the same tick.
@@ -671,6 +681,44 @@ Vault scope:    `applabel`, `user_id`, `vaultlabel`
 Box scope:      `applabel`, `user_id`, `vaultlabel`, `boxlabel`
 Revision:       `format`, `revision_tok`, `revision_seq`, `written_at`
 Whisper:        `whisper_schema_version`, `whisper_codec`, `whisper_ciphered`, `box_key_wrapped`
+
+
+### Box record, overlay, central
+
+Box payload has its `sidecar`, `whisper_ciphered`, and key metadata (`whisper_schema_version`, `whisper_codec`, `box_key_wrapped`)
+
+When do we seal? When can we send?
+
+* can you edit a box when locked? NO
+* can you send a signed box with a newer version when locked? I think so?, but it's easier to say NO
+* can you edit when untimely? No; customer can adjust what "untimely" means per-call
+* can you send when untimely? Also no, customer can adjust
+
+* When do we seal? I think it has to be at each edit, so that we can lock access and keep the uncommitted value
+* Can you access sidecar data when locked? NO. Customer can copy whatever they want from it already; they don't have the capability to lock/unlock
+
+| scenario     | `c` timely | `c` data | `overlay` | ... |
+| ------------ | ---------- | ------- | --------- | --- |
+| probably-new | no       | sparse     | box dna |
+| listed       |
+
+*(The Coach's note, restored from the stash of 2026-10-29 21:45. As built: `edit` and `send` both
+hydrate with the call's horizon and demand unlocked; the seal happens in `edit`, so the overlay
+holds ciphertext. The sidecar reading is open question E. The scenario table is the Coach's to
+finish; the rows I can fill from the code are below.)*
+
+| scenario                         | central            | timely | overlay              | `isHydrated` | `send` needs                    |
+| -------------------------------- | ------------------ | ------ | -------------------- | ------------ | ------------------------------- |
+| made from dna, never fetched     | draft (sparse, 0)  | no     | none                 | no           | hydrate, unlock, a whisper      |
+| made from dna, fetched absent    | draft (sparse, 0)  | yes    | none                 | no           | unlock, a whisper               |
+| warm from cache                  | sparse             | no     | none                 | no           | hydrate (brings the whisper)    |
+| listed by a notice               | sparse             | no     | none                 | no           | hydrate                         |
+| fetched                          | full               | yes    | none                 | yes          | unlock                          |
+| fetched, sidecar edited          | full               | yes    | `{ sidecar }`        | yes          | unlock (already proven at edit) |
+| fetched, whisper edited          | full               | yes    | ciphered + key       | yes          | unlock                          |
+| draft, whisper edited            | draft              | yes    | ciphered + key       | yes          | unlock                          |
+| sparse notice over a full record | sparse (newer)     | yes    | kept                 | no           | the strobe's fetch, then unlock |
+| deleted elsewhere, then fetched  | tombstone          | yes    | dropped              | no           | nothing: gone, let go           |
 
 ### Performance & Overhead Breakdown
 

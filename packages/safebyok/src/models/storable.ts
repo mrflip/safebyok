@@ -99,9 +99,9 @@ export type StorableOpts<ScopeT extends object, RecordT extends SparseT, SparseT
  * The scope is the instance's only own fields, frozen. Everything that changes is read through
  * `snapshot`, which keeps its identity until something changes, as `useSyncExternalStore` wants.
  *
- * Refusals: 'vault_locked' from a verb that needs the vaultKey while the vault is locked; the
- * listing's absent refusal ('absent_box', 'absent_vault') from a verb on a thing gone;
- * 'bad_option' from `send` or `del` on a record too sparse to write.
+ * Refusals: 'vault_locked' from `edit`, `send` or `del` while the vault is locked; the listing's
+ * absent refusal ('absent_box', 'absent_vault') from a verb on a thing gone; 'bad_option' from
+ * `send` on a record too sparse to write.
  */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends ScopeT & Revision & Times, PatchT, SnapshotT> {
   readonly scope: ScopeT
@@ -257,15 +257,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Hydrate, then lay `patch` over the record in hand as the overlay; resolve `this`. Nothing is stored until `send`.
    * The concrete class turns the patch into record fields through `overlayOf`, sealing what the
-   * vaultKey must seal, and refuses 'vault_locked' there if it must. A later edit lays over the
-   * last. An empty patch still begins an overlay. Central is never touched: a newer record
-   * received meanwhile is adopted beneath the overlay, and the host decides between the two.
+   * vaultKey must seal. A later edit lays over the last. An empty patch still begins an overlay.
+   * Central is never touched: a newer record received meanwhile is adopted beneath the overlay,
+   * and the host decides between the two. Refuses 'vault_locked' while the vault is locked,
+   * whatever the patch holds.
    */
   async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
     await this.hydrate(opts)
     this.demandNotGone()
+    this.demandUnlocked()
     const laid = await this.overlayOf(patch, opts)
     this.demandNotGone()
+    this.demandUnlocked()
     const merged: Partial<RecordT> = { ...this.#overlay, ...laid }
     this.#overlay = Object.freeze(merged)
     this.replaceSnapshot()
@@ -389,7 +392,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   /** `record` without its heavy fields. */
   protected abstract sparseOf(record: SparseT): SparseT
-  /** The record fields `patch` lays over the record in hand, sealed where the vaultKey must seal them. Demand unlocked there, and only there. */
+  /** The record fields `patch` lays over the record in hand, sealed where the vaultKey must seal them. Called unlocked. */
   protected abstract overlayOf(patch: PatchT, opts: EditOpts): Promise<Partial<RecordT>>
   /** The snapshot of the record in hand and what changes beside it. */
   protected abstract makeSnapshot(): SnapshotT
