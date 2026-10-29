@@ -1,7 +1,7 @@
 {
   "name": "safebyok-react",
   "private": false,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "React binding for safebyok: a provider that follows the signed-in user, snapshot hooks, and the ask-for-the-passphrase-on-demand guard.",
   "keywords": [
     "safebyok",

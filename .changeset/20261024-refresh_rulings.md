@@ -1,5 +1,0 @@
----
-"safebyok": patch
----
-
-**Another tab's unlock or renewal no longer locks this tab for a moment, and a tab that already holds the newer copy of a vault refuses a restored older one too.** A refresh used to drop this tab's lease whenever this device's store held a newer one, so the tab showed `locked` until its next call took up the other tab's lease; it now drops it only when the store holds none (a `lock()` in another tab) or one under other ways in, so the tab stays `unlocked` until its own deadline, and its next call then takes the other tab's lease up without asking. A lock and an unlock in another tab that both land before this tab's next read leave it unlocked. A Vault object that had seen the newer copy used to ignore storage handing back an older one, for its whole life, as a late read of its own write; `hello()`, `refresh()` and every call that reads now refuse it `vault_behind` and lock, as another tab and a new birth already did, and `bank.clearCachedVault` remains the way to accept a restore made on purpose. A read replica lagging behind what this device has seen now meets the same refusal until it catches up and the next `hello()` reads afresh.
