@@ -1,6 +1,6 @@
 # Thread 4a: Hydrate and timeliness (2026-10-30)
 
-Branch `20261030-timeliness`, PR #PR, stacked on #370. Justify: green (core 3838 pass, 37 skipped as before, 1 todo, new here).
+Branch `20261030-timeliness`, PR #371, stacked on #370. Justify: green (core 3838 pass, 37 skipped as before, 1 todo, new here).
 
 * **Built**: the Coach's three fixes, each a line or two.
   * (a) `isWholeRecord(record)` in `Storable`, protected, beside `classifyRecordShape` (same banner): `MSX.isTombstone(record) || this.isFullRecord(record)`. `receive` notes success on `this.isWholeRecord(answer)`.
