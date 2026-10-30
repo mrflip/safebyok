@@ -51,7 +51,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #central: Fetched<RecordT, SparseT>
   /** The record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending; null while nothing is staged. */
   #staged: Fetched<RecordT, SparseT> | null
-  /** Made on first read, and again by each `settle` once one exists. */
+  /** Made on the first `snapshot`, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
   readonly #listeners = new Set<() => void>()
@@ -168,7 +168,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Replace the snapshot with a new one, and notify all listeners. Before the first read there is none to replace: the read makes it. */
+  /** Replace the snapshot with a new one, and notify all listeners. Before the first `snapshot` there is none to replace: that call makes it. */
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
@@ -386,7 +386,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * | `adopt`, `gone` | null: a healthy record newer than central, or a deletion from any device, drops the staged     |
    * | `ouch`          | `{ ...staged, ...nextRevision }`: the staged outlives the damage, under the revision after the ouchstone; null where nothing is staged |
    *
-   * If the new received record's revision matches the staged's: successful write! Unstage it.
+   * If the new received record's revision matches the staged's: successful send! Unstage it.
    * We don't have any strategy that is both good and simple for an uncommitted staged edit
    * surpassed by an received update. Anything we do has us dragging the staged record along
    * until the customer tries to send, hopefully hitting a stale_write -- but a spurious edit
