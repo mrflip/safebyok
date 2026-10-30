@@ -139,7 +139,7 @@ export type ModelsWorld = {
   now(): number
   /** Jump the clock to `ms`; no timer fires. */
   setNow(ms: number): void
-  /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due. */
+  /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due, each with the clock at its due time. */
   advance(ms: number): Promise<void>
   setLockState(lockState: LockState): void
   /** End the watches and put real timers back. Call it in `afterEach`. */
@@ -207,7 +207,9 @@ class Script<CallT> {
  */
 export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const { fakeTimers = true } = opts
+  // The clock under real timers. Under fake ones the clock is the faked `Date`, which moves to each timer's due time as it fires.
   let now = opts.now ?? T0
+  const clockNow = (): number => (fakeTimers ? Date.now() : now)
   let lockState: LockState = opts.lockState ?? 'unlocked'
   if (fakeTimers) { vi.useFakeTimers({ now }) }
 
@@ -229,7 +231,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null): BoxAnswer => ({ scope, ok: false, err, world })
 
   const world: BoxWorld = {
-    clock:        { now: () => now },
+    clock:        { now: clockNow },
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
@@ -266,7 +268,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
         ...(held !== undefined && sparseOf(held)),
         revision_tok: randomId(),
         revision_seq: (ante?.revision_seq ?? NeverStoredSeq) + 1,
-        written_at:   now,
+        written_at:   clockNow(),
       })
       stored.set(scope.boxlabel, tombstone)
       return answerOf(scope, tombstone)
@@ -304,8 +306,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   const setNow = (ms: number): void => {
-    now = ms
-    if (vi.isFakeTimers()) { vi.setSystemTime(ms) }
+    if (fakeTimers) { vi.setSystemTime(ms) } else { now = ms }
   }
 
   const dispose = (): void => {
@@ -319,11 +320,10 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
 
-    now:      () => now,
+    now:      clockNow,
     setNow,
     advance:  async (ms) => {
-      now += ms
-      if (vi.isFakeTimers()) { await vi.advanceTimersByTimeAsync(ms) }
+      if (fakeTimers) { await vi.advanceTimersByTimeAsync(ms) } else { now += ms }
     },
     setLockState: (next) => { lockState = next },
     dispose,
