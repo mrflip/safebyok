@@ -1,6 +1,6 @@
 # Thread 3: The listing's pipeline (2026-10-30)
 
-Branch `20261030-listing_pipeline`, PR #372, stacked on #370. Justify: green (core 3911 tests pass, 37 skipped as before, 93 more than thread 1; root scripts 289; size budgets unmoved).
+Branch `20261030-listing_pipeline`, PR #372, stacked on #375 (restacked 2026-10-30; was on #370). Justify: green (core 3911 tests pass, 37 skipped as before, 93 more than thread 1; root scripts 289; size budgets unmoved).
 
 * **Built**
   * `Listing.settle(thing?)` saves `thing.cacheable` to the device cache, tells a refused save to `onBadNews`, and then remakes the listing's snapshot. `#receiveInto` (so `fetch`, `put`, `del`, notices and `build(record)`) and `build(dna)` pass the thing; `hello` passes none. For a delivered record the snapshot is in fact made inside `receive` (the thing notifies the listing), before the save; only `build(dna)` and `hello` rely on `settle`'s own remake.
@@ -46,3 +46,12 @@ Closed: item 2 (`build`'s news, a record's refusal or a refused save, is told to
 ## For the Coach
 * The inventory above is the answer to your direction on bad news; I wrote none of it down as code.
 * A `stale_write` whose carried record `receive` refuses now reaches the caller as `stale_write`, meta kept, the refusal told as news (tested here as `corrupt_record`). Thread 2's `record_conflict` test is not on this branch; if it expects the conflict thrown to the caller it will need updating where stacked.
+
+## Restacked (2026-10-30)
+Rebased from 5b80fd21 (an old tip of #370) onto bc53f4e8 (#375, thread 4b), the line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375. Old tip tagged `20261030-listing_pipeline-prerebase` (7972132c). No rework done.
+* **Merges.** `box.ts`: the subclass banner keeps the lower wording ("Required by Storable"). `storable.ts`: one import line, `FetchOpts` beside 4b's `Vaulted`. `listing.test.ts` (add/add with thread 2), `box-listing.test.ts` (with thread 7's `boxDna` describe), `models-shapes.test.ts` (with thread 7's `MSX.boxDna`): one import block, the lower describes first, thread 3's last.
+* **Tests restated to the lower threads' behaviour.** Four of thread 3's delivery-refusal tests (fetch, `build(record)`, `put`, the `stale_write` carrying a conflict) and its notice test expected `corrupt_record`; thread 2's same-revision row now names that record `record_conflict`.
+* **Lower tests restated to thread 3's routing** (ruling 4: a refusal `receive` throws is told to `onBadNews`, the caller gets the instance): thread 2's "nothing stored for a thing held alive" now expects `record_conflict` told, `absent_box` thrown under `ifAbsent: 'fail'`, and one `save`; thread 4b's `vault_remade` through `box.fetch()` now expects it told and the fetch to resolve the box unchanged. Ruling (M) likely turns both back into throws: the rework worker's call.
+* **Thread 5's** "getSnapshot is made on the first call" now builds its box with `new Box(...)`, held by no listing: `#hold` primes every held thing's snapshot, so a box from `listing.build` already has one.
+* Commit 1be5ec32 (code) is red on its own until b8bdeaba (its tests) (one test), as its original was.
+
