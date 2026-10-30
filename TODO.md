@@ -7,11 +7,16 @@ What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your 
 **Potential Optimizations**: a user-facing rough edge the core leaves alone for now, to keep its
 control flow simple (STYLE.md, *Control flow and refusals*), with the argument for smoothing it.
 * Boxscope was somehow called out as an exception without VaultScope getting it -- the thread to revert this must have died. MAke it BoxScope and BoxScopepath everywhere (also any zod checkers or var names)
+
+What is the difference between refusals and errors
+
 ## Loud
 
 Add a helper like objStrict, objDuckish, implementing the duckish type (an otherwise-strict type allowing certain specified fields that are validated, ignored and stripped)
 
 What every adapter author and reviewer should have in front of them, and not lose in a shelf below.
+
+DeviceDB intelligently handles versioning of cached objects on LWW among records with same version
 
 * **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
   (the primitives sprint, on keeping both the checked `getVault` / `ensureVault` and the relaying

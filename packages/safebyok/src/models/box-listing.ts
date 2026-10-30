@@ -3,15 +3,17 @@
 import { VaultError } from '../errors'
 import { BoxFormat } from './box'
 import type { Boxscope, VaultScope } from '../shapes/scopes'
+import type { Whisper } from '../shapes/box'
 import { type BoxRecord, type BoxSnapshot, type BoxSparse, Box } from './box'
 import { type Answer, type FetchOpts, type Notice, Listing } from './listing'
-import type { Cacheable, Dna, Fetched, LockState, Revision, Staged, TimelyOpts, Times, World } from './storable'
+import type { Cacheable, Dna, Fetched, LockState, Revision, TimelyOpts, Times, World } from './models-shapes'
 
 // == [What a box listing is given]: BoxWorld, BoxStore, BoxCache, BoxListingOpts
 
-/** The vault, as far as its boxes need it: the clock, its scope, its lock, its own timeliness, and the world an answer carries. */
+/** The vault, as far as its boxes need it: the clock, its scope and token, its lock, its own timeliness, and the world an answer carries. */
 export type BoxWorld = World & {
-  scope: VaultScope
+  scope:     VaultScope
+  vault_tok: string
   lockState(): LockState
   ensureTimely(opts: TimelyOpts): Promise<void>
   takeWorld(world: unknown): void
@@ -19,18 +21,21 @@ export type BoxWorld = World & {
 
 /** The vaultDB's box verbs, as this listing calls them. Mapping the real VaultDB onto these is the later match-up. */
 export type BoxStore = {
-  getBox(scope: Boxscope): Promise<Answer<Boxscope, BoxRecord, BoxSparse>>
-  putBox(record: BoxRecord): Promise<Answer<Boxscope, BoxRecord, BoxSparse>>
-  delBox(scope: Boxscope, revision: Revision): Promise<Answer<Boxscope, BoxRecord, BoxSparse>>
+  getBox(scope: Boxscope): Promise<Answer<BoxRecord, BoxSparse>>
+  putBox(record: BoxRecord): Promise<Answer<BoxRecord, BoxSparse>>
+  delBox(scope: Boxscope, revision: Revision): Promise<Answer<BoxRecord, BoxSparse>>
   /** `fullFor` names the boxes to push full records for; every other notice is sparse at most. */
-  watchBoxes(scope: VaultScope, onNotice: (notice: Notice<Boxscope, BoxRecord, BoxSparse>) => void, fullFor: () => readonly string[]): () => void
+  watchBoxes(scope: VaultScope, onNotice: (notice: Notice<BoxRecord, BoxSparse>) => void, fullFor: () => readonly string[]): () => void
 }
 
 /** The device cache of this vault's boxes: each box's cacheable form, central and staged as they stood. */
 export type BoxCache = {
-  loadBoxes(scope: VaultScope): Promise<readonly Cacheable<Boxscope, BoxRecord, BoxSparse>[]>
-  saveBox(cacheable: Cacheable<Boxscope, BoxRecord, BoxSparse>): Promise<void>
+  loadBoxes(scope: VaultScope): Promise<readonly Cacheable<BoxRecord, BoxSparse>[]>
+  saveBox(cacheable: Cacheable<BoxRecord, BoxSparse>): Promise<void>
 }
+
+/** The dna of a box, with the whisper to seal into it once built. */
+export type BoxDna = Dna<Boxscope, BoxRecord> & { whisper?: Whisper | undefined }
 
 export type BoxListingOpts = {
   world:                 BoxWorld
@@ -59,7 +64,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  // == [By boxlabel]: box, fetchBox
+  // == [By boxlabel]: box, fetchBox, buildBox
 
   /** The box held under `boxlabel`, or null. Reads nothing. */
   box(boxlabel: string): Box | null {
@@ -71,16 +76,16 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.fetch(this.#scopeFor(boxlabel), opts)
   }
 
+  /** Build a box from `dna`, and seal its whisper in where one is given: the constructor takes no whisper. Stores nothing. */
+  async buildBox(dna: BoxDna): Promise<Box> {
+    const { whisper, ...rest } = dna
+    const box = await this.build(rest)
+    if (whisper !== undefined) { await box.seal(whisper) }
+    return box
+  }
+
   #scopeFor(boxlabel: string): Boxscope {
     return { ...this.world.scope, boxlabel }
-  }
-  // --
-
-  // == [The vault locked]: forgetWhispers
-
-  /** Drop every whisper kept open on a box. The vault calls it as it locks. */
-  forgetWhispers(): void {
-    for (const box of this.things) { box.forgetWhisper() }
   }
   // --
 
@@ -95,12 +100,12 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return { applabel, user_id, vaultlabel, boxlabel }
   }
 
-  /** A never-stored box: the dna over the sparse defaults, an empty sidecar among them. No whisper until one is edited in. */
+  /** The box a dna stages at birth: the dna over the sparse defaults, an empty sidecar among them. No whisper until one is sealed in. */
   protected draftOf(dna: Dna<Boxscope, BoxRecord> & Revision & Times): BoxSparse {
-    return { format: BoxFormat, whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, ...dna }
+    return { fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, ...dna }
   }
 
-  protected makeThing(central: Fetched<Boxscope, BoxRecord, BoxSparse>, staged: Staged<Boxscope, BoxRecord>): Box {
+  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse>): Box {
     return new Box({ world: this.world, listing: this, central, staged, maxMillisSinceRefresh: this.#maxMillisSinceRefresh })
   }
 
@@ -120,32 +125,32 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     this.world.takeWorld(world)
   }
 
-  protected storedInStaleRefusal(err: VaultError): Fetched<Boxscope, BoxRecord, BoxSparse> | null {
+  protected storedInStaleRefusal(err: VaultError): Fetched<BoxRecord, BoxSparse> | null {
     const stored: unknown = err.meta?.box_stored
     return isBoxSparse(stored) ? stored : null
   }
 
-  protected storeGet(scope: Boxscope): Promise<Answer<Boxscope, BoxRecord, BoxSparse>> {
+  protected storeGet(scope: Boxscope): Promise<Answer<BoxRecord, BoxSparse>> {
     return this.#store.getBox(scope)
   }
 
-  protected storePut(record: BoxRecord): Promise<Answer<Boxscope, BoxRecord, BoxSparse>> {
+  protected storePut(record: BoxRecord): Promise<Answer<BoxRecord, BoxSparse>> {
     return this.#store.putBox(record)
   }
 
-  protected storeDel(scope: Boxscope, revision: Revision): Promise<Answer<Boxscope, BoxRecord, BoxSparse>> {
+  protected storeDel(scope: Boxscope, revision: Revision): Promise<Answer<BoxRecord, BoxSparse>> {
     return this.#store.delBox(scope, revision)
   }
 
-  protected watchStore(onNotice: (notice: Notice<Boxscope, BoxRecord, BoxSparse>) => void): () => void {
+  protected watchStore(onNotice: (notice: Notice<BoxRecord, BoxSparse>) => void): () => void {
     return this.#store.watchBoxes(this.world.scope, onNotice, () => this.hydratedThings.map((box) => box.boxlabel))
   }
 
-  protected loadCached(): Promise<readonly Cacheable<Boxscope, BoxRecord, BoxSparse>[]> {
+  protected loadCached(): Promise<readonly Cacheable<BoxRecord, BoxSparse>[]> {
     return this.#cache.loadBoxes(this.world.scope)
   }
 
-  protected saveCached(cacheable: Cacheable<Boxscope, BoxRecord, BoxSparse>): Promise<void> {
+  protected saveCached(cacheable: Cacheable<BoxRecord, BoxSparse>): Promise<void> {
     return this.#cache.saveBox(cacheable)
   }
   // --
@@ -154,8 +159,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
 // == [Helpers]: isBoxSparse
 
-// Stands in for the sparse record's validator, which the match-up with shapes/box brings.
+// A placeholder for the sparse record's validator, which the match-up with shapes/box brings.
 const isBoxSparse = (val: unknown): val is BoxSparse => (
-  typeof val === 'object' && val !== null && 'boxlabel' in val && 'revision_seq' in val && 'revision_tok' in val
+  typeof val === 'object' && val !== null && 'boxlabel' in val && 'revision_seq' in val && 'revision_tok' in val && 'am' in val
 )
 // --

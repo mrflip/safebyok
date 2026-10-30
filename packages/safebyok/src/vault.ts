@@ -26,6 +26,7 @@ import * as Phrases from './phrases'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
+import { lockedError } from './utils/throwers'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
@@ -1874,11 +1875,9 @@ export class Vault implements VaultStamp {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError
+// == [Refusals]: damagedBeyondNaming, goneError, remadeError, behindError, gateMovedError, gatingLandedError
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
-
-const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again.')
 
 const goneError = () => new VaultError('vault_gone', Phrases.VaultObjectGone)
 

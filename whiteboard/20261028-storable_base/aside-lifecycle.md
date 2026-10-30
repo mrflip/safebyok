@@ -106,7 +106,7 @@ strobe. A sparse record over a sparse one schedules nothing: a thing never opene
 10. **`revision_tok` is `randomId()`**, the existing maker; `mintRevisionTok` is gone.
 11. **The new `BoxSparse` and `BoxRecord` are intersections** of the existing shapes with
     `Boxscope`, `Revision` and `Times`, so shapes/box is used and not modified. Their validators
-    wait on the match-up: `isBoxSparse` in box-listing.ts stands in, and says so.
+    wait on the match-up: `isBoxSparse` in box-listing.ts is a placeholder, and says so.
 12. **`storable-things.ts` is deleted.** It broke the package's typecheck, and its notes are
     below under *Notes carried from storable-things.ts*.
 
@@ -136,7 +136,7 @@ C. **A vault answer older than the copy held.** The generic rule ignores it (an 
    The spec says `vault_behind`, lock, take nothing. The old code told them apart by reading the
    device record before the vaultDB. In the new design the instance's central is the high-water
    mark after warmup, so an older answer is either the benign race or a storage rollback, and the
-   revision alone cannot say which. Recommendation: the generic rule stands for the record; the
+   revision alone cannot say which. Recommendation: the generic rule holds for the record; the
    vault's `reconcile` adds one judgment, that a `gate_epoch` below the one held is
    `vault_behind`, since the gate is what an unlocked vault must not trust a rollback of. An own
    `putWayin` whose read-before-write answers after it is the one case that rule gets wrong, and
@@ -202,7 +202,7 @@ The Coach's running comments in the deleted scratch file, kept here as they bear
 * what the db sent will not parse: `corrupt_record` (an answer missing what it must say: a stale
   refusal with no stored record, a tombstone naming another scope, a lease this package did not
   write), `damaged_vault` / `damaged_box` (a stored record failing its checks), `newer_format` (a
-  format a later safebyok may write). What we hold stands; the refusal goes to the caller.
+  format a later safebyok may write). The copy held is kept; the refusal goes to the caller.
   - "the entry reads as damaged": for a box, yes, today. The listing carries `damagedBoxes`
     (`boxlabel`, `revision_tok` or null, `damage: 'newer_format' | 'damaged'`), the snapshot shows
     them, `damaged_box` is told once per revision, and `putBox` may write over one whose revision
@@ -246,7 +246,7 @@ what to do with sidecar when a newer sparse record shows up?
 Dispatch recent central version:
 
 * Inconsistent: absence where a record was held, a tombstone with same version: refuse
-* a record older than the version held (lower `revision_seq`): ignored, held copy stands. A read
+* a record older than the version held (lower `revision_seq`): ignored, the held copy is kept. A read
   served before an own write and answered after it looks exactly like this.
 * a tombstone, : the instance is evicted from the listing and told
   it is gone; its snapshot stops showing data.
@@ -269,7 +269,7 @@ If conditions are met:
      records claiming one `revision_seq` under different `revision_tok`s; absence, or a tombstone, at
      the very revision held, a draft at 0 excepted) is a refusal, thrown. A record of another scope
      is the listing's to refuse: nothing in the storable knows a scopepath.
-   - **Reconcile returns the record that stands**, and that record is what can be cached: the held
+   - **Reconcile returns the record to keep**, and that record is what can be cached: the held
      one where the answer is older or says less (a sparse over a full at the same revision), else the
      answer. No verdicts. ~~`older`, `same`, `adopt`, `gone`, `conflict`~~ An edited copy is not
      reconciled against: the host deals with drift between edited (theirs) and central (ours).

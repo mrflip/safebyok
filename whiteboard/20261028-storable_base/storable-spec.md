@@ -65,7 +65,7 @@ spec that conflicts with the first. `box`-only terms say so.
 * `combined`, the record in hand: the staged where one is begun, else central; what the snapshot shows and what `send` writes.
   - ~~`record` as the accessor for this~~
 * `snapshot`: frozen plain data a host renders, the same object until something changes; never a whisper.
-* `cacheable`: getter, `{ ...sparse, central, staged }` as they stand, frozen: what the listing writes to the device cache after a `receive`, and what `hello` revives an instance from.
+* `cacheable`: getter, `{ ...sparse, central, staged }` as they are, frozen: what the listing writes to the device cache after a `receive`, and what `hello` revives an instance from.
   - ~~`combined` frozen. May be sparse, full, or tombstone.~~
   - ~~what `receive` hands the listing~~ (`receive` and `settle` hand back `{ badnews }` only)
   - ~~`cached`: the copy read from the deviceDB at warmup~~ (after warmup the cache is only written; the copy read is just the record a cold instance is born with)
@@ -325,10 +325,7 @@ Otherwise call reconcileStaged -- 'fill', 'adopt', 'gone'
 
 sent { patch, central, staged, act, nextRevision }. Do *not* consult own props
 
-| act                     | new staged                                             |
-| ----------------------- | ------------------------------------------------------ |
-| `edit`, `fill`, `adopt` | `{ ...central, ...staged, ...patch, ...nextRevision }` |
-| `del`, `gone`           | `this.tombstoneFor(act, nextRevision)`                 |
+_(table moved to the `reconcileStaged` doc block in storable.ts; `gone` now drops the staged, per the Coach, 2026-10-30)_
 | `ouch`                  | `{ ...staged, ...patch, ...nextRevision }` |
 
 ## Box: Edit/Receive, Reconcile/Adopt/Setttle, Seal
@@ -463,6 +460,9 @@ GOOD:
 
 ### Stashed Prompts
 
+For box edit I want to cheat. Have it pull whisper from the patch, call super.edit, then if patch.whisper is defined (null or set to a value) call sealWhisper.
+
+The whisper functions in src/box aren't terrible; the line calling lease.trySealProps should be using this.stamp. You'll be setting private variables not creating an instance. All of the madeUnder stuff is hallucinated.
 
 Implement types and validations for the storable files as we do for everything else (see shapes). Use, but don't (yet) modify, the types and checkers in shapes/box or shapes/vault. if there are strays -- a shape from the existing shapes/box doesn't match well -- put that in storable/goaway.ts.  To be clear: (a) reuse existing structures when they serve the design; (b) don't modify the larger body of working code.
 

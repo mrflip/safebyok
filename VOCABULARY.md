@@ -174,7 +174,7 @@ named subtractions (STYLE.md, *Shapes and duck typing*).
 | **sparse**    | A subset of the record's own fields, minus the heavy and sensitive ones, as a list or a log shows it (`VaultSparse`, `BoxSparse`): the shape wherever the whole record is not needed. An associate, such as a vault's gate or its boxes, is never in it. Never "listing" or "listed", which read as the list or what holds it. |
 | **stamp**     | The fields fixed for the record's life, which are exactly the fields bound into its cryptography (`VaultStamp`; see *The stamp*, above).                                   |
 | **scope**     | The composite id: the names its scopepath is made of (`VaultScope`, `BankScope`, and `Boxscope`, the one that smushes its two words).                                     |
-| **dna**       | The DNA form of a type is the partial duck of its required and optional props, along with those under the factory's control (they will be ignored): what a caller hands `make` or `ensureVault`. Its validator is the type's duckish, below. |
+| **dna**       | The DNA form of a type is the partial duck of its required and optional props, along with those under the factory's control (they will be ignored): what a caller hands `build` or `ensureVault`. Its validator is the type's duckish, below. |
 | **tombstone** | What a deletion leaves (`VaultTombstone`).                                                                                                                                  |
 | **snapshot**  | For a stateful thing, what a host renders: its sparse shape and what changes beside it, as frozen plain data that keeps its identity until something changes (`VaultSnapshot`). |
 
