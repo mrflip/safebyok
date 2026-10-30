@@ -111,8 +111,10 @@ export type ModelsWorldOpts = {
  * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
  * answers a tombstone at the revision after the one stored (or expected); `watch` and the cache
  * do as they are told. `put` refuses 'stale_write', carrying the box stored,
- * when `expected` is null and a box (not a tombstone) is stored, unless `ifPresent` is 'replace'. Nothing else compares
- * `expected` to what is stored: any other `stale_write` is scripted.
+ * when `expected` is null and a box (not a tombstone) is stored, unless `ifPresent` is 'replace'; then, over any
+ * record stored, a tombstone or damaged one included, it keeps and answers the record at the `revision_seq` one past
+ * the one stored, under the record's own `revision_tok`. Nothing else compares `expected` to what is stored: any other
+ * `stale_write` is scripted.
  * Each `will...` queues an answer for the next call of its verb, one answer per call, then back to
  * the default.
  */
@@ -263,8 +265,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       const held = stored.get(record.boxlabel)
       const scope = CX.boxscope.parse(record)
       if (expected === null && ifPresent !== 'replace' && held !== undefined && ! MSX.isTombstone(held)) { return refusalOf(scope, Refusals.staleBox(held)) }
-      stored.set(record.boxlabel, record)
-      return answerOf(CX.boxscope.parse(record), record)
+      const landed = (expected === null && ifPresent === 'replace' && held !== undefined) ? { ...record, revision_seq: held.revision_seq + 1 } : record
+      stored.set(record.boxlabel, landed)
+      return answerOf(scope, landed)
     },
     del: async (scope, expected) => {
       calls.push({ verb: 'del', scope, expected })

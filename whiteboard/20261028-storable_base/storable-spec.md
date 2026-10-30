@@ -187,7 +187,7 @@ Some of these are design considerations / future feature requests but they influ
   - `maxBoxMillis`: specialized for the box (not acted on yet).
 * `ifAbsent`: `'fail' | 'nil'`, policy when attempting to read an absent or tombstoned record -- default `'fail'`.
 * `ifPresent`: `'replace' | 'fail' | 'fetch'`, policy when writing to an already-present record (not acted on yet). (this interacts with `stale_write` and `ensure_x`; its semantics viz tombstone need consideration)
-  - Only `'replace'` is implemented: optional on `send`, it makes storage put over a record it holds when `expected` is null; with `expected` given the compare-and-set holds whatever it says. `'fail'` and `'fetch'` will not be implemented until a clear need and a scenario table arrive.
+  - Only `'replace'` is implemented: optional on `send`, it makes storage put over a record it holds when `expected` is null, at the revision after the one held; with `expected` given the compare-and-set holds whatever it says. `'fail'` and `'fetch'` will not be implemented until a clear need and a scenario table arrive.
 * `reseal` (box): with no whisper given or exposed, seal the stored one again.
 
 * `ifPresent`: 'replace', 'fail', 'fetch'
