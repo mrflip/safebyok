@@ -1,6 +1,6 @@
 # Thread 7: The dna at `build`'s door (2026-10-30)
 
-Branch `20261030-box_dna`, PR #PRNUM, stacked on #370 (restacked onto #374; the restack's push is
+Branch `20261030-box_dna`, PR #377, stacked on #370 (restacked onto #374; the restack's push is
 pending). Justify: green (safebyok 3847 passed, 37 skipped; every package green, size budgets
 unmoved).
 
