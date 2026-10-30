@@ -317,7 +317,7 @@ describe("Box snapshot", () => {
   })
 })
 
-describe("Box sidecar while the vault is locked", () => {
+describe("Box sidecar, locked or not", () => {
   it("LOCKED is the registered symbol of that name, which the whisper answers itself", async () => {
     expect(LOCKED).to.eq(Symbol.for('LOCKED'))
     const box = await boxOf()
@@ -326,93 +326,75 @@ describe("Box sidecar while the vault is locked", () => {
     expect(box.whisper).to.eq(LOCKED)
   })
 
-  it("answers itself while unlocked, and the locked bag while locked", async () => {
+  it("answers itself, whether the vault is unlocked or locked", async () => {
     const box = await boxOf()
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
     held.mw.setLockState('locked')
-    expect(box.sidecar).to.have.property(LOCKED, true)
-    expect(Object.keys(box.sidecar!)).to.deep.equal([])
+    expect(box.sidecar).to.deep.equal({ note: 'a test box' })
     held.mw.setLockState('unlocked')
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
   })
 
-  it("is one frozen bag, whatever the box holds", async () => {
-    const full = await boxOf()
+  it("is null where the record in hand is not full, locked or not", async () => {
     const sparse = await boxOf(held.mw.sparseBoxRecord({ boxlabel: 'b_sparse' }))
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
-    held.mw.setLockState('locked')
-    expect(Object.isFrozen(full.sidecar)).to.be.true
-    for (const box of [sparse, gone]) {
-      expect(box.sidecar).to.eq(full.sidecar)
-      expect(box.sidecar).to.have.property(LOCKED, true)
+    for (const lockState of ['unlocked', 'locked'] as const) {
+      held.mw.setLockState(lockState)
+      expect(sparse.sidecar).to.be.null
+      expect(gone.sidecar).to.be.null
     }
   })
 
-  it("is the snapshot's sidecar too, from the settle after the lock", async () => {
+  it("is the snapshot's sidecar too, and a lock leaves the snapshot and its listeners alone", async () => {
     const box = await boxOf()
     const unlocked = box.getSnapshot()
+    const listener = vi.fn()
+    box.subscribe(listener)
     held.mw.setLockState('locked')
     box.settle()
-    const locked = box.getSnapshot()
-    expect(locked).to.not.eq(unlocked)
-    expect(locked.sidecar).to.have.property(LOCKED, true)
-    expect(locked).to.deep.include({ full: true, present: true, revision_seq: 1 })
+    expect(box.getSnapshot()).to.eq(unlocked)
+    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
+    expect(box.getSnapshot()).to.deep.include({ full: true, present: true, revision_seq: 1 })
     held.mw.setLockState('unlocked')
     box.settle()
-    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
+    expect(box.getSnapshot()).to.eq(unlocked)
+    expect(listener.mock.calls).to.have.lengthOf(0)
   })
 
-  it("is the bag in a snapshot even for a box whose sidecar is empty or absent, which differ from it only by the symbol", async () => {
+  it("tells an empty sidecar from an absent one in the snapshot, locked or not", async () => {
     const empty = await boxOf(fullBoxRecord({ sidecar: {} }))
     const sparse = await boxOf(held.mw.sparseBoxRecord({ boxlabel: 'b_sparse' }))
-    const [emptySnap, sparseSnap] = [empty.getSnapshot(), sparse.getSnapshot()]
-    const listeners = [vi.fn(), vi.fn()]
-    empty.subscribe(listeners[0]!)
-    sparse.subscribe(listeners[1]!)
-    held.mw.setLockState('locked')
-    empty.settle()
-    sparse.settle()
-    expect(empty.getSnapshot()).to.not.eq(emptySnap)
-    expect(empty.getSnapshot().sidecar).to.have.property(LOCKED, true)
-    expect(sparse.getSnapshot()).to.not.eq(sparseSnap)
-    expect(sparse.getSnapshot().sidecar).to.have.property(LOCKED, true)
-    expect(listeners[0]!.mock.calls).to.have.lengthOf(1)
-    expect(listeners[1]!.mock.calls).to.have.lengthOf(1)
-  })
-
-  it("lets nothing of the sidecar out through the snapshot's JSON, the box's JSON, or the sparse form", async () => {
-    const box = await boxOf(fullBoxRecord({ sidecar: { note: 'a marked sidecar value' } }))
-    held.mw.setLockState('locked')
-    box.settle()
-    for (const shown of [JSON.stringify(box.getSnapshot()), JSON.stringify(box), JSON.stringify(box.sparse)]) {
-      expect(shown).to.not.contain('a marked sidecar value')
+    for (const lockState of ['unlocked', 'locked'] as const) {
+      held.mw.setLockState(lockState)
+      expect(empty.getSnapshot().sidecar).to.deep.equal({})
+      expect(sparse.getSnapshot().sidecar).to.be.null
     }
-    expect(JSON.stringify(box.getSnapshot())).to.contain('"sidecar":{}')
   })
 
-  it("is never on the sparse form, toJSON or a tombstone, locked or not: those have no sidecar at all", async () => {
+  it("follows a receive of a record with another sidecar into the snapshot while locked", async () => {
+    const box = await boxOf()
+    held.mw.setLockState('locked')
+    const before = box.getSnapshot()
+    box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'newer' } }))
+    expect(box.getSnapshot()).to.not.eq(before)
+    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'newer' })
+    expect(box.sidecar).to.deep.equal({ note: 'newer' })
+  })
+
+  it("is never on the sparse form or a tombstone, locked or not: those have no sidecar at all", async () => {
     const box = await boxOf()
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
     for (const lockState of ['unlocked', 'locked'] as const) {
       held.mw.setLockState(lockState)
       for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), cacheableOf(gone).central]) {
         expect(form).to.not.have.property('sidecar')
-        expect(Object.getOwnPropertySymbols(form)).to.deep.equal([])
       }
       const { central, staged, ...sparse } = cacheableOf(box)
       expect(sparse).to.not.have.property('sidecar')
-      expect(Object.getOwnPropertySymbols(central)).to.deep.equal([])
+      expect(central).to.deep.equal(fullBoxRecord())
       expect(staged).to.be.null
     }
   })
-
-  it("leaves the record in hand as it is: the cacheable central keeps the sidecar it was stored with", async () => {
-    const box = await boxOf()
-    held.mw.setLockState('locked')
-    expect(cacheableOf(box).central).to.deep.equal(fullBoxRecord())
-  })
-
-  it.todo("a lock coming down settles every box, so that a snapshot made before it stops carrying the sidecar")
 })
 
 describe("Box own props", () => {

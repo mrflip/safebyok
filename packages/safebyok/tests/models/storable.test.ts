@@ -1485,3 +1485,27 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
   })
 })
 // --
+
+// == [The double edge]: a staged edit carried past damage, then storage answers nothing stored
+
+describe("storable.receive(null): a staged edit carried past damage, then nothing stored", () => {
+  it("is dropped with nothing refused or told: central becomes the deletion at the ouchstone's revision", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord(CentralRev))
+    await box.edit({ sidecar: { note: 'staged' } })
+    box.receive(rcvdOf('ouch', NewerRev))
+    expect(box.hasStaged).to.be.true
+    expect(box.revision_seq).to.eq(NewerRev.revision_seq + 1)
+    expect(box.sidecar).to.deep.equal({ note: 'staged' })
+
+    held.mw.setNow(T0 + 9000)
+    box.receive(null)
+
+    expect(box.hasStaged).to.be.false
+    expect(box.isPresent).to.be.false
+    expect(cacheableOf(box).staged).to.be.null
+    expect(cacheableOf(box).central).to.deep.include({ revision_seq: NewerRev.revision_seq, revision_tok: NewerRev.revision_tok, am: 'x', written_at: T0 + 9000 })
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+})
+// --
