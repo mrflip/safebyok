@@ -26,6 +26,12 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
 * *Thread 1:* `build(dna)` does not save to the cache today; thread 3's `settle(thing)` will, and
   the `save` assertions thread 1 left in `box-listing.test.ts` change with it.
 * *Thread 1:* `box.sidecar` is null for a draft, since a draft is not full.
+* *Thread 1 review; orchestrator's YOLO call, open to the Coach:* **a damaged record arrives as a
+  tombstone, `am` 'd', in the kind's sparse form**, the adapter filling in the kind's constants
+  (for a box `fmt`, `whisper_codec`, `whisper_schema_version`). A bare tombstone (scope,
+  `vault_tok`, revision and times only) refuses `bad_record` at `sparseOf`. Tests that build a
+  damaged answer, a `stale_write`'s `meta.box_stored` included, use
+  `tombstoneBoxRecord(overrides, 'd')`, which builds exactly that form.
 
 ## Shared test world
 
