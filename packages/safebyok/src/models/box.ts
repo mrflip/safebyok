@@ -6,25 +6,17 @@ import { type BoxRecord, type BoxSparse, type EditOpts, isTombstone } from './mo
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
-// == [Record forms]: LOCKED, LockedSidecar, BoxSnapshot, BoxProps, BoxEditOpts
+// == [Record forms]: LOCKED, BoxSnapshot, BoxProps, BoxEditOpts
 
-/** The sentinel `box.whisper` answers while the vault is locked, and the key that marks a {@link LockedSidecar}. It is registered with `Symbol.for`, so `Symbol.for('LOCKED')` is this symbol. */
+/** The sentinel `box.whisper` answers while the vault is locked. It is registered with `Symbol.for`, so `Symbol.for('LOCKED')` is this symbol. */
 export const LOCKED: unique symbol = Symbol.for('LOCKED')
-
-/** The bag `box.sidecar` and the snapshot's `sidecar` answer in place of the sidecar while the vault is locked. It is one frozen object, marked by the {@link LOCKED} key, which JSON leaves out. */
-export type LockedSidecar = Readonly<{ [LOCKED]: true }>
-
-const lockedSidecar: LockedSidecar = Object.freeze({ [LOCKED]: true as const })
-
-/** Whether `sidecar` is the bag a locked box answers, which is always the one frozen object. */
-const isLockedSidecar = (sidecar: Sidecar | LockedSidecar | null): boolean => sidecar === lockedSidecar
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
   revision_seq:  number
   registered_at: number
   written_at:    number
-  sidecar:       Sidecar | LockedSidecar | null
+  sidecar:       Sidecar | null
   full:          boolean
   present:       boolean
   exposed:       boolean
@@ -54,11 +46,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   get fmt(): number { return this.combined.fmt }
 
-  /** The sidecar of the record in hand, which only the full record carries; null otherwise. While the vault is locked, it is the {@link LockedSidecar} bag instead, whatever the record holds. */
-  get sidecar(): Sidecar | LockedSidecar | null {
-    if (this.isLocked) { return lockedSidecar }
-    return this.full?.sidecar ?? null
-  }
+  /** The sidecar of the record in hand, which only the full record carries; null otherwise. It holds nothing secret, so it shows whether the vault is locked or not. */
+  get sidecar(): Sidecar | null { return this.full?.sidecar ?? null }
 
   /** The sealed parts of the record in hand; null where it is not full. */
   get box_key_wrapped():        BoxRecord['box_key_wrapped'] | null  { return this.full?.box_key_wrapped ?? null }
@@ -152,12 +141,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     const carried = this.isFullRecord(base) ? base.sidecar : null
     if (carried === null && patch.sidecar === undefined && ! isTombstone(this.combined)) { return Promise.reject(new VaultError('bad_option', Phrases.NoSidecarToCarry)) }
     return stubSeal({ ...base, sidecar: patch.sidecar ?? carried ?? {} }, whisper)
-  }
-
-  /** Two snapshots are alike when their JSON is, and both or neither carry the locked sidecar. */
-  protected override sameSnapshot(next: BoxSnapshot, current: BoxSnapshot): boolean {
-    // JSON leaves the LOCKED key out: without the identity check, a box that locks with an empty sidecar would keep its old snapshot.
-    return isLockedSidecar(next.sidecar) === isLockedSidecar(current.sidecar) && super.sameSnapshot(next, current)
   }
 
   protected makeSnapshot(): BoxSnapshot {
