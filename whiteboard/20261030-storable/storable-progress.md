@@ -40,6 +40,43 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   damaged answer, a `stale_write`'s `meta.box_stored` included, use
   `tombstoneBoxRecord(overrides, 'd')`, which builds exactly that form.
 
+* *Thread 4a (#371):* a record is **whole** when full or a tombstone (`isWholeRecord`, protected,
+  beside `classifyRecordShape`); a damaged tombstone now notes success too (an open matter).
+  `hydrate` passes `isWholeRecord(central) ? opts.maxMillisSinceRefresh : 0`.
+  `isTimelyWithin(Infinity)` is true. A per-call `maxMillisSinceRefresh: Infinity` reaches
+  `hydrate` through the `ensureReadyTo...` guards and fetches nothing, a draft's included; a
+  *listing* horizon of Infinity still fetches once on a thing never fetched, since the trigger
+  is born due (an open matter; `it.todo`). Under Infinity a `hydrate` during a fetch resolves at
+  once rather than joining it.
+* *Thread 4a:* a fetching `hydrate` calls the world's `ensureTimely` three times (`hydrate`, the
+  launched `Storable.fetch` with `{}`, `listing.fetch`); tests assert only that the world comes
+  first. An open matter; no thread changes it.
+* *Thread 4a:* the trigger had no tests; `tests/helpers/trigger.test.ts` is new. 4a created
+  `tests/models/storable.test.ts` and `tests/models/box.test.ts`, tops of imports and
+  `useModelsWorld` only: a thread beside it creating the same file meets an add/add conflict in
+  the imports at restack.
+
+* *Thread 3 (#372):* `fetch` defaults to `ifAbsent: 'fail'`; a caller that wants null passes
+  `{ ifAbsent: 'nil' }` (the trigger's launch does). `put`, `del` and notices judge no
+  `ifAbsent`. The listing's `settle(thing?)` saves `thing.cacheable`, then remakes the snapshot,
+  even when the save refuses. The listing's snapshot is `readonly SnapshotT[]`, the present
+  things' own `getSnapshot()`: thread 5 tests the box's snapshot knowing the listing shows it.
+  `isWatchable` defaults true.
+* *Thread 3:* `hello` replaces a thing already held under a cached scope, so tests call `hello`
+  first and build after (in review as a finding against one durable instance per scope).
+* *Thread 3:* seven places bad news reaches no one are listed in its thread file; the inventory
+  for the Coach's later design. Whether the trigger's launched `tryFetch` refusal reaches anyone
+  was not followed: thread 4b follows it, as it works in the verbs the trigger launches.
+* *Thread 2 (#373):* `record_conflict` is a condition kind, thrown by `cmpRevisions` and the
+  one-revision-two-fates rows; `corrupt_record` stays for adapter answers in shapes the protocol
+  does not allow. Thread 2 created `tests/models/listing.test.ts` (beside thread 3's) and
+  `tests/loosened/loosened.test.ts`: append describes at their ends. Its thread file's section
+  *Rows unreachable or differing from the table* is thread 6's source; four of its findings are
+  open matters (what "alive" means; `same | full | ouch` has no row; an older record resets the
+  refresh clock; a box held alive with nothing stored is stuck on `record_conflict`).
+* *Orchestrator:* a PR's base is `main`, its first line "Stacked on #N" (`gh pr create --base
+  main`); #371 and #372 were filed against #370's branch and moved.
+
 ## Shared test world
 
 `packages/safebyok/tests/test-helpers/models-world.ts` (thread 1, #370). The full API is the
@@ -61,6 +98,8 @@ short:
   `willSave`; answer makers `answerOf`, `refusalOf`, `staleWriteOf(scope, stored)`; seeding
   `seedStore`, `seedCache`; pushing `notify`, `notifyRaw`.
 * Time: fake timers on by default; move time only by `mw.setNow(ms)` (clock alone) or
-  `await mw.advance(ms)` (clock and timers together). Lock by `mw.setLockState`.
+  `await mw.advance(ms)` (clock and timers together). `setNow` past a timer's due time leaves it
+  armed and unfired: to test "no timer", start from a draft or let it fire with `advance`
+  (thread 4a). Lock by `mw.setLockState`.
 * Builders: `fullBoxRecord`, `sparseBoxRecord`, `tombstoneBoxRecord(overrides, 'x' | 'd')`,
   `boxscope(boxlabel)`, `T0`.
