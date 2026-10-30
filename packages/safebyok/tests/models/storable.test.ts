@@ -429,7 +429,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
 
   const BadCases = [
     [(box: Box) => box.tryFetch(),                          (box: Box) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },    "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: Box) => box.tryFetch(),                          () => { held.mw.willGet(() => { throw new Error('socket closed') }) },           "unexpected_error",    'tryFetch whose store throws a plain Error'],
+    [(box: Box) => box.tryFetch(),                          () => { held.mw.willGet(() => { throw new Error("socket closed") }) },           "unexpected_error",    'tryFetch whose store throws a plain Error'],
     [(box: Box) => box.tryHydrate(),                        () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },           "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: Box) => box.tryEdit({ sidecar: { note: 'x' } }), () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryEdit while locked'],
     [(box: Box) => box.trySend({ sidecar: { note: 'x' } }), (box: Box) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'trySend that storage refuses as stale'],

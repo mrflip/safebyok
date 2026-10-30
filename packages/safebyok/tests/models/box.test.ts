@@ -65,13 +65,13 @@ describe("box.receive(rcvd): the own props follow a newer record", () => {
 describe("box.unsealWhisper(): refused from its guard", () => {
   const RefusedCases = [
     // absent, refused ahead of the seal:
-    [() => tombstoneBoxRecord({ revision_seq: 2 }),      'unlocked', "absent_box",       'a deleted box'],
-    [() => tombstoneBoxRecord({ revision_seq: 2 }, 'd'), 'unlocked', "absent_box",       'a damaged box'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }),      "unlocked", "absent_box",       'a deleted box'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }, 'd'), "unlocked", "absent_box",       'a damaged box'],
     // locked, refused first:
-    [() => tombstoneBoxRecord({ revision_seq: 2 }),      'locked',   "vault_locked",     'a deleted box while the vault is locked'],
-    [() => fullBoxRecord(),                              'locked',   "vault_locked",     'a full box while the vault is locked'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }),      "locked",   "vault_locked",     'a deleted box while the vault is locked'],
+    [() => fullBoxRecord(),                              "locked",   "vault_locked",     'a full box while the vault is locked'],
     // present and full, past the guard to the seal not yet written:
-    [() => fullBoxRecord(),                              'unlocked', "unexpected_error", 'a full box, which reaches the unseal, not written yet'],
+    [() => fullBoxRecord(),                              "unlocked", "unexpected_error", 'a full box, which reaches the unseal, not written yet'],
   ] as const
   for (const [recordOf, lockState, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
@@ -87,8 +87,8 @@ describe("box.unsealWhisper(): refused from its guard", () => {
 
 describe("box.edit(patch): rebirth over a tombstone", () => {
   const TombstoneCases = [
-    ['x', 'rev-x2', 'a deleted box'],
-    ['d', 'rev-d2', 'a damaged box'],
+    ["x", "rev-x2", 'a deleted box'],
+    ["d", "rev-d2", 'a damaged box'],
   ] as const
   for (const [am, tok, blurb] of TombstoneCases) {
     it(`stages ${blurb} alive at the next revision, registered now; a second edit keeps both; send puts it over the tombstone's revision`, async () => {
