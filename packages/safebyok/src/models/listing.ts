@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type IfPresent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -143,18 +143,15 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown.
-   * `ifPresent`, optional, may only be `'replace'`: it goes to storage with the put, which judges it. Where the revision expected is none, storage puts over a record it holds, at the revision after that record's; where one is expected, its compare-and-set holds as it does without.
-   */
-  async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ifPresent?: IfPresent): Promise<ThingT | null> {
+  /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown. */
+  async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const record = this.recordOf(duck)
-    const replace = ifPresent === undefined ? undefined : MSX.ifPresent.parse(ifPresent)
     const expectedRevision = this.expectedRevisionOf(this.scopeOf(record))
-    const answer = await this.#store.put(record, expectedRevision, replace)
+    const answer = await this.#store.put(record, expectedRevision)
     return this.#deliver(answer, this.scopeOf(record))
   }
 
-  tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ifPresent?: IfPresent): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck, ifPresent)) }
+  tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck)) }
 
   /** Delete the thing `duck` names, a sparse record or a thing, at the revision its instance expects, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {

@@ -16,7 +16,7 @@ import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxProps, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type IfPresent, type LockState, type Notice, type Revision, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Revision, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Refusals from '../../src/refusals'
 import * as CX from '../../src/shapes/scopes'
@@ -77,7 +77,7 @@ export type ModelsCall =
   | { verb: 'ensureTimely', opts: TimelyOpts }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, expected: Revision | null, ifPresent: IfPresent | undefined }
+  | { verb: 'put',          record: BoxRecord, expected: Revision | null }
   | { verb: 'del',          scope: Boxscope, expected: Revision | null }
   | { verb: 'watch',        onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[] }
   | { verb: 'unwatch' }
@@ -110,11 +110,9 @@ export type ModelsWorldOpts = {
  * By default the store answers as a store that keeps what it is given: `get` answers the record
  * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
  * answers a tombstone at the revision after the one stored (or expected); `watch` and the cache
- * do as they are told. `put` refuses 'stale_write', carrying the box stored,
- * when `expected` is null and a box (not a tombstone) is stored, unless `ifPresent` is 'replace'; then, over any
- * record stored, a tombstone or damaged one included, it keeps and answers the record at the `revision_seq` one past
- * the one stored, under the record's own `revision_tok`. Nothing else compares `expected` to what is stored: any other
- * `stale_write` is scripted.
+ * do as they are told. `put` refuses 'stale_write', carrying the record stored, when `expected` is null
+ * and any record is stored, a tombstone included (revision 0 lands only over no row), and keeps the record
+ * exactly as given. Nothing else compares `expected` to what is stored: any other `stale_write` is scripted.
  * Each `will...` queues an answer for the next call of its verb, one answer per call, then back to
  * the default.
  */
@@ -159,7 +157,7 @@ export type ModelsWorld = {
   seedCache(...copies: readonly Cacheable<BoxRecord, BoxSparse>[]): void
 
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
-  willPut(...answers: readonly Scripted<{ record: BoxRecord, expected: Revision | null, ifPresent: IfPresent | undefined }>[]): void
+  willPut(...answers: readonly Scripted<{ record: BoxRecord, expected: Revision | null }>[]): void
   willDel(...answers: readonly Scripted<{ scope: Boxscope, expected: Revision | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((opts: TimelyOpts) => Promise<void> | void)[]): void
@@ -228,7 +226,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
-    put:          new Script<{ record: BoxRecord, expected: Revision | null, ifPresent: IfPresent | undefined }>(),
+    put:          new Script<{ record: BoxRecord, expected: Revision | null }>(),
     del:          new Script<{ scope: Boxscope, expected: Revision | null }>(),
     ensureTimely: new Script<TimelyOpts>(),
     load:         new Script<undefined>(),
@@ -258,16 +256,15 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (scripted) { return (await answer) as BoxAnswer }
       return answerOf(scope, stored.get(scope.boxlabel) ?? null)
     },
-    put: async (record, expected, ifPresent) => {
-      calls.push({ verb: 'put', record, expected, ifPresent })
-      const { scripted, answer } = scripts.put.take({ record, expected, ifPresent })
+    put: async (record, expected) => {
+      calls.push({ verb: 'put', record, expected })
+      const { scripted, answer } = scripts.put.take({ record, expected })
       if (scripted) { return (await answer) as BoxAnswer }
       const held = stored.get(record.boxlabel)
       const scope = CX.boxscope.parse(record)
-      if (expected === null && ifPresent !== 'replace' && held !== undefined && ! MSX.isTombstone(held)) { return refusalOf(scope, Refusals.staleBox(held)) }
-      const landed = (expected === null && ifPresent === 'replace' && held !== undefined) ? { ...record, revision_seq: held.revision_seq + 1 } : record
-      stored.set(record.boxlabel, landed)
-      return answerOf(scope, landed)
+      if (expected === null && held !== undefined) { return refusalOf(scope, Refusals.staleBox(held)) }
+      stored.set(record.boxlabel, record)
+      return answerOf(scope, record)
     },
     del: async (scope, expected) => {
       calls.push({ verb: 'del', scope, expected })

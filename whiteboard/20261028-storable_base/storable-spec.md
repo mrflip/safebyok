@@ -186,11 +186,19 @@ Some of these are design considerations / future feature requests but they influ
   - `maxWorldMillis`: the same for the world (not acted on yet).
   - `maxBoxMillis`: specialized for the box (not acted on yet).
 * `ifAbsent`: `'fail' | 'nil'`, policy when attempting to read an absent or tombstoned record -- default `'fail'`.
-* `ifPresent`: `'replace' | 'fail' | 'fetch'`, policy when writing to an already-present record (not acted on yet). (this interacts with `stale_write` and `ensure_x`; its semantics viz tombstone need consideration)
-  - Only `'replace'` is implemented: optional on `send`, it makes storage put over a record it holds when `expected` is null, at the revision after the one held; with `expected` given the compare-and-set holds whatever it says. `'fail'` and `'fetch'` will not be implemented until a clear need and a scenario table arrive.
+* `ifPresent`: how `send` meets what storage holds. A put carries the record at revision N, minted
+  on the device over the revision N − 1 it holds (`expected`; none when N is 0). A revision is its
+  tok and seq: "at N − 1" means the very record the device holds.
+
+  | `ifPresent` | over no row (N = 0) or the record at N − 1 | over N or later | over a lower revision |
+  |---|---|---|---|
+  | `'replace'` (default; the only one implemented) | lands | `stale_write`, carrying what is stored | `stale_write`, as today |
+  | `'fetch'` (not implemented) | lands over no row or a tombstone at N − 1; over a live N − 1: open | answers what is stored, `ok: true` | `stale_write`, as today |
+
+  `'replace'` is the versioned replace (compare-and-swap): storage never renumbers or patches a
+  record. `'fetch'` will not be implemented until a clear need and a scenario table arrive.
 * `reseal` (box): with no whisper given or exposed, seal the stored one again.
 
-* `ifPresent`: 'replace', 'fail', 'fetch'
 * `maxMillisSinceRefresh`, `maxWorldMillis`
 
 ## Local copies
