@@ -360,6 +360,10 @@ package's exports; `Class.make` and any constructor taking outside input; a host
 host's callback returns (a strength checker's verdict, a key deriver's output). A failure there is
 a refusal with a `kind` the caller can branch on.
 
+**A constructor validates its arguments**, in a parse as its first line, even when the `make` or
+`build` that calls it parsed them already: it is an entry point of its own. An instance among them
+(a listing, a clock) is checked by a custom instanceOf checker rather than a description of its shape.
+
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
 handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`,
 `dragForceInput.parse({ thing, vel })` (the Coach, 2026-10-27: "validators [are] the principal
