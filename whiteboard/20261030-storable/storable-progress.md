@@ -95,6 +95,17 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   ff949221, c58f468e, 9f3376f7; justify green); thread 5's `boxOf` became `builtBoxOf`. #372 is
   rebased once, onto 4b's reworked tip, by thread 3's rework worker.
 
+* *The Coach's rulings of 2026-10-30, third batch* (verbatim in *Resolved*): a dna carrying
+  `revision_seq` is refused; `registered_at` takes "needs no logic" (and the Coach is looking into
+  its constraints); a record under another `vault_tok` throws `unexpected_error` (thread 9);
+  `build(dna)` over a held scope refuses; the timer reschedules after any completed launch
+  (thread 10). Every tombstone is whole, the never-stored shim at revision -1 included.
+* *The Coach's conception of making a record, to revisit when the Coach is back:* "regular data
+  inserted over a tombstone at rev -1 that is never sent, followed by an immediate dispatch at max
+  fresh window. Does not rely on detecting that a record is new, or indicating that a record is
+  new; does not need a special validator, does not need a special name." Today `build(dna)`,
+  `boxDna` and `hasRevision` do this with a dna validator; build nothing more on them.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
