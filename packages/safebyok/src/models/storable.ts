@@ -362,9 +362,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * * A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
    *   revision, so central becomes it and `reconcileStaged` drops the staged. This includes nothing stored
    *   (`receive(null)`) for a thing held damaged.
-   *   The double edge: a staged edit carried to the revision after a newer damaged record's ouchstone is dropped
-   *   with the rest when nothing stored then arrives, with no refusal and no news; the edit might have been kept, but
-   *   this policy unstages it.
+   *   The double edge: a staged edit carried past a newer damaged record's ouchstone is dropped when nothing stored
+   *   then arrives. Nothing is refused and no news is told. The edit could have been kept; this policy unstages it.
    * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
    * refuses another tok at the same seq before any row is weighed.
    *
