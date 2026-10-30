@@ -1,6 +1,6 @@
 # Thread 3: The listing's pipeline (2026-10-30)
 
-Branch `20261030-listing_pipeline`, PR #371 (see the PR for the number if this one moved), stacked on #370. Justify: green (core 3902 tests pass, 37 skipped as before, 93 more than thread 1; root scripts 289; size budgets unmoved).
+Branch `20261030-listing_pipeline`, PR #372, stacked on #370. Justify: green (core 3902 tests pass, 37 skipped as before, 93 more than thread 1; root scripts 289; size budgets unmoved).
 
 * **Built**
   * `Listing.settle(thing?)` saves `thing.cacheable` to the device cache and then remakes the listing's snapshot, in a `finally`: the snapshot is made even when the cache refuses the save. `#receiveInto` (so `fetch`, `put`, `del`, notices and `build(record)`) and `build(dna)` pass the thing; `hello` passes none.
