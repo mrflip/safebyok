@@ -157,7 +157,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Delivering an answer]: deliver, buildOrReceive, bornOf, hold, neverStoredOf
+  // == [Delivering an answer]: deliver, buildOrReceive, makeThingFor, hold, neverStoredOf
 
   /** The pipeline every answer takes. Check it; take the world; hand the record, or none stored, to `#buildOrReceive` under the scope the answer names; a refusal answer is thrown, after the record a 'stale_write' carries is delivered.
    * The answer's own refusals are thrown: its world's, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
@@ -180,7 +180,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     throw answer.err
   }
 
-  // The one place an instance is made and held: `#bornOf` is called from here alone, and only where no instance is held.
+  // The one place an instance is made and held: `#makeThingFor` is called from here alone, and only where no instance is held.
   /** The instance under `scope` once `intake` meets it: the instance held, or, where none is, one born of `intake` and held.
    * A record received goes to the instance's `receive`, a new instance's included, which is held only once it has taken
    * the record; a refusal `receive` throws is thrown, nothing held or saved. A cached copy leaves an instance held as it
@@ -193,7 +193,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const held = this.at(scope)
     if (held !== null && intake.flavor === 'drafted') { throw alreadyHeldError() }
     if (held !== null && intake.flavor === 'cached')  { return held }
-    const thing = held ?? this.#bornOf(intake)
+    const thing = held ?? this.#makeThingFor(intake)
     if (thing === null) { return null }
     if (intake.flavor === 'received') { this.tellBadNews(thing.receive(intake.record).badnews) }
     if (thing !== held) { this.#hold(thing) }
@@ -202,7 +202,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** A new instance for `intake`, constructed and nothing more; null for nothing stored. A record's instance is born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; a copy's revives its central and staged; a draft is staged over a central never stored. */
-  #bornOf(intake: Intake<RecordT, SparseT>): ThingT | null {
+  #makeThingFor(intake: Intake<RecordT, SparseT>): ThingT | null {
     if (intake.flavor === 'cached')  { return this.makeThing(intake.copy.central, intake.copy.staged) }
     if (intake.flavor === 'drafted') { return this.makeThing(this.#neverStoredOf(intake.draft), intake.draft) }
     return intake.record === null ? null : this.makeThing(this.#neverStoredOf(this.sparseOf(intake.record)), null)
