@@ -1,7 +1,7 @@
 # Thread 2: reconcile_rows (2026-10-30)
 
 Branch `20261030-reconcile_rows`, PR #373, stacked on #370 (its base is `20261030-models_world`).
-Justify: green; safebyok 3888 passed, 37 skipped, 3 todo.
+Justify: green; safebyok 3889 passed, 37 skipped, 1 todo.
 
 * **Built**
   * `record_conflict`, a condition, in `src/errors.ts` (the doc block, `refusalKindVals`,
@@ -36,15 +36,32 @@ Justify: green; safebyok 3888 passed, 37 skipped, 3 todo.
     breaks, which is the signal to update it.
   * The changeset says no exported call refuses with the new kind yet. That is true: only the
     unexported models do.
+  * **Ruling, "alive" (the Coach, 2026-10-30)**: "Don't redefine the constants. If a different
+    policy makes more sense, implement that and put a big honking note down." `amVals`,
+    `liveness` and every constant stay. The rows changed instead, in `reconcileCentral`'s table
+    and code. At one revision a damaged record delivered skips over any central, a deletion
+    included (`same | ouch | any`). A deletion delivered over a copy held damaged takes 'gone'
+    (`same | gone | ouch`, a new row): central becomes the deletion and the staged is dropped.
+    That row covers `receive(null)`, and a listing's fetch of nothing stored, for a box held
+    damaged. Alive in the table now reads as `amVals` has it, am 'a'. A NOTE paragraph above the
+    table says what the rows do and cites the ruling. It sits above the table, away from the
+    ouchstone sentence thread 4b rewrites. The two pinned tests and their `it.todo`s became
+    passing tests: same | ouch | any now loops over all four centrals, plus same | gone | ouch,
+    and `receive(null)` for a box held damaged.
+  * **Ruling, a box stuck on `record_conflict` (the Coach, 2026-10-30)**: "a reset button to go
+    back to tombstone -1? Not against it, but we don't want something to cause infinite refresh.
+    The real way out is to tell the customer." No automatic way out was built. Both refusal
+    messages (`cmpRevisions`, `OneRevisionTwoFates`), the README Conditions row, the `errors.ts`
+    kind comment, the errors test blurb and the changeset now say three things. Storage and this
+    device disagree about one revision of a record. This device kept its own copy. Fetching
+    again finds the same disagreement, so the app tells the user and a developer looks at the
+    storage adapter. Nothing promises that fetching again mends it. The README row no longer
+    names `revision_seq` ("a different record under the same revision number"), which settles
+    the reviewer's note on that.
 
 * **Rows unreachable or differing from the table** (for thread 6)
-  1. **"alive" is read two ways.** `amVals` defines alive as am 'a'. `reconcileCentral` treats it
-     as "not gone", so ouch counts as alive. Two consequences:
-     * same | ouch | gone refuses `record_conflict`, but the row same | ouch | any says 'skip'.
-     * same | gone | ouch refuses `record_conflict`. Under the am reading no row matches it.
-       This case includes `receive(null)` and a listing's fetch of nothing stored for a box
-       held damaged.
-     Both are pinned, with `it.todo`.
+  1. **"alive" was read two ways**: settled by the Coach's ruling (see *Decisions taken*).
+     same | ouch | gone now skips, and same | gone | ouch takes 'gone'.
   2. **same | full | ouch matches no row.** A healthy record delivered at the revision held
      damaged falls through and refuses `unexpected_error` ("a bug in Storable"). It is reachable
      with one healthy fetch after an ouch. Pinned, with `it.todo`.
@@ -63,14 +80,8 @@ Justify: green; safebyok 3888 passed, 37 skipped, 3 todo.
   * `build(damaged)` for a thing not held makes its ouchstone from the damaged record's own
     sparse props, because the never-stored central `#makeThingFor` builds comes from them. The
     table's note "nothing of the delivered one is kept" holds only for a thing already held.
-  * Nothing stored for a box held alive refuses `record_conflict` on every fetch, as the
-    handoff expects, so reading again never mends it. I worded the README row's remedy to say
-    that and to point at the storage adapter. How the box gets unstuck (for example by dropping
-    the cached copy) is the listing pipeline's question.
 
 * **For the Coach**
-  * **alive**: does the table mean am 'a', or not gone? I recommend am 'a': same | ouch | any
-    skips in every case, and same | gone | ouch takes 'gone'.
   * **same | full | ouch**: I recommend 'fill' (central becomes the healthy record, the staged
     left as it was), as same | full | sparse does.
   * **older and timely**: should only full or gone records that are not older mark the thing
