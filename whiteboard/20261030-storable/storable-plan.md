@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #384 (thread 14); thread 11 (#385) in rework (flagged: replace's revision); then 12, 15, 13, 16, then 6.
+* **Status:** thread 11 (#385) filing, flagged twice (the seal-stamp row is the Coach's); then 12, 15, 13, 16, then 6.
 
 ## Read first
 
@@ -440,6 +440,16 @@ storage puts a replacing record at stored seq + 1 under the replacing tok. Left:
 fake (thread 16); whether `'replace'` skips `send`'s hydrating fetch (a row); a cached copy's
 staged scope unchecked against its central's; doc-block tidies (a documentarian run).
 
+*Review (second, over the rework b0877371...94ae442e, medium):* flagged (#385). One style fix.
+**Significant:** storage renumbering a replacing record collides with the seal: the record is
+sealed at the minted seq, the stamp carries `revision_seq`, so under the real seal a replaced box
+would refuse to open. Options: (a) the stamp binds `revision_tok`, not `revision_seq`; (b) storage
+refuses and the device re-mints and reseals; (c) `'replace'` unimplemented until the scenario
+table. A TOP row. *Orchestrator:* filed as built against the default that a twice-flagged thread
+waits, since it is correct under the stub and (a) needs no change; under (b) it is reworked and
+the line restacked. Left: a plain put over a tombstone lands below it; a damaged record's
+unreadable seq (both to thread 16 and the `Store` contract); doc blocks; the race test's title.
+
 ### 16. A faithful fake store
 
 *Orchestrator, from #385's review:* the fake store in `tests/test-helpers/models-world.ts` gives
@@ -447,7 +457,11 @@ staged scope unchecked against its central's; doc-block tidies (a documentarian 
 seq and tok), and nothing stored with an `expected` given refuses too, as a real store would;
 `stale_write` carries what is stored. Fix the seeds of the tests that put or delete over a record
 they did not expect (the reviewer counted 9 across `listing.test.ts`, `box.test.ts`,
-`loosened.test.ts`, among them the save-refused loop cases), changing no assertion's subject.
+`loosened.test.ts`, among them the save-refused loop cases), changing no assertion's subject. From #385's second review, the `Store` contract and the fake
+also say: what a plain put (`expected` null, no `ifPresent`) does over a stored tombstone (today it
+lands at the minted seq, below the tombstone, so devices holding the tombstone diverge; Rec: it
+refuses `stale_write` carrying the tombstone, as over a live box, and the device re-mints above);
+and what `'replace'` does over a damaged record with no readable seq.
 Label `faithful_fake`. Worker `sonnet`; review `low`. Depends on 13 (cut from its tip, last
 before 6). Size: small to medium.
 
