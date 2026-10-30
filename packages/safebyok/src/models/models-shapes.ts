@@ -87,7 +87,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & Partial<RecordT>
 
-/** The copy the listing writes to the device cache: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
+/** The copy the listing saves to the device cache: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
 export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
   central: Fetched<RecordT, SparseT>
   staged:  Fetched<RecordT, SparseT> | null
