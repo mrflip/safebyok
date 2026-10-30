@@ -4,7 +4,7 @@ import { type VaultError, isVaultError } from '../errors'
 import { type Outcome, outcomeOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
 import { stableJsonify } from '../stable-jsonify'
-import { type Dna, type Fetched, type LockState, type Revision, type Storable, type StorableListing, type TimelyOpts, type Times, type Tombstone, type World, isTombstone } from './storable'
+import { type Cacheable, type Dna, type Fetched, type LockState, type Revision, type Overlay, type Storable, type StorableListing, type TimelyOpts, type Times, type World, NeverStoredSeq, isTombstone } from './storable'
 import { randomId } from '../crypto'
 
 // == [What storage answers]: Answer, Notice, FetchOpts, ListingOpts
@@ -60,10 +60,10 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Read the device cache once and make an instance of each copy; start the watch; hydrate every instance. */
+  /** Read the device cache once and revive an instance from each copy; start the watch; hydrate every instance. */
   async hello(): Promise<void> {
     const cached = await this.loadCached()
-    for (const copy of cached) { await this.make(copy) }
+    for (const copy of cached) { await this.#hold(this.makeThing(copy.central, copy.overlay)) }
     this.#unwatch ??= this.watchStore(this.#onNotice)
     await this.hydrateAll()
   }
@@ -87,12 +87,17 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
   /** The instances held whole: the ones the watch may push full records for. */
   get hydratedThings(): readonly ThingT[] { return this.things.filter((thing) => thing.isHydrated) }
 
-  /** Make the instance of `input` and hold it, resolving it: a dna becomes a draft at revision 0; a sparse record, a full one or a tombstone is held as it is. Stores nothing. */
-  async make(input: Dna<ScopeT, RecordT> | Fetched<ScopeT, RecordT, SparseT>): Promise<ThingT> {
+  /** Make the instance of `input` and hold it, resolving it: a dna becomes a never-stored central, its defaults filled; a sparse record, a full one or a tombstone is held as it is. Stores nothing. */
+  make(input: Dna<ScopeT, RecordT> | Fetched<ScopeT, RecordT, SparseT>): Promise<ThingT> {
     const central = hasRevision(input) ? input : this.draftOf(this.stampDna(input))
-    const thing = this.makeThing(central)
+    return this.#hold(this.makeThing(central, null))
+  }
+
+  /** Hold `thing` under its scope and initialize it, telling what it settles; publish. */
+  async #hold(thing: ThingT): Promise<ThingT> {
     this.#things.set(this.scopepathOf(thing.scope), thing)
-    this.tellBadNews(await thing.settle())
+    const settled = await thing.initialize()
+    this.tellBadNews(settled.badnews)
     this.publish()
     return thing
   }
@@ -154,9 +159,9 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
   /** Take the world; hand the record to `thing.receive`; let a thing gone go; cache and tell what came back; publish. */
   async #deliver(thing: Thing<ScopeT, RecordT, SparseT>, answer: Answer<ScopeT, RecordT, SparseT>): Promise<void> {
     this.takeWorld(answer.world)
-    const { cacheable, badnews } = await thing.receive(answer.record)
+    const { badnews } = await thing.receive(answer.record)
     if (thing.isGone) { this.#letGo(thing) }
-    await this.saveCached(cacheable)
+    await this.saveCached(thing.cacheable)
     this.tellBadNews(badnews)
     this.publish()
   }
@@ -218,10 +223,10 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
 
   // == [Helpers]: stampDna, scopeOf
 
-  /** `dna` with the revision nothing stored has and the times of now: what `draftOf` completes. */
+  /** `dna` with the revision nothing stored has (`NeverStoredSeq`, so its first overlay is revision 0) and the times of now: what `draftOf` completes. */
   protected stampDna(dna: Dna<ScopeT, RecordT>): Dna<ScopeT, RecordT> & Revision & Times {
     const now = this.clock.now()
-    return { ...dna, revision_tok: randomId(), revision_seq: 0, registered_at: now, written_at: now }
+    return { ...dna, revision_tok: randomId(), revision_seq: NeverStoredSeq, registered_at: now, written_at: now }
   }
 
   protected scopeOf(fetched: Fetched<ScopeT, RecordT, SparseT>): ScopeT {
@@ -233,9 +238,10 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
 
   protected abstract scopepathOf(scope: ScopeT): string
   protected abstract scopeOfSparse(sparse: SparseT): ScopeT
-  /** The draft a stamped dna makes: the thing's sparse form at revision 0, its defaults filled in; a vault's is its full novel record. */
+  /** The never-stored central a stamped dna makes: the thing's sparse form, its defaults filled in; a vault's is its full novel record. */
   protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): SparseT | RecordT
-  protected abstract makeThing(central: Fetched<ScopeT, RecordT, SparseT>): ThingT
+  /** Construct the instance, and nothing more: the listing initializes it. */
+  protected abstract makeThing(central: Fetched<ScopeT, RecordT, SparseT>, overlay: Overlay<ScopeT, RecordT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError
   abstract lockState(): LockState
   abstract ensureTimelyWorld(opts: TimelyOpts): Promise<void>
@@ -250,8 +256,8 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
   protected abstract watchStore(onNotice: (notice: Notice<ScopeT, RecordT, SparseT>) => void): () => void
 
   // The deviceDB, as this listing maps it: read once at hello, written after.
-  protected abstract loadCached(): Promise<readonly Fetched<ScopeT, RecordT, SparseT>[]>
-  protected abstract saveCached(cacheable: SparseT | Tombstone<ScopeT>): Promise<void>
+  protected abstract loadCached(): Promise<readonly Cacheable<ScopeT, RecordT, SparseT>[]>
+  protected abstract saveCached(cacheable: Cacheable<ScopeT, RecordT, SparseT>): Promise<void>
   // --
 }
 // --

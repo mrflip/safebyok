@@ -3,7 +3,9 @@ import { type Outcome, valOf } from '../outcome'
 
 export type TriggerOpts<SnapT, ValT> = {
   clock:                  Clock
-  maxMillisSinceSuccess:  number
+  maxMillis:  number
+  // The next launch is scheduled at this fraction of maxMillis after a success, so it has completed by the horizon. Default 0.8.
+  eagerFrac?:             number | undefined
   doSnapshot:             () => SnapT
   doTryLaunch:            () => Promise<Outcome<ValT>>
 }
@@ -16,7 +18,8 @@ export type TriggerTiming = Readonly<{
 }>
 
 export class Trigger<SnapT, ValT> {
-  readonly maxMillisSinceSuccess: number
+  readonly maxMillis: number
+  readonly eagerFrac: number
 
   readonly #clock:        Clock
   readonly #doSnapshot:   () => SnapT
@@ -33,7 +36,8 @@ export class Trigger<SnapT, ValT> {
 
   constructor(opts: TriggerOpts<SnapT, ValT>) {
     this.#clock = opts.clock
-    this.maxMillisSinceSuccess = opts.maxMillisSinceSuccess
+    this.maxMillis = opts.maxMillis
+    this.eagerFrac = opts.eagerFrac ?? 0.8
     this.#doSnapshot = opts.doSnapshot
     this.#doTryLaunch = opts.doTryLaunch
     this.#launchAt = this.#clock.now()   // never launched: due now
@@ -46,20 +50,20 @@ export class Trigger<SnapT, ValT> {
 
   get isTimely(): boolean { return this.#clock.now() < this.#launchAt }
 
-  isTimelyWithin(maxMillisSinceSuccess: number): boolean {
+  isTimelyWithin(maxMillis: number): boolean {
     if (this.#lastSucceededAt === null) { return false }
-    return this.#clock.now() - this.#lastSucceededAt < maxMillisSinceSuccess
+    return this.#clock.now() - this.#lastSucceededAt < maxMillis
   }
 
   // A success that came some other way than a launch: an own write's answer, say.
   noteSuccessNow(): void {
     this.#lastSucceededAt = this.#clock.now()
-    this.scheduleLaunchAt(this.#lastSucceededAt + this.maxMillisSinceSuccess)
+    this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
   }
 
   // Timely by the given horizon, else by the scheduled launch; launch when not. A launch under way is joined.
-  async ensureTimelyWithin(maxMillisSinceSuccess?: number): Promise<void> {
-    const timely = maxMillisSinceSuccess === undefined ? this.isTimely : this.isTimelyWithin(maxMillisSinceSuccess)
+  async ensureTimelyWithin(maxMillis?: number): Promise<void> {
+    const timely = maxMillis === undefined ? this.isTimely : this.isTimelyWithin(maxMillis)
     if (! timely) { await this.launch() }
   }
 
@@ -99,7 +103,7 @@ export class Trigger<SnapT, ValT> {
       this.#lastCompletedAt = this.#clock.now()
       if (outcome.ok) {
         this.#lastSucceededAt = this.#lastCompletedAt
-        this.scheduleLaunchAt(this.#lastSucceededAt + this.maxMillisSinceSuccess)
+        this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
       }
       return outcome
     } finally {

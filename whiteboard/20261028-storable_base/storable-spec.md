@@ -61,10 +61,13 @@ spec that conflicts with the first. `box`-only terms say so.
 ### Copies a storable keeps
 
 * `central`: the latest record this device knows storage holds, frozen: full, sparse, a draft, or a tombstone.
-* `overlay`: the record fields edited here and not yet sent; null when none.
-* `record`, the record in hand: central with the overlay laid over it; what the snapshot shows and what `send` writes.
+* `staged`: the record fields edited here and not yet sent; null when none.
+* `combined`, the record in hand: the staged where one is begun, else central; what the snapshot shows and what `send` writes.
+  - ~~`record` as the accessor for this~~
 * `snapshot`: frozen plain data a host renders, the same object until something changes; never a whisper.
-* `cacheable`: what `receive` hands the listing to write to the device cache. May be sparse, full, or tombstone.
+* `cacheable`: getter, `{ ...sparse, central, staged }` as they stand, frozen: what the listing writes to the device cache after a `receive`, and what `hello` revives an instance from.
+  - ~~`combined` frozen. May be sparse, full, or tombstone.~~
+  - ~~what `receive` hands the listing~~ (`receive` and `settle` hand back `{ badnews }` only)
   - ~~`cached`: the copy read from the deviceDB at warmup~~ (after warmup the cache is only written; the copy read is just the record a cold instance is born with)
 
 ### Record forms
@@ -72,13 +75,13 @@ spec that conflicts with the first. `box`-only terms say so.
 (The second bullet points for some are me folding other drafts back in. The `codeface` ones are consensus)
 
 * `full`, `record` (`BoxRecord`): every field storage holds.
-  - _the code uses record as an accessor meaning "the best of central and overlay" -- big mistake by me. Will change once I understand the lifecycle_
+  - _the code uses record as an accessor meaning "the best of central and staged" -- big mistake by me. Will change once I understand the lifecycle_ (now `combined`)
   * ~~record: all props in the database row ("full")~~
 * `sparse` (`BoxSparse`): the record without its heavy fields (`gate`, `encrypted_whisper`). Certain listing queries and updated record notifications carry only the sparse form.
 * sparse: suitable for listing. does not have heavyweight attributes. Not sure if vault draft is (or can be made to be) sparse.
 * `dna`: scope and seed props handed to `build` ~~or `send` with `ifPresent: 'fetch'` (this will be sugar added later: build().send(ifPresent: 'fetch' maxMillis Infinity))~~.
 * `tombstone`: durable record of a deletion; scope, revision, times, `deleted: true`. _Explain, intelligibly: ~~An answer of nothing stored is one too, at the revision held.~~_
-* tombstone: scope, revision, `registered_at`, `written_at` (when it was deleted), sentinel that it's gone. Nothing the user put in the thing (no sidecar).
+* tombstone: scope, revision, `registered_at`, `written_at` (when it was deleted), sentinel that it's either gone or damaged. Nothing the user put in the thing (no sidecar).
 * `stamp`: the fields the seal binds: without the full set of values, the encrypted value cannot be recovered. For box, its sparse form plus `vault_tok`.
 * `live`: an instance, (eg of `Box`); `pojo` (Plain Ol' Javascript Object): by implication, the fields of a datatype as plain properties and none if its methods (eg `mybox.record` or `{ ...mybox }`).
   * live: an instance, meeting one of those shapes via getters or ownprops, enumerable or not
@@ -98,15 +101,15 @@ spec that conflicts with the first. `box`-only terms say so.
 ### Verbs on a storable
 
 * `hydrate(opts)`: make the world and then the record in hand timely, fetching each that is not. Calls made during a fetch join it.
-* `edit(patch, opts)`: reconcile patch, overlay, and central; adopt the values; settle the consequences (eg handling the lease and wayins). Does not modify Central. `overlay` is now in place -- even if nothing changed, even if the patch is empty. ~~Stores nothing.~~ Does not update the VaultDB, and currently, does not cache. ~~Needs the vault unlocked, whatever the patch holds.~~ _that is Not true for a vault, and it's Not clear if it's true for sidecar._
+* `edit(patch, opts)`: reconcile patch, staged, and central; adopt the values; settle the consequences (eg handling the lease and wayins). Does not modify Central. `staged` is now in place -- even if nothing changed, even if the patch is empty. ~~Stores nothing.~~ Does not update the VaultDB, and currently, does not cache. ~~Needs the vault unlocked, whatever the patch holds.~~ _that is Not true for a vault, and it's Not clear if it's true for sidecar._
   - ~~`modify`~~
 * `send(patch, opts)`: `edit` to apply the patch, `put`s the reconciled settled
   record bearing the correct next revision. Returns the stored result
   (as `this`, by contract -- it does so by waiting until the answer
   is committed, `receive`d, adopted and settled).
-* `del(opts)`: immediately delete the thing using a timely revision. Optimistically applies the tombstone as overlay, and once committed, returns the stored value (as `this`, by contract -- same process as for `send`)
+* `del(opts)`: immediately delete the thing using a timely revision. Optimistically applies the tombstone as staged, and once committed, returns the stored value (as `this`, by contract -- same process as for `send`)
 * `receive(fetched)`: update to match a new observation of the external value. Reconciles, adopts, settles; and then hands back its `cacheable` and any `badnews`.
-* `reconcile(rcvd)`: produce an update strategy using the record's own state, `central`, `overlay`, and the `rcvd` props (from edit or recieve). Throws if defects are found (as determined by subclass and presumably someday by a customer hook).
+* `reconcile(rcvd)`: produce an update strategy using the record's own state, `central`, `staged`, and the `rcvd` props (from edit or recieve). Throws if defects are found (as determined by subclass and presumably someday by a customer hook).
 * `adopt(???)`: set own props, private vars, etc for a reconciled newly receive/edit'ed record (and maybe from constructor as well). Unclear about how to handle the edit/receive/constructor split; I was considering `assign`. Never modifies or reconsiders the props, or takes further action
   - ~~(there are no such fields: the snapshot reads the record)~~ yes there are: gate, gate_epoch
 * `settle()`: idempotently act on the updated state. Must call super().
@@ -114,8 +117,9 @@ spec that conflicts with the first. `box`-only terms say so.
   - ~~now central beyond its fields, and return the bad news found in it~~.
   - A vault settles its lease and ways in here
   - Called after every `receive`, `edit` and once by `build`
-* ~~`overlayOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
-  - ~~`overlayPropsAndSealBeforeSettling`~~
+* `makestaged(base, patch, opts)` (concrete): the one step of `edit` the concrete class writes: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing; hand back the whole record.
+  - ~~`stagedOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
+  - ~~`stagedPropsAndSealBeforeSettling`~~
 * `seal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, cryptographically binding the stamp. `unsealWhisper` opens the stored whisper for one call. ~~`unseal` is not a thing~~
 * `reseal` (box): unseal the stored whisper and edit it back in, sealed again.
 * `expose` (box): unseal and save the `#whisper` internally. This opens a whole ton of questions, and is a NOTYET todo. I have included it as an important forcing consideration for the design.
@@ -128,9 +132,12 @@ spec that conflicts with the first. `box`-only terms say so.
 
 * `timely`: fetched within its horizon. Of a storable, the record in hand; of the world, its own.
 * `hydrated`: the record in hand is full.
-* `gone`: central is a tombstone. The listing has let the instance go; every verb on it refuses the absent refusal.
+* `gone`: central is a tombstone (gone or damaged). The listing has let the instance go; every verb on it refuses the absent refusal.
+* `damaged`: central is an ouchstone (damaged tombstone)
 * `locked`, `unlocked`: the vault's lock, by the listing's word (`lockState`).
-* `storable` (adjective): a record can be written now: not gone, unlocked, and the record in hand full. `demandStorability` throws otherwise; `ensureTimelyStorability` hydrates first.
+* `storable` (adjective): a record can be written now: not gone, unlocked, and the record in hand full.
+* `ensureReadyToX(opts)`, `demandReadyToX()`: the guard pair of each verb X (`Fetch`, `Edit`, `Send`, `Del`; box: `Seal`, `UnsealWhisper`). `ensure` hydrates by `opts` then demands; `demand` checks for drift, synchronously.
+  - ~~`demandStorability`, `ensureTimelyStorability`~~
 * `isX`: boolean, never throws. `demandX`: synchronous, throws unless X. `ensureX`: async, makes X so or dies trying
 * `absent_box`, `absent_vault`: refusal when `ifAbsent: fail`
 
@@ -239,15 +246,23 @@ But: they're not the concern of the op-- all they need to know is that their pre
 * Seal on every edit YES, very desirable
   - seals at customer's indicated timeliness
 * Must be unlocked to edit. YES, because we want to seal
-* if there is an overlay, my intent is clear: stage this for writing when I hit send
+* if there is an staged, my intent is clear: stage this for writing when I hit send
 
 The interface I intend to offer combines sending and editing. For simplicity though, let's separate them
-Customer must call edit while unlocked and, to them, timely -- earning a sealed overlay.
+Customer must call edit while unlocked and, to them, timely -- earning a sealed staged.
 Customer then dirdles a bunch of time away. What happens to box in the meantime? What happens when customer then calls send()?
 
-### Overlay
+### staged
 
-Overlay represents staged edits to the box contents. If it is absent,
+The storable coordinates updates from other devices with local uncommitted changes by carrying
+- `central`, the latest view of the centrally stored record;
+- `staged`, if data has been edited locally: a payload that will overwrite
+   the stored values when `send` is called. New data `receive`d passes through
+   `reconcile` to allow the staged and central values to be merged
+   (or refused if there is a problem). Any call to `edit` activates the staged:
+   even if there are no changes, and even if the offered patch is empty.
+
+staged represents uncommitted edits to the box contents. If it is absent,
 It honors this contract:
 
 1. If absent, the the box is unmodified since `central`; its values should be preferred.
@@ -255,12 +270,12 @@ It honors this contract:
 3. Every defined value in the payload should be written to the store. Currently, every value in the payload must be defined. ~~no missing or undefined fields should be written into the store _this may tighten_~~
 4. The revision_seq is one greater than that of `central`
 5. The revision_tok is new and fabricated using the secure `randomBytes` helper
-6. Overlay is not sent to VaultDB until `send` is called. Currently its value is not cached.
+6. staged is not sent to VaultDB until `send` is called. Currently its value is not cached.
 
-If a newer or fuller version is received, we may choose to update the overlay, re-establishing it as ready to send. Storable may choose not to (or may not be able to), deferring that to be done by `send`.
+If a newer or fuller version is received, we may choose to update the staged, re-establishing it as ready to send. Storable may choose not to (or may not be able to), deferring that to be done by `send`.
 
 **Initial Creation ('draft') with no timely awareness of a tombstone**: On a new record, `central` has revision `-1` and a fabricated revision id. It's never stored.
-The overlay with the initial props holds revision `0`.
+The staged with the initial props holds revision `0`.
 
 * If I seal lots of times, and do a send, subsequent seals will go against the central revision. This is necessary, you have to prove you sequence. Also it's good: the worst case scenario is a stale_write that the customer retries. If a send fails, the resealed value is the right one to send.
 
@@ -269,7 +284,7 @@ The overlay with the initial props holds revision `0`.
 
 ### Receive
 
-An overlay is always signed, with a revision one larger than `central` when it was prepared.
+An staged is always signed, with a revision one larger than `central` when it was prepared.
 Unless newer records are spotted, it's ready to send.
 
 Principle: it's desireable to allow customer to make reconciliation decisions
@@ -277,59 +292,46 @@ Principle: don't throw away customer data.
 Principle: honor customer intent
 Principle: provide defaults that are #1 safe > #2 clear >> ... >> #3 ergonomic
 
-#### Reconcile:
+#### Reconcile Central
 
-If `rcvd` is older than `central`, return `{ central, 'older' }`. Adopt and settle will be skipped
-If `rcvd` is the same age `central`, return `{ central, 'older' }`. Adopt and settle will be skipped
+here means sparse or full. normal means sparse, full or gone. any is normal or damaged.
 
-|       | rcvd   | central | policy                   | considered   |
-| ----- | ------ | ------- | ------------------------ | ------------ |
-| older | any    | here    | 'older'                  | -            |
-| older | any    | gone    | 'older'                  | ('gone') |
-|       |        |         |                          |              |
-| same  | sparse | here    | 'same'                   | -            |
-| same  | full   | sparse  | 'fill'                   | -            |
-| same  | full   | full    | 'same'                   | -            |
-| same  | gone   | here    | ~ _fill in refusal name_ | (any better decision is customer's)          |
-|       |        |         |                          |              |
-| newer | sparse | any     | 'adopt'                  | -            |
-| newer | full   | any     | 'adopt'                  | -            |
-|       |        |         |                          |              |
-|       | gone   | any     | ???                      |
+|       | rcvd    | central | policy                  | result       | considered   |
+| ----- | ------- | ------- | ----------------------- | ------------ | ------------ |
+| older | any     | here    | 'older'                 | central      | -            |
+| older | any     | gone    | 'older'                 | central (ts) | ('gone'?)    |
+|       |         |         |                         |              |              |
+| same  | sparse  | here    | 'same'                  | central      | -            |
+| same  | full    | sparse  | 'fill'                  | rcvd         | -            |
+| same  | full    | full    | 'same'                  | central      | -            |
+| same  | gone    | here    | throw 'record_conflict' | central (ts) | (impossible) |
+| same  | gone    | gone    | 'same'                  | central (ts) | ('gone'?)    |
+|       |         |         |                         |              |              |
+| newer | sparse  | any     | 'adopt'                 | rcvd         | -            |
+| newer | full    | any     | 'adopt'                 | rcvd         | -            |
+| newer | gone    | any     | 'gone'                  | rcvd (ts)    | -            |
+|       |         |         |                         |              |              |
+| older | damaged | any     | 'skip'                  | central      | -            |
+| same  | damaged | any     | 'skip'                  | central      | -            |
+| newer | damaged | any     | 'ouch'                  | ouchstone    | -            |
 
-(? damaged)
+Newer revision_seq may be 1 or more above last seen -- may have missed updates.
 
+On 'older', 'same' or 'skip', receive skips adopt and settle
+Otherwise call reconcileStaged -- 'fill', 'adopt', 'gone', 'ouch'
 
-With no overlay present, it's easy: if `central` is older than , or if `central` is sparse and `reconciled` is the same age and full, set the central prop to `reconciled`, `adopt` its properties, and `settle`
+#### Reconcile Staged
 
-reconcile returns an updated payload and a policy.
-* `'reseal'`
+sent { patch, central, staged, act, nextRevision }. Do *not* consult own props
 
-### Send
-
-* world is not timely: get world and box, might as well
-*
-
-
-## Props
-
-| type  | immutable                                 | revision       | hydrated                 |
-| ----- | ----------------------------------------- | -------------- | ------------------------ |
-| Vault | scope props, `registered_at`, `vault_tok` | revision props | `gate_epoch`, `gate`     |
-| Box   | scope props, `registered_at`              | revision props | whisper props, `sidecar` |
-
-Vault scope:    `applabel`, `user_id`, `vaultlabel`
-Box scope:      `applabel`, `user_id`, `vaultlabel`, `boxlabel`
-Revision:       `format`, `revision_tok`, `revision_seq`, `written_at`
-Whisper:        `whisper_schema_version`, `whisper_codec`, `whisper_ciphered`, `box_key_wrapped`
-
-### Box record, overlay, central
-
-Box payload has its `sidecar`, `whisper_ciphered`, and key metadata (`whisper_schema_version`, `whisper_codec`, `box_key_wrapped`)
+| act                     | new staged                                             |
+| ----------------------- | ------------------------------------------------------- |
+| `edit`, `fill`, `adopt` | `{ ...central, ...staged, ...patch, ...nextRevision }` |
+| `del`, `gone`, `ouch`   | `this.tombstoneFor(act, nextRevision)`                  |
 
 ## Box: Edit/Receive, Reconcile/Adopt/Setttle, Seal
 
-| scenario     | `c` timely | `c` data | `overlay` | ... |
+| scenario     | `c` timely | `c` data | `staged` | ... |
 | ------------ | ---------- | ------- | --------- | --- |
 | probably-new | no       | sparse     | box dna |
 | listed       |
@@ -337,7 +339,7 @@ Box payload has its `sidecar`, `whisper_ciphered`, and key metadata (`whisper_sc
 In the below, keep in mind that `timely` is against the maxMillis number given. Creating a new record
 is best done with maxBoxMillis: Infinity, and we will likely offer that as sugar.
 
-| scenario                | central           | timely | overlay        | `isHydrated` | `send` needs                    |
+| scenario                | central           | timely | staged        | `isHydrated` | `send` needs                    |
 | ----------------------- | ----------------- | ------ | -------------- | ------------ | ------------------------------- |
 | new dna, never fetched  | draft (sparse, 0) | no/∞   | dna            | no           | hydrate, unlock, a whisper      |
 | new dna, fetched absent | draft (sparse, 0) | yes    | dna            | no           | unlock, a whisper               |
@@ -353,6 +355,46 @@ is best done with maxBoxMillis: Infinity, and we will likely offer that as sugar
 
 I don't see a difference or need for `isHydrated` -- explain
 My intention is that send checks for timely and then writes
+### Send
+
+* world is not timely: get world and box, might as well
+*
+
+
+## Props
+
+| type  | immutable                                 | revision       | payload                 |
+| ----- | ----------------------------------------- | -------------- | ------------------------ |
+| Vault | scope props, `registered_at`, `vault_tok` | revision props | `gate_epoch`, `gate`     |
+| Box   | scope props, `registered_at`              | revision props | whisper props, `sidecar` |
+
+Vault scope:    `applabel`, `user_id`, `vaultlabel`
+Box scope:      `applabel`, `user_id`, `vaultlabel`, `boxlabel`
+Revision:       `format`, `revision_tok`, `revision_seq`, `written_at`
+Whisper:        `whisper_schema_version`, `whisper_codec`, `whisper_ciphered`, `box_key_wrapped`
+
+Tombstone: immutable props, revision props, timestamp, no payload
+
+* **Own props**: everything that is convenient to see in a log or that we'd advertise for use: scope props, timestamps, revision, format; `vault_tok` and `gate_epoch`
+
+Storable props come in several flavors. These are managed by the storable:
+- immutable props: the scope (eg `applabel`, `user_id`, `vaultlabel`), plus `registered_at`; Vault adds `vault_tok`
+- envelope props: revision props (`revision_tok`, `revision_seq`, `written_at`), managed by the storable
+Payload props are defined by the concrete class:
+- in Vault, `gate_epoch` and gate props; in Box, `sidecar`, and the whisper / box key props
+
+Public props are exposed as own props or as accessors onto private props -- not onto the
+captured records, as those gain and lose in ground truth as the storable is updated.
+Objects (vault, lease, gate, world, listing) are adorn'ed or private, as are secret or wrapped things
+(ciphered whisper, wrapped keys). Sidecar is an up/down call: a getter.
+  - not sidecar, at present: getter on a private variable (the same object held by `combined`)
+* **Private vars**: box: whisper props; vault: `gate`, `lease`, etc
+* **Non-enumerable frozen props**: world, listing, refresh trigger
+* **important delegated props**: instances use `world.logger` and `world.clock`.
+
+## Box record, staged, central
+
+Box payload has its `sidecar`, `whisper_ciphered`, and key metadata (`whisper_schema_version`, `whisper_codec`, `box_key_wrapped`)
 
 ## Open questions
 
@@ -361,8 +403,6 @@ settle force-replaces the snapshot
 (can it invalidate it and have it prepared lazily on request (which the subscribe would if there are listeners)?)
 
  The case of edit and recieve is mostly similar, it diverges maybe within reconcile and in adopt it matters where the record is attached. not sure when those happen. T
-
-
 
 I want to serve the react case and the non-react case: I can fiddle around
 with the innards of sidecar and whisper
@@ -389,24 +429,31 @@ When do we seal? When can we send?
 
 Design here is inchoate.
 
-Listing creates instances on only these occasions:
+A storable is instantiated using async `build` in one of these circumstances:
 
-* listing `hello` (`warmup`?): loads anything found in deviceDB, makes instances from them
-* host calls listing.send({...}) (¿listing.make?)
-* listing is notified of a record change for an absent record
+- explicitly by host, giving props for an assumedly never-before-stored thing (¿`listing.make`?)
+- listing's subscription reports a record it doesn't yet hold
+- during warmup, loaded from the local DeviceDB cache
+- when a listing operation contains records not yet held
 
-Listing updates instances on
+External updates to the `central` value come via `receive` (even when it's the result of an operation):
 
-* return of an operation
-* listing is notified of a record change for an instance it has (might be sparse, full, or tombstoned)
-* #edit is called directly
+- full:    an explicit fetch, yielding a full record
+- sparse:  an explicit listing operation, yielding a sparse record
+- full:    as metadata on certain refused calls, such as `stale_write` (which returns the stored record that won the race)
+- full:    return value of a write operation, giving the full actual record stored
+- full(§): subscribed notification of a record change ((§): notification-space-limited VaultDBs, eg Postgres, may omit payloads of large records)
+- full:    in the case of vault, the `world` slot of any VaultDB call
+- either:  in the case of vault, the `world` slot of any VaultDB subscription (depends on VaultDB capabilities)
+
+The staged changes only when `edit` or `del` is called directly, and is spent when `receive` adopts the record it sent (same `revision_tok`) or a tombstone.
 
 ### Short term churn
 
-These phrases replace others use in earlier parts of the design (i.e. we now say `overlay` and do not say `edited`)
+These phrases replace others use in earlier parts of the design (i.e. we now say `staged` and do not say `edited`)
 GOOD:
 * patch and PatchT (not props) for edit (not modify);
-* 'overlay' (replacing the local-copy #edited record).
+* 'staged' (replacing the local-copy #edited record).
 * `reconcile` (not deconflict)
 
 

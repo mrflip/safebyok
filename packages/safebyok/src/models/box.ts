@@ -1,6 +1,6 @@
 import { VaultError } from '../errors'
 import type { Sidecar, Whisper } from '../shapes/box'
-import { type EditOpts, type Fetched, type StorableOpts, Storable, isTombstone } from './storable'
+import { type EditOpts, type Fetched, Storable, isTombstone } from './storable'
 
 // == [Record forms]: BoxScope, BoxSparse, BoxRecord, BoxSnapshot, BoxProps, BoxEditOpts, LOCKED
 
@@ -60,12 +60,6 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   // The whisper the host asked to keep open on the instance, until the vault locks. Set, it is what the next edit seals.
   #exposed: Whisper | null = null
 
-  constructor(central: Fetched<BoxScope, BoxRecord, BoxSparse>, opts: StorableOpts<BoxScope, BoxRecord, BoxSparse>) {
-    super(central, opts)
-    this.assign(central)
-    Object.seal(this)
-  }
-
   protected override assign(record: Fetched<BoxScope, BoxRecord, BoxSparse>): void {
     super.assign(record)
     this.#sidecar = isTombstone(record) ? null : record.sidecar
@@ -87,7 +81,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   set whisper(whisper: Whisper | typeof LOCKED | null) {
     this.demandUnlocked()
     this.#exposed = whisper === LOCKED ? null : whisper
-    this.replaceSnapshot()
+    void this.settle()
   }
 
   // == [Concrete ops]: unsealWhisper, expose, seal, reseal, edit, forgetWhisper
@@ -102,7 +96,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   // Open the stored whisper and keep it on the instance, readable and settable as `box.whisper` until the vault locks.
   async expose(opts: EditOpts = {}): Promise<this> {
     this.#exposed = await this.unsealWhisper(opts)
-    this.replaceSnapshot()
+    void this.settle()
     return this
   }
 
@@ -124,7 +118,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   // The vault locked: nothing open stays open.
   forgetWhisper(): void {
     this.#exposed = null
-    this.replaceSnapshot()
+    void this.settle()
   }
 
   // Not yet: decipher the whisper under the boxKey, unwrapped through the vault's lease.
@@ -135,7 +129,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
     return Promise.reject(new VaultError('unexpected_error', 'unseal is not written yet.'))
   }
 
-  // == [What a storable defines]: scopeOf, isFullRecord, sparseOf, overlayPropsAndSealBeforeSettling, makeSnapshot
+  // == [What a storable defines]: scopeOf, isFullRecord, sparseOf, makestaged, makeSnapshot
 
   protected scopeOf(fetched: Fetched<BoxScope, BoxRecord, BoxSparse>): BoxScope {
     const { applabel, user_id, vaultlabel, boxlabel } = fetched
@@ -152,13 +146,16 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   }
 
   // The sidecar is not bound by the seal, so it is replaced in place. A whisper given or exposed is sealed
-  // under the drafted record's props; with neither, the ciphered whisper rides along as it is.
+  // under `base`'s props; with neither, the ciphered whisper rides along as it is, which needs `base` full.
   // Not yet: the seal itself (a fresh boxKey, wrapped under the vaultKey; the whisper ciphered with the record's stamp).
-  protected overlayPropsAndSealBeforeSettling(drafted: BoxRecord, props: BoxProps): Promise<BoxRecord> {
-    const withSidecar = props.sidecar === undefined ? drafted : { ...drafted, sidecar: props.sidecar }
-    const whisper = props.whisper ?? this.#exposed
-    if (whisper === null) { return Promise.resolve(withSidecar) }
-    return Promise.resolve({ ...withSidecar, box_key_wrapped: withSidecar.box_key_wrapped, whisper_ciphered: withSidecar.whisper_ciphered })
+  protected makestaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
+    const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
+    const whisper = patch.whisper ?? this.#exposed
+    if (whisper === null) {
+      if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', 'This box holds no whisper to carry forward, so an edit needs one: hydrate it, or give a whisper.')) }
+      return Promise.resolve(withSidecar)
+    }
+    return Promise.reject(new VaultError('unexpected_error', 'seal is not written yet.'))
   }
 
   protected makeSnapshot(): BoxSnapshot {

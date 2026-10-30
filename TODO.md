@@ -9,6 +9,8 @@ control flow simple (STYLE.md, *Control flow and refusals*), with the argument f
 * Boxscope was somehow called out as an exception without VaultScope getting it -- the thread to revert this must have died. MAke it BoxScope and BoxScopepath everywhere (also any zod checkers or var names)
 ## Loud
 
+Add a helper like objStrict, objDuckish, implementing the duckish type (an otherwise-strict type allowing certain specified fields that are validated, ignored and stripped)
+
 What every adapter author and reviewer should have in front of them, and not lose in a shelf below.
 
 * **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
