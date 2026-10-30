@@ -272,7 +272,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Bad news]: tellBadNews
 
   /** Tell each item of `badnews` to the host's `onBadNews`, where one was given. */
-  protected tellBadNews(badnews: readonly VaultError[]): void {
+  tellBadNews(badnews: readonly VaultError[]): void {
     for (const news of badnews) { this.#onBadNews?.(news) }
   }
   // --

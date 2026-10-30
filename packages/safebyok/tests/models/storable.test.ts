@@ -1220,3 +1220,75 @@ describe("storable try forms: an outcome, never a rejection", () => {
   }
 })
 // --
+
+// == [Success by receive's verdict]: success noted on the fetch path, a refused background refresh
+
+describe("storable.hydrate(opts): success is receive's verdict on the record fetched", () => {
+  it("notes no success for a fetch answered with an older record: the next hydrate fetches again", async () => {
+    const { listing, box } = await timelyBoxOf(1000)
+    await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+    held.mw.setNow(T0 + 1000)
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
+    await box.hydrate({ maxMillisSinceRefresh: 1000 })
+    expect(box.revision_seq).to.eq(2)
+    expect(box.isTimely).to.be.false
+    await box.hydrate({ maxMillisSinceRefresh: 1000 })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+  })
+
+  it("notes no success for a fetch answered with a sparse record where nothing whole is held", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.setNow(T0 + 1000)
+    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
+    await box.hydrate()
+    expect(box.isTimely).to.be.false
+  })
+
+  it("notes success for a fetch answered with a newer full record, scheduling the next launch at eagerFrac", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.setNow(T0 + 1000)
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
+    await box.hydrate()
+    expect(box.isTimely).to.be.true
+    held.mw.setNow(T0 + 1800)
+    expect(box.isTimely).to.be.false
+  })
+
+  it("throws a refusal of the record fetched to the hydrate's caller, and notes no success", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.setNow(T0 + 1000)
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
+    await TH.expectRefusal(box.hydrate(), 'record_conflict')
+    expect(box.isTimely).to.be.false
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+})
+
+describe("storable: a refresh the timer launches, which no caller awaits", () => {
+  it("tells a refused fetch to onBadNews", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
+    await held.mw.advance(800)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_unavailable'])
+  })
+
+  it("tells a refusal of the record fetched to onBadNews: nothing stored for a box held alive", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.willGet(held.mw.answerOf(box.scope, null))
+    await held.mw.advance(800)
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['record_conflict'])
+    expect(box.isPresent).to.be.true
+  })
+
+  it("tells nothing of a box held gone that storage answers nothing stored: its ifAbsent is 'nil'", async () => {
+    const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
+    const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
+    held.mw.clearCalls()
+    held.mw.willGet(held.mw.answerOf(box.scope, null))
+    await held.mw.advance(800)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+})
+// --
