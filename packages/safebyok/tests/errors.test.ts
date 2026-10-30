@@ -142,6 +142,7 @@ const FamilyCases = [
   ["damaged_box",         "bad_news",  'a box stored damaged is told to the user, who may remove it'],
   ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
+  ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is mended by reading the record again'],
   ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
   ["vault_behind",        "bad_news",  'storage handing back an older copy of the vault than this device has seen is a fact a user can be told'],
   ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],
