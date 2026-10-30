@@ -211,6 +211,12 @@ export const OneRevisionTwoFates = "Storage and this device disagree about one r
 /** Why a record under another vault_tok than the instance holds is not taken in. */
 export const OtherVaultTok = "Storage holds this record under another vault_tok than this device holds it under: the vault was deleted and made anew, or storage mixed the records of two vaults. This device kept its own copy and did not take in the one storage sent. Load the vault again from storage, and its boxes with it: safebyok does not yet remake what it holds of a vault made anew."
 
+/** Why a record under another vault_tok than the vault its listing lies in is not made into an instance. */
+export const OtherVaultTokAtBirth = "Storage gave a record under another vault_tok than the vault this listing lies in, so no instance was made of it: the vault was deleted and made anew, or storage mixed the records of two vaults. Load the vault again from storage, and its boxes with it."
+
+/** Why a record delivered under one scope that names another is not taken in. */
+export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
+
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --

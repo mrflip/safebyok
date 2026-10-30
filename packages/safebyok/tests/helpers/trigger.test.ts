@@ -63,12 +63,29 @@ describe("trigger.isTimelyWithin(maxMillis): Infinity means go ahead", () => {
 })
 
 describe("trigger opts notesOwnSuccess and onTimerRefusal", () => {
-  it("notes no success for an ok outcome when the launch notes its own", async () => {
+  it("notes no success for an ok outcome when the launch notes its own, yet schedules the next launch", async () => {
     const { trigger } = scriptedOf({ notesOwnSuccess: true, outcomes: [good(1)] })
     await trigger.launch()
     expect(trigger.timing.lastCompletedAt).to.eq(T0)
     expect(trigger.timing.lastSucceededAt).to.be.null
-    expect(trigger.isTimely).to.be.false
+    expect(trigger.timing.launchAt).to.eq(T0 + 800)
+  })
+
+  it("launches again at the horizon after an ok outcome that noted no success, and again after that", async () => {
+    const { trigger } = scriptedOf({ notesOwnSuccess: true, outcomes: [good(1), good(2), good(3)] })
+    await trigger.launch()
+    await vi.advanceTimersByTimeAsync(800)
+    expect(trigger.timing.lastLaunchedAt).to.eq(T0 + 800)
+    await vi.advanceTimersByTimeAsync(800)
+    expect(trigger.timing.lastLaunchedAt).to.eq(T0 + 1600)
+    expect(trigger.timing.lastSucceededAt).to.be.null
+  })
+
+  it("schedules no launch after a refusal, when the launch notes its own success", async () => {
+    const down = new VaultError('storage_unavailable', "Down.")
+    const { trigger } = scriptedOf({ notesOwnSuccess: true, outcomes: [bad(down)] })
+    await trigger.tryLaunch()
+    expect(vi.getTimerCount()).to.eq(0)
   })
 
   it("notes success for an ok outcome by default", async () => {

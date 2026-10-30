@@ -7,7 +7,7 @@ import { lockedError, movedUnderEditError, notFullError } from '../helpers/throw
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, Cacheable, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, World } from './models-shapes'
+import type { Age, Am, Cacheable, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -63,9 +63,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
-  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts) {
-    MSX.storableArgs.parse({ world, listing, central, staged, opts })
+  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `tell` is how it tells bad news nobody asked about to the host. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts, tell: Tell) {
+    MSX.storableArgs.parse({ world, listing, central, staged, opts, tell })
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
@@ -81,9 +81,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       eagerFrac:   opts.eagerFrac,
       doSnapshot:  () => this.snapshot,
       doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
-      // `receive` notes success by its verdict: a record not older, central or the record in hand whole.
+      // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
       notesOwnSuccess: true,
-      onTimerRefusal:  (err) => { listing.tellBadNews([err]) },
+      onTimerRefusal:  (err) => { tell([err]) },
     })
   }
 
