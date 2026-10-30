@@ -287,73 +287,14 @@ The staged with the initial props holds revision `0`.
 A staged record is always signed, with a revision one larger than `central` when it was prepared.
 Unless newer records are spotted, it's ready to send.
 
-Principle: it's desireable to allow customer to make reconciliation decisions
-Principle: don't throw away customer data.
-Principle: honor customer intent
-Principle: provide defaults that are #1 safe > #2 clear >> ... >> #3 ergonomic
+The two reconcile tables live in the doc blocks of `reconcileCentral` and `reconcileStaged` in
+`src/models/storable.ts` and are authoritative there. The principles that once stood here cannot
+all be honored at once; they and the choice made among them are in `receive-principles.md`.
 
-#### Reconcile Central
+## Box: Edit/Receive, Reconcile/Adopt/Settle, Seal
 
-here means sparse or full. normal means sparse, full or gone. any is normal or damaged.
+The scenario tables that stood here are covered by the reconcile doc blocks and by *Guards and states*.
 
-|       | rcvd    | central | policy                  | result       | considered   |
-| ----- | ------- | ------- | ----------------------- | ------------ | ------------ |
-| older | any     | here    | 'older'                 | central      | -            |
-| older | any     | gone    | 'older'                 | central (ts) | ('gone'?)    |
-|       |         |         |                         |              |              |
-| same  | sparse  | here    | 'same'                  | central      | -            |
-| same  | full    | sparse  | 'fill'                  | rcvd         | -            |
-| same  | full    | full    | 'same'                  | central      | -            |
-| same  | gone    | here    | throw 'record_conflict' | central (ts) | (impossible) |
-| same  | gone    | gone    | 'same'                  | central (ts) | ('gone'?)    |
-|       |         |         |                         |              |              |
-| newer | sparse  | any     | 'adopt'                 | rcvd         | -            |
-| newer | full    | any     | 'adopt'                 | rcvd         | -            |
-| newer | gone    | any     | 'gone'                  | rcvd (ts)    | -            |
-|       |         |         |                         |              |              |
-| older | damaged | any     | 'skip'                  | central      | -            |
-| same  | damaged | any     | 'skip'                  | central      | -            |
-| newer | damaged | any     | 'ouch'                  | ouchstone    | -            |
-
-Newer revision_seq may be 1 or more above last seen -- may have missed updates.
-
-On 'older', 'same' or 'skip', receive skips adopt and settle
-on `ouch` or `del`, a tombstone is assembled at the appropriate revision
-Otherwise call reconcileStaged -- 'fill', 'adopt', 'gone'
-
-#### Reconcile Staged
-
-sent { patch, central, staged, act, nextRevision }. Do *not* consult own props
-
-_(table moved to the `reconcileStaged` doc block in storable.ts; `gone` now drops the staged, per the Coach, 2026-10-30)_
-| `ouch`                  | `{ ...staged, ...patch, ...nextRevision }` |
-
-## Box: Edit/Receive, Reconcile/Adopt/Setttle, Seal
-
-| scenario     | `c` timely | `c` data | `staged` | ... |
-| ------------ | ---------- | ------- | --------- | --- |
-| probably-new | no       | sparse     | box dna |
-| listed       |
-
-In the below, keep in mind that `timely` is against the maxMillis number given. Creating a new record
-is best done with maxBoxMillis: Infinity, and we will likely offer that as sugar.
-
-| scenario                | central           | timely | staged        | `isHydrated` | `send` needs                    |
-| ----------------------- | ----------------- | ------ | -------------- | ------------ | ------------------------------- |
-| new dna, never fetched  | draft (sparse, 0) | no/∞   | dna            | no           | hydrate, unlock, a whisper      |
-| new dna, fetched absent | draft (sparse, 0) | yes    | dna            | no           | unlock, a whisper               |
-| warm from cache         | full              | no/∞   | none           | no           | hydrate (brings the whisper)    |
-| warm from cache         | sparse            | no     | none           | no           | hydrate (brings the whisper)    |
-| listed by a notice      | sparse            | no     | none           | no           | hydrate                         |
-| fetched                 | full              | yes    | none           | yes          | unlock                          |
-| fetched, sidecar edited | full              | yes    | `{ sidecar }`  | yes          | unlock (already proven at edit) |
-| fetched, whisper edited | full              | yes    | ciphered + key | yes          | unlock                          |
-| draft, whisper edited   | draft             | yes    | ciphered + key | yes          | unlock                          |
-| had full, rcvd sparse   | sparse (newer)    | yes    | kept           | no           | the strobe's fetch, then unlock |
-| had del, rcvd sparse    | tombstone         | yes    | dropped        | no           | nothing: gone, let go           |
-
-I don't see a difference or need for `isHydrated` -- explain
-My intention is that send checks for timely and then writes
 ### Send
 
 * world is not timely: get world and box, might as well
