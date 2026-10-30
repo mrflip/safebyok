@@ -72,14 +72,12 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer
 
-/** One call made to the world, the store or the cache, as {@link ModelsWorld.calls} logs it, in the order made.
- * `put` carries `ifPresent` as the listing passed it: undefined until the listing passes one.
- */
+/** One call made to the world, the store or the cache, as {@link ModelsWorld.calls} logs it, in the order made. */
 export type ModelsCall =
   | { verb: 'ensureTimely', opts: TimelyOpts }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, expected: Revision | null, ifPresent: unknown }
+  | { verb: 'put',          record: BoxRecord, expected: Revision | null }
   | { verb: 'del',          scope: Boxscope, expected: Revision | null }
   | { verb: 'watch',        onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[] }
   | { verb: 'unwatch' }
@@ -119,7 +117,7 @@ export type ModelsWorldOpts = {
 export type ModelsWorld = {
   /** The vault, as the listing is given it. */
   world:  BoxWorld
-  store:  Omit<BoxStore, 'put'> & { put(record: BoxRecord, expected: Revision | null, ifPresent?: unknown): ReturnType<BoxStore['put']> }
+  store:  BoxStore
   cache:  BoxCache
   /** Every call made to the world, the store and the cache, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
@@ -155,7 +153,7 @@ export type ModelsWorld = {
   seedCache(...copies: readonly Cacheable<BoxRecord, BoxSparse>[]): void
 
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
-  willPut(...answers: readonly Scripted<{ record: BoxRecord, expected: Revision | null, ifPresent: unknown }>[]): void
+  willPut(...answers: readonly Scripted<{ record: BoxRecord, expected: Revision | null }>[]): void
   willDel(...answers: readonly Scripted<{ scope: Boxscope, expected: Revision | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((opts: TimelyOpts) => Promise<void> | void)[]): void
@@ -224,7 +222,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
-    put:          new Script<{ record: BoxRecord, expected: Revision | null, ifPresent: unknown }>(),
+    put:          new Script<{ record: BoxRecord, expected: Revision | null }>(),
     del:          new Script<{ scope: Boxscope, expected: Revision | null }>(),
     ensureTimely: new Script<TimelyOpts>(),
     load:         new Script<undefined>(),
@@ -254,9 +252,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (scripted) { return (await answer) as BoxAnswer }
       return answerOf(scope, stored.get(scope.boxlabel) ?? null)
     },
-    put: async (record, expected, ifPresent) => {
-      calls.push({ verb: 'put', record, expected, ifPresent })
-      const { scripted, answer } = scripts.put.take({ record, expected, ifPresent })
+    put: async (record, expected) => {
+      calls.push({ verb: 'put', record, expected })
+      const { scripted, answer } = scripts.put.take({ record, expected })
       if (scripted) { return (await answer) as BoxAnswer }
       stored.set(record.boxlabel, record)
       return answerOf(CX.boxscope.parse(record), record)

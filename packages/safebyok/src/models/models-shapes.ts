@@ -294,39 +294,32 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
-
-/** The policies when sending a record to a place that already holds one: `replace` it, `fail`, or `fetch` it and hand that back instead. */
-export const ifPresentVals = ['replace', 'fail', 'fetch'] as const
+// == [Options]: ifAbsentVals, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
 
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
 export const ifAbsentVals = ['fail', 'nil'] as const
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
- * `ifPresent` is one of {@link ifPresentVals}, `ifAbsent` one of {@link ifAbsentVals}. `horizonMillis`
+ * `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
  * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
  * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
- * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
+ * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` is `timelyOpts`, named for `send`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
  * strips the rest.
  */
-export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
-  const ifPresent     = oneof(ifPresentVals)
+export const { ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
   const ifAbsent      = oneof(ifAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const timelyOpts    = obj({ maxMillisSinceRefresh: horizonMillis.optional(), maxWorldMillis: horizonMillis.optional() })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
-  const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
+  const sendOpts      = timelyOpts
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
     maxMillisSinceRefresh: horizonMillis,
     /** The fraction of the horizon after which the trigger schedules the next refresh. */
     eagerFrac:             num.positive().max(1).optional(),
   })
-  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
+  return { ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
 })
-
-/** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
-export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
@@ -337,7 +330,7 @@ export type TimelyOpts = Z.infer<typeof timelyOpts>
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
 export type FetchOpts = Z.infer<typeof fetchOpts>
 
-/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, how it treats a thing storage already holds. Not yet acted on. */
+/** `send`'s options: its {@link TimelyOpts}, and no more. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
 /** `edit`'s options: its {@link TimelyOpts}. */

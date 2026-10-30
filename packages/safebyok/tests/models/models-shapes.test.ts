@@ -385,17 +385,6 @@ describe("MSX.boxRecord and MSX.boxSparse", () => {
 })
 
 describe("The checks of options", () => {
-  describe("MSX.ifPresent", () => {
-    holdsCases(MSX.ifPresent, 'bad_option', [
-      ["replace", true,  'passes replace'],
-      ["fail",    true,  'passes fail'],
-      ["fetch",   true,  'passes fetch'],
-      ["skip",    false, 'refuses a policy it does not know'],
-      [true,      false, 'refuses a boolean'],
-      [undefined, false, 'refuses undefined: a default is the option\'s, not the check\'s'],
-    ])
-  })
-
   describe("MSX.horizonMillis", () => {
     holdsCases(MSX.horizonMillis, 'bad_option', [
       [0,         true,  'passes zero: nothing is timely'],
@@ -420,14 +409,14 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
     holdsCases(MSX.sendOpts, 'bad_option', [
-      [{ ifPresent: 'fetch', maxWorldMillis: 5 },   true,  'passes ifPresent beside the horizons'],
+      [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
-      [{ ifPresent: 'skip' },                       false, 'refuses an ifPresent it does not know'],
+      [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon, as timelyOpts does'],
     ])
 
     it("take their fields from the bag given and strip the rest", () => {
-      expect(MSX.timelyOpts.parse({ maxWorldMillis: 5, ifPresent: 'fail', reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(MSX.sendOpts.parse({ ifPresent: 'fail', reseal: true })).to.deep.equal({ ifPresent: 'fail' })
+      expect(MSX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(MSX.sendOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
     })
 
     it("name the failing field", () => {
@@ -631,6 +620,6 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   ])
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
-    expect(MSX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, ifPresent: 'fail' })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
+    expect(MSX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
   })
 })
