@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** paused 2026-10-30, every remaining thread waiting on the Coach (`human/20261030-sprint_storable_paused.md`). Filed: 1, 4a, 2, 5, 7. Waiting: 3, 4b. Not started: 8, 6.
+* **Status:** resumed 2026-10-30 on the Coach's 22 rulings. #370/#371 pushed onto #374; the line (2, 5, 7, 4b, 3) restacking; then 4b's and 3's reworks, 8 (remove ifPresent), 9 (the rest of the rulings), 6.
 
 ## Read first
 
@@ -246,6 +246,32 @@ keys listed by hand. The worker's four open matters confirmed (three rows, one m
 **Depends on:** 3 and 4b. Cut from the top of the two once restacked into a line.
 **Size:** small to medium.
 
+
+*Orchestrator, after the Coach's ruling (2026-10-30) on P3:* "Yes, the semantics of ifPresent are
+pretty doubtful in a versioned update process. remove it as one of the options (unless it's
+needed for something, in which case narrowly limit its contract)". **Thread 8 is now: remove
+`ifPresent`** (`ifPresentVals`, `ifPresent`, `sendOpts`' field, the fake store's third argument,
+any doc naming it), unless a survey finds something that needs it, in which case narrow its
+contract and say why. Label `if_present` kept. Worker `sonnet`; review `low`. Depends on 4b's
+rework (it touches `send`'s opts). Size: small.
+
+### 9. The Coach's rulings of 2026-10-30, the rest
+
+*Orchestrator:* rulings that land in code no other thread is working in. Label `rulings`.
+1. `same | full | ouch` takes `fill` (the Coach: "fill"), a row in `reconcileCentral`'s table.
+2. A `same` answer to a `del` drops the staged tombstone (took the Rec), a row in
+   `reconcileStaged`'s table or the one line in `receive` that ends early.
+3. `record_conflict` stays a `condition`; its README row and messages say a retry is worth one
+   try, and if it persists the system is not working (the Coach: "it is worth a retry I guess. The
+   system is fundamentally not working if this happens").
+4. `cacheable`: "who needs cacheable besides .handle? If nobody, make it protected". Survey every
+   reader (the listing, the cache, tests); narrow it so a host holding a box cannot reach it,
+   giving the listing what it needs by the plainest means the language allows.
+5. A TODO.md entry (the Coach: "yes, TODO"): an edit is never saved to the device cache, so an
+   unsent staged edit is lost on reload.
+Tests beside each. Worker `opus`; review `medium`. Depends on 3's and 4b's reworks. Size: small
+to medium.
+
 ### 6. What this model guarantees
 
 > **6. What this model guarantees.** No code. Read `notes/guarantees.md` *The guarantees* and the README sections in *Read first*, then `tests/loosened/loosened.test.ts` and threads 2 through 5 and 8's thread files, and write `whiteboard/20261028-storable_base/guarantees-of-the-model.md`: a table, one row per guarantee or promise, columns `Guarantee | Old source | Model | Evidence`, where *Model* is `kept`, `changed`, `not yet` or `dropped` and *Evidence* names a test by file and title or a line of code. Every describe of the loosened file appears as `changed` or `dropped` with the Coach's decision left blank; every firm loosening appears as `changed` with the Coach's word as its evidence. Nothing about the seal beyond noting the rows that wait on it. Depends on 2, 3, 4, 5, 8. Size: small, `opus`.
@@ -258,6 +284,9 @@ so the loosened file and every thread file are in its tree. Reads 4a's and 4b's 
 **Size:** small.
 
 ## Order
+
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8 and 9 on top, then 6. 4b's and 3's reworks build on the line; 8 and 9 after them.
+
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
 and 4b have filed and are restacked into a line. Thread 6 last, on the whole line.
