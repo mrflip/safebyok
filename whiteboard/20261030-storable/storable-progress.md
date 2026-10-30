@@ -88,6 +88,12 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
     (superseded by the timeliness rule); nobody settling boxes on lock (the vault's thread).
 * *Orchestrator (2026-10-30):* #370 and #371 force-pushed onto #374 with the Coach's permission;
   the rest of the line restacks as main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3.
+* *Orchestrator (2026-10-30, YOLO call, a Coach row):* a `send` whose vault locks between `edit`
+  and `put` puts the staged record it holds (`cacheable.staged`), not the box: thread 5's locked
+  `sidecar` getter returns the LOCKED bag, and `put` parsing the box's getters refused
+  `bad_record`. Lands in #375 at its rebase. #373, #376 and #377 are pushed on the line (tips
+  ff949221, c58f468e, 9f3376f7; justify green); thread 5's `boxOf` became `builtBoxOf`. #372 is
+  rebased once, onto 4b's reworked tip, by thread 3's rework worker.
 
 ## Discoveries
 
