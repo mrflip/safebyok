@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** planned; thread 1 starting.
+* **Status:** thread 1 filed (#370); threads 2, 3 and 4a building.
 
 ## Read first
 
@@ -75,6 +75,14 @@ in call order with the store's calls, for thread 4a's "world first". The clock i
 the fake timer story is the one `src/helpers/trigger.ts` uses (vitest fake timers, if the trigger
 schedules with `setTimeout`).
 **Size:** medium to large.
+
+*Review:* flagged, then clean (#370). The first review fixed the world's clock under fake timers
+(a timer due partway through `mw.advance` read the end time), `useModelsWorld` making a world at
+collection, two doc and title mismatches, and four style families. Its significant finding, a
+damaged tombstone refused by `boxSparse`, was reworked by the orchestrator's YOLO ruling (a
+damaged record arrives in the kind's sparse form; an open matter). Left: the module-level world in
+`models-shapes.test.ts` (Cleanup, thread 7); forwarding builders on `ModelsWorld` (a decision);
+three restatements of the tombstone rule in doc blocks (thread 3 collapses them).
 
 ### 2. The reconcile tables, row by row
 
