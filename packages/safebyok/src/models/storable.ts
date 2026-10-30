@@ -16,7 +16,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw new VaultError('record_conflict', 'Storage holds a record at the same revision_seq as this device, under another revision_tok: two puts landed as one revision, so neither can be trusted until the record is read again.')
+    throw new VaultError('record_conflict', 'Storage holds a record at the same revision_seq as this device, under another revision_tok: two puts landed as one revision, so neither can be trusted until the record is fetched again.')
   }
   return 'same'
 }
