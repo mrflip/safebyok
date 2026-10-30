@@ -61,7 +61,7 @@ export const refusalKindVals = [
   'crypto_failed',       // the browser's WebCrypto failed a key, wrap or cipher that should have worked: a fault of the platform, not of the user or the record
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'record_conflict',     // storage and this device hold one revision of a record and disagree about it, so neither copy can be trusted until it is fetched again
+  'record_conflict',     // storage and this device disagree about one revision of a record; fetching it again finds the same disagreement
   'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
   'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
