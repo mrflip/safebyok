@@ -39,6 +39,17 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   hydrates first, so a draft's first send adopts a stored box and `ifPresent: 'fail'` never fires;
   a TOP row for the Coach, to settle before thread 8.
 
+* *Thread 4b (#375, on the local restack):* `send` is `edit` then `put`; `demandReadyToDel` is
+  `demandUnlocked`; `demandFull` stays (the box's unseal guard and `#unseal` call it);
+  `registered_at` follows the record in hand (the tattoo keeps the scope alone, with #374);
+  `#minted` memoizes the next revision until `send` or `del`; the box's unseal and seal guard
+  pairs exist. Test helper `fakeSealBoxListingOf(mw, overrides, duringMakeStaged)` at the end of
+  `models-world.ts` fakes the seal and can lock the vault mid-`makeStaged`. Tests read central and
+  staged through `box.cacheable`. Its `tests/loosened/loosened.test.ts` meets #373's at the
+  restack (add/add: keep one import block and both sets of describes). Four open matters (a
+  record under another `vault_tok`; the exposed whisper across a lock; a refused background
+  refresh; a `del` answered `same`).
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
