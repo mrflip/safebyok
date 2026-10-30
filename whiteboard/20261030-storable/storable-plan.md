@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #384 (thread 14); thread 11 (#385) in review; then 12, 15, 13, then 6.
+* **Status:** filed through #384 (thread 14); thread 11 (#385) in rework (flagged: replace's revision); then 12, 15, 13, 16, then 6.
 
 ## Read first
 
@@ -432,6 +432,25 @@ Tests in `models-shapes.test.ts`, `listing.test.ts` or
 `box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `medium` (raised from `low` for the two guards). Depends on 14 (cut from its
 tip; 10 and 11 both touch `listing.ts`). Size: small.
 
+*Review:* flagged (#385, medium; no compaction). Three test fixes (the tombstone path never
+reached `expected: null`; a box test that checked no option; alignment). **Significant:** a
+replacing put wrote the minted seq 0 over a higher stored seq, so other devices judged it older
+and diverged, and the race made `record_conflict`. *Orchestrator (YOLO, a TOP row):* reworked so
+storage puts a replacing record at stored seq + 1 under the replacing tok. Left: the faithful
+fake (thread 16); whether `'replace'` skips `send`'s hydrating fetch (a row); a cached copy's
+staged scope unchecked against its central's; doc-block tidies (a documentarian run).
+
+### 16. A faithful fake store
+
+*Orchestrator, from #385's review:* the fake store in `tests/test-helpers/models-world.ts` gives
+`put` and `del` a full compare-and-set: a given `expected` must match what is stored (revision
+seq and tok), and nothing stored with an `expected` given refuses too, as a real store would;
+`stale_write` carries what is stored. Fix the seeds of the tests that put or delete over a record
+they did not expect (the reviewer counted 9 across `listing.test.ts`, `box.test.ts`,
+`loosened.test.ts`, among them the save-refused loop cases), changing no assertion's subject.
+Label `faithful_fake`. Worker `sonnet`; review `low`. Depends on 13 (cut from its tip, last
+before 6). Size: small to medium.
+
 ### 12. The sidecar, locked or not
 
 *Orchestrator, the Coach's ruling (2026-10-30):* "OK make sidecar visible when locked or
@@ -488,12 +507,12 @@ whisper is secret material: no side door, CLAUDE.md). Depends on 15 (cut from it
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 16 (a faithful fake store), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
