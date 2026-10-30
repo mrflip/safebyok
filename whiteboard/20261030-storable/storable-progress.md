@@ -80,7 +80,7 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   - **Background refresh refusals** go to `onBadNews` ("yes").
   - **The cache:** "it's a cache, it's fine for it to get updated multiple times or not at all";
     listeners before the save are accepted. Edits not cached: a TODO.
-  - **`ifPresent`:** removed (thread 8). **`same | full | ouch`:** fill. **`del` answered `same`:**
+  - **`ifPresent`:** removed (thread 8), then back as `'replace'`, inert (thread 11; see the Coach's ruling on what it means). **`same | full | ouch`:** fill. **`del` answered `same`:**
     drops the staged tombstone. **`record_conflict`:** a condition, worth one retry.
     **`cacheable`:** protected if only the listing needs it. **`bad_option`** for every dna fault.
   - Left as they are: one listing horizon of Infinity fetching once; three `ensureTimely` calls
@@ -126,6 +126,13 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   record in hand; `cacheable` private, pushed by the storable's settle (thread 12); the double
   edge (an edit carried past damage, dropped on nothing stored) accepted if documented and tested
   (thread 12). Force-push permission renewed ("You have permissions to force push as needed").
+* *The Coach (2026-10-30), on what `'replace'` means* (verbatim in *Resolved*): **every put is the
+  versioned replace (compare-and-swap)**; storage never renumbers or patches a record;
+  `ifPresent: 'replace'` names that default and changes nothing; `'fetch'` (not implemented) would
+  CAS-put over no row or a tombstone at N - 1 and otherwise answer what is stored as a success. The
+  spec's `ifPresent` entry is the table. A revision-0 put over a stored tombstone is `stale_write`.
+  The brief's thread 8 text (its `'fail'` is this `'replace'`; its `'replace'`, an overwrite, does
+  not exist) is superseded.
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.

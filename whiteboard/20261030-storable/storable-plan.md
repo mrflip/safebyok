@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #385 (thread 11); thread 12 building; then 17, 15, 13, 16, then 6.
+* **Status:** #385 back in draft, reworked to compare-and-swap only (the Coach's ruling); #387 reviewed, waiting to restack onto it; then 17, 15, 13, 16, then 6.
 
 ## Read first
 
@@ -450,6 +450,18 @@ waits, since it is correct under the stub and (a) needs no change; under (b) it 
 the line restacked. Left: a plain put over a tombstone lands below it; a damaged record's
 unreadable seq (both to thread 16 and the `Store` contract); doc blocks; the race test's title.
 
+*Orchestrator (2026-10-30), the Coach's ruling on what `'replace'` means:* "no new operation was
+planned or intended. the old compare-and-swap is the only thing meant ... a 'versioned replace'";
+"ifPresent: 'replace' only means the default implementation exactly as described in the spec".
+The overwrite this thread built (and its seq + 1 rework) was a misreading, taken from the brief's
+thread 8 text ("'replace' writes over it"). #385 is back in draft and reworked: every put is the
+compare-and-swap (revision 0 lands over no row only, a tombstone counting as a row; revision N
+over the very record at N - 1, tok and seq; otherwise `stale_write` carrying what is stored);
+storage never renumbers or patches; `ifPresent: 'replace'` accepted and inert, handed to nothing;
+the spec's `ifPresent` entry becomes the Coach's table (`'fetch'` not implemented, a live N - 1
+under it open). The seal-stamp and skip-refresh rows are retired as moot. Then a short review of
+the rework, #387 restacked onto it with a lease, both filed.
+
 ### 16. A faithful fake store
 
 *Orchestrator, from #385's review:* the fake store in `tests/test-helpers/models-world.ts` gives
@@ -458,10 +470,11 @@ seq and tok), and nothing stored with an `expected` given refuses too, as a real
 `stale_write` carries what is stored. Fix the seeds of the tests that put or delete over a record
 they did not expect (the reviewer counted 9 across `listing.test.ts`, `box.test.ts`,
 `loosened.test.ts`, among them the save-refused loop cases), changing no assertion's subject. From #385's second review, the `Store` contract and the fake
-also say: what a plain put (`expected` null, no `ifPresent`) does over a stored tombstone (today it
-lands at the minted seq, below the tombstone, so devices holding the tombstone diverge; Rec: it
-refuses `stale_write` carrying the tombstone, as over a live box, and the device re-mints above);
-and what `'replace'` does over a damaged record with no readable seq.
+enforce the Coach's table (the spec's `ifPresent` entry) for every put and `del`, tok included;
+#385's rework already refuses a revision-0 put over a stored tombstone. A revision lower than
+expected stays `stale_write` (the Coach: "whatever refusal we do now"); note in the thread file
+that the device then judges what is stored older and stays stuck, a fundamentally inconsistent
+state CLAUDE.md answers with a reload, for the Coach.
 Label `faithful_fake`. Worker `sonnet`; review `low`. Depends on 13 (cut from its tip, last
 before 6). Size: small to medium.
 
