@@ -169,7 +169,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
       expect(MSX.isTombstone(full)).to.be.false
     })
 
-    it("marks a central never stored with a seq below any a store writes", () => {
+    it("marks a central never stored with a seq below any a store puts", () => {
       expect(MSX.NeverStoredSeq).to.be.lessThan(0)
     })
   })
