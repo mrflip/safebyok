@@ -49,8 +49,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The latest record this device knows storage holds: full, sparse, or a tombstone. A thing never stored is born with a tombstone at NeverStoredSeq. */
   #central: Fetched<RecordT, SparseT>
-  /** The record in hand: central itself while nothing is staged; else the record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending. */
-  #staged: Fetched<RecordT, SparseT>
+  /** The record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending; null while nothing is staged. */
+  #staged: Fetched<RecordT, SparseT> | null
   /** Made on first read, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
@@ -62,13 +62,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Constructor]: constructor, assignInitialProps, assign
 
   /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT>, opts: StorableOpts) {
+  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts) {
     MSX.storableArgs.parse({ world, listing, central, staged, opts })
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
-    this.#staged  = Object.freeze(staged)
+    this.#staged  = staged === null ? null : Object.freeze(staged)
     this.assignInitialProps(this.combined)
     this.settle()
     Object.seal(this)
@@ -95,21 +95,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Forms]: scope, combined, central, staged, stagedOrNull, full, cacheable, sparse, am, toJSON
+  // == [Forms]: scope, combined, central, staged, full, cacheable, sparse, am, toJSON
 
   get scope(): ScopeT { return this.#scope }
 
   /** The record in hand: the staged where there is one, else central. */
-  protected get combined(): Fetched<RecordT, SparseT> { return this.#staged }
+  protected get combined(): Fetched<RecordT, SparseT> { return this.#staged ?? this.#central }
 
   /** The most recent view of the stored record. */
   protected get central(): Fetched<RecordT, SparseT> { return this.#central }
 
-  /** The record edited here and not yet sent; central itself where there is none. */
-  protected get staged(): Fetched<RecordT, SparseT> { return this.#staged }
-
-  /** The staged as `reconcileStaged` reads it: null where nothing is staged. */
-  protected get stagedOrNull(): Fetched<RecordT, SparseT> | null { return this.hasStaged ? this.#staged : null }
+  /** The record edited here and not yet sent; null where there is none. */
+  protected get staged(): Fetched<RecordT, SparseT> | null { return this.#staged }
 
   /** The record in hand where it is the full record, else null. */
   protected get full(): RecordT | null {
@@ -141,8 +138,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   get isFull(): boolean { return this.full !== null }
 
-  /** The record in hand is under a revision central is not. */
-  get hasStaged(): boolean { return this.#staged.revision_tok !== this.#central.revision_tok }
+  /** A record is staged: edited here and not yet sent. */
+  get hasStaged(): boolean { return this.#staged !== null }
 
   get isWatchable(): boolean { return this.#watchable }
 
@@ -248,7 +245,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const nextRevision = this.nextRevision(this.#central)
     const made = await this.makeStaged({ ...this.combined, ...nextRevision, written_at: this.world.clock.now(), am: 'a' }, patch, opts)
     this.demandReadyToEdit()   // drift while making it: the vault may have locked
-    this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.stagedOrNull, patch: made, nextRevision }))
+    this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.staged, patch: made, nextRevision }))
     this.settle()
     return this
   }
@@ -269,7 +266,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToDel(opts)
     const nextRevision = this.nextRevision(this.#central)
-    this.adopt(this.#central, this.reconcileStaged({ act: 'del', central: this.#central, staged: this.stagedOrNull, nextRevision }))
+    this.adopt(this.#central, this.reconcileStaged({ act: 'del', central: this.#central, staged: this.staged, nextRevision }))
     this.settle()
     await this.listing.del(this)
     return this
@@ -293,14 +290,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (rcvdShape === 'full' || rcvdShape === 'gone') { this.#trigger.noteSuccessNow() }
     const act = MSX.receivedAct.safeParse(policy)
     if (! act.success) { return { badnews: [] } }
-    this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.stagedOrNull, rcvd: answer, nextRevision: this.nextRevision(central) }))
+    this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.staged, rcvd: answer, nextRevision: this.nextRevision(central) }))
     return this.settle()
   }
 
-  /** Hold both, frozen, central itself as the staged where `staged` is null, and assign the props of the record in hand; the snapshot waits for `settle`. */
+  /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
     this.#central = Object.freeze(central)
-    this.#staged = Object.freeze(staged ?? central)
+    this.#staged = staged === null ? null : Object.freeze(staged)
     this.assign(this.combined)
   }
 
