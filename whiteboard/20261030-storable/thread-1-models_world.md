@@ -1,6 +1,6 @@
 # Thread 1: The models' test world, and three fixes to the forms (2026-10-30)
 
-Branch `20261030-models_world`, PR #370, stacked on #368. Justify: green (core 3807 tests pass, 37 skipped as before; 297 of them new here, in `tests/models/`).
+Branch `20261030-models_world`, PR #370, stacked on #368. Justify: green (core 3809 tests pass, 37 skipped as before; 299 of them new here, in `tests/models/`).
 
 * **Built**:
   * Fix (a): `staged` is null when none. `Storable.#staged` is `Fetched | null`; `combined` is `#staged ?? #central`; `hasStaged` is `#staged !== null`; the `staged` getter answers null; `stagedOrNull` is gone; `cacheable.staged` and `storableArgs.staged` are `sparseBase.nullable()`; `Listing.makeThing(central, staged | null)` and its `BoxListing` override take null, as does `adopt`.
@@ -29,6 +29,7 @@ Import from `tests/test-helpers/models-world.ts` directly; it is deliberately no
 * `put`'s third argument is recorded and unused; thread 8 gives it meaning. No compare-and-set in the defaults.
 * `holdsCases` in `models-shapes.test.ts` gives one `expect` per row on the refusalkind thrown (or `'passes'`), so a failure shows both.
 * The `Case` tables and `verdictOf` are file-local; copy them rather than export.
+* **A damaged record is delivered as a tombstone in the kind's sparse form** (the review's significant finding, ruled by the orchestrator, YOLO, a two-way door). The `Answer` and `Notice` docs said a damaged tombstone carried only its scope, `vault_tok`, revision and times, which `MSX.answer` passes but `BoxListing.sparseOf` (`boxSparse`) refuses `bad_record`. Now the docs say what `Tombstone<SparseT>` already did: `am` 'd', the sparse props as far as storage recovered them, the kind's constants filled in by the adapter (for a box `fmt`, `whisper_codec`, `whisper_schema_version`). No code path changed; `boxSparse` and fix (b) stand as they were. Set aside: loosening `boxSparse` for tombstones, which would spread the damaged case into every concrete listing. `tombstoneBoxRecord(_, 'd')` builds exactly the sparse form (it always did; its doc now says so). `box-listing.test.ts` ends with `fetch` answering such a tombstone (a damaged box held, not present) and a bare one refused `bad_record`, pinning the contract. Threads 2 and 3 (adapters, `storedInStaleRefusal`) should build damaged tombstones this way.
 
 ## Discoveries
 * `listing.snapshot` is `thing.sparse` of present things, and `sparse` is the sparse form of **central**. A box built from a dna (draft staged over a central never stored, `am: 'x'`, seq -1) therefore appears in the snapshot as that tombstone, not as its draft. The test asserts the boxlabel only. Threads 3 and 5 own the snapshot; they should decide whether the snapshot shows `combined`.
