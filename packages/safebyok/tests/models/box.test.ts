@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { type Box, type BoxSnapshot, LOCKED } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -45,7 +45,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   }
 })
 
-describe("box.receive(rcvd): vault_tok and registered_at, set over a tombstone", () => {
+describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_tok throws", () => {
   it("keeps registered_at over a newer living record registered at another time", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
@@ -53,32 +53,59 @@ describe("box.receive(rcvd): vault_tok and registered_at, set over a tombstone",
     expect(box.revision_seq).to.eq(2)
   })
 
-  it("takes registered_at and vault_tok from a record received over a tombstone held", async () => {
+  it("takes registered_at from a record received over a tombstone held", async () => {
     const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', registered_at: T0 + 7, vault_tok: 'vault-tok-other' }))
-    expect(box).to.include({ registered_at: T0 + 7, vault_tok: 'vault-tok-other', revision_seq: 3 })
+    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', registered_at: T0 + 7 }))
+    expect(box).to.include({ registered_at: T0 + 7, vault_tok: 'vault-tok-u1', revision_seq: 3 })
   })
 
+  // Thread 9 restates thread 4b's 'vault_remade' cases: the Coach's ruling throws 'unexpected_error', over a tombstone too.
+  const HeldCases = [
+    ['a box held alive',          () => fullBoxRecord()],
+    ['a box held deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
+    ['a box held damaged',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'd')],
+  ] as const
   const OtherVaultCases = [
     [2, 'a newer record'],
+    [1, 'a record at the revision held'],
     [0, 'an older record, which the revisions of another life of the vault do not order'],
   ] as const
-  for (const [seq, blurb] of OtherVaultCases) {
-    it(`refuses 'vault_remade' for ${blurb} under another vault_tok over a box held alive, keeping its own copy`, async () => {
-      const box = await boxListingOf(held.mw).build(fullBoxRecord())
-      const { central } = box.cacheable
-      TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'vault_remade')
-      expect(box.cacheable.central).to.eq(central)
-      expect(box.vault_tok).to.eq('vault-tok-u1')
-    })
+  for (const [heldBlurb, heldOf] of HeldCases) {
+    for (const [seq, blurb] of OtherVaultCases) {
+      it(`throws 'unexpected_error' for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
+        const box = await boxListingOf(held.mw).build(heldOf())
+        const { central } = cacheableOf(box)
+        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'unexpected_error')
+        expect(cacheableOf(box).central).to.eq(central)
+        expect(box.vault_tok).to.eq('vault-tok-u1')
+      })
+    }
   }
 
-  it("refuses 'vault_remade' from a fetch that meets a record under another vault_tok", async () => {
+  it("throws 'unexpected_error' over a draft's central never stored, and for a tombstone or a damaged record under another vault_tok", async () => {
+    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('drafted') })
+    const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'unexpected_error')
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'unexpected_error')
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'd')), 'unexpected_error')
+    expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
+  })
+
+  it("throws 'unexpected_error' from a fetch that meets a record under another vault_tok", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    await TH.expectRefusal(box.fetch(), 'vault_remade')
+    await TH.expectRefusal(box.fetch(), 'unexpected_error')
     expect(box.revision_seq).to.eq(1)
+  })
+
+  it("tells 'unexpected_error' to onBadNews for a notice under another vault_tok, keeping its own copy", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    const box = await listing.build(fullBoxRecord())
+    await held.mw.notify(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }))
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 1 })
   })
 })
 // --
@@ -119,16 +146,16 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       held.mw.setNow(T0 + 5000)
       await expect(box.edit({ whisper: 'sk-test-0000' })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
-      expect(box.cacheable.staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
+      expect(cacheableOf(box).staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
       const reborn = box.revision_tok
       held.mw.setNow(T0 + 6000)
       await box.edit({ sidecar: { note: 'reborn' } })
-      expect(box.cacheable.staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
+      expect(cacheableOf(box).staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
       await box.send({})
       const [put] = held.mw.callsOf('put')
       expect(put?.expected).to.deep.equal({ revision_tok: tok, revision_seq: 2 })
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
-      expect(box.cacheable.central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+      expect(cacheableOf(box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     })
 
     it(`refuses a sidecar edit with no whisper over ${blurb} as 'bad_option', from makeStaged`, async () => {
@@ -146,7 +173,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     held.mw.setNow(T0 + 5000)
     await box.edit({ whisper: 'sk-test-0000' })
     expect(box.registered_at).to.eq(T0)
-    expect(box.cacheable.staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+    expect(cacheableOf(box).staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 })
 // --
@@ -368,11 +395,11 @@ describe("Box sidecar while the vault is locked", () => {
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
     for (const lockState of ['unlocked', 'locked'] as const) {
       held.mw.setLockState(lockState)
-      for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), gone.cacheable.central]) {
+      for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), cacheableOf(gone).central]) {
         expect(form).to.not.have.property('sidecar')
         expect(Object.getOwnPropertySymbols(form)).to.deep.equal([])
       }
-      const { central, staged, ...sparse } = box.cacheable
+      const { central, staged, ...sparse } = cacheableOf(box)
       expect(sparse).to.not.have.property('sidecar')
       expect(Object.getOwnPropertySymbols(central)).to.deep.equal([])
       expect(staged).to.be.null
@@ -382,7 +409,7 @@ describe("Box sidecar while the vault is locked", () => {
   it("leaves the record in hand as it is: the cacheable central keeps the sidecar it was stored with", async () => {
     const box = await boxOf()
     held.mw.setLockState('locked')
-    expect(box.cacheable.central).to.deep.equal(fullBoxRecord())
+    expect(cacheableOf(box).central).to.deep.equal(fullBoxRecord())
   })
 
   it.todo("a lock coming down settles every box, so that a snapshot made before it stops carrying the sidecar")
@@ -420,3 +447,29 @@ describe("Box own props", () => {
     expect(JSON.stringify(box)).to.eq(JSON.stringify(held.mw.sparseBoxRecord()))
   })
 })
+
+// == [Thread 9]: forgetting the whisper while locked
+
+describe("box.whisper = null while the vault is locked (thread 9)", () => {
+  for (const [forget, blurb] of [[null, 'null'], [LOCKED, 'LOCKED']] as const) {
+    it(`passes setting ${blurb}, forgetting the whisper exposed, which stays forgotten once unlocked`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      box.whisper = 'sk-test-0000'
+      held.mw.setLockState('locked')
+      box.whisper = forget
+      expect(box.getSnapshot().exposed).to.be.false
+      held.mw.setLockState('unlocked')
+      expect(box.whisper).to.be.null
+    })
+  }
+
+  it("refuses 'vault_locked' setting a new whisper, keeping the one exposed", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = 'sk-test-0000'
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => { box.whisper = 'sk-test-1111' }, 'vault_locked')
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.eq('sk-test-0000')
+  })
+})
+// --

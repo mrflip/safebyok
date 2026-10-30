@@ -271,3 +271,30 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 /** Why the vault's trouble holds a throw from the host's onBadNews handler. */
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
+
+// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, NoWhisperToCarry, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
+
+/** Why a record in hand that is not full cannot be opened. */
+export const RecordNotFull = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
+
+/** Why an edit laid over a central that moved while it was being made stages nothing. */
+export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is the one delivered, and this refusal carries it: call again to edit it."
+
+/** Why `build` makes nothing of a dna for a scope the listing already holds. */
+export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
+
+/** Why an edit of a box that holds no whisper, given none, stages nothing. */
+export const NoWhisperToCarry = "This box holds no whisper to carry forward, so an edit needs one: hydrate it, or give a whisper."
+
+/** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
+export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+
+/** Why a record storage holds deleted at the revision held alive, or the other way round, is not taken in. */
+export const OneRevisionTwoFates = "Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy and did not take in what storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+
+/** Why a record under another vault_tok than the instance holds is not taken in. */
+export const OtherVaultTok = "Storage holds this record under another vault_tok than this device holds it under: the vault was deleted and made anew, or storage mixed the records of two vaults. This device kept its own copy and did not take in the one storage sent. Load the vault again from storage, and its boxes with it: safebyok does not yet remake what it holds of a vault made anew."
+
+/** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
+export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
+// --

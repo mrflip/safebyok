@@ -5,8 +5,9 @@ import { Box } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import { cmpRevisions, Storable } from '../../src/models/storable'
+import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
-import { type BoxAnswer, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { type BoxAnswer, boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -83,7 +84,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
     expect(box?.isTimely).to.be.true
     await box?.hydrate({ maxMillisSinceRefresh: 60_000 })
     expect(mw.callsOf('get')).to.have.lengthOf(1)
-    expect(box?.cacheable).to.include({ central, staged })
+    expect(cacheableOf(box)).to.include({ central, staged })
   })
 
   it("never fetches a never-stored central for want of the whisperCiphered: a draft's central is a tombstone, whole", async () => {
@@ -277,8 +278,8 @@ const boxOf = (central: Rec, staged: Rec | null = null): SpiedBox => (
 
 /** The box's held records and the own props that follow the record in hand, for comparing before and after. */
 const stateOf = (box: Box) => ({
-  central:      box.cacheable.central,
-  staged:       box.cacheable.staged,
+  central:      cacheableOf(box).central,
+  staged:       cacheableOf(box).staged,
   revision_seq: box.revision_seq,
   revision_tok: box.revision_tok,
   written_at:   box.written_at,
@@ -415,8 +416,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       const rcvd = rcvdOf('full', SameRev)
       box.receive(rcvd)
       expect(policies).to.deep.equal(['fill'])
-      expect(box.cacheable.central).to.deep.equal(rcvd)
-      expect(box.cacheable.staged).to.be.null
+      expect(cacheableOf(box).central).to.deep.equal(rcvd)
+      expect(cacheableOf(box).staged).to.be.null
       expect(box.isFull).to.be.true
       expect(box.sidecar).to.deep.equal({ note: 'delivered' })
       expect(box.written_at).to.eq(SameRev.written_at)
@@ -426,8 +427,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       const box = boxOf(Centrals.sparse(), Staged())
       box.receive(rcvdOf('full', SameRev))
       expect(policies).to.deep.equal(['fill'])
-      expect(box.cacheable.central).to.deep.equal(rcvdOf('full', SameRev))
-      expect(box.cacheable.staged).to.deep.equal(Staged())
+      expect(cacheableOf(box).central).to.deep.equal(rcvdOf('full', SameRev))
+      expect(cacheableOf(box).staged).to.deep.equal(Staged())
       expect(box.revision_tok).to.eq('rev-s3')
       expect(box.sidecar).to.deep.equal({ note: 'staged' })
     })
@@ -443,19 +444,33 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       const rcvd = rcvdOf('gone', SameRev)
       box.receive(rcvd)
       expect(policies).to.deep.equal(['gone'])
-      expect(box.cacheable.central).to.deep.equal(rcvd)
-      expect(box.cacheable.staged).to.be.null
+      expect(cacheableOf(box).central).to.deep.equal(rcvd)
+      expect(cacheableOf(box).staged).to.be.null
       expect(box.isPresent).to.be.false
       expect(stateOf(box)).to.include({ revision_seq: 2, revision_tok: 'rev-c2', written_at: SameRev.written_at })
     })
 
-    it("same | full | ouch matches no row, and refuses 'unexpected_error' as a bug in Storable today (pinned: see the todo below)", () => {
-      const box = boxOf(Centrals.ouch(), Staged())
-      const before = stateOf(box)
-      TH.expectSyncRefusal(() => box.receive(rcvdOf('full', SameRev)), 'unexpected_error')
-      expect(stateOf(box)).to.deep.equal(before)
+    // Thread 9 replaces thread 2's pinned refusal and its todo: the Coach ruled 'fill'.
+    it("same | full | ouch takes 'fill': central becomes the delivered record, nothing staged stays so, and the thing is present and full", () => {
+      const box = boxOf(Centrals.ouch())
+      const rcvd = rcvdOf('full', SameRev)
+      box.receive(rcvd)
+      expect(policies).to.deep.equal(['fill'])
+      expect(cacheableOf(box).central).to.deep.equal(rcvd)
+      expect(cacheableOf(box).staged).to.be.null
+      expect(box.isPresent).to.be.true
+      expect(box.isFull).to.be.true
+      expect(box.sidecar).to.deep.equal({ note: 'delivered' })
     })
-    it.todo("same | full | ouch: the table has no row for a healthy record delivered at the revision this device holds damaged; should it take 'fill' (central becomes the delivered record, the staged as it was), as same | full | sparse does?")
+
+    it("same | full | ouch takes 'fill', and a staged edit stays as it was", () => {
+      const box = boxOf(Centrals.ouch(), Staged())
+      box.receive(rcvdOf('full', SameRev))
+      expect(policies).to.deep.equal(['fill'])
+      expect(cacheableOf(box).central).to.deep.equal(rcvdOf('full', SameRev))
+      expect(cacheableOf(box).staged).to.deep.equal(Staged())
+      expect(box.revision_tok).to.eq('rev-s3')
+    })
   })
 
   describe("a newer rcvd", () => {
@@ -466,8 +481,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
           const rcvd = rcvdOf(rcvdShape, NewerRev)
           box.receive(rcvd)
           expect(policies).to.deep.equal(['adopt'])
-          expect(box.cacheable.central).to.deep.equal(rcvd)
-          expect(box.cacheable.staged).to.be.null
+          expect(cacheableOf(box).central).to.deep.equal(rcvd)
+          expect(cacheableOf(box).staged).to.be.null
           expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok: 'rev-n3', written_at: NewerRev.written_at })
         })
       }
@@ -477,7 +492,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
         const rcvd = rcvdOf('gone', NewerRev)
         box.receive(rcvd)
         expect(policies).to.deep.equal(['gone'])
-        expect(box.cacheable.central).to.deep.equal(rcvd)
+        expect(cacheableOf(box).central).to.deep.equal(rcvd)
         expect(box.isPresent).to.be.false
         expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok: 'rev-n3', written_at: NewerRev.written_at })
       })
@@ -486,8 +501,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
         const box = boxOf(Centrals[centralShape]())
         box.receive(tombstoneBoxRecord({ ...NewerRev, registered_at: T0 - 5 }, 'd'))
         expect(policies).to.deep.equal(['ouch'])
-        expect(box.cacheable.central).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000, am: 'd' })
-        expect(box.cacheable.staged).to.be.null
+        expect(cacheableOf(box).central).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000, am: 'd' })
+        expect(cacheableOf(box).staged).to.be.null
         expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000 })
       })
     }
@@ -506,8 +521,8 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
           const rcvd = rcvdOf(rcvdShape, { ...NewerRev, revision_tok })
           box.receive(rcvd)
           expect(policies).to.deep.equal([policy])
-          expect(box.cacheable.central).to.deep.equal(rcvd)
-          expect(box.cacheable.staged).to.be.null
+          expect(cacheableOf(box).central).to.deep.equal(rcvd)
+          expect(cacheableOf(box).staged).to.be.null
           expect(box.hasStaged).to.be.false
           expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok, written_at: NewerRev.written_at })
         })
@@ -519,15 +534,15 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
     const box = boxOf(Centrals.sparse(), Staged())
     box.receive(rcvdOf('full', SameRev))
     expect(policies).to.deep.equal(['fill'])
-    expect(box.cacheable.staged).to.deep.equal(Staged())
+    expect(cacheableOf(box).staged).to.deep.equal(Staged())
   })
 
   it("ouch: central becomes an ouchstone of the held sparse props, and the staged is carried to the revision after it, under a new tok", () => {
     const box = boxOf(Centrals.full(), Staged())
     box.receive(rcvdOf('ouch', NewerRev))
     expect(policies).to.deep.equal(['ouch'])
-    expect(box.cacheable.central).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000, am: 'd' })
-    const { staged } = box.cacheable
+    expect(cacheableOf(box).central).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000, am: 'd' })
+    const { staged } = cacheableOf(box)
     expect(staged?.revision_seq).to.eq(4)
     expect(staged?.revision_tok).to.be.a('string').and.not.oneOf(['rev-s3', 'rev-n3', 'rev-c2'])
     expect(staged).to.deep.equal({ ...Staged(), revision_seq: 4, revision_tok: staged?.revision_tok })
@@ -539,22 +554,22 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
     const box = boxOf(Centrals.full())
     box.receive(rcvdOf('ouch', NewerRev))
     expect(policies).to.deep.equal(['ouch'])
-    expect(box.cacheable.staged).to.be.null
+    expect(cacheableOf(box).staged).to.be.null
   })
 
   it("edit: the patch over central and the staged, under the revision after central's, one tok until send or del spends it", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(Centrals.full())
     await box.edit({ sidecar: { note: 'first' } })
-    const first = box.cacheable.staged
+    const first = cacheableOf(box).staged
     expect(first).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'first' }, revision_seq: 3, revision_tok: first?.revision_tok, written_at: T0 + 9000 })
     expect(first?.revision_tok).to.not.eq('rev-c2')
     held.mw.setNow(T0 + 9500)
     await box.edit({ sidecar: { note: 'second' } })
-    const second = box.cacheable.staged
+    const second = cacheableOf(box).staged
     expect(second).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'second' }, revision_seq: 3, revision_tok: second?.revision_tok, written_at: T0 + 9500 })
     expect(second?.revision_tok).to.eq(first?.revision_tok)
-    expect(box.cacheable.central).to.deep.equal(Centrals.full())
+    expect(cacheableOf(box).central).to.deep.equal(Centrals.full())
   })
 
   it("del: a deletion's tombstone of the held sparse props, staged under the revision after central's; storage's refusal leaves it staged", async () => {
@@ -562,10 +577,10 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
     const box = await listing.build(Centrals.full())
     held.mw.willDel(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', 'The fake store is down.')))
     await TH.expectRefusal(box.del(), 'storage_unavailable')
-    const { staged } = box.cacheable
+    const { staged } = cacheableOf(box)
     expect(staged).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: staged?.revision_tok, written_at: T0 + 9000, am: 'x' })
     expect(box.isPresent).to.be.false
-    expect(box.cacheable.central).to.deep.equal(Centrals.full())
+    expect(cacheableOf(box).central).to.deep.equal(Centrals.full())
   })
 })
 
@@ -573,10 +588,10 @@ describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with, and the draft stays staged", async () => {
     const listing = boxListingOf(held.mw)
     const built = await listing.build({ ...held.mw.boxscope('anthropic_api_key') })
-    const box = new SpiedBox(held.mw.world, listing, built.cacheable.central, built.cacheable.staged, { maxMillisSinceRefresh: 10 * 60_000 })
-    expect(box.cacheable.central.revision_seq).to.eq(MSX.NeverStoredSeq)
+    const box = new SpiedBox(held.mw.world, listing, cacheableOf(built).central, cacheableOf(built).staged, { maxMillisSinceRefresh: 10 * 60_000 })
+    expect(cacheableOf(box).central.revision_seq).to.eq(MSX.NeverStoredSeq)
     expectReceivedUnchanged(box, null, 'same')
-    expect(box.cacheable.staged?.revision_seq).to.eq(0)
+    expect(cacheableOf(box).staged?.revision_seq).to.eq(0)
   })
 
   for (const centralShape of ShapesAlive) {
@@ -590,8 +605,8 @@ describe("storable.receive(null)", () => {
     const box = boxOf(Centrals.ouch(), Staged())
     box.receive(null)
     expect(policies).to.deep.equal(['gone'])
-    expect(box.cacheable.central).to.deep.equal({ ...Centrals.ouch(), written_at: T0 + 9000, am: 'x' })
-    expect(box.cacheable.staged).to.be.null
+    expect(cacheableOf(box).central).to.deep.equal({ ...Centrals.ouch(), written_at: T0 + 9000, am: 'x' })
+    expect(cacheableOf(box).staged).to.be.null
     expect(box.isPresent).to.be.false
   })
 
@@ -784,15 +799,15 @@ describe("Storable forms", () => {
     it("is the sparse form of central with central and the staged beside it, the staged null where nothing is staged", async () => {
       const box = await builtBoxOf()
       expect(box.hasStaged).to.be.false
-      expect(box.cacheable).to.deep.equal({ ...held.mw.sparseBoxRecord(), central: fullBoxRecord(), staged: null })
-      expect(Object.isFrozen(box.cacheable)).to.be.true
+      expect(cacheableOf(box)).to.deep.equal({ ...held.mw.sparseBoxRecord(), central: fullBoxRecord(), staged: null })
+      expect(Object.isFrozen(cacheableOf(box))).to.be.true
     })
 
     it("carries the staged record, whole, once an edit has staged one; the sparse form stays central's", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
       await box.edit({ sidecar: { note: 'staged' } })
-      const { staged, central, ...sparse } = box.cacheable
+      const { staged, central, ...sparse } = cacheableOf(box)
       expect(central).to.deep.equal(fullBoxRecord())
       expect(staged).to.include({ revision_seq: 2, written_at: T0 + 500, am: 'a' })
       expect(staged).to.have.property('sidecar').that.deep.equals({ note: 'staged' })
@@ -801,23 +816,23 @@ describe("Storable forms", () => {
 
     it("has no sidecar on the sparse form nor on a tombstone, central or staged", async () => {
       const full = await builtBoxOf()
-      const { staged, central, ...sparse } = full.cacheable
+      const { staged, central, ...sparse } = cacheableOf(full)
       expect(staged).to.be.null
       expect(central).to.have.property('sidecar')
       expect(sparse).to.not.have.property('sidecar')
 
       const gone = await builtBoxOf(held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-      expect(gone.cacheable.central).to.not.have.property('sidecar')
-      expect(gone.cacheable).to.not.have.property('sidecar')
+      expect(cacheableOf(gone).central).to.not.have.property('sidecar')
+      expect(cacheableOf(gone)).to.not.have.property('sidecar')
 
       const damaged = await builtBoxOf(held.mw.tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-d3' }, 'd'))
-      expect(damaged.cacheable.central).to.not.have.property('sidecar')
-      expect(damaged.cacheable).to.not.have.property('sidecar')
+      expect(cacheableOf(damaged).central).to.not.have.property('sidecar')
+      expect(cacheableOf(damaged)).to.not.have.property('sidecar')
 
       await full.del()
       expect(full.hasStaged).to.be.false
-      expect(full.cacheable.central).to.not.have.property('sidecar')
-      expect(full.cacheable).to.not.have.property('sidecar')
+      expect(cacheableOf(full).central).to.not.have.property('sidecar')
+      expect(cacheableOf(full)).to.not.have.property('sidecar')
     })
 
     it("is a staged tombstone, with no sidecar, while a del is in the store's hands", async () => {
@@ -825,9 +840,9 @@ describe("Storable forms", () => {
       const { entered, release } = holdNextDel(box, held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
       const deleting = box.del()
       await entered
-      expect(box.cacheable.staged).to.include({ am: 'x', revision_seq: 2 })
-      expect(box.cacheable.staged).to.not.have.property('sidecar')
-      expect(box.cacheable.central).to.deep.equal(fullBoxRecord())
+      expect(cacheableOf(box).staged).to.include({ am: 'x', revision_seq: 2 })
+      expect(cacheableOf(box).staged).to.not.have.property('sidecar')
+      expect(cacheableOf(box).central).to.deep.equal(fullBoxRecord())
       expect(box.getSnapshot().present).to.be.false
       release()
       await deleting
@@ -861,7 +876,7 @@ describe("Storable own props", () => {
     })
   })
 
-  describe("the props that follow the record in hand: revision_tok, revision_seq, written_at, and vault_tok over a tombstone", () => {
+  describe("the props that follow the record in hand: revision_tok, revision_seq, written_at; and vault_tok, which never moves", () => {
     const writable = ['vault_tok', 'revision_tok', 'revision_seq', 'written_at'] as const
 
     it("start as the record the box was received with", async () => {
@@ -889,11 +904,13 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    it("take the vault_tok of a record received over a tombstone under another vault_tok, and the scope does not", async () => {
+    // Thread 9 restates this case: over a tombstone, a record under another vault_tok now throws, as over a living box.
+    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws 'unexpected_error', and neither it nor the scope moves", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
-      box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' }))
-      expect(box.vault_tok).to.eq('vault-tok-u2')
+      TH.expectSyncRefusal(() => box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })), 'unexpected_error')
+      expect(box.vault_tok).to.eq('vault-tok-u1')
+      expect(Object.getOwnPropertyDescriptor(box, 'vault_tok')).to.include({ writable: false, configurable: false })
       expect(box.scope).to.eq(scope)
       expect(box.scope).to.deep.equal(held.mw.boxscope('anthropic_api_key'))
     })
@@ -912,8 +929,8 @@ describe("Storable own props", () => {
       expect(box.revision_tok).to.not.eq('rev-a1')
       expect(box.written_at).to.eq(T0 + 500)
       expect(box.vault_tok).to.eq('vault-tok-u1')
-      expect(box.cacheable.central).to.deep.equal(fullBoxRecord())
-      expect(followingPropsOf(box)).to.include({ revision_tok: box.cacheable.staged?.revision_tok, revision_seq: 2 })
+      expect(cacheableOf(box).central).to.deep.equal(fullBoxRecord())
+      expect(followingPropsOf(box)).to.include({ revision_tok: cacheableOf(box).staged?.revision_tok, revision_seq: 2 })
     })
 
     it("follow a tombstone staged by a del while the store has it, and the stored tombstone once it answers", async () => {
@@ -938,13 +955,13 @@ describe("Storable own props", () => {
 describe("storable.edit(patch): the record staged", () => {
   it("stages a sidecar patch at the next revision, written now and registered when central was, leaving central untouched and storing nothing", async () => {
     const { box } = await timelyBoxOf()
-    const { central } = box.cacheable
+    const { central } = cacheableOf(box)
     held.mw.setNow(T0 + 500)
     await expect(box.edit({ sidecar: { note: 'edited' } })).resolves.to.eq(box)
     expect(box.hasStaged).to.be.true
-    expect(box.cacheable.staged).to.deep.include({ revision_seq: 2, written_at: T0 + 500, registered_at: T0, am: 'a', sidecar: { note: 'edited' } })
-    expect(box.cacheable.staged?.revision_tok).not.to.eq(central.revision_tok)
-    expect(box.cacheable.central).to.eq(central)
+    expect(cacheableOf(box).staged).to.deep.include({ revision_seq: 2, written_at: T0 + 500, registered_at: T0, am: 'a', sidecar: { note: 'edited' } })
+    expect(cacheableOf(box).staged?.revision_tok).not.to.eq(central.revision_tok)
+    expect(cacheableOf(box).central).to.eq(central)
     expect(box.revision_seq).to.eq(2)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
@@ -974,7 +991,7 @@ describe("storable.edit(patch): the record staged", () => {
       const [put] = held.mw.callsOf('put')
       await box.edit({ sidecar: { note: 'after' } })
       expect(box.revision_tok).not.to.eq(put?.record.revision_tok)
-      expect(box.revision_seq).to.eq(box.cacheable.central.revision_seq + 1)
+      expect(box.revision_seq).to.eq(cacheableOf(box).central.revision_seq + 1)
     })
   }
 
@@ -1017,7 +1034,7 @@ describe("storable.edit(patch): central moving while makeStaged runs", () => {
       await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
       expect(box.hasStaged).to.be.false
       expect(box.isPresent).to.eq(present)
-      expect(box.cacheable.central).to.deep.equal(rcvdOf())
+      expect(cacheableOf(box).central).to.deep.equal(rcvdOf())
     })
   }
 
@@ -1030,7 +1047,7 @@ describe("storable.edit(patch): central moving while makeStaged runs", () => {
   it("stages the edit when what is received only confirms central's revision", async () => {
     const box = await landingBoxOf(sparseBoxRecord())
     await expect(box.edit({ sidecar: { note: 'mine' } })).resolves.to.eq(box)
-    expect(box.cacheable.staged).to.deep.include({ revision_seq: 2, sidecar: { note: 'mine' } })
+    expect(cacheableOf(box).staged).to.deep.include({ revision_seq: 2, sidecar: { note: 'mine' } })
   })
 })
 // --
@@ -1060,7 +1077,7 @@ describe("storable.send(patch): edit, then put", () => {
     hold.open()
     expect(await sending).to.eq(box)
     expect(box.hasStaged).to.be.false
-    expect(box.cacheable.central).to.deep.equal(put?.record)
+    expect(cacheableOf(box).central).to.deep.equal(put?.record)
   })
 
   it("puts a draft under maxMillisSinceRefresh Infinity without fetching, at revision 0, expecting no record stored", async () => {
@@ -1090,35 +1107,37 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     const deleting = box.del()
     await vi.advanceTimersByTimeAsync(0)
     expect(box.isPresent).to.be.false
-    expect(box.cacheable.staged).to.deep.include({ am: 'x', revision_seq: 2 })
+    expect(cacheableOf(box).staged).to.deep.include({ am: 'x', revision_seq: 2 })
     expect(held.mw.callsOf('del')[0]?.expected).to.deep.equal({ revision_tok: 'rev-a1', revision_seq: 1 })
     hold.open()
     expect(await deleting).to.eq(box)
     expect(box.hasStaged).to.be.false
-    expect(box.cacheable.central).to.deep.include({ am: 'x', revision_tok: 'rev-x2' })
+    expect(cacheableOf(box).central).to.deep.include({ am: 'x', revision_tok: 'rev-x2' })
   })
 
   it("deletes again a thing deleted, at its tombstone's revision; a tombstone at the next revision answered reads 'gone' and drops the staged", async () => {
     const { box } = await timelyBoxOf()
     await box.del()
-    const tombstone = box.cacheable.central
+    const tombstone = cacheableOf(box).central
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
     const [del] = held.mw.callsOf('del')
     expect(del?.expected).to.deep.equal({ revision_tok: tombstone.revision_tok, revision_seq: tombstone.revision_seq })
-    expect(box.cacheable.central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq + 1 })
+    expect(cacheableOf(box).central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq + 1 })
     expect(box.hasStaged).to.be.false
   })
 
-  it("deletes again a thing deleted; the same tombstone answered reads 'same', and the staged tombstone stays held", async () => {
+  // Thread 9 restates this case: the Coach ruled that a 'same' answer to a del spends the staged tombstone.
+  it("deletes again a thing deleted; the same tombstone answered reads 'same', and the staged tombstone is dropped", async () => {
     const { box } = await timelyBoxOf()
     await box.del()
-    const tombstone = box.cacheable.central
+    const tombstone = cacheableOf(box).central
     held.mw.willDel(({ scope }) => held.mw.answerOf(scope, tombstone))
     await expect(box.del()).resolves.to.eq(box)
-    expect(box.cacheable.central).to.eq(tombstone)
-    expect(box.hasStaged).to.be.true
-    expect(box.revision_seq).to.eq(tombstone.revision_seq + 1)
+    expect(cacheableOf(box).central).to.eq(tombstone)
+    expect(box.hasStaged).to.be.false
+    expect(box.isPresent).to.be.false
+    expect(box.revision_seq).to.eq(tombstone.revision_seq)
   })
 
   it("deletes a damaged thing at the ouchstone's revision", async () => {
@@ -1127,7 +1146,7 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
     expect(held.mw.callsOf('del')[0]?.expected).to.deep.equal({ revision_tok: 'rev-d3', revision_seq: 3 })
-    expect(box.cacheable.central).to.deep.include({ am: 'x', revision_seq: 4 })
+    expect(cacheableOf(box).central).to.deep.include({ am: 'x', revision_seq: 4 })
   })
 })
 // --
@@ -1157,7 +1176,7 @@ describe("storable verbs while the vault is locked", () => {
     lock.during = true
     await expect(box.edit({ sidecar: { note: 'made while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
-    expect(box.cacheable.staged).to.deep.include({ sidecar: { note: 'made while locking' } })
+    expect(cacheableOf(box).staged).to.deep.include({ sidecar: { note: 'made while locking' } })
   })
 
   it("completes a send whose vault locks between edit and put", async () => {
@@ -1289,6 +1308,121 @@ describe("storable: a refresh the timer launches, which no caller awaits", () =>
     await held.mw.advance(800)
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(held.mw.badnews).to.deep.equal([])
+  })
+})
+// --
+
+// == [Thread 9]: the Coach's rulings of 2026-10-30, as storable cases
+
+describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a del (thread 9)", () => {
+  it("keeps the staged tombstone of a del in flight over a living box when a record at the revision held arrives meanwhile: only a deletion spends it", async () => {
+    const { box } = await timelyBoxOf()
+    const hold = holdOf()
+    held.mw.willDel(async ({ scope, expected }) => {
+      await hold.promise
+      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: (expected?.revision_seq ?? 0) + 1, revision_tok: 'rev-x2' }))
+    })
+    const deleting = box.del()
+    await vi.advanceTimersByTimeAsync(0)
+    box.receive(held.mw.sparseBoxRecord())
+    expect(cacheableOf(box).staged).to.deep.include({ am: 'x', revision_seq: 2 })
+    expect(box.isPresent).to.be.false
+    hold.open()
+    await deleting
+    expect(box.hasStaged).to.be.false
+  })
+
+  it("keeps a staged rebirth over a box held gone when the deletion held arrives again", async () => {
+    const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+    await box.edit({ whisper: 'sk-test-0000' })
+    box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+    expect(box.isPresent).to.be.true
+    expect(cacheableOf(box).staged).to.deep.include({ am: 'a', revision_seq: 3 })
+  })
+
+  it("drops the staged tombstone of a box held gone when storage answers nothing stored, and settles", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+    held.mw.willDel(() => new Promise(() => undefined))
+    void box.del()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(box.hasStaged).to.be.true
+    const snapshot = box.getSnapshot()
+    box.receive(null)
+    expect(box.hasStaged).to.be.false
+    expect(box.getSnapshot()).to.not.eq(snapshot)
+    expect(box.getSnapshot()).to.include({ revision_seq: 2, revision_tok: 'rev-x2', present: false })
+  })
+})
+
+describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile carries it (thread 9)", () => {
+  const MovedCases = [
+    [() => fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2', sidecar: { note: 'theirs' } }), 'a newer record'],
+    [() => tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }),                         'a deletion'],
+  ] as const
+  for (const [rcvdOf, blurb] of MovedCases) {
+    it(`carries ${blurb} received as meta.box_stored, the central now held`, async () => {
+      const box = await landingBoxOf(rcvdOf())
+      const err = await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+      expect(err.meta?.box_stored).to.deep.equal(rcvdOf())
+      expect(err.meta?.box_stored).to.eq(cacheableOf(box).central)
+      expect(err.message).to.eq(Phrases.MovedUnderEdit)
+    })
+  }
+
+  it("carries a central the listing reads back as storage's own 'stale_write' would carry it", async () => {
+    const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
+    const err = await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+    const { listing } = box as unknown as { listing: { storedInStaleRefusal: (err: VaultError) => unknown } }
+    expect(listing.storedInStaleRefusal(err)).to.deep.equal(cacheableOf(box).central)
+  })
+})
+
+describe("storable refusal sentences, from phrases.ts (thread 9)", () => {
+  it("says a record_conflict is worth one fetch, and that one persisting means the system is not working", async () => {
+    const { box } = await timelyBoxOf()
+    const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })), 'record_conflict')
+    expect(err.message).to.eq(Phrases.OneRevisionTwoFates)
+    expect(err.family).to.eq('condition')
+    const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }), 'record_conflict')
+    expect(twoToks.message).to.eq(Phrases.OneRevisionTwoToks)
+    for (const message of [Phrases.OneRevisionTwoFates, Phrases.OneRevisionTwoToks]) {
+      expect(message).to.contain('worth one try').and.to.contain('fundamentally not working')
+    }
+  })
+
+  it("refuses a locked edit and a record not full with the sentences phrases.ts holds", async () => {
+    const { box } = await timelyBoxOf()
+    held.mw.setLockState('locked')
+    const locked = await TH.expectRefusal(box.edit({ sidecar: {} }), 'vault_locked')
+    expect(locked.message).to.eq(Phrases.VaultLocked)
+    held.mw.setLockState('unlocked')
+    const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))
+    const notFull = TH.expectSyncRefusal(() => sparse.demandFull(), 'bad_option')
+    expect(notFull.message).to.eq(Phrases.RecordNotFull)
+  })
+
+  it("throws a record under another vault_tok with the sentence phrases.ts holds", async () => {
+    const { box } = await timelyBoxOf()
+    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })), 'unexpected_error')
+    expect(err.message).to.eq(Phrases.OtherVaultTok)
+  })
+})
+
+describe("storable: the cacheable copy, kept from the host (thread 9)", () => {
+  it("answers no cacheable prop, by any string key: the listing makes the copy by a symbol no entry point exports", async () => {
+    const { box } = await timelyBoxOf()
+    expect('cacheable' in box).to.be.false
+    expect(Object.getOwnPropertyNames(Storable.prototype)).to.not.include('cacheable')
+    expect(JSON.stringify(box)).to.not.contain('central')
+    expect(cacheableOf(box)).to.include({ central: cacheableOf(box).central, staged: null })
+  })
+
+  it("is what the listing saves", async () => {
+    const { listing } = await timelyBoxOf()
+    const box = await listing.build(fullBoxRecord({ boxlabel: 'saved_one' }))
+    const saves = held.mw.callsOf('save')
+    expect(saves.at(-1)?.cacheable).to.deep.equal(cacheableOf(box))
   })
 })
 // --

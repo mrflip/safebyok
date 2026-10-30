@@ -1,4 +1,5 @@
 import { VaultError } from '../errors'
+import * as Phrases from '../phrases'
 import type { Sidecar, Whisper } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import type { BoxRecord, BoxSparse, EditOpts } from './models-shapes'
@@ -86,15 +87,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   // == [The whisper]: whisper, unsealWhisper, expose, seal, reseal, edit
 
-  /** The exposed whisper, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper reads again once it unlocks. Setting it exposes the given whisper without sealing it: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it. */
+  /** The exposed whisper, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper reads again once it unlocks. Setting it exposes the given whisper without sealing it, which needs the vault unlocked: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it, locked or not. */
   get whisper(): Whisper | typeof LOCKED | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
   }
 
   set whisper(whisper: Whisper | typeof LOCKED | null) {
-    this.demandUnlocked()
-    this.#exposed = whisper === LOCKED ? null : whisper
+    const forgets = (whisper === null) || (whisper === LOCKED)
+    if (! forgets) { this.demandUnlocked() }
+    this.#exposed = forgets ? null : whisper
     this.settle()
   }
 
@@ -145,7 +147,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
     const whisper = patch.whisper ?? this.#exposed
     if (whisper === null) {
-      if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', 'This box holds no whisper to carry forward, so an edit needs one: hydrate it, or give a whisper.')) }
+      if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', Phrases.NoWhisperToCarry)) }
       return Promise.resolve(withSidecar)
     }
     return Promise.reject(new VaultError('unexpected_error', 'seal is not written yet.'))

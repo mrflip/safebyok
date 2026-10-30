@@ -22,9 +22,9 @@ export type VaultProps = Readonly<Record<string, never>>
 // == [Vault]
 
 /** A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in.
- * Its `vault_tok` is the life of the vault in its scope: a draft's is minted here, and storage's
- * replaces it once adopted over the draft's central, nothing stored; a record under another
- * `vault_tok` over a vault held alive refuses 'vault_remade'. Its guards take no lock: its record holds no secret, and a change to its gate will carry its own
+ * Its `vault_tok` is the life of the vault in its scope, fixed at birth: a draft's is minted
+ * here, a received record's is its own, and a record under another `vault_tok` throws
+ * 'unexpected_error', a draft's central never stored included. Its guards take no lock: its record holds no secret, and a change to its gate will carry its own
  * proof. A vault deleted or damaged is not edited back to life, as a box is: a new life is a new
  * `vault_tok`, so a new instance, built by the listing.
  */
@@ -72,7 +72,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [What a storable defines]: isFullRecord, makeStaged, makeSnapshot
+  // == [Required by Storable]: isFullRecord, makeStaged, makeSnapshot
 
   /** Every vault record is full until the gate exists. */
   protected isFullRecord(_fetched: VaultSparse): _fetched is VaultRecord {

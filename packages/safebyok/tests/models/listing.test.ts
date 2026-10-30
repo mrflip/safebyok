@@ -3,7 +3,7 @@ import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
 import * as TH from '../test-helpers'
-import { boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { boxListingOf, cacheableOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -11,11 +11,11 @@ describe("listing.fetch(scope): nothing stored for a thing held alive", () => {
   it("refuses 'record_conflict' by the same-revision row same | gone | alive, the box as it was and nothing saved to the cache", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
-    const before = box.cacheable
+    const before = cacheableOf(box)
     held.mw.clearCalls()
     held.mw.willGet(held.mw.answerOf(box.scope, null))
     await TH.expectRefusal(listing.fetch(box.scope), 'record_conflict')
-    expect(box.cacheable).to.deep.equal(before)
+    expect(cacheableOf(box)).to.deep.equal(before)
     expect(listing.at(box.scope)).to.eq(box)
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'get', 'takeWorld'])
   })
@@ -31,7 +31,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       for (const copy of copies) {
         const box = listing.at(scopeOf(copy.boxlabel))
         expect(box).to.be.instanceOf(Box)
-        expect(box?.cacheable, copy.boxlabel).to.deep.equal(copy)
+        expect(cacheableOf(box), copy.boxlabel).to.deep.equal(copy)
       }
     })
 
@@ -124,7 +124,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("puts a box over the revision its instance expects, and its answer spends the staged", async () => {
       const { listing, box } = await edited()
       expect(box.hasStaged).to.be.true
-      const { staged } = box.cacheable
+      const { staged } = cacheableOf(box)
       held.mw.clearCalls()
       const answered = await listing.put(box)
       const [call] = held.mw.callsOf('put')
@@ -132,7 +132,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(call?.record).to.deep.equal(staged)
       expect(answered).to.eq(box)
       expect(box.hasStaged).to.be.false
-      expect(box.cacheable.central).to.deep.equal(staged)
+      expect(cacheableOf(box).central).to.deep.equal(staged)
       expect(box.sidecar).to.deep.equal({ note: 'edited' })
     })
 
@@ -181,7 +181,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       await listing.put(box)
       const saves = held.mw.callsOf('save')
       expect(saves).to.have.lengthOf(1)
-      expect(saves[0]?.cacheable).to.deep.equal(box.cacheable)
+      expect(saves[0]?.cacheable).to.deep.equal(cacheableOf(box))
     })
 
     it("has tryPut resolve the outcome of a refusal, rejecting never", async () => {
@@ -320,8 +320,8 @@ describe("Listing's pipeline: what every answer takes", () => {
       await listing.fetch(scopeOf('two'))
       const saves = held.mw.callsOf('save')
       expect(saves.map(({ cacheable }) => [cacheable.boxlabel, cacheable.central.revision_seq])).to.deep.equal([['one', -1], ['two', 1], ['two', 2]])
-      expect(saves[0]?.cacheable).to.deep.equal(one.cacheable)
-      expect(saves[2]?.cacheable).to.deep.equal(two.cacheable)
+      expect(saves[0]?.cacheable).to.deep.equal(cacheableOf(one))
+      expect(saves[2]?.cacheable).to.deep.equal(cacheableOf(two))
     })
 
     it("saves a delivery that changes nothing too: the answer is delivered, so the copy is current", async () => {

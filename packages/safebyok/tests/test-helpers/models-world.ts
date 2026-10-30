@@ -429,3 +429,13 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
   })
 }
 // --
+
+// == [Peeking]: cacheableOf
+
+/** The copy `box`'s listing saves to the device cache, by the storable's {@link MSX.ToCacheable} method, which a host holding a box does not reach; undefined for no box, as `box?.cacheable` read before it went private. */
+export function cacheableOf(box: Box): Cacheable<BoxRecord, BoxSparse>
+export function cacheableOf(box: Box | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
+export function cacheableOf(box: Box | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
+  return box?.[MSX.ToCacheable]()
+}
+// --
