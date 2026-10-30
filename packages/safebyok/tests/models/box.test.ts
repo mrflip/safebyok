@@ -501,6 +501,21 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
     expect(box.revision_seq).to.eq(3)
   })
 
+  it("refuses 'bad_option' a live box still sparse once hydrated, given no sidecar, staging nothing", async () => {
+    held.mw.seedStore(sparseBoxRecord())
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' }), 'bad_option')
+    expect(box.hasStaged).to.be.false
+  })
+
+  it("seals the sidecar given over a live box still sparse once hydrated", async () => {
+    held.mw.seedStore(sparseBoxRecord())
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    expect(box.isFull).to.be.true
+    expect(box.sidecar).to.deep.equal({ account: 'home' })
+  })
+
   it("seals the whisper exposed, where the edit gives none", async () => {
     const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     box.whisper = 'sk-test-0000'

@@ -2,7 +2,7 @@ import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar, Whisper } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
-import type { BoxRecord, BoxSparse, EditOpts } from './models-shapes'
+import { type BoxRecord, type BoxSparse, type EditOpts, isTombstone } from './models-shapes'
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
@@ -141,7 +141,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return 'whisper_ciphered' in fetched
   }
 
-  /** A whisper given or exposed is sealed by {@link stubSeal} under `base`'s props, with the sidecar given, else the one `base` carries, else `{}`; with neither whisper, the sealed parts ride along as they are, which needs `base` full. */
+  /** A whisper given or exposed is sealed by {@link stubSeal} under `base`'s props, with the sidecar given, else the one `base` carries; a box gone or damaged is reborn with `{}`, but a live one whose record in hand is sparse refuses 'bad_option', as `{}` would be put over the sidecar stored. With neither whisper, the sealed parts ride along as they are, which needs `base` full. */
   protected makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
     const whisper = patch.whisper ?? this.#exposed
     if (whisper === null) {
@@ -149,8 +149,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
       if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', Phrases.NoWhisperToCarry)) }
       return Promise.resolve(withSidecar)
     }
-    const sidecar = patch.sidecar ?? (this.isFullRecord(base) ? base.sidecar : {})
-    return stubSeal({ ...base, sidecar }, whisper)
+    const carried = this.isFullRecord(base) ? base.sidecar : null
+    if (carried === null && patch.sidecar === undefined && ! isTombstone(this.combined)) { return Promise.reject(new VaultError('bad_option', Phrases.NoSidecarToCarry)) }
+    return stubSeal({ ...base, sidecar: patch.sidecar ?? carried ?? {} }, whisper)
   }
 
   /** Two snapshots are alike when their JSON is, and both or neither carry the locked sidecar. */
