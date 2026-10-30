@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #384 (thread 14); thread 11 next; then 12, 13, then 6.
+* **Status:** filed through #384 (thread 14); thread 11 (#385) in review; then 12, 15, 13, then 6.
 
 ## Read first
 
@@ -440,7 +440,33 @@ whether the vault is locked or not; thread 5's `LockedSidecar` bag goes from the
 `LOCKED` wherever else it is used, such as the whisper); `Box.sameSnapshot` compares the sidecar
 as the other fields are once no symbol-keyed bag needs identity. Thread 5's and 4b's tests that
 pin the LOCKED sidecar are restated. `send` keeps putting its staged record (the YOLO call of the
-restack). Worker `sonnet`; review `medium`. Depends on 11. Size: small.
+restack). Also, two more rulings of the Coach (2026-10-30, the convenient thread):
+* **`cacheable` private** ("Make private, in whatever thread is convenient"): the storable's own
+  `settle` hands its cacheable to the listing's save (a push, not a pull), so it is a `#` field
+  nothing outside reads; `ToCacheable` and `cacheableOf` go, and tests assert on what the fake
+  cache saved (`mw`'s cache calls) or on the snapshot.
+* **The double edge, documented and tested** ("As long as we can document and test the outcome,
+  I am fine with the double edge case meaning that we could have possibly saved the data ... but
+  instead were forced into a different defensible policy of unstaging the edit"): an end-to-end
+  test that a staged edit carried past damage (newer `ouch`) is dropped, with no refusal, when
+  storage then answers nothing stored; and a line in `reconcileCentral`'s damage note saying so.
+Worker `sonnet`; review `medium`. Depends on 11. Size: small to medium.
+
+### 15. A whisper and a sidecar on every update
+
+*Orchestrator, the Coach's ruling (2026-10-30), on #384's whisperless-dna row:* "Make it so
+customer must supply a whisper and sidecar on every update. This situation will eventually
+improve, but it's greatly simplifying". Label `whisper_required`.
+Every update names both: `build(dna)` (the dna's whisper and sidecar), `edit(patch)` and `send`
+(the patch's), `seal`. One without both refuses `bad_option` before anything is staged. What
+the rule retires goes with it: carrying a sidecar or a whisper over from the record in hand
+(`NoSidecarToCarry`, `NoWhisperToCarry`, the sparse-base paths in `makeStaged`), `reseal` and
+`BoxEditOpts`, and the whisperless dna (the stub seal always takes a whisper). *YOLO:* the exposed
+whisper (`box.whisper = …`) no longer stands in for one at an edit; the setter stays as the
+Coach asked, documented as exposing only. A tombstone (`del`) is not an update. Tests restated
+where they edit with a sidecar alone or a whisper alone. Worker `opus`; review `medium`. Depends
+on 12 (cut from its tip; both touch `box.ts`). Size: medium.
+
 
 ### 13. The whisper, an object
 
@@ -452,7 +478,7 @@ as a plain object (`box.whisper = { val: 'sk-…' }`), checked at the setter and
 sidecar is; the seal serializes the object. `null` and `LOCKED` keep their meaning (thread 9's
 setter). **Hands off:** cutting off access to the private value while locked (the Coach: "I will
 have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
-whisper is secret material: no side door, CLAUDE.md). Depends on 12. Size: small to medium.
+whisper is secret material: no side door, CLAUDE.md). Depends on 15 (cut from its tip). Size: small to medium.
 
 ### 6. What this model guarantees
 
@@ -462,12 +488,12 @@ whisper is secret material: no side door, CLAUDE.md). Depends on 12. Size: small
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` twice; 13's whisper object rides 14's seal), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
