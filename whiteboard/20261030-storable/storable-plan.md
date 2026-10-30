@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** 1, 4a filed (restacked onto #374 locally; push waits on the Coach); 2 filed (#373); 3 (#372) in second review; 4b (#375) in review; 5 building.
+* **Status:** 1, 4a filed (restacked onto #374 locally; push waits on the Coach); 2 filed (#373); 3 (#372) waits on the Coach; 4b (#375) in review; 5 and 7 building.
 
 ## Read first
 
@@ -101,6 +101,15 @@ asked, so it needs nothing of thread 3; it is tested through `listing.fetch` wit
 **Look-ahead:** thread 6 reads its thread file for every row found unreachable or differing.
 **Size:** medium, judgment-heavy.
 
+*Review:* fixed, reworked on the Coach's rulings, fixed (#373). The first review fixed the README
+row (`takeWorld` runs before `receive` refuses) and named the operation, fetch, in every
+`record_conflict` text. The rework made same-revision damage skip and a deletion over held damage
+read gone (the Coach: "don't redefine the constants"), with a note above the table, and made the
+refusal tell the customer. The second fixed the note's and messages' accuracy. Left, to the Coach:
+`same | full | ouch` refusing `unexpected_error`; an older record resetting the refresh clock;
+nothing stored over a damaged copy dropping a carried edit silently; `record_conflict`'s family.
+For the restack: its listing test expecting `fetch` to throw `record_conflict` meets #372's rework.
+
 ### 3. The listing's pipeline
 
 > **3. The listing's pipeline.** Three fixes first, the Coach's: (a) the device cache is written by the listing's `settle`, which is where consequences of new state belong, as the storable's `settle` holds its own: `settle(thing?)` saves `thing.cacheable` where a thing is given, then makes the snapshot; `#receiveInto` and `build(dna)` pass the thing, `hello`'s settle after `load` passes nothing, so a built draft is cached and a revived one is not written back; (b) `isWatchable` defaults to true; (c) `ifAbsent: 'fail' | 'nil'` on `fetch`, default `'fail'`, judged in `#deliver` once the answer is delivered: an answer of nothing stored, or of a tombstone deleted or damaged, throws `absentRefusal(scope)` under `'fail'` and resolves null under `'nil'`, in both cases after the instance held, if any, has received it and settled; `Storable.hydrate` passes `'nil'`, so a refresh in the background never errors into a bitbucket. Then, in `tests/models/listing.test.ts` and `box-listing.test.ts`: `fetch` of nothing stored refuses `absent_box`, whether or not a thing is held, and under `'nil'` resolves null, the held instance still at `at(scope)` as its tombstone; `fetch` of a stored tombstone likewise; ~~`fetch` of nothing stored for a thing held alive refuses `record_conflict` by the same-revision row, before `ifAbsent` is asked;~~ `build(tombstone)` holds a gone instance; `put(box)` and `put(record)` take one path, over `expectedRevisionOf(scope)` (null for a thing never stored or not held), and the answer spends the staged; `del(box)` at central's revision; a refused answer throws after `storedInStaleRefusal`'s record is delivered, for a `stale_write` carrying `meta.box_stored` full, sparse, and absent; a malformed answer, and an answer missing its `scope`, refuse `bad_record` before anything is delivered; a notice from the watch is delivered as an answer, and a refusal met on the way reaches `onBadNews` rather than throwing; `hello` revives from `load`, each box's `cacheable` round-tripping to an equal `cacheable`, writing nothing back, then starts the watch with `fullFor` naming the watchable scopes, every box among them until one is set otherwise, then hydrates all; `goodbye` ends the watch once; `save` is called once per settle given a thing, with that thing's `cacheable`: each delivery, each `build`; the listing's `snapshot` holds present things only, is the same array until one changes, and its listeners are called once per change. Depends on 1. Size: medium to large.
@@ -125,6 +134,16 @@ passes `ifAbsent: 'nil'`, through `Storable.fetch` to `listing.fetch`), `models-
 plain enough to take a third argument. Thread 4a changes `hydrate`'s body; this thread touches the
 trigger's launch line, not `hydrate`, so the two meet at restack only if both reach the same line.
 **Size:** medium to large.
+
+*Review:* flagged, reworked, flagged (#372); waits unfiled on the Coach. The first review fixed
+doc and test wording; its finding on `hello` replacing a held instance was reworked (YOLO:
+`hello` revives only scopes not held; a replaced instance is unsubscribed). The rework also built
+the Coach's bad-news ruling (catches in `#receiveInto` and `settle` telling `onBadNews`). The
+second review fixed two catch-ordering bugs and flagged that a delivery refusal no longer reaches
+a `fetch`/`put`/`del` caller (against CLAUDE.md's "reported by throwing"; a refused background
+refresh then counts as success). A TOP row; thread 8 waits on it. Left: listeners before the
+cache save (a row); a replaced instance's trigger left running; `hydrateAll` telling one world
+refusal per instance.
 
 ### 4a. Hydrate and timeliness
 
