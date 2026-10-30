@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #381 (thread 8); thread 9 (#382) in review; then 10, 11, 12, 13, then 6.
+* **Status:** filed through #382 (thread 9); thread 10 building; then 14, 11, 12, 13, then 6.
 
 ## Read first
 
@@ -361,6 +361,36 @@ context. Label `listing_ends`.
 Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its tip: both touch
 `listing.ts`). Size: medium (eight items; if it compacts twice, split what remains).
 
+### 14. Build seals what it stages
+
+*Orchestrator, the Coach's ruling (2026-10-30), on thread 7's sealed-parts row:* "Ideally we'd
+have as an invariant that the box was always full; we can't, but we have (afaict in all but this
+case) the invariant that the box can be made full by refreshing. Here, we have to either start
+janking in special flags and messing with the data model, or require that a new record must be
+sealed immediately. Can you stub out seal to make placeholders for the needed fields, and somehow
+or another have build seal any staged data? It sounds like most other things are demonstrable but
+this needs a whole lot of upcoming work that it is blocking for needing that upcoming work".
+Label `build_seals`. Runs next after thread 10, ahead of 11-13.
+1. **A stub seal** in the models: it makes the sealed fields a full record needs
+   (`box_key_wrapped`, `whisper_ciphered`, whatever `isFullRecord` asks) as placeholders, shaped
+   right, plainly marked a stub until the vault's seal lands. **No secret material in them, ever**:
+   a placeholder is a constant or random bytes, never derived from or carrying the whisper or any
+   key (CLAUDE.md, *Secret material never leaves through a side door*; *Never invent
+   cryptography*: this is a placeholder, not a construction). Survey first: 4b's seal guard pairs
+   and `fakeSealBoxListingOf` in `models-world.ts` may already give the seam; build on it.
+2. **`build` seals what it stages:** `build(dna)` stages revision 0 over the shim and seals it
+   before it returns, so a built box's record in hand is full. A dna's whisper, if it carries one,
+   is what the seal takes in.
+3. **`boxDna` drops `box_key_wrapped` and `whisper_ciphered`** (thread 7's Rec, the row this
+   ruling answers): sealed parts never come from a dna; its strictness refuses them.
+4. **Timeliness asks of the record in hand alone:** with a built box full, `#holdsWhole`'s union
+   with central goes (the Coach's earlier "the box is never sparse"); remove thread 10's TODO.md
+   entry (item 7) that waited on this. Restate the tests that pin the union (4b's "send of a draft
+   with Infinity fetches nothing" should still pass, the draft now whole).
+**Hands off, lifted for this thread** by the Coach's direction: `build` and `boxDna`; `registered_at`'s
+logic stays hands off. Worker `opus`; review `high` (a seal stub sits next to secret material).
+Depends on 10 (cut from its tip). Size: medium.
+
 ### 11. `ifPresent: 'replace'`
 
 *Orchestrator, the Coach's note (2026-10-30), after thread 8 filed:* "Accept ifPresent as a flag.
@@ -375,8 +405,8 @@ whatever `ifPresent` says. The fake store in `models-world.ts` honours it. Doc b
 optional and takes only `'replace'`. In `whiteboard/20261028-storable_base/storable-spec.md`, a
 note where `ifPresent` is described: `'fail'` and `'fetch'` will not be implemented until a clear
 need and a scenario table arrive. Tests in `models-shapes.test.ts`, `listing.test.ts` or
-`box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `low`. Depends on 10 (cut from its
-tip: both touch `listing.ts`). Size: small.
+`box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `low`. Depends on 14 (cut from its
+tip; 10 and 11 both touch `listing.ts`). Size: small.
 
 ### 12. The sidecar, locked or not
 
@@ -408,12 +438,12 @@ whisper is secret material: no side door, CLAUDE.md). Depends on 12. Size: small
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 11, 12, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` twice), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` twice; 13's whisper object rides 14's seal), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3

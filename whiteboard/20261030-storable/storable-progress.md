@@ -115,6 +115,12 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   step is the Coach's to specify; until then `#holdsWhole`'s union stays (a TODO, thread 10).
   The whisper's get/set "should be cutting off access to the private variable when locked": the
   Coach's to look at; thread 9's setter (null and `LOCKED` pass while locked) stays, documented.
+* *The Coach's rulings of 2026-10-30, fifth batch* (verbatim in *Resolved*): **build seals what
+  it stages**, through a stub seal of placeholders, so a box is full from birth and can always be
+  made full by refreshing (thread 14; it supersedes the "making a record" hands-off for `build`
+  and `boxDna`, and retires `#holdsWhole`'s union); a draft meeting another `vault_tok` throws
+  ("practically impossible once we have vault"); who reads `cacheable`: only the listing's
+  `settle` (a row asks whether to make it a push and `#`-private).
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.
