@@ -7,7 +7,6 @@ import { lockedError, movedUnderEditError, notFullError } from '../helpers/throw
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import { ToCacheable } from './models-shapes'
 import type { Age, Am, Cacheable, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
@@ -125,7 +124,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
 
   /** The copy the listing saves to the device cache, central and the staged beside the sparse form. Keyed by a symbol no entry point exports: the listing calls it, and a host holding the thing does not. */
-  [ToCacheable](): Cacheable<RecordT, SparseT> {
+  [MSX.ToCacheable](): Cacheable<RecordT, SparseT> {
     return Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
   }
 
