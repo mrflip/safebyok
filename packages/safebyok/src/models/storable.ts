@@ -219,7 +219,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, edit, send, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone, `opts.ifAbsent` says: the absent refusal by default, or an absent thing as it is under 'nil', which the trigger's refresh always passes. */
+  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone,
+   * `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent.
+   */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     await this.ensureReadyToFetch(opts)
     await this.listing.fetch(this.scope, opts)
