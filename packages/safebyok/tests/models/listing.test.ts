@@ -683,7 +683,7 @@ describe("listing: a host's onBadNews that fails", () => {
       held.mw.willLoad(() => { throw new VaultError('unexpected_error', "The cache is gone.") })
       held.mw.willGet(held.mw.refusalOf(held.mw.boxscope('anthropic_api_key'), new VaultError('storage_unavailable', "Down.")))
       held.mw.seedStore(fullBoxRecord())
-      await expect(listing.hello()).resolves.to.eq(undefined)
+      await listing.hello()
       expect(told).to.deep.equal(['unexpected_error'])
       expect(reported).to.have.lengthOf(1)
     } finally {
@@ -741,7 +741,7 @@ describe("listing: a refusal met by a timer's launch and by a call that joins it
     const hydrating = box.hydrate()
     await vi.advanceTimersByTimeAsync(0)
     open()
-    await expect(hydrating).rejects.toBe(down)
+    await expect(hydrating).rejects.to.eq(down)
     await vi.advanceTimersByTimeAsync(0)
     expect(held.mw.badnews).to.deep.equal([down])
   })
@@ -929,7 +929,7 @@ const seededCache = async () => {
   return copies
 }
 
-/** What a handler that throws throws, and one that answers a promise that rejects rejects with. */
+/** Handlers that fail: `bust` throws, and `rejectingHandler` answers a promise that rejects. */
 const bust = (): never => { throw new Error("The handler is broken.") }
 const rejectingHandler = (): Promise<never> => Promise.reject(new Error("Rejected."))
 const notAnArray = { not: 'an array' } as never
