@@ -6,11 +6,11 @@ import type { Clock } from '../shapes/bank-opts'
 export type TriggerOpts<SnapT, ValT> = {
   clock:                  Clock
   maxMillis:  number
-  // The next launch is scheduled at this fraction of maxMillis after a success, so it has completed by the horizon. Default 0.8.
+  // The next launch is scheduled at this fraction of maxMillis after a success or a launch that completes ok, so it has completed by the horizon. Default 0.8.
   eagerFrac?:             number | undefined
   doSnapshot:             () => SnapT
   doTryLaunch:            () => Promise<Outcome<ValT>>
-  // The launch notes its own success, by noteSuccessNow, and an ok outcome notes no success more, though the next launch is scheduled after it all the same. Default false: an ok outcome is a success.
+  // The launch notes its own success, by noteSuccessNow: an ok outcome that noted none leaves the trigger untimely, though the next launch is scheduled after it all the same. Default false: an ok outcome is a success.
   notesOwnSuccess?:       boolean | undefined
   // Told the refusal of a launch the timer made, which no caller awaits.
   onTimerRefusal?:        ((err: VaultError) => void) | undefined
@@ -37,6 +37,10 @@ export class Trigger<SnapT, ValT> {
   #lastLaunchedAt:  number | null = null
   #lastCompletedAt: number | null = null
   #lastSucceededAt: number | null = null
+  // Whether a success was noted since the launch under way began.
+  #notedInLaunch = false
+  // Whether the last launch completed ok yet noted no success: untimely until a success is noted, whenever the next launch is scheduled.
+  #unconfirmed = false
 
   // The launch under way, which every tryLaunch made meanwhile joins (oneAtATime, but with a value).
   #running: Promise<Outcome<ValT>> | null = null
@@ -58,7 +62,7 @@ export class Trigger<SnapT, ValT> {
     return Object.freeze({ launchAt: this.#launchAt, lastLaunchedAt: this.#lastLaunchedAt, lastCompletedAt: this.#lastCompletedAt, lastSucceededAt: this.#lastSucceededAt })
   }
 
-  get isTimely(): boolean { return this.#clock.now() < this.#launchAt }
+  get isTimely(): boolean { return ! this.#unconfirmed && this.#clock.now() < this.#launchAt }
 
   /** Whether the last success lies within `maxMillis` of now. `Infinity` is always timely, for a trigger that has never succeeded too: it means go ahead. */
   isTimelyWithin(maxMillis: number): boolean {
@@ -69,6 +73,8 @@ export class Trigger<SnapT, ValT> {
 
   // A success that came some other way than a launch: the answer to an own put, say.
   noteSuccessNow(): void {
+    this.#notedInLaunch = true
+    this.#unconfirmed = false
     this.#lastSucceededAt = this.#clock.now()
     this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
   }
@@ -111,10 +117,12 @@ export class Trigger<SnapT, ValT> {
   async #launchAlone(): Promise<Outcome<ValT>> {
     try {
       this.#lastLaunchedAt = this.#clock.now()
+      this.#notedInLaunch = false
       const outcome = await this.#doTryLaunch()
       this.#lastCompletedAt = this.#clock.now()
       if (outcome.ok) {
         if (! this.#notesOwnSuccess) { this.#lastSucceededAt = this.#lastCompletedAt }
+        this.#unconfirmed = this.#notesOwnSuccess && ! this.#notedInLaunch
         this.scheduleLaunchAt(this.#lastCompletedAt + (this.maxMillis * this.eagerFrac))
       }
       return outcome

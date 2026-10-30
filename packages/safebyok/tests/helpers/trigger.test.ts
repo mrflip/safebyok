@@ -69,6 +69,14 @@ describe("trigger opts notesOwnSuccess and onTimerRefusal", () => {
     expect(trigger.timing.lastCompletedAt).to.eq(T0)
     expect(trigger.timing.lastSucceededAt).to.be.null
     expect(trigger.timing.launchAt).to.eq(T0 + 800)
+    expect(trigger.isTimely).to.be.false
+  })
+
+  it("reads timely again once a success is noted after an ok outcome that noted none", async () => {
+    const { trigger } = scriptedOf({ notesOwnSuccess: true, outcomes: [good(1)] })
+    await trigger.launch()
+    trigger.noteSuccessNow()
+    expect(trigger.isTimely).to.be.true
   })
 
   it("launches again at the horizon after an ok outcome that noted no success, and again after that", async () => {

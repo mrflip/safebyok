@@ -1247,6 +1247,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
     await box.hydrate({ maxMillisSinceRefresh: 1000 })
     expect(box.revision_seq).to.eq(2)
+    expect(box.isTimely).to.be.false
     await box.hydrate({ maxMillisSinceRefresh: 1000 })
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
@@ -1256,6 +1257,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     held.mw.setNow(T0 + 1000)
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
     await box.hydrate()
+    expect(box.isTimely).to.be.false
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
@@ -1435,7 +1437,7 @@ describe("storable: the timer after a launch that completes", () => {
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
     await held.mw.advance(800)
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    expect(box.isTimely).to.be.true
+    expect(box.isTimely).to.be.false
     await held.mw.advance(800)
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
