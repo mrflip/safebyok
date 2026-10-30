@@ -145,6 +145,20 @@ refresh then counts as success). A TOP row; thread 8 waits on it. Left: listener
 cache save (a row); a replaced instance's trigger left running; `hydrateAll` telling one world
 refusal per instance.
 
+*Orchestrator (2026-10-30, the rework on the Coach's rulings):* rebased once, onto 4b's filed tip
+(bc53f4e8, after its rework), by the rework worker. Act on: (M) the throw rule: "Throwing means
+'We fundamentally cannot give you what you asked for, and need to wreck everything in
+consequence'. If you can give them what they asked for, no throw. If not, throw."; reporting
+through `onBadNews` stays, and a refused delivery never counts as a refresh; (L) one pipeline:
+"everything should go through a common scheme: hello, send, anything -- buildOrReceive, so that
+there's no way for anything to be built more than once", with a survey for other places the rule
+is broken, `build(dna)` over a held scope among them; (Q) a refused background refresh other than
+absent goes to `onBadNews`; and, from 4b's second review, the trigger notes success only by
+`receive`'s verdict, never on any ok fetch (the Coach's timeliness rule on the fetch path). From
+4b: `fetch` alone judges `ifAbsent`. Restate thread 2's listing test that expects `fetch` to throw
+`record_conflict` wherever the throw rule changes it. Worker `opus` (the rulings turn on
+judgment); review `medium`.
+
 ### 4a. Hydrate and timeliness
 
 > From the Coach's thread 4, split as it asks ("split hydrate and timeliness from the verbs and guards"): fixes (a), (b), (c), and these tests, in `storable.test.ts` and `box.test.ts`, with the fake clock: `hydrate` fetches when the record is untimely by `maxMillisSinceRefresh` and not when timely, fetches a sparse central however timely and never a never-stored one for that reason, calls made during a fetch join it, the world's `ensureTimely` is called first every time; `maxMillisSinceRefresh: Infinity` fetches nothing, for a thing never fetched too; after a failed fetch no launch is scheduled and the next verb launches on demand; a horizon past `MaxTimerMillis` arms no timer and still reads stale by its value once passed; success is noted on a full record and on a tombstone, not on a sparse one.
@@ -196,6 +210,14 @@ move while `edit` awaits `makeStaged`, and `send` then overwrites the newer reco
 Left: `registered_at` renewed by an edit during an in-flight `del` (a row); `notFullError`'s
 advice after a hydrate; missing doc blocks on the `ensureReadyTo...` guards; `it.todo` titles
 carrying questions (Cleanup); loosened-file titles citing file:line.
+*Review (second, over the rework b19fbfbf...a100fc4e, high):* fixed (#375). One fix: the
+`hydrate` test of a sparse central with a full edit staged built its box outside the listing, so
+the box under test received nothing (bc53f4e8). Agreed with "central or combined whole" and
+`movedUnderEditError` on `stale_write`; `vault_remade` is an existing kind. Left: the whisper
+setter refusing `null` while locked (thread 9, a row); the trigger noting success on any ok
+fetch (thread 3's rework); own props drifting under another life, and another life over a
+tombstone (rows); `stale_write` without `box_stored` and inline thrower sentences (thread 9);
+G6/G7 amendment (thread 6).
 
 ### 5. The snapshot and the props
 
@@ -269,6 +291,14 @@ rework (it touches `send`'s opts). Size: small.
    giving the listing what it needs by the plainest means the language allows.
 5. A TODO.md entry (the Coach: "yes, TODO"): an edit is never saved to the device cache, so an
    unsent staged edit is lost on reload.
+6. *Orchestrator (YOLO, a Coach row):* `box.whisper = null` (and `LOCKED`) passes while the vault
+   is locked; only a new whisper needs it unlocked (#375 second review: the exposed whisper is
+   kept through a lock "until the host sets it null", and the setter refused that while locked).
+7. `edit`'s mid-edit `stale_write` (`movedUnderEditError`) attaches central as
+   `meta.box_stored`, as `RefusalMeta` documents for `stale_write`.
+8. The inline thrower sentences in `storable.ts`/`box.ts` (`movedUnderEditError`,
+   `vaultRemadeError`, `notFullError`, `lockedError`) move to `phrases.ts` (STYLE.md *What a
+   refusal says*).
 Tests beside each. Worker `opus`; review `medium`. Depends on 3's and 4b's reworks. Size: small
 to medium.
 
