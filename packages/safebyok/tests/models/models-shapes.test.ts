@@ -640,12 +640,12 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
   ])
 
   holdsCases(MSX.sendOpts, 'bad_option', [
-    [{},                                                true,  'passes no options'],
-    [{ ifPresent: 'replace' },                          true,  'passes ifPresent replace'],
-    [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
-    [{ ifPresent: 'replace', maxWorldMillis: 5 },       true,  'passes ifPresent beside the timely options'],
-    [{ ifPresent: 'fail' },                             false, 'refuses an ifPresent that is not replace'],
-    [{ maxMillisSinceRefresh: -1, ifPresent: 'replace' }, false, 'refuses a negative horizon, as timelyOpts does'],
+    [{},                                                    true,  'passes no options'],
+    [{ ifPresent: 'replace' },                              true,  'passes ifPresent replace'],
+    [{ ifPresent: undefined },                              true,  'passes ifPresent undefined'],
+    [{ ifPresent: 'replace', maxWorldMillis: 5 },           true,  'passes ifPresent beside the timely options'],
+    [{ ifPresent: 'fail' },                                 false, 'refuses an ifPresent that is not replace'],
+    [{ maxMillisSinceRefresh: -1, ifPresent: 'replace' },   false, 'refuses a negative horizon, as timelyOpts does'],
   ])
 
   it("keeps ifPresent and the timely options and strips the rest", () => {
