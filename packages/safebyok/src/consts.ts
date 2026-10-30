@@ -37,3 +37,13 @@ export const MaxSaltBytes = 65_536
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32
+
+/** The longest duration we use for a timer, in hours -- the equivalent of 24.5 days (close to, but below, the hard limit of 2**31-1 milliseconds).
+ * Trigger time spans longer than this are considered as infinite -- never stale, never triggered.
+ */
+export const MaxTimerHours = 588
+
+/** The longest duration we use for a timer, in milliseconds -- the equivalent of 24.5 days (close to, but below, the hard limit of 2**31-1 milliseconds).
+ * Trigger time spans longer than this are considered as infinite -- never stale, never triggered.
+ */
+export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
