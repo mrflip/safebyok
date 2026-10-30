@@ -20,6 +20,25 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
 * *The Coach (2026-10-30):* bad-news handling is unspecified later work (plan, *For the Coach*).
   Build nothing for it; note where bad news cannot reach anyone.
 
+* *Orchestrator (2026-10-30), at the Coach's request via session byok-ed:* the line stacks on
+  **#374** (`20261030-vault_model`, on #368): its 2f7337f3 makes `vault_tok` follow the record in
+  hand (the tattoo keeps the scope and `registered_at`), and it adds `models/vault.ts`,
+  `vault-listing.ts` and a vault section in `models-shapes.ts`, untested. #370 and #371 are
+  rebased onto it **locally only** (branches `20261030-models_world`, `20261030-timeliness`; copies
+  `restacked/...`): the force-push was refused, a row for the Coach. Origin's #370/#371 still sit
+  on #368. Thread 4b builds on the local restack. Threads 2, 3 move at the final restack.
+* *The Coach (2026-10-30), on thread 3's bad-news inventory:* "do write stuff that's useful and
+  consistent with the plan. Perhaps you could run the build() branch of deliver in a method with
+  a try/catch loop that syndicateds bad news": thread 3's rework, item 4.
+* *The Coach (2026-10-30), on "alive":* "Don't redefine the constants. If a different policy
+  makes more sense, implement that and put a big honking note down": thread 2's rework makes
+  same-revision damage skip and a deletion over held damage read gone, in the table's rows.
+* *The Coach (2026-10-30), on a box stuck on `record_conflict`:* no automatic way out ("we don't
+  want something to cause infinite refresh. The real way out is to tell the customer").
+* *Session byok-ed's scenarios.md* (in #374): P1 and P2 were already fixed in #372. **P3:** `send`
+  hydrates first, so a draft's first send adopts a stored box and `ifPresent: 'fail'` never fires;
+  a TOP row for the Coach, to settle before thread 8.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
