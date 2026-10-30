@@ -117,7 +117,7 @@ spec that conflicts with the first. `box`-only terms say so.
   - ~~now central beyond its fields, and return the bad news found in it~~.
   - A vault settles its lease and ways in here
   - Called after every `receive`, `edit` and once by `build`
-* `makestaged(base, patch, opts)` (concrete): the one step of `edit` the concrete class writes: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing; hand back the whole record.
+* `makeStaged(base, patch, opts)` (concrete): the one step of `edit` the concrete class writes: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing; hand back the whole record.
   - ~~`stagedOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
   - ~~`stagedPropsAndSealBeforeSettling`~~
 * `seal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, cryptographically binding the stamp. `unsealWhisper` opens the stored whisper for one call. ~~`unseal` is not a thing~~
@@ -284,7 +284,7 @@ The staged with the initial props holds revision `0`.
 
 ### Receive
 
-An staged is always signed, with a revision one larger than `central` when it was prepared.
+A staged record is always signed, with a revision one larger than `central` when it was prepared.
 Unless newer records are spotted, it's ready to send.
 
 Principle: it's desireable to allow customer to make reconciliation decisions
@@ -318,16 +318,18 @@ here means sparse or full. normal means sparse, full or gone. any is normal or d
 Newer revision_seq may be 1 or more above last seen -- may have missed updates.
 
 On 'older', 'same' or 'skip', receive skips adopt and settle
-Otherwise call reconcileStaged -- 'fill', 'adopt', 'gone', 'ouch'
+on `ouch` or `del`, a tombstone is assembled at the appropriate revision
+Otherwise call reconcileStaged -- 'fill', 'adopt', 'gone'
 
 #### Reconcile Staged
 
 sent { patch, central, staged, act, nextRevision }. Do *not* consult own props
 
 | act                     | new staged                                             |
-| ----------------------- | ------------------------------------------------------- |
+| ----------------------- | ------------------------------------------------------ |
 | `edit`, `fill`, `adopt` | `{ ...central, ...staged, ...patch, ...nextRevision }` |
-| `del`, `gone`, `ouch`   | `this.tombstoneFor(act, nextRevision)`                  |
+| `del`, `gone`           | `this.tombstoneFor(act, nextRevision)`                 |
+| `ouch`                  | `{ ...staged, ...patch, ...nextRevision }` |
 
 ## Box: Edit/Receive, Reconcile/Adopt/Setttle, Seal
 

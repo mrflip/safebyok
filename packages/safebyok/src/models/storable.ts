@@ -8,7 +8,7 @@ import type { Clock } from '../shapes/bank-opts'
 import { stableJsonify } from '../stable-jsonify'
 import { Trigger } from '../utils/trigger'
 
-// == [Record forms]: Revision, Times, Tombstone, Fetched, Dna, staged, Cacheable, Settled, CentralPolicy, Reconciled, stagedPolicy, NeverStoredSeq, isTombstone
+// == [Record forms]: Revision, Times, Tombstone, Fetched, Dna, Staged, Cacheable, Settled, CentralPolicy, Reconciled, StagedPolicy, NeverStoredSeq, isTombstone
 
 export type Revision = Readonly<{ revision_tok: string, revision_seq: number }>
 
@@ -25,12 +25,12 @@ export type Fetched<ScopeT, RecordT, SparseT> = RecordT | SparseT | Tombstone<Sc
 export type Dna<ScopeT, RecordT> = ScopeT & Partial<RecordT>
 
 // The staged: the whole record edited here and not yet sent, a tombstone while `del` is sending, or null when nothing is edited.
-export type staged<ScopeT, RecordT> = RecordT | Tombstone<ScopeT> | null
+export type Staged<ScopeT, RecordT> = RecordT | Tombstone<ScopeT> | null
 
 // What the listing writes to the device cache: the sparse form (or the tombstone), then central and the staged as they stand.
 export type Cacheable<ScopeT, RecordT, SparseT> = (SparseT | Tombstone<ScopeT>) & Readonly<{
   central: Fetched<ScopeT, RecordT, SparseT>
-  staged: staged<ScopeT, RecordT>
+  staged: Staged<ScopeT, RecordT>
 }>
 
 // Bag `settle` and `receive` hand back: news to tell the host once. What to cache is the instance's `cacheable`.
@@ -40,8 +40,8 @@ export type Settled = Readonly<{ badnews: readonly VaultError[] }>
 export type CentralPolicy = 'older' | 'same' | 'fill' | 'adopt'
 export type Reconciled<ScopeT, RecordT, SparseT> = Readonly<{ central: Fetched<ScopeT, RecordT, SparseT>, policy: CentralPolicy }>
 
-// What brought `reconcilestaged` an staged: a central policy past 'same', or the verb that begins one.
-export type stagedPolicy = CentralPolicy | 'edit' | 'del'
+// What brought `reconcileStaged` a staged: a central policy past 'same', or the verb that begins one.
+export type StagedPolicy = CentralPolicy | 'edit' | 'del'
 
 // The revision_seq of a central nothing has stored: a new thing is born with central at -1 and its staged at 0.
 export const NeverStoredSeq = -1
@@ -78,7 +78,7 @@ export type StorableOpts<ScopeT extends object, RecordT extends SparseT, SparseT
   world:                  World
   listing:                StorableListing<ScopeT, RecordT, SparseT>
   central:                Fetched<ScopeT, RecordT, SparseT>
-  staged?:               staged<ScopeT, RecordT> | undefined
+  staged?:               Staged<ScopeT, RecordT> | undefined
   maxMillisSinceRefresh:  number
   // The trigger's: the fraction of the horizon after which the next refresh is scheduled.
   eagerFrac?:             number | undefined
@@ -127,7 +127,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // The most recent stored value this device knows: full, sparse, or a tombstone; at NeverStoredSeq for a thing never stored.
   #central: Fetched<ScopeT, RecordT, SparseT>
   // The record edited here and not yet sent, whole and under the next revision, so `send` can put it as it is; a tombstone while `del` is sending. Null when nothing is edited.
-  #staged: staged<ScopeT, RecordT>
+  #staged: Staged<ScopeT, RecordT>
   // Made on first read, and again by `settle`: the concrete class's fields do not exist while the base constructor runs.
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, void>
@@ -167,14 +167,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.written_at = record.written_at
   }
 
-  // == [Identity and forms]: combined, central, staged, cacheable, sparse, isGone, isHydrated, hasstaged, toJSON
+  // == [Identity and forms]: combined, central, staged, cacheable, sparse, isGone, isHydrated, hasStaged, toJSON
 
   // The record in hand: the staged where one is begun, else central.
   protected get combined(): Fetched<ScopeT, RecordT, SparseT> { return this.#staged ?? this.#central }
 
   protected get central(): Fetched<ScopeT, RecordT, SparseT> { return this.#central }
 
-  protected get staged(): staged<ScopeT, RecordT> { return this.#staged }
+  protected get staged(): Staged<ScopeT, RecordT> { return this.#staged }
 
   // What the listing writes to the device cache after a `receive`: the sparse form (the tombstone, for a thing gone), then central and the staged as they stand, frozen.
   get cacheable(): Cacheable<ScopeT, RecordT, SparseT> {
@@ -189,13 +189,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   get isGone(): boolean { return isTombstone(this.#central) }
 
-  // The record in hand is full: central is, or an staged is begun.
+  // The record in hand is full: central is, or a staged is begun.
   get isHydrated(): boolean {
     const { combined } = this
     return ! isTombstone(combined) && this.isFullRecord(combined)
   }
 
-  get hasstaged(): boolean { return this.#staged !== null }
+  get hasStaged(): boolean { return this.#staged !== null }
 
   toJSON(): SparseT | null { return this.sparse }
   // --
@@ -309,13 +309,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  // Lay `patch` over the record in hand under the next revision, through the concrete class's `makestaged`; hold the result as the staged; settle. Central is untouched; nothing is stored.
+  // Lay `patch` over the record in hand under the next revision, through the concrete class's `makeStaged`; hold the result as the staged; settle. Central is untouched; nothing is stored.
   async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
     await this.ensureReadyToEdit(opts)
     const base = this.#notGone()
-    const staged = await this.makestaged({ ...base, ...this.nextRevision(), written_at: this.world.clock.now() }, patch, opts)
+    const staged = await this.makeStaged({ ...base, ...this.nextRevision(), written_at: this.world.clock.now() }, patch, opts)
     this.demandReadyToEdit()   // drift while making it: the vault may have locked, or the thing gone
-    this.adopt(this.#central, this.reconcilestaged('edit', this.#central, staged))
+    this.adopt(this.#central, this.reconcileStaged('edit', this.#central, staged))
     await this.settle()
     return this
   }
@@ -336,7 +336,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToDel(opts)
     const tombstone: Tombstone<ScopeT> = { ...this.scope, ...this.nextRevision(), registered_at: this.registered_at, written_at: this.world.clock.now(), deleted: true }
-    this.adopt(this.#central, this.reconcilestaged('del', this.#central, tombstone))
+    this.adopt(this.#central, this.reconcileStaged('del', this.#central, tombstone))
     await this.settle()
     await this.listing.delRecordOf(this)
     return this
@@ -352,7 +352,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Receiving]: receive, reconcileCentral, reconcilestaged, adopt, settle
+  // == [Receiving]: receive, reconcileCentral, reconcileStaged, adopt, settle
 
   // The listing hands in what storage said about this thing, or null for nothing stored. Judge it against central; where it is the newer or the fuller, judge the staged against it, adopt both, settle. A whole answer makes the record timely, even one that only confirms central.
   async receive(fetched: Fetched<ScopeT, RecordT, SparseT> | null): Promise<Settled> {
@@ -360,7 +360,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const { central, policy } = this.reconcileCentral(answer)
     if (isTombstone(answer) || this.isFullRecord(answer)) { this.#trigger.noteSuccessNow() }
     if (policy === 'older' || policy === 'same') { return { badnews: [] } }
-    this.adopt(central, this.reconcilestaged(policy, central, this.#staged))
+    this.adopt(central, this.reconcileStaged(policy, central, this.#staged))
     return this.settle()
   }
 
@@ -382,14 +382,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
 
   // What becomes of `staged` once `central` stands, by what brought it: `edit` and `del` begin it; a `fill` leaves it; a newer central spends it when storage holds what it sent or the thing is gone, and otherwise leaves it, over a central it no longer follows, for the next `edit` to make again.
-  protected reconcilestaged(policy: stagedPolicy, central: Fetched<ScopeT, RecordT, SparseT>, staged: staged<ScopeT, RecordT>): staged<ScopeT, RecordT> {
+  protected reconcileStaged(policy: StagedPolicy, central: Fetched<ScopeT, RecordT, SparseT>, staged: Staged<ScopeT, RecordT>): Staged<ScopeT, RecordT> {
     if (staged === null || policy !== 'adopt') { return staged }
     if (isTombstone(central) || central.revision_tok === staged.revision_tok) { return null }
     return staged
   }
 
   // Hold both, frozen, and assign the props of the record in hand; the snapshot waits for `settle`.
-  protected adopt(central: Fetched<ScopeT, RecordT, SparseT>, staged: staged<ScopeT, RecordT>): void {
+  protected adopt(central: Fetched<ScopeT, RecordT, SparseT>, staged: Staged<ScopeT, RecordT>): void {
     this.#central = Object.freeze(central)
     this.#staged = staged === null ? null : Object.freeze(staged)
     this.assign(this.combined)
@@ -415,14 +415,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [What the concrete class defines]: scopeOf, isFullRecord, sparseOf, makestaged, makeSnapshot
+  // == [What the concrete class defines]: scopeOf, isFullRecord, sparseOf, makeStaged, makeSnapshot
 
   protected abstract scopeOf(fetched: Fetched<ScopeT, RecordT, SparseT>): ScopeT
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   protected abstract sparseOf(record: SparseT): SparseT
   // The step of `edit` only the concrete class can take: `base` is the record in hand, sparse or full, under its next
   // revision; lay the patch over it and seal what needs sealing. What comes back is held as the staged, whole.
-  protected abstract makestaged(base: SparseT, patch: PatchT, opts: EditOpts): Promise<RecordT>
+  protected abstract makeStaged(base: SparseT, patch: PatchT, opts: EditOpts): Promise<RecordT>
   protected abstract makeSnapshot(): SnapshotT
   // --
 }

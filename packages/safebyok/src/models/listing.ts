@@ -4,7 +4,7 @@ import { type VaultError, isVaultError } from '../errors'
 import { type Outcome, outcomeOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
 import { stableJsonify } from '../stable-jsonify'
-import { type Cacheable, type Dna, type Fetched, type LockState, type Revision, type Overlay, type Storable, type StorableListing, type TimelyOpts, type Times, type World, NeverStoredSeq, isTombstone } from './storable'
+import { type Cacheable, type Dna, type Fetched, type LockState, type Revision, type Staged, type Storable, type StorableListing, type TimelyOpts, type Times, type World, NeverStoredSeq, isTombstone } from './storable'
 import { randomId } from '../crypto'
 
 // == [What storage answers]: Answer, Notice, FetchOpts, ListingOpts
@@ -63,7 +63,7 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
   /** Read the device cache once and revive an instance from each copy; start the watch; hydrate every instance. */
   async hello(): Promise<void> {
     const cached = await this.loadCached()
-    for (const copy of cached) { await this.#hold(this.makeThing(copy.central, copy.overlay)) }
+    for (const copy of cached) { await this.#hold(this.makeThing(copy.central, copy.staged)) }
     this.#unwatch ??= this.watchStore(this.#onNotice)
     await this.hydrateAll()
   }
@@ -223,7 +223,7 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
 
   // == [Helpers]: stampDna, scopeOf
 
-  /** `dna` with the revision nothing stored has (`NeverStoredSeq`, so its first overlay is revision 0) and the times of now: what `draftOf` completes. */
+  /** `dna` with the revision nothing stored has (`NeverStoredSeq`, so its first staged record is revision 0) and the times of now: what `draftOf` completes. */
   protected stampDna(dna: Dna<ScopeT, RecordT>): Dna<ScopeT, RecordT> & Revision & Times {
     const now = this.clock.now()
     return { ...dna, revision_tok: randomId(), revision_seq: NeverStoredSeq, registered_at: now, written_at: now }
@@ -241,7 +241,7 @@ implements StorableListing<ScopeT, RecordT, SparseT> {
   /** The never-stored central a stamped dna makes: the thing's sparse form, its defaults filled in; a vault's is its full novel record. */
   protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): SparseT | RecordT
   /** Construct the instance, and nothing more: the listing initializes it. */
-  protected abstract makeThing(central: Fetched<ScopeT, RecordT, SparseT>, overlay: Overlay<ScopeT, RecordT>): ThingT
+  protected abstract makeThing(central: Fetched<ScopeT, RecordT, SparseT>, staged: Staged<ScopeT, RecordT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError
   abstract lockState(): LockState
   abstract ensureTimelyWorld(opts: TimelyOpts): Promise<void>

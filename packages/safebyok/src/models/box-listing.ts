@@ -5,7 +5,7 @@ import { BoxFormat } from './box'
 import type { Boxscope, VaultScope } from '../shapes/scopes'
 import { type BoxRecord, type BoxSnapshot, type BoxSparse, Box } from './box'
 import { type Answer, type FetchOpts, type Notice, Listing } from './listing'
-import type { Cacheable, Dna, Fetched, LockState, staged, Revision, TimelyOpts, Times, World } from './storable'
+import type { Cacheable, Dna, Fetched, LockState, Revision, Staged, TimelyOpts, Times, World } from './storable'
 
 // == [What a box listing is given]: BoxWorld, BoxStore, BoxCache, BoxListingOpts
 
@@ -100,7 +100,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return { format: BoxFormat, whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, ...dna }
   }
 
-  protected makeThing(central: Fetched<Boxscope, BoxRecord, BoxSparse>, staged: staged<Boxscope, BoxRecord>): Box {
+  protected makeThing(central: Fetched<Boxscope, BoxRecord, BoxSparse>, staged: Staged<Boxscope, BoxRecord>): Box {
     return new Box({ world: this.world, listing: this, central, staged, maxMillisSinceRefresh: this.#maxMillisSinceRefresh })
   }
 

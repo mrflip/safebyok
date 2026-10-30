@@ -129,7 +129,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
     return Promise.reject(new VaultError('unexpected_error', 'unseal is not written yet.'))
   }
 
-  // == [What a storable defines]: scopeOf, isFullRecord, sparseOf, makestaged, makeSnapshot
+  // == [What a storable defines]: scopeOf, isFullRecord, sparseOf, makeStaged, makeSnapshot
 
   protected scopeOf(fetched: Fetched<BoxScope, BoxRecord, BoxSparse>): BoxScope {
     const { applabel, user_id, vaultlabel, boxlabel } = fetched
@@ -148,7 +148,7 @@ export class Box extends Storable<BoxScope, BoxRecord, BoxSparse, BoxProps, BoxS
   // The sidecar is not bound by the seal, so it is replaced in place. A whisper given or exposed is sealed
   // under `base`'s props; with neither, the ciphered whisper rides along as it is, which needs `base` full.
   // Not yet: the seal itself (a fresh boxKey, wrapped under the vaultKey; the whisper ciphered with the record's stamp).
-  protected makestaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
+  protected makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
     const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
     const whisper = patch.whisper ?? this.#exposed
     if (whisper === null) {
