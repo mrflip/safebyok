@@ -35,7 +35,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.snapshot).to.eq(first)
     })
 
-    it("is one function with one identity, as useSyncExternalStore wants it, answering the snapshot as it stands", async () => {
+    it("is one function with one identity, as useSyncExternalStore wants it, answering the current snapshot", async () => {
       const box = await boxOf()
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
@@ -253,7 +253,7 @@ describe("Storable own props", () => {
       expect(JSON.stringify(box)).to.not.contain('"scope"')
     })
 
-    it("is tattooed on the box as its own props, which nothing writes or removes", async () => {
+    it("is tattooed on the box as its own props, which nothing assigns or deletes", async () => {
       const box = await boxOf()
       for (const ckey of ['applabel', 'user_id', 'vaultlabel', 'boxlabel'] as const) {
         const descriptor = Object.getOwnPropertyDescriptor(box, ckey)
