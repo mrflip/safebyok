@@ -202,7 +202,7 @@ describe("Box sidecar while the vault is locked", () => {
     expect(box.cacheable.central).to.deep.equal(fullBoxRecord())
   })
 
-  it.todo("a lock coming down settles every box, so that a snapshot made before it stops carrying the sidecar: nothing calls `settle` when the world locks, and `getSnapshot` answers the unlocked snapshot until something else settles (open question)")
+  it.todo("a lock coming down settles every box, so that a snapshot made before it stops carrying the sidecar")
 })
 
 describe("Box own props", () => {
