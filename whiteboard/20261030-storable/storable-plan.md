@@ -323,6 +323,15 @@ Coach is looking into both ("There's something weird about the constraints on it
 something broken about my conception of making a record").
 Tests beside each. Worker `opus`; review `medium`. Depends on 8 (cut from its tip). Size: medium.
 
+*Review:* fixed (#382, medium; 2 compactions). Five fixes: test banners and titles that narrated
+the rulings' history, `ToCacheable` through `MSX`, two doc blocks, the `delSpent` comment. Left:
+a box listing holding no instance takes in a record under any `vault_tok` (`#makeThingFor` births
+from the record itself; the gap predates the thread): thread 10, item 8; a cached box from before
+a remade vault throws on every hydrate (the TODO's flush-and-remake covers it); two
+`as unknown as` casts into `RefusalMeta`'s old forms (cleanup, the match-up); `VaultListing`'s
+`staleMetaOf` untested (no vault-model tests yet); `Phrases.VaultLocked`'s "nothing was read or
+written", shared package-wide (cleanup).
+
 ### 10. The listing's loose ends
 
 *Orchestrator (2026-10-30):* from thread 3's third review, split from 9 so neither outgrows one
@@ -344,8 +353,13 @@ context. Label `listing_ends`.
    (the Coach: "you have to seal (via some unspecified-as-yet-by-me step) as part of making a new
    box. So the box is never sparse"); once it does, timeliness asks whether the record in hand is
    whole, and `#holdsWhole`'s union with central goes. Nothing in code changes now.
+8. *Orchestrator, from #382's review (YOLO):* `#makeThingFor` (or `#buildOrReceive`, before birth)
+   compares a record's `vault_tok` with `BoxWorld.vault_tok` (the vault's, for the vault listing
+   if it has the like) and throws `unexpected_error` on a mismatch, by the same rule as item 9 of
+   thread 9: today a listing holding no instance for the scope births one from the record itself,
+   so the check compares the record with itself.
 Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its tip: both touch
-`listing.ts`). Size: small to medium.
+`listing.ts`). Size: medium (eight items; if it compacts twice, split what remains).
 
 ### 11. `ifPresent: 'replace'`
 
