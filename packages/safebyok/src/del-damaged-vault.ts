@@ -1,5 +1,5 @@
 import * as CX from './shapes/scopes'
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 import { valOf } from './outcome'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import { randomId } from './crypto'
@@ -13,7 +13,7 @@ import { parseVaultDB, parseDeviceDB } from './vault-opts'
 export type DelDamagedVaultOpts = Pick<MakeBankOpts, 'applabel' | 'user_id' | 'vaultDB' | 'deviceDB'> & Pick<VaultScope, 'vaultlabel'>
 
 /** The check of {@link delDamagedVault}'s one bag: Bank.make's options, each its own to check, and the `vaultlabel`. Its `parse` refuses 'bad_option' for anything else, a misspelt field among them, counted and never named. */
-const { delDamagedVaultOpts } = Validator('bad_option', ({ unk }) => ({
+const { delDamagedVaultOpts } = Checkers('bad_option', ({ unk }) => ({
   delDamagedVaultOpts: OX.makeBankOpts.extend({ vaultlabel: unk, strengthChecker: unk.optional() }),
 }))
 

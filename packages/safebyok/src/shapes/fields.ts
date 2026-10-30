@@ -2,18 +2,16 @@
 
 import type * as Z from 'zod'
 import * as Phrases from '../phrases'
-import { Validator } from '../checks/validator'
+import { Checkers, objCheck } from '../checks/validator'
 
 export { epochMillis, type EpochMillis } from './primitives'
 
 // == [Ciphered]: ciphered
 
 /** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
-export const { ciphered } = Validator('bad_record', ({ obj, str }) => ({
-  ciphered: obj({
-    cipher_iv_b64:  str.min(1),
-    ciphertext_b64: str.min(1),
-  }).strict(),
+export const ciphered = objCheck(({ str }) => ({
+  cipher_iv_b64:  str.min(1),
+  ciphertext_b64: str.min(1),
 }))
 export type Ciphered = Z.infer<typeof ciphered>
 // --
@@ -30,7 +28,7 @@ export type Ciphered = Z.infer<typeof ciphered>
  * @example obj({ wayinkind: lit('passphrase'), salt_b64, vault_key_wayin_wrapped, ... })   // a record's fields, by the names they check
  * @example box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, ctx))               // a BoxKeyWrapped, where the box record is made
  */
-export const { vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Validator('bad_record', ({ str }) => ({
+export const { vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
   revision_tok:            str.min(1, Phrases.TokenMissing),
   device_id:               str.min(1),

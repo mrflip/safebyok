@@ -10,7 +10,7 @@ import * as VX from './shapes/vault'
 import { MinuteMillis, FarFuture, FarPast } from './consts'
 import { Box, boxSparseOf, whisperBytesOf } from './box'
 import * as CX from './shapes/scopes'
-import { Validator } from './checks/validator'
+import { Checkers } from './checks/validator'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type BadOutcome, type Outcome, bad, outcomeOf, valOf } from './outcome'
@@ -1977,7 +1977,7 @@ export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
  * Its `parse` refuses 'bad_option' for props that are no object, a sidecar that is no JSON object,
  * or a field beside them, quoting none of it. The boxlabel is the caller's to check, as a name.
  */
-const { putBoxProps } = Validator('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: BX.sidecar.optional() }).strict() }))
+const { putBoxProps } = Checkers('bad_option', ({ obj, unk }) => ({ putBoxProps: obj({ boxlabel: unk, sidecar: BX.sidecar.optional() }).strict() }))
 
 /** The box `delBox()` removed. Storage keeps nothing of it. */
 export type DeletedBox = Readonly<{
