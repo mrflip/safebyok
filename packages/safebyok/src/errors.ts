@@ -14,7 +14,7 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
+ *   `stale_write`, `record_conflict`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
  *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
  *   `same_passphrase`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
@@ -61,6 +61,7 @@ export const refusalKindVals = [
   'crypto_failed',       // the browser's WebCrypto failed a key, wrap or cipher that should have worked: a fault of the platform, not of the user or the record
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
+  'record_conflict',     // storage and this device hold one revision of a record and disagree about it, so neither copy can be trusted until it is read again
   'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
   'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
@@ -118,6 +119,7 @@ export const RefusalFamilyForKind = {
   crypto_failed:       'condition',
   unexpected_error:    'misuse',
   stale_write:         'condition',
+  record_conflict:     'condition',
   vault_mismatch:      'condition',
   vault_behind:        'bad_news',
   not_permitted:       'condition',
