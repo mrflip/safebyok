@@ -235,7 +235,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where neither central nor the record in hand is whole. Calls made during a fetch join it. */
+  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where it is not whole. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToFetch(opts)
     await this.#trigger.ensureTimelyWithin(this.#holdsWhole ? opts.maxMillisSinceRefresh : 0)
@@ -293,8 +293,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there, but for a deletion at the revision
    * held met by the staged tombstone of a `del`, which is spent: the staged is dropped, and the thing settles. Otherwise
    * `reconcileStaged` judges the staged against the new central, both are adopted, and the thing settles. A record not
-   * older than central notes success where, once it is taken in, central or the record in hand is whole, so a sparse one
-   * that only confirms the revision held counts; an older one notes nothing.
+   * older than central notes success where, once it is taken in, the record in hand is whole, so a sparse one that only
+   * confirms the revision held counts; an older one notes nothing.
    */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     const answer = rcvd ?? this.tombstoneFor(this.#central)
@@ -465,8 +465,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return MSX.isTombstone(record) || this.isFullRecord(record)
   }
 
-  /** Whether central or the record in hand is whole: the stored record is known whole, or a whole record is staged over a sparse central. A draft's central, nothing stored, is whole though its staged is sparse. */
-  get #holdsWhole(): boolean { return this.isWholeRecord(this.#central) || this.isWholeRecord(this.combined) }
+  /** Whether the record in hand is whole. A thing built from a dna is staged full, so only a sparse record storage delivered, with nothing staged over it, is not. */
+  get #holdsWhole(): boolean { return this.isWholeRecord(this.combined) }
   // --
 
   // == [Concrete Subclass Required Methods]: isFullRecord, makeStaged, makeSnapshot

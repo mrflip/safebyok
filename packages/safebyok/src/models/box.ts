@@ -4,6 +4,7 @@ import type { Sidecar, Whisper } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import type { BoxRecord, BoxSparse, EditOpts } from './models-shapes'
 import { Storable } from './storable'
+import { stubSeal } from './stub-seal'
 
 // == [Record forms]: LOCKED, LockedSidecar, BoxSnapshot, BoxProps, BoxEditOpts
 
@@ -140,17 +141,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return 'whisper_ciphered' in fetched
   }
 
-  /** A whisper given or exposed is sealed under `base`'s props, the sidecar given or carried among them; with neither whisper, the sealed parts ride along as they are, which needs `base` full.
-   * Not yet: the seal itself (a fresh boxKey, wrapped under the vaultKey; the whisper ciphered with the record's stamp).
-   */
+  /** A whisper given or exposed is sealed by {@link stubSeal} under `base`'s props, with the sidecar given, else the one `base` carries, else `{}`; with neither whisper, the sealed parts ride along as they are, which needs `base` full. */
   protected makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
-    const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
     const whisper = patch.whisper ?? this.#exposed
     if (whisper === null) {
+      const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
       if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', Phrases.NoWhisperToCarry)) }
       return Promise.resolve(withSidecar)
     }
-    return Promise.reject(new VaultError('unexpected_error', 'seal is not written yet.'))
+    const sidecar = patch.sidecar ?? (this.isFullRecord(base) ? base.sidecar : {})
+    return stubSeal({ ...base, sidecar }, whisper)
   }
 
   /** Two snapshots are alike when their JSON is, and both or neither carry the locked sidecar. */

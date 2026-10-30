@@ -403,7 +403,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose boxes fake the seal, for a test that must seal over a record with no sealed parts (a draft, a tombstone) and is not about sealing: a whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, the sidecar given or carried, else `{}`. Without a whisper, `makeStaged` is the box's own. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
+/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: a whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, the sidecar given or carried, else `{}`. Without a whisper, `makeStaged` is the box's own. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
  *
  * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test' }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit

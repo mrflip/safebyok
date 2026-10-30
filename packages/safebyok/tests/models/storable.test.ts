@@ -87,9 +87,9 @@ describe("storable.hydrate(opts): when it fetches", () => {
     expect(cacheableOf(box)).to.include({ central, staged })
   })
 
-  it("never fetches a never-stored central for want of the whisperCiphered: a draft's central is a tombstone, whole", async () => {
+  it("never fetches a draft for want of the whisperCiphered: a draft is staged full", async () => {
     const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
-    expect(box.isFull).to.be.false
+    expect(box.isFull).to.be.true
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
@@ -1457,6 +1457,31 @@ describe("storable: the timer after a launch that completes", () => {
     held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
     await held.mw.advance(800)
     expect(vi.getTimerCount()).to.eq(0)
+  })
+})
+// --
+
+// == [Timeliness of the record in hand]: hydrate, receive
+
+describe("storable.hydrate(opts): timeliness asks of the record in hand alone", () => {
+  it("fetches a box built from a dna once, never having fetched it, then nothing within the horizon, as the box is whole", async () => {
+    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    await held.mw.advance(30_000)
+    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.hasStaged).to.be.true
+  })
+
+  it("fetches a sparse box whatever its age, until a whole record is in hand", async () => {
+    held.mw.seedStore(fullBoxRecord())
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    await box.hydrate({ maxMillisSinceRefresh: Infinity })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.isFull).to.be.true
+    await box.hydrate({ maxMillisSinceRefresh: Infinity })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
   })
 })
 // --
