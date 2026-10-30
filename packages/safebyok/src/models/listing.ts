@@ -240,8 +240,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (thing !== undefined) { await this.#cache.save(thing.cacheable) }
     } catch (err) {
       this.tellBadNews([refusalOf(err)])
+    } finally {
+      this.#remakeSnapshot()
     }
-    this.#remakeSnapshot()
   }
 
   /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. */
