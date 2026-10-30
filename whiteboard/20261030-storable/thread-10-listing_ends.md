@@ -1,6 +1,6 @@
 # Thread 10: The listing's loose ends (2026-10-30)
 
-Branch `20261030-listing_ends`, PR #TBD, stacked on #382 (thread 9). Justify green: safebyok
+Branch `20261030-listing_ends`, PR #383, stacked on #382 (thread 9). Justify green: safebyok
 4241 passed, 37 skipped, 1 todo; every other package green; build and size budgets unmoved.
 Changeset: empty.
 
@@ -65,3 +65,7 @@ forbids a promise-returning handler for a `void`-returning property).
 ## For the Coach
 
 Nothing blocking.
+
+## Open matters
+
+* **Item 4 per copy**: one malformed cached copy is a miss for that copy only. Recommend keep.
