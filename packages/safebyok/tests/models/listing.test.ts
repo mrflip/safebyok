@@ -166,7 +166,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("has tryPut resolve the outcome of a refusal, rejecting never", async () => {
       const { listing, box } = await edited()
-      held.mw.willPut(held.mw.refusalOf(box.scope, new VaultError('not_permitted', 'No.')))
+      held.mw.willPut(held.mw.refusalOf(box.scope, new VaultError('not_permitted', "No.")))
       const outcome = await listing.tryPut(box)
       expect(outcome.ok).to.be.false
       expect(outcome.err?.refusalkind).to.eq('not_permitted')
@@ -225,7 +225,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
       held.mw.clearCalls()
-      const err = new VaultError('not_permitted', 'Not yours.')
+      const err = new VaultError('not_permitted', "Not yours.")
       held.mw.willGet(held.mw.refusalOf(box.scope, err, 'a world'))
       await expect(listing.fetch(box.scope)).rejects.toBe(err)
       expect(held.mw.callsOf('takeWorld')).to.deep.equal([{ verb: 'takeWorld', world: 'a world' }])
@@ -245,7 +245,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       ['a record that is no record',              () => ({ scope: scopeOf(), ok: true, val: { junk: 1 }, world: null })],
       ['an answer missing its scope',             () => ({ ok: true, val: fullBoxRecord(), world: null })],
       ['a refusal that is no VaultError',         () => ({ scope: scopeOf(), ok: false, err: new Error('plain'), world: null })],
-      ['an answer carrying both val and err',     () => ({ scope: scopeOf(), ok: true, val: fullBoxRecord(), err: new VaultError('not_permitted', 'No.'), world: null })],
+      ['an answer carrying both val and err',     () => ({ scope: scopeOf(), ok: true, val: fullBoxRecord(), err: new VaultError('not_permitted', "No."), world: null })],
     ]
     for (const [blurb, answer] of malformed) {
       it(`refuses ${blurb} as 'bad_record' before anything is delivered`, async () => {
@@ -313,7 +313,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("makes the snapshot even when the cache refuses the save, and throws the refusal", async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.willSave(() => { throw new VaultError('unexpected_error', 'The cache is full.') })
+      held.mw.willSave(() => { throw new VaultError('unexpected_error', "The cache is full.") })
       await TH.expectRefusal(listing.build(fullBoxRecord()), 'unexpected_error')
       expect(listing.snapshot).to.have.lengthOf(1)
     })
