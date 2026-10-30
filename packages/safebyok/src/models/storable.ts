@@ -330,9 +330,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    *
    * NOTE, damage at one revision (the Coach, 2026-10-30). Alive here is `am` 'a', as `amVals` has it: a full or sparse
    * record, never a damaged one. At the same revision, damage is not a fate that conflicts with deletion:
-   * - A damaged record delivered skips, whatever central is, a deletion included: what storage holds failed its checks
+   * * A damaged record delivered skips, whatever central is, a deletion included: what storage holds failed its checks
    *   here, so it tells this device nothing to weigh against its own copy.
-   * - A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
+   * * A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
    *   revision, so central becomes it and the staged is dropped. This includes nothing stored (`receive(null)`) for a
    *   thing held damaged.
    * Only a deletion against a living record, either way round, refuses 'record_conflict'.
