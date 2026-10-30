@@ -1,7 +1,5 @@
-/**
- * The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a fake vaultDB store, a
- * fake device cache, one log of every call made to them, and the builders of the records they
- * hold. Import it directly, not through `TH`: `src/models/` is not exported, and the door
+/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a fake vaultDB store, a fake device cache, one log of every call made to them, and the builders of the records they hold.
+ * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
  * Time. The clock is settable, and starts at {@link T0}. The Trigger a storable runs schedules its
@@ -82,10 +80,10 @@ export type ModelsCall =
   | { verb: 'load' }
   | { verb: 'save',         cacheable: Cacheable<BoxRecord, BoxSparse> }
 
-/** What a scripted call answers: the answer itself, or a function of the call that makes it (or throws, or rejects). Whatever it answers is handed to the listing as it is, a malformed answer too. */
+/** The answer of a scripted call: the answer itself, or a function of the call that makes it (or throws, or rejects). Whatever it answers is handed to the listing as it is, a malformed answer too. */
 export type Scripted<CallT> = object | null | undefined | ((call: CallT) => unknown)
 
-/** What the store answers: the {@link Answer} for boxes. */
+/** The answer of a store call: the `Answer` for boxes. */
 export type BoxAnswer = Awaited<ReturnType<BoxStore['get']>>
 
 /** A watch the listing started: the callbacks it gave, and whether it is still live. */
