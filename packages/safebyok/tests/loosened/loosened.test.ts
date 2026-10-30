@@ -3,7 +3,7 @@ import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, 
 
 const held = useModelsWorld()
 
-// == [Creation and re-creation, thread 4b]: registered_at over a rebirth, the tombstone's registered_at, build(dna) over a held scope
+// == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at, build(dna) over a held scope
 
 describe("registered_at over a rebirth", () => {
   it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's edit, not its first store, nor the put that stores it", async () => {
@@ -71,7 +71,7 @@ describe("build(dna) over a held scope", () => {
 })
 // --
 
-// == [The whisper exposed, thread 4b]: a lock that forgets nothing
+// == [The whisper exposed]: a lock that forgets nothing
 
 describe("the whisper exposed across a lock", () => {
   it("notes/guarantees.md:238 (a Box holds its record, ciphertext, never a whisper) and box.ts:96 (kept until the vault locks): a whisper exposed reads LOCKED while locked, and reads again once unlocked", async () => {
