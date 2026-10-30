@@ -1,57 +1,43 @@
 # Thread 3: The listing's pipeline (2026-10-30)
 
-Branch `20261030-listing_pipeline`, PR #372, stacked on #375 (restacked 2026-10-30; was on #370). Justify: green (core 3911 tests pass, 37 skipped as before, 93 more than thread 1; root scripts 289; size budgets unmoved).
+Branch `20261030-listing_pipeline`, PR #372, stacked on #375 (line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375 → #372). Justify: green (core 4195 pass, 37 skipped, 2 todo; root scripts 289; every package and size budget green), at the tip and at each commit.
 
 * **Built**
-  * `Listing.settle(thing?)` saves `thing.cacheable` to the device cache, tells a refused save to `onBadNews`, and then remakes the listing's snapshot. `#receiveInto` (so `fetch`, `put`, `del`, notices and `build(record)`) and `build(dna)` pass the thing; `hello` passes none. For a delivered record the snapshot is in fact made inside `receive` (the thing notifies the listing), before the save; only `build(dna)` and `hello` rely on `settle`'s own remake.
-  * `#receiveInto` catches what `thing.receive` throws and tells it to `onBadNews` (rework, the Coach's ruling 4); `hydrateAll` tells each refused hydrate.
-  * `ifAbsent: 'fail' | 'nil'` on `fetch` / `tryFetch` (`MSX.ifAbsent`, `MSX.fetchOpts` = `timelyOpts` plus `ifAbsent`; types `IfAbsent`, `FetchOpts`). Default 'fail'. Judged in `#deliver`, after the thing has received and settled: nothing stored, or a tombstone ('x' or 'd'), is absent; 'fail' throws `absentRefusal(scope)`, 'nil' resolves null. `put`, `del` and notices pass none and get the thing back, tombstone or not. The `Storable` trigger launch is `tryFetch({ ifAbsent: 'nil' })`.
-  * The listing snapshot is `readonly SnapshotT[]`: each present thing's own `getSnapshot()`, frozen, the same array until some thing's snapshot changes (compared by element identity). `#hold` primes each thing's snapshot and subscribes, so a change in one thing remakes the list and tells the listing's subscribers. A draft shows its draft; the Bob test (a thing edited in place, the others' elements unchanged) is in `box-listing.test.ts`.
-  * `isWatchable` defaults true (a plain get/set on `Storable`), pulled forward from a later thread.
-  * Doc tidy: the damaged-tombstone rule is said in full in `Tombstone` and by pointer in `Answer` and `Notice`; Cache docs say "loaded once at `hello`, saved after each delivery".
-  * Tests: new `tests/models/listing.test.ts` (48); appended to `box-listing.test.ts` (an absent-box describe, the snapshot describe); a describe in `models-shapes.test.ts` for `ifAbsent` / `fetchOpts`. Thread 1's `build(dna)` case now says it saves to the cache and checks the save. An empty changeset (`src/models/` is not exported).
+  * `Listing.settle(thing?)` saves `thing.cacheable` to the device cache, tells a refused save to `onBadNews` (a cache miss), and remakes the listing's snapshot in a `finally`.
+  * `ifAbsent: 'fail' | 'nil'` on `fetch` / `tryFetch` (`MSX.ifAbsent`, `MSX.fetchOpts`; types `IfAbsent`, `FetchOpts`), default 'fail', judged in `#deliver` after delivery: nothing stored or a tombstone is absent. Only a fetch passes one; `put`, `del` and notices have the instance back, tombstone or not. The trigger's launch is `tryFetch({ ifAbsent: 'nil' })`.
+  * The listing snapshot: each present thing's own `getSnapshot()`, frozen, the same array until a thing's snapshot changes (element identity). `#hold` primes and subscribes.
+  * `isWatchable` defaults true, pulled forward.
+  * Second rework: one pipeline (`#buildOrReceive`), the throw rule, success by receive's verdict, the background refresh told (below).
+  * Tests: `tests/models/listing.test.ts`; appended describes in `box-listing.test.ts`, `models-shapes.test.ts`, `storable.test.ts`, `tests/helpers/trigger.test.ts`. An empty changeset (`src/models/` and `src/helpers/` are not exported).
+
+## Rework (second review, 2026-10-30)
+Commits b6fdb125 and 261354f7, after folding 1be5ec32 into b8bdeaba's tests (now 51f0984f) so every commit is green.
+
+* **The throw rule (M).** A call that cannot give what it asked for throws; reporting never replaces a throw owed. A record `receive` refuses is thrown to the `fetch`, `put`, `del` or `build(record)` that asked, the instance as it was, nothing saved, nothing told. A `stale_write` is still thrown as it came; the record it carries, if `receive` refuses it, is told (the caller already has a throw). A refused cache save, a refused cache load and a copy that cannot be revived are cache misses: told, no throw. Every refusal met on a notice, a malformed notice's included, is told. Thread 2's "nothing stored for a thing held alive" and 4b's `vault_remade` through `box.fetch()` are back to their original throws.
+* **One pipeline (L).** Survey of every site that made or held an instance before: `hello` (`makeThing` + `#hold` per cached copy, skipping held scopes); `build(dna)` (`makeThing` + `#hold`, *replacing* a held instance); `build(record)` (`at ?? #makeThingFor`); `#buildOrReceive` for `fetch`, `put`, `del`, notices and a `stale_write`'s carried record (`at ?? #makeThingFor`); `#makeThingFor` itself; the concrete `makeThing`s (`box-listing.ts`, `vault-listing.ts`), called only by the listing. Now every one goes through `#buildOrReceive(scope, intake)`, the intake a `received` record, a `cached` copy or a `drafted` dna; it alone calls `#bornOf`, and only where nothing is held. A test counts `makeThing` across all routes: once per scope.
+  * Consequences: `build(dna)` over a held scope refuses 'bad_option' (`alreadyHeldError`: edit the instance held), the spec's simplest cure, so the `loosened.test.ts` describe pinning the replacement is gone. Nothing is ever replaced, so the first review's YOLO fix (the unsubscribe map) falls out, and so does "a replaced instance's trigger left running". `hello` reviving only scopes not held stays, as the `cached` rule. A newborn is held only once `receive` accepts its record, so a refused one leaves nothing held.
+* **Background refresh (Q) and success (4).** `Trigger` takes `notesOwnSuccess` (an ok outcome notes nothing; the launch notes its own) and `onTimerRefusal` (told a timer launch's refusal, which no caller awaits). `Storable` sets both: `receive`'s verdict (not older, the record in hand whole) is the one owner of success on the fetch path, and a timer launch's refusal reaches `listing.tellBadNews` (now public). A `hydrate` caller still has its refusal thrown; `hydrateAll` tells.
+* **ifAbsent (5).** Already only `fetch` passes one; a test pins `del` answered by a tombstone resolving the instance.
+* **Set aside.** Catching in a `#receiveInto` (the first rework's ruling-4 design: it swallowed throws owed). Keeping the unsubscribe map and replacing on `build(dna)` (the Coach: nothing built more than once). Dropping success-noting from `Trigger` altogether (it is a generic helper with an ok-means-success default other users may want; an opt is additive). Telling *and* throwing a delivery refusal (the Coach: reporting does not replace a throw, and a caller who has the throw needs no news).
 
 ## Decisions taken
-* **Rework rulings (YOLO, two-way doors).** (1) `hello` revives a cached copy only for a scope `at(scope)` does not hold: a held instance is fresher. No test in this thread called `hello` first merely to dodge the replacement (each does it to start the watch), so none was removed. (2) `#hold` keeps each subscription's unsubscribe in a private map by scopepath and calls it when it replaces an instance; `build(dna)` over a held scope still replaces (the Coach's open question, pinned by another thread's `loosened.test.ts`). (3) The snapshot-before-save mechanism is unchanged (see Open questions); `settle`'s `try/finally` is gone, because the catch that tells a refused save replaced it.
-* **Which refusals reach whom (the Coach's ruling 4).** A `fetch`, `put` or `del` that asked gets the answer's own refusals thrown: the world's (`takeWorld`, `ensureTimely`), the answer's `err` (a `stale_write` as it came, `meta.box_stored` kept), `absentRefusal` for a `fetch` with 'fail', and a malformed answer. A refusal met in *delivering the record* (`thing.receive` throwing `corrupt_record`, say, or the cache's save) goes only to `onBadNews`, for every route alike (`fetch`, `put`, `del`, `build(record)`, `build(dna)`, notices); the caller has the instance back as it stands. So a `stale_write` whose carried record conflicts now reaches the caller as `stale_write` with its meta, the conflict told as news (tested). `build` returns the instance and no news: its refusals reach `onBadNews`. `hydrateAll` tells each refused hydrate. A record that cannot be made into an instance (`#makeThingFor`) still throws: nothing exists to hand back. Cost: a `fetch` caller no longer hears of a record `receive` refused, and a host that gives no `onBadNews` hears nothing of it (inventory 3).
-* `ifAbsent` is judged **after** delivery, so a 'fail' fetch of a tombstone still leaves the listing holding the tombstoned thing, saved and in the snapshot; only the caller sees the refusal.
 * `fetch` validates its scope with `scopeOf` before any call, so a bad scope refuses before `ensureTimely`.
-* The snapshot is compared by element identity, not deep equality: a thing makes a new snapshot object when it changes and the same one when it does not.
-* The fake store and tests supply the extra contract fields (the Coach's direction): the adapters are a later match-up.
-* Set aside: a `settle` that returns bad news to its caller (it is the design the Coach calls poorly thought out; see below); deep-comparing snapshots.
-
-## Bad news that reaches no one (the Coach's inventory; ruling 4 closed items 2, 5 and part of 1 and 4)
-Closed: item 2 (`build`'s news, a record's refusal or a refused save, is told to `onBadNews`; a dna still has none of its own), item 5 (`hydrateAll` tells each refused hydrate), and the parts of items 1 and 4 about a refused save and about delivery refusals met on a notice.
-1. `Storable.settle()` returns `{ badnews: [] }` always; the base can produce none, and a `Listing.settle(thing)` has no news to carry at all (it returns `void`).
-3. `tellBadNews` does `this.#onBadNews?.(news)`: with no `onBadNews` given the news is dropped. This now matters more: every delivery refusal goes this way.
-4. `MSX.notice.parse(notice)` throws **inside the store's watch callback**, reaching the adapter and not `onBadNews`.
-6. `Storable.receive` ends silently with `{ badnews: [] }` when `reconcileCentral`'s verdict is not a `receivedAct` ('older', 'same', 'skip'); a 'skip' (a record that cannot be judged against central) is not news to anyone.
-7. The `Trigger` launch uses `tryFetch`, so its refusals are the Trigger's; I did not follow where they go.
-
-## Open questions
-* **Snapshot before save (the reviewer's significant finding 1; the Coach's).** A listener hears the new snapshot during `receive`, because the thing notifies the listing as it settles, before `Listing.settle` saves to the device cache. A fix changes how the listing follows its things (follow the things only after the save, or a listing-level batch), so none was made. Test "makes the snapshot inside receive, before the save" pins today's order.
-* **A fetch hears no delivery refusal.** Ruling 4 sends a `corrupt_record` met by `receive` to `onBadNews` and gives the `fetch` caller the instance as it stands. Is a caller who asked owed the refusal as well (tell and throw)? Left as ruled.
+* Snapshots compared by identity: a thing makes a new snapshot object only when it changes.
+* A held instance's change remakes the listing snapshot inside `receive`, before the save; a newborn's appears at `settle`, after the save. The Coach ruled the cache may lag ("it's a cache"), and no instance is ever unfollowed.
+* The fake store and tests supply the contract's extra fields (the Coach's direction).
 
 ## Discoveries
-* Thread 1 left open whether the snapshot shows `combined`; now each thing's own `getSnapshot()` does, which is what the thing shows (the draft). Thread 5 inherits that.
-* Four thread-1 tests broke under the 'fail' default; they now pass `{ ifAbsent: 'nil' }` or use `listing.at`.
-* `hello` used to replace any thing already held under a cached scope; it now revives only scopes not held.
-* Without the unsubscribe a replaced instance's change only remade the same snapshot (no listener called), so the leak is not visible through the listing; the test spies on the unsubscribe.
-* No test of "bad news before the save" is possible yet, since no source of it exists (item 1).
+* A newborn notifies nobody of its first `receive`: it is subscribed only once held, after.
+* `hydrateAll` joining a timer launch tells its refusal twice (see the bad-news file, item 8).
+* Bad news: the inventory is in `thread-3-bad-news.md`, beside this file.
 
 ## Deviations
-* None from the plan; no suppressions (`eslint-disable`, `ts-expect-error`).
-* Pulled forward: `isWatchable` defaulting true (the handoff named it).
+* No suppressions (`eslint-disable`, `ts-expect-error`) added.
+* Pulled forward: `isWatchable` defaulting true.
 
 ## For the Coach
-* The inventory above is the answer to your direction on bad news; I wrote none of it down as code.
-* A `stale_write` whose carried record `receive` refuses now reaches the caller as `stale_write`, meta kept, the refusal told as news (tested here as `corrupt_record`). Thread 2's `record_conflict` test is not on this branch; if it expects the conflict thrown to the caller it will need updating where stacked.
+* **`build(dna)` over a held scope refuses 'bad_option'.** Your "one pipeline" ruling leaves build(dna) either refusing or meaning edit; refusing is the smaller door. If you would rather it edit the held instance, it is one branch in `#buildOrReceive`.
+* **A cache load refused at `hello` is a cache miss**, told, and hello goes on to watch and hydrate.
 
 ## Restacked (2026-10-30)
-Rebased from 5b80fd21 (an old tip of #370) onto bc53f4e8 (#375, thread 4b), the line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375. Old tip tagged `20261030-listing_pipeline-prerebase` (7972132c). No rework done.
-* **Merges.** `box.ts`: the subclass banner keeps the lower wording ("Required by Storable"). `storable.ts`: one import line, `FetchOpts` beside 4b's `Vaulted`. `listing.test.ts` (add/add with thread 2), `box-listing.test.ts` (with thread 7's `boxDna` describe), `models-shapes.test.ts` (with thread 7's `MSX.boxDna`): one import block, the lower describes first, thread 3's last.
-* **Tests restated to the lower threads' behaviour.** Four of thread 3's delivery-refusal tests (fetch, `build(record)`, `put`, the `stale_write` carrying a conflict) and its notice test expected `corrupt_record`; thread 2's same-revision row now names that record `record_conflict`.
-* **Lower tests restated to thread 3's routing** (ruling 4: a refusal `receive` throws is told to `onBadNews`, the caller gets the instance): thread 2's "nothing stored for a thing held alive" now expects `record_conflict` told, `absent_box` thrown under `ifAbsent: 'fail'`, and one `save`; thread 4b's `vault_remade` through `box.fetch()` now expects it told and the fetch to resolve the box unchanged. Ruling (M) likely turns both back into throws: the rework worker's call.
-* **Thread 5's** "getSnapshot is made on the first call" now builds its box with `new Box(...)`, held by no listing: `#hold` primes every held thing's snapshot, so a box from `listing.build` already has one.
-* Commit 1be5ec32 (code) is red on its own until b8bdeaba (its tests) (one test), as its original was.
-
+Rebased from 5b80fd21 onto bc53f4e8 (#375); old tip tagged `20261030-listing_pipeline-prerebase` (7972132c). Merges in `box.ts`, `storable.ts` and the shared test files kept both sides, thread 3's describes last. Thread 5's "getSnapshot is made on the first call" builds its box with `new Box(...)`, as `#hold` primes a held box's snapshot.
