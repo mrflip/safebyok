@@ -388,7 +388,9 @@ export type ListingWorld = World & {
 }
 
 /** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none.
- * Every `put` is the versioned replace (compare-and-swap): it lands only if storage holds the revision `expected` names, its `revision_tok` and `revision_seq`, or nothing at all when `expected` is null (a stored tombstone counts as something); otherwise storage refuses 'stale_write', carrying what it holds. The record lands exactly as the device minted it: storage never renumbers or patches it, and answers what it then holds.
+ * Every `put` is the versioned replace (compare-and-swap). With `expected` given, it lands only over the record at that revision, its `revision_tok` and `revision_seq` both.
+ * With `expected` null, it lands only where storage holds no record; a stored tombstone is a record. Otherwise storage refuses 'stale_write', carrying the record it holds.
+ * A put that lands keeps the record exactly as given, never renumbered or patched, and answers what storage then holds.
  * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
  */
 export type Store<ScopeT, RecordT, SparseT> = {
