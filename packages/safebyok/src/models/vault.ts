@@ -59,13 +59,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Guards]: demandReadyToEdit, demandReadyToSend, demandReadyToDel
+  // == [Guards]: demandReadyToEdit, demandReadyToDel
 
   /** An edit needs the vault present, and no lock. */
   override demandReadyToEdit(): this { return this.demandPresent() }
-
-  /** A send needs what an edit does: every vault record is full. */
-  override demandReadyToSend(): this { return this.demandPresent() }
 
   /** A vault deleted has no life left to delete; a damaged one may be deleted, as `bank.delDamagedVault` did. Not yet: the passphrase's proof the old `vault.del` took. */
   override demandReadyToDel(): this {

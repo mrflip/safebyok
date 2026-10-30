@@ -65,6 +65,25 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
+  // == [Guards]: ensureReadyToUnsealWhisper, demandReadyToUnsealWhisper, ensureReadyToSeal, demandReadyToSeal
+
+  async ensureReadyToUnsealWhisper(opts: EditOpts = {}): Promise<this> {
+    await this.hydrate(opts)
+    return this.demandReadyToUnsealWhisper()
+  }
+
+  /** Opening the whisper needs the vault unlocked and the record in hand present and full: a box gone or damaged has no whisper to open, and refuses 'absent_box'. */
+  demandReadyToUnsealWhisper(): this { return this.demandUnlocked().demandPresent().demandFull() }
+
+  async ensureReadyToSeal(opts: EditOpts = {}): Promise<this> {
+    await this.hydrate(opts)
+    return this.demandReadyToSeal()
+  }
+
+  /** A seal needs the vault unlocked, and no more: a box gone or damaged is sealed back to life. */
+  demandReadyToSeal(): this { return this.demandUnlocked() }
+  // --
+
   // == [The whisper]: whisper, unsealWhisper, expose, seal, reseal, edit
 
   /** The exposed whisper, or LOCKED while the vault is. Setting it exposes the given whisper without sealing it: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it. */
@@ -81,8 +100,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   /** Open the stored whisper and hand it back, keeping nothing on the instance. */
   async unsealWhisper(opts: EditOpts = {}): Promise<Whisper> {
-    await this.hydrate(opts)
-    this.demandUnlocked()
+    await this.ensureReadyToUnsealWhisper(opts)
     return this.#unseal()
   }
 
