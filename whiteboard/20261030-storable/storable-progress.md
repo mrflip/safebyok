@@ -121,6 +121,11 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   and `boxDna`, and retires `#holdsWhole`'s union); a draft meeting another `vault_tok` throws
   ("practically impossible once we have vault"); who reads `cacheable`: only the listing's
   `settle` (a row asks whether to make it a push and `#`-private).
+* *The Coach's rulings of 2026-10-30, sixth batch* (verbatim in *Resolved*): **a whisper and a
+  sidecar on every update** ("greatly simplifying"; thread 15): nothing is carried over from the
+  record in hand; `cacheable` private, pushed by the storable's settle (thread 12); the double
+  edge (an edit carried past damage, dropped on nothing stored) accepted if documented and tested
+  (thread 12). Force-push permission renewed ("You have permissions to force push as needed").
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.
