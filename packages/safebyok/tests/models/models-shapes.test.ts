@@ -615,19 +615,19 @@ describe("MSX.boxDna", () => {
 
 describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   holdsCases(MSX.ifAbsent, 'bad_option', [
-    ['fail',   true,  'passes fail'],
-    ['nil',    true,  'passes nil'],
-    ['create', false, 'refuses create, which fetch does not offer'],
-    [undefined, false, 'refuses undefined: the default is applied by the caller, not the check'],
+    ["fail",     true,  'passes fail'],
+    ["nil",      true,  'passes nil'],
+    ["create",   false, 'refuses create, which fetch does not offer'],
+    [undefined,  false, 'refuses undefined: the default is applied by the caller, not the check'],
   ])
 
   holdsCases(MSX.fetchOpts, 'bad_option', [
-    [{},                                          true,  'passes no options'],
-    [{ ifAbsent: 'nil' },                         true,  'passes ifAbsent nil'],
-    [{ ifAbsent: undefined },                     true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
-    [{ ifAbsent: 'fail', maxMillisSinceRefresh: 5 }, true, 'passes ifAbsent beside the timely options'],
-    [{ ifAbsent: 'replace' },                     false, 'refuses an ifAbsent that is not one of the two'],
-    [{ maxMillisSinceRefresh: -1 },               false, 'refuses a negative horizon, as timelyOpts does'],
+    [{},                                                true,  'passes no options'],
+    [{ ifAbsent: 'nil' },                               true,  'passes ifAbsent nil'],
+    [{ ifAbsent: undefined },                           true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
+    [{ ifAbsent: 'fail', maxMillisSinceRefresh: 5 },    true,  'passes ifAbsent beside the timely options'],
+    [{ ifAbsent: 'replace' },                           false, 'refuses an ifAbsent that is not one of the two'],
+    [{ maxMillisSinceRefresh: -1 },                     false, 'refuses a negative horizon, as timelyOpts does'],
   ])
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
