@@ -1,6 +1,6 @@
 # Thread 11: ifPresent 'replace', and two listing guards (2026-10-30)
 
-Branch `20261030-if_present_replace`, PR #385 (base `main`), stacked on #384. Justify: green (safebyok 4295 passed).
+Branch `20261030-if_present_replace`, PR #385 (base `main`), stacked on #384. Justify: green (safebyok 4299 passed).
 
 * **Built**:
   * `ifPresent?: 'replace'` is back in `models-shapes.ts`: `ifPresentVals = ['replace']`, the `ifPresent` checker, the `IfPresent` type, `sendOpts = timelyOpts.extend({ ifPresent: ifPresent.optional() })`. `Store.put(record, expected, ifPresent?)`.
@@ -10,6 +10,8 @@ Branch `20261030-if_present_replace`, PR #385 (base `main`), stacked on #384. Ju
   * Guard 2, `#demandRecordOfVault` now checks every record a cached copy would make an instance of: its central and its staged (`#recordsOf` replaces `#centralOf`). A copy with another vault_tok in either is a cache miss told to `onBadNews`.
   * Spec note in `whiteboard/20261028-storable_base/storable-spec.md` under `ifPresent`; nothing else there touched.
   * Tests: `models-shapes.test.ts`, `box.test.ts` (send), `listing.test.ts` (put, scope guard, staged vault_tok), each in describes appended at the end.
+* **Rework (review of b0877371, Significant)**: a replacing put moves the revision forward. With `expected` null and `ifPresent: 'replace'` over any record held (alive, damaged or a tombstone), storage keeps the record at `revision_seq` one past the held one's, under the record's own `revision_tok`, and answers it; over nothing held it lands at the minted seq; with `expected` given, `'replace'` is ignored. Said in `Store`'s doc block (what every adapter must do), `IfPresent`'s, `listing.put`'s and `send`'s, and a clause on the spec note. The fake store does it (`landed` in `put`). No `src` logic changed: the box that replaced receives a record newer than its central, and `reconcileStaged`'s `adopt` row drops its staged. Tests: `box.test.ts` (the replace describe: seq 5 stored and held, nothing staged; another device holding seq 4 adopts the notice; the race past another device's seq 0 lands at seq 1, no `record_conflict`), `listing.test.ts` (the fake over a live, deleted and damaged record each lands at seq 5; over nothing at 0).
+  * Set aside: the refusal carrying the revision it replaces and the listing re-minting above it (two round trips, and the race reopens between them); waiting for the scenario table (leaves `'replace'` diverging devices meanwhile).
 * **Decisions taken**:
   * The fake compares only `expected === null` against a stored live box. Comparing `expected` given to the stored revision broke an existing listing test (a put over a different seeded record), and the plan asks the fake only to honour `ifPresent`; a "compare-and-set holds with `expected` given" case is a scripted `stale_write` plus the call log showing `expected` and `ifPresent` both handed over.
   * `send` with `ifPresent: 'replace'` on a never-stored box needs `maxMillisSinceRefresh: Infinity` (and `maxWorldMillis`) to be meaningful: the default edit hydrates first, and the fetch teaches the box what storage holds, so `expected` is then given. The tests pin this.
