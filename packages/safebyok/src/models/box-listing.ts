@@ -64,7 +64,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return { fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, ...dna }
   }
 
-  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse>): Box {
+  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): Box {
     return new Box(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 

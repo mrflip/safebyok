@@ -172,7 +172,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** A new instance for a record not yet held, with nothing stored as its central, so that `receive` adopts the record as it would any newer one. */
   #makeThingFor(record: Fetched<RecordT, SparseT>): ThingT {
     const neverStored = this.#neverStoredOf(this.sparseOf(record))
-    return this.#hold(this.makeThing(neverStored, neverStored))
+    return this.#hold(this.makeThing(neverStored, null))
   }
 
   #hold(thing: ThingT): ThingT {
@@ -249,7 +249,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The record a stamped dna makes, staged at birth: the thing's sparse form, its defaults filled in, alive; a vault's is its full novel record. */
   protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): SparseT | RecordT
   /** Construct the instance, and nothing more. */
-  protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT>): ThingT
+  protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError
   /** The record a 'stale_write' refusal carries, what storage holds; null for none, or for a record that fails its check. */
   protected abstract storedInStaleRefusal(err: VaultError): Fetched<RecordT, SparseT> | null
