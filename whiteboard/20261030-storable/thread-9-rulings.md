@@ -1,6 +1,6 @@
 # Thread 9: The Coach's rulings of 2026-10-30, the rest (2026-10-30)
 
-Branch `20261030-rulings`, PR #TBD, stacked on #381 (thread 8). Justify green: safebyok 4214
+Branch `20261030-rulings`, PR #382, stacked on #381 (thread 8). Justify green: safebyok 4214
 passed, 37 skipped, 1 todo; every other package green; build and size budgets unmoved.
 
 ## Built
