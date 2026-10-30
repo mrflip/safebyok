@@ -6,10 +6,10 @@ import { Storable } from './storable'
 
 // == [Record forms]: LOCKED, LockedSidecar, BoxSnapshot, BoxProps, BoxEditOpts
 
-/** The sentinel `box.whisper` returns while the vault is locked; and the key of {@link LockedSidecar}. Registered with `Symbol.for`, so a host that holds the same description holds the same symbol. */
+/** The sentinel `box.whisper` answers while the vault is locked, and the key that marks a {@link LockedSidecar}. It is registered with `Symbol.for`, so `Symbol.for('LOCKED')` is this symbol. */
 export const LOCKED: unique symbol = Symbol.for('LOCKED')
 
-/** The bag `box.sidecar` and the snapshot's `sidecar` answer while the vault is locked, in place of the sidecar: a frozen bag marked by the {@link LOCKED} key, which JSON leaves out. */
+/** The bag `box.sidecar` and the snapshot's `sidecar` answer in place of the sidecar while the vault is locked. It is one frozen object, marked by the {@link LOCKED} key, which JSON leaves out. */
 export type LockedSidecar = Readonly<{ [LOCKED]: true }>
 
 const lockedSidecar: LockedSidecar = Object.freeze({ [LOCKED]: true as const })
@@ -52,7 +52,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   get fmt(): number { return this.combined.fmt }
 
-  /** The sidecar of the record in hand, which only the full record carries; null otherwise. While the vault is locked, the {@link LockedSidecar} bag instead: the sidecar is not readable then. */
+  /** The sidecar of the record in hand, which only the full record carries; null otherwise. While the vault is locked, it is the {@link LockedSidecar} bag instead, whatever the record holds. */
   get sidecar(): Sidecar | LockedSidecar | null {
     if (this.isLocked) { return lockedSidecar }
     return this.full?.sidecar ?? null
@@ -133,8 +133,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return Promise.reject(new VaultError('unexpected_error', 'seal is not written yet.'))
   }
 
-  /** Two snapshots are alike when their JSON is and both or neither carry the locked sidecar: JSON leaves the {@link LOCKED} key out, so a box that locks with an empty sidecar would otherwise keep its old snapshot. */
+  /** Two snapshots are alike when their JSON is, and both or neither carry the locked sidecar. */
   protected override sameSnapshot(next: BoxSnapshot, current: BoxSnapshot): boolean {
+    // JSON leaves the LOCKED key out: without the identity check, a box that locks with an empty sidecar would keep its old snapshot.
     return isLockedSidecar(next.sidecar) === isLockedSidecar(current.sidecar) && super.sameSnapshot(next, current)
   }
 
