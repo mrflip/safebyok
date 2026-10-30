@@ -181,10 +181,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#hold(this.makeThing(neverStored, null))
   }
 
-  /** Hold `thing` under its scope, and follow its snapshot: the first is made now, since a thing notifies only once it has one, and each change of it makes the listing's again. */
+  /** Hold `thing` under its scope, and make the listing's snapshot again on each change of the thing's. */
   #hold(thing: ThingT): ThingT {
     this.#things.set(this.scopepathOf(thing.scope), thing)
-    thing.getSnapshot()
+    thing.getSnapshot()   // a thing notifies only once it has a snapshot
     thing.subscribe(() => { this.#remakeSnapshot() })
     return thing
   }
@@ -220,7 +220,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Act on new state, as the storable's `settle` does on its own: save `thing` to the device cache, where one is given, then make the listing's snapshot again. The snapshot is made even when the cache refuses the save. */
+  /** Save `thing`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again, even when the save refuses; the refusal is thrown after. */
   protected async settle(thing?: ThingT): Promise<void> {
     try {
       if (thing !== undefined) { await this.#cache.save(thing.cacheable) }
