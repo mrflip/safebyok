@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** waiting on one push (2026-10-30): the line is filed through #375; #372 is reworked and reviewed but local only, its force-push refused by the permission check; 8, 9, 10 and 6 wait on it.
+* **Status:** resumed 2026-10-30 on the Coach's push permission and six rulings: #372 pushed and filing; then 8, 9, 10 in a chain, then 6.
 
 ## Read first
 
@@ -305,6 +305,17 @@ rework (it touches `send`'s opts); cut from 3's filed tip, the top of the line. 
 8. The inline thrower sentences in `storable.ts`/`box.ts` (`movedUnderEditError`,
    `vaultRemadeError`, `notFullError`, `lockedError`) move to `phrases.ts` (STYLE.md *What a
    refusal says*).
+9. A record under a `vault_tok` other than the one held throws `unexpected_error`, over a living
+   central or a tombstone alike (the Coach: "If box receives a record with a different vault_tok
+   it should throw unexpected error, I'm pretty sure we will want to flush all instances and
+   remake them"). This replaces 4b's `vault_remade` refusal, and `assign` stops taking a new
+   `vault_tok` over a tombstone. A TODO.md entry: flush and remake every instance on a remade vault.
+10. A dna carrying `revision_seq` is refused (the Coach: "go ahead to have the validator reject");
+    it is today, as a record held to the record check. `boxDna`'s doc stops listing `revision_seq`
+    among the props it takes and strips.
+**Hands off:** `registered_at`'s logic, and anything more built on `boxDna`/`hasRevision`: the
+Coach is looking into both ("There's something weird about the constraints on it"; "There is
+something broken about my conception of making a record").
 Tests beside each. Worker `opus`; review `medium`. Depends on 8 (cut from its tip). Size: medium.
 
 ### 10. The listing's loose ends
