@@ -328,7 +328,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("a refusal met in delivering a record", () => {
-    it("is told to onBadNews and not thrown to a fetch, which has the instance back as it stands", async () => {
+    it("is told to onBadNews and not thrown to a fetch, which has the instance back as it is", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-other' }))

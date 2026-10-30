@@ -151,7 +151,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Delivering an answer]: deliver, buildOrReceive, receiveInto, makeThingFor, hold, neverStoredOf
 
   /** The pipeline every answer takes. Check it; take the world; a refusal is thrown, after the record a 'stale_write' carries is delivered; a record, or none stored, goes to `#buildOrReceive` under the scope the answer names.
-   * What reaches the caller who asked, a `fetch`, a `put` or a `del`, is the answer's own: its world's refusal, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal met in delivering the record, by `receive` or by the cache's save, goes to `onBadNews` and not to the caller, who has the instance back as it stands.
+   * The answer's own refusals are thrown to the caller: its world's, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal met in delivering the record, by `receive` or by the cache's save, goes to `onBadNews`, and the caller has the instance back as it is.
    * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put`, a `del` and a notice pass none, and have the instance back, a tombstone or not.
    */
   async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
@@ -174,7 +174,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing === null ? Promise.resolve(null) : this.#receiveInto(thing, record)
   }
 
-  /** `thing.receive(record)`, then settle on the thing. The bad news `receive` returns, and a refusal it throws, are told to `onBadNews`, never thrown: whoever delivered here, a fetch, a put, a del, a build or a notice, has the instance back. */
+  /** `thing.receive(record)`, then settle on the thing. The bad news `receive` returns, and a refusal it throws, are told to `onBadNews`, never thrown, so the instance is always handed back. */
   async #receiveInto(thing: ThingT, record: Fetched<RecordT, SparseT> | null): Promise<ThingT> {
     try {
       this.tellBadNews(thing.receive(record).badnews)
