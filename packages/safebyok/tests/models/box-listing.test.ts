@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
-import { NeverStoredSeq } from '../../src/models/models-shapes'
+import * as MSX from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
@@ -46,7 +46,7 @@ describe("BoxListing", () => {
       expect(listing.at(box.scope)).to.eq(box)
       expect(box.hasStaged).to.be.true
       expect(box.revision_seq).to.eq(0)
-      expect(box.cacheable.central.revision_seq).to.eq(NeverStoredSeq)
+      expect(box.cacheable.central.revision_seq).to.eq(MSX.NeverStoredSeq)
       expect(box.cacheable.central.am).to.eq('x')
       expect(box.cacheable.staged?.revision_seq).to.eq(0)
       expect(box.cacheable.staged?.am).to.eq('a')
@@ -164,6 +164,34 @@ describe("BoxListing", () => {
       const box = await boxListingOf(held.mw).build({ ...dna(), whisper: undefined })
       expect(box.hasStaged).to.be.true
       expect(box.revision_seq).to.eq(0)
+    })
+  })
+
+  describe("listing.fetch(scope) answering a damaged record", () => {
+    it("builds and holds a damaged box for a tombstone in the box's sparse form, for a box not yet held", async () => {
+      const listing = boxListingOf(held.mw)
+      const scope = held.mw.boxscope('anthropic_api_key')
+      const damaged = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }, 'd')
+      expect(damaged).to.deep.equal({ ...sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }), am: 'd' })
+      held.mw.willGet(held.mw.answerOf(scope, damaged))
+      const box = await listing.fetch(scope)
+      expect(box).to.be.instanceOf(Box)
+      expect(listing.at(scope)).to.eq(box)
+      expect(box?.isPresent).to.be.false
+      expect(box?.am).to.eq('d')
+      expect(box?.cacheable.central).to.deep.equal(damaged)
+    })
+
+    it("refuses a tombstone of only the scope, vault_tok, revision and times as 'bad_record' at the box's sparse form, though the base's answer check passes it", async () => {
+      const listing = boxListingOf(held.mw)
+      const scope = held.mw.boxscope('anthropic_api_key')
+      const { vault_tok, revision_tok, registered_at, written_at } = fullBoxRecord()
+      const bare = { ...scope, vault_tok, am: 'd', revision_tok, revision_seq: 2, registered_at, written_at }
+      const answer = { scope, ok: true, val: bare, world: null }
+      expect(() => MSX.answer.parse(answer)).to.not.throw()
+      held.mw.willGet(answer)
+      await TH.expectRefusal(listing.fetch(scope), 'bad_record')
+      expect(listing.at(scope)).to.be.null
     })
   })
 })

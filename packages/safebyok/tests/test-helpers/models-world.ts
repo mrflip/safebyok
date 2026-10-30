@@ -58,7 +58,10 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
  */
 export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => MSX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
-/** The tombstone of a box record: its sparse form, `am` 'x' for a deletion or 'd' for damage. `overrides` says otherwise.
+/** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
+ * A damaged one is the form a store delivers for a stored record that fails its check: the kind's
+ * sparse form, its constants (`fmt`, `whisper_codec`, `whisper_schema_version`) filled in, so that
+ * `BoxListing.sparseOf` accepts it.
  *
  * @example tombstoneBoxRecord({ revision_seq: 2 })        // a deleted box
  * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // a damaged box, as a store hands it back
