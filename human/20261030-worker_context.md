@@ -1,8 +1,8 @@
-# Worker context: one check after merge (2026-10-30)
+# Worker context: a saving held in reserve (2026-10-30)
 
-`thread-worker.md` now has `disallowedTools: Artifact`. A probe could not confirm it takes the
-Artifact tool away (a fresh user agents folder was not picked up mid-session). On the first sprint
-after merge, check one worker's transcript: its first `api-request-shape` line should list ten
-tools, none named `Artifact`:
-`jq -r 'select(.type=="api-request-shape") | .shape.tools[].name' <agent>.jsonl | head -12`.
-If `Artifact` is still there, the denylist did not apply, and the 10k a turn is not saved.
+`thread-worker.md` carries `disallowedTools: Artifact`, commented out: the Artifact tool's schema
+is about 10k tokens on every turn of every worker, and a worker publishes nothing. The Coach chose
+to keep the tool for now. If it is turned on, check one worker's transcript on the next sprint:
+its first `api-request-shape` line should list no tool named `Artifact`
+(`jq -r 'select(.type=="api-request-shape") | .shape.tools[].name' <agent>.jsonl`). No probe
+has yet confirmed the field takes.

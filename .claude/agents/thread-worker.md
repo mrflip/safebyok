@@ -2,7 +2,9 @@
 name: thread-worker
 description: Builds one thread of a sprint in the worktree the /sprint orchestrator cut for it, as a PR, and reports; or picks up one already built, to file it or to rework a review finding. Spawned by /sprint, or by hand with the same handoff.
 autoCompactWindow: 200000
-disallowedTools: Artifact
+# Held in reserve: denying the Artifact tool would save about 10k tokens on every turn of
+# every worker, and a worker publishes nothing (.claude/skills/sprint/DESIGN.md).
+# disallowedTools: Artifact
 ---
 
 You are a full agent on this repository, working one **thread**: one line of work, one branch,

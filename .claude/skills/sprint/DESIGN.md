@@ -66,11 +66,12 @@ sprinting or not, which is why those are one sentence of when to use it.
   first*: the brief and the progress document, then five STYLE.md sections) put 33k tokens in its
   context before its first edit, mostly rules its *From the sprint* lines already quoted, carried
   on every turn after. Thread 8, handed one item and two of the plan's sections, finished at 56k.
-* **Workers do without the Artifact tool** (`disallowedTools:` in `thread-worker.md`). Its schema
-  alone is 36k characters, about 10k tokens on every turn of every worker, and a worker publishes
-  nothing. A denylist, not an allowlist: an allowlist also strips what an agent loads on demand
-  (ToolSearch and the tools behind it, Skill, the MCP servers), and no spawn can give a tool back:
-  the Agent tool takes no tool list, and a message adds none.
+* **A saving held in reserve: workers could do without the Artifact tool** (`disallowedTools:`,
+  commented out in `thread-worker.md`). Its schema alone is 36k characters, about 10k tokens on
+  every turn of every worker, and a worker publishes nothing; the Coach chose on 2026-10-30 to keep
+  it for now. If adopted, a denylist, not an allowlist: an allowlist also strips what an agent loads
+  on demand (ToolSearch and the tools behind it, Skill, the MCP servers), and no spawn can give a
+  tool back: the Agent tool takes no tool list, and a message adds none.
 * **The reviewer re-checks only what `/code-review` did not verify.** Reviewers ran a median of
   32 turns, up to 97, most of them `grep` and `sed` re-checking findings that `/code-review`'s
   verify pass had already confirmed.
