@@ -2,7 +2,7 @@
 
 import { randomId } from '../crypto'
 import type { VaultError } from '../errors'
-import { type Outcome, outcomeOf } from '../outcome'
+import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
 import { type Answer, type Cache, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -29,6 +29,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   readonly #store: Store<ScopeT, RecordT, SparseT>
   readonly #cache: Cache<RecordT, SparseT>
   readonly #things    = new Map<string, ThingT>()
+  readonly #unsubscribes = new Map<string, () => void>()
   readonly #listeners = new Set<() => void>()
   readonly #onBadNews: ((news: VaultError) => void) | null
   #snapshot: readonly SnapshotT[] = Object.freeze([])
@@ -54,10 +55,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Load the device cache once and revive an instance from each copy, saving nothing back; start the watch; hydrate every instance. */
+  /** Load the device cache once and revive an instance from each copy whose scope is not already held, saving nothing back (an instance held is fresher than its cached copy); start the watch; hydrate every instance. */
   async hello(): Promise<void> {
     const cached = await this.#cache.load()
-    for (const copy of cached) { this.#hold(this.makeThing(copy.central, copy.staged)) }
+    for (const copy of cached) {
+      if (this.at(this.scopeOf(copy.central)) === null) { this.#hold(this.makeThing(copy.central, copy.staged)) }
+    }
     await this.settle()
     this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
     await this.hydrateAll()
@@ -86,6 +89,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * A record, sparse, full or a tombstone, is delivered as a fetch's answer would be: `build(record)` is
    * `thing.receive(record)` for a thing not yet held, so a thing already held under its scope receives it.
    * A dna, its defaults filled, is staged at revision 0 over a central never stored. Either way the instance is saved to the device cache.
+   * Build returns the instance and no news: the refusals of its delivery and of the cache's save are told to `onBadNews`.
    */
   async build(input: Dna<ScopeT, RecordT> | Fetched<RecordT, SparseT>): Promise<ThingT> {
     if (hasRevision(input)) { return this.#receiveInto(this.at(this.scopeOf(input)) ?? this.#makeThingFor(input), input) }
@@ -95,8 +99,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing
   }
 
+  /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on. */
   async hydrateAll(opts: TimelyOpts = {}): Promise<void> {
-    await Promise.all(this.things.map((thing) => thing.tryHydrate(opts)))
+    const outcomes = await Promise.all(this.things.map((thing) => thing.tryHydrate(opts)))
+    for (const { ok, err } of outcomes) { if (! ok) { this.tellBadNews([err]) } }
   }
   // --
 
@@ -145,6 +151,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Delivering an answer]: deliver, buildOrReceive, receiveInto, makeThingFor, hold, neverStoredOf
 
   /** The pipeline every answer takes. Check it; take the world; a refusal is thrown, after the record a 'stale_write' carries is delivered; a record, or none stored, goes to `#buildOrReceive` under the scope the answer names.
+   * What reaches the caller who asked, a `fetch`, a `put` or a `del`, is the answer's own: its world's refusal, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal met in delivering the record, by `receive` or by the cache's save, goes to `onBadNews` and not to the caller, who has the instance back as it stands.
    * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put`, a `del` and a notice pass none, and have the instance back, a tombstone or not.
    */
   async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
@@ -167,10 +174,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing === null ? Promise.resolve(null) : this.#receiveInto(thing, record)
   }
 
-  /** `thing.receive(record)`; tell the bad news that comes back; settle on the thing. */
+  /** `thing.receive(record)`, then settle on the thing. The bad news `receive` returns, and a refusal it throws, are told to `onBadNews`, never thrown: whoever delivered here, a fetch, a put, a del, a build or a notice, has the instance back. */
   async #receiveInto(thing: ThingT, record: Fetched<RecordT, SparseT> | null): Promise<ThingT> {
-    const { badnews } = thing.receive(record)
-    this.tellBadNews(badnews)
+    try {
+      this.tellBadNews(thing.receive(record).badnews)
+    } catch (err) {
+      this.tellBadNews([refusalOf(err)])
+    }
     await this.settle(thing)
     return thing
   }
@@ -181,11 +191,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#hold(this.makeThing(neverStored, null))
   }
 
-  /** Hold `thing` under its scope, and make the listing's snapshot again on each change of the thing's. */
+  /** Hold `thing` under its scope, and make the listing's snapshot again on each change of the thing's. An instance held under that scope is let go: the listing stops following it. */
   #hold(thing: ThingT): ThingT {
-    this.#things.set(this.scopepathOf(thing.scope), thing)
+    const scopepath = this.scopepathOf(thing.scope)
+    this.#unsubscribes.get(scopepath)?.()
+    this.#things.set(scopepath, thing)
     thing.getSnapshot()   // a thing notifies only once it has a snapshot
-    thing.subscribe(() => { this.#remakeSnapshot() })
+    this.#unsubscribes.set(scopepath, thing.subscribe(() => { this.#remakeSnapshot() }))
     return thing
   }
 
@@ -197,7 +209,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [The watch]: onNotice
 
-  /** Deliver a notice as a good answer; a refusal met on the way is bad news, as nobody asked. */
+  /** Deliver a notice as a good answer; a refusal met on the way, the world's or a record that cannot be made into an instance, is bad news, as nobody asked. */
   readonly #onNotice = async (notice: Notice<RecordT, SparseT>): Promise<void> => {
     MSX.notice.parse(notice)
     const { record, world } = notice
@@ -220,13 +232,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Save `thing`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again, even when the save refuses; the refusal is thrown after. */
+  /** Save `thing`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again. A save that is refused is told to `onBadNews`, not thrown. */
   protected async settle(thing?: ThingT): Promise<void> {
     try {
       if (thing !== undefined) { await this.#cache.save(thing.cacheable) }
-    } finally {
-      this.#remakeSnapshot()
+    } catch (err) {
+      this.tellBadNews([refusalOf(err)])
     }
+    this.#remakeSnapshot()
   }
 
   /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. */
