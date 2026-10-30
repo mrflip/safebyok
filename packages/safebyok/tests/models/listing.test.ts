@@ -971,13 +971,22 @@ describe("listing.put(duck, ifPresent): handed to storage, which judges it", () 
     ])
   })
 
-  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, unless 'replace', and put over a tombstone as before", async () => {
+  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, unless 'replace'", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord()), 'stale_write')
     expect(listing.things.map(({ revision_tok }) => revision_tok)).to.deep.equal(['rev-stored'])
+    await expect(boxListingOf(held.mw).put(fullBoxRecord(), 'replace')).resolves.to.be.instanceOf(Box)
+    expect(held.mw.callsOf('put').map(({ expected, ifPresent }) => ({ expected, ifPresent }))).to.deep.equal([
+      { expected: null, ifPresent: undefined },
+      { expected: null, ifPresent: 'replace' },
+    ])
+  })
+
+  it("makes the fake store put over a tombstone stored when none was expected", async () => {
     held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
-    await expect(listing.put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))).resolves.to.be.instanceOf(Box)
+    await expect(boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))).resolves.to.be.instanceOf(Box)
+    expect(held.mw.callsOf('put').map(({ expected }) => expected)).to.deep.equal([null])
   })
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', calling the store not at all", async () => {
