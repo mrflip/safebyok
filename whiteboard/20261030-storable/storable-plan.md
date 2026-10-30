@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** resumed 2026-10-30 on the Coach's 22 rulings. #370/#371 pushed onto #374; the line (2, 5, 7, 4b, 3) restacking; then 4b's and 3's reworks, 8 (remove ifPresent), 9 (the rest of the rulings), 6.
+* **Status:** waiting on one push (2026-10-30): the line is filed through #375; #372 is reworked and reviewed but local only, its force-push refused by the permission check; 8, 9, 10 and 6 wait on it.
 
 ## Read first
 
