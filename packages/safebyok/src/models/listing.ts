@@ -14,7 +14,7 @@ import type { Storable } from './storable'
 type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown, unknown>
 
 /** Intake for `#buildOrReceive`: a record storage gave, or `build` was handed, null for nothing stored; a copy from the device cache; or a dna's draft. */
-type Intake<RecordT, SparseT> = Received<RecordT, SparseT> | Readonly<{ flavor: 'cached', copy: Cacheable<RecordT, SparseT> }> | Readonly<{ flavor: 'drafted', draft: SparseT | RecordT }>
+type Intake<RecordT, SparseT> = Received<RecordT, SparseT> | Readonly<{ flavor: 'cached', copy: Cacheable<RecordT, SparseT> }> | Readonly<{ flavor: 'drafted', draft: RecordT }>
 type Received<RecordT, SparseT> = Readonly<{ flavor: 'received', record: Fetched<RecordT, SparseT> | null }>
 // --
 
@@ -109,13 +109,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Build the instance of `input`, hold it, and resolve it. Stores nothing.
    * A record, sparse, full or a tombstone, is delivered as a fetch's answer would be: a thing already held under its
    * scope receives it, and a refusal its `receive` throws is thrown.
-   * A dna, its defaults filled, is staged at revision 0 over a central never stored. A dna for a scope already held
+   * A dna, its defaults filled, is staged at revision 0 over a central never stored, as the full record `draftOf` makes,
+   * so the instance is whole from birth. A dna for a scope already held
    * refuses 'bad_option': `edit` the instance held, which brings a deleted or damaged one back to life.
    * Either way the instance is saved to the device cache; a save refused is told to `onBadNews`.
    */
   async build(input: Dna<ScopeT, RecordT> | Fetched<RecordT, SparseT>): Promise<ThingT> {
     if (hasRevision(input)) { return this.#buildOrReceive(this.scopeOf(input), { flavor: 'received', record: input }) }
-    const draft = this.draftOf(this.stampDna(input))
+    const draft = await this.draftOf(this.stampDna(input))
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
   }
 
@@ -235,10 +236,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** How the instances made here tell bad news. */
   readonly #tell: Tell = (badnews) => { this.tellBadNews(badnews) }
 
-  /** A new instance for `intake`, constructed and nothing more; null for nothing stored. A record's instance is born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; a copy's revives its central and staged; a draft is staged over a central never stored. */
+  /** A new instance for `intake`, constructed and nothing more; null for nothing stored. A record's instance is born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; a copy's revives its central and staged; a draft is staged over a central never stored, of the draft's sparse form. */
   #makeThingFor(intake: Intake<RecordT, SparseT>): ThingT | null {
     if (intake.flavor === 'cached')  { return this.makeThing(intake.copy.central, intake.copy.staged, this.#tell) }
-    if (intake.flavor === 'drafted') { return this.makeThing(this.#neverStoredOf(intake.draft), intake.draft, this.#tell) }
+    if (intake.flavor === 'drafted') { return this.makeThing(this.#neverStoredOf(this.sparseOf(intake.draft)), intake.draft, this.#tell) }
     return intake.record === null ? null : this.makeThing(this.#neverStoredOf(this.sparseOf(intake.record)), null, this.#tell)
   }
 
@@ -344,8 +345,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract sparseOf(duck: unknown): SparseT
   /** The full record `duck` is, as a plain copy; refuses a duck that is not full. */
   abstract recordOf(duck: unknown): RecordT
-  /** The record a stamped dna makes, staged at birth: the thing's sparse form, its defaults filled in, alive; a vault's is its full novel record. */
-  protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): SparseT | RecordT
+  /** The full record a stamped dna makes, staged at birth: its defaults filled in, alive, and sealed where the kind seals; a vault's is its novel record. */
+  protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): Promise<RecordT>
   /** Construct the instance, handing it `tell`, and nothing more. */
   protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, tell: Tell): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError

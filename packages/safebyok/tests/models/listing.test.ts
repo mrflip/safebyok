@@ -169,9 +169,9 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("refuses a box not full as 'bad_record' before storage is called", async () => {
       const listing = boxListingOf(held.mw)
-      const draft = await listing.build({ ...scopeOf() })
+      const sparse = await listing.build(sparseBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.put(draft), 'bad_record')
+      await TH.expectRefusal(listing.put(sparse), 'bad_record')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 

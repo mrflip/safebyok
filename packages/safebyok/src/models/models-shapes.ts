@@ -44,7 +44,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, ca
   const am = oneof(amVals)
   const revision = obj({
     revision_tok,
-    /** A counter the store moves at every write: of two revisions, the higher `revision_seq` is the newer. {@link NeverStoredSeq} marks a central never stored. */
+    /** A counter the store moves at every put and del: of two revisions, the higher `revision_seq` is the newer. {@link NeverStoredSeq} marks a central never stored. */
     revision_seq: int,
   })
   const times = obj({
@@ -65,7 +65,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, ca
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
 export type Am = Z.infer<typeof am>
 
-/** A record's revision: its `revision_tok`, minted at each write, and its `revision_seq`, higher on the later write. */
+/** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
 export type Revision = Readonly<Z.infer<typeof revision>>
 
 /** When the thing was first stored, and when the record in hand was written; on a tombstone, when it was deleted. */
@@ -194,10 +194,10 @@ export type CentralPolicy = Z.infer<typeof centralPolicy>
 /** A row of `reconcileStaged`: one of {@link stagedActVals}. */
 export type StagedAct = Z.infer<typeof stagedAct>
 
-/** What `reconcileCentral` hands back: the central that results, and the policy that chose it. {@link reconciled} checks what the base knows of one. */
+/** Return type of `reconcileCentral`: the central that results, and the policy that chose it. {@link reconciled} checks what the base knows of one. */
 export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, SparseT>, policy: CentralPolicy }>
 
-/** What every row of `reconcileStaged` reads: `central` as held, `staged` as held or null where nothing is staged, and the revision after the central that results. */
+/** The forms every row of `reconcileStaged` takes: `central` as held, `staged` as held or null where nothing is staged, and the revision after the central that results. */
 type FormsBase<RecordT, SparseT> = Readonly<{
   central:      Fetched<RecordT, SparseT>
   staged:       Fetched<RecordT, SparseT> | null
@@ -210,7 +210,7 @@ export type StagedForms<RecordT, SparseT> =
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'del', patch?: undefined, rcvd?: undefined }>)
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: ReceivedAct, patch?: undefined, rcvd: Fetched<RecordT, SparseT> }>)
 
-/** What `settle` and `receive` hand back: `badnews`, the refusals to tell the host once. The copy to cache is the instance's, made by its {@link ToCacheable} method. */
+/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy to cache is the instance's, made by its {@link ToCacheable} method. */
 export type Settled = Z.infer<typeof settled>
 // --
 
@@ -252,28 +252,29 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 
 /** The check of a box's dna, a duckish refusing 'bad_option' and naming the failing field. A record is checked by `boxRecord` or `boxSparse`, never by this.
  * The scope is required. The record's own props are optional: `sidecar`, `whisper_codec` and
- * `whisper_schema_version` take their defaults where missing or undefined, the sealed parts are
- * kept where given, and `whisper`, the whisper to seal in once built, may be given. The props the factory
- * controls, `fmt`, `am`, `vault_tok`, `revision_tok` and the times, may be given, must pass their
- * checks, and are stripped. A field it does not take refuses, as a bag a person typed would, and
- * `revision_seq` among them: input carrying one is a record, which `build` holds to the record check.
+ * `whisper_schema_version` take their defaults where missing or undefined, and `whisper`, the
+ * whisper `build` seals in, may be given. The sealed parts never come from a dna: `build` seals
+ * every box it makes, so a dna carrying one refuses, as a field it does not take. The props the
+ * factory controls, `fmt`, `am`, `vault_tok`, `revision_tok` and the times, may be given, must
+ * pass their checks, and are stripped. A field it does not take refuses, as a bag a person typed
+ * would, and `revision_seq` among them: input carrying one is a record, which `build` holds to the
+ * record check.
  *
  * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...' })         // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: 'sk-ant-...' }
  * @example boxDna.parse({ ...scope, am: 'x', vault_tok: 'tok-u1' })   // the scope and the defaults: am and vault_tok are the factory's
  * @example boxDna.parse({ ...scope, boxlabel: 'B' })                  // throws 'bad_option', naming boxlabel
  * @example boxDna.parse({ ...scope, revision_seq: 3 })                // throws 'bad_option': a dna carries no revision_seq
+ * @example boxDna.parse({ ...scope, whisper_ciphered: ciphered })     // throws 'bad_option': the sealed parts are the seal's to make
  */
-export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel, box_key_wrapped, whisper_ciphered }) => obj({
+export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel }) => obj({
   applabel, user_id, vaultlabel, boxlabel,
   sidecar:                sidecar.default({}),
   whisper_codec:          lit('json_v1').default('json_v1'),
   whisper_schema_version: lit(1).default(1),
-  box_key_wrapped:        box_key_wrapped.optional(),
-  whisper_ciphered:       whisper_ciphered.optional(),
   whisper:                whisper.optional(),
   fmt:                    lit(BoxFormat).optional(),
   ...sparseBase.omit({ revision_seq: true }).partial().shape,
-}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option', [FX])
+}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option')
 
 /** A box's dna as {@link boxDna} hands it back: the scope, the record's own props with their defaults filled, and the whisper where one was given. */
 export type BoxDnaFilled = Z.output<typeof boxDna>
@@ -328,7 +329,7 @@ export const { ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storabl
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
 
-/** How fresh the record in hand and the world must be before a verb goes on. The world reads `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
+/** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */

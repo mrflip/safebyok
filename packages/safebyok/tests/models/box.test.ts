@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type Box, type BoxSnapshot, LOCKED } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
+import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
 import { boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
@@ -278,7 +279,7 @@ describe("Box snapshot", () => {
       expect(snapshot).to.include({ full: false, present: false, exposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-d2' })
     })
 
-    it("born from a dna: present, not full, the sidecar null, at revision 0 registered and written now", async () => {
+    it("born from a dna: present, full, the sidecar empty, at revision 0 registered and written now", async () => {
       held.mw.setNow(T0 + 7000)
       const box = await boxListingOf(held.mw).build(held.mw.boxscope('openai_api_key'))
       expect(box.getSnapshot()).to.deep.equal({
@@ -287,8 +288,8 @@ describe("Box snapshot", () => {
         revision_seq:  0,
         registered_at: T0 + 7000,
         written_at:    T0 + 7000,
-        sidecar:       null,
-        full:          false,
+        sidecar:       {},
+        full:          true,
         present:       true,
         exposed:       false,
       })
@@ -469,6 +470,51 @@ describe("box.whisper = null while the vault is locked", () => {
     TH.expectSyncRefusal(() => { box.whisper = 'sk-test-1111' }, 'vault_locked')
     held.mw.setLockState('unlocked')
     expect(box.whisper).to.eq('sk-test-0000')
+  })
+})
+// --
+
+// == [The stub seal in edit]: seal, edit, makeStaged
+
+describe("box.edit(props) with a whisper: the stub seals it", () => {
+  it("seals a whisper over a full box at the next revision, keeping its sidecar, its sealed parts the stub's", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
+    await box.seal('sk-test-0000')
+    expect(box.revision_seq).to.eq(2)
+    expect(box.sidecar).to.deep.equal({ account: 'work' })
+    expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
+    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
+  })
+
+  it("seals the sidecar given in place of the one the box carries", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    expect(box.sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("seals a deleted box back to life with an empty sidecar, where none is given", async () => {
+    const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
+    await box.edit({ whisper: 'sk-test-0000' })
+    expect(box.isPresent).to.be.true
+    expect(box.isFull).to.be.true
+    expect(box.sidecar).to.deep.equal({})
+    expect(box.revision_seq).to.eq(3)
+  })
+
+  it("seals the whisper exposed, where the edit gives none", async () => {
+    const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
+    box.whisper = 'sk-test-0000'
+    await box.edit({})
+    expect(box.isFull).to.be.true
+    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
+  })
+
+  it("stages nothing that carries the whisper, in the record in hand, the cache's copy or the snapshot", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    await box.edit({ whisper: { key: 'sk-test-SECRET' } })
+    for (const form of [box.toJSON(), cacheableOf(box), box.snapshot]) {
+      expect(JSON.stringify(form)).to.not.include('SECRET')
+    }
   })
 })
 // --

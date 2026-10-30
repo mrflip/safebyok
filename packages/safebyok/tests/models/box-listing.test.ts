@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
 import * as MSX from '../../src/models/models-shapes'
+import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
 import { boxListingOf, cacheableOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
@@ -84,12 +85,12 @@ describe("BoxListing", () => {
       expect(held.mw.stored.size).to.eq(0)
     })
 
-    it("fills the draft's defaults beside the dna's scope: the format, the vault's tok, no sidecar before a seal", async () => {
+    it("fills the draft's defaults beside the dna's scope: the format, the vault's tok, an empty sidecar, sealed", async () => {
       const box = await boxListingOf(held.mw).build(dna())
       expect(box.fmt).to.eq(fullBoxRecord().fmt)
       expect(box.vault_tok).to.eq(held.mw.world.vault_tok)
-      expect(box.isFull).to.be.false
-      expect(box.sidecar).to.be.null
+      expect(box.isFull).to.be.true
+      expect(box.sidecar).to.deep.equal({})
     })
 
     it("tells the listener of the snapshot once", async () => {
@@ -158,10 +159,11 @@ describe("BoxListing", () => {
   })
 
   describe("listing.build(dna with a whisper)", () => {
-    it("seals the whisper in once the box is built, and so reaches the seal, which is not yet written", async () => {
-      const listing = boxListingOf(held.mw)
-      const err = await TH.expectRefusal(listing.build({ ...dna(), whisper: { key: 'sk-ant-secret' } }), 'unexpected_error')
-      expect(err.message).to.not.include('sk-ant-secret')
+    it("seals the whisper in at birth: the box is full at revision 0, and holds none of the whisper", async () => {
+      const box = await boxListingOf(held.mw).build({ ...dna(), whisper: { key: 'sk-ant-secret' } })
+      expect(box.isFull).to.be.true
+      expect(box.revision_seq).to.eq(0)
+      expect(JSON.stringify(cacheableOf(box))).to.not.include('sk-ant-secret')
     })
 
     it("builds a dna whose whisper is undefined as it would one with none", async () => {
@@ -530,7 +532,7 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     const draft = await listing.build({ ...scope() })
     const [shown] = listing.snapshot
     expect(shown).to.eq(draft.snapshot)
-    expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, present: true, full: false })
+    expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, present: true, full: true })
     expect(shown?.revision_seq).to.not.eq(MSX.NeverStoredSeq)
   })
 
@@ -558,6 +560,88 @@ describe("boxListing.build(dna): a revision_seq makes it a record", () => {
     await TH.expectRefusal(listing.build(dna), 'bad_record')
     expect(listing.things).to.deep.equal([])
     expect(held.mw.callsOf('save')).to.deep.equal([])
+  })
+})
+// --
+
+// == [Sealed at birth]: build, boxDna, the stub seal
+
+describe("boxListing.build(dna): the box is sealed at birth", () => {
+  it("stages a full record at revision 0 over the central never stored, its sealed parts the stub's", async () => {
+    const box = await boxListingOf(held.mw).build(dna())
+    expect(box.isFull).to.be.true
+    expect(box.hasStaged).to.be.true
+    expect(box.revision_seq).to.eq(0)
+    expect(box.expectedRevision()).to.be.null
+    expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
+    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
+    expect(cacheableOf(box).central).to.include({ revision_seq: MSX.NeverStoredSeq, am: 'x' })
+  })
+
+  it("keeps the central never stored sparse: the sealed parts and the sidecar ride only on the staged", async () => {
+    const box = await boxListingOf(held.mw).build({ ...dna(), sidecar: { account: 'work' } })
+    expect(cacheableOf(box).central).to.not.have.any.keys('sidecar', 'box_key_wrapped', 'whisper_ciphered')
+  })
+
+  it("seals the dna's sidecar in beside the whisper", async () => {
+    const box = await boxListingOf(held.mw).build({ ...dna(), sidecar: { account: 'work' }, whisper: 'sk-test-0000' })
+    expect(box.sidecar).to.deep.equal({ account: 'work' })
+    expect(box.isFull).to.be.true
+  })
+
+  it("calls nothing of the store, a whisper given or not: it saves the sealed box to the cache, once", async () => {
+    const box = await boxListingOf(held.mw).build({ ...dna(), whisper: 'sk-test-0000' })
+    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['save'])
+    expect(held.mw.callsOf('save')[0]?.cacheable.staged).to.deep.equal(cacheableOf(box).staged)
+  })
+
+  it("sends as it is built, with no whisper given: the record put is full, at revision 0, expecting nothing stored", async () => {
+    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: Infinity }).build(dna())
+    await box.send({})
+    const [put] = held.mw.callsOf('put')
+    expect(put?.expected).to.be.null
+    expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
+    expect(MSX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
+  })
+
+  it("refuses 'vault_locked' while the vault is locked, holding, saving and sealing nothing", async () => {
+    held.mw.setLockState('locked')
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.build({ ...dna(), whisper: 'sk-test-0000' }), 'vault_locked')
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("builds a record while the vault is locked, as a record needs no seal", async () => {
+    held.mw.setLockState('locked')
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    expect(box.revision_seq).to.eq(1)
+  })
+
+  it("refuses 'bad_option' a dna carrying sealed parts, holding nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    const { box_key_wrapped, whisper_ciphered } = fullBoxRecord()
+    await TH.expectRefusal(listing.build({ ...dna(), box_key_wrapped, whisper_ciphered }), 'bad_option')
+    expect(listing.things).to.deep.equal([])
+  })
+})
+
+describe("boxListing.build(dna): no secret material", () => {
+  it("leaves none of the whisper in the record in hand, the cache's copy, the snapshots or the listing", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build({ ...dna(), whisper: { key: 'sk-test-SECRET' } })
+    for (const form of [box.toJSON(), cacheableOf(box), box.snapshot, listing.snapshot, held.mw.callsOf('save')]) {
+      expect(JSON.stringify(form)).to.not.include('SECRET')
+    }
+    expect(box.whisper).to.be.null
+  })
+
+  it("seals the same placeholders whatever the whisper", async () => {
+    const listing = boxListingOf(held.mw)
+    const one = await listing.build({ ...dna('one_box'), whisper: 'sk-test-one' })
+    const other = await listing.build({ ...dna('other_box'), whisper: 'sk-test-other' })
+    expect(one.whisper_ciphered).to.deep.equal(other.whisper_ciphered)
+    expect(one.box_key_wrapped).to.deep.equal(other.box_key_wrapped)
   })
 })
 // --

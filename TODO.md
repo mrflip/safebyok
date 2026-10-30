@@ -154,17 +154,6 @@ storage's comparison of a box's epoch against the vault props', on the Coach's r
 never changes until rotation is built, and a vault made anew has a new `vault_tok`, which already
 voids every box. Rotation adds an epoch back, with its own format bump, when it is built.
 
-### Making a box seals it, so a box is never sparse
-
-The Coach (2026-10-30, on the storable's timeliness): "you have to seal (via some
-unspecified-as-yet-by-me step) as part of making a new box. So the box is never sparse." Today
-`build(dna)` holds a box staged as its sparse form, with no whisper sealed, and `Storable`'s
-`#holdsWhole` asks whether central or the record in hand is whole, so that a box made here and
-not yet sealed is not taken for timely on the strength of a central never stored. Once making a
-box seals it, timeliness asks only whether the record in hand is whole, and the union with central
-goes. The step that seals at making is the Coach's to specify (a whisper required by `build`, or
-a seal run inside it); nothing in the code changes until it is.
-
 ### "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary key"
 
 The Coach (2026-10-21, sprint contract, on #216's row "Rollback check and del()"): "Add a todo

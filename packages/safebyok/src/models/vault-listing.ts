@@ -50,8 +50,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
   /** The vault a dna stages at birth: the dna under a `vault_tok` minted here, the life this vault takes if storage holds none. */
-  protected draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times): VaultRecord {
-    return { ...dna, fmt: VaultFormat, am: 'a', vault_tok: randomId() }
+  protected draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times): Promise<VaultRecord> {
+    return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: randomId() })
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, tell: Tell): Vault {

@@ -546,7 +546,6 @@ describe("MSX.boxDna", () => {
     [{ ...scope, whisper: 'sk-ant-fake' },                  true,  'passes a whisper that is a string'],
     [{ ...scope, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
     [{ ...scope, sidecar: { account: 'work' } },            true,  'passes a sidecar'],
-    [{ ...scope, box_key_wrapped, whisper_ciphered },       true,  'passes the sealed parts of a full record'],
     [{ ...scope, whisper: undefined, sidecar: undefined },  true,  'passes optional props given as undefined'],
     [{ ...scope, ...factoryProps, fmt: MSX.BoxFormat },     true,  'passes the props the factory controls, each passing its check'],
     // the scope refused:
@@ -557,7 +556,8 @@ describe("MSX.boxDna", () => {
     [{ ...scope, sidecar: 'work account' },                 false, 'refuses a sidecar that is no object'],
     [{ ...scope, whisper_codec: 'json_v2' },                false, 'refuses a codec it does not know'],
     [{ ...scope, whisper_schema_version: 2 },               false, 'refuses a schema version it does not know'],
-    [{ ...scope, whisper_ciphered: { cipher_iv_b64: 'iv' } }, false, 'refuses a whisper_ciphered missing its ciphertext'],
+    [{ ...scope, box_key_wrapped },                         false, 'refuses a box_key_wrapped, which only the seal makes'],
+    [{ ...scope, whisper_ciphered },                        false, 'refuses a whisper_ciphered, which only the seal makes, as its fifth example shows'],
     [{ ...scope, whisper: null },                           false, 'refuses a whisper that is null'],
     [{ ...scope, whisper: new Date(T0) },                   false, 'refuses a whisper JSON would mangle'],
     // the factory's props, given, must pass their checks:
@@ -589,9 +589,9 @@ describe("MSX.boxDna", () => {
     expect(MSX.boxDna.parse({ ...scope, sidecar: undefined, whisper_codec: undefined, whisper_schema_version: undefined })).to.deep.equal(filled)
   })
 
-  it("keeps the sidecar and the sealed parts given", () => {
+  it("keeps the sidecar given", () => {
     const sidecar = { account: 'work' }
-    expect(MSX.boxDna.parse({ ...scope, sidecar, box_key_wrapped, whisper_ciphered })).to.deep.equal({ ...filled, sidecar, box_key_wrapped, whisper_ciphered })
+    expect(MSX.boxDna.parse({ ...scope, sidecar })).to.deep.equal({ ...filled, sidecar })
   })
 
   it("names the failing field", () => {
