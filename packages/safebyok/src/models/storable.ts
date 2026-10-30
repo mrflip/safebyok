@@ -87,11 +87,9 @@ export type EditOpts = TimelyOpts
  *    `reconcile` to allow the overlay and central values to be merged
  *    (or refused if there is a problem). Any call to `edit` activates the overlay:
  *    even if there are no changes, and even if the offered patch is empty.
- * The protected `record` accessor gives a unified view of the row as it would be stored.
- * Public props are exposed as own props or accessors.
  *
- * (FIX ME implementation -- not clear if edit should also call reconcile; make *limited*
- *  and *thoughtful* changes to the chain ordering based on vault's needs)
+ * Public props are exposed as own props or as accessors onto private props -- not onto the
+ * captured records, as those gain and lose in ground truth as the storable is updated.
  *
  * A storable is instantiated using async `build` in one of three circumstances:
  *
@@ -110,14 +108,6 @@ export type EditOpts = TimelyOpts
  * - full:    in the case of vault, the `world` slot of any VaultDB call
  * - either:  in the case of vault, the `world` slot of any VaultDB subscription (depends on VaultDB capabilities)
  *
- * Timeliness: a storable is timely if
- * - its `world` is timely,        AND
- * - it is consistent,             AND
- * - its `central` value is timely AND
- * - there is a payload (i.e. there is an `overlay` or the `central` value is full)
- *
- * Read operations require the world to be timely, and unlocked at the moment the read is attempted.
- * Write operations require the object and world to be timely, and to be unlocked at the moment the write is attempted.
  * FIXME -- need to allow different timeliness windows for the object and the world
  *
  * FIXME -- PropsT is something an other agent hallucinated, rip that out
@@ -266,7 +256,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     //   ? this.#trigger.isTimely
     //   : this.#trigger.isTimelyWithin(opts.maxMillisSinceRefresh)
     // if (! timely) { await this.#trigger.launch() }
-    await this.#trigger.ensureTimelyWithin(opts.maxMillisSinceRefresh)
+    // FIXME -- have the trigger accept an `eagerFrac` option, default 0.8. The timer is set for that fraction of max millis -- we'd like the call to have *completed* every max millis, not to be *called* every max millis.
+    // undefined means the period set when the trigger was created: i.e. it should usually be true if the timer is working and response times are reasonable
+    await this.#trigger.ensureTimelyWithin({ maxMillis: opts.maxMillisSinceRefresh })
     return this
   }
 

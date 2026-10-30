@@ -247,12 +247,25 @@ Customer then dirdles a bunch of time away. What happens to box in the meantime?
 
 ### Overlay
 
-When a box is sealed, its revision is one greater than that of `central` (the most recent view of the stored value)
+Overlay represents staged edits to the box contents. If it is absent,
+It honors this contract:
+
+1. If absent, the the box is unmodified since `central`; its values should be preferred.
+2. If present, its values are to be preferred over `central`'s, even if central is sparse. ~~fields that are missing or undefined fall back to their central value, here or in the central DB~~
+3. Every defined value in the payload should be written to the store. Currently, every value in the payload must be defined. ~~no missing or undefined fields should be written into the store _this may tighten_~~
+4. The revision_seq is one greater than that of `central`
+5. The revision_tok is new and fabricated using the secure `randomBytes` helper
+6. Overlay is not sent to VaultDB until `send` is called. Currently its value is not cached.
+
+If a newer or fuller version is received, we may choose to update the overlay, re-establishing it as ready to send. Storable may choose not to (or may not be able to), deferring that to be done by `send`.
 
 **Initial Creation ('draft') with no timely awareness of a tombstone**: On a new record, `central` has revision `-1` and a fabricated revision id. It's never stored.
 The overlay with the initial props holds revision `0`.
 
 * If I seal lots of times, and do a send, subsequent seals will go against the central revision. This is necessary, you have to prove you sequence. Also it's good: the worst case scenario is a stale_write that the customer retries. If a send fails, the resealed value is the right one to send.
+
+
+
 
 ### Receive
 
