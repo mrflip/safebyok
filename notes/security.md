@@ -7,7 +7,7 @@ security expert who knows what questions to ask.
 
 **Adding an entry.** The agent that made the decision hands it to a `sonnet` subagent with this
 file's path, the caution in a sentence or two, the date, and the PR or branch, and commits what
-the subagent wrote. The subagent searches the entries for the same mechanism (`grep -n` for its
+the subagent wrote. The subagent searches the entries for the same mechanism (`rg -n` for its
 names), reading only the ones it finds. Where one already says it, the subagent amends that
 entry in place (below) and changes no other entry. Otherwise it writes a new dated entry at the top
 of *Of Interest*. Either way it keeps the voice above, and returns the lines it changed.

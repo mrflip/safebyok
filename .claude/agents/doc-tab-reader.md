@@ -26,7 +26,7 @@ names of tabs.
    `data.bytes`. If it does not, you have mistyped: redo the copy once, slowly. If it still does
    not, say so and report no path.
 4. **Report**, briefly: the absolute path, the byte count, and the tab's outline with line numbers
-   (`grep -nE '^(#|\*\*[^*]+\*\*$)'`: a tab's sections are often bold lines, not `#` headings).
+   (`rg -n '^(#|\*\*[^*]+\*\*$)' <file>`: a tab's sections are often bold lines, not `#` headings).
    Answer no question about the content and do not paste the tab back: the caller reads the file,
    or only the lines it needs.
 

@@ -18,7 +18,7 @@ runs it. A line is weighed by who pays for it and how often, against what it pre
 
 `wc -l -w` the four documents and the files under `.claude/agents` and `.claude/skills`, and
 `git log --oneline -5 -- CLAUDE.md` for the last pass. Read CLAUDE.md whole. Read the other
-files by heading (`grep -n '^#'`), then only the sections a CLAUDE.md line points at or repeats.
+files by heading (`rg -n '^#' <file>`), then only the sections a CLAUDE.md line points at or repeats.
 
 ## 2. Sort every line of CLAUDE.md
 
@@ -34,7 +34,7 @@ For each rule, ask what going wrong costs and who would catch it:
 * **Moves to PROCESS.md** when it is a git, PR, packaging or dependency habit.
 * **Moves into a file's own comments or README** when it explains one file (a tsconfig, the e2e
   layout) that can carry the explanation itself.
-* **Cut** when the linter enforces it (`grep` the rule in `packages/safebyok/eslint.config.mjs`),
+* **Cut** when the linter enforces it (`rg` the rule in `packages/safebyok/eslint.config.mjs`),
   training knows it, or another line in CLAUDE.md says it. A rule said three ways in three
   sections becomes one.
 * **A list becomes its rule** when the rule reproduces the list and will not go stale: a list of
@@ -47,7 +47,7 @@ For each "read X before Y" in CLAUDE.md: can an agent recognize the condition fr
 does it fire rarely enough to be worth stating? One that fires on nearly every task becomes an
 unconditional "read X once". One an agent cannot recognize ("a term you do not recognize") stays
 only when the text it points at is too long to inline. A pointer names a section as its file
-spells the heading: check with `grep -n '^#'`.
+spells the heading: check with `rg -n '^#' <file>`.
 
 ## 4. Tighten the words
 
@@ -57,8 +57,8 @@ house voice: plain sentences, the cast's names, no hedges.
 ## 5. Finish each move
 
 A move is complete only when the destination says it: add the line there, in that file's voice,
-under its right heading, and fix every reference to the old place (`grep -rn` the old section's
-title, `--exclude-dir={whiteboard,winboard,node_modules}`). A rule cut from CLAUDE.md that nothing
+under its right heading, and fix every reference to the old place (`rg -n` the old section's
+title over `.`). A rule cut from CLAUDE.md that nothing
 else says is a decision for the Coach, not a silent loss: list it.
 
 ## 6. Report, then wait

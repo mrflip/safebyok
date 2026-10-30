@@ -132,7 +132,7 @@ Rerere is on from the global git config here, so it will act. Know when
 it does: git prints `Staged '<path>' using previous resolution.`
 (`Resolved '<path>' ...` without autoupdate), leaves no conflict markers
 and no unmerged file, and still stops the rebase. A check for unmerged
-files alone will not show it: grep the rebase output for `previous
+files alone will not show it: `rg` the rebase output for `previous
 resolution`, never filter that line out. Such a line is this run's own
 earlier resolution, good or bad; if the conflict was hairy, diff the file
 against what you meant. These resolutions stay in the clone's cache and

@@ -1,0 +1,3 @@
+# Opened only through a subagent (CLAUDE.md, *Layout*); a pattern here, not in the root .ignore,
+# holds when rg searches notes/ itself.
+security.md

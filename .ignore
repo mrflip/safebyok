@@ -1,0 +1,9 @@
+# What ripgrep (`rg`) skips by default, beside what .gitignore does: history and folders an agent
+# opens only by name (CLAUDE.md, *Layout*, *Reading*). A path given to rg explicitly is still
+# searched: `rg foo whiteboard/<your thread>/`. `--no-ignore-dot` searches everything here.
+# A pattern with a slash holds only for searches from the root: put it in that folder's .ignore.
+**/CHANGELOG.md
+.changeset/
+human/
+whiteboard/
+winboard/
