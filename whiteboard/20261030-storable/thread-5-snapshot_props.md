@@ -1,6 +1,6 @@
 # Thread 5: The snapshot and the props (2026-10-30)
 
-Branch `20261030-snapshot_props`, PR #PRNUM, stacked on #370 (restacked onto #374; the restack's push is pending). Justify: green (core 3860 tests pass, 37 skipped as before, 1 todo; 53 of them new here, in `tests/models/box.test.ts` and `storable.test.ts`).
+Branch `20261030-snapshot_props`, PR #376, stacked on #370 (restacked onto #374; the restack's push is pending). Justify: green (core 3860 tests pass, 37 skipped as before, 1 todo; 52 of them new here, plus the 1 todo, in `tests/models/box.test.ts` and `storable.test.ts`).
 
 * **Built**:
   * The Coach's fix, in `src/models/box.ts`: `LOCKED` is `Symbol.for('LOCKED')`. `box.sidecar` answers `lockedSidecar` while locked, one frozen `{ [LOCKED]: true }` (type `LockedSidecar`, exported), so `BoxSnapshot.sidecar` carries it too; unlocked, as before (null unless full). `box.whisper` still answers the symbol. `Box.sameSnapshot` also compares whether each snapshot carries the bag (by identity), because `stableJsonify` leaves a symbol key out: a box with an empty sidecar, or none, would otherwise read as unchanged by the lock, keeping a snapshot with the real sidecar.
