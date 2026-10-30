@@ -653,8 +653,9 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot()).to.eq(second)
     })
 
-    it("is made on the first call, so that a settle before it has none to replace and tells nobody", async () => {
-      const box = await builtBoxOf()
+    it("is made on the first call, so that a settle before it has none to replace and tells nobody", () => {
+      const { mw } = held
+      const box = new Box(mw.world, boxListingOf(mw), mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
       const listener = vi.fn()
       box.subscribe(listener)
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))

@@ -7,7 +7,7 @@ import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
 import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 
-// == [What a box listing is given]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
+// == [Given to a box listing]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
 
 /** The vault, as far as its boxes need it: a {@link ListingWorld}, and the vault's scope and token. */
 export type BoxWorld = ListingWorld & { scope: VaultScope, vault_tok: string }
@@ -51,7 +51,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [What a listing defines]
+  // == [Defined by the box listing]
 
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')

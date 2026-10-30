@@ -34,7 +34,7 @@ export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
  * `tombstone` is a sparse base that is damaged or gone; `cacheable` is one with `central` and
- * `staged` beside it, as the listing writes it to the device cache. Each takes its fields from
+ * `staged` beside it, as the listing saves it to the device cache. Each takes its fields from
  * whatever carries them, a record, a storable or a snapshot, and strips the rest.
  *
  * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
@@ -78,7 +78,12 @@ export type Vaulted = Readonly<Z.infer<typeof vaulted>>
 /** The least a sparse form carries: the scope, and what {@link sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
 export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 
-/** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one. */
+/** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one.
+ * A stored record that fails its check arrives as a tombstone, `am` 'd': the sparse props as far
+ * as storage recovered them, and the kind's constants filled in by the adapter, so that the
+ * concrete listing's `sparseOf` accepts it. Where that much cannot be recovered, the store
+ * refuses 'corrupt_record' instead. For a box, see {@link boxSparse}.
+ */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
 /** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
@@ -123,15 +128,12 @@ type AnswerBase<ScopeT> = Readonly<{ scope: ScopeT, world: unknown }>
 
 /** The outcome of a storage call about `scope`, as the concrete listing maps it: an {@link Outcome} whose `val` is the record stored (null for none), or whose `err` is the refusal, with the `scope` and the `world` it lies in as storage holds it now beside it.
  * Whatever an `Outcome` carries, an answer carries. A stored record that fails its check is
- * delivered as a tombstone, `am` 'd', in the kind's sparse form: its sparse props as far as
- * storage recovered them, and the kind's constants filled in by the adapter (for a box, `fmt`,
- * `whisper_codec` and `whisper_schema_version`), so that the concrete listing's `sparseOf` accepts
- * it. Nothing the user put in the thing rides on it. Where that much cannot be recovered, the store
- * refuses 'corrupt_record' instead. {@link answer} checks what the base knows of one.
+ * delivered as a damaged {@link Tombstone}, in the kind's sparse form, or refused 'corrupt_record'
+ * by the store. {@link answer} checks what the base knows of one.
  */
 export type Answer<ScopeT, RecordT, SparseT> = Outcome<Fetched<RecordT, SparseT> | null> & AnswerBase<ScopeT>
 
-/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least; a damaged one arrives as an answer's would, a tombstone, `am` 'd', in the kind's sparse form, the kind's constants filled in by the adapter. {@link notice} checks what the base knows of one. */
+/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least; a damaged one arrives as {@link Answer} says, a {@link Tombstone}. {@link notice} checks what the base knows of one. */
 export type Notice<RecordT, SparseT> = Readonly<{ record: Fetched<RecordT, SparseT>, world: unknown }>
 // --
 
@@ -292,22 +294,27 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [Options]: ifPresentVals, ifPresent, horizonMillis, timelyOpts, sendOpts, storableOpts, IfPresent, TimelyOpts, SendOpts, EditOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: `replace` it, `fail`, or `fetch` it and hand that back instead. */
 export const ifPresentVals = ['replace', 'fail', 'fetch'] as const
 
+/** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
+export const ifAbsentVals = ['fail', 'nil'] as const
+
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
- * `ifPresent` is one of {@link ifPresentVals}. `horizonMillis` is a span of milliseconds, 0 or more,
- * or `Infinity` for never. `timelyOpts` says how fresh the record in hand (`maxMillisSinceRefresh`)
- * and the world (`maxWorldMillis`) must be before a verb goes on; `sendOpts` adds `ifPresent`;
- * `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
+ * `ifPresent` is one of {@link ifPresentVals}, `ifAbsent` one of {@link ifAbsentVals}. `horizonMillis`
+ * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
+ * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
+ * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
  * strips the rest.
  */
-export const { ifPresent, horizonMillis, timelyOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
+export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
   const ifPresent     = oneof(ifPresentVals)
+  const ifAbsent      = oneof(ifAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const timelyOpts    = obj({ maxMillisSinceRefresh: horizonMillis.optional(), maxWorldMillis: horizonMillis.optional() })
+  const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
   const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
@@ -315,14 +322,20 @@ export const { ifPresent, horizonMillis, timelyOpts, sendOpts, storableOpts } = 
     /** The fraction of the horizon after which the trigger schedules the next refresh. */
     eagerFrac:             num.positive().max(1).optional(),
   })
-  return { ifPresent, horizonMillis, timelyOpts, sendOpts, storableOpts }
+  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
 })
 
 /** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
+/** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
+export type IfAbsent = Z.infer<typeof ifAbsent>
+
 /** How fresh the record in hand and the world must be before a verb goes on. The world reads `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
+
+/** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
+export type FetchOpts = Z.infer<typeof fetchOpts>
 
 /** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, how it treats a thing storage already holds. Not yet acted on. */
 export type SendOpts = Z.infer<typeof sendOpts>
@@ -374,7 +387,7 @@ export type Store<ScopeT, RecordT, SparseT> = {
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
-/** The deviceDB's cache of one kind of thing, as a listing calls it: read once at `hello`, written after each delivery. */
+/** The deviceDB's cache of one kind of thing, as a listing calls it: loaded once at `hello`, saved after each delivery. */
 export type Cache<RecordT, SparseT> = {
   load(): Promise<readonly Cacheable<RecordT, SparseT>[]>
   save(cacheable: Cacheable<RecordT, SparseT>): Promise<void>
