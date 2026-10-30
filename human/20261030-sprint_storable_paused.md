@@ -1,45 +1,26 @@
-# Sprint storable: paused, 2026-10-30
+# Sprint storable: waiting on one push, 2026-10-30
 
-Paused because every remaining thread waits on the Coach. Sprint doc (Open Matters, Cleanup,
-Progress): https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB. Plan and progress:
-`whiteboard/20261030-storable/` on branch `20261030-storable` (sprint PR #369).
+Supersedes the earlier pause note of today.
 
-## The base
+## Where things are
 
-At the Coach's request (via session byok-ed), the line stacks on **#374** (`20261030-vault_model`,
-on #368). Threads 1 and 4a were rebased onto it locally, cleanly, `pnpm justify` green, but the
-force-push with lease was refused by the permission classifier. So:
+- **Pushed and filed, in one line:** main → #368 → #374 → #370 (1) → #371 (4a) → #373 (2) →
+  #376 (5) → #377 (7) → #375 (4b, reworked on the rulings, second review fixed).
+- **Thread 3 (#372):** rebased onto #375, reworked on the rulings (throw rule, one pipeline,
+  background refusals, success by `receive`'s verdict), third review fixed, justify green at every
+  commit. **Local only**, at 28190db2 in `/workspace/byok-listing_pipeline`. The permission check
+  refused the worker's force-push, and the orchestrator has not pushed it either, since that would
+  get around the refusal.
+- **Waiting on that push:** threads 8 (remove `ifPresent`), 9 (the rest of the rulings) and 10
+  (the listing's loose ends), in a chain, then 6 (the guarantees table).
 
-* origin's `20261030-models_world` (#370) and `20261030-timeliness` (#371) still sit on #368;
-* the local branches of the same names hold the restack (f07026cb and ce0fca2f), with copies at
-  `restacked/20261030-models_world` and `restacked/20261030-timeliness`;
-* threads 4b, 5 and 7 were cut from the local restack and pushed; their PRs carry the restacked
-  #370/#371 commits until the restack is pushed.
+## What would free the sprint
 
-To go on: allow `git push --force-with-lease=<branch>:<old sha>` on this sprint's thread
-branches, or push the two branches yourself:
-`git push --force-with-lease=20261030-models_world:5b80fd21 origin 20261030-models_world` and
-`git push --force-with-lease=20261030-timeliness:06929fd9 origin 20261030-timeliness`.
+Answer "push it" on the TOP row of *Open Matters*, or run:
 
-## Threads
+    git -C /workspace/byok-listing_pipeline push --force-with-lease=20261030-listing_pipeline:77f9868d origin 20261030-listing_pipeline
 
-| Thread | PR | State |
-| --- | --- | --- |
-| 1 models_world | #370 | filed; restacked onto #374 locally |
-| 4a timeliness | #371 | filed; restacked onto #374 locally |
-| 2 reconcile_rows | #373 | filed (after a rework on the Coach's rulings); on old #370, moves at the final restack |
-| 5 snapshot_props | #376 | filed, on the local restack |
-| 7 box_dna | #377 | filed, on the local restack |
-| 3 listing_pipeline | #372 | **waits on the Coach**, unfiled in `/workspace/byok-listing_pipeline` (second review flagged: a delivery refusal no longer reaches a `fetch`/`put`/`del` caller) |
-| 4b verbs_guards | #375 | **waits on the Coach**, unfiled in `/workspace/byok-verbs_guards` (review flagged: central can move while `edit` awaits `makeStaged`) |
-| 8 if_present | | not started: waits on 3 and 4b, and on the `ifPresent`-vs-hydrate row |
-| 6 model_guarantees | | not started: waits on every other thread |
-
-## What would free the most
-
-1. The TOP row on whether a `fetch` throws what `receive` refuses (frees 3, then 8).
-2. The TOP row on central moving mid-`edit` (frees 4b, then 8).
-3. The TOP row on `ifPresent: 'fail'` never firing because `send` hydrates first (shapes 8).
-4. The force-push permission (lets the restack onto #374 reach origin).
-
-Every other open question is a row in *Open Matters*, one per matter, TOP first in importance.
+The orchestrator then applies the worker's PR body
+(`scratchpad/listing_pipeline/body-new.md`), posts the third review, files the thread, and starts
+thread 8. The rulings for #370 and #369 also wait to be put into those PR bodies, since that
+`gh pr edit` was refused as well (bodies in `scratchpad/rulings/new-370.md`, `new-369.md`).
