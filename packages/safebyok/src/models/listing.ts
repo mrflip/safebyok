@@ -259,5 +259,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
 // == [Helpers]: hasRevision
 
-const hasRevision = (input: object): input is Revision & Times => 'revision_seq' in input
+/** True for a record handed to `build`, which carries a `revision_seq`; false for a dna. A dna carrying one is taken for a record. */
+export const hasRevision = (input: object): input is Revision & Times => 'revision_seq' in input
 // --

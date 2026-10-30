@@ -1,4 +1,4 @@
-/** The shapes the models share, imported as `MSX`: the record forms a storable holds and reconciles, what storage answers, the bags reconciling passes, the world and listing a storable lives in, the options its verbs take, and the arguments it is made with.
+/** The shapes the models share, imported as `MSX`: the record forms a storable holds and reconciles, what storage answers, the bags reconciling passes, the world and listing a storable lives in, the options its verbs take, the arguments it is made with, and the dna a box is built from.
  * A type generic over a model's record cannot come from its validator, so it stays a type, with
  * the validator beside it: each check judges what the base can know of a record, its revision,
  * its times, its `am` and its `vault_tok`, and leaves the concrete class's validator the rest.
@@ -12,7 +12,7 @@ import { type VaultError, isVaultError } from '../errors'
 import { type Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as OX from '../shapes/bank-opts'
-import { sidecar } from '../shapes/box'
+import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
 
 // == [Checks]: Checks
@@ -84,8 +84,8 @@ export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals
 /** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
-/** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props; those the factory controls are ignored. */
-export type Dna<ScopeT, RecordT> = ScopeT & Partial<RecordT>
+/** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
+export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
 /** The copy the listing saves to the device cache: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
 export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
@@ -210,7 +210,7 @@ export type StagedForms<RecordT, SparseT> =
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, boxRecord, boxSparse, BoxRecord, BoxSparse
+// == [The box's forms]: BoxFormat, boxRecord, boxSparse, boxDna, BoxRecord, BoxSparse, BoxDnaFilled
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const BoxFormat = 5001
@@ -245,6 +245,32 @@ export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, appl
 
 export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
+
+/** The check of a box's dna, the duckish `listing.build` holds a dna to on its first line, refusing 'bad_option', naming the failing field. A record handed to `build` is held to `boxRecord` or `boxSparse` instead.
+ * The scope is required. The record's own props are optional: `sidecar`, `whisper_codec` and
+ * `whisper_schema_version` take their defaults where missing or undefined, the sealed parts are
+ * kept where given, and `whisper`, the whisper to seal in once built, may be given. The props the factory
+ * controls, `fmt`, `am`, `vault_tok`, the revision and the times, may be given, must pass their
+ * checks, and are stripped. A field it does not take refuses, as a bag a person typed would.
+ *
+ * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...' })         // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: 'sk-ant-...' }
+ * @example boxDna.parse({ ...scope, am: 'x', vault_tok: 'tok-u1' })   // the scope and the defaults: am and vault_tok are the factory's
+ * @example boxDna.parse({ ...scope, boxlabel: 'B' })                  // throws 'bad_option', naming boxlabel
+ */
+export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel, box_key_wrapped, whisper_ciphered }) => obj({
+  applabel, user_id, vaultlabel, boxlabel,
+  sidecar:                sidecar.default({}),
+  whisper_codec:          lit('json_v1').default('json_v1'),
+  whisper_schema_version: lit(1).default(1),
+  box_key_wrapped:        box_key_wrapped.optional(),
+  whisper_ciphered:       whisper_ciphered.optional(),
+  whisper:                whisper.optional(),
+  fmt:                    lit(BoxFormat).optional(),
+  ...sparseBase.partial().shape,
+}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, revision_seq: _revision_seq, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option', [FX])
+
+/** A box's dna as {@link boxDna} hands it back: the scope, the record's own props with their defaults filled, and the whisper where one was given. */
+export type BoxDnaFilled = Z.output<typeof boxDna>
 // --
 
 // == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, VaultRecord, VaultSparse
