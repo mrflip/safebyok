@@ -367,7 +367,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
-      if ((rcvdShape === 'full') && (centralShape === 'sparse')) { return { central, policy: 'fill' } }
+      if ((rcvdShape === 'full') && (centralShape === 'sparse')) { return { central: rcvd, policy: 'fill' } }
     } else {
       if (rcvdShape === 'gone') { return { central: rcvd, policy: 'gone' } }
       if (rcvdShape === 'ouch') { return { central: this.tombstoneFor(rcvd, 'd'), policy: 'ouch' } }
@@ -377,15 +377,27 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
 
   /** The staged that replaces the one held, given a new central (fill, adopt, gone, ouch) or a verb called here (edit, del); null for nothing staged.
-   * An implementation reads `forms` and nothing else: never an own prop.
+   * An implementation reads `forms` and nothing else: never an own prop. A staged edit surpassed by
+   * a received update has no strategy both good and simple, so the simple one: a healthy record
+   * drops it, a damaged one carries it to the next revision (the Coach, 2026-10-30).
    *
    * | act             | staged after                                                                                   |
    * | --------------- | ---------------------------------------------------------------------------------------------- |
    * | `edit`          | `{ ...central, ...staged, ...patch, ...nextRevision }`                                         |
    * | `del`           | `tombstoneFor(nextRevision)`, 'x'                                                              |
-   * | `ouch`          | `staged`, as it was: damage sets central and touches nothing staged                            |
-   * | `gone`          | null: a deletion seen, from any device, drops the staged                                       |
-   * | `fill`, `adopt` | null where nothing is staged or the staged is now stored; a staged tombstone moved to `nextRevision`; else `{ ...rcvd, ...staged, ...nextRevision }` |
+   * | `fill`          | `staged`, as it was: a full record at the same revision surpasses nothing                      |
+   * | `adopt`, `gone` | null: a healthy record newer than central, or a deletion from any device, drops the staged     |
+   * | `ouch`          | `{ ...staged, ...nextRevision }`: the staged outlives the damage, under the revision after the ouchstone; null where nothing is staged |
+   *
+   * If the new received record's revision matches the staged's: successful write! Unstage it.
+   * We don't have any strategy that is both good and simple for an uncommitted staged edit
+   * surpassed by an received update. Anything we do has us dragging the staged record along
+   * until the customer tries to send, hopefully hitting a stale_write -- but a spurious edit
+   * call could bump the staged record into prominence.
+   *
+   * Instead, we have to go with simple: if the new record is
+   * healthy (full, sparse, or deletion tombstone), the staged record is dropped. If it is
+   * damaged, the staged record is moved to the next revision.
    *
    * @param forms.act          - The row to take.
    * @param forms.central      - The central held.
@@ -396,13 +408,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    */
   protected reconcileStaged(forms: StagedForms<RecordT, SparseT>): Fetched<RecordT, SparseT> | null {
     MSX.stagedForms.parse(forms)
-    const { act, central, staged, rcvd, patch, nextRevision } = forms
+    const { act, central, staged, patch, nextRevision } = forms
     if (act === 'edit') { return { ...central, ...staged, ...patch, ...nextRevision } }
     if (act === 'del')  { return this.tombstoneFor(nextRevision) }
-    if (act === 'ouch') { return staged }
-    if (act === 'gone' || staged === null || staged.revision_tok === rcvd.revision_tok) { return null }
-    if (MSX.isTombstone(staged)) { return { ...staged, ...nextRevision } }
-    return { ...rcvd, ...staged, ...nextRevision }
+    if (act === 'fill') { return staged }
+    if (act === 'ouch') { return staged === null ? null : { ...staged, ...nextRevision } }
+    return null
   }
 
   /** The shape of `record`, by its `am` first: 'ouch' for a damaged one's tombstone, 'gone' for a deletion's, then 'full' for a record carrying its payload, 'sparse' for one without it. */
