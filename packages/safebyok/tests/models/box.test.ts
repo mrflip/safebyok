@@ -176,7 +176,15 @@ describe("box.whisper while the vault is locked", () => {
     expect(box.whisper).to.eq(LOCKED)
   })
 
-  it.todo("forgets the whisper exposed when the vault locks, as expose's doc says (Coach: today it reads again once unlocked, pinned in tests/loosened; who forgets it, the box at its next read or the vault's lock?)")
+  it("keeps the whisper exposed while the vault locks, and reads it again once unlocked", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = 'sk-test-0000'
+    held.mw.setLockState('locked')
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.getSnapshot().exposed).to.be.true
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.eq('sk-test-0000')
+  })
 })
 // --
 

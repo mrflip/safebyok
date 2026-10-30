@@ -45,7 +45,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
 
-  /** The whisper the host asked to keep open on the instance, until the vault locks. Set, it is what the next edit seals. */
+  /** The whisper the host asked to keep open on the instance, kept while the vault locks and unlocks until the host sets it null. Set, it is what the next edit seals. */
   #exposed: Whisper | null = null
 
   // == [Props, as the record has them]: fmt, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -86,7 +86,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   // == [The whisper]: whisper, unsealWhisper, expose, seal, reseal, edit
 
-  /** The exposed whisper, or LOCKED while the vault is. Setting it exposes the given whisper without sealing it: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it. */
+  /** The exposed whisper, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper reads again once it unlocks. Setting it exposes the given whisper without sealing it: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it. */
   get whisper(): Whisper | typeof LOCKED | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
@@ -104,7 +104,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return this.#unseal()
   }
 
-  /** Open the stored whisper and keep it on the instance, readable and settable as `box.whisper` until the vault locks. */
+  /** Open the stored whisper and keep it on the instance, readable and settable as `box.whisper`, kept while the vault locks and unlocks: a host that calls this accepts the whisper living on the instance until it sets `box.whisper` null. */
   async expose(opts: EditOpts = {}): Promise<this> {
     this.#exposed = await this.unsealWhisper(opts)
     this.settle()
