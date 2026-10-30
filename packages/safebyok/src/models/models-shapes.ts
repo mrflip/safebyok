@@ -301,14 +301,14 @@ export type VaultRecord = Z.infer<typeof vaultRecord>
 
 // == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
 
-/** The policies when sending a record to a place that already holds one: the one value, `replace`, puts over it. The others considered, `fail` and `fetch`, are not implemented. */
+/** The policies when sending a record to a place that already holds one: the one value, `replace`, the versioned replace (compare-and-swap) every put is, and the default. `fetch` is not implemented. */
 export const ifPresentVals = ['replace'] as const
 
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
 export const ifAbsentVals = ['fail', 'nil'] as const
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
- * `ifPresent` is optional, and only ever {@link ifPresentVals}' `'replace'`; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
+ * `ifPresent` is optional, and only ever {@link ifPresentVals}' `'replace'`, which names what every put already is and changes nothing; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
  * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
  * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
  * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
@@ -330,7 +330,7 @@ export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOp
   return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
 })
 
-/** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: `'replace'` puts over it, at the `revision_seq` one past the one held, so that the record put is newer than the one it replaces on every device. */
+/** How `send` meets what storage holds, as {@link ifPresent} checks it: `'replace'`, the default and only policy, is the versioned replace (compare-and-swap). Nothing hands it to storage. `'fetch'` is not implemented. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
@@ -342,7 +342,7 @@ export type TimelyOpts = Z.infer<typeof timelyOpts>
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
 export type FetchOpts = Z.infer<typeof fetchOpts>
 
-/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'` makes storage put over a thing it holds that this device believes never stored, where it would refuse 'stale_write'. */
+/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'`, the default and only policy, the versioned replace. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
 /** `edit`'s options: its {@link TimelyOpts}. */
@@ -387,10 +387,13 @@ export type ListingWorld = World & {
   takeWorld(world: unknown): void
 }
 
-/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none. `put` is also given `ifPresent` when `send` was: `'replace'` makes storage put over a record it holds, alive, damaged or a tombstone, but only where `expected` is null. Over a record held, storage puts the record given at the `revision_seq` one past the held one's, under the given `revision_tok`, and answers what it then holds, as any put answers; over nothing held, the record lands as given. With `expected` given, storage's compare-and-set holds whatever `ifPresent` says. Storage judges it, not the listing. `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most. */
+/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none.
+ * Every `put` is the versioned replace (compare-and-swap): it lands only if storage holds the revision `expected` names, its `revision_tok` and `revision_seq`, or nothing at all when `expected` is null (a stored tombstone counts as something); otherwise storage refuses 'stale_write', carrying what it holds. The record lands exactly as the device minted it: storage never renumbers or patches it, and answers what it then holds.
+ * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
+ */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
-  put(record: RecordT, expected: Revision | null, ifPresent?: IfPresent): Promise<Answer<ScopeT, RecordT, SparseT>>
+  put(record: RecordT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   del(scope: ScopeT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }

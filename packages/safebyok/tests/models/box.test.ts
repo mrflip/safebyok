@@ -545,83 +545,37 @@ const neverStoredBoxOf = async () => {
   return box
 }
 
-describe("box.send(patch, { ifPresent: 'replace' }): a box this device believes never stored", () => {
-  it("refuses 'stale_write' with no ifPresent, handing storage the revision none and no ifPresent, and delivers the box stored", async () => {
-    const box = await neverStoredBoxOf()
-    await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, asBuilt), 'stale_write')
-    const [put] = held.mw.callsOf('put')
-    expect(put).to.deep.include({ expected: null, ifPresent: undefined })
-    expect(box.revision_tok).to.eq('rev-stored')
-  })
+describe("box.send: the versioned replace, with or without ifPresent 'replace'", () => {
+  for (const opts of [{}, { ifPresent: 'replace' }] as const) {
+    it(`refuses 'stale_write' for a box this device believes never stored over a box stored, handing storage the revision none, with opts ${JSON.stringify(opts)}`, async () => {
+      const box = await neverStoredBoxOf()
+      await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      const [put] = held.mw.callsOf('put')
+      expect(put?.expected).to.be.null
+      expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
+      expect(box).to.include({ revision_tok: 'rev-stored', revision_seq: 4 })
+    })
 
-  it("puts over the box stored with ifPresent 'replace', at the revision after the one stored, and adopts it with nothing staged", async () => {
-    const box = await neverStoredBoxOf()
-    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
-    const [put] = held.mw.callsOf('put')
-    expect(put).to.deep.include({ expected: null, ifPresent: 'replace' })
-    expect(put?.record.revision_seq).to.eq(0)
-    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: put?.record.revision_tok, revision_seq: 5 })
-    expect(box).to.include({ revision_tok: put?.record.revision_tok, revision_seq: 5 })
-    expect(box.revision_tok).to.not.eq('rev-stored')
-    expect(cacheableOf(box).staged).to.be.null
-    expect(box.sidecar).to.deep.equal({ note: 'new' })
-  })
+    it(`refuses it over a tombstone stored, with opts ${JSON.stringify(opts)}`, async () => {
+      held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
+      const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+      held.mw.clearCalls()
+      await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      expect(held.mw.callsOf('put')[0]?.expected).to.be.null
+      expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
+    })
+  }
 
-  it("puts with nothing stored as it would without, 'replace' or not, at the revision minted", async () => {
+  it("puts with nothing stored at the revision minted, with ifPresent 'replace'", async () => {
     const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
     await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
     expect(box.isPresent).to.be.true
     expect(box.revision_seq).to.eq(0)
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 0 })
   })
 
-  it("lands a record that another device holding the box stored receives as newer, and adopts", async () => {
-    const other = boxListingOf(held.mw)
-    await other.hello()
-    const otherBox = await other.build(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
-    const box = await neverStoredBoxOf()
-    await box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })
-    const landed = held.mw.stored.get('anthropic_api_key')
-    if (landed === undefined) { throw new Error("nothing stored") }
-    await held.mw.notify(landed)
-    expect(otherBox).to.include({ revision_tok: box.revision_tok, revision_seq: 5 })
-    expect(otherBox.sidecar).to.deep.equal({ note: 'new' })
-    expect(held.mw.badnews).to.deep.equal([])
-  })
-
-  it("lands past a seq 0 another device stored under another tok since the box was built, with no 'record_conflict' on either device", async () => {
-    const other = boxListingOf(held.mw)
-    await other.hello()
-    const scope = held.mw.boxscope('anthropic_api_key')
-    const box = await boxListingOf(held.mw).build({ ...scope })
-    const otherBox = await other.build({ ...scope })
-    await otherBox.send({ sidecar: { note: 'other' } }, asBuilt)
-    expect(otherBox.revision_seq).to.eq(0)
-    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
-    expect(box).to.include({ revision_seq: 1 })
-    expect(box.revision_tok).to.not.eq(otherBox.revision_tok)
-    const landed = held.mw.stored.get('anthropic_api_key')
-    if (landed === undefined) { throw new Error("nothing stored") }
-    expect(landed).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 1 })
-    await held.mw.notify(landed)
-    expect(otherBox).to.include({ revision_tok: box.revision_tok, revision_seq: 1 })
-    expect(held.mw.badnews).to.deep.equal([])
-  })
-
-  it("leaves the compare-and-set to storage where a revision is expected: 'replace' is handed over and a 'stale_write' is still thrown", async () => {
-    const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    const expected = box.expectedRevision()
-    held.mw.clearCalls()
-    held.mw.willPut((call) => held.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other', revision_seq: call.record.revision_seq + 3 })))
-    await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt }), 'stale_write')
-    const [put] = held.mw.callsOf('put')
-    expect(put?.expected).to.deep.equal(expected)
-    expect(expected).to.not.be.null
-    expect(put?.ifPresent).to.eq('replace')
-    expect(box.revision_tok).to.eq('rev-other')
-  })
-
-  it("takes the timely options beside it, handing them on without ifPresent", async () => {
-    const box = await neverStoredBoxOf()
+  it("takes the timely options beside ifPresent, handing the timely ones on", async () => {
+    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
     await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
     expect(held.mw.callsOf('ensureTimely')[0]?.opts).to.deep.equal({ maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })
   })
@@ -629,7 +583,7 @@ describe("box.send(patch, { ifPresent: 'replace' }): a box this device believes 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before staging or putting anything", async () => {
     const box = await neverStoredBoxOf()
     const before = cacheableOf(box)
-    await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'fail' as never, ...asBuilt }), 'bad_option')
+    await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
     expect(cacheableOf(box)).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })

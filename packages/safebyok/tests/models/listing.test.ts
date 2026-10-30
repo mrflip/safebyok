@@ -960,54 +960,29 @@ const edited = async () => {
 }
 // --
 
-describe("listing.put(duck, ifPresent): handed to storage, which judges it", () => {
-  it("passes 'replace' to the store beside the revision expected, and nothing when none is given", async () => {
-    const listing = boxListingOf(held.mw)
-    await listing.put(fullBoxRecord(), 'replace')
-    await listing.put(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
-    expect(held.mw.callsOf('put').map(({ expected, ifPresent }) => ({ expected, ifPresent }))).to.deep.equal([
-      { expected: null, ifPresent: 'replace' },
-      { expected: { revision_tok: fullBoxRecord().revision_tok, revision_seq: fullBoxRecord().revision_seq }, ifPresent: undefined },
-    ])
-  })
-
-  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, unless 'replace'", async () => {
+describe("listing.put: the versioned replace", () => {
+  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, delivering the box stored", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord()), 'stale_write')
     expect(listing.things.map(({ revision_tok }) => revision_tok)).to.deep.equal(['rev-stored'])
-    await expect(boxListingOf(held.mw).put(fullBoxRecord(), 'replace')).resolves.to.be.instanceOf(Box)
-    expect(held.mw.callsOf('put').map(({ expected, ifPresent }) => ({ expected, ifPresent }))).to.deep.equal([
-      { expected: null, ifPresent: undefined },
-      { expected: null, ifPresent: 'replace' },
-    ])
-  })
-
-  it("makes the fake store put a replacing record over any record stored at the seq after it, under the record's own tok", async () => {
-    for (const record of [fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }), tombstoneBoxRecord({ revision_seq: 4 }), tombstoneBoxRecord({ revision_seq: 4 }, 'd')]) {
-      held.mw.seedStore(record)
-      const box = await boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-replacing', revision_seq: 0 }), 'replace')
-      expect(box).to.include({ revision_tok: 'rev-replacing', revision_seq: 5 })
-      expect(held.mw.stored.get(record.boxlabel)).to.deep.include({ revision_tok: 'rev-replacing', revision_seq: 5 })
-    }
-    held.mw.stored.clear()
-    const box = await boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-replacing', revision_seq: 0 }), 'replace')
-    expect(box).to.include({ revision_tok: 'rev-replacing', revision_seq: 0 })
-  })
-
-  it("makes the fake store put over a tombstone stored when none was expected", async () => {
-    held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
-    await expect(boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))).resolves.to.be.instanceOf(Box)
     expect(held.mw.callsOf('put').map(({ expected }) => expected)).to.deep.equal([null])
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
   })
 
-  it("refuses 'bad_option' an ifPresent that is not 'replace', calling the store not at all", async () => {
+  it("makes the fake store refuse 'stale_write' over a tombstone stored when none was expected, delivering the tombstone", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.put(fullBoxRecord(), 'fail' as never), 'bad_option')
-    const outcome = await listing.tryPut(fullBoxRecord(), 'fetch' as never)
-    expect(outcome.ok).to.be.false
-    expect(outcome.ok ? null : outcome.err.refusalkind).to.eq('bad_option')
-    expect(held.mw.callsOf('put')).to.deep.equal([])
+    held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 })), 'stale_write')
+    expect(held.mw.callsOf('put').map(({ expected }) => expected)).to.deep.equal([null])
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
+    expect(listing.things.map(({ isPresent }) => isPresent)).to.deep.equal([false])
+  })
+
+  it("makes the fake store keep the record exactly as given over no row", async () => {
+    const box = await boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-new', revision_seq: 0 }))
+    expect(box).to.include({ revision_tok: 'rev-new', revision_seq: 0 })
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-new', revision_seq: 0 })
   })
 })
 
