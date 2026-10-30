@@ -51,7 +51,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #central: Fetched<RecordT, SparseT>
   /** The record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending; null while nothing is staged. */
   #staged: Fetched<RecordT, SparseT> | null
-  /** Made on first read, and again by each `settle` once one exists. */
+  /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
   readonly #listeners = new Set<() => void>()
@@ -114,7 +114,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return ! MSX.isTombstone(combined) && this.isFullRecord(combined) ? combined : null
   }
 
-  /** The copy the listing writes to the device cache. */
+  /** The copy the listing saves to the device cache. */
   get cacheable(): Cacheable<RecordT, SparseT> {
     return Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
   }
@@ -168,7 +168,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Replace the snapshot with a new one, and notify all listeners. Before the first read there is none to replace: the read makes it. */
+  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
@@ -230,10 +230,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryFetch(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given. Calls made during a fetch join it. */
+  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where central is not whole. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToFetch(opts)
-    await this.#trigger.ensureTimelyWithin(opts.maxMillisSinceRefresh)
+    await this.#trigger.ensureTimelyWithin(this.isWholeRecord(this.#central) ? opts.maxMillisSinceRefresh : 0)
     return this
   }
 
@@ -280,14 +280,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
    * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there; otherwise `reconcileStaged` judges
-   * the staged against the new central, both are adopted, and the thing settles. A full record or a tombstone makes the
-   * record timely, even one that only confirms central.
+   * the staged against the new central, both are adopted, and the thing settles. A whole record makes the record in hand
+   * timely, even one that only confirms central.
    */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     const answer = rcvd ?? this.tombstoneFor(this.#central)
     const rcvdShape = this.classifyRecordShape(answer)
     const { central, policy } = this.reconcileCentral(answer, rcvdShape)
-    if (rcvdShape === 'full' || rcvdShape === 'gone') { this.#trigger.noteSuccessNow() }
+    if (this.isWholeRecord(answer)) { this.#trigger.noteSuccessNow() }
     const act = MSX.receivedAct.safeParse(policy)
     if (! act.success) { return { badnews: [] } }
     this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.staged, rcvd: answer, nextRevision: this.nextRevision(central) }))
@@ -324,7 +324,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape
+  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape, isWholeRecord
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken. The staged is not consulted.
    *
@@ -419,6 +419,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (record.am === 'x')             { return 'gone' }
     if (this.isFullRecord(record))     { return 'full' }
     return 'sparse'
+  }
+
+  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone, deleted or damaged. A sparse record is not. */
+  protected isWholeRecord(record: Fetched<RecordT, SparseT>): boolean {
+    return MSX.isTombstone(record) || this.isFullRecord(record)
   }
   // --
 
