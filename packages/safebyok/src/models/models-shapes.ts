@@ -299,32 +299,39 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [Options]: ifAbsentVals, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
+
+/** The policies when sending a record to a place that already holds one: the one value, `replace`, puts over it. The others considered, `fail` and `fetch`, are not implemented. */
+export const ifPresentVals = ['replace'] as const
 
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
 export const ifAbsentVals = ['fail', 'nil'] as const
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
- * `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
+ * `ifPresent` is optional, and only ever {@link ifPresentVals}' `'replace'`; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
  * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
  * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
- * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` is `timelyOpts`, named for `send`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
+ * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
  * strips the rest.
  */
-export const { ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
+export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
+  const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const timelyOpts    = obj({ maxMillisSinceRefresh: horizonMillis.optional(), maxWorldMillis: horizonMillis.optional() })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
-  const sendOpts      = timelyOpts
+  const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
     maxMillisSinceRefresh: horizonMillis,
     /** The fraction of the horizon after which the trigger schedules the next refresh. */
     eagerFrac:             num.positive().max(1).optional(),
   })
-  return { ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
+  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
 })
+
+/** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: `'replace'`. */
+export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
@@ -335,7 +342,7 @@ export type TimelyOpts = Z.infer<typeof timelyOpts>
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
 export type FetchOpts = Z.infer<typeof fetchOpts>
 
-/** `send`'s options: its {@link TimelyOpts}, and no more. */
+/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'` makes storage put over a thing it holds that this device believes never stored, where it would refuse 'stale_write'. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
 /** `edit`'s options: its {@link TimelyOpts}. */
@@ -380,10 +387,10 @@ export type ListingWorld = World & {
   takeWorld(world: unknown): void
 }
 
-/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none. `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most. */
+/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none. `put` is also given `ifPresent` when `send` was: `'replace'` makes storage put over a record it holds, but only where `expected` is null; with `expected` given, storage's compare-and-set holds whatever `ifPresent` says. Storage judges it, not the listing. `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most. */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
-  put(record: RecordT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
+  put(record: RecordT, expected: Revision | null, ifPresent?: IfPresent): Promise<Answer<ScopeT, RecordT, SparseT>>
   del(scope: ScopeT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }

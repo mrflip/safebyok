@@ -626,3 +626,34 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
     expect(MSX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
   })
 })
+
+describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
+  it("name the one policy, replace", () => {
+    expect(MSX.ifPresentVals).to.deep.equal(['replace'])
+  })
+
+  holdsCases(MSX.ifPresent, 'bad_option', [
+    ["replace",  true,  'passes replace'],
+    ["fail",     false, 'refuses fail, which send does not offer'],
+    ["fetch",    false, 'refuses fetch, which send does not offer'],
+    [undefined,  false, 'refuses undefined: sendOpts makes it optional, not the check'],
+  ])
+
+  holdsCases(MSX.sendOpts, 'bad_option', [
+    [{},                                                true,  'passes no options'],
+    [{ ifPresent: 'replace' },                          true,  'passes ifPresent replace'],
+    [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
+    [{ ifPresent: 'replace', maxWorldMillis: 5 },       true,  'passes ifPresent beside the timely options'],
+    [{ ifPresent: 'fail' },                             false, 'refuses an ifPresent that is not replace'],
+    [{ maxMillisSinceRefresh: -1, ifPresent: 'replace' }, false, 'refuses a negative horizon, as timelyOpts does'],
+  ])
+
+  it("keeps ifPresent and the timely options and strips the rest", () => {
+    expect(MSX.sendOpts.parse({ ifPresent: 'replace', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'replace', maxWorldMillis: 5 })
+  })
+
+  it("name the failing field", () => {
+    const err = TH.expectSyncRefusal(() => MSX.sendOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
+  })
+})

@@ -959,3 +959,94 @@ const edited = async () => {
   return { listing, box }
 }
 // --
+
+describe("listing.put(duck, ifPresent): handed to storage, which judges it", () => {
+  it("passes 'replace' to the store beside the revision expected, and nothing when none is given", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.put(fullBoxRecord(), 'replace')
+    await listing.put(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+    expect(held.mw.callsOf('put').map(({ expected, ifPresent }) => ({ expected, ifPresent }))).to.deep.equal([
+      { expected: null, ifPresent: 'replace' },
+      { expected: { revision_tok: fullBoxRecord().revision_tok, revision_seq: fullBoxRecord().revision_seq }, ifPresent: undefined },
+    ])
+  })
+
+  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, unless 'replace', and put over a tombstone as before", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
+    await TH.expectRefusal(listing.put(fullBoxRecord()), 'stale_write')
+    expect(listing.things.map(({ revision_tok }) => revision_tok)).to.deep.equal(['rev-stored'])
+    held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
+    await expect(listing.put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))).resolves.to.be.instanceOf(Box)
+  })
+
+  it("refuses 'bad_option' an ifPresent that is not 'replace', calling the store not at all", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.put(fullBoxRecord(), 'fail' as never), 'bad_option')
+    const outcome = await listing.tryPut(fullBoxRecord(), 'fetch' as never)
+    expect(outcome.ok).to.be.false
+    expect(outcome.ok ? null : outcome.err.refusalkind).to.eq('bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
+})
+
+describe("listing: an answer is for the scope the call asked about", () => {
+  it("refuses 'bad_record' a fetch answered for another scope, though the record agrees with the answer, making and saving nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willGet(held.mw.answerOf(scopeOf('other_box'), fullBoxRecord({ boxlabel: 'other_box' })))
+    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'bad_record')
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.callsOf('save')).to.deep.equal([])
+  })
+
+  it("refuses it for a put and a del answered for another scope, and for a refusal answered so, the refusal not thrown in its place", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willPut(held.mw.answerOf(scopeOf('other_box'), fullBoxRecord({ boxlabel: 'other_box' })))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box' })), 'bad_record')
+    held.mw.willDel(held.mw.answerOf(scopeOf('other_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
+    await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })), 'bad_record')
+    held.mw.willPut(held.mw.staleWriteOf(scopeOf('other_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box' })), 'bad_record')
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+
+  it("leaves an instance held under the scope asked as it was", async () => {
+    const listing = boxListingOf(held.mw)
+    const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
+    const before = cacheableOf(asked)
+    held.mw.willGet(held.mw.answerOf(scopeOf('other_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
+    await TH.expectRefusal(listing.fetch(asked.scope), 'bad_record')
+    expect(cacheableOf(asked)).to.deep.equal(before)
+    expect(listing.things).to.deep.equal([asked])
+  })
+})
+
+/** The cached copy of a box with an edit staged, its staged record then given `vault_tok`. */
+const copyStagedUnder = async (vault_tok: string) => {
+  const maker = boxListingOf(held.mw)
+  const box = await maker.build(fullBoxRecord({ boxlabel: 'staged_box' }))
+  await box.edit({ sidecar: { note: 'edited' } })
+  const copy = cacheableOf(box)
+  held.mw.clearCalls()
+  return { ...copy, staged: { ...copy.staged!, vault_tok } }
+}
+
+describe("listing.hello(): a cached copy's staged record is of the vault's own vault_tok", () => {
+  it("tells a copy whose central is the vault's own but whose staged is of another vault_tok to onBadNews as a cache miss, making no instance of it", async () => {
+    held.mw.willLoad([await copyStagedUnder('vault-tok-other')])
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("revives a copy whose staged record is of the vault's own vault_tok", async () => {
+    held.mw.willLoad([await copyStagedUnder(held.mw.world.vault_tok)])
+    held.mw.seedStore(fullBoxRecord({ boxlabel: 'staged_box' }))
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    expect(held.mw.badnews).to.deep.equal([])
+    expect(listing.at(scopeOf('staged_box'))?.hasStaged).to.be.true
+  })
+})
