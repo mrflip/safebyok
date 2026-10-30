@@ -366,10 +366,18 @@ const sparseOf = (record: Fetched<BoxRecord, BoxSparse>): BoxSparse => MSX.boxSp
  *   it('fetches', async () => { held.mw.seedStore(fullBoxRecord()); await boxListingOf(held.mw).fetch(held.mw.boxscope('anthropic_api_key')) })
  */
 export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } => {
-  let current = makeModelsWorld(opts)
+  let current: ModelsWorld | null = null
   beforeEach(() => { current = makeModelsWorld(opts) })
-  afterEach(() => { current.dispose() })
-  return { get mw() { return current } }
+  afterEach(() => {
+    current?.dispose()
+    current = null
+  })
+  return {
+    get mw() {
+      if (current === null) { throw new Error('held.mw is made before each test and disposed after it: reach it inside a test or a hook.') }
+      return current
+    },
+  }
 }
 
 /** A {@link BoxListing} over the world's vault, store and cache, its bad news logged in `badnews`. `overrides` replaces any of its options; the horizon is ten minutes.
