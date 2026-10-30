@@ -35,8 +35,11 @@ Particular to this sprint, beside the brief's eight:
      `read` or `write`, which mean only the blanket category (CLAUDE.md, *Name the operation*).
    * no comment or doc block that opens *What the* or *What a* (`What a foo returns`, `What the
      blerg sees when created`). Concise and specific: `Return type of foo's X, Y or Z
-     operations`, `DNA for creating a blerg`. A thread fixes such a comment on a line it touches
-     anyway, and leaves the rest (an open matter asks the Coach about a documentarian run).
+     operations`, `DNA for creating a blerg`.
+   * **Fix as you go** (the Coach, 2026-10-30: "there's a lot of scratch paper write-rewrites"):
+     a thread rewrites any such comment, doc block or banner, and any of the words above, in the
+     model code it works in, not only on the lines its change touches. A comment rewrite only;
+     behaviour and names stay.
 3. **Shared test files.** Threads 2, 3, 4a, 5 and 7 run side by side and add to the same files.
    Each thread puts its cases in top-level `describe`s of its own, appended at the end of the file,
    and edits no describe another thread wrote; additions to `tests/test-helpers/models-world.ts`
@@ -94,7 +97,14 @@ asked, so it needs nothing of thread 3; it is tested through `listing.fetch` wit
 
 > **3. The listing's pipeline.** Three fixes first, the Coach's: (a) the device cache is written by the listing's `settle`, which is where consequences of new state belong, as the storable's `settle` holds its own: `settle(thing?)` saves `thing.cacheable` where a thing is given, then makes the snapshot; `#receiveInto` and `build(dna)` pass the thing, `hello`'s settle after `load` passes nothing, so a built draft is cached and a revived one is not written back; (b) `isWatchable` defaults to true; (c) `ifAbsent: 'fail' | 'nil'` on `fetch`, default `'fail'`, judged in `#deliver` once the answer is delivered: an answer of nothing stored, or of a tombstone deleted or damaged, throws `absentRefusal(scope)` under `'fail'` and resolves null under `'nil'`, in both cases after the instance held, if any, has received it and settled; `Storable.hydrate` passes `'nil'`, so a refresh in the background never errors into a bitbucket. Then, in `tests/models/listing.test.ts` and `box-listing.test.ts`: `fetch` of nothing stored refuses `absent_box`, whether or not a thing is held, and under `'nil'` resolves null, the held instance still at `at(scope)` as its tombstone; `fetch` of a stored tombstone likewise; ~~`fetch` of nothing stored for a thing held alive refuses `record_conflict` by the same-revision row, before `ifAbsent` is asked;~~ `build(tombstone)` holds a gone instance; `put(box)` and `put(record)` take one path, over `expectedRevisionOf(scope)` (null for a thing never stored or not held), and the answer spends the staged; `del(box)` at central's revision; a refused answer throws after `storedInStaleRefusal`'s record is delivered, for a `stale_write` carrying `meta.box_stored` full, sparse, and absent; a malformed answer, and an answer missing its `scope`, refuse `bad_record` before anything is delivered; a notice from the watch is delivered as an answer, and a refusal met on the way reaches `onBadNews` rather than throwing; `hello` revives from `load`, each box's `cacheable` round-tripping to an equal `cacheable`, writing nothing back, then starts the watch with `fullFor` naming the watchable scopes, every box among them until one is set otherwise, then hydrates all; `goodbye` ends the watch once; `save` is called once per settle given a thing, with that thing's `cacheable`: each delivery, each `build`; the listing's `snapshot` holds present things only, is the same array until one changes, and its listeners are called once per change. Depends on 1. Size: medium to large.
 
-*Orchestrator:* Label `listing_pipeline`. Struck test moved to thread 2. Touches `listing.ts`
+*Orchestrator:* **Fix (d), the Coach's (2026-10-30, ruling on thread 1's finding):** the
+listing's snapshot shows exactly what the live instances show: it is the array of its present
+things' own snapshots (`thing.getSnapshot()`), typed `readonly SnapshotT[]`, never a sparse
+slice the listing makes itself. "If `listing.at('robert').sidecar.uncle === 'Bob'`, every other
+legitimate access path to that record should be" Bob. It is the same array until one thing's
+snapshot changes; a draft built from a dna shows its draft. The snapshot tests above are written
+to it.
+Label `listing_pipeline`. Struck test moved to thread 2. Touches `listing.ts`
 (`settle`, `#receiveInto`, `build`, `hello`, `fetch`, `#deliver`), `storable.ts` (the `watchable`
 default; the trigger's launch, `doTryLaunch: () => this.tryFetch()`, is where `hydrate`'s fetch
 passes `ifAbsent: 'nil'`, through `Storable.fetch` to `listing.fetch`), `models-shapes.ts` if
