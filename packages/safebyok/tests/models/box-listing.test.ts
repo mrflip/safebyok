@@ -77,11 +77,9 @@ describe("BoxListing", () => {
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
-    it("stores nothing, and calls only nothing of the store and the cache", async () => {
+    it("stores nothing, and calls nothing of the world, the store or the cache", async () => {
       await boxListingOf(held.mw).build(dna())
-      expect(held.mw.callsOf('get')).to.deep.equal([])
-      expect(held.mw.callsOf('put')).to.deep.equal([])
-      expect(held.mw.callsOf('del')).to.deep.equal([])
+      expect(held.mw.calls).to.deep.equal([])
       expect(held.mw.stored.size).to.eq(0)
     })
 
