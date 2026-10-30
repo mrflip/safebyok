@@ -328,19 +328,29 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken. The staged is not consulted.
    *
+   * NOTE, damage at one revision (the Coach, 2026-10-30). Alive here is `am` 'a', as `amVals` has it: a full or sparse
+   * record, never a damaged one. At the same revision, damage is not a fate that conflicts with deletion:
+   * - A damaged record delivered skips, whatever central is, a deletion included: what storage holds failed its checks
+   *   here, so it tells this device nothing to weigh against its own copy.
+   * - A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
+   *   revision, so central becomes it and the staged is dropped. This includes nothing stored (`receive(null)`) for a
+   *   thing held damaged.
+   * Only a deletion against a living record, either way round, refuses 'record_conflict'.
+   *
    * | age   | rcvd   | central | policy                   | central after |
    * | ----- | ------ | ------- | ------------------------ | ------------- |
    * | older | any    | any     | 'older'                  | central       |
    * | older | gone   | any     | 'older'                  | central       |
    * | older | ouch   | any     | 'skip'                   | central       |
    * |       |        |         |                          |               |
+   * | same  | ouch   | any     | 'skip'                   | central       |
+   * | same  | gone   | ouch    | 'gone'                   | rcvd          |
    * | same  | gone   | alive   | throw 'record_conflict'  | -             |
    * | same  | alive  | gone    | throw 'record_conflict'  | -             |
    * | same  | sparse | any     | 'same'                   | central       |
    * | same  | gone   | gone    | 'same'                   | central       |
    * | same  | full   | full    | 'same'                   | central       |
    * | same  | full   | sparse  | 'fill'                   | rcvd          |
-   * | same  | ouch   | any     | 'skip'                   | central       |
    * |       |        |         |                          |               |
    * | newer | sparse | any     | 'adopt'                  | rcvd          |
    * | newer | full   | any     | 'adopt'                  | rcvd          |
@@ -358,9 +368,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
+      if ((rcvdShape === 'ouch'))                                { return { central, policy: 'skip' } }
+      if ((rcvdShape === 'gone') && (centralShape === 'ouch'))   { return { central: rcvd, policy: 'gone' } }
       if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', OneRevisionTwoFates) }
       if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', OneRevisionTwoFates) }
-      if ((rcvdShape === 'ouch'))                                { return { central, policy: 'skip' } }
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
