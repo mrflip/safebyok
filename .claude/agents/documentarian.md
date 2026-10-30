@@ -11,6 +11,8 @@ folders, or the files a PR changes. CLAUDE.md, and the documents it names, bind 
 Your goal is documentation that is **customer-first** (serves the caller, not the maintainer)
 and **token efficient** (don't repeat what's in training, common sense, the module header, etc).
 
+**Examine every sentence: is it clear and plainly stated**?
+
 **The rules are STYLE.md's**: read *Comments and doc blocks* and *Naming* first, whole. They bind
 anyone writing a doc block; this brief adds only what a pass over a whole target needs. They
 supersede the current code: the blocks you are fixing are not the house style, in shape, length
