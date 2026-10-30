@@ -81,7 +81,7 @@ export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 /** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
-/** What a storage call delivers as its `val`: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
 /** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props; those the factory controls are ignored. */
@@ -123,13 +123,15 @@ type AnswerBase<ScopeT> = Readonly<{ scope: ScopeT, world: unknown }>
 
 /** The outcome of a storage call about `scope`, as the concrete listing maps it: an {@link Outcome} whose `val` is the record stored (null for none), or whose `err` is the refusal, with the `scope` and the `world` it lies in as storage holds it now beside it.
  * Whatever an `Outcome` carries, an answer carries. A stored record that fails its check is
- * delivered as a tombstone, `am` 'd', made of what was recovered of it: its scope, `vault_tok`,
- * revision and times, and nothing else. Where that much cannot be recovered, the store refuses
- * 'corrupt_record' instead. {@link answer} checks what the base knows of one.
+ * delivered as a tombstone, `am` 'd', in the kind's sparse form: its sparse props as far as
+ * storage recovered them, and the kind's constants filled in by the adapter (for a box, `fmt`,
+ * `whisper_codec` and `whisper_schema_version`), so that the concrete listing's `sparseOf` accepts
+ * it. Nothing the user put in the thing rides on it. Where that much cannot be recovered, the store
+ * refuses 'corrupt_record' instead. {@link answer} checks what the base knows of one.
  */
 export type Answer<ScopeT, RecordT, SparseT> = Outcome<Fetched<RecordT, SparseT> | null> & AnswerBase<ScopeT>
 
-/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least, a damaged one as the tombstone an answer would carry. {@link notice} checks what the base knows of one. */
+/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least; a damaged one arrives as an answer's would, a tombstone, `am` 'd', in the kind's sparse form, the kind's constants filled in by the adapter. {@link notice} checks what the base knows of one. */
 export type Notice<RecordT, SparseT> = Readonly<{ record: Fetched<RecordT, SparseT>, world: unknown }>
 // --
 
@@ -333,7 +335,7 @@ export type Cache<RecordT, SparseT> = {
   save(cacheable: Cacheable<RecordT, SparseT>): Promise<void>
 }
 
-/** What a listing is made with: its world, store and cache, the refresh horizon of each thing it makes, and where to tell bad news. */
+/** The options a listing is made with: its world, store and cache, the refresh horizon of each thing it makes, and where to tell bad news. */
 export type ListingOpts<ScopeT, RecordT, SparseT> = {
   world:                 ListingWorld
   store:                 Store<ScopeT, RecordT, SparseT>
