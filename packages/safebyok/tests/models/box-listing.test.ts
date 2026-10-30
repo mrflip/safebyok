@@ -549,9 +549,9 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
   })
 })
 
-// == [Thread 9]: a dna carrying revision_seq
+// == [A dna carrying revision_seq]: build
 
-describe("boxListing.build(dna): a revision_seq makes it a record (thread 9)", () => {
+describe("boxListing.build(dna): a revision_seq makes it a record", () => {
   it("refuses 'bad_record' for a dna with a whisper and a revision_seq, holding and sealing nothing", async () => {
     const listing = boxListingOf(held.mw)
     const dna = { ...held.mw.boxscope('anthropic_api_key'), whisper: 'sk-test-0000', revision_seq: 3 }

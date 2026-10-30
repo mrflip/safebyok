@@ -450,7 +450,6 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       expect(stateOf(box)).to.include({ revision_seq: 2, revision_tok: 'rev-c2', written_at: SameRev.written_at })
     })
 
-    // Thread 9 replaces thread 2's pinned refusal and its todo: the Coach ruled 'fill'.
     it("same | full | ouch takes 'fill': central becomes the delivered record, nothing staged stays so, and the thing is present and full", () => {
       const box = boxOf(Centrals.ouch())
       const rcvd = rcvdOf('full', SameRev)
@@ -904,7 +903,6 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    // Thread 9 restates this case: over a tombstone, a record under another vault_tok now throws, as over a living box.
     it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws 'unexpected_error', and neither it nor the scope moves", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
@@ -1127,7 +1125,6 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     expect(box.hasStaged).to.be.false
   })
 
-  // Thread 9 restates this case: the Coach ruled that a 'same' answer to a del spends the staged tombstone.
   it("deletes again a thing deleted; the same tombstone answered reads 'same', and the staged tombstone is dropped", async () => {
     const { box } = await timelyBoxOf()
     await box.del()
@@ -1312,9 +1309,9 @@ describe("storable: a refresh the timer launches, which no caller awaits", () =>
 })
 // --
 
-// == [Thread 9]: the Coach's rulings of 2026-10-30, as storable cases
+// == [Spent dels, stale meta, sentences]: a del answered same, the stale_write of edit, phrases.ts, ToCacheable
 
-describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a del (thread 9)", () => {
+describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a del", () => {
   it("keeps the staged tombstone of a del in flight over a living box when a record at the revision held arrives meanwhile: only a deletion spends it", async () => {
     const { box } = await timelyBoxOf()
     const hold = holdOf()
@@ -1355,7 +1352,7 @@ describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a 
   })
 })
 
-describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile carries it (thread 9)", () => {
+describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile carries it", () => {
   const MovedCases = [
     [() => fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2', sidecar: { note: 'theirs' } }), 'a newer record'],
     [() => tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }),                         'a deletion'],
@@ -1378,7 +1375,7 @@ describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile c
   })
 })
 
-describe("storable refusal sentences, from phrases.ts (thread 9)", () => {
+describe("storable refusal sentences, from phrases.ts", () => {
   it("says a record_conflict is worth one fetch, and that one persisting means the system is not working", async () => {
     const { box } = await timelyBoxOf()
     const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })), 'record_conflict')
@@ -1409,7 +1406,7 @@ describe("storable refusal sentences, from phrases.ts (thread 9)", () => {
   })
 })
 
-describe("storable: the cacheable copy, kept from the host (thread 9)", () => {
+describe("storable: the cacheable copy, kept from the host", () => {
   it("answers no cacheable prop, by any string key: the listing makes the copy by a symbol no entry point exports", async () => {
     const { box } = await timelyBoxOf()
     expect('cacheable' in box).to.be.false

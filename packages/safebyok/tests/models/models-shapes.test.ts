@@ -536,7 +536,7 @@ describe("The checks of the world and the listing", () => {
 describe("MSX.boxDna", () => {
   const filled = { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
-  // Thread 9: a dna carries no revision_seq, so the factory's props stop at the rest.
+  // A dna carries no revision_seq, so the factory's props stop at the rest.
   const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
   holdsCases(MSX.boxDna, 'bad_option', [
