@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** resumed 2026-10-30 on the Coach's push permission and six rulings: #372 pushed and filing; then 8, 9, 10 in a chain, then 6.
+* **Status:** resumed 2026-10-30; filed through #381 (thread 8). Thread 9 building; then 10, then 6.
 
 ## Read first
 
@@ -282,6 +282,11 @@ needed for something, in which case narrowly limit its contract)". **Thread 8 is
 any doc naming it), unless a survey finds something that needs it, in which case narrow its
 contract and say why. Label `if_present` kept. Worker `sonnet`; review `low`. Depends on 4b's
 rework (it touches `send`'s opts); cut from 3's filed tip, the top of the line. Size: small.
+
+*Review:* clean (#381, low). No fixes. The survey found nothing that needs `ifPresent`, so it is
+removed, not narrowed; `sendOpts = timelyOpts` keeps `send`'s option type. Left: a ragged wrap in
+the options doc block (a documentarian pass); the scenario and spec rows naming `ifPresent`, the
+Coach's to strike (Cleanup).
 
 ### 9. The Coach's rulings of 2026-10-30, the rest
 
