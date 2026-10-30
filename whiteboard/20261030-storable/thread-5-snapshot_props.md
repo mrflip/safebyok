@@ -29,3 +29,11 @@ Branch `20261030-snapshot_props`, PR #376, stacked on #370 (restacked onto #374;
 
 1. **Who settles the boxes when the lock comes down?** The model has no lock event: `isLocked` reads the listing's world, and the snapshot is replaced only by `settle`. Until the vault wires a lock to `listing.settle` / each box's `settle`, a snapshot made before the lock carries the sidecar while locked. Recommendation: the vault's `lock()` settles the box listing's things (thread for the vault wiring), and the `it.todo` becomes a test there.
 2. **`cacheable.central` carries the real sidecar while locked.** The device cache needs the full record to restore the box after a reload, and the sidecar is stored in the clear. But `cacheable` is a public getter on the box, so any holder of a locked box reads the sidecar through it. Recommendation: leave it, since `cacheable` is for the listing and the cache, not the host (host code gets snapshots), and say so in the doc of `cacheable`; or make `cacheable` private to the listing's friends. The test pins today's behaviour.
+
+## Restacked
+
+Restacked 2026-10-30 onto thread 2 (#373), in the line main → #368 → #374 → #370 → #371 → #373 → #376.
+
+* `tests/models/storable.test.ts`: threads 2 and 4a had created the file too; it holds one import block and every describe of the three, thread 5's last. Thread 2's reconcile tables already define a `boxOf` (a SpiedBox over a central and a staged), so thread 5's helper of that name, a box built through the listing, is `builtBoxOf` here. No assertion changed.
+* `tests/models/box.test.ts`: thread 4a had created it; one import block, thread 4a's describes first, then thread 5's.
+* `src/models/storable.ts`: the two `#snapshot` doc lines thread 5 reworded for the word rules thread 4a had reworded first; thread 4a's wording kept. The `reconcileStaged` paragraph thread 5 touched ("successful send") thread 2 had already removed.
