@@ -216,7 +216,15 @@ describe("storable.hydrate(opts): a horizon past MaxTimerMillis", () => {
 })
 
 describe("storable.hydrate(opts): a thing made with a horizon of Infinity", () => {
-  it.todo("fetches nothing for a thing never fetched, given no horizon (Coach: does the thing's own maxMillisSinceRefresh of Infinity mean go ahead before its first success? Today the trigger is born due, so the first hydrate fetches once)")
+  it("fetches once on the first hydrate given no horizon, as the trigger is born due, and nothing after", async () => {
+    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: Infinity }).build({ ...held.mw.boxscope('anthropic_api_key') })
+    held.mw.clearCalls()
+    await box.hydrate()
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    await held.mw.advance(1e9)
+    await box.hydrate()
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+  })
 })
 // --
 
