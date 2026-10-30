@@ -1,0 +1,85 @@
+import { describe, expect, it, vi } from 'vitest'
+import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+
+const held = useModelsWorld()
+
+// == [Creation and re-creation, thread 4b]: registered_at over a rebirth, the tombstone's registered_at, build(dna) over a held scope
+
+describe("registered_at over a rebirth", () => {
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's edit, not its first store, nor the put that stores it", async () => {
+    const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
+    await box.del()
+    held.mw.setNow(T0 + 5000)
+    await box.edit({ whisper: 'sk-test-0000' })
+    held.mw.setNow(T0 + 9000)
+    await box.send({})
+    expect(box.cacheable.central).to.deep.include({ am: 'a', registered_at: T0 + 5000, written_at: T0 + 9000 })
+  })
+
+  it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar {} unless given", async () => {
+    const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
+    held.mw.setNow(T0 + 5000)
+    await box.send({ whisper: 'sk-test-0000' })
+    expect(box.cacheable.central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
+  })
+
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted, and the rebirth's own time is lost quietly", async () => {
+    const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
+    held.mw.setNow(T0 + 5000)
+    held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
+    await box.send({ whisper: 'sk-test-0000' })
+    expect(box.registered_at).to.eq(T0)
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+})
+
+describe("the tombstone's registered_at", () => {
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): the tombstone a del stages keeps the buried record's registered_at, though nothing is stored", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setNow(T0 + 5000)
+    held.mw.willDel(() => new Promise(() => undefined))
+    void box.del()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(box.cacheable.staged).to.deep.include({ am: 'x', registered_at: T0 })
+    expect(box.registered_at).to.eq(T0)
+  })
+
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): the ouchstone made of a newer damaged record keeps the held record's registered_at, never the damaged record's", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.receive(tombstoneBoxRecord({ revision_seq: 2, registered_at: T0 + 3 }, 'd'))
+    expect(box.cacheable.central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
+  })
+})
+
+describe("build(dna) over a held scope", () => {
+  const HeldCases = [
+    [() => fullBoxRecord(),                        'a live box'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }), 'a deleted box'],
+  ] as const
+  for (const [recordOf, blurb] of HeldCases) {
+    it(`whiteboard/20261028-storable_base/sprint-box-contract.md:54 (one durable instance per scope): build(dna) over ${blurb} holds a second instance in its place, the first still reading its own record`, async () => {
+      const listing = boxListingOf(held.mw)
+      const first = await listing.build(recordOf())
+      const firstCentral = first.cacheable.central
+      const second = await listing.build({ ...held.mw.boxscope('anthropic_api_key') })
+      expect(second).not.to.eq(first)
+      expect(listing.at(first.scope)).to.eq(second)
+      expect(first.cacheable.central).to.eq(firstCentral)
+      expect(second.expectedRevision()).to.be.null
+    })
+  }
+})
+// --
+
+// == [The whisper exposed, thread 4b]: a lock that forgets nothing
+
+describe("the whisper exposed across a lock", () => {
+  it("notes/guarantees.md:238 (a Box holds its record, ciphertext, never a whisper) and box.ts:96 (kept until the vault locks): a whisper exposed reads LOCKED while locked, and reads again once unlocked", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = 'sk-test-0000'
+    held.mw.setLockState('locked')
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.eq('sk-test-0000')
+  })
+})
+// --
