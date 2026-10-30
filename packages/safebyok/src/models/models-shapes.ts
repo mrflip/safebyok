@@ -239,6 +239,25 @@ export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
 // --
 
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, VaultRecord, VaultSparse
+
+/** The vault format these forms describe, as each record carries it in `fmt`. */
+export const VaultFormat = 6001
+
+/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, the same fields, strict, as a stored record is. The scope alone is `vaultScope` in shapes/scopes.
+ * Not yet: the gate and its `gate_epoch`, the payload that will make the full record more than
+ * the sparse one. Until then every vault record is full.
+ */
+export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel }) => {
+  const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), ...sparseBase.shape })
+  const vaultRecord = vaultSparse.strict()
+  return { vaultRecord, vaultSparse }
+}, [FX])
+
+export type VaultSparse = Z.infer<typeof vaultSparse>
+export type VaultRecord = Z.infer<typeof vaultRecord>
+// --
+
 // == [Options]: ifPresentVals, ifPresent, horizonMillis, timelyOpts, sendOpts, storableOpts, IfPresent, TimelyOpts, SendOpts, EditOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: `replace` it, `fail`, or `fetch` it and hand that back instead. */
