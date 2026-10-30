@@ -1,0 +1,205 @@
+# Sprint storable: box fills its contract
+
+* **Date:** 2026-10-30. **Issued by:** the Coach (flip), from
+  `whiteboard/20261028-storable_base/sprint-box-contract.md`.
+* **Mode:** YOLO.
+* **Levels (defaults):** review `medium`; worker and reviewer `opus` at their agents' own effort;
+  style pass `sonnet` (`style-reviewer`'s pin). Thread levels below where they differ.
+* **At once:** 3 threads.
+* **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
+  `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
+* **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
+* **Status:** planned; thread 1 starting.
+
+## Read first
+
+* `CLAUDE.md`, then `whiteboard/20261028-storable_base/sprint-box-contract.md` whole: the Coach's
+  brief. Its *Read first*, *Ground rules* 1-8, *The absent contract*, *Where the spec and the code
+  disagree* and *For the Coach* bind every thread. One correction: its `src/utils/trigger.ts` is
+  `packages/safebyok/src/helpers/trigger.ts` since 7483a7b3.
+* `whiteboard/20261030-storable/storable-progress.md`: what earlier threads decided and found.
+
+## Ground rules
+
+Particular to this sprint, beside the brief's eight:
+
+1. **The models and the brief over the old code.** This sprint is a large departure from what
+   `src/box.ts`, `src/vault.ts` and `src/shapes/` do. Where the old implementation and the models
+   disagree, the models' code and the brief are the design; the old code is history. Nothing is
+   ported from it, and no test imports it (brief, ground rule 5).
+2. **Words.** In code, comments, doc blocks, thread files and PRs:
+   * never `standing` or `stands` (temporary? estimate? upright?); say what is meant: *kept*,
+     *in force*, *unchanged*, *remains*.
+   * never `raise` (fail? increment?): *throw*, *refuse*, *bump*, *increase*.
+   * name the operation (`get`, `find`, `fetch`, `put`, `del`, `hydrate`, `receive`) rather than
+     `read` or `write`, which mean only the blanket category (CLAUDE.md, *Name the operation*).
+   * no comment or doc block that opens *What the* or *What a* (`What a foo returns`, `What the
+     blerg sees when created`). Concise and specific: `Return type of foo's X, Y or Z
+     operations`, `DNA for creating a blerg`. A thread fixes such a comment on a line it touches
+     anyway, and leaves the rest (an open matter asks the Coach about a documentarian run).
+3. **Shared test files.** Threads 2, 3, 4a, 5 and 7 run side by side and add to the same files.
+   Each thread puts its cases in top-level `describe`s of its own, appended at the end of the file,
+   and edits no describe another thread wrote; additions to `tests/test-helpers/models-world.ts`
+   go at its end too, without reshaping what is there. A restack then only keeps both sides.
+4. **The loosened file** `packages/safebyok/tests/loosened/loosened.test.ts`: the first thread to
+   need it creates it; every thread appends its describes at the end (brief, ground rule 2).
+5. **Thread files** are `whiteboard/20261030-storable/thread-<N>-<label>.md` on the thread's own
+   branch. Spec-against-code findings (brief, ground rule 4) go there and in the PR's open
+   questions, one item each, so the orchestrator can carry each to the Coach.
+6. **No size budget moves**: `src/models/` is not exported, so no import shape measures it. A
+   thread that exports it has gone out of scope.
+7. **PRs** say "Stacked on #N": #368 for thread 1, the thread below for the rest.
+
+## Threads
+
+### 1. The models' test world, and three fixes to the forms
+
+> **1. The models' test world, and three fixes to the forms.** The fixes first, each the Coach's (2026-10-30), each in `models-shapes.ts`, `storable.ts` and `listing.ts` together: (a) `staged` is null when none: `#staged` is `Fetched | null`, `combined` is `#staged ?? #central`, `hasStaged` is `#staged !== null`, the `staged` getter answers null, `stagedOrNull` goes, `cacheable.staged` is null when none, and the constructor, `storableArgs`, `makeThing`, `adopt`, `cacheable` and `hello` take null where they took central; (b) `boxSparse` keeps `whisper_codec` and `whisper_schema_version`, so a sparse record can be sealed over as it is; `sidecar`, `box_key_wrapped` and `whisper_ciphered` stay full-only; (c) an `Answer` is an `Outcome<Fetched | null>` with `scope` and `world` beside it, typed and checked as such, so whatever `Outcome` carries an answer carries (today, no `meta`). Then build `tests/test-helpers/models-world.ts` from the patterns in ground rule 7: `makeModelsWorld(opts)` returning the fake world, store, cache, their recorded calls, a `fullBoxRecord(overrides)` builder, and a `boxListingOf(world)` that constructs a `BoxListing` over them. Then `tests/models/models-shapes.test.ts`: every checker in `models-shapes.ts` accepts what its doc says and refuses with the kind its doc says, including `storableArgs`, `listingOpts`, `answer`, `notice`, `stagedForms` (the act-to-row rule), `boxRecord` strict and `boxSparse` stripping, and that a `Box` instance passes `boxRecord` as a duck while a pojo with an extra field does not. Then the first `box-listing.test.ts` cases: a listing checks its arguments; `build(dna)` holds a box born never stored (central at `NeverStoredSeq` with the draft's times, draft staged at revision 0, `expectedRevision()` null, present, in the snapshot); `build(record)` equals a `fetch` that delivers the same record, compared by `cacheable`; `build` of a dna with a whisper reaches the seal and refuses `unexpected_error`. Depends on nothing. Size: medium to large.
+
+*Orchestrator:* Label `models_world`. Touches `models-shapes.ts`, `storable.ts`, `listing.ts`,
+`box.ts` (any `stagedOrNull` caller), new `tests/test-helpers/models-world.ts`,
+`tests/models/models-shapes.test.ts`, `tests/models/box-listing.test.ts`.
+**Levels:** worker `sonnet` (the Coach's suggestion); review `medium`, `opus`.
+**Depends on:** nothing in the sprint; cut from `origin/20261030-storable_base` (#368).
+**Look-ahead:** every later thread builds on this world, so it covers the whole `Store`, `Cache`
+and `BoxWorld` interfaces, not only what thread 1's tests call. The fake store's `put` takes and
+records a third argument, `ifPresent`, unused until thread 8 honors it. `get` answers a scripted
+record, null (nothing stored) or a refusal; `put`/`del` answer by default as ground rule 7 says
+and can be told to answer otherwise (a `stale_write` with `meta.box_stored` full, sparse or
+absent, for thread 3; a malformed answer); `watch` records `onNotice` and `fullFor` and returns a
+recorded unwatch, so thread 3 can push notices. The world records `ensureTimely` and `takeWorld`
+in call order with the store's calls, for thread 4a's "world first". The clock is settable and
+the fake timer story is the one `src/helpers/trigger.ts` uses (vitest fake timers, if the trigger
+schedules with `setTimeout`).
+**Size:** medium to large.
+
+### 2. The reconcile tables, row by row
+
+> **2. The reconcile tables, row by row.** One fix first, the Coach's: a `record_conflict` kind joins `errors.ts` (class `condition`, with its row in the README's *Errors* table: storage and this device hold one revision of a record and disagree about it, so neither copy can be trusted until it is read again), and `cmpRevisions` and the one-revision-two-fates rows of `reconcileCentral` throw it in place of `corrupt_record`, which stays for an adapter answering in a shape its protocol does not allow. Then, in `tests/models/storable.test.ts`, drive `receive` through a `Box` from thread 1's world so that every row of the `reconcileCentral` table and every row of the `reconcileStaged` table is hit at least once, by age (older, same, newer) and shape (sparse, full, gone, ouch), with and without a staged record, including: the same revision under another tok refuses `record_conflict` from `cmpRevisions`; one revision, two fates refuses `record_conflict`; `fill` over a sparse central leaving a staged edit as it was; `adopt` and `gone` dropping a staged edit, whether or not its tok is the one storage now holds; `ouch` setting central to an ouchstone made of the held sparse props and carrying a staged edit to the revision after it; nothing stored (`receive(null)`) for a thing never stored reading as `same`; a stored tombstone's `revision_seq` moving the thing's own props. Each row's test names the row in its title. Where a row cannot be reached, or the code's result differs from the table, the thread file says so (ground rule 4). Depends on 1. Size: medium, judgment-heavy.
+
+*Orchestrator:* Label `reconcile_rows`. Touches `src/errors.ts` (and wherever the kinds are
+listed: `tests/errors.test.ts`, phrases, the README's *Errors* table), `storable.ts`
+(`cmpRevisions`, `reconcileCentral`), `tests/models/storable.test.ts`, the loosened file for the
+staged edits `reconcileStaged` drops or carries (brief, ground rule 2).
+**Pulled in from thread 3:** `fetch` of nothing stored for a thing held alive refuses
+`record_conflict` by the same-revision row. It throws in `receive`, before `ifAbsent` would be
+asked, so it needs nothing of thread 3; it is tested through `listing.fetch` with the fake store's
+`get` answering nothing stored.
+**Levels:** worker `opus`; review `high` (every row is a judgment against a table).
+**Depends on:** 1.
+**Look-ahead:** thread 6 reads its thread file for every row found unreachable or differing.
+**Size:** medium, judgment-heavy.
+
+### 3. The listing's pipeline
+
+> **3. The listing's pipeline.** Three fixes first, the Coach's: (a) the device cache is written by the listing's `settle`, which is where consequences of new state belong, as the storable's `settle` holds its own: `settle(thing?)` saves `thing.cacheable` where a thing is given, then makes the snapshot; `#receiveInto` and `build(dna)` pass the thing, `hello`'s settle after `load` passes nothing, so a built draft is cached and a revived one is not written back; (b) `isWatchable` defaults to true; (c) `ifAbsent: 'fail' | 'nil'` on `fetch`, default `'fail'`, judged in `#deliver` once the answer is delivered: an answer of nothing stored, or of a tombstone deleted or damaged, throws `absentRefusal(scope)` under `'fail'` and resolves null under `'nil'`, in both cases after the instance held, if any, has received it and settled; `Storable.hydrate` passes `'nil'`, so a refresh in the background never errors into a bitbucket. Then, in `tests/models/listing.test.ts` and `box-listing.test.ts`: `fetch` of nothing stored refuses `absent_box`, whether or not a thing is held, and under `'nil'` resolves null, the held instance still at `at(scope)` as its tombstone; `fetch` of a stored tombstone likewise; ~~`fetch` of nothing stored for a thing held alive refuses `record_conflict` by the same-revision row, before `ifAbsent` is asked;~~ `build(tombstone)` holds a gone instance; `put(box)` and `put(record)` take one path, over `expectedRevisionOf(scope)` (null for a thing never stored or not held), and the answer spends the staged; `del(box)` at central's revision; a refused answer throws after `storedInStaleRefusal`'s record is delivered, for a `stale_write` carrying `meta.box_stored` full, sparse, and absent; a malformed answer, and an answer missing its `scope`, refuse `bad_record` before anything is delivered; a notice from the watch is delivered as an answer, and a refusal met on the way reaches `onBadNews` rather than throwing; `hello` revives from `load`, each box's `cacheable` round-tripping to an equal `cacheable`, writing nothing back, then starts the watch with `fullFor` naming the watchable scopes, every box among them until one is set otherwise, then hydrates all; `goodbye` ends the watch once; `save` is called once per settle given a thing, with that thing's `cacheable`: each delivery, each `build`; the listing's `snapshot` holds present things only, is the same array until one changes, and its listeners are called once per change. Depends on 1. Size: medium to large.
+
+*Orchestrator:* Label `listing_pipeline`. Struck test moved to thread 2. Touches `listing.ts`
+(`settle`, `#receiveInto`, `build`, `hello`, `fetch`, `#deliver`), `storable.ts` (the `watchable`
+default; the trigger's launch, `doTryLaunch: () => this.tryFetch()`, is where `hydrate`'s fetch
+passes `ifAbsent: 'nil'`, through `Storable.fetch` to `listing.fetch`), `models-shapes.ts` if
+`FetchOpts` or a checker needs `ifAbsent`, `tests/models/listing.test.ts`,
+`tests/models/box-listing.test.ts`.
+**Pulled in from thread 4:** `isWatchable` is a plain get/set, true until set (it tests fix (b)).
+**Levels:** worker `sonnet` (the Coach's suggestion); review `medium`.
+**Depends on:** 1.
+**Look-ahead:** thread 8 hands `ifPresent` through `listing.put`, so `put`'s signature stays
+plain enough to take a third argument. Thread 4a changes `hydrate`'s body; this thread touches the
+trigger's launch line, not `hydrate`, so the two meet at restack only if both reach the same line.
+**Size:** medium to large.
+
+### 4a. Hydrate and timeliness
+
+> From the Coach's thread 4, split as it asks ("split hydrate and timeliness from the verbs and guards"): fixes (a), (b), (c), and these tests, in `storable.test.ts` and `box.test.ts`, with the fake clock: `hydrate` fetches when the record is untimely by `maxMillisSinceRefresh` and not when timely, fetches a sparse central however timely and never a never-stored one for that reason, calls made during a fetch join it, the world's `ensureTimely` is called first every time; `maxMillisSinceRefresh: Infinity` fetches nothing, for a thing never fetched too; after a failed fetch no launch is scheduled and the next verb launches on demand; a horizon past `MaxTimerMillis` arms no timer and still reads stale by its value once passed; success is noted on a full record and on a tombstone, not on a sparse one.
+>
+> The Coach's fixes, verbatim from thread 4: (a) `whole` is a term: a record is whole when it is full or a tombstone, what storage would hand back complete; sparse is not. `isWholeRecord(record)` sits beside `classifyRecordShape` in the base, and `receive` notes success on a whole record, as it does today under two names. (b) `hydrate` fetches whatever the age when central is not whole (`ensureTimelyWithin(0)`, one line, no new method): a draft's central is the never-stored tombstone, whole, so creation is not forced to fetch. (c) `Trigger.isTimelyWithin(Infinity)` is true, for a thing never fetched too, by one line at its top (spec, *Please Remember!!*: Infinity means go ahead; `now - (-Infinity) < Infinity` would still be false, so the line is explicit).
+
+*Orchestrator:* Label `timeliness`. Touches `storable.ts` (`receive`'s success line, `hydrate`,
+`isWholeRecord` beside `classifyRecordShape`), `src/helpers/trigger.ts` and its existing tests,
+`tests/models/storable.test.ts`, `tests/models/box.test.ts`.
+**Levels:** worker `opus`; review `medium`.
+**Depends on:** 1.
+**Look-ahead:** 4b is cut from this thread's tip; its *send of a draft with Infinity fetches
+nothing* rests on fix (c). Whether `trigger.ts` is used by the old code too: a change to it must
+keep the old code's tests green.
+**Size:** medium.
+
+### 4b. Verbs and guards
+
+> From the Coach's thread 4, split as it asks: fixes (d), (e), (f), (g), and these tests, in `storable.test.ts` and `box.test.ts`: `edit` with a sidecar patch stages a record at `nextRevision` with `written_at` now and leaves central untouched, three times in a row staging the same `revision_tok` against central's revision, a fresh one after a `send` whatever its outcome, and a fresh one after central changes; `send` is `edit` then `put`, returning `this` once the answer is adopted; `send` of a sparse box with no whisper refuses from `makeStaged`, `bad_option`, and `send` of a draft with `maxMillisSinceRefresh: Infinity` fetches nothing; `del` stages a tombstone then deletes; a second `del` passes the guards and deletes again at the tombstone's revision, and `del` of a damaged box deletes at the ouchstone's revision (what the fake store answers to each is the thread's to decide and record: a tombstone at the next revision reads `gone`, the same tombstone reads `same`); *The absent contract*: `unsealWhisper` of a gone or damaged box refuses `absent_box` from its guard, ahead of the seal's `unexpected_error`; rebirth: `edit` on a deleted or damaged box passes the guards and the record made is alive at the next revision with `registered_at` now, a second `edit` over that staged rebirth keeps its `registered_at`, and `send` puts it over the tombstone's revision; `receive` of a newer record registered at another time moves the own prop; locked: `demandUnlocked` refuses `vault_locked` from `edit`, `send`, `del` and `unsealWhisper` at their entry, and a lock that comes down after entry, during `makeStaged` or between `edit` and `put`, stops nothing, `box.whisper` reads `LOCKED`, `isLocked` follows the listing's word; the `try` forms resolve outcomes and never reject. ~~`isWatchable` is a plain get/set, true until set.~~
+>
+> The Coach's fixes, verbatim from thread 4: (d) `send` needs no record at all, and no verb checks the lock mid-flight (the Coach, 2026-10-30: an operation that passed its guards completes even if the lock comes down before it returns): `ensureReadyToSend` and `demandReadyToSend` go, `send` is `edit` then `put` with nothing between, and the `demandReadyToEdit()` after `makeStaged` in `edit` goes with its drift comment; `demandFull` and `notFullError` go if nothing else calls them, since `edit`'s `makeStaged` already hands back a full record or refuses and `listing.put`'s `recordOf` refuses a duck that is not one; `demandReadyToDel` is `demandUnlocked` alone, since deleting a deleted or damaged thing is no error. (e) `registered_at` follows the record in hand: it leaves the non-writable tattoo (which keeps the scope and `vault_tok`) and joins the revision props `assign` sets, and `edit`'s base takes `registered_at: now` where the record in hand is a tombstone, since a thing edited back to life is registered anew; where an earlier edit already staged the rebirth, the record in hand is that staged record and its `registered_at` stands. (f) The next revision is stable until it is sent: `nextRevision(ante)` memoizes what it mints, in a private field holding the revision and the `revision_tok` of the `ante` it followed, and answers the same revision while `ante`'s tok is the one memoized; `send` and `del` clear the field before they hand the record to the listing, so edit, edit, edit, send, edit, edit stages two toks, not five, and a failed send is followed by a fresh one (the stamp binds the tok, so it is settled before `makeStaged` seals, as `edit` already orders it). No new method: the field, the check in `nextRevision`, and one assignment in each of `send` and `del`. (g) The box's guard pairs exist ahead of the seal: `ensureReadyToUnsealWhisper(opts)` hydrates then `demandReadyToUnsealWhisper()`, which is `demandUnlocked().demandPresent().demandFull()`, called by `unsealWhisper` in place of its `hydrate` and `demandUnlocked` lines; `ensureReadyToSeal` and `demandReadyToSeal`, the latter `demandUnlocked()`, called by nothing yet.
+
+*Orchestrator:* Label `verbs_guards`. Struck test moved to thread 3. Touches `storable.ts`
+(guards, `edit`, `send`, `del`, `nextRevision`, `assignInitialProps`, `assign`, `revisionPropsOf`),
+`box.ts` (`unsealWhisper`, the new guard pairs; `#unseal` still calls `demandFull`, so `demandFull`
+likely stays), `models-shapes.ts` if a revision-props shape lists `registered_at`,
+`tests/models/storable.test.ts`, `tests/models/box.test.ts`, the loosened file (rebirth's
+`registered_at`, the tombstone keeping the buried record's time, the brief's *For the Coach*).
+**Levels:** worker `opus`; review `high` (the guards and the lock are what `notes/guarantees.md`
+speaks to).
+**Depends on:** 4a (cut from its tip).
+**Look-ahead:** thread 8 hands `ifPresent` from `send` to `listing.put`; `send`'s opts carry it.
+Thread 5's own-keys test counts the tattooed keys; fix (e) moves `registered_at` from the
+non-writable tattoo to the writable revision props without changing the count, which thread 5
+should not depend on beyond that.
+**Size:** large.
+
+### 5. The snapshot and the props
+
+> **5. The snapshot and the props.** One fix first, the Coach's: the sidecar is not readable while the vault is locked. `LOCKED` becomes `Symbol.for('LOCKED')`, and `box.sidecar` answers the bag `{ [LOCKED]: true }` while locked, so the snapshot's `sidecar` carries it too; unlocked, the sidecar as today, null unless full. `box.whisper` keeps answering the symbol itself. Then, in `box.test.ts` and `storable.test.ts`: `getSnapshot` returns the same frozen object until a `settle` changes it, and a `settle` that changes nothing notifies nobody; `subscribe` returns an unsubscribe that works; the box snapshot carries the scope, the revision props, `registered_at`, `written_at`, `sidecar` (null unless full, the locked bag while locked), `full`, `present`, `exposed`; after `receive`, `edit` and `del` the own props `revision_tok`, `revision_seq`, `written_at` and `registered_at` follow the record in hand, and `scope` and `vault_tok` never change (the tattoo is non-writable); `toJSON` is the sparse form of central; `cacheable` is `{ ...sparse, central, staged }` with `staged` null when nothing is staged and no sidecar on the sparse or on any tombstone; a box's own enumerable keys are exactly the nine the base tattoos, and `scope` is a getter over one frozen object. Depends on 1. Size: small.
+
+*Orchestrator:* Label `snapshot_props`. Touches `box.ts` (`LOCKED`, `sidecar`, `BoxSnapshot`'s
+`sidecar` type), `tests/models/box.test.ts`, `tests/models/storable.test.ts`.
+**Caution:** `registered_at` following the record in hand after `edit` over a tombstone is thread
+4b's fix (e). This thread runs beside 4b, so it tests `registered_at` only where the code today
+already moves it (`receive`); the rebirth case is 4b's.
+**Levels:** worker `sonnet`; review `medium` (the locked sidecar is a read path while locked).
+**Depends on:** 1.
+**Size:** small.
+
+### 7. The dna at `build`'s door
+
+> **7. The dna at `build`'s door.** Today a dna is checked only when it reaches the constructor, through `boxscope.parse` inside `makeThing`: a one-letter boxlabel refuses `bad_record` from deep in the stack. Per VOCABULARY.md *duckish* and CLAUDE.md *Validate at each module entrypoint*, `BoxListing.build` parses its dna on its first line with a `boxDna` checker in `models-shapes.ts` beside `boxRecord`: the scope required, the record's props optional, `whisper` optional, the factory's own props (`fmt`, `am`, `vault_tok`, the revision and times) allowed and stripped, refusing `bad_option`. This is the one piece of surface the sprint adds, and it is a validator, not a method. Tests in `box-listing.test.ts`. Depends on 1. Size: small.
+
+*Orchestrator:* Label `box_dna`. Touches `models-shapes.ts` (`boxDna`, made in a `Checkers`,
+`Checker` or `objCheck` call, STYLE.md *Validation*), `box-listing.ts` (`build`'s first line),
+`tests/models/box-listing.test.ts`, `tests/models/models-shapes.test.ts`.
+`build` takes a dna or a record (`BoxDna | Fetched`); the checker applies to the dna branch only.
+**Levels:** worker `opus` (the Coach's suggestion); review `medium`.
+**Depends on:** 1.
+**Size:** small.
+
+### 8. `ifPresent`
+
+> **8. `ifPresent`.** The policy as it is needed now (the Coach, 2026-10-30), and no more of it. `ifPresent: 'fail' | 'fetch' | 'replace'` on `send`, handed through `listing.put` to `store.put(record, expected, ifPresent)` and judged by storage, where the record is: it applies when `expected` is null, a thing this device believes never stored, and storage holds one: `'fail'`, the default and what happens today, refuses `stale_write` carrying the stored record; `'fetch'` writes nothing and answers the stored record, so the staged is dropped as any newer record drops it (the old `ensureBox`); `'replace'` writes over it. With `expected` given, the compare-and-set stands whatever `ifPresent` says. The fake store honors all three. Tests in `listing.test.ts`, `box-listing.test.ts` and `box.test.ts`; the `ifPresent` row of the README's `putBox` promises is thread 6's to list as touched. Depends on 3 and 4. Size: small to medium. Open for the Coach: whether `ifPresent` should also speak when `expected` is given and stale, where `'fetch'` would be today's `stale_write` without the throw.
+
+*Orchestrator:* Label `if_present`. Touches `models-shapes.ts` (`ifPresent` exists already, with
+`sendOpts`), `storable.ts` (`send`), `listing.ts` (`put`), the `Store` type,
+`tests/test-helpers/models-world.ts` (the fake store honoring all three),
+`tests/models/listing.test.ts`, `box-listing.test.ts`, `box.test.ts`.
+**Levels:** worker `opus`; review `medium`.
+**Depends on:** 3 and 4b. Cut from the top of the two once restacked into a line.
+**Size:** small to medium.
+
+### 6. What this model guarantees
+
+> **6. What this model guarantees.** No code. Read `notes/guarantees.md` *The guarantees* and the README sections in *Read first*, then `tests/loosened/loosened.test.ts` and threads 2 through 5 and 8's thread files, and write `whiteboard/20261028-storable_base/guarantees-of-the-model.md`: a table, one row per guarantee or promise, columns `Guarantee | Old source | Model | Evidence`, where *Model* is `kept`, `changed`, `not yet` or `dropped` and *Evidence* names a test by file and title or a line of code. Every describe of the loosened file appears as `changed` or `dropped` with the Coach's decision left blank; every firm loosening appears as `changed` with the Coach's word as its evidence. Nothing about the seal beyond noting the rows that wait on it. Depends on 2, 3, 4, 5, 8. Size: small, `opus`.
+
+*Orchestrator:* Label `model_guarantees`. Runs last, on the restacked line of every other thread,
+so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
+"thread 4", and 7's too.
+**Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8.
+**Size:** small.
+
+## Order
+
+Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
+and 4b have filed and are restacked into a line. Thread 6 last, on the whole line.
+
+## For the Coach
+
+* The brief's own *For the Coach* list is unchanged; threads pin those behaviours in the loosened
+  file rather than settle any of them.
+* Old *What a* / *What the* comments in `src/models/`: an open matter in the sprint doc.
