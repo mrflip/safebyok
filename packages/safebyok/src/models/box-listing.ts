@@ -1,6 +1,6 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB, the device cache and the vault. */
 
-import { VaultError } from '../errors'
+import { type RefusalMeta, VaultError } from '../errors'
 import type { Whisper } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
@@ -77,13 +77,18 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return new VaultError('absent_box', `No box is stored under the label ${scope.boxlabel}.`)
   }
 
-  /** What `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */
+  /** The record `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */
   protected storedInStaleRefusal(err: VaultError): Fetched<BoxRecord, BoxSparse> | null {
     const stored: unknown = err.meta?.box_stored
     const full = boxRecord.safeParse(stored)
     if (full.success) { return full.data }
     const sparse = boxSparse.safeParse(stored)
     return sparse.success ? sparse.data : null
+  }
+
+  staleMetaOf(stored: Fetched<BoxRecord, BoxSparse>): RefusalMeta {
+    // `RefusalMeta` still names the old box forms; the models' records are the ones `storedInStaleRefusal` takes back.
+    return { box_stored: stored as unknown as Required<RefusalMeta>['box_stored'] }
   }
   // --
 }

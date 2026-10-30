@@ -372,6 +372,28 @@ things surrounding the very muddy meaning of rollback." The watermark, the devic
 rule in VAULTDB.md (#279), the vault epoch and `stale_write` each guard a different "going
 backwards". Settle one definition, say which mechanism guards which case, and name each for it.
 
+### An edit is never saved to the device cache
+
+The Coach (2026-10-30, the storable sprint, thread 9): "yes, TODO". The models' listing saves an
+instance to the device cache in its `settle(thing)`, which runs on each delivery and each `build`;
+`Storable.edit` settles the instance alone and tells the listing nothing, so a staged edit not yet
+sent lives only in memory, and a reload revives the instance from the copy saved before the edit:
+the edit is lost. The design question: whether `edit` hands the thing to the listing's `settle` (the
+staged record holds the whisper sealed, never in the clear, so the copy is safe to keep), and what a
+revived staged edit means once its revision may have been passed by another device meanwhile.
+
+### Flush and remake every instance of a vault made anew
+
+The Coach (2026-10-30, the storable sprint, thread 9): "If box receives a record with a different
+vault_tok it should throw unexpected error, I'm pretty sure we will want to flush all instances and
+remake them". Today a storable's `vault_tok` is fixed at its birth, and a record under another one
+throws 'unexpected_error' from `reconcileCentral`, before any row, to the fetch, put, del or build
+that delivered it, or to `onBadNews` from a notice or a refresh the timer launches. Nothing remakes
+anything: the host must load the vault again. The design question: who notices a vault made anew
+(the vault listing on the vault's own record, or a box listing on its first box), and how every
+instance of the old life is let go, its listeners told, and the listing rebuilt under the new
+`vault_tok`, with its device cache cleared.
+
 ## Potential Optimizations
 
 ### A storage read begun before a create can undo it

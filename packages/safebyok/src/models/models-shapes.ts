@@ -208,7 +208,7 @@ export type StagedForms<RecordT, SparseT> =
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'del', patch?: undefined, rcvd?: undefined }>)
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: ReceivedAct, patch?: undefined, rcvd: Fetched<RecordT, SparseT> }>)
 
-/** What `settle` and `receive` hand back: `badnews`, the refusals to tell the host once. The copy to cache is the instance's `cacheable`. */
+/** What `settle` and `receive` hand back: `badnews`, the refusals to tell the host once. The copy to cache is the instance's, made by its {@link ToCacheable} method. */
 export type Settled = Z.infer<typeof settled>
 // --
 
@@ -252,12 +252,14 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  * The scope is required. The record's own props are optional: `sidecar`, `whisper_codec` and
  * `whisper_schema_version` take their defaults where missing or undefined, the sealed parts are
  * kept where given, and `whisper`, the whisper to seal in once built, may be given. The props the factory
- * controls, `fmt`, `am`, `vault_tok`, the revision and the times, may be given, must pass their
- * checks, and are stripped. A field it does not take refuses, as a bag a person typed would.
+ * controls, `fmt`, `am`, `vault_tok`, `revision_tok` and the times, may be given, must pass their
+ * checks, and are stripped. A field it does not take refuses, as a bag a person typed would, and
+ * `revision_seq` among them: input carrying one is a record, which `build` holds to the record check.
  *
  * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...' })         // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: 'sk-ant-...' }
  * @example boxDna.parse({ ...scope, am: 'x', vault_tok: 'tok-u1' })   // the scope and the defaults: am and vault_tok are the factory's
  * @example boxDna.parse({ ...scope, boxlabel: 'B' })                  // throws 'bad_option', naming boxlabel
+ * @example boxDna.parse({ ...scope, revision_seq: 3 })                // throws 'bad_option': a dna carries no revision_seq
  */
 export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel, box_key_wrapped, whisper_ciphered }) => obj({
   applabel, user_id, vaultlabel, boxlabel,
@@ -268,8 +270,8 @@ export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlab
   whisper_ciphered:       whisper_ciphered.optional(),
   whisper:                whisper.optional(),
   fmt:                    lit(BoxFormat).optional(),
-  ...sparseBase.partial().shape,
-}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, revision_seq: _revision_seq, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option', [FX])
+  ...sparseBase.omit({ revision_seq: true }).partial().shape,
+}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option', [FX])
 
 /** A box's dna as {@link boxDna} hands it back: the scope, the record's own props with their defaults filled, and the whisper where one was given. */
 export type BoxDnaFilled = Z.output<typeof boxDna>
@@ -340,7 +342,7 @@ export type EditOpts = TimelyOpts
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, IsListing, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, IsListing, isListing, ToCacheable, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
@@ -352,6 +354,9 @@ export const IsListing: unique symbol = Symbol('safebyok.listing')
 export const isListing = (val: unknown): val is { [IsListing]: true } => (
   typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
 )
+
+/** The key of a storable's method that makes the copy its listing saves to the device cache. A symbol no entry point exports, so a host holding a box or a vault does not reach the copy, staged record and all; the listing and the tests' `cacheableOf` do. */
+export const ToCacheable: unique symbol = Symbol('safebyok.toCacheable')
 
 /** The check of whether the world a listing lives in is unlocked or locked: one of {@link lockStateVals}. Its `parse` refuses 'unexpected_error', as a world that answers otherwise is a bug. */
 export const lockState = Checker(({ oneof }) => oneof(lockStateVals), 'unexpected_error')

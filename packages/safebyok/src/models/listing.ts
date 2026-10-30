@@ -1,11 +1,11 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the device cache they are warmed from, the watch on storage, and every storage call made for that kind of thing. */
 
 import { randomId } from '../crypto'
-import type { VaultError } from '../errors'
+import type { RefusalMeta, VaultError } from '../errors'
 import { alreadyHeldError } from '../helpers/throwers'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -251,7 +251,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Save `thing`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again. A save that is refused is told to `onBadNews`, not thrown. */
   protected async settle(thing?: ThingT): Promise<void> {
     try {
-      if (thing !== undefined) { await this.#cache.save(thing.cacheable) }
+      if (thing !== undefined) { await this.#cache.save(thing[ToCacheable]()) }
     } catch (err) {
       this.tellBadNews([refusalOf(err)])
     } finally {
@@ -286,7 +286,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal
+  // == [Defined by the concrete listing]: scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal, staleMetaOf
 
   protected abstract scopepathOf(scope: ScopeT): string
   /** The scope of `duck`, a record in any form or a thing ducking as one; refuses anything else. */
@@ -302,6 +302,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract absentRefusal(scope: ScopeT): VaultError
   /** The record a 'stale_write' refusal carries, what storage holds; null for none, or for a record that fails its check. */
   protected abstract storedInStaleRefusal(err: VaultError): Fetched<RecordT, SparseT> | null
+  /** The `meta` of a 'stale_write' this device makes itself, carrying `stored`, the record storage now holds, where {@link storedInStaleRefusal} finds it. */
+  abstract staleMetaOf(stored: Fetched<RecordT, SparseT>): RefusalMeta
   // --
 }
 // --

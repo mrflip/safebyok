@@ -536,6 +536,8 @@ describe("The checks of the world and the listing", () => {
 describe("MSX.boxDna", () => {
   const filled = { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
+  // Thread 9: a dna carries no revision_seq, so the factory's props stop at the rest.
+  const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
   holdsCases(MSX.boxDna, 'bad_option', [
     // the scope, and what a caller may give beside it:
@@ -545,7 +547,7 @@ describe("MSX.boxDna", () => {
     [{ ...scope, sidecar: { account: 'work' } },            true,  'passes a sidecar'],
     [{ ...scope, box_key_wrapped, whisper_ciphered },       true,  'passes the sealed parts of a full record'],
     [{ ...scope, whisper: undefined, sidecar: undefined },  true,  'passes optional props given as undefined'],
-    [{ ...scope, ...baseProps, fmt: MSX.BoxFormat },        true,  'passes the props the factory controls, each passing its check'],
+    [{ ...scope, ...factoryProps, fmt: MSX.BoxFormat },     true,  'passes the props the factory controls, each passing its check'],
     // the scope refused:
     [{ ...scope, boxlabel: undefined },                     false, 'refuses a dna with no boxlabel'],
     [{ ...scope, boxlabel: 'B' },                           false, 'refuses a boxlabel that is no label, as its third example shows'],
@@ -561,7 +563,7 @@ describe("MSX.boxDna", () => {
     [{ ...scope, fmt: 8 },                                  false, 'refuses another format'],
     [{ ...scope, am: 'z' },                                 false, 'refuses an am it does not know'],
     [{ ...scope, vault_tok: 7 },                            false, 'refuses a vault_tok that is no string'],
-    [{ ...scope, revision_seq: 'one' },                     false, 'refuses a revision_seq that is no integer'],
+    [{ ...scope, revision_seq: 1 },                         false, 'refuses a revision_seq, which a dna never carries, as its fourth example shows'],
     [{ ...scope, registered_at: 5 },                        false, 'refuses a registered_at that is no epoch'],
     // a bag a person typed:
     [{ ...scope, sidcar: {} },                              false, 'refuses a field it does not take, being strict'],
@@ -577,9 +579,9 @@ describe("MSX.boxDna", () => {
   })
 
   it("strips the props the factory controls, as its second example shows", () => {
-    const parsed = MSX.boxDna.parse({ ...scope, ...baseProps, fmt: MSX.BoxFormat })
+    const parsed = MSX.boxDna.parse({ ...scope, ...factoryProps, fmt: MSX.BoxFormat })
     expect(parsed).to.deep.equal(filled)
-    expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at')
+    expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
   })
 
   it("fills a default for a prop given as undefined", () => {
