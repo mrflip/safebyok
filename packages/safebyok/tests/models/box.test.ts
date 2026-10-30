@@ -6,7 +6,7 @@ import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tom
 
 const held = useModelsWorld()
 
-// == [Receive]: success noted on a whole record, the own props following
+// == [Receive]: success noted on a whole record, vault_tok and registered_at over a tombstone
 
 describe("box.receive(rcvd): a whole record makes the box timely", () => {
   const ReceivedCases = [
@@ -45,17 +45,40 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   }
 })
 
-describe("box.receive(rcvd): the own props follow a newer record", () => {
-  it("moves registered_at to a newer record's, registered at another time", async () => {
+describe("box.receive(rcvd): vault_tok and registered_at, set over a tombstone", () => {
+  it("keeps registered_at over a newer living record registered at another time", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
-    expect(box.registered_at).to.eq(T0 + 7)
+    expect(box.registered_at).to.eq(T0)
+    expect(box.revision_seq).to.eq(2)
   })
 
-  it("moves vault_tok to a newer record's, under another vault_tok", async () => {
-    const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-other' }))
-    expect(box.vault_tok).to.eq('vault-tok-other')
+  it("takes registered_at and vault_tok from a record received over a tombstone held", async () => {
+    const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', registered_at: T0 + 7, vault_tok: 'vault-tok-other' }))
+    expect(box).to.include({ registered_at: T0 + 7, vault_tok: 'vault-tok-other', revision_seq: 3 })
+  })
+
+  const OtherVaultCases = [
+    [2, 'a newer record'],
+    [0, 'an older record, which the revisions of another life of the vault do not order'],
+  ] as const
+  for (const [seq, blurb] of OtherVaultCases) {
+    it(`refuses 'vault_remade' for ${blurb} under another vault_tok over a box held alive, keeping its own copy`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      const { central } = box.cacheable
+      TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'vault_remade')
+      expect(box.cacheable.central).to.eq(central)
+      expect(box.vault_tok).to.eq('vault-tok-u1')
+    })
+  }
+
+  it("refuses 'vault_remade' from a fetch that meets a record under another vault_tok", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
+    await TH.expectRefusal(box.fetch(), 'vault_remade')
+    expect(box.revision_seq).to.eq(1)
   })
 })
 // --
@@ -114,6 +137,17 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       expect(box.hasStaged).to.be.false
     })
   }
+
+  it("keeps the own registered_at over an edit made while a del is in flight, central being alive, though the record it stages is registered now", async () => {
+    const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.willDel(() => new Promise(() => undefined))
+    void box.del()
+    await vi.advanceTimersByTimeAsync(0)
+    held.mw.setNow(T0 + 5000)
+    await box.edit({ whisper: 'sk-test-0000' })
+    expect(box.registered_at).to.eq(T0)
+    expect(box.cacheable.staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+  })
 })
 // --
 
