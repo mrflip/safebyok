@@ -1370,7 +1370,7 @@ describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile c
     })
   }
 
-  it("carries a central the listing reads back as storage's own 'stale_write' would carry it", async () => {
+  it("carries a central where `storedInStaleRefusal` finds it, as storage's own 'stale_write' would carry it", async () => {
     const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
     const err = await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
     const { listing } = box as unknown as { listing: { storedInStaleRefusal: (err: VaultError) => unknown } }
