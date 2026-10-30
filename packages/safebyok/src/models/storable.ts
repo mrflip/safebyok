@@ -333,9 +333,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * * A damaged record delivered skips, whatever central is, a deletion included: what storage holds failed its checks
    *   here, so it tells this device nothing to weigh against its own copy.
    * * A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
-   *   revision, so central becomes it and the staged is dropped. This includes nothing stored (`receive(null)`) for a
-   *   thing held damaged.
-   * Only a deletion against a living record, either way round, refuses 'record_conflict'.
+   *   revision, so central becomes it and `reconcileStaged` drops the staged. This includes nothing stored
+   *   (`receive(null)`) for a thing held damaged.
+   * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
+   * refuses another tok at the same seq before any row is weighed.
    *
    * | age   | rcvd   | central | policy                   | central after |
    * | ----- | ------ | ------- | ------------------------ | ------------- |
