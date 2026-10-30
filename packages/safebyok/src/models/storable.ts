@@ -16,7 +16,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw new VaultError('record_conflict', 'Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again finds the same disagreement: storage lost or rewrote the record, and the storage adapter is where to look.')
+    throw new VaultError('record_conflict', 'Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again finds the same disagreement until what storage holds changes. Storage lost or rewrote the record, and the storage adapter is where to look.')
   }
   return 'same'
 }
@@ -443,7 +443,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
 // == [Helpers]: OneRevisionTwoFates, revisionPropsOf, tattoo
 
-const OneRevisionTwoFates = 'Storage and this device disagree about one revision of a record: one of them holds it deleted and the other holds it alive. This device kept its own copy and did not take in the one storage sent. Fetching the record again finds the same disagreement: storage lost or rewrote the record, and the storage adapter is where to look.'
+const OneRevisionTwoFates = 'Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy. Fetching the record again finds the same disagreement until what storage holds changes. Storage lost or rewrote the record, and the storage adapter is where to look.'
 
 /** The own props that follow the record in hand. */
 const revisionPropsOf = ({ vault_tok, revision_tok, revision_seq, written_at }: Revision & Times & Vaulted): Revision & Vaulted & Pick<Times, 'written_at'> => ({ vault_tok, revision_tok, revision_seq, written_at })
