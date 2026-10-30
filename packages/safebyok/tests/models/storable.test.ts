@@ -121,7 +121,7 @@ describe("storable.hydrate(opts): the world first, and one fetch at a time", () 
   it("rejects with the world's refusal, fetching nothing", async () => {
     const { box } = await timelyBoxOf(1000)
     held.mw.setNow(T0 + 1000)
-    held.mw.willEnsureTimely(() => Promise.reject(new VaultError('storage_unavailable', 'The vault could not be fetched.')))
+    held.mw.willEnsureTimely(() => Promise.reject(new VaultError('storage_unavailable', "The vault could not be fetched.")))
     await expect(box.hydrate()).rejects.toThrow(/could not be fetched/)
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
@@ -150,7 +150,7 @@ describe("storable.hydrate(opts): the world first, and one fetch at a time", () 
 describe("storable.hydrate(opts): after a failed fetch", () => {
   it("schedules no launch after the scheduled one fails, and the next hydrate launches on demand", async () => {
     const { box } = await timelyBoxOf(1000)
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', 'The store could not be reached.')))
+    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
     await held.mw.advance(800)
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(vi.getTimerCount()).to.eq(0)
@@ -163,7 +163,7 @@ describe("storable.hydrate(opts): after a failed fetch", () => {
 
   it("rejects a hydrate whose fetch fails with its refusal, scheduling no launch, and launches again on the next", async () => {
     const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', 'The store could not be reached.')))
+    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
     await expect(box.hydrate()).rejects.toThrow(/could not be reached/)
     expect(vi.getTimerCount()).to.eq(0)
     await box.hydrate()

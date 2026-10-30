@@ -10,7 +10,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   const ReceivedCases = [
     // whole:
     [() => fullBoxRecord(),                true,  'a full record'],
-    [() => tombstoneBoxRecord(),           true,  'a deletion\'s tombstone'],
+    [() => tombstoneBoxRecord(),           true,  "a deletion's tombstone"],
     [() => tombstoneBoxRecord({}, 'd'),    true,  'a damaged record, as the tombstone storage hands back'],
     [() => null,                           true,  'nothing stored, which reads as a tombstone'],
     // not whole:
