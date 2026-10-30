@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
+import { Listing } from '../../src/models/listing'
 import * as TH from '../test-helpers'
 import { boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
@@ -298,11 +299,115 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.callsOf('save')).to.have.lengthOf(2)
     })
 
-    it("makes the snapshot even when the cache refuses the save, and throws the refusal", async () => {
+    it("makes the snapshot inside receive, before the save; a save refused is told to onBadNews, not thrown", async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.willSave(() => { throw new VaultError('unexpected_error', "The cache is full.") })
-      await TH.expectRefusal(listing.build(fullBoxRecord()), 'unexpected_error')
+      let heardAtSave = -1
+      held.mw.willSave(() => {
+        heardAtSave = listing.snapshot.length
+        throw new VaultError('unexpected_error', "The cache is full.")
+      })
+      const box = await listing.build(fullBoxRecord())
+      expect(heardAtSave).to.eq(1)
+      expect(listing.at(box.scope)).to.eq(box)
       expect(listing.snapshot).to.have.lengthOf(1)
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    })
+
+    it("makes the snapshot of a build(dna) after the save, which holds nothing back: a save refused is told", async () => {
+      const listing = boxListingOf(held.mw)
+      let heardAtSave = -1
+      held.mw.willSave(() => {
+        heardAtSave = listing.snapshot.length
+        throw new VaultError('unexpected_error', "The cache is full.")
+      })
+      const box = await listing.build({ ...scopeOf() })
+      expect(heardAtSave).to.eq(0)
+      expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    })
+  })
+
+  describe("a refusal met in delivering a record", () => {
+    it("is told to onBadNews and not thrown to a fetch, which has the instance back as it stands", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord())
+      held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-other' }))
+      held.mw.clearCalls()
+      const got = await listing.fetch(scopeOf())
+      expect(got).to.eq(box)
+      expect(box.revision_tok).to.eq('rev-a1')
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['corrupt_record'])
+      expect(held.mw.callsOf('save')).to.have.lengthOf(1)
+    })
+
+    it("is told to onBadNews and not thrown to a build(record), which has the instance back", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord())
+      const again = await listing.build(fullBoxRecord({ revision_tok: 'rev-other' }))
+      expect(again).to.eq(box)
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['corrupt_record'])
+    })
+
+    it("is told to onBadNews and not thrown to a put", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord())
+      held.mw.willPut({ scope: box.scope, ok: true, val: fullBoxRecord({ revision_tok: 'rev-other' }), world: null })
+      expect(await listing.put(box)).to.eq(box)
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['corrupt_record'])
+    })
+
+    it("lets a 'stale_write' reach its caller as it came, the carried record's conflict going to onBadNews", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord())
+      held.mw.willPut(held.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
+      const err = await TH.expectRefusal(listing.put(box), 'stale_write')
+      expect(err.meta).to.have.property('box_stored')
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['corrupt_record'])
+    })
+
+    it("leaves the answer's own refusals to the caller: a world's, a refusal answer, the absent refusal", async () => {
+      const listing = boxListingOf(held.mw)
+      held.mw.willGet(held.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Down."), null))
+      await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_unavailable')
+      await TH.expectRefusal(listing.fetch(scopeOf()), 'absent_box')
+      expect(held.mw.badnews).to.deep.equal([])
+    })
+
+    it("is told, from a hydrate that is refused, by hydrateAll, which resolves", async () => {
+      await seededCache()
+      const listing = boxListingOf(held.mw)
+      await listing.hello()
+      held.mw.clearCalls()
+      held.mw.willGet(held.mw.refusalOf(scopeOf('full_box'), new VaultError('storage_unavailable', "Down."), null))
+      await listing.hydrateAll({ maxMillisSinceRefresh: 0 })
+      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_unavailable'])
+    })
+  })
+
+  describe("one instance for each scope", () => {
+    it("keeps an instance held through hello: its cached copy is not revived over it", async () => {
+      await seededCache()
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord({ boxlabel: 'full_box', revision_tok: 'rev-a2', revision_seq: 2 }))
+      await listing.hello()
+      expect(listing.at(scopeOf('full_box'))).to.eq(box)
+      expect(box.revision_seq).to.eq(2)
+      expect(listing.things).to.have.lengthOf(3)
+    })
+
+    it("lets go the instance a build(dna) over its scope replaces: a change of it no longer makes the listing's snapshot again", async () => {
+      const listing = boxListingOf(held.mw)
+      const old = await listing.build(fullBoxRecord())
+      const replacement = await listing.build({ ...scopeOf() })
+      expect(listing.at(scopeOf())).to.eq(replacement)
+      const remade = vi.spyOn(Listing.prototype, 'things', 'get')   // the snapshot is made from `things`
+      try {
+        await old.edit({ sidecar: { note: 'orphan' } })
+        expect(remade).to.not.have.been.called
+      } finally {
+        remade.mockRestore()
+      }
+      expect(listing.snapshot).to.deep.equal([replacement.getSnapshot()])
     })
   })
 
