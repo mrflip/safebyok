@@ -124,6 +124,9 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.
+  Thread 10 (eight items, sonnet) ran with a *keep your context lean* paragraph in its handoff
+  (search before reading; read by line range; one test file while building, justify once; `tail`
+  long output; never read `storable.test.ts` whole) and did not compact. Every handoff carries it.
 
 ## Discoveries
 
