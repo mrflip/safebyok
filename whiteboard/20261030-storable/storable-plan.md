@@ -159,6 +159,12 @@ absent goes to `onBadNews`; and, from 4b's second review, the trigger notes succ
 `record_conflict` wherever the throw rule changes it. Worker `opus` (the rulings turn on
 judgment); review `medium`.
 
+*Review (third, over the rework f1f715fc...71d19b59, medium):* fixed (#372). One fix: `#bornOf`
+renamed `#makeThingFor` (a make verb; it constructs) (28190db2). The worker's choices hold;
+`#buildOrReceive` holds before its first await, so no double build. The rework's push was refused
+by the permission check (a TOP row). Left: the timer stopping after a refresh that is not a
+success (thread 10, a row); the rest to thread 10.
+
 ### 4a. Hydrate and timeliness
 
 > From the Coach's thread 4, split as it asks ("split hydrate and timeliness from the verbs and guards"): fixes (a), (b), (c), and these tests, in `storable.test.ts` and `box.test.ts`, with the fake clock: `hydrate` fetches when the record is untimely by `maxMillisSinceRefresh` and not when timely, fetches a sparse central however timely and never a never-stored one for that reason, calls made during a fetch join it, the world's `ensureTimely` is called first every time; `maxMillisSinceRefresh: Infinity` fetches nothing, for a thing never fetched too; after a failed fetch no launch is scheduled and the next verb launches on demand; a horizon past `MaxTimerMillis` arms no timer and still reads stale by its value once passed; success is noted on a full record and on a tombstone, not on a sparse one.
@@ -275,7 +281,7 @@ needed for something, in which case narrowly limit its contract)". **Thread 8 is
 `ifPresent`** (`ifPresentVals`, `ifPresent`, `sendOpts`' field, the fake store's third argument,
 any doc naming it), unless a survey finds something that needs it, in which case narrow its
 contract and say why. Label `if_present` kept. Worker `sonnet`; review `low`. Depends on 4b's
-rework (it touches `send`'s opts). Size: small.
+rework (it touches `send`'s opts); cut from 3's filed tip, the top of the line. Size: small.
 
 ### 9. The Coach's rulings of 2026-10-30, the rest
 
@@ -299,8 +305,27 @@ rework (it touches `send`'s opts). Size: small.
 8. The inline thrower sentences in `storable.ts`/`box.ts` (`movedUnderEditError`,
    `vaultRemadeError`, `notFullError`, `lockedError`) move to `phrases.ts` (STYLE.md *What a
    refusal says*).
-Tests beside each. Worker `opus`; review `medium`. Depends on 3's and 4b's reworks. Size: small
-to medium.
+Tests beside each. Worker `opus`; review `medium`. Depends on 8 (cut from its tip). Size: medium.
+
+### 10. The listing's loose ends
+
+*Orchestrator (2026-10-30):* from thread 3's third review, split from 9 so neither outgrows one
+context. Label `listing_ends`.
+1. *YOLO, a Coach row:* the storable reschedules its timer after any launch that completes,
+   without noting success, so a box answered by an older record stays untimely and keeps trying at
+   its horizon; a refused launch still stops the timer.
+2. The listing calls the host's `onBadNews` guarded, as Vault's `#handlerThrew` does, so one that
+   throws inside the timer's callback is no unhandled rejection.
+3. `MSX.answer` (or `#deliver`) refuses `bad_record` when a record's scope differs from
+   `answer.scope`.
+4. `hello` checks what `#cache.load()` resolves to as an array of cacheables; a malformed result
+   is a cache miss, told to `onBadNews`.
+5. `Storable` is handed a tell function when it is made; `Listing.tellBadNews` goes back to
+   protected.
+6. A refusal reaches `onBadNews` once when `hydrate` or `hydrateAll` joins a timer launch
+   (bad-news item 8).
+Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its tip: both touch
+`listing.ts`). Size: small to medium.
 
 ### 6. What this model guarantees
 
@@ -310,12 +335,12 @@ to medium.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8 and 9 on top, then 6. 4b's and 3's reworks build on the line; 8 and 9 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
